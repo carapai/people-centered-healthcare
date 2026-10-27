@@ -4,7 +4,7 @@ _Last updated: 2026-10-27_
 
 ## Phase
 
-Phase 0 — Research and Wayfinder (charting complete; research in progress). No implementation has started.
+Phase 0 — Research and Wayfinder. Charting and all 11 research tickets are complete; grilling tickets are next. No implementation has started.
 
 ## Wayfinder map
 
@@ -18,21 +18,30 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 
 | Ticket | Branch | Status |
 |---|---|---|
-| What do SurrealDB server and embedded engines guarantee today? (#2) | `research/surrealdb` | running |
-| How do comparable systems run an offline facility server on a LAN? (#3) | `research/facility-edge` | running |
-| What sync designs suit central / edge / desktop hierarchy for clinical data? (#4) | `research/synchronization` | running |
-| What are the options for FHIR R5 resource models, validation and search in Rust? (#5) | `research/fhir-r5` | running |
-| How should offline authentication and authorization work for health workers? (#6) | `research/offline-auth` | running |
-| How do FHIR R5 workflow, SDC extraction and WHO SMART Guidelines fit a generic engine? (#7) | `research/clinical-workflows` | running |
-| What finance, insurance and payment facts constrain the billing design? (#8) | `research/health-financing` | running |
-| What inventory and supply-chain patterns fit facility stock ledgers? (#9) | `research/inventory` | running |
-| What patient matching and MPI approaches suit a national-scale, offline-first registry? (#10) | `research/patient-identity` | queued (batch 2) |
-| What does Tauri v2 offer for embedded local services and secure packaging? (#11) | `research/tauri` | queued (batch 2) |
-| Which TanStack, XState, Ark UI and Panda CSS pieces are stable enough to depend on? (#12) | `research/frontend` | queued (batch 2) |
+| What do SurrealDB server and embedded engines guarantee today? (#2) | `research/surrealdb` | closed |
+| How do comparable systems run an offline facility server on a LAN? (#3) | `research/facility-edge` | closed |
+| What sync designs suit central / edge / desktop hierarchy for clinical data? (#4) | `research/synchronization` | closed |
+| What are the options for FHIR R5 resource models, validation and search in Rust? (#5) | `research/fhir-r5` | closed |
+| How should offline authentication and authorization work for health workers? (#6) | `research/offline-auth` | closed |
+| How do FHIR R5 workflow, SDC extraction and WHO SMART Guidelines fit a generic engine? (#7) | `research/clinical-workflows` | closed |
+| What finance, insurance and payment facts constrain the billing design? (#8) | `research/health-financing` | closed |
+| What inventory and supply-chain patterns fit facility stock ledgers? (#9) | `research/inventory` | closed |
+| What patient matching and MPI approaches suit a national-scale, offline-first registry? (#10) | `research/patient-identity` | closed |
+| What does Tauri v2 offer for embedded local services and secure packaging? (#11) | `research/tauri` | closed |
+| Which TanStack, XState, Ark UI and Panda CSS pieces are stable enough to depend on? (#12) | `research/frontend` | closed |
 
 ## Outstanding decisions
 
-All 18 grilling tickets (#13–#31) are open and require the human in the loop. Unblocked now: **Which bounded context owns each resource, and which deployables ship first?** (#13). The rest unblock as research closes.
+All 18 grilling tickets (#13–#31) and both task tickets (#32, #33) are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+
+1. Which bounded context owns each resource, and which deployables ship first? (#13)
+2. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
+3. How are global and facility-local identifiers minted? (#17)
+4. How do LAN clients find and trust the Facility Edge Node? (#19)
+5. How are terminology, metadata and configuration packaged and published? (#23)
+6. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+
+Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
 ## Known blockers
 
