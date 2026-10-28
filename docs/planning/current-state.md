@@ -55,12 +55,13 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 2 grilling tickets and eight task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
 1. What is the generic workflow engine's definition and execution model? (#24)
-2. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-3. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-4. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
-5. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
-6. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
-7. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
+2. What are the CI/CD, release and production-operations rules? (#31)
+3. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+4. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+5. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+6. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
+7. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
+8. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
 
 Recommended next: What is the generic workflow engine's definition and execution model? (#24). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
 
