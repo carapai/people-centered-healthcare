@@ -4,7 +4,7 @@ This page condenses two research tickets:
 - [How do comparable systems run an offline facility server on a LAN?](https://github.com/carapai/people-centered-healthcare/issues/3), full findings on branch `research/facility-edge`;
 - [What do SurrealDB server and embedded engines guarantee today?](https://github.com/carapai/people-centered-healthcare/issues/2), branch `research/surrealdb`.
 
-It covers process, storage, power and recovery, plus LAN TLS, discovery and enrollment. Decisions: [docs/architecture/facility-edge.md](../architecture/facility-edge.md) (ADR 0007) and [docs/architecture/lan-connectivity.md](../architecture/lan-connectivity.md) (ADRs 0008, 0009).
+It covers process, storage, power and recovery, plus LAN TLS, discovery and enrollment. Decisions: [docs/architecture/facility-edge.md](../architecture/facility-edge.md) and [backup-and-recovery.md](../architecture/backup-and-recovery.md) (ADR 0007) and [docs/architecture/lan-security.md](../architecture/lan-security.md) (ADRs 0008, 0009).
 
 ## Prior art
 

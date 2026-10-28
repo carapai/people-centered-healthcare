@@ -33,26 +33,26 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 ## Completed decisions
 
 - Which bounded context owns each resource, and which deployables ship first? (#13) — see `docs/architecture/resource-ownership.md`, ADRs 0001–0004, `GLOSSARY.md`.
-- What are the crate layers and the dependency rules that enforce them? (#14) — see `docs/architecture/crate-architecture.md`, ADRs 0005–0006.
-- What is the Facility Edge Node's process, storage and recovery model? (#18) — see `docs/architecture/facility-edge.md`, `docs/research/facility-edge.md`, ADR 0007.
-- How do LAN clients find and trust the Facility Edge Node? (#19) — see `docs/architecture/lan-connectivity.md`, ADRs 0008–0009.
+- What are the crate layers and the dependency rules that enforce them? (#14) — see `docs/architecture/dependency-rules.md`, `docs/architecture/crate-catalogue.md`, ADRs 0005–0006.
+- What is the Facility Edge Node's process, storage and recovery model? (#18) — see `docs/architecture/facility-edge.md`, `docs/architecture/backup-and-recovery.md`, `docs/research/facility-edge.md`, ADR 0007.
+- How do LAN clients find and trust the Facility Edge Node? (#19) — see `docs/architecture/lan-security.md`, ADRs 0008–0009.
+- How do staff authenticate and get authorized offline? (#20) — see `docs/architecture/offline-auth.md`, `docs/research/offline-auth.md`, ADRs 0010–0011.
 
 ## Outstanding decisions
 
-14 grilling tickets and three task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+13 grilling tickets and three task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
 1. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
 2. How are global and facility-local identifiers minted? (#17)
-3. How do staff authenticate and get authorized offline? (#20)
-4. Who holds write authority for each resource at central, edge and desktop? (#21)
-5. How are terminology, metadata and configuration packaged and published? (#23)
-6. How do patient matching, self-registration and caregiver delegation work? (#26)
-7. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
-8. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
-9. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
-10. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+3. Who holds write authority for each resource at central, edge and desktop? (#21)
+4. How are terminology, metadata and configuration packaged and published? (#23)
+5. How do patient matching, self-registration and caregiver delegation work? (#26)
+6. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
+7. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
+8. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+9. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
 
-Recommended next, given the Facility Edge priority: How do staff authenticate and get authorized offline? (#20), now unblocked. The power-loss spike (#34) is AFK and can run in parallel.
+Recommended next, given the Facility Edge priority: Who holds write authority for each resource at central, edge and desktop? (#21), which gates the sync protocol. The power-loss spike (#34) is AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -66,4 +66,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **How do staff authenticate and get authorized offline?** (#20) in a grilling session with the user.
+Work the map: resolve **Who holds write authority for each resource at central, edge and desktop?** (#21) in a grilling session with the user.

@@ -11,7 +11,7 @@ LAN discovery and TLS trust are decided in [How do LAN clients find and trust th
 
 ## Process model
 
-- There is one OS service running one binary, `facility-edge` (a runtime crate over `health-edge-runtime`; see [crate-architecture.md](crate-architecture.md)). It has a `--service` mode and a foreground mode for development.
+- There is one OS service running one binary, `facility-edge` (a runtime crate over `health-edge-runtime`; see [crate-catalogue.md](crate-catalogue.md)). It has a `--service` mode and a foreground mode for development.
 - It hosts the Deployable contents from [resource-ownership.md](resource-ownership.md): the operational contexts, plus read-only Registries and Terminology & Metadata.
 - **SurrealDB is embedded** (`kv-rocksdb`, version pinned exactly per the SurrealDB research). The process owns the data directory alone. There is one shared `Surreal` handle per process, and no external tool opens the directory while the node runs.
 - **Durability:** `sync=every` is mandatory, and `never` is rejected at startup. The RocksDB block cache is capped explicitly (default about 25% of RAM) rather than auto-sized.
@@ -41,22 +41,9 @@ LAN discovery and TLS trust are decided in [How do LAN clients find and trust th
 - A **UPS is mandatory**. NUT is used on Linux, and NUT or the vendor agent on Windows. A low-battery signal triggers a graceful stop: drain requests, finish the in-flight transaction, take a final backup if time allows, then stop. Where no UPS signal is available, durability rests on `sync=every`.
 - A power-cut validation spike must pass on Windows NTFS and Linux ext4 before edge storage implementation starts. See the task ticket [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34).
 
-## Backup
+## Backup and recovery
 
-Recovery draws on two sources. **Central** holds everything already synced. **Local backups** cover the window that has not been uploaded, and any outage.
-
-- **What:** a snapshot-consistent logical export, taken through the SurrealDB SDK inside the edge process. It includes the outbox, so un-uploaded work is preserved.
-- **When:** hourly while the facility is active. Retention is 48 hourly and 14 daily copies. An admin can also run it on demand, including to USB. One is taken automatically before every update.
-- **Where:** the second volume, never the data volume.
-- **Protection:** every backup is encrypted with a per-node backup key. The key is escrowed at central (custody details stay in the map's Not yet specified under disaster recovery and key escrow).
-- **Integrity:** every backup is verified after it is written, using its checksum and manifest. CI runs an export→import round-trip test on representative data, and the schema avoids `set<record>` values because of SurrealDB bug #7621.
-
-## Restore and failover
-
-- **No hot standby and no automatic failover** in v1 (ADR 0007).
-- **Same machine, corrupted store:** stop the node, restore the latest verified backup, start, and resume sync.
-- **Machine lost:** use a cold spare, either pre-enrolled or any baseline PC. First re-provision it from central (node identity re-issued, facility data pulled down). Then import the un-uploaded outbox operations from the last local backup. Sync deduplicates them by `op_id`.
-- **Targets:** data loss of at most one backup interval for work not yet synced, and under one hour to recover when a spare is available. Formal RPO/RTO and DR drills stay in Not yet specified.
+Local backups, restore, failover and recovery targets are in [backup-and-recovery.md](backup-and-recovery.md).
 
 ## Updates and migrations
 
