@@ -110,6 +110,14 @@ _Avoid_: Policy (unqualified), scheme
 A configured point in a care workflow where payment status is checked, which can pass, defer, or, for non-urgent care only, block.
 _Avoid_: Payment step, cashier stop
 
+**Stock Unit**:
+The finest-grained quantity of stock that is tracked: one batch of one product, with one expiry, in one store, from one funding source, with one ownership and one usability status.
+_Avoid_: Stock line, SKU (for the batch-level unit)
+
+**Reservation**:
+A temporary hold on a quantity of a Stock Unit for a specific dispense, transfer or kit, which makes it unavailable to others without moving it.
+_Avoid_: Allocation (unqualified), commitment
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account
