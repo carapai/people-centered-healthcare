@@ -85,4 +85,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: work the task **Is the known-scope implementation backlog created?** (#33).
+Work the task **Is the known-scope implementation backlog created?** (#33).
