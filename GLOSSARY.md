@@ -44,6 +44,14 @@ _Avoid_: Merge error, sync failure
 An explicit, time-boxed hand-over of a defined scope from a Facility Edge Node to a desktop, such as an outreach session.
 _Avoid_: Checkout, offline copy
 
+**Sync Scope**:
+The set of records a node receives from its upstream, such as a facility's records plus the global registries and approved definitions it needs.
+_Avoid_: Subscription, partition
+
+**Reconciliation Record**:
+A record raised when ledger operations that are each valid break an invariant together, such as a stock balance going negative, and that an accountable person settles with further operations rather than by choosing a version.
+_Avoid_: Conflict (for ledgers), discrepancy
+
 ## Healthcare language
 
 **Healthcare Service**:

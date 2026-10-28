@@ -4,7 +4,7 @@ Status: **accepted** (ADR 0012). Produced while resolving the Wayfinder ticket [
 - An **Owner** (a Module) decides *which rules* govern a record.
 - An **Authority Node** decides *which node's commit is canonical*.
 
-The wire protocol, cursors and per-class conflict mechanics are decided in [What is the sync protocol and per-resource conflict policy?](https://github.com/carapai/people-centered-healthcare/issues/22). Background: the `research/synchronization` branch.
+The wire protocol, cursors and per-class conflict mechanics are in [synchronization.md](synchronization.md) (ADRs 0019–0021). Background: the `research/synchronization` branch.
 
 ## Concepts
 

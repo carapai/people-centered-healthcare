@@ -2,7 +2,7 @@
 
 Status: **accepted** (ADR 0007). Produced while resolving the Wayfinder ticket [What is the Facility Edge Node's process, storage and recovery model?](https://github.com/carapai/people-centered-healthcare/issues/18). Background: [docs/research/facility-edge.md](../research/facility-edge.md).
 
-LAN discovery and TLS trust are decided in [How do LAN clients find and trust the Facility Edge Node?](https://github.com/carapai/people-centered-healthcare/issues/19). Staff authentication is decided in [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20). The sync protocol is decided in [What is the sync protocol and per-resource conflict policy?](https://github.com/carapai/people-centered-healthcare/issues/22).
+LAN discovery and TLS trust are decided in [How do LAN clients find and trust the Facility Edge Node?](https://github.com/carapai/people-centered-healthcare/issues/19). Staff authentication is decided in [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20). The sync protocol is in [synchronization.md](synchronization.md).
 
 ## Topology
 

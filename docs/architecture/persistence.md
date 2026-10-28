@@ -4,7 +4,7 @@ Status: **accepted** (ADRs 0017, 0018). Produced while resolving the Wayfinder t
 - the model, validation and search semantics are in [fhir-r5-model.md](fhir-r5-model.md);
 - ids are in [identifiers.md](identifiers.md);
 - authority is in [write-authority.md](write-authority.md);
-- the change-log and outbox wire format is decided in [What is the sync protocol and per-resource conflict policy?](https://github.com/carapai/people-centered-healthcare/issues/22).
+- the change log, outbox, `seq` counter and wire format are in [synchronization.md](synchronization.md) (ADR 0019).
 
 A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.surql).
 

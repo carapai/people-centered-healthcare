@@ -65,4 +65,4 @@ Business identifiers live in `identifier`. Each system is declared by a NamingSy
 ## Open items
 
 - The governance of a national health ID (MoH format and issuer) sits in the map's Not yet specified, under the national client registry stance.
-- The maximum supported offline period sizes any reserved blocks (in Not yet specified).
+- Reserved blocks are sized for the 90-day supported edge offline window ([synchronization.md](synchronization.md)).

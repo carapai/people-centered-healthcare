@@ -22,7 +22,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-fhir-validation` | crate | Pure; wraps the FHIRPath engine |
 | `health-fhir-search` | crate | Parsed search AST + SearchParameter registry only; SurrealQL translation lives in `health-surrealdb` |
 | `health-fhir-mapping` | crate | |
-| `health-sync-protocol` | crate | Wire types; protocol decided in [What is the sync protocol and per-resource conflict policy?](https://github.com/carapai/people-centered-healthcare/issues/22) |
+| `health-sync-protocol` | crate | Wire types and the shared client and apply logic; see [synchronization.md](synchronization.md) |
 | `health-persistence` | crate | Moved here from §17 (ADR 0005): pure unit-of-work, outbox and versioning traits |
 | `health-<context>-contract` | crate per Bounded Context | Events, typed Workflow actions, context ids, cross-context query DTOs; created when the context first publishes one |
 
