@@ -216,4 +216,4 @@ FHIR `Device` for medical equipment instances is not yet assigned (see the map's
 |---|---|---|
 | `central-server` | All Bounded Contexts as modules, with the gateway | Modular monolith; contexts are extracted into the spec's `apps/server/*` Deployables only when a real need arises |
 | `facility-edge` | Clinical Records, Clinical Operations, Care Coordination, Programs & Public Health, Finance, Supply Chain, Workflow, Patient Engagement, Identity & Access; read-only replicas of Registries and Terminology & Metadata | Analytics and external integrations stay central |
-| Tauri desktop host | Desktop subset decided in [What can a standalone Tauri client do offline, and how is it packaged?](https://github.com/carapai/people-centered-healthcare/issues/30) | |
+| Tauri desktop host | Desktop roles and offline subset in [desktop-client.md](desktop-client.md) | |

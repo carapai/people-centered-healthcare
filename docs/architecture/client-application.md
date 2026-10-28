@@ -4,7 +4,7 @@ Status: **accepted** (ADRs 0036, 0037, 0038). Produced while resolving the Wayfi
 - app delivery and device keys on the LAN: [lan-security.md](lan-security.md);
 - sessions: [offline-auth.md](offline-auth.md);
 - sync item states: [synchronization.md](synchronization.md);
-- what the standalone desktop can do: [What can a standalone Tauri client do offline, and how is it packaged?](https://github.com/carapai/people-centered-healthcare/issues/30).
+- the desktop's roles and packaging: [desktop-client.md](desktop-client.md).
 
 ## Layers
 

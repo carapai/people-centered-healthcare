@@ -1,6 +1,6 @@
 # Offline authentication and authorization
 
-Status: **accepted** (ADRs 0010, 0011). Produced while resolving the Wayfinder ticket [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20). Background: [docs/research/offline-auth.md](../research/offline-auth.md). This builds on device enrollment in [lan-security.md](lan-security.md) (ADR 0009). The standalone Tauri subset is decided in [What can a standalone Tauri client do offline, and how is it packaged?](https://github.com/carapai/people-centered-healthcare/issues/30).
+Status: **accepted** (ADRs 0010, 0011). Produced while resolving the Wayfinder ticket [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20). Background: [docs/research/offline-auth.md](../research/offline-auth.md). This builds on device enrollment in [lan-security.md](lan-security.md) (ADR 0009). The desktop's local authentication is in [desktop-client.md](desktop-client.md).
 
 ## Identity provider shape
 
