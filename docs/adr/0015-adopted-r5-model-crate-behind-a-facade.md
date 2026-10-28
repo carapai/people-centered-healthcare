@@ -9,6 +9,8 @@ The reasons:
 
 The crate (`helios-fhir` or `fhir-r5`) is chosen by the spike task [Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5?](https://github.com/carapai/people-centered-healthcare/issues/35). If the spike is inconclusive, the default is `helios-fhir`.
 
+**Resolved:** the spike picked `fhir-r5 =4.2.3` (ADR 0050).
+
 ## Considered Options
 
 - **Our own code generator from `hl7.fhir.r5.core`:** full control, but it re-solves problems the crates have already paid for, before any clinical feature exists. Rejected for now. It stays possible later behind the facade.

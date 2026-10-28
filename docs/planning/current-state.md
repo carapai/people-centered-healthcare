@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0049), the §8 docs are written, and the known-scope backlog exists as 100 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Six AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0050), the §8 docs are written, and the known-scope backlog exists as 100 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Five AFK validation spikes and three grilling tickets surfaced by the model-crate spike remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -58,16 +58,20 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 
 ## Outstanding decisions
 
-Wayfinder tickets open: the six AFK validation spikes only. Frontier (open, unblocked, unclaimed), in map order:
+- Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — `fhir-r5 =4.2.3`; see `docs/research/fhir-r5.md`, ADR 0050. Raised three grilling tickets (#142–#144).
 
-1. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-2. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-3. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
-4. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
-5. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
-6. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
+Wayfinder tickets open: five AFK validation spikes and three grilling tickets. Frontier (open, unblocked, unclaimed), in map order:
 
-Recommended next: start implementation with [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42), the only unblocked task, and run the six spikes in parallel; the frontend-scaffold (#38) and model-crate (#35) spikes gate Phase 1–2 tasks.
+1. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34): AFK task; needs facility hardware
+2. Does the per-node commit counter sustain facility write rates on edge hardware? (#36): AFK task; needs edge hardware
+3. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37): AFK task
+4. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38): AFK task; can run locally
+5. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39): AFK task; needs Windows facility PCs
+6. [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142) (#142): grilling; blocks #53
+7. [How does FHIRPath evaluation stay decimal-exact?](https://github.com/carapai/people-centered-healthcare/issues/143) (#143): grilling; blocks #59, #93 and #96
+8. [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144) (#144): grilling; blocks #91
+
+Recommended next: the grilling ticket [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142), which is now the only thing gating [Adopt the R5 model crate behind health-fhir-models](https://github.com/carapai/people-centered-healthcare/issues/53). In parallel, start [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42) and run the frontend-scaffold spike (#38).
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 

@@ -19,7 +19,7 @@ An index of the chosen stack, with the versions already recorded in the other re
 
 | Piece | Candidates / choice | Version recorded (2026-10-27) | Source |
 |---|---|---|---|
-| R5 model crate | `helios-fhir` (default) or `fhir-r5`, chosen by spike #35 | helios-fhir 0.2.6; fhir / fhir-r5 4.2.4 | [fhir-r5.md](fhir-r5.md) |
+| R5 model crate | `fhir-r5` (ADR 0050) | `fhir-r5` =4.2.3; `fhir-r4` =4.2.2 | [fhir-r5.md](fhir-r5.md) |
 | FHIRPath (Rust) | `octofhir-fhirpath` | 0.4.57, 1176/1176 official tests (2026-10-21) | [fhir-r5.md](fhir-r5.md) |
 | UCUM | `octofhir-ucum` | 0.8 | [fhir-r5.md](fhir-r5.md) |
 | Core package | `hl7.fhir.r5.core` | 5.0.0 | [fhir-r5.md](fhir-r5.md) |

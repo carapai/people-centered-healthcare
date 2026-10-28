@@ -1,6 +1,6 @@
 # FHIR R5 model, validation and search
 
-Status: **accepted** (ADRs 0015, 0016). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
+Status: **accepted** (ADRs 0015, 0016, 0050). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
 
 The physical storage of resources, history and index entries in SurrealDB is in [persistence.md](persistence.md). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
 
@@ -18,7 +18,10 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 ## Resource model (ADR 0015)
 
 - **Adopted crate.** One generated R5 (5.0.0) model crate, pinned to an exact version with only R5 enabled.
-  - It is chosen by the spike [Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5?](https://github.com/carapai/people-centered-healthcare/issues/35); `helios-fhir` is the default if the spike is inconclusive.
+  - It is **`fhir-r5 =4.2.3`** (ADR 0050), the choice of the spike [Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5?](https://github.com/carapai/people-centered-healthcare/issues/35). R4 conversion uses its sibling `fhir-r4 =4.2.2`.
+  - CI round-trips the whole official R5 example corpus on every bump, with a short list of known-invalid examples excluded.
+  - Only rarely changing crates name the whole `Resource` enum, because its serde code is rebuilt in each crate that uses it.
+  - Parsing is strict: a missing required element is a parse error, and unknown elements are dropped. Inbound handling is in [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142).
   - It lives in its own workspace member and is cached in CI, because generated models are expensive to compile.
 - **Facade only.** Domain crates import only `health-fhir-models`. A crate swap must not touch domain code.
 - **Typed in code, JSON at rest.** Domain logic works on typed models, and canonical R5 JSON is the stored resource of record.
@@ -31,7 +34,8 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 ## FHIRPath
 
 - FHIRPath runs behind a `FhirPathEngine` trait in `health-fhir-validation`.
-- The default implementation is `octofhir-fhirpath` over JSON, which passes 1176/1176 official tests and is independent of the model crate. `helios-fhirpath` is the alternative if Helios models are chosen.
+- The default implementation is `octofhir-fhirpath` over JSON, which passes 1176/1176 official tests and is independent of the model crate.
+- The spike found that it loses decimal precision (0.010 → 0.0100000000000000002…). The fix is decided in [How does FHIRPath evaluation stay decimal-exact?](https://github.com/carapai/people-centered-healthcare/issues/143).
 - The official FHIRPath test suite runs in CI against the configured engine.
 - Terminology functions (`memberOf`, `subsumes`) delegate to the local terminology service.
 - Whether CQL is needed stays in the map's Not yet specified.
@@ -52,7 +56,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 | External or legacy inbound (integrations, R4 adapters) | Tier 1 strict; tiers 2–4 | Tier 1 failure: reject. Tier 2–4 failure: **quarantine** review queue |
 
 - If a code is missing from the node's **local** terminology snapshot, an offline write gets a warning, and central re-checks the code on ingest.
-- **Profile validator.** v1 starts with our structural and invariant checks plus profile snapshot evaluation. The spike evaluates `helios-fhir-validator` for profiles and slicing.
+- **Profile validator.** v1 starts with our structural and invariant checks plus profile snapshot evaluation. The spike found that `helios-fhir-validator` evaluates only `pattern` discriminators. The tier 3 engine is decided in [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).
 - **HL7 Java validator.** It is a **CI oracle only**: test fixtures and generated examples are cross-checked against it. It is never shipped.
 
 ## Search parameters and indexed projections
