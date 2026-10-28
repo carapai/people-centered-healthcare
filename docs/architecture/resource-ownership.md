@@ -145,7 +145,7 @@ Solid arrows: synchronous dependency (caller → callee). Dotted arrows: domain 
 | Resource / record | Owner |
 |---|---|
 | ChargeItemDefinition, price books, pricing rules | pricing |
-| Coverage, CoverageEligibilityRequest/Response, Claim, ClaimResponse, ExplanationOfBenefit | coverage |
+| Coverage, CoverageEligibilityRequest/Response, Claim, ClaimResponse, ExplanationOfBenefit, InsurancePlan (Benefit Plans), payer Contracts | coverage |
 | Account, ChargeItem, Invoice | billing |
 | PaymentNotice, PaymentReconciliation, payment records | payments |
 | Ledger entries | financial-ledger |

@@ -94,6 +94,22 @@ _Avoid_: Trust score, verification flag
 A person's own application to be registered or linked, which may end in a link to an existing patient, a new patient, or rejection.
 _Avoid_: Sign-up (for the request), patient account
 
+**Price Book**:
+An approved, dated list of prices for Healthcare Services and products, for one scope such as a payer contract, program, department or facility.
+_Avoid_: Tariff (unqualified), price list file
+
+**Funding Source**:
+Whoever pays for a charge: the patient, an insurer, a government program, a donor grant, or a waiver.
+_Avoid_: Payer (when the funder is not an insurer), sponsor
+
+**Benefit Plan**:
+What a payer covers under a contract: copays, deductibles, limits and exclusions.
+_Avoid_: Policy (unqualified), scheme
+
+**Financial Gate**:
+A configured point in a care workflow where payment status is checked, which can pass, defer, or, for non-urgent care only, block.
+_Avoid_: Payment step, cashier stop
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account
