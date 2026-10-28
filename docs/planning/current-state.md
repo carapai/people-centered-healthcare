@@ -47,20 +47,21 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - How do patient matching, self-registration and caregiver delegation work? (#26) — see `docs/architecture/patient-identity.md`, `docs/research/patient-identity.md`, ADRs 0027–0029, `GLOSSARY.md`.
 - How do pricing, coverage, billing, payments and the ledger fit together? (#27) — see `docs/architecture/pricing-and-insurance.md`, `docs/architecture/billing-and-payments.md`, `docs/research/health-financing.md`, ADRs 0030–0033, `GLOSSARY.md`.
 - How do stock transactions stay consistent across stores, edges and dispensing? (#28) — see `docs/architecture/inventory-and-procurement.md`, `docs/research/inventory.md`, ADRs 0034–0035, `GLOSSARY.md`.
+- How does one React app adapt across central, LAN and Tauri runtimes? (#29) — see `docs/architecture/client-application.md`, `docs/research/frontend.md`, ADRs 0036–0038.
 
 ## Outstanding decisions
 
-4 grilling tickets and six task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+3 grilling tickets and seven task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
-1. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
-2. What can a standalone Tauri client do offline, and how is it packaged? (#30)
-3. What is the generic workflow engine's definition and execution model? (#24)
-4. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-5. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-6. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
-7. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
+1. What can a standalone Tauri client do offline, and how is it packaged? (#30)
+2. What is the generic workflow engine's definition and execution model? (#24)
+3. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+4. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+5. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+6. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
+7. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
 
-Recommended next: How does one React app adapt across central, LAN and Tauri runtimes? (#29). The power-loss (#34), model-crate (#35), commit-counter (#36) and matching-scale (#37) spikes are AFK and can run in parallel.
+Recommended next: What can a standalone Tauri client do offline, and how is it packaged? (#30). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37) and frontend-scaffold (#38) spikes are AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -74,4 +75,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **How does one React app adapt across central, LAN and Tauri runtimes?** (#29) in a grilling session with the user.
+Work the map: resolve **What can a standalone Tauri client do offline, and how is it packaged?** (#30) in a grilling session with the user.

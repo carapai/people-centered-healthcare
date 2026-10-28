@@ -81,4 +81,4 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
 
 ## Out of this decision
 
-Import rules for the Bun `packages/*` belong to [How does one React app adapt across central, LAN and Tauri runtimes?](https://github.com/carapai/people-centered-healthcare/issues/29).
+Import rules for the Bun workspace (ports, transports, `src/platform/` confinement of `@tauri-apps/*`) are in [client-application.md](client-application.md).
