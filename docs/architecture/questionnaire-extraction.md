@@ -8,7 +8,7 @@ Related decisions:
 - validation tiers: [fhir-r5-model.md](fhir-r5-model.md) (ADR 0016);
 - sync groups and rejection codes: [synchronization.md](synchronization.md).
 
-Packaging and publication of Questionnaires and mappings is decided in [How are terminology, metadata and configuration packaged and published?](https://github.com/carapai/people-centered-healthcare/issues/23).
+Packaging and publication of Questionnaires and mappings are in [configuration.md](configuration.md) and [metadata.md](metadata.md).
 
 ## Definitions
 

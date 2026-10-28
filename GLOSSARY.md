@@ -66,6 +66,18 @@ _Avoid_: Template, config, form (for the definition)
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform
 
+**Activation**:
+The dated decision that a published version of a definition or configuration package governs a given scope (the nation, a district, a facility or a program); publishing alone governs nothing.
+_Avoid_: Deployment, release (for activation)
+
+**Override Point**:
+A configuration setting that a base package explicitly allows a district or facility to change.
+_Avoid_: Customisation, local copy
+
+**Form Layout**:
+The presentation of a form (ordering, grouping, widgets, visibility) kept separately from the clinical definition of the form it presents.
+_Avoid_: Form (for the layout), template
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account

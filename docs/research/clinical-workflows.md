@@ -2,7 +2,7 @@
 
 A condensed version of the research ticket [How do FHIR R5 workflow, SDC extraction and WHO SMART Guidelines fit a generic engine?](https://github.com/carapai/people-centered-healthcare/issues/7). The full findings, with citations, are on the unmerged branch `research/clinical-workflows`. The research feeds three decisions:
 - extraction: [docs/architecture/questionnaire-extraction.md](../architecture/questionnaire-extraction.md) (ADRs 0022, 0023);
-- packaging: [How are terminology, metadata and configuration packaged and published?](https://github.com/carapai/people-centered-healthcare/issues/23);
+- packaging: [configuration.md](../architecture/configuration.md) and [metadata.md](../architecture/metadata.md) (ADRs 0024–0026);
 - the workflow engine: [What is the generic workflow engine's definition and execution model?](https://github.com/carapai/people-centered-healthcare/issues/24).
 
 ## SDC extraction and population (SDC 4.0.0, FHIR R4)
