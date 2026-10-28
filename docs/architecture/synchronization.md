@@ -16,7 +16,7 @@ flowchart LR
   B[LAN browsers] -- "FHIR REST / app API only" --> E
 ```
 
-- **One protocol, one implementation.** Every hop uses the same versioned API, `/sync/v1/…`, implemented once. The wire types and the shared client and apply logic live in `health-sync-protocol`, used by `health-sync-server` at central and by the edge and desktop sync modules (crate-catalogue.md). The edge acts as the sync server for its desktops and as a sync client of central.
+- **One protocol, one implementation.** Every hop uses the same versioned API, `/sync/v1/…`, implemented once. The wire types and the shared client and apply logic live in `health-sync-protocol`, used by `health-sync-server` at central and by the edge and desktop sync modules (crate-catalogue.md). The edge's sync module serves its desktops with the same `health-sync-protocol` server-side apply logic that `health-sync-server` uses at central. The edge acts as the sync server for its desktops and as a sync client of central.
 - **Wire format.** HTTP/2 with zstd-compressed NDJSON bodies.
 - **LAN browsers** never sync. FHIR REST stays the API for apps and external clients.
 - **Pinning.** A desktop is pinned to one upstream. Re-pointing it requires a drained outbox (write-authority.md).

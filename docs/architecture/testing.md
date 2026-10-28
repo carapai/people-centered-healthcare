@@ -12,6 +12,8 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | FHIR conformance | Round-trip of the R5 examples; profile validation of fixtures, with the HL7 Java validator as an oracle | Every PR (fixtures); nightly (oracle) |
 | Workflow | Definition scenarios from `tests/`; SCXML conformance subset | Every PR |
 | Metadata and terminology | Package validation; semver diff rules; extraction fixtures; FHIRPath conformance across fhirpath.js and octofhir | Every PR |
+| Pricing | Price Book and Price Rule fixtures through all six stages, coverage splits, rounding and largest-remainder allocation | Every PR |
+| Payer adapters | Contract tests per payer adapter against recorded or mock payer responses (eligibility, claim, remittance) | Every PR (mock); nightly (sandbox where available) |
 | Frontend | Vitest unit tests; component tests; axe accessibility checks | Every PR |
 | End-to-end | Playwright on the web; Tauri via `tauri-driver` on Windows and Linux; the §117–119 scenarios | Nightly |
 | Offline and sync | Multi-node simulation (central, edge, desktop) with partitions, clock skew, long outages, `reseed_required`, restore and epoch change | Nightly |

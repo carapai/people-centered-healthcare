@@ -24,7 +24,7 @@ flowchart BT
   T[testing: dev-only]
 ```
 
-Arrows point from the depended-on layer to the dependent layer. "Presentation" (Axum routers, Tauri commands) is not a separate layer. Routers live in `health-http` / `health-fhir-server`, and Tauri commands live in the desktop runtime.
+Arrows point from the depended-on layer to the dependent layer. "Presentation" (Axum routers, Tauri commands) is not a separate layer. Routers live in `health-http` / `health-fhir-server`, and the only Tauri commands (the IPC dispatch command and native OS-capability commands) live in the desktop runtime (ADR 0036).
 
 ## Dependency rules
 

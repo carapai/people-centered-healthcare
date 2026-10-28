@@ -19,7 +19,7 @@ Status: **accepted** (ADRs 0030, 0031). Produced while resolving the Wayfinder t
 - **Price Books and rules:**
   - effective-dated, and immutable once approved by **one finance approver** at central;
   - facility finance staff edit their own facility's books at central, so prices cannot be changed offline;
-  - they sync down in the metadata lane as global replicas.
+  - they are **not** configuration packages: they sync down as signed global records in the metadata lane, like other global replicas.
 - **Local profiles.** Every financial profile is pinned locally (ADR 0030).
 
 ## Pricing context
@@ -91,7 +91,7 @@ sequenceDiagram
   C-->>E: claim status and adjustments sync down
 ```
 
-- **Payer adapters.** There is one port per payer, in `health-integration`. It uses FHIR Claim where the payer supports it, and an export format or portal file otherwise. No national payer or claim format is assumed; Uganda's NHIS is not in force.
+- **Payer adapters.** The payer port is defined in the `coverage` domain crate (dependency-rules.md: driven ports belong to the Module), and there is one adapter per payer in `health-integration`. It uses FHIR Claim where the payer supports it, and an export format or portal file otherwise. No national payer or claim format is assumed; Uganda's NHIS is not in force.
 - **Preauthorization** is a Claim with `use=preauthorization`. A financial gate can require an approved preauthorization (billing-and-payments.md).
 - **Denials** are a ClaimResponse outcome. **Appeals** are resubmissions referencing the original.
 - **Government and donor funding** are funding sources with their own "payer" records. Their claims are reports or exports, not payer adjudication.

@@ -30,7 +30,7 @@ flowchart LR
     R[Axum router via tower oneshot] --> APP[Application crates<br/>same as edge]
     APP --> DB[(Embedded SurrealDB<br/>RocksDB, sync=every)]
     APP --> BL[(Blob store)]
-    SY[health-desktop sync] --> DB
+    SY[health-desktop-runtime sync module] --> DB
     AU[health-auth] --> KS[OS keystore]
     FO[Upstream router<br/>pass-through / local] --> R
   end
