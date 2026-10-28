@@ -42,24 +42,24 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - How are FHIR R5 resources modelled, validated and searched in Rust? (#15) — see `docs/architecture/fhir-r5-model.md`, `docs/research/fhir-r5.md`, ADRs 0015–0016.
 - How are FHIR resources, versions and history persisted in SurrealDB? (#16) — see `docs/architecture/persistence.md`, `docs/research/surrealdb.md`, ADRs 0017–0018.
 - What is the sync protocol and per-resource conflict policy? (#22) — see `docs/architecture/synchronization.md`, `docs/research/synchronization.md`, ADRs 0019–0021, `GLOSSARY.md`.
+- How are QuestionnaireResponses extracted into clinical resources? (#25) — see `docs/architecture/questionnaire-extraction.md`, `docs/research/clinical-workflows.md`, ADRs 0022–0023, `GLOSSARY.md`.
 
 ## Outstanding decisions
 
-9 grilling tickets and five task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+8 grilling tickets and five task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
-1. How are QuestionnaireResponses extracted into clinical resources? (#25)
-2. How are terminology, metadata and configuration packaged and published? (#23)
-3. How do patient matching, self-registration and caregiver delegation work? (#26)
-4. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
-5. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
-6. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
-7. What can a standalone Tauri client do offline, and how is it packaged? (#30)
-8. What is the generic workflow engine's definition and execution model? (#24) — unblocked by the sync decision
-9. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-10. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-11. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+1. How are terminology, metadata and configuration packaged and published? (#23)
+2. How do patient matching, self-registration and caregiver delegation work? (#26)
+3. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
+4. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
+5. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+6. What can a standalone Tauri client do offline, and how is it packaged? (#30)
+7. What is the generic workflow engine's definition and execution model? (#24)
+8. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+9. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+10. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
 
-Recommended next: How are QuestionnaireResponses extracted into clinical resources? (#25). The power-loss (#34), model-crate (#35) and commit-counter (#36) spikes are AFK and can run in parallel.
+Recommended next: How are terminology, metadata and configuration packaged and published? (#23). The power-loss (#34), model-crate (#35) and commit-counter (#36) spikes are AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -73,4 +73,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **How are QuestionnaireResponses extracted into clinical resources?** (#25) in a grilling session with the user.
+Work the map: resolve **How are terminology, metadata and configuration packaged and published?** (#23) in a grilling session with the user.

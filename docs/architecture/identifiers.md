@@ -31,10 +31,10 @@ Anything produced deterministically from another record gets `UUIDv5(platform_na
 
 | Derivation | Name |
 |---|---|
-| QuestionnaireResponse extraction | `{QuestionnaireResponse.id}\|{mapping canonical URL, no version}\|{target linkId path}#{repeat index}\|{target resource type}` |
+| QuestionnaireResponse extraction | `{QuestionnaireResponse.id}\|{mapping canonical URL, no version}\|{target linkId path}#{repeat instance key}\|{target resource type}` — the key is the stable `QuestionnaireResponse.item.id` our form filler stamps on each repeat instance, or the repeat index only for imported responses without item ids |
 | Any other derivation (charge from a dispense, stock movement from a MedicationDispense, Task from a workflow step, …) | `{source record id or op_id}\|{derivation rule canonical URL}` |
 
-Re-extracting with a newer mapping version keeps the same name, so the result is a new **version** of the same resource, never a second resource. The extraction internals are decided in [How are QuestionnaireResponses extracted into clinical resources?](https://github.com/carapai/people-centered-healthcare/issues/25).
+Re-extracting with a newer mapping version keeps the same name, so the result is a new **version** of the same resource, never a second resource. The extraction internals are in [questionnaire-extraction.md](questionnaire-extraction.md).
 
 ## Business identifiers (Uganda reference)
 

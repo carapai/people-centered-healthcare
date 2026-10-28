@@ -62,6 +62,10 @@ _Avoid_: Service (unqualified), product
 An immutable, versioned artefact that describes how care or configuration should work, such as a Questionnaire, workflow definition, program definition or ValueSet, referenced by canonical URL and version.
 _Avoid_: Template, config, form (for the definition)
 
+**Extraction Mapping**:
+A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
+_Avoid_: Form mapping, transform
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account
