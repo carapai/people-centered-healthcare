@@ -13,7 +13,7 @@ Status: **accepted** (ADRs 0024, 0025, 0026). Produced while resolving the Wayfi
 - **Configuration can't change clinical meaning.** It references metadata and terminology, and never changes their meaning.
 - **Presentation is kept apart (§42).** A **Form Layout** is a configuration artefact keyed to a Questionnaire `url|version`. The Questionnaire itself keeps only clinical structure.
 
-Configuration artefacts are JSON documents in a package's `configuration/` folder. Each is validated against a JSON Schema that the platform release ships.
+Configuration artefacts are JSON documents in a package's `configuration/` folder. Each is validated against a JSON Schema that the platform release ships. Each carries its own `url` and `version`, and the manifest Library pins it as a `composed-of` `relatedArtifact` (ADR 0049).
 
 ## Package format (ADR 0024)
 

@@ -17,9 +17,15 @@ Metadata defines **clinical structure** (§41). It is owned by the `metadata` Mo
 | SearchParameter | Custom parameters; activation starts a reindex (persistence.md) |
 | ImplementationGuide, CapabilityStatement | Package and server descriptions |
 | Questionnaire | Clinical structure only, plus intrinsic SDC rendering such as `questionnaire-itemControl`. Layout lives in configuration |
-| Extraction Mapping | questionnaire-extraction.md |
+| Extraction Mapping | Profiled `Library` with contained SDC templates (ADR 0049); questionnaire-extraction.md |
 | PlanDefinition, ActivityDefinition, Library, Measure | Protocol and indicator definitions |
-| Program definitions, workflow definitions | Their models are in [workflow-engine.md](workflow-engine.md) |
+| Program definitions, Workflow Definitions, Matching Rules | Programs: profiled `PlanDefinition`; Workflow Definitions and Matching Rules: profiled `Library` with typed JSON content (ADR 0049). Models in [workflow-engine.md](workflow-engine.md), [program-designer.md](program-designer.md), [patient-identity.md](patient-identity.md) |
+
+## Canonical URLs (ADR 0049)
+
+- **Pattern:** `{canonicalBase}/{ResourceType or config kind}/{name}`, where `canonicalBase` is the publishing package's `canonical`.
+- **Bases:** platform core artefacts use a platform-owned base; country artefacts use the country's base, whose control is in the national-governance fog.
+- **References** always pin `url|version`.
 
 ## Versioning
 

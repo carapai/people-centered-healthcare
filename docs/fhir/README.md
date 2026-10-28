@@ -30,17 +30,19 @@ Canonical URLs and the exact artefact form are not fixed yet for any of these; t
 | **Locally pinned inventory façade profiles** for "all FHIR inventory resources" (FMM 0–1); the façades named there are InventoryItem, SupplyDelivery, SupplyRequest and InventoryReport | [inventory-and-procurement.md:22](../architecture/inventory-and-procurement.md) |
 | CRMI-style `Library` manifest in each package, with pinned ValueSet expansions | [configuration.md:25](../architecture/configuration.md), [terminology.md:12](../architecture/terminology.md) |
 
-### Published Definitions whose representation is still open
+### Representation of engine-native Published Definitions
 
-These are decided as Published Definitions owned by metadata ([resource-ownership.md:97](../architecture/resource-ownership.md)), but which FHIR resource (if any) carries them is not yet written down. Tracked in [Which FHIR resources carry engine-native Published Definitions?](https://github.com/carapai/people-centered-healthcare/issues/41):
+Decided in [ADR 0049](../adr/0049-engine-native-definitions-as-profiled-library-and-plandefinition.md):
 
-| Definition | Decided in |
-|---|---|
-| Extraction Mapping (SDC template-extraction content with contained templates) | [questionnaire-extraction.md](../architecture/questionnaire-extraction.md), [ADR 0022](../adr/0022-template-extraction-with-separate-mappings-re-derived-at-authority.md) |
-| Matching Rules (fields as FHIRPath, comparators, m/u values, blocking keys, thresholds) | [patient-identity.md:82](../architecture/patient-identity.md) |
-| Workflow Definition (engine-native statechart; PlanDefinition only as import) | [workflow-engine.md](../architecture/workflow-engine.md), [ADR 0042](../adr/0042-engine-native-statecharts-with-plandefinition-as-import.md) |
-| Program definition | [metadata.md](../architecture/metadata.md) |
-| Human-readable identifier formats (prefix, padding, check digit, yearly reset) | [identifiers.md](../architecture/identifiers.md) |
+| Definition | Representation | Profile |
+|---|---|---|
+| Extraction Mapping | `Library` (`type` = `extraction-mapping`) with SDC templates as contained resources | `ExtractionMappingLibrary` |
+| Matching Rules | `Library` (`type` = `matching-rules`), content `application/vnd.health.matching-rules+json` | `MatchingRulesLibrary` |
+| Workflow Definition | `Library` (`type` = `workflow-definition`), content `application/vnd.health.workflow+json` | `WorkflowDefinitionLibrary` |
+| Program definition | `PlanDefinition` (`type` = `clinical-protocol`) linking its artefacts in `relatedArtifact` | `ProgramPlanDefinition` |
+| Form Layouts, charge triggers, Financial Gate configs, override points, settings, human-readable identifier format rules | Non-FHIR JSON in `configuration/` with `url` and `version`, pinned by the manifest Library (`composed-of`) | JSON Schema per kind |
+
+Identifier *systems* remain NamingSystems ([identifiers.md](../architecture/identifiers.md)); only their formatting rules are configuration JSON.
 
 ### Codes, tags and identifier systems
 
