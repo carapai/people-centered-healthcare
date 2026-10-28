@@ -2,7 +2,7 @@
 
 Status: **accepted** (ADRs 0001–0004) — produced while resolving the Wayfinder ticket [Which bounded context owns each resource, and which deployables ship first?](https://github.com/carapai/people-centered-healthcare/issues/13).
 
-This document names the single **Owner** (a Module inside a Bounded Context) of every authoritative resource and transaction. Write authority per runtime (central / edge / desktop), sync direction and conflict policy are decided separately in [Who holds write authority for each resource at central, edge and desktop?](https://github.com/carapai/people-centered-healthcare/issues/21) and will extend this table.
+This document names the single **Owner** (a Module inside a Bounded Context) of every authoritative resource and transaction. Write authority per runtime (central / edge / desktop), sync direction and conflict policy are in [write-authority.md](write-authority.md) (ADR 0012).
 
 ## Rules
 

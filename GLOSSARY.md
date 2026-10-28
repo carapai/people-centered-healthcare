@@ -24,6 +24,26 @@ _Avoid_: Service, microservice, app
 A rebuildable view assembled from other contexts' records that owns no authoritative data, such as the Care Journey or a worklist.
 _Avoid_: Projection table, cache, report
 
+**Authority Node**:
+The single node (central, a Facility Edge Node or a desktop) whose acceptance makes a record's version canonical at a given moment.
+_Avoid_: Master, primary, source of truth
+
+**Facility Authority Node**:
+The one node that holds authority for all of a facility's records: central, the facility's edge, or its single standalone desktop.
+_Avoid_: Home server, facility master
+
+**Candidate Version**:
+A version of a record written by a node that is not its Authority Node, waiting to be accepted or turned into a Conflict Record.
+_Avoid_: Draft, pending edit
+
+**Conflict Record**:
+A kept record of two diverging versions of the same record, waiting for resolution under that record class's policy.
+_Avoid_: Merge error, sync failure
+
+**Authority Lease**:
+An explicit, time-boxed hand-over of a defined scope from a Facility Edge Node to a desktop, such as an outreach session.
+_Avoid_: Checkout, offline copy
+
 ## Healthcare language
 
 **Healthcare Service**:
