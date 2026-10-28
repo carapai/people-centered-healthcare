@@ -4,7 +4,7 @@ This page condenses two research tickets:
 - [How do comparable systems run an offline facility server on a LAN?](https://github.com/carapai/people-centered-healthcare/issues/3), full findings on branch `research/facility-edge`;
 - [What do SurrealDB server and embedded engines guarantee today?](https://github.com/carapai/people-centered-healthcare/issues/2), branch `research/surrealdb`.
 
-It covers process, storage, power and recovery. LAN TLS and discovery findings are condensed when [How do LAN clients find and trust the Facility Edge Node?](https://github.com/carapai/people-centered-healthcare/issues/19) is resolved. Decisions: [docs/architecture/facility-edge.md](../architecture/facility-edge.md), ADR 0007.
+It covers process, storage, power and recovery, plus LAN TLS, discovery and enrollment. Decisions: [docs/architecture/facility-edge.md](../architecture/facility-edge.md) (ADR 0007) and [docs/architecture/lan-connectivity.md](../architecture/lan-connectivity.md) (ADRs 0008, 0009).
 
 ## Prior art
 
@@ -43,6 +43,31 @@ It covers process, storage, power and recovery. LAN TLS and discovery findings a
 - Network UPS Tools covers Linux. Its Windows branch exists, but MSI packaging and some drivers depend on community work.
 - The upsmon `SHUTDOWNCMD` details were not confirmed.
 - Graceful-stop hooks: the SCM stop control and systemd SIGTERM / `STOPPING=1`.
+
+## Secure contexts and LAN TLS
+
+- Browsers treat `https`, `localhost` and loopback as potentially trustworthy origins, but **not private LAN IPs**. Over plain `http://192.168.x.x`, service workers and other secure-context APIs, such as non-extractable WebCrypto keys stored for reuse, are unavailable.
+- Chrome's `OverrideSecurityRestrictionsOnInsecureOrigin` policy exempts listed origins, but only on managed Chrome, and traffic stays unencrypted.
+- Chrome's Local Network Access prompt (Chrome 142+) first targets public→local requests. A page served by the edge to its own origin is out of scope. A central web app calling the edge would be in scope.
+- **Public CAs:**
+  - CA/B SC-081 limits public certificates to ≤200 days from March 2026, ≤100 days from March 2027 and ≤47 days from March 2029. Private CAs are "not directly in scope".
+  - Let's Encrypt IP certificates last 160 h and need CA reachability, so they are useless offline.
+  - Public-domain DNS-01 certificates need online renewal and LAN DNS control.
+- **Private roots on client platforms:**
+  - Apple's 398-day rule does not apply to user- or admin-added roots. The iOS 13 rules (SAN names, serverAuth EKU, ≤825 days) apply to "all" certificates, so leaf certificates stay ≤825 days.
+  - On iOS, a manually installed root also needs the Certificate Trust Settings toggle unless it was installed via MDM or Configurator.
+  - Chrome on Windows and macOS uses the OS stores.
+  - Firefox needs `security.enterprise_roots.enabled` or the `Certificates.Install` / `ImportEnterpriseRoots` policy.
+  - Android apps (API 24+) trust only system CAs unless their network security config opts in.
+  - Whether Android Chrome trusts user-installed CAs is **unverified**.
+- `rcgen` 0.14 supports CA certificates, `signed_by`, and IP and DNS SANs, and rustls serves the result.
+
+## Discovery
+
+- `mdns-sd` 0.21 is pure Rust and can register and browse. `astro-dnssd` wraps Bonjour/Avahi, and Open mSupply has to catch its panics.
+- Browsers cannot browse DNS-SD. Android resolves `.local` names (since 2021, not over VPN or mobile data). Windows browser resolution of `.local` is unverified.
+- RFC 9119: multicast on Wi-Fi goes at the lowest rate, is never acknowledged, and commonly loses ≥5% of packets. Operators often drop mDNS, and multicast-to-unicast conversion mitigates this. Blocking by AP client isolation is unverified here.
+- Open mSupply identifies servers by hardware ID, verifies its own server exactly, and trusts others on first use (TOFU). No comparable system documents per-device revocation on a LAN.
 
 ## Open items carried forward
 
