@@ -18,4 +18,4 @@ We chose this because automatic merging of clinical or identity data produces re
 ## Consequences
 
 - Concurrent edits produce more Conflict Records, which need a review queue and an ageing alert (7 days) at each Authority Node.
-- Identity merges never rewrite references at facilities. A merged provisional Patient carries `link: replaced-by` the golden record.
+- Identity reconciliation never rewrites references at facilities. A reconciled provisional Patient carries `link: refer` to the golden record (amended by ADR 0027; `replaced-by` is used only for same-facility duplicate merges).

@@ -1,6 +1,6 @@
 # Identifiers
 
-Status: **accepted** (ADRs 0013, 0014). Produced while resolving the Wayfinder ticket [How are global and facility-local identifiers minted?](https://github.com/carapai/people-centered-healthcare/issues/17). Related decisions: [write-authority.md](write-authority.md) (Facility Authority Node), [lan-security.md](lan-security.md) (device enrollment), [offline-auth.md](offline-auth.md). Patient matching on these identifiers is decided in [How do patient matching, self-registration and caregiver delegation work?](https://github.com/carapai/people-centered-healthcare/issues/26).
+Status: **accepted** (ADRs 0013, 0014). Produced while resolving the Wayfinder ticket [How are global and facility-local identifiers minted?](https://github.com/carapai/people-centered-healthcare/issues/17). Related decisions: [write-authority.md](write-authority.md) (Facility Authority Node), [lan-security.md](lan-security.md) (device enrollment), [offline-auth.md](offline-auth.md). Patient matching on these identifiers is in [patient-identity.md](patient-identity.md).
 
 ## Kinds of identifier
 

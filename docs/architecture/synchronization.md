@@ -186,8 +186,8 @@ stateDiagram-v2
 ## Provisional states
 
 - **Provisional Patients** travel with `provisional: true`.
-- **Identity reconciliation.** Central's identity reconciliation sends down its result: confirmation, or `link: replaced-by` the golden record. Matching rules are decided in [How do patient matching, self-registration and caregiver delegation work?](https://github.com/carapai/people-centered-healthcare/issues/26).
-- **No reference rewriting.** Facilities never rewrite references after a merge; they resolve through `Patient.link`. No historic clinical record changes for an identity merge.
+- **Identity reconciliation.** Central's identity reconciliation sends down its result: the source Patient gains `link: refer` to its golden record (ADR 0027), or stays provisional while under review. Matching and linking are in [patient-identity.md](patient-identity.md).
+- **No reference rewriting.** Facilities never rewrite references after linking or merging; they resolve through `Patient.link`. No historic clinical record changes for an identity merge.
 - **Payments.** Provisional payments are confirmed or reversed by later operations, never by editing.
 
 ## Tombstones, retention and long outages

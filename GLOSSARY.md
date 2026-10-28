@@ -78,6 +78,22 @@ _Avoid_: Customisation, local copy
 The presentation of a form (ordering, grouping, widgets, visibility) kept separately from the clinical definition of the form it presents.
 _Avoid_: Form (for the layout), template
 
+**Source Patient**:
+A Patient record created by one registration (at a facility, offline, or by the patient), which clinical records refer to and which keeps its identity forever.
+_Avoid_: Local patient, duplicate
+
+**Golden Record**:
+The single registry-owned Patient that represents one real person, linked to all of that person's Source Patients and carrying the platform health ID.
+_Avoid_: Master patient, merged patient
+
+**Assurance Level**:
+How strongly an account's claim to be, or to act for, a person has been verified, from a phone code up to an official identity check.
+_Avoid_: Trust score, verification flag
+
+**Registration Request**:
+A person's own application to be registered or linked, which may end in a link to an existing patient, a new patient, or rejection.
+_Avoid_: Sign-up (for the request), patient account
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account
