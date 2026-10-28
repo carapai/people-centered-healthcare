@@ -60,7 +60,7 @@ flowchart LR
   | `block` | Only for non-urgent care, and only where the gate allows blocking |
 
 - **Deferred charges** stay as receivables on the Account. Converting one to a waiver needs a permission (social worker or finance role) and is audited.
-- **Placement** of gates in each flow is decided in [What is the generic workflow engine's definition and execution model?](https://github.com/carapai/people-centered-healthcare/issues/24).
+- **Placement** of gates in each flow is in [workflow-engine.md](workflow-engine.md).
 
 ## Payments (ADR 0032)
 

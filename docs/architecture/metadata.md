@@ -19,7 +19,7 @@ Metadata defines **clinical structure** (§41). It is owned by the `metadata` Mo
 | Questionnaire | Clinical structure only, plus intrinsic SDC rendering such as `questionnaire-itemControl`. Layout lives in configuration |
 | Extraction Mapping | questionnaire-extraction.md |
 | PlanDefinition, ActivityDefinition, Library, Measure | Protocol and indicator definitions |
-| Program definitions, workflow definitions | Their models are decided in [What is the generic workflow engine's definition and execution model?](https://github.com/carapai/people-centered-healthcare/issues/24) |
+| Program definitions, workflow definitions | Their models are in [workflow-engine.md](workflow-engine.md) |
 
 ## Versioning
 

@@ -118,6 +118,14 @@ _Avoid_: Stock line, SKU (for the batch-level unit)
 A temporary hold on a quantity of a Stock Unit for a specific dispense, transfer or kit, which makes it unavailable to others without moving it.
 _Avoid_: Allocation (unqualified), commitment
 
+**Workflow Definition**:
+A Published Definition describing the states, steps, timers and decisions of a care or administrative process, such as an OPD visit or ART follow-up.
+_Avoid_: Flow, pathway (for the definition)
+
+**Workflow Instance**:
+One run of a Workflow Definition for one context, such as one patient's visit or one program enrolment, with its own history.
+_Avoid_: Case, process (unqualified)
+
 **Login Account**:
 The credential a person uses to sign in; it is never itself a Patient and links to one only through a verified Person.
 _Avoid_: User (unqualified), patient account
