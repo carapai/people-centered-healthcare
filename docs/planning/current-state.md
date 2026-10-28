@@ -45,7 +45,7 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 
 ## Outstanding decisions
 
-8 grilling tickets and five task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+8 grilling tickets and five task tickets are open; 9 of them are on the frontier; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
 1. How are QuestionnaireResponses extracted into clinical resources? (#25)
 2. How are terminology, metadata and configuration packaged and published? (#23)
@@ -54,9 +54,10 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 5. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
 6. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
 7. What can a standalone Tauri client do offline, and how is it packaged? (#30)
-8. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-9. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-10. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+8. What is the generic workflow engine's definition and execution model? (#24) — unblocked by the sync decision
+9. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+10. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+11. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
 
 Recommended next: How are QuestionnaireResponses extracted into clinical resources? (#25). The power-loss (#34), model-crate (#35) and commit-counter (#36) spikes are AFK and can run in parallel.
 
