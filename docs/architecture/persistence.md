@@ -1,0 +1,144 @@
+# Persistence: FHIR resources, versions and history in SurrealDB
+
+Status: **accepted** (ADRs 0017, 0018). Produced while resolving the Wayfinder ticket [How are FHIR resources, versions and history persisted in SurrealDB?](https://github.com/carapai/people-centered-healthcare/issues/16). Background: [docs/research/surrealdb.md](../research/surrealdb.md). Related decisions:
+- the model, validation and search semantics are in [fhir-r5-model.md](fhir-r5-model.md);
+- ids are in [identifiers.md](identifiers.md);
+- authority is in [write-authority.md](write-authority.md);
+- the change-log and outbox wire format is decided in [What is the sync protocol and per-resource conflict policy?](https://github.com/carapai/people-centered-healthcare/issues/22).
+
+A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.surql).
+
+## Engine, version and process
+
+| Runtime | Process | Engine | Durability |
+|---|---|---|---|
+| Facility Edge Node | Embedded in `facility-edge` (ADR 0007) | RocksDB (`kv-rocksdb`) | `sync=every` |
+| Standalone Tauri desktop | Embedded in-process, one shared handle | RocksDB | `sync=every` |
+| Central | Separate `surreal start rocksdb://…` server, single node, on localhost or a private network | RocksDB | `sync=every` |
+
+- **Version pinning:** every runtime uses one exact SurrealDB **3.3.x** version (SDK and server), upgraded together and only deliberately, with the FHIR query regression suite as the gate.
+- **SurrealKV** is revisited only once upstream recommends it and it has some release history.
+- **Central high availability** (Enterprise or TiKV) and the BSL "Database Service" clause are in the map's Not yet specified.
+
+## Namespace, database and ownership
+
+- **Layout:** one **namespace per tenant** (a country deployment, e.g. `ug`) and one database `main` per node. Every Module's tables live in that one database, so ADR 0004 transactions can span Owners.
+- **Ownership is enforced in code:**
+  - each table belongs to exactly one Owner's repository (table → Owner follows [resource-ownership.md](resource-ownership.md));
+  - the architecture check rejects a repository that touches another Owner's table;
+  - shared infrastructure tables (`idx_*`, `change_log`, `outbox`, `conflict`, `_migration`) are written only through `health-surrealdb`'s unit of work.
+
+## Tables per resource type
+
+**Head table `<type>`** (e.g. `observation`): `SCHEMAFULL`, one row per resource, record id = the resource's UUID.
+
+| Field | Content |
+|---|---|
+| `resource` | The full canonical R5 JSON (`object FLEXIBLE`), the resource of record |
+| `version_id` | UUID; equal to `meta.versionId`, which is the `op_id` of the write (ADR 0018) |
+| `version_seq` | Integer assigned by the Authority Node, monotonic per resource |
+| `last_updated` | `meta.lastUpdated` |
+| `deleted` | Tombstone flag |
+| `facility`, `authority_node` | Scope and authority (ADR 0012) |
+| `provisional` | For provisional records, e.g. Patients |
+| `security_labels`, `profiles` | Copied from `meta`, used by the policy decision point and validation |
+| `index_keys` | The record ids of this resource's current search index entries |
+| hot projections | Typed, indexed fields for the most frequent query paths, declared per type and filled by the search extractor. For example, Observation has `patient`, `encounter`, `code`, `effective_at`, `status`, and Encounter has `patient`, `status`, `period`, `location` |
+
+**History table `<type>_history`**: record id `[resource_uuid, version_seq]`, so an instance's history is one range scan.
+
+| Field | Content |
+|---|---|
+| `resource` | The full resource for that version (never a diff) |
+| `version_id`, `parent_version_id` | For sync ancestry |
+| `op_id`, `origin_node`, `hlc`, author | Provenance of the write |
+| `last_updated`, `deleted` | |
+
+- History for a type, and system-wide `_history`, use an index on `last_updated` (plus `version_seq` for ties).
+- Unaccepted Candidate Versions are stored in the `conflict` table, **never** in history.
+- History is kept at least as long as the sync tombstone horizon (the maximum offline window is in Not yet specified). Pruning beyond that is a retention policy, not a default.
+
+**References in projections** are `record<…>` links held as single values or arrays, never `set<record>` (SurrealDB #7621).
+
+## Search index tables
+
+Each supported SearchParameter writes entries into one table per search type. Each table's record id is an **array ordered for range scans**:
+
+| Table | Record id |
+|---|---|
+| `idx_token` | `[type, param, system, code, resource_uuid]` |
+| `idx_string` | `[type, param, folded_value, resource_uuid]` |
+| `idx_date` | `[type, param, start, end, resource_uuid]`, plus a secondary index on `end` for overlap queries |
+| `idx_reference` | `[type, param, target_type, target_id, resource_uuid]` |
+| `idx_quantity` | `[type, param, system, canonical_unit, value, resource_uuid]` |
+| `idx_number` | `[type, param, value, resource_uuid]` |
+| `idx_uri` | `[type, param, value, resource_uuid]` |
+| `idx_composite` | `[type, param, component tuple…, resource_uuid]` |
+
+- **How a search runs.** A search compiles to **record range scans** over these ids. Several parameters are intersected, preferring the most selective. Hot projections serve the common paths directly.
+- **Testing.** The persistence test suite includes `EXPLAIN` checks for each main query shape, so a full scan fails a test instead of passing silently.
+- **Writes.** On every write, the transaction deletes the entries listed in the head's `index_keys` and writes the new ones. No scan is needed.
+- **Reindex.** Activating a configuration package that adds or changes a SearchParameter starts a **resumable background reindex job**. The parameter becomes searchable only when the job completes.
+
+## The write transaction
+
+Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work:
+
+```mermaid
+sequenceDiagram
+  participant UC as Use case
+  participant UoW as Unit of work (health-surrealdb)
+  participant DB as SurrealDB
+  UC->>UoW: save(resource, If-Match)
+  UoW->>DB: BEGIN
+  UoW->>DB: read head (version_id, version_seq, index_keys)
+  alt head.version_id ≠ If-Match
+    UoW-->>UC: 412 Precondition Failed
+  else matches (or create)
+    UoW->>DB: guard records / UNIQUE checks
+    UoW->>DB: upsert head
+    UoW->>DB: create history row
+    UoW->>DB: delete old index entries; create new ones
+    UoW->>DB: append change_log + outbox rows
+    UoW->>DB: COMMIT
+  end
+  Note over UoW,DB: write-write conflict → retry ≤3 with jitter; on retry the If-Match check yields 412 if the other writer won
+```
+
+- **`If-Match` is required** on updates from our clients. Creates use `PUT [type]/[client-uuid]` (update-as-create, `updateCreate=true`). `POST` create works for external clients, and the server then mints a UUIDv7.
+- **Concurrent writers.** Two writers of the same resource both write its head record, so SurrealDB snapshot isolation reports a retryable conflict.
+- **Multi-record invariants** are never enforced by read-then-check, because snapshot isolation allows write skew. They use **guard records** or **UNIQUE indexes** written in the same transaction. Examples: one active MRN per facility, one open Encounter per patient per service point, unique business identifiers within their system.
+
+## REST semantics implemented here
+
+- `versioned-update` capability.
+- Weak ETag `W/"<versionId>"` and `Last-Modified` from `meta.lastUpdated`.
+- `If-Match` mismatch → 412.
+- Deleted → 410 (read and vread); unknown → 404.
+- Conditional create, update and delete follow the R5 matrices in [docs/research/fhir-r5.md](../research/fhir-r5.md). They are resolved through the search index inside the same transaction.
+- `_history` at instance, type and system level: Bundle type `history`, oldest last, deletes included, `_since`, `_at` and `_count`.
+- `transaction` Bundles are one SurrealDB transaction, all or nothing. `batch` entries are independent transactions with per-entry results.
+
+## Reference integrity
+
+Checked in application code on write, not with SurrealDB `REFERENCE` constraints, because some dangling references are legitimate.
+
+| Reference to | Rule |
+|---|---|
+| A resource in the same transaction or Bundle | Must resolve |
+| In-scope facility records (Patient, Encounter, …) | Must resolve |
+| Global replicas (Practitioner, Location, products, Published Definitions) | Must resolve against the local replica |
+| Records outside this node's scope, e.g. another facility's Encounter in a referral | Allowed; flagged `unresolved` and checked at central |
+
+- **Deletion.** A resource that live records still reference cannot be deleted (409). Clinical corrections use `entered-in-error`, not delete.
+- **Physical purge** happens only when a node's scope shrinks or a retention period expires. It runs as an audited background job.
+
+## Migrations
+
+We write our own migrations runner as a module of `health-surrealdb`. SurrealKit needs a custom build for embedded engines, and its third-party alternatives are unverified on 3.3.
+
+- **Schema migrations** are versioned, forward-only `.surql` files embedded in the binary. CI validates them with `surreal validate` and formats them with `surql-fmt`.
+- **Data migrations** (resource rewrites) are written in Rust.
+- **Startup.** Pending migrations are applied before the node reports ready (ADR 0007) and recorded in `_migration` with checksums. If an already-applied migration has been modified, startup fails.
+- **Reindexing** is a separate resumable job, never a migration.
+- **Testing.** Every migration also runs on the export → import round-trip fixture ([backup-and-recovery.md](backup-and-recovery.md)).

@@ -40,12 +40,13 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - Who holds write authority for each resource at central, edge and desktop? (#21) — see `docs/architecture/write-authority.md`, ADR 0012, `GLOSSARY.md`.
 - How are global and facility-local identifiers minted? (#17) — see `docs/architecture/identifiers.md`, ADRs 0013–0014.
 - How are FHIR R5 resources modelled, validated and searched in Rust? (#15) — see `docs/architecture/fhir-r5-model.md`, `docs/research/fhir-r5.md`, ADRs 0015–0016.
+- How are FHIR resources, versions and history persisted in SurrealDB? (#16) — see `docs/architecture/persistence.md`, `docs/research/surrealdb.md`, ADRs 0017–0018.
 
 ## Outstanding decisions
 
-10 grilling tickets and four task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+9 grilling tickets and four task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
-1. How are FHIR resources, versions and history persisted in SurrealDB? (#16)
+1. What is the sync protocol and per-resource conflict policy? (#22)
 2. How are QuestionnaireResponses extracted into clinical resources? (#25)
 3. How are terminology, metadata and configuration packaged and published? (#23)
 4. How do patient matching, self-registration and caregiver delegation work? (#26)
@@ -56,7 +57,7 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 9. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
 10. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
 
-Recommended next: How are FHIR resources, versions and history persisted in SurrealDB? (#16), the last blocker on the sync protocol (#22). The power-loss (#34) and model-crate (#35) spikes are AFK and can run in parallel.
+Recommended next: What is the sync protocol and per-resource conflict policy? (#22), now unblocked. The power-loss (#34) and model-crate (#35) spikes are AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -70,4 +71,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **How are FHIR resources, versions and history persisted in SurrealDB?** (#16) in a grilling session with the user.
+Work the map: resolve **What is the sync protocol and per-resource conflict policy?** (#22) in a grilling session with the user.
