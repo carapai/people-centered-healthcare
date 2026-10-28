@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 — Research and Wayfinder. Charting, all 11 research tickets, the original 18 grilling tickets and the documentation-consistency task are complete. Remaining: two grilling tickets raised by the consistency check (#40, #41), the backlog task (#33, blocked by them) and six AFK validation spikes. No implementation has started.
+Phase 0 — Research and Wayfinder. Charting, all 11 research tickets, the original 18 grilling tickets and the documentation-consistency task are complete. Remaining: one grilling ticket raised by the consistency check (#41), the backlog task (#33, blocked by it) and six AFK validation spikes. No implementation has started.
 
 ## Wayfinder map
 
@@ -52,21 +52,21 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - What is the generic workflow engine's definition and execution model? (#24) — see `docs/architecture/workflow-engine.md`, `docs/research/clinical-workflows.md`, ADRs 0042–0044, `GLOSSARY.md`.
 - What are the CI/CD, release and production-operations rules? (#31) — see `docs/architecture/deployment.md`, `docs/architecture/testing.md`, ADRs 0045–0047.
 - Is the documentation set complete and consistent? (#32) — all §8 architecture and research docs written; `docs/development/` guides (§107); `docs/crates`, `docs/services`, `docs/fhir` index pages; consistency fixes. Raised two new grilling tickets (#40, #41).
+- Must Facility Edge Nodes require full-disk encryption? (#40) — see ADR 0048, `docs/architecture/security.md`, `docs/architecture/facility-edge.md`.
 
 ## Outstanding decisions
 
-Two grilling tickets and seven task tickets are open. Frontier (open, unblocked, unclaimed), in map order:
+One grilling ticket and seven task tickets are open. Frontier (open, unblocked, unclaimed), in map order:
 
-1. Must Facility Edge Nodes require full-disk encryption? (#40)
-2. Which FHIR resources carry engine-native Published Definitions? (#41)
-3. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-4. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-5. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
-6. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
-7. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
-8. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
+1. Which FHIR resources carry engine-native Published Definitions? (#41)
+2. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+3. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+4. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+5. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
+6. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
+7. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
 
-Recommended next: Must Facility Edge Nodes require full-disk encryption? (#40), then Which FHIR resources carry engine-native Published Definitions? (#41); both block Is the known-scope implementation backlog created? (#33). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
+Recommended next: Which FHIR resources carry engine-native Published Definitions? (#41), which blocks Is the known-scope implementation backlog created? (#33). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -84,4 +84,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **Must Facility Edge Nodes require full-disk encryption?** (#40) in a grilling session with the user.
+Work the map: resolve **Which FHIR resources carry engine-native Published Definitions?** (#41) in a grilling session with the user.

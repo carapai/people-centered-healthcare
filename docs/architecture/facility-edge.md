@@ -37,6 +37,7 @@ LAN discovery and TLS trust are in [lan-security.md](lan-security.md). Staff aut
 ## Hardware and power baseline
 
 - x64, at least 8 GB RAM, SSD system storage.
+- **TPM 2.0 and UEFI Secure Boot enabled.** Full-disk encryption with TPM-only unlock (BitLocker or LUKS2 + TPM2) is mandatory before provisioning, so the edge still restarts unattended after a power cut (ADR 0048).
 - A **second storage volume or a dedicated external drive** for backups.
 - A **UPS is mandatory**. NUT is used on Linux, and NUT or the vendor agent on Windows. A low-battery signal triggers a graceful stop: drain requests, finish the in-flight transaction, take a final backup if time allows, then stop. Where no UPS signal is available, durability rests on `sync=every`.
 - A power-cut validation spike must pass on Windows NTFS and Linux ext4 before edge storage implementation starts. See the task ticket [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34).

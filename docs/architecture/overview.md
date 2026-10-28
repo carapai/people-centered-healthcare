@@ -139,6 +139,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0045](../adr/0045-pinned-least-privilege-ci-and-signed-or-failed-releases.md) | CI runs pinned, least-privilege workflows behind a merge queue, and a release is either fully signed with provenance or it fails |
 | [0046](../adr/0046-central-recovery-by-hourly-export-and-warm-standby.md) | Central recovers from hourly exports to a warm standby, and edges re-push facility data after a central restore |
 | [0047](../adr/0047-no-health-data-in-telemetry-and-in-country-observability.md) | Telemetry never carries personal health data, and the observability stack is self-hosted in-country |
+| [0048](../adr/0048-mandatory-tpm-unlocked-full-disk-encryption-on-edges.md) | Facility Edge Nodes require full-disk encryption with TPM-only unlock, so they still restart unattended |
 
 ## Still open
 

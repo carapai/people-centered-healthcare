@@ -16,5 +16,6 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
 
 - **No hot standby and no automatic failover** in v1 (ADR 0007).
 - **Same machine, corrupted store:** stop the node, restore the latest verified backup, start, and resume sync.
+- **TPM recovery** (after a BIOS or Secure Boot change): central operations reads the escrowed disk recovery key to the verified facility admin by phone, then rotates it (ADR 0048).
 - **Machine lost:** use a cold spare, either pre-enrolled or any baseline PC. First re-provision it from central (node identity re-issued, facility data pulled down). Then import the un-uploaded outbox operations from the last local backup. Sync deduplicates them by `op_id`.
 - **Targets:** data loss of at most one backup interval for work not yet synced, and under one hour to recover when a spare is available. Formal targets and drills are in [deployment.md](deployment.md) (ADR 0046).

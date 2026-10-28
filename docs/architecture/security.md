@@ -19,7 +19,7 @@ This page consolidates how MASTER_PROMPT §95–97 is met. Each mechanism is dec
 | Session management | 15-minute DPoP access tokens with a 12-hour cap; PIN resume and switch; idle lock after 15 min; tokens in memory only | offline-auth.md, client-application.md |
 | Device trust | Device-bound enrollment approved by a facility admin; DPoP keys; revocation | ADR 0009, lan-security.md |
 | Encryption in transit | TLS everywhere: a private PKI with name-constrained facility intermediates on the LAN, mTLS for sync | ADR 0008, synchronization.md |
-| Encryption at rest | Encrypted backups everywhere; full-disk encryption check on desktops. **The edge's at-rest policy is open** (see below) | backup-and-recovery.md, ADR 0040 |
+| Encryption at rest | Encrypted backups everywhere. Edges: mandatory full-disk encryption with TPM-only unlock, recovery keys escrowed at central. Desktops: full-disk encryption check (warn or block by configuration) | ADR 0048, ADR 0040, backup-and-recovery.md |
 | Key management | See [Keys](#keys) | |
 | Secure backups | Encrypted per-node, keys escrowed, drills | ADR 0046 |
 | Logging and monitoring | OpenTelemetry to an in-country stack, with no personal health data | ADR 0047 |
@@ -60,6 +60,7 @@ Permissions are enforced in the Rust services on every node, never only in the U
 | Permission-snapshot signing | Central | Signs per-user snapshots | — | ADR 0011 |
 | Publication signing | Central HSM/KMS | Signs definition packages | Yearly | ADR 0024 |
 | Release signing | Azure Artifact Signing, KMS, GPG, cosign | Installers, updater artifacts, edge packages, images | Per ADR 0045 | ADRs 0041, 0045 |
+| Disk recovery keys (edge) | Wrapped and escrowed in central KMS; read out by phone to a verified facility admin; no on-site copy | Rotated after every use | ADR 0048 |
 | Backup keys | Per node, wrapped and escrowed in central KMS; central master key under 3-of-5 Shamir | Backup encryption | Runbook custodians | ADR 0046 |
 
 ## Data protection (Uganda)
@@ -71,5 +72,4 @@ DPPA 2019 and its 2021 Regulations obligations (lawful basis, DPIA, registration
 
 ## Open items
 
-- **Edge at-rest encryption.** Desktops check full-disk encryption at provisioning (ADR 0040). No equivalent rule has been decided for the Facility Edge Node, which holds the facility's records and staff credential hashes. Tracked in [Must Facility Edge Nodes require full-disk encryption?](https://github.com/carapai/people-centered-healthcare/issues/40).
 - **Desktops hold credential hashes.** Mode B and offline-fallback desktops hold Argon2id hashes for the staff who may log in there, a wider exposure than ADR 0010 describes for the edge alone. They are mitigated by the keystore, the full-disk encryption check and revocation.
