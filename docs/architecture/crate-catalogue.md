@@ -18,7 +18,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 
 | Crate | Starts as | Notes |
 |---|---|---|
-| `health-fhir-models` | crate | Facade over a generated R5 model; internals decided in [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15) |
+| `health-fhir-models` | crate | Facade over a generated R5 model; internals in [fhir-r5-model.md](fhir-r5-model.md) |
 | `health-fhir-validation` | crate | Pure; wraps the FHIRPath engine |
 | `health-fhir-search` | crate | Parsed search AST + SearchParameter registry only; SurrealQL translation lives in `health-surrealdb` |
 | `health-fhir-mapping` | crate | |
@@ -90,3 +90,22 @@ The edge and desktop runtimes reuse the same domain and application crates as ce
 | `health-test-support` | crate (fixtures, in-memory port fakes) |
 | `health-contract-tests` | `tests/` directories in the crates exercised, until tests cross crates |
 | `health-integration-tests` | `tests/` directories, until tests cross crates |
+
+## tools
+
+| Tool | Purpose | Source |
+|---|---|---|
+| `tools/architecture-checks` | Layer and dependency rules from `cargo metadata` | dependency-rules.md |
+| `tools/synthetic-data` | Synthetic patients, facilities, stock, prices and payer contracts with Ugandan distributions | testing.md |
+| `health-cli` | Development CLI (§108); only justified commands, starting with `check architecture` | MASTER_PROMPT §108 |
+
+## Bun workspace packages
+
+| Package | Purpose | Source |
+|---|---|---|
+| `apps/client` | The one React app, with `src/platform/` as its composition boundary | client-application.md |
+| `@health/design-system` | Panda CSS 2 preset (`panda lib`), Ark UI recipes, DataTable | client-application.md |
+| `@health/fhir-types` | R5 TypeScript types generated from the R5 definitions | ADR 0036 |
+| `@health/api-client` | TypeScript types and Zod schemas generated from the `utoipa` OpenAPI document | ADR 0036 |
+
+Package names other than `apps/client` are working names, to be fixed by the scaffold.

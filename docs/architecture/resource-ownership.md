@@ -94,7 +94,8 @@ Solid arrows: synchronous dependency (caller → callee). Dotted arrows: domain 
 | StructureDefinition, SearchParameter, ImplementationGuide, CapabilityStatement | metadata |
 | Questionnaire | metadata |
 | PlanDefinition, ActivityDefinition, Library, Measure (as Published Definitions) | metadata |
-| Program definitions, workflow definitions, extraction mappings, form layouts | metadata |
+| Program definitions, workflow definitions, Extraction Mappings, Matching Rules | metadata |
+| Form Layouts, charge triggers, Financial Gate configurations | configuration |
 | Configuration packages, facility overrides, publication lifecycle records | configuration |
 
 ### Clinical Records

@@ -9,7 +9,7 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
 - **What:** a snapshot-consistent logical export, taken through the SurrealDB SDK inside the edge process. It includes the outbox, so un-uploaded work is preserved. The content-addressed blob directory (ADR 0021) is copied alongside it, adding only new hashes.
 - **When:** hourly while the facility is active. Retention is 48 hourly and 14 daily copies. An admin can also run it on demand, including to USB. One is taken automatically before every update.
 - **Where:** the second volume, never the data volume.
-- **Protection:** every backup is encrypted with a per-node backup key. The key is escrowed at central (custody details stay in the map's Not yet specified under disaster recovery and key escrow).
+- **Protection:** every backup is encrypted with a per-node backup key. The key is wrapped and escrowed in central KMS (custody in [deployment.md](deployment.md), ADR 0046).
 - **Integrity:** every backup is verified after it is written, using its checksum and manifest. CI runs an export→import round-trip test on representative data, and the schema avoids `set<record>` values because of SurrealDB bug #7621.
 
 ## Restore and failover

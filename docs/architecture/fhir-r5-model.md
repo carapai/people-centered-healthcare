@@ -2,7 +2,7 @@
 
 Status: **accepted** (ADRs 0015, 0016). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
 
-The physical storage of resources, history and index entries in SurrealDB is decided in [How are FHIR resources, versions and history persisted in SurrealDB?](https://github.com/carapai/people-centered-healthcare/issues/16). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
+The physical storage of resources, history and index entries in SurrealDB is in [persistence.md](persistence.md). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
 
 ## Crates involved
 
