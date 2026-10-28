@@ -33,24 +33,24 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 ## Completed decisions
 
 - Which bounded context owns each resource, and which deployables ship first? (#13) — see `docs/architecture/resource-ownership.md`, ADRs 0001–0004, `GLOSSARY.md`.
+- What are the crate layers and the dependency rules that enforce them? (#14) — see `docs/architecture/crate-architecture.md`, ADRs 0005–0006.
 
 ## Outstanding decisions
 
-17 grilling tickets and both task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+16 grilling tickets and both task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
-1. What are the crate layers and the dependency rules that enforce them? (#14)
-2. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
-3. How are global and facility-local identifiers minted? (#17)
-4. What is the Facility Edge Node's process, storage and recovery model? (#18)
-5. How do LAN clients find and trust the Facility Edge Node? (#19)
-6. Who holds write authority for each resource at central, edge and desktop? (#21)
-7. How are terminology, metadata and configuration packaged and published? (#23)
-8. How do patient matching, self-registration and caregiver delegation work? (#26)
-9. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
-10. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
-11. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+1. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
+2. How are global and facility-local identifiers minted? (#17)
+3. What is the Facility Edge Node's process, storage and recovery model? (#18)
+4. How do LAN clients find and trust the Facility Edge Node? (#19)
+5. Who holds write authority for each resource at central, edge and desktop? (#21)
+6. How are terminology, metadata and configuration packaged and published? (#23)
+7. How do patient matching, self-registration and caregiver delegation work? (#26)
+8. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
+9. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
+10. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
 
-Recommended next, given the Facility Edge priority: What is the Facility Edge Node's process, storage and recovery model? (#18), or the crate layers (#14) first since every implementation task depends on it.
+Recommended next, given the Facility Edge priority: What is the Facility Edge Node's process, storage and recovery model? (#18).
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -64,4 +64,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **Which bounded context owns each resource, and which deployables ship first?** (#13) in a grilling session with the user.
+Work the map: resolve **What is the Facility Edge Node's process, storage and recovery model?** (#18) in a grilling session with the user.
