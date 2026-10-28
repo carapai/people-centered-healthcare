@@ -45,7 +45,7 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 
 ## Outstanding decisions
 
-8 grilling tickets and five task tickets are open; 9 of them are on the frontier; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+9 grilling tickets and five task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
 1. How are QuestionnaireResponses extracted into clinical resources? (#25)
 2. How are terminology, metadata and configuration packaged and published? (#23)
