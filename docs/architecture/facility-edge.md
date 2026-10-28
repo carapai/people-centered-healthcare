@@ -57,7 +57,7 @@ Local backups, restore, failover and recovery targets are in [backup-and-recover
 - **Migrations are forward-only and versioned.** They run at startup inside the edge process, extending the service-manager timeout while they run.
 - **On a failed migration or failed readiness:** reinstall the previous binary automatically and restore the pre-update backup. Old binaries are never run against a migrated store.
 - **Compatibility:** central supports edge versions N and N-1 on the sync protocol, so a facility may lag one release.
-- Release signing and the CI pipeline are decided in [What are the CI/CD, release and production-operations rules?](https://github.com/carapai/people-centered-healthcare/issues/31).
+- Release signing and the CI pipeline are in [deployment.md](deployment.md).
 
 ## Health monitoring
 

@@ -77,7 +77,7 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
    - there is a dependency cycle.
 3. **`cargo-deny`** checks licences, advisories, duplicate versions and workspace-wide bans.
 4. **Workspace lints** in the root `Cargo.toml`, plus `clippy` with `-D warnings`.
-5. All of these run in CI on every pull request and as a pre-commit target. The CI wiring is decided in [What are the CI/CD, release and production-operations rules?](https://github.com/carapai/people-centered-healthcare/issues/31).
+5. All of these run in CI on every pull request and as a pre-commit target. The CI wiring is in [deployment.md](deployment.md).
 
 ## Out of this decision
 

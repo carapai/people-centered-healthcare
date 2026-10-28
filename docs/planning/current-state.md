@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 — Research and Wayfinder. Charting and all 11 research tickets are complete; grilling tickets are next. No implementation has started.
+Phase 0 — Research and Wayfinder. Charting, all 11 research tickets and all 18 grilling tickets are complete. Remaining: the documentation-consistency task (#32), the backlog task (#33) and six AFK validation spikes. No implementation has started.
 
 ## Wayfinder map
 
@@ -50,12 +50,13 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - How does one React app adapt across central, LAN and Tauri runtimes? (#29) — see `docs/architecture/client-application.md`, `docs/research/frontend.md`, ADRs 0036–0038.
 - What can a standalone Tauri client do offline, and how is it packaged? (#30) — see `docs/architecture/desktop-client.md`, `docs/research/tauri.md`, ADRs 0039–0041.
 - What is the generic workflow engine's definition and execution model? (#24) — see `docs/architecture/workflow-engine.md`, `docs/research/clinical-workflows.md`, ADRs 0042–0044, `GLOSSARY.md`.
+- What are the CI/CD, release and production-operations rules? (#31) — see `docs/architecture/deployment.md`, `docs/architecture/testing.md`, ADRs 0045–0047.
 
 ## Outstanding decisions
 
-1 grilling ticket and eight task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+No grilling tickets remain; eight task tickets are open. Frontier (open, unblocked, unclaimed), in map order:
 
-1. What are the CI/CD, release and production-operations rules? (#31)
+1. Is the documentation set complete and consistent? (#32) — task
 2. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
 3. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
 4. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
@@ -63,7 +64,7 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 6. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
 7. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
 
-Recommended next: What are the CI/CD, release and production-operations rules? (#31). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
+Recommended next: Is the documentation set complete and consistent? (#32), then Is the known-scope implementation backlog created? (#33). The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -77,4 +78,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **What are the CI/CD, release and production-operations rules?** (#31) in a grilling session with the user.
+Work the map: work the task **Is the documentation set complete and consistent?** (#32).

@@ -1,6 +1,6 @@
 # Backup and recovery
 
-Status: **accepted** (ADR 0007). Produced while resolving the Wayfinder ticket [What is the Facility Edge Node's process, storage and recovery model?](https://github.com/carapai/people-centered-healthcare/issues/18). This page covers the Facility Edge Node; process and update rules are in [facility-edge.md](facility-edge.md). Central and desktop recovery targets are still to be decided (see the map's Not yet specified: disaster recovery).
+Status: **accepted** (ADR 0007). Produced while resolving the Wayfinder ticket [What is the Facility Edge Node's process, storage and recovery model?](https://github.com/carapai/people-centered-healthcare/issues/18). This page covers the Facility Edge Node; process and update rules are in [facility-edge.md](facility-edge.md). Central recovery targets, retention, key custody and drills are in [deployment.md](deployment.md) (ADR 0046); mode B desktops follow this page (desktop-client.md).
 
 ## Backup
 
@@ -17,4 +17,4 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
 - **No hot standby and no automatic failover** in v1 (ADR 0007).
 - **Same machine, corrupted store:** stop the node, restore the latest verified backup, start, and resume sync.
 - **Machine lost:** use a cold spare, either pre-enrolled or any baseline PC. First re-provision it from central (node identity re-issued, facility data pulled down). Then import the un-uploaded outbox operations from the last local backup. Sync deduplicates them by `op_id`.
-- **Targets:** data loss of at most one backup interval for work not yet synced, and under one hour to recover when a spare is available. Formal RPO/RTO and DR drills stay in Not yet specified.
+- **Targets:** data loss of at most one backup interval for work not yet synced, and under one hour to recover when a spare is available. Formal targets and drills are in [deployment.md](deployment.md) (ADR 0046).
