@@ -38,22 +38,22 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - How do LAN clients find and trust the Facility Edge Node? (#19) — see `docs/architecture/lan-security.md`, ADRs 0008–0009.
 - How do staff authenticate and get authorized offline? (#20) — see `docs/architecture/offline-auth.md`, `docs/research/offline-auth.md`, ADRs 0010–0011.
 - Who holds write authority for each resource at central, edge and desktop? (#21) — see `docs/architecture/write-authority.md`, ADR 0012, `GLOSSARY.md`.
+- How are global and facility-local identifiers minted? (#17) — see `docs/architecture/identifiers.md`, ADRs 0013–0014.
 
 ## Outstanding decisions
 
-12 grilling tickets and three task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+11 grilling tickets and three task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
 1. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
-2. How are global and facility-local identifiers minted? (#17)
-3. How are terminology, metadata and configuration packaged and published? (#23)
-4. How do patient matching, self-registration and caregiver delegation work? (#26)
-5. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
-6. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
-7. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
-8. What can a standalone Tauri client do offline, and how is it packaged? (#30)
-9. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+2. How are terminology, metadata and configuration packaged and published? (#23)
+3. How do patient matching, self-registration and caregiver delegation work? (#26)
+4. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
+5. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
+6. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+7. What can a standalone Tauri client do offline, and how is it packaged? (#30)
+8. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
 
-Recommended next: How are global and facility-local identifiers minted? (#17), which with the persistence ticket (#16, blocked on #15) gates the sync protocol (#22). The power-loss spike (#34) is AFK and can run in parallel.
+Recommended next: How are FHIR R5 resources modelled, validated and searched in Rust? (#15), which unblocks persistence (#16) and through it the sync protocol (#22). The power-loss spike (#34) is AFK and can run in parallel.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -67,4 +67,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the map: resolve **How are global and facility-local identifiers minted?** (#17) in a grilling session with the user.
+Work the map: resolve **How are FHIR R5 resources modelled, validated and searched in Rust?** (#15) in a grilling session with the user.
