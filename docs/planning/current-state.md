@@ -1,6 +1,6 @@
 # Current state
 
-_Last updated: 2026-10-27_
+_Last updated: 2026-10-28_
 
 ## Phase
 
@@ -30,16 +30,27 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 | What does Tauri v2 offer for embedded local services and secure packaging? (#11) | `research/tauri` | closed |
 | Which TanStack, XState, Ark UI and Panda CSS pieces are stable enough to depend on? (#12) | `research/frontend` | closed |
 
+## Completed decisions
+
+- Which bounded context owns each resource, and which deployables ship first? (#13) — see `docs/architecture/resource-ownership.md`, ADRs 0001–0004, `GLOSSARY.md`.
+
 ## Outstanding decisions
 
-All 18 grilling tickets (#13–#31) and both task tickets (#32, #33) are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
+17 grilling tickets and both task tickets are open; grilling requires the human in the loop. Frontier (open, unblocked, unclaimed), in map order:
 
-1. Which bounded context owns each resource, and which deployables ship first? (#13)
+1. What are the crate layers and the dependency rules that enforce them? (#14)
 2. How are FHIR R5 resources modelled, validated and searched in Rust? (#15)
 3. How are global and facility-local identifiers minted? (#17)
-4. How do LAN clients find and trust the Facility Edge Node? (#19)
-5. How are terminology, metadata and configuration packaged and published? (#23)
-6. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+4. What is the Facility Edge Node's process, storage and recovery model? (#18)
+5. How do LAN clients find and trust the Facility Edge Node? (#19)
+6. Who holds write authority for each resource at central, edge and desktop? (#21)
+7. How are terminology, metadata and configuration packaged and published? (#23)
+8. How do patient matching, self-registration and caregiver delegation work? (#26)
+9. How do pricing, coverage, billing, payments and the ledger fit together? (#27)
+10. How do stock transactions stay consistent across stores, edges and dispensing? (#28)
+11. How does one React app adapt across central, LAN and Tauri runtimes? (#29)
+
+Recommended next, given the Facility Edge priority: What is the Facility Edge Node's process, storage and recovery model? (#18), or the crate layers (#14) first since every implementation task depends on it.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
