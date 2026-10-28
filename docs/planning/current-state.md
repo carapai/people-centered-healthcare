@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 — Research and Wayfinder. Charting, all 11 research tickets, the original 18 grilling tickets and the documentation-consistency task are complete. All decision tickets are resolved. Remaining: the backlog task (#33) and six AFK validation spikes. No implementation has started.
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0049), the §8 docs are written, and the known-scope backlog exists as 100 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Six AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -54,20 +54,20 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - Is the documentation set complete and consistent? (#32) — all §8 architecture and research docs written; `docs/development/` guides (§107); `docs/crates`, `docs/services`, `docs/fhir` index pages; consistency fixes. Raised two new grilling tickets (#40, #41).
 - Must Facility Edge Nodes require full-disk encryption? (#40) — see ADR 0048, `docs/architecture/security.md`, `docs/architecture/facility-edge.md`.
 - Which FHIR resources carry engine-native Published Definitions? (#41) — see ADR 0049, `docs/fhir/README.md`, `docs/architecture/metadata.md`.
+- Is the known-scope implementation backlog created? (#33) — 100 issues (#42–#141), 17 milestones; see `docs/planning/roadmap.md`, `milestones.md`, `task-index.md`, `dependencies.md`, `progress.md`.
 
 ## Outstanding decisions
 
-No grilling tickets remain; seven task tickets are open. Frontier (open, unblocked, unclaimed), in map order:
+Wayfinder tickets open: the six AFK validation spikes only. Frontier (open, unblocked, unclaimed), in map order:
 
-1. Is the known-scope implementation backlog created? (#33) — task
-2. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
-3. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
-4. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
-5. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
-6. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
-7. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
+1. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34) — AFK task
+2. Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — AFK task
+3. Does the per-node commit counter sustain facility write rates on edge hardware? (#36) — AFK task
+4. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — AFK task
+5. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — AFK task
+6. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39) — AFK task
 
-Recommended next: Is the known-scope implementation backlog created? (#33), now unblocked. The power-loss (#34), model-crate (#35), commit-counter (#36), matching-scale (#37), frontend-scaffold (#38) and embedded-desktop-database (#39) spikes are AFK and can run in parallel.
+Recommended next: start implementation with [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42), the only unblocked task, and run the six spikes in parallel; the frontend-scaffold (#38) and model-crate (#35) spikes gate Phase 1–2 tasks.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -85,4 +85,4 @@ None (no code yet).
 
 ## Next recommended step
 
-Work the task **Is the known-scope implementation backlog created?** (#33).
+Implement **Create the Cargo workspace with the six-layer layout** (#42), then follow [dependencies.md](dependencies.md).
