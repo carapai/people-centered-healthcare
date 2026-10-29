@@ -8,7 +8,8 @@
 # repositories.
 #
 # - Merging: squash only, with the PR title as the commit subject; head branches are deleted.
-# - Security: secret scanning with push protection.
+# - Security: the dependency graph (for dependency review), and secret scanning with push
+#   protection.
 # - The `main` ruleset: no deletion or force push, linear history, a PR with one approval and
 #   code-owner review, resolved conversations, and every required check passing on an
 #   up-to-date branch. ADR changes need a second approval (adr-approvals.yml).
@@ -58,6 +59,11 @@ gh api --method PATCH "repos/$REPO" --silent \
   -F delete_branch_on_merge=true \
   -f squash_merge_commit_title=PR_TITLE \
   -f squash_merge_commit_message=PR_BODY
+
+# Dependency review reads the dependency graph, which Dependabot alerts turn on. Renovate,
+# not Dependabot, raises the update PRs.
+echo "dependency graph (Dependabot alerts)"
+gh api --method PUT "repos/$REPO/vulnerability-alerts" --silent
 
 echo "secret scanning with push protection"
 gh api --method PATCH "repos/$REPO" --silent --input - <<'JSON'
