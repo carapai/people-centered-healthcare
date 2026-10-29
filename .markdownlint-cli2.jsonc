@@ -1,0 +1,19 @@
+// markdownlint for docs/ and the READMEs (documentation.yml).
+{
+  "config": {
+    // One paragraph or list item per line is the house style.
+    "MD013": false,
+    // A list may follow its lead-in line directly ("**Scope:**" then "- …"); CommonMark
+    // lets a list interrupt a paragraph.
+    "MD032": false,
+    // Numbered rules keep their numbers across sections (architecture-rules.md).
+    "MD029": false,
+    // Repeated subheadings ("In code") under different parents.
+    "MD024": { "siblings_only": true },
+    // Line breaks inside table cells.
+    "MD033": { "allowed_elements": ["br"] }
+  },
+  "globs": ["**/*.md"],
+  // MASTER_PROMPT.md is the authoritative specification and is not reformatted.
+  "ignores": ["MASTER_PROMPT.md", "CLAUDE.md", "**/node_modules/**", "target/**", "third_party/**", ".claude/**"]
+}

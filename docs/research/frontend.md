@@ -76,4 +76,3 @@ The spike was [Does the frontend scaffold build on Bun, Vite 8, Panda 2, React C
 - HMR;
 - `panda lib` and `panda build`;
 - terminology and CDA tests.
-

@@ -109,4 +109,3 @@ The spike was [Can SurrealDB blocking indexes serve patient matching at 45M-pers
 - a true cold cache;
 - recall of the refined keys;
 - tantivy.
-
