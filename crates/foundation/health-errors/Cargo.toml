@@ -1,0 +1,15 @@
+[package]
+name = "health-errors"
+description = "Shared error primitives used by every layer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "foundation"
+
+[lints]
+workspace = true
+
+[dependencies]

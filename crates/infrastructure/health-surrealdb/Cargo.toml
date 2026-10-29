@@ -1,0 +1,15 @@
+[package]
+name = "health-surrealdb"
+description = "SurrealDB adapter: unit of work, repositories, search translation and migrations (ADRs 0017–0018)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]

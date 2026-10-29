@@ -1,0 +1,45 @@
+# cargo-deny policy (ADR 0045).
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+confidence-threshold = 0.9
+# The allowlist is policy, not a record of what is in use today.
+unused-allowed-license = "allow"
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+]
+
+# Workspace crates are unpublished (publish = false) and need no licence.
+[licenses.private]
+ignore = true
+
+# SurrealDB's Business Source License 1.1 is a documented exception (ADR 0045).
+[[licenses.exceptions]]
+crate = "surrealdb"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-core"
+allow = ["BUSL-1.1"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -17,6 +17,7 @@ Every crate belongs to exactly one layer. It may depend only on crates in **lowe
 | 5 | infrastructure | `crates/infrastructure/` | Adapters that implement ports: SurrealDB, HTTP/Axum, auth, audit, messaging, files, crypto, FHIR server, sync server, external integrations | foundation, contracts, domains, application |
 | 6 | runtime | `crates/edge/`, `crates/desktop/`, `apps/server/*`, `apps/client/src-tauri` | Composition roots and runtime-specific adapters (discovery, node identity, keyring, OS service hooks). **No business logic** | Anything below |
 | — | testing | `crates/testing/` | Fixtures, fakes of ports, contract and integration harnesses | Anything, **as dev-dependency only** |
+| — | tooling | `tools/` | Workspace tooling binaries (`architecture-checks`, `synthetic-data`) | Anything; nothing depends on them |
 
 ```mermaid
 flowchart BT
@@ -31,7 +32,7 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
 1. **Downward only.** No crate may depend on a crate in the same or a higher layer, with two exceptions: within contracts, per-context contract crates may depend on the FHIR and foundation contract crates; within infrastructure, adapters may depend on `health-surrealdb`, `health-http` and other infrastructure crates. The dependency graph is acyclic.
 2. **No domain→domain edges** (ADR 0006), not even within one Bounded Context. A domain that needs another Module's data declares a port in its own crate. The application layer implements that port by calling the other Module (an anti-corruption seam).
 3. **No application→application edges.** A use case that spans Bounded Contexts is composed in a runtime crate or integrated through events.
-4. **Runtime crates are leaves.** Nothing depends on `crates/edge/*`, `crates/desktop/*` or `apps/*`.
+4. **Runtime crates are leaves.** Nothing depends on `crates/edge/*`, `crates/desktop/*` or `apps/*`, except the composition roots in `apps/`. These may depend on the runtime library crates they wrap: `apps/server/facility-edge` over `health-edge-runtime`, for example. A runtime library may not depend on another runtime library.
 5. **Domain crates are pure.** Allowed externals: `serde`, `thiserror`, `rust_decimal`, `uuid`, the chosen time crate, and `tracing` (macros only). Forbidden in domains: `tokio`, `axum`, `tower`, `surrealdb`, `reqwest`, `tauri`, `tracing-subscriber`, `opentelemetry`, `anyhow`. Any other crate needs an allowlist entry, reviewed like an ADR.
 6. **No runtime-mode switches in domain or application crates.** These crates have no `[features]` and no `cfg` keyed on central/edge/desktop. Differences between runtimes (write authority, id minting, clock, which application crates are linked) are injected through ports and configuration. Cargo features are allowed in infrastructure and runtime crates only, to choose an adapter (e.g. embedded vs remote SurrealDB).
 7. **`anyhow` only at boundaries.** It is allowed in runtime crates and in tooling; every other layer uses `thiserror` types.
@@ -61,7 +62,7 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
 
    ```toml
    [package.metadata.health]
-   layer = "domain"            # foundation | contracts | domain | application | infrastructure | runtime | testing
+   layer = "domain"            # foundation | contracts | domain | application | infrastructure | runtime | testing | tooling
    context = "clinical-records" # omitted for foundation, shared contracts and infrastructure
    ```
 
@@ -75,6 +76,11 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
    - a dependency declares an inline version instead of `workspace = true`;
    - a crate does not inherit workspace lints;
    - there is a dependency cycle.
+
+   It is implemented in [`tools/architecture-checks`](../../tools/architecture-checks/README.md), and runs with `cargo run -p architecture-checks`.
+   - **Rule names.** Each violation names the crate, the edge and a rule name (for example `[domain-to-domain]`).
+   - **Policy file.** The domain allowlist and lint exemptions live in `tools/architecture-checks/allowlist.toml`.
+   - **Limits.** Dev-dependencies are exempt from the layer direction rules. The "`tracing` macros only" part of rule 5 is not checked mechanically.
 3. **`cargo-deny`** checks licences, advisories, duplicate versions and workspace-wide bans.
 4. **Workspace lints** in the root `Cargo.toml`, plus `clippy` with `-D warnings`.
 5. All of these run in CI on every pull request and as a pre-commit target. The CI wiring is in [deployment.md](deployment.md).

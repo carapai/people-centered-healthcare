@@ -1,6 +1,6 @@
 # Adding a crate
 
-> Status: planned layout. No code exists yet; the root `Cargo.toml` and `tools/architecture-checks` are created by the scaffold.
+> Status: the root `Cargo.toml` (#42) and `tools/architecture-checks` (#43) exist. Run `cargo run -p architecture-checks` after adding a crate.
 
 ## When to use
 
@@ -14,10 +14,14 @@ Any new workspace member. Crates are created lazily, when the first implementati
    ```toml
    [package]
    name = "health-<name>"
-   edition.workspace = true   # exact inherited keys to be fixed by the scaffold
+   description = "<one line>"
+   version.workspace = true
+   edition.workspace = true
+   rust-version.workspace = true
+   publish.workspace = true
 
    [package.metadata.health]
-   layer = "domain"           # foundation | contracts | domain | application | infrastructure | runtime | testing
+   layer = "domain"           # foundation | contracts | domain | application | infrastructure | runtime | testing | tooling
    context = "<context>"      # omitted for foundation, shared contracts and infrastructure
 
    [lints]
@@ -26,7 +30,7 @@ Any new workspace member. Crates are created lazily, when the first implementati
    [dependencies]
    serde = { workspace = true }
    ```
-4. Add any new external crate once, to root `[workspace.dependencies]`. A new external in a domain crate needs an allowlist entry, reviewed like an ADR.
+4. Add any new crate once, to root `[workspace.dependencies]`, including workspace crates as `{ path = "…" }` entries, so every dependency is `{ workspace = true }`. A new external in a domain crate needs an allowlist entry, reviewed like an ADR.
 5. Do not add `[features]` to domain or application crates. Features in infrastructure or runtime crates only choose adapters.
 6. Keep items `pub(crate)` by default and re-export the public API from `lib.rs`.
 7. Add the crate to the root workspace members, and to `CODEOWNERS` if it is a sync or security crate ([deployment.md](../architecture/deployment.md)).

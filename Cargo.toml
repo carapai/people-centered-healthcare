@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/foundation/health-errors",
+    "crates/contracts/health-persistence",
+    "crates/domains/health-client-registry",
+    "crates/application/health-registries-app",
+    "crates/infrastructure/health-surrealdb",
+    "apps/server/central-server",
+    "tools/architecture-checks",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+
+# Every external crate is declared here once; members use `{ workspace = true }`.
+[workspace.dependencies]
+anyhow = "1.0.104"
+cargo_metadata = "0.23.1"
+tempfile = "3.27.0"
+toml = "1.1.8"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+print_stdout = "warn"
