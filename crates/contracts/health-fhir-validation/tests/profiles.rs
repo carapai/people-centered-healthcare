@@ -43,7 +43,6 @@ const VITALS: &str = "http://hl7.org/fhir/StructureDefinition/vitalsigns";
 const HEART_RATE: &str = "http://hl7.org/fhir/StructureDefinition/heartrate";
 const BP: &str = "http://hl7.org/fhir/StructureDefinition/bp";
 const UG_PATIENT: &str = "http://example.org/fhir/StructureDefinition/ug-patient";
-const UG_VALUE: &str = "http://example.org/fhir/StructureDefinition/ug-simple-value";
 
 /// Tiers 1–3 together, as the write path runs them; the issues as (code, location).
 async fn issues(resource: &Value, profiles: &[&str]) -> Vec<(IssueCode, String)> {
@@ -185,29 +184,24 @@ async fn exists_and_type_discriminators() {
     let date = patient(json!({ "deceasedDateTime": "2026-01-01" }));
     assert_eq!(
         issues(&date, &[UG_PATIENT]).await,
-        one(IssueCode::Structure, "Patient.deceasedDateTime")
+        vec![
+            (IssueCode::Structure, "Patient.deceasedDateTime".to_owned()),
+            (IssueCode::Structure, "Patient.deceasedDateTime".to_owned()),
+        ],
+        "dateTime is narrowed out of deceased[x], and its slice allows no value"
     );
 }
 
 #[tokio::test]
 async fn profile_discriminator() {
-    let observation = |quantity: Value| json!({ "resourceType": "Observation", "status": "final", "code": { "text": "x" }, "valueQuantity": quantity });
+    // Patient.address is closed, sliced by profile: every address must conform to ug-address.
+    let district = patient(json!({ "address": [{ "city": "Lira", "district": "Lira" }] }));
+    assert_eq!(issues(&district, &[UG_PATIENT]).await, Vec::new());
+    let no_district = patient(json!({ "address": [{ "city": "Lira" }] }));
     assert_eq!(
-        issues(
-            &observation(json!({ "value": 1, "unit": "kg" })),
-            &[UG_VALUE]
-        )
-        .await,
-        Vec::new()
-    );
-    let found = issues(
-        &observation(json!({ "value": 1, "comparator": "<", "unit": "kg" })),
-        &[UG_VALUE],
-    )
-    .await;
-    assert!(
-        found.contains(&(IssueCode::Structure, "Observation.valueQuantity".to_owned())),
-        "a comparator is not a SimpleQuantity: {found:?}"
+        issues(&no_district, &[UG_PATIENT]).await,
+        one(IssueCode::Structure, "Patient.address[0]"),
+        "an address without a district is not a ug-address"
     );
 }
 
@@ -274,11 +268,32 @@ fn differential_only_and_unsupported_profiles_fail_to_compile() {
     let errors = ProfileSet::compile(&[differential]).expect_err("refused");
     assert!(errors[0].reason.contains("no snapshot"), "{errors:?}");
 
-    let mut definitions = read_dir("custom-profiles");
-    // Without SimpleQuantity in the set, the profile discriminator cannot be checked.
+    // Without ug-address in the set, the profile discriminator cannot be checked.
+    let mut definitions: Vec<Value> = read_dir("custom-profiles")
+        .into_iter()
+        .filter(|d| d["id"] != "ug-address")
+        .collect();
     let errors = ProfileSet::compile(&definitions).expect_err("refused");
     assert!(
-        errors.iter().any(|e| e.reason.contains("SimpleQuantity")),
+        errors.iter().any(|e| e.reason.contains("ug-address")),
+        "{errors:?}"
+    );
+
+    // A choice element is sliced by type only.
+    let mut patient = read_dir("custom-profiles")
+        .into_iter()
+        .find(|d| d["id"] == "ug-patient")
+        .expect("ug-patient");
+    patient["snapshot"]["element"]
+        .as_array_mut()
+        .expect("elements")
+        .iter_mut()
+        .find(|e| e["id"] == "Patient.deceased[x]")
+        .expect("deceased[x]")["slicing"]["discriminator"] =
+        json!([{ "type": "value", "path": "$this" }]);
+    let errors = ProfileSet::compile(&[patient]).expect_err("refused");
+    assert!(
+        errors.iter().any(|e| e.reason.contains("choice element")),
         "{errors:?}"
     );
 

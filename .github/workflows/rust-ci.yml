@@ -111,3 +111,26 @@ jobs:
             grep -q "no coverage data found" coverage.err || exit 1
             echo "::notice::the domain and application crates have no code yet; nothing to measure"
           fi
+
+  java-differential:
+    name: HL7 Java validator differential
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      # The FHIR packages the validator loads (core, terminology, extensions), keyed on its
+      # version.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.fhir/packages
+          key: fhir-packages-${{ hashFiles('tools/fhir/fetch-java-validator.sh') }}
+      - run: tools/fhir/fetch-r5-examples.sh
+      - run: tools/fhir/java-differential.sh target/fhir/r5-examples/json

@@ -108,6 +108,12 @@ pub struct ProfileSet {
     profiles: HashMap<String, Arc<Compiled>>,
 }
 
+/// A canonical without its `|version`. Generated snapshots pin versions
+/// (`…/Organization|5.0.0`); the active set holds one version of each profile.
+fn unversioned(url: &str) -> &str {
+    url.split_once('|').map_or(url, |(url, _)| url)
+}
+
 /// Whether `url` is the base definition of an R5 type (not a profile).
 fn is_base_type(url: &str) -> bool {
     url.strip_prefix(SD).is_some_and(|name| {
@@ -324,7 +330,7 @@ fn fill(rule: &mut Rule, element: &Value, url: &str) -> Result<(), String> {
                     .into_iter()
                     .flatten()
                     .filter_map(Value::as_str)
-                    .map(str::to_owned)
+                    .map(|url| unversioned(url).to_owned())
                     .collect()
             };
             Some(TypeRule {
@@ -379,6 +385,15 @@ fn fill(rule: &mut Rule, element: &Value, url: &str) -> Result<(), String> {
                 return Err(format!(
                     "discriminator path {path} needs resolve(), which is out of v1"
                 ));
+            }
+            // A choice element is sliced by type only (the HL7 snapshot generator refuses
+            // anything else, #166).
+            if element["path"].as_str().is_some_and(|p| p.ends_with("[x]"))
+                && kind != Discriminator::Type
+            {
+                return Err(
+                    "a choice element can only be sliced with the type discriminator".to_owned(),
+                );
             }
             discriminators.push((kind, path));
         }
@@ -670,11 +685,12 @@ impl Walker<'_> {
 
     /// The values of one element (all of them, for cardinality and slicing).
     fn element(&mut self, rule: &Rule, items: &[Item<'_>], parent: &str, name: &str) {
+        let here = element_location(items, parent, name);
         let count = items.len() as u64;
         if count < rule.min {
             self.issue(
                 IssueCode::Required,
-                &format!("{parent}.{name}"),
+                &here,
                 format!("{name} needs at least {} value(s)", rule.min),
             );
         }
@@ -683,7 +699,7 @@ impl Walker<'_> {
         {
             self.issue(
                 IssueCode::Structure,
-                &format!("{parent}.{name}"),
+                &here,
                 format!("{name} allows at most {max} value(s)"),
             );
         }
@@ -703,6 +719,7 @@ impl Walker<'_> {
         parent: &str,
         name: &str,
     ) {
+        let here = element_location(items, parent, name);
         let mut assigned: Vec<Option<usize>> = Vec::with_capacity(items.len());
         for item in items {
             assigned.push(
@@ -722,7 +739,7 @@ impl Walker<'_> {
             if count < slice.min {
                 self.issue(
                     IssueCode::Required,
-                    &format!("{parent}.{name}"),
+                    &here,
                     format!(
                         "slice {slice_name} of {name} needs at least {} value(s)",
                         slice.min
@@ -734,7 +751,7 @@ impl Walker<'_> {
             {
                 self.issue(
                     IssueCode::Structure,
-                    &format!("{parent}.{name}"),
+                    &here,
                     format!("slice {slice_name} of {name} allows at most {max} value(s)"),
                 );
             }
@@ -779,7 +796,7 @@ impl Walker<'_> {
             if order.windows(2).any(|w| w[0] > w[1]) {
                 self.issue(
                     IssueCode::Structure,
-                    &format!("{parent}.{name}"),
+                    &here,
                     format!("the slices of {name} must appear in order"),
                 );
             }
@@ -1095,6 +1112,15 @@ impl Walker<'_> {
     }
 }
 
+/// Where an element's own issues are reported: `Patient.identifier`, or for a choice element
+/// the key present in the JSON (`Patient.deceasedDateTime`), not `Patient.deceased[x]`.
+fn element_location(items: &[Item<'_>], parent: &str, name: &str) -> String {
+    match items.first() {
+        Some(item) if name.ends_with("[x]") => item.location.clone(),
+        _ => format!("{parent}.{name}"),
+    }
+}
+
 fn is_resource_slot(code: &str) -> bool {
     matches!(code, "Resource" | "DomainResource")
 }
@@ -1191,7 +1217,7 @@ impl ProfileValidator for SnapshotValidator {
                 .and_then(Value::as_str)
                 .unwrap_or_default();
             for url in profiles {
-                let Some(compiled) = self.set.profiles.get(url) else {
+                let Some(compiled) = self.set.profiles.get(unversioned(url)) else {
                     issues.push(Issue {
                         code: IssueCode::Processing,
                         location: resource_type.to_owned(),

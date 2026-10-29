@@ -42,6 +42,9 @@ tools/fhir/check-element-table.sh target/fhir/r5-core/package
 HEALTH_FHIR_R5_EXAMPLES=$PWD/target/fhir/r5-examples/json \
   cargo test --release -p health-fhir-models -p health-fhir-validation
 
+# rust-ci.yml, java-differential job (needs java 17+)
+tools/fhir/java-differential.sh target/fhir/r5-examples/json
+
 # frontend-ci.yml (in apps/client)
 bun install --frozen-lockfile && bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan
 

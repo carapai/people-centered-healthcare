@@ -34,4 +34,5 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
   - compile refusals, including a differential-only profile;
   - with `HEALTH_FHIR_R5_EXAMPLES` set, every official example that claims one of the profiles.
 - `tests/performance.rs` holds the budget (ADR 0053): with `HEALTH_FHIR_R5_EXAMPLES` set, in a release build, tiers 1–3 must take p95 ≤ 2 ms (or `HEALTH_VALIDATION_P95_MS`) over the official clinical examples, with the vital-signs profiles active.
+- `tests/java_differential.rs` compares our verdicts with the HL7 Java validator's (`tools/fhir/java-differential.sh`; fhir-r5-model.md § The HL7 Java validator differential). `examples/differential_cases.rs` writes its cases.
 - A unit test in `src/invariants.rs` evaluates every check that `HOLDS_BY_SHAPE` skips over the corpus, and each must hold.
