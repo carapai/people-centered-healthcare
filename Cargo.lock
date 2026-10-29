@@ -1927,10 +1927,13 @@ dependencies = [
 name = "health-fhir-validation"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "health-fhir-models",
  "octofhir-fhirpath",
  "regex",
  "serde_json",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3241,8 +3244,6 @@ dependencies = [
 [[package]]
 name = "octofhir-ucum"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91656d38e1fbc6e06283e133b5784358a1106d138652c2a9446081dd8b93487"
 dependencies = [
  "fuzzy-matcher",
  "lazy_static",

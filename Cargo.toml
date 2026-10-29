@@ -43,6 +43,7 @@ health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
 health-time = { path = "crates/foundation/health-time" }
 
 anyhow = "1.0.104"
+async-trait = "0.1.92"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
 cargo_metadata = "0.23.1"
 # The adopted R5 model crate, exactly pinned (ADR 0050); only health-fhir-models may use it.
@@ -90,3 +91,5 @@ print_stdout = "warn"
 [patch.crates-io]
 # ADR 0052: the decimal-exact fork, vendored with its patches listed in PATCHES.md.
 octofhir-fhirpath = { path = "third_party/octofhir-fhirpath" }
+# A dependency of octofhir-fhirpath; patched so non-ASCII unit codes cannot panic.
+octofhir-ucum = { path = "third_party/octofhir-ucum" }
