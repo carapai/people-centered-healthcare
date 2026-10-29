@@ -60,7 +60,7 @@ Permissions are enforced in the Rust services on every node, never only in the U
 | Permission-snapshot signing | Central | Signs per-user snapshots | — | ADR 0011 |
 | Publication signing | Central HSM/KMS | Signs definition packages | Yearly | ADR 0024 |
 | Release signing | Azure Artifact Signing, KMS, GPG, cosign | Installers, updater artifacts, edge packages, images | Per ADR 0045 | ADRs 0041, 0045 |
-| Disk recovery keys (edge) | Wrapped and escrowed in central KMS; read out by phone to a verified facility admin; no on-site copy | Rotated after every use | ADR 0048 |
+| Disk recovery keys (edge) | Wrapped and escrowed in central KMS; read out by phone to a verified facility admin; no on-site copy | Unlocks the edge's full-disk encryption when the TPM cannot | Rotated after every use | ADR 0048 |
 | Backup keys | Per node, wrapped and escrowed in central KMS; central master key under 3-of-5 Shamir | Backup encryption | Runbook custodians | ADR 0046 |
 
 ## Data protection (Uganda)

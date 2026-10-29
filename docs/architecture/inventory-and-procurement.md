@@ -68,7 +68,7 @@ sequenceDiagram
     UC->>DB: change_log + outbox (op)
     UC->>DB: COMMIT
   end
-  Note over UC,DB: a concurrent writer of the same Stock Unit hits a write conflict → retry; the re-read sees the new balance
+  Note over UC,DB: a concurrent writer of the same Stock Unit hits a write conflict → retry, the re-read sees the new balance
 ```
 
 - **The balance record is the guard.** Each Stock Unit has exactly one balance record, written in every movement's transaction (persistence.md guard-record pattern).

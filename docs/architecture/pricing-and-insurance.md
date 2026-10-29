@@ -87,7 +87,7 @@ sequenceDiagram
   C->>C: assemble Claim per Account and payer
   C->>P: submit (FHIR Claim or export format)
   P-->>C: ClaimResponse / remittance
-  C->>C: ExplanationOfBenefit; PaymentReconciliation → ledger postings
+  C->>C: ExplanationOfBenefit, PaymentReconciliation → ledger postings
   C-->>E: claim status and adjustments sync down
 ```
 

@@ -21,20 +21,35 @@ The strategy is decided in [docs/architecture/testing.md](../architecture/testin
 | Payments | Payment reconciliation (nightly) |
 | Permissions, tracing, data exposure | Security (authorization matrix and redaction every PR; ZAP nightly) |
 
-## Planned commands
+## Commands
 
-These are the jobs CI runs (from [deployment.md](../architecture/deployment.md)); local wrappers are to be fixed by the scaffold.
+These are the commands CI runs (`.github/workflows/`; [deployment.md](../architecture/deployment.md) § Workflows in code). Run them locally before a PR.
 
 ```text
-cargo fmt --check
-cargo clippy (with -D warnings)                 # exact flags to be fixed by the scaffold
-cargo nextest run
-cargo doc  (with -D warnings)
-tools/architecture-checks
-cargo-deny                                      # licences, advisories, duplicates, bans
-cargo llvm-cov                                  # ≥ 80% lines on domain and application crates
-surreal validate <file>.surql ; surql-fmt --check
-bun install --frozen-lockfile ; tsc ; panda codegen ; vitest
+# rust-ci.yml
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+cargo run --locked --quiet -p architecture-checks
+cargo deny --locked check
+cargo nextest run --workspace --locked
+cargo test --workspace --doc --locked
+cargo llvm-cov nextest --package=<each domain and application crate> --fail-under-lines 80
+
+# rust-ci.yml, fhir-corpus job
+tools/fhir/fetch-r5-core.sh && tools/fhir/fetch-r5-examples.sh
+tools/fhir/check-element-table.sh target/fhir/r5-core/package
+HEALTH_FHIR_R5_EXAMPLES=$PWD/target/fhir/r5-examples/json \
+  cargo test --release -p health-fhir-models -p health-fhir-validation
+
+# frontend-ci.yml (in apps/client)
+bun install --frozen-lockfile && bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan
+
+# documentation.yml
+bunx markdownlint-cli2@0.18.1
+tools/docs/check-adr-index.sh
+tools/docs/render-mermaid.sh                    # needs mmdc
+git ls-files '*.surql' | xargs surreal validate
 ```
 
 ## Rules
@@ -52,7 +67,7 @@ bun install --frozen-lockfile ; tsc ; panda codegen ; vitest
 - `crates/<layer>/<crate>/src/**` unit tests and `crates/<layer>/<crate>/tests/`
 - `crates/testing/health-test-support/`
 - Package `tests/` folders (fixtures, scenarios)
-- `.github/workflows/rust-ci.yml`, `frontend-ci.yml`, `integration-tests.yml`, `security.yml`, `documentation.yml`
+- `.github/workflows/rust-ci.yml`, `frontend-ci.yml`, `security.yml`, `dependency-review.yml`, `documentation.yml`; `integration-tests.yml` comes with the integration suites
 
 ## Governing decisions
 

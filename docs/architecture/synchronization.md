@@ -70,7 +70,7 @@ sequenceDiagram
   loop until caught up
     N->>U: pull since cursor (priority lanes)
     U-->>N: items in seq order + new cursor
-    N->>N: apply in one transaction per group; checkpoint
+    N->>N: apply in one transaction per group, checkpoint
   end
   N->>U: blob uploads (resumable chunks)
 ```

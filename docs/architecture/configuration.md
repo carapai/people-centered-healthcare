@@ -36,7 +36,7 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 | Terminology | Large code systems and expansions (ICD, LOINC, …) | Terminology lead (two approvers) |
 | Program | Forms, mappings, workflow and program definitions for ART, TB, ANC, … | Program clinical leads (two approvers) |
 | Country configuration | Roles and permissions, deployment settings | Platform admin (one approver) |
-| Override | District or facility configuration at declared override points | See [Overrides](#overrides) |
+| Override | District or facility configuration at declared override points | See [Overrides](#overrides-adr-0026) |
 
 - **Identity.** A package is identified by `name@version` and its sha-256.
 - **Transport.** Packages travel as blobs through the content-addressed store (ADR 0021).
@@ -84,10 +84,10 @@ sequenceDiagram
   participant D as Desktop
   C->>E: activation record (metadata lane)
   E->>C: fetch package blob(s) by hash
-  E->>E: verify signature + sha-256; stage
+  E->>E: verify signature + sha-256, stage
   E->>E: check dependencies, minSoftware, formatVersion
   alt incompatible or missing dependency
-    E-->>C: activation failed (reason); keep previous set
+    E-->>C: activation failed (reason), keep previous set
   else ok
     E->>E: at effective time: switch active set atomically
     E->>E: reindex if SearchParameters changed

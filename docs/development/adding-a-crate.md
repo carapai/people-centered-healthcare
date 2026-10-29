@@ -11,6 +11,7 @@ Any new workspace member. Crates are created lazily, when the first implementati
 1. Pick the layer and its directory from [dependency-rules.md](../architecture/dependency-rules.md): `crates/foundation/`, `crates/contracts/`, `crates/domains/`, `crates/application/`, `crates/infrastructure/`, `crates/edge/`, `crates/desktop/`, `apps/…`, or `crates/testing/`.
 2. Name it `health-<name>` following the catalogue (`health-<context>-contract`, `health-<context>-app`, `health-<module>`).
 3. Write `Cargo.toml`:
+
    ```toml
    [package]
    name = "health-<name>"
@@ -30,6 +31,7 @@ Any new workspace member. Crates are created lazily, when the first implementati
    [dependencies]
    serde = { workspace = true }
    ```
+
 4. Add any new crate once, to root `[workspace.dependencies]`, including workspace crates as `{ path = "…" }` entries, so every dependency is `{ workspace = true }`. A new external in a domain crate needs an allowlist entry, reviewed like an ADR.
 5. Do not add `[features]` to domain or application crates. Features in infrastructure or runtime crates only choose adapters.
 6. Keep items `pub(crate)` by default and re-export the public API from `lib.rs`.

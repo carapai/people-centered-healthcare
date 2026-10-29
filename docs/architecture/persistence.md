@@ -113,11 +113,11 @@ sequenceDiagram
     UoW->>DB: guard records / UNIQUE checks
     UoW->>DB: upsert head
     UoW->>DB: create history row
-    UoW->>DB: delete old index entries; create new ones
+    UoW->>DB: delete old index entries, create new ones
     UoW->>DB: append change_log + outbox rows
     UoW->>DB: COMMIT
   end
-  Note over UoW,DB: write-write conflict → retry ≤3 with jitter; on retry the If-Match check yields 412 if the other writer won
+  Note over UoW,DB: write-write conflict → retry ≤3 with jitter, on retry the If-Match check yields 412 if the other writer won
 ```
 
 - **Implementation (#56).** `health-surrealdb::SurrealStore` runs each unit of work as one SurrealDB interactive transaction.

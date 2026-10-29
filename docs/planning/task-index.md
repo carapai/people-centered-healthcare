@@ -2,7 +2,6 @@
 
 _Generated from the backlog spec when the backlog was created (2026-10-28). GitHub issues are authoritative; update this file when the plan changes._
 
-
 | # | Task | Phase | Blocked by | Human |
 |---|---|---|---|---|
 | [#42](https://github.com/carapai/people-centered-healthcare/issues/42) | Create the Cargo workspace with the six-layer layout | 1 | — |  |
@@ -15,6 +14,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#49](https://github.com/carapai/people-centered-healthcare/issues/49) | Create central-server with the shared Axum router and telemetry | 1 | #42 |  |
 | [#50](https://github.com/carapai/people-centered-healthcare/issues/50) | Generate FHIR R5 TypeScript types and the OpenAPI client types | 1 | #44, #49 |  |
 | [#51](https://github.com/carapai/people-centered-healthcare/issues/51) | Build tools/synthetic-data | 1 | #42 |  |
+| [#173](https://github.com/carapai/people-centered-healthcare/issues/173) | Run Vitest and component tests in frontend-ci | 1 | #47 |  |
 | [#52](https://github.com/carapai/people-centered-healthcare/issues/52) | Implement typed identifiers and node-prefixed sequences | 2 | #42 |  |
 | [#53](https://github.com/carapai/people-centered-healthcare/issues/53) | Adopt the R5 model crate behind health-fhir-models | 2 | #42, #35 |  |
 | [#54](https://github.com/carapai/people-centered-healthcare/issues/54) | Define health-persistence unit-of-work, outbox and versioning traits | 2 | #42 |  |
