@@ -22,10 +22,11 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 0 of 101 implementation tasks done. Validation spikes open: 4.
+Total: 0 of 101 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
 - 2026-10-28: backlog created; no implementation started.
 - 2026-10-29: model-crate spike resolved (ADR 0050); follow-ups decided (ADRs 0051–0053); added #145.
 - 2026-10-29: frontend-scaffold spike resolved (ADR 0054).
+- 2026-10-29: matching-scale spike resolved at reduced scale; raised #146.

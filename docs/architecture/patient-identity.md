@@ -92,7 +92,12 @@ flowchart TD
 - **API.** `Patient/$match` returns `search.score` and the `match-grade` extension.
 - **Candidate generation.**
   - Blocking keys and phonetic codes are written to SurrealDB array-keyed tables `idx_block:[key_type, key_value, patient_uuid]` in the Patient's write transaction (ADR 0017).
-  - Its scale is checked by [Can SurrealDB blocking indexes serve patient matching at 45M-person scale?](https://github.com/carapai/people-centered-healthcare/issues/37). If it fails, the fallback is a tantivy sidecar at central.
+  - **Scale.** The reduced-scale spike [Can SurrealDB blocking indexes serve patient matching at 45M-person scale?](https://github.com/carapai/people-centered-healthcare/issues/37) used SurrealDB 3.3.5.
+    - Range-scan cost follows the block size, not the table size (about 4 µs per row).
+    - The storage design holds, and the tantivy fallback is **not** needed for exact-key candidate generation.
+    - The base key set is too broad: 99% of queries exceed 2,000 candidates at 45M, mostly because of district + given initial.
+    - The default keys and the stop-list are decided in [Which default blocking keys and stop-list do the Matching Rules use?](https://github.com/carapai/people-centered-healthcare/issues/146).
+    - Latency at 45M on central hardware, under concurrent load, is an acceptance criterion of the matching task.
 
 ### "Did you mean" at registration
 
