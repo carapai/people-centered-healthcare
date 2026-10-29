@@ -1,0 +1,24 @@
+[package]
+name = "health-fhir-search"
+description = "SearchParameter registry, search request parser and AST, index-value extraction and normalization. Pure."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "contracts"
+
+[lints]
+workspace = true
+
+[dependencies]
+jiff = { workspace = true }
+rust_decimal = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+unicode-normalization = { workspace = true }
+
+[dev-dependencies]
+jiff = { workspace = true }
+serde_json = { workspace = true }

@@ -1669,6 +1669,17 @@ name = "health-errors"
 version = "0.1.0"
 
 [[package]]
+name = "health-fhir-search"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "rust_decimal",
+ "serde_json",
+ "thiserror",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "health-identifiers"
 version = "0.1.0"
 dependencies = [
@@ -1707,9 +1718,12 @@ version = "0.1.0"
 name = "health-surrealdb"
 version = "0.1.0"
 dependencies = [
+ "health-fhir-search",
  "health-identifiers",
  "health-persistence",
  "health-time",
+ "jiff",
+ "rust_decimal",
  "serde_json",
  "sha2 0.11.1",
  "surrealdb",

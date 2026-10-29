@@ -7,15 +7,17 @@
 //!   refuses to start if an applied migration was modified.
 //!
 //! - [`SurrealStore`] implements the `health-persistence` unit of work on SurrealDB interactive
-//!   transactions: heads, history, guards, counters and the outbox. Search index entries arrive
-//!   with the search task (#57).
+//!   transactions: heads, history, guards, counters, the outbox and search index entries.
+//! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
 mod connection;
 mod migrations;
 pub mod ownership;
+pub mod search;
 mod store;
 
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
+pub use search::{ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SurrealStore, SurrealTx};

@@ -4,6 +4,8 @@ DEFINE TABLE _migration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD name ON _migration TYPE string PERMISSIONS FULL
 DEFINE TABLE account TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON account TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON account TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON account TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON account TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON account TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON account TYPE string PERMISSIONS FULL
@@ -17,6 +19,8 @@ DEFINE TABLE account_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX account_history_last_updated ON account_history FIELDS last_updated, version_seq
 DEFINE TABLE activity_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON activity_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON activity_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON activity_definition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON activity_definition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON activity_definition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON activity_definition TYPE string PERMISSIONS FULL
@@ -30,6 +34,8 @@ DEFINE TABLE activity_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX activity_definition_history_last_updated ON activity_definition_history FIELDS last_updated, version_seq
 DEFINE TABLE allergy_intolerance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON allergy_intolerance TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON allergy_intolerance TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON allergy_intolerance TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON allergy_intolerance TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON allergy_intolerance TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON allergy_intolerance TYPE string PERMISSIONS FULL
@@ -43,6 +49,8 @@ DEFINE TABLE allergy_intolerance_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX allergy_intolerance_history_last_updated ON allergy_intolerance_history FIELDS last_updated, version_seq
 DEFINE TABLE appointment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON appointment TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON appointment TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON appointment TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON appointment TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON appointment TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON appointment TYPE string PERMISSIONS FULL
@@ -56,6 +64,8 @@ DEFINE TABLE appointment_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX appointment_history_last_updated ON appointment_history FIELDS last_updated, version_seq
 DEFINE TABLE appointment_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON appointment_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON appointment_response TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON appointment_response TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON appointment_response TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON appointment_response TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON appointment_response TYPE string PERMISSIONS FULL
@@ -69,6 +79,8 @@ DEFINE TABLE appointment_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX appointment_response_history_last_updated ON appointment_response_history FIELDS last_updated, version_seq
 DEFINE TABLE audit_event TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON audit_event TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON audit_event TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON audit_event TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON audit_event TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON audit_event TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON audit_event TYPE string PERMISSIONS FULL
@@ -82,6 +94,8 @@ DEFINE TABLE audit_event_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX audit_event_history_last_updated ON audit_event_history FIELDS last_updated, version_seq
 DEFINE TABLE capability_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON capability_statement TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON capability_statement TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON capability_statement TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON capability_statement TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON capability_statement TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON capability_statement TYPE string PERMISSIONS FULL
@@ -95,6 +109,8 @@ DEFINE TABLE capability_statement_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX capability_statement_history_last_updated ON capability_statement_history FIELDS last_updated, version_seq
 DEFINE TABLE care_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON care_plan TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON care_plan TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON care_plan TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON care_plan TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON care_plan TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON care_plan TYPE string PERMISSIONS FULL
@@ -108,6 +124,8 @@ DEFINE TABLE care_plan_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX care_plan_history_last_updated ON care_plan_history FIELDS last_updated, version_seq
 DEFINE TABLE care_team TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON care_team TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON care_team TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON care_team TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON care_team TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON care_team TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON care_team TYPE string PERMISSIONS FULL
@@ -121,12 +139,16 @@ DEFINE TABLE care_team_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX care_team_history_last_updated ON care_team_history FIELDS last_updated, version_seq
 DEFINE TABLE charge_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON charge_item TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON charge_item TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON charge_item TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON charge_item TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON charge_item TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON charge_item TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON charge_item TYPE int PERMISSIONS FULL
 DEFINE TABLE charge_item_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON charge_item_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON charge_item_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON charge_item_definition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON charge_item_definition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON charge_item_definition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON charge_item_definition TYPE string PERMISSIONS FULL
@@ -147,6 +169,8 @@ DEFINE TABLE charge_item_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX charge_item_history_last_updated ON charge_item_history FIELDS last_updated, version_seq
 DEFINE TABLE claim TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON claim TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON claim TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON claim TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON claim TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON claim TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON claim TYPE string PERMISSIONS FULL
@@ -160,6 +184,8 @@ DEFINE TABLE claim_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX claim_history_last_updated ON claim_history FIELDS last_updated, version_seq
 DEFINE TABLE claim_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON claim_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON claim_response TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON claim_response TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON claim_response TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON claim_response TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON claim_response TYPE string PERMISSIONS FULL
@@ -173,6 +199,8 @@ DEFINE TABLE claim_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX claim_response_history_last_updated ON claim_response_history FIELDS last_updated, version_seq
 DEFINE TABLE clinical_impression TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON clinical_impression TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON clinical_impression TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON clinical_impression TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON clinical_impression TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON clinical_impression TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON clinical_impression TYPE string PERMISSIONS FULL
@@ -186,6 +214,8 @@ DEFINE TABLE clinical_impression_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX clinical_impression_history_last_updated ON clinical_impression_history FIELDS last_updated, version_seq
 DEFINE TABLE code_system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON code_system TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON code_system TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON code_system TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON code_system TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON code_system TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON code_system TYPE string PERMISSIONS FULL
@@ -199,6 +229,8 @@ DEFINE TABLE code_system_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX code_system_history_last_updated ON code_system_history FIELDS last_updated, version_seq
 DEFINE TABLE composition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON composition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON composition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON composition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON composition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON composition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON composition TYPE string PERMISSIONS FULL
@@ -212,6 +244,8 @@ DEFINE TABLE composition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX composition_history_last_updated ON composition_history FIELDS last_updated, version_seq
 DEFINE TABLE concept_map TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON concept_map TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON concept_map TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON concept_map TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON concept_map TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON concept_map TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON concept_map TYPE string PERMISSIONS FULL
@@ -225,6 +259,8 @@ DEFINE TABLE concept_map_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX concept_map_history_last_updated ON concept_map_history FIELDS last_updated, version_seq
 DEFINE TABLE condition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON condition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON condition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON condition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON condition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON condition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON condition TYPE string PERMISSIONS FULL
@@ -238,6 +274,8 @@ DEFINE TABLE condition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX condition_history_last_updated ON condition_history FIELDS last_updated, version_seq
 DEFINE TABLE consent TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON consent TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON consent TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON consent TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON consent TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON consent TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON consent TYPE string PERMISSIONS FULL
@@ -251,6 +289,8 @@ DEFINE TABLE consent_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX consent_history_last_updated ON consent_history FIELDS last_updated, version_seq
 DEFINE TABLE contract TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON contract TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON contract TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON contract TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON contract TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON contract TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON contract TYPE string PERMISSIONS FULL
@@ -267,12 +307,16 @@ DEFINE TABLE counter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD year ON counter TYPE none | int PERMISSIONS FULL
 DEFINE TABLE coverage TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON coverage TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON coverage TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON coverage TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON coverage TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON coverage TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON coverage TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON coverage TYPE int PERMISSIONS FULL
 DEFINE TABLE coverage_eligibility_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON coverage_eligibility_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON coverage_eligibility_request TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON coverage_eligibility_request TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON coverage_eligibility_request TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON coverage_eligibility_request TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON coverage_eligibility_request TYPE string PERMISSIONS FULL
@@ -286,6 +330,8 @@ DEFINE TABLE coverage_eligibility_request_history TYPE NORMAL SCHEMAFULL PERMISS
   DEFINE INDEX coverage_eligibility_request_history_last_updated ON coverage_eligibility_request_history FIELDS last_updated, version_seq
 DEFINE TABLE coverage_eligibility_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON coverage_eligibility_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON coverage_eligibility_response TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON coverage_eligibility_response TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON coverage_eligibility_response TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON coverage_eligibility_response TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON coverage_eligibility_response TYPE string PERMISSIONS FULL
@@ -306,6 +352,8 @@ DEFINE TABLE coverage_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX coverage_history_last_updated ON coverage_history FIELDS last_updated, version_seq
 DEFINE TABLE detected_issue TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON detected_issue TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON detected_issue TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON detected_issue TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON detected_issue TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON detected_issue TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON detected_issue TYPE string PERMISSIONS FULL
@@ -319,6 +367,8 @@ DEFINE TABLE detected_issue_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX detected_issue_history_last_updated ON detected_issue_history FIELDS last_updated, version_seq
 DEFINE TABLE device_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON device_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON device_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON device_definition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON device_definition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON device_definition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON device_definition TYPE string PERMISSIONS FULL
@@ -332,6 +382,8 @@ DEFINE TABLE device_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX device_definition_history_last_updated ON device_definition_history FIELDS last_updated, version_seq
 DEFINE TABLE device_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON device_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON device_request TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON device_request TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON device_request TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON device_request TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON device_request TYPE string PERMISSIONS FULL
@@ -345,6 +397,8 @@ DEFINE TABLE device_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX device_request_history_last_updated ON device_request_history FIELDS last_updated, version_seq
 DEFINE TABLE diagnostic_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON diagnostic_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON diagnostic_report TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON diagnostic_report TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON diagnostic_report TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON diagnostic_report TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON diagnostic_report TYPE string PERMISSIONS FULL
@@ -358,6 +412,8 @@ DEFINE TABLE diagnostic_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX diagnostic_report_history_last_updated ON diagnostic_report_history FIELDS last_updated, version_seq
 DEFINE TABLE document_reference TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON document_reference TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON document_reference TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON document_reference TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON document_reference TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON document_reference TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON document_reference TYPE string PERMISSIONS FULL
@@ -371,6 +427,8 @@ DEFINE TABLE document_reference_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX document_reference_history_last_updated ON document_reference_history FIELDS last_updated, version_seq
 DEFINE TABLE encounter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON encounter TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON encounter TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON encounter TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON encounter TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON encounter TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON encounter TYPE string PERMISSIONS FULL
@@ -384,6 +442,8 @@ DEFINE TABLE encounter_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX encounter_history_last_updated ON encounter_history FIELDS last_updated, version_seq
 DEFINE TABLE endpoint TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON endpoint TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON endpoint TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON endpoint TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON endpoint TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON endpoint TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON endpoint TYPE string PERMISSIONS FULL
@@ -397,6 +457,8 @@ DEFINE TABLE endpoint_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX endpoint_history_last_updated ON endpoint_history FIELDS last_updated, version_seq
 DEFINE TABLE episode_of_care TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON episode_of_care TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON episode_of_care TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON episode_of_care TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON episode_of_care TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON episode_of_care TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON episode_of_care TYPE string PERMISSIONS FULL
@@ -410,6 +472,8 @@ DEFINE TABLE episode_of_care_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX episode_of_care_history_last_updated ON episode_of_care_history FIELDS last_updated, version_seq
 DEFINE TABLE explanation_of_benefit TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON explanation_of_benefit TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON explanation_of_benefit TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON explanation_of_benefit TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON explanation_of_benefit TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON explanation_of_benefit TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON explanation_of_benefit TYPE string PERMISSIONS FULL
@@ -423,6 +487,8 @@ DEFINE TABLE explanation_of_benefit_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE INDEX explanation_of_benefit_history_last_updated ON explanation_of_benefit_history FIELDS last_updated, version_seq
 DEFINE TABLE family_member_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON family_member_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON family_member_history TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON family_member_history TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON family_member_history TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON family_member_history TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON family_member_history TYPE string PERMISSIONS FULL
@@ -436,6 +502,8 @@ DEFINE TABLE family_member_history_history TYPE NORMAL SCHEMAFULL PERMISSIONS NO
   DEFINE INDEX family_member_history_history_last_updated ON family_member_history_history FIELDS last_updated, version_seq
 DEFINE TABLE flag TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON flag TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON flag TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON flag TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON flag TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON flag TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON flag TYPE string PERMISSIONS FULL
@@ -449,6 +517,8 @@ DEFINE TABLE flag_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX flag_history_last_updated ON flag_history FIELDS last_updated, version_seq
 DEFINE TABLE goal TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON goal TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON goal TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON goal TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON goal TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON goal TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON goal TYPE string PERMISSIONS FULL
@@ -462,6 +532,8 @@ DEFINE TABLE goal_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX goal_history_last_updated ON goal_history FIELDS last_updated, version_seq
 DEFINE TABLE group TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON group TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON group TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON group TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON group TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON group TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON group TYPE string PERMISSIONS FULL
@@ -477,6 +549,8 @@ DEFINE TABLE guard TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD held ON guard TYPE bool PERMISSIONS FULL
 DEFINE TABLE guidance_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON guidance_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON guidance_response TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON guidance_response TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON guidance_response TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON guidance_response TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON guidance_response TYPE string PERMISSIONS FULL
@@ -490,6 +564,8 @@ DEFINE TABLE guidance_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX guidance_response_history_last_updated ON guidance_response_history FIELDS last_updated, version_seq
 DEFINE TABLE healthcare_service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON healthcare_service TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON healthcare_service TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON healthcare_service TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON healthcare_service TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON healthcare_service TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON healthcare_service TYPE string PERMISSIONS FULL
@@ -501,8 +577,48 @@ DEFINE TABLE healthcare_service_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON healthcare_service_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON healthcare_service_history TYPE int PERMISSIONS FULL
   DEFINE INDEX healthcare_service_history_last_updated ON healthcare_service_history FIELDS last_updated, version_seq
+DEFINE TABLE idx_composite TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD param ON idx_composite TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_composite TYPE string PERMISSIONS FULL
+DEFINE TABLE idx_date TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD end ON idx_date TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD param ON idx_date TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_date TYPE string PERMISSIONS FULL
+  DEFINE INDEX idx_date_end ON idx_date FIELDS rt, param, end
+DEFINE TABLE idx_missing TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD param ON idx_missing TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_missing TYPE string PERMISSIONS FULL
+DEFINE TABLE idx_number TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD param ON idx_number TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_number TYPE string PERMISSIONS FULL
+DEFINE TABLE idx_quantity TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD `value` ON idx_quantity TYPE decimal PERMISSIONS FULL
+  DEFINE FIELD code ON idx_quantity TYPE string PERMISSIONS FULL
+  DEFINE FIELD param ON idx_quantity TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_quantity TYPE string PERMISSIONS FULL
+  DEFINE INDEX idx_quantity_code_value ON idx_quantity FIELDS rt, param, code, `value`
+  DEFINE INDEX idx_quantity_value ON idx_quantity FIELDS rt, param, `value`
+DEFINE TABLE idx_reference TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD param ON idx_reference TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_reference TYPE string PERMISSIONS FULL
+  DEFINE FIELD target_id ON idx_reference TYPE string PERMISSIONS FULL
+  DEFINE INDEX idx_reference_target_id ON idx_reference FIELDS rt, param, target_id
+DEFINE TABLE idx_string TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD exact ON idx_string TYPE string PERMISSIONS FULL
+  DEFINE FIELD param ON idx_string TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_string TYPE string PERMISSIONS FULL
+DEFINE TABLE idx_token TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD code ON idx_token TYPE string PERMISSIONS FULL
+  DEFINE FIELD param ON idx_token TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_token TYPE string PERMISSIONS FULL
+  DEFINE INDEX idx_token_code ON idx_token FIELDS rt, param, code
+DEFINE TABLE idx_uri TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD param ON idx_uri TYPE string PERMISSIONS FULL
+  DEFINE FIELD rt ON idx_uri TYPE string PERMISSIONS FULL
 DEFINE TABLE imaging_study TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON imaging_study TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON imaging_study TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON imaging_study TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON imaging_study TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON imaging_study TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON imaging_study TYPE string PERMISSIONS FULL
@@ -516,12 +632,16 @@ DEFINE TABLE imaging_study_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX imaging_study_history_last_updated ON imaging_study_history FIELDS last_updated, version_seq
 DEFINE TABLE immunization TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON immunization TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON immunization TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON immunization TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON immunization TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON immunization TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON immunization TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON immunization TYPE int PERMISSIONS FULL
 DEFINE TABLE immunization_evaluation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON immunization_evaluation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON immunization_evaluation TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON immunization_evaluation TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON immunization_evaluation TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON immunization_evaluation TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON immunization_evaluation TYPE string PERMISSIONS FULL
@@ -542,6 +662,8 @@ DEFINE TABLE immunization_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX immunization_history_last_updated ON immunization_history FIELDS last_updated, version_seq
 DEFINE TABLE immunization_recommendation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON immunization_recommendation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON immunization_recommendation TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON immunization_recommendation TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON immunization_recommendation TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON immunization_recommendation TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON immunization_recommendation TYPE string PERMISSIONS FULL
@@ -555,6 +677,8 @@ DEFINE TABLE immunization_recommendation_history TYPE NORMAL SCHEMAFULL PERMISSI
   DEFINE INDEX immunization_recommendation_history_last_updated ON immunization_recommendation_history FIELDS last_updated, version_seq
 DEFINE TABLE implementation_guide TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON implementation_guide TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON implementation_guide TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON implementation_guide TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON implementation_guide TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON implementation_guide TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON implementation_guide TYPE string PERMISSIONS FULL
@@ -568,6 +692,8 @@ DEFINE TABLE implementation_guide_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX implementation_guide_history_last_updated ON implementation_guide_history FIELDS last_updated, version_seq
 DEFINE TABLE insurance_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON insurance_plan TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON insurance_plan TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON insurance_plan TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON insurance_plan TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON insurance_plan TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON insurance_plan TYPE string PERMISSIONS FULL
@@ -581,6 +707,8 @@ DEFINE TABLE insurance_plan_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX insurance_plan_history_last_updated ON insurance_plan_history FIELDS last_updated, version_seq
 DEFINE TABLE inventory_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON inventory_item TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON inventory_item TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON inventory_item TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON inventory_item TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON inventory_item TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON inventory_item TYPE string PERMISSIONS FULL
@@ -594,6 +722,8 @@ DEFINE TABLE inventory_item_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX inventory_item_history_last_updated ON inventory_item_history FIELDS last_updated, version_seq
 DEFINE TABLE inventory_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON inventory_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON inventory_report TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON inventory_report TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON inventory_report TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON inventory_report TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON inventory_report TYPE string PERMISSIONS FULL
@@ -607,6 +737,8 @@ DEFINE TABLE inventory_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX inventory_report_history_last_updated ON inventory_report_history FIELDS last_updated, version_seq
 DEFINE TABLE invoice TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON invoice TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON invoice TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON invoice TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON invoice TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON invoice TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON invoice TYPE string PERMISSIONS FULL
@@ -620,6 +752,8 @@ DEFINE TABLE invoice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX invoice_history_last_updated ON invoice_history FIELDS last_updated, version_seq
 DEFINE TABLE library TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON library TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON library TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON library TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON library TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON library TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON library TYPE string PERMISSIONS FULL
@@ -633,6 +767,8 @@ DEFINE TABLE library_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX library_history_last_updated ON library_history FIELDS last_updated, version_seq
 DEFINE TABLE location TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON location TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON location TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON location TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON location TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON location TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON location TYPE string PERMISSIONS FULL
@@ -646,6 +782,8 @@ DEFINE TABLE location_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX location_history_last_updated ON location_history FIELDS last_updated, version_seq
 DEFINE TABLE measure TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON measure TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON measure TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON measure TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON measure TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON measure TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON measure TYPE string PERMISSIONS FULL
@@ -659,6 +797,8 @@ DEFINE TABLE measure_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX measure_history_last_updated ON measure_history FIELDS last_updated, version_seq
 DEFINE TABLE measure_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON measure_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON measure_report TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON measure_report TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON measure_report TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON measure_report TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON measure_report TYPE string PERMISSIONS FULL
@@ -672,12 +812,16 @@ DEFINE TABLE measure_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX measure_report_history_last_updated ON measure_report_history FIELDS last_updated, version_seq
 DEFINE TABLE medication TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON medication TYPE int PERMISSIONS FULL
 DEFINE TABLE medication_administration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication_administration TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication_administration TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication_administration TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication_administration TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication_administration TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication_administration TYPE string PERMISSIONS FULL
@@ -691,6 +835,8 @@ DEFINE TABLE medication_administration_history TYPE NORMAL SCHEMAFULL PERMISSION
   DEFINE INDEX medication_administration_history_last_updated ON medication_administration_history FIELDS last_updated, version_seq
 DEFINE TABLE medication_dispense TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication_dispense TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication_dispense TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication_dispense TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication_dispense TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication_dispense TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication_dispense TYPE string PERMISSIONS FULL
@@ -711,6 +857,8 @@ DEFINE TABLE medication_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX medication_history_last_updated ON medication_history FIELDS last_updated, version_seq
 DEFINE TABLE medication_knowledge TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication_knowledge TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication_knowledge TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication_knowledge TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication_knowledge TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication_knowledge TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication_knowledge TYPE string PERMISSIONS FULL
@@ -724,6 +872,8 @@ DEFINE TABLE medication_knowledge_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX medication_knowledge_history_last_updated ON medication_knowledge_history FIELDS last_updated, version_seq
 DEFINE TABLE medication_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication_request TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication_request TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication_request TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication_request TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication_request TYPE string PERMISSIONS FULL
@@ -737,6 +887,8 @@ DEFINE TABLE medication_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX medication_request_history_last_updated ON medication_request_history FIELDS last_updated, version_seq
 DEFINE TABLE medication_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON medication_statement TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON medication_statement TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON medication_statement TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON medication_statement TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON medication_statement TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON medication_statement TYPE string PERMISSIONS FULL
@@ -750,6 +902,8 @@ DEFINE TABLE medication_statement_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX medication_statement_history_last_updated ON medication_statement_history FIELDS last_updated, version_seq
 DEFINE TABLE naming_system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON naming_system TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON naming_system TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON naming_system TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON naming_system TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON naming_system TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON naming_system TYPE string PERMISSIONS FULL
@@ -763,6 +917,8 @@ DEFINE TABLE naming_system_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX naming_system_history_last_updated ON naming_system_history FIELDS last_updated, version_seq
 DEFINE TABLE nutrition_order TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON nutrition_order TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON nutrition_order TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON nutrition_order TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON nutrition_order TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON nutrition_order TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON nutrition_order TYPE string PERMISSIONS FULL
@@ -776,6 +932,8 @@ DEFINE TABLE nutrition_order_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX nutrition_order_history_last_updated ON nutrition_order_history FIELDS last_updated, version_seq
 DEFINE TABLE observation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON observation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON observation TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON observation TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON observation TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON observation TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON observation TYPE string PERMISSIONS FULL
@@ -789,6 +947,8 @@ DEFINE TABLE observation_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX observation_history_last_updated ON observation_history FIELDS last_updated, version_seq
 DEFINE TABLE organization TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON organization TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON organization TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON organization TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON organization TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON organization TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON organization TYPE string PERMISSIONS FULL
@@ -808,6 +968,8 @@ DEFINE TABLE outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX outbox_created_at ON outbox FIELDS created_at
 DEFINE TABLE patient TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON patient TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON patient TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON patient TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON patient TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON patient TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON patient TYPE string PERMISSIONS FULL
@@ -821,6 +983,8 @@ DEFINE TABLE patient_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX patient_history_last_updated ON patient_history FIELDS last_updated, version_seq
 DEFINE TABLE payment_notice TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON payment_notice TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON payment_notice TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON payment_notice TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON payment_notice TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON payment_notice TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON payment_notice TYPE string PERMISSIONS FULL
@@ -834,6 +998,8 @@ DEFINE TABLE payment_notice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX payment_notice_history_last_updated ON payment_notice_history FIELDS last_updated, version_seq
 DEFINE TABLE payment_reconciliation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON payment_reconciliation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON payment_reconciliation TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON payment_reconciliation TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON payment_reconciliation TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON payment_reconciliation TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON payment_reconciliation TYPE string PERMISSIONS FULL
@@ -847,6 +1013,8 @@ DEFINE TABLE payment_reconciliation_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE INDEX payment_reconciliation_history_last_updated ON payment_reconciliation_history FIELDS last_updated, version_seq
 DEFINE TABLE person TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON person TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON person TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON person TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON person TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON person TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON person TYPE string PERMISSIONS FULL
@@ -860,6 +1028,8 @@ DEFINE TABLE person_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX person_history_last_updated ON person_history FIELDS last_updated, version_seq
 DEFINE TABLE plan_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON plan_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON plan_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON plan_definition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON plan_definition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON plan_definition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON plan_definition TYPE string PERMISSIONS FULL
@@ -873,6 +1043,8 @@ DEFINE TABLE plan_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX plan_definition_history_last_updated ON plan_definition_history FIELDS last_updated, version_seq
 DEFINE TABLE practitioner TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON practitioner TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON practitioner TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON practitioner TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON practitioner TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON practitioner TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON practitioner TYPE string PERMISSIONS FULL
@@ -886,6 +1058,8 @@ DEFINE TABLE practitioner_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX practitioner_history_last_updated ON practitioner_history FIELDS last_updated, version_seq
 DEFINE TABLE practitioner_role TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON practitioner_role TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON practitioner_role TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON practitioner_role TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON practitioner_role TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON practitioner_role TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON practitioner_role TYPE string PERMISSIONS FULL
@@ -899,6 +1073,8 @@ DEFINE TABLE practitioner_role_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX practitioner_role_history_last_updated ON practitioner_role_history FIELDS last_updated, version_seq
 DEFINE TABLE procedure TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON procedure TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON procedure TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON procedure TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON procedure TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON procedure TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON procedure TYPE string PERMISSIONS FULL
@@ -912,6 +1088,8 @@ DEFINE TABLE procedure_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX procedure_history_last_updated ON procedure_history FIELDS last_updated, version_seq
 DEFINE TABLE questionnaire TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON questionnaire TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON questionnaire TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON questionnaire TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON questionnaire TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON questionnaire TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON questionnaire TYPE string PERMISSIONS FULL
@@ -925,6 +1103,8 @@ DEFINE TABLE questionnaire_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX questionnaire_history_last_updated ON questionnaire_history FIELDS last_updated, version_seq
 DEFINE TABLE questionnaire_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON questionnaire_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON questionnaire_response TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON questionnaire_response TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON questionnaire_response TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON questionnaire_response TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON questionnaire_response TYPE string PERMISSIONS FULL
@@ -936,8 +1116,17 @@ DEFINE TABLE questionnaire_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE FIELD version_id ON questionnaire_response_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON questionnaire_response_history TYPE int PERMISSIONS FULL
   DEFINE INDEX questionnaire_response_history_last_updated ON questionnaire_response_history FIELDS last_updated, version_seq
+DEFINE TABLE reindex_job TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD `after` ON reindex_job TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD done ON reindex_job TYPE bool PERMISSIONS FULL
+  DEFINE FIELD params ON reindex_job TYPE array<string> PERMISSIONS FULL
+  DEFINE FIELD params.* ON reindex_job TYPE string PERMISSIONS FULL
+  DEFINE FIELD processed ON reindex_job TYPE int PERMISSIONS FULL
+  DEFINE FIELD rt ON reindex_job TYPE string PERMISSIONS FULL
 DEFINE TABLE related_person TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON related_person TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON related_person TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON related_person TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON related_person TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON related_person TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON related_person TYPE string PERMISSIONS FULL
@@ -951,6 +1140,8 @@ DEFINE TABLE related_person_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX related_person_history_last_updated ON related_person_history FIELDS last_updated, version_seq
 DEFINE TABLE request_orchestration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON request_orchestration TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON request_orchestration TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON request_orchestration TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON request_orchestration TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON request_orchestration TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON request_orchestration TYPE string PERMISSIONS FULL
@@ -964,6 +1155,8 @@ DEFINE TABLE request_orchestration_history TYPE NORMAL SCHEMAFULL PERMISSIONS NO
   DEFINE INDEX request_orchestration_history_last_updated ON request_orchestration_history FIELDS last_updated, version_seq
 DEFINE TABLE risk_assessment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON risk_assessment TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON risk_assessment TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON risk_assessment TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON risk_assessment TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON risk_assessment TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON risk_assessment TYPE string PERMISSIONS FULL
@@ -977,6 +1170,8 @@ DEFINE TABLE risk_assessment_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX risk_assessment_history_last_updated ON risk_assessment_history FIELDS last_updated, version_seq
 DEFINE TABLE schedule TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON schedule TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON schedule TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON schedule TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON schedule TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON schedule TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON schedule TYPE string PERMISSIONS FULL
@@ -990,6 +1185,8 @@ DEFINE TABLE schedule_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX schedule_history_last_updated ON schedule_history FIELDS last_updated, version_seq
 DEFINE TABLE search_parameter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON search_parameter TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON search_parameter TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON search_parameter TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON search_parameter TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON search_parameter TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON search_parameter TYPE string PERMISSIONS FULL
@@ -1003,6 +1200,8 @@ DEFINE TABLE search_parameter_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX search_parameter_history_last_updated ON search_parameter_history FIELDS last_updated, version_seq
 DEFINE TABLE service_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON service_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON service_request TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON service_request TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON service_request TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON service_request TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON service_request TYPE string PERMISSIONS FULL
@@ -1016,6 +1215,8 @@ DEFINE TABLE service_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX service_request_history_last_updated ON service_request_history FIELDS last_updated, version_seq
 DEFINE TABLE slot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON slot TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON slot TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON slot TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON slot TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON slot TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON slot TYPE string PERMISSIONS FULL
@@ -1029,6 +1230,8 @@ DEFINE TABLE slot_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX slot_history_last_updated ON slot_history FIELDS last_updated, version_seq
 DEFINE TABLE specimen TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON specimen TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON specimen TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON specimen TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON specimen TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON specimen TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON specimen TYPE string PERMISSIONS FULL
@@ -1042,6 +1245,8 @@ DEFINE TABLE specimen_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX specimen_history_last_updated ON specimen_history FIELDS last_updated, version_seq
 DEFINE TABLE structure_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON structure_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON structure_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON structure_definition TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON structure_definition TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON structure_definition TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON structure_definition TYPE string PERMISSIONS FULL
@@ -1055,6 +1260,8 @@ DEFINE TABLE structure_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE INDEX structure_definition_history_last_updated ON structure_definition_history FIELDS last_updated, version_seq
 DEFINE TABLE supply_delivery TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON supply_delivery TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON supply_delivery TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON supply_delivery TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON supply_delivery TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON supply_delivery TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON supply_delivery TYPE string PERMISSIONS FULL
@@ -1068,6 +1275,8 @@ DEFINE TABLE supply_delivery_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX supply_delivery_history_last_updated ON supply_delivery_history FIELDS last_updated, version_seq
 DEFINE TABLE supply_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON supply_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON supply_request TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON supply_request TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON supply_request TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON supply_request TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON supply_request TYPE string PERMISSIONS FULL
@@ -1081,6 +1290,8 @@ DEFINE TABLE supply_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX supply_request_history_last_updated ON supply_request_history FIELDS last_updated, version_seq
 DEFINE TABLE task TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON task TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON task TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON task TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON task TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON task TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON task TYPE string PERMISSIONS FULL
@@ -1094,6 +1305,8 @@ DEFINE TABLE task_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX task_history_last_updated ON task_history FIELDS last_updated, version_seq
 DEFINE TABLE value_set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON value_set TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON value_set TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON value_set TYPE record PERMISSIONS FULL
   DEFINE FIELD json ON value_set TYPE string PERMISSIONS FULL
   DEFINE FIELD last_updated ON value_set TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON value_set TYPE string PERMISSIONS FULL

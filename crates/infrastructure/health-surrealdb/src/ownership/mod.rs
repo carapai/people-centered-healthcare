@@ -35,8 +35,25 @@ pub struct ResourceOwnership {
 /// The Owner of the unit of work's own tables.
 pub const UNIT_OF_WORK: &str = "unit-of-work";
 
-/// Infrastructure tables, written only through the unit of work (persistence.md).
-pub const INFRASTRUCTURE_TABLES: &[&str] = &["_migration", "guard", "counter", "outbox"];
+/// Infrastructure tables, written only through the unit of work (persistence.md). The search
+/// index tables hold entries derived from each Owner's records, written in that Owner's
+/// transaction; no module writes them directly.
+pub const INFRASTRUCTURE_TABLES: &[&str] = &[
+    "_migration",
+    "guard",
+    "counter",
+    "outbox",
+    "idx_token",
+    "idx_string",
+    "idx_date",
+    "idx_reference",
+    "idx_quantity",
+    "idx_number",
+    "idx_uri",
+    "idx_composite",
+    "idx_missing",
+    "reindex_job",
+];
 
 /// Every owned resource type, sorted by type.
 pub fn resources() -> &'static [ResourceOwnership] {

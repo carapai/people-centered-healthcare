@@ -80,6 +80,17 @@ Each supported SearchParameter writes entries into one table per search type. Ea
 - **Writes.** On every write, the transaction deletes the entries listed in the head's `index_keys` and writes the new ones. No scan is needed.
 - **Reindex.** Activating a configuration package that adds or changes a SearchParameter starts a **resumable background reindex job**. The parameter becomes searchable only when the job completes.
 
+### In code
+
+`health-fhir-search` (contracts) extracts and parses; `health-surrealdb::search` stores and compiles. Migration `0002_search_index` defines the tables.
+
+- **Keys.** Each table's record id is the array above, ending with the resource id. Dates are SurrealDB datetimes and numbers and quantity values are decimals, so the ids sort by value. `rt` and `param` fields repeat the first two elements so secondary indexes can lead with them: `idx_token(rt, param, code)` for a code without a system, `idx_date(rt, param, end)`, `idx_reference(rt, param, target_id)` for an id without a type, and `idx_quantity(rt, param, value)` and `(rt, param, code, value)` for a quantity whose unit system or unit is left open. `idx_string` carries the exact text for `:exact`.
+- **`:missing` and `:not`.** A supported parameter with no value writes a marker in `idx_missing` (`[type, param, resource_uuid]`), so `:missing=true` is a range scan too, and `:not` is (entries ∪ markers) minus the matches.
+- **Composites.** A composite's leading components must give their whole key (a `system|code` token, a typed reference or a uri); its last component may be any value or range. Other composite searches are refused.
+- **Results.** Each clause's scans return resource ids, a clause's values are unioned, and clauses are intersected smallest first. Pages are keyset by resource id. `total` is exact for every indexed search; the unfiltered listing of a type is a record-id range over the head table and does not count.
+- **Policy.** Clauses from the policy decision point (`SearchPolicy`) are ANDed into every search, including the unfiltered listing, so `total` never counts what the caller cannot see.
+- **Reindex.** New parameters enter the registry as `Reindexing`: every write from then on indexes them, and searches using them are refused. The job walks the head table in id order, one batch per transaction, and records the last id in `reindex_job`; a restart resumes there. When it reports done, the parameter is activated.
+
 ## The write transaction
 
 Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work.

@@ -5,8 +5,14 @@
 //! a concurrent commit to the same head, guard or counter record makes this commit fail, and
 //! that failure is [`WriteError::Conflict`]. Preconditions are checked against the head read
 //! inside the transaction, so a rerun after a conflict sees the winner and returns 412.
+//!
+//! Each version write also replaces the resource's search index entries (see [`crate::search`]).
 
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError, RwLock};
+
+use health_fhir_search::{Registry, extract};
+use jiff::tz::Offset;
+use serde_json::Value;
 
 use health_identifiers::{NumberFormat, OpId, ResourceId, SequenceState};
 use health_persistence::{
@@ -18,19 +24,49 @@ use surrealdb::engine::any::Any;
 use surrealdb::method::Transaction as SurrealTransaction;
 use surrealdb::types::SurrealValue;
 
+use crate::search::sql::Sql;
+use crate::search::write::replace_entries;
 use crate::{Connection, ownership};
 
 /// The SurrealDB-backed [`Store`].
 #[derive(Clone)]
 pub struct SurrealStore {
-    connection: Connection,
+    pub(crate) connection: Connection,
     clock: Arc<dyn Clock>,
+    registry: Arc<RwLock<Arc<Registry>>>,
 }
 
 impl SurrealStore {
-    /// A store over a migrated connection, stamping `meta.lastUpdated` from `clock`.
+    /// A store over a migrated connection, stamping `meta.lastUpdated` from `clock`. It indexes
+    /// nothing until a registry is set.
     pub fn new(connection: Connection, clock: Arc<dyn Clock>) -> Self {
-        Self { connection, clock }
+        Self {
+            connection,
+            clock,
+            registry: Arc::new(RwLock::new(Arc::new(Registry::new(Offset::UTC)))),
+        }
+    }
+
+    /// This store, indexing the parameters `registry` supports.
+    #[must_use]
+    pub fn with_registry(self, registry: Registry) -> Self {
+        self.set_registry(registry);
+        self
+    }
+
+    /// Replaces the registry, e.g. when a configuration package adds parameters (as
+    /// `Reindexing`) or a reindex completes (`Active`). Transactions already begun keep the
+    /// registry they started with.
+    pub fn set_registry(&self, registry: Registry) {
+        *self
+            .registry
+            .write()
+            .unwrap_or_else(PoisonError::into_inner) = Arc::new(registry);
+    }
+
+    /// The current registry.
+    pub fn registry(&self) -> Arc<Registry> {
+        Arc::clone(&self.registry.read().unwrap_or_else(PoisonError::into_inner))
     }
 }
 
@@ -48,6 +84,7 @@ impl Store for SurrealStore {
         Ok(SurrealTx {
             tx: Some(tx),
             clock: Arc::clone(&self.clock),
+            registry: self.registry(),
         })
     }
 }
@@ -56,6 +93,7 @@ impl Store for SurrealStore {
 pub struct SurrealTx {
     tx: Option<SurrealTransaction<Any>>,
     clock: Arc<dyn Clock>,
+    registry: Arc<Registry>,
 }
 
 impl Drop for SurrealTx {
@@ -97,7 +135,7 @@ fn is_conflict(error: &surrealdb::Error) -> bool {
         || message.contains("retryable")
 }
 
-fn write_error(error: surrealdb::Error) -> WriteError {
+pub(crate) fn write_error(error: surrealdb::Error) -> WriteError {
     if is_conflict(&error) {
         WriteError::Conflict
     } else {
@@ -105,20 +143,20 @@ fn write_error(error: surrealdb::Error) -> WriteError {
     }
 }
 
-fn table(resource_type: &ResourceType) -> Result<&'static str, StoreError> {
+pub(crate) fn table(resource_type: &ResourceType) -> Result<&'static str, StoreError> {
     ownership::resource(resource_type.as_str())
         .map(|r| r.table)
         .ok_or_else(|| StoreError::UnknownResourceType(resource_type.to_string()))
 }
 
 impl SurrealTx {
-    fn tx(&self) -> Result<&SurrealTransaction<Any>, StoreError> {
+    pub(crate) fn tx(&self) -> Result<&SurrealTransaction<Any>, StoreError> {
         self.tx
             .as_ref()
             .ok_or_else(|| StoreError::Unavailable("transaction already finished".into()))
     }
 
-    async fn head(
+    pub(crate) async fn head(
         &self,
         resource_type: &ResourceType,
         id: ResourceId,
@@ -172,23 +210,43 @@ impl SurrealTx {
         let version_seq = previous_seq + 1;
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
-        self.tx()?
-            .query(
-                "LET $row = { json: $json, version_id: $version_id, version_seq: $seq, last_updated: <datetime> $at, deleted: $deleted };
-                 UPSERT type::record($table, $id) CONTENT $row;
-                 CREATE type::record($history, [$id, $seq]) CONTENT $row;",
-            )
-            .bind(("table", table))
-            .bind(("history", format!("{table}_history")))
-            .bind(("id", id.to_string()))
-            .bind(("seq", seq))
-            .bind(("json", stamped.as_str().to_owned()))
-            .bind(("version_id", op_id.to_string()))
-            .bind(("at", format!("{last_updated:.3}")))
-            .bind(("deleted", deleted))
-            .await
-            .and_then(surrealdb::IndexedResults::check)
-            .map_err(write_error)?;
+        let extraction = if deleted {
+            // A tombstone keeps its body but is never found by search.
+            health_fhir_search::Extraction::default()
+        } else {
+            let resource: Value = serde_json::from_str(stamped.as_str())
+                .map_err(|e| StoreError::Unavailable(format!("stamped JSON: {e}")))?;
+            extract(&self.registry, resource_type.as_str(), &resource, None)
+        };
+        let mut sql = Sql::default();
+        let id_text = id.to_string();
+        let keys = replace_entries(
+            &mut sql,
+            table,
+            resource_type.as_str(),
+            &id_text,
+            &extraction,
+            None,
+        );
+        let head = sql.str(table);
+        let history = sql.str(format!("{table}_history"));
+        let rid = sql.str(id_text.as_str());
+        let seq = sql.value(crate::search::sql::Bind::Int(seq));
+        let json = sql.str(stamped.as_str());
+        let version_id = sql.str(op_id.to_string());
+        let at = sql.value(crate::search::sql::Bind::Datetime(format!(
+            "{last_updated:.3}"
+        )));
+        let deleted_text = if deleted { "true" } else { "false" };
+        sql.push(format!(
+            "UPSERT type::record({head}, {rid}) SET json = {json}, version_id = {version_id}, \
+             version_seq = {seq}, last_updated = {at}, deleted = {deleted_text}, index_keys = {keys}"
+        ));
+        sql.push(format!(
+            "CREATE type::record({history}, [{rid}, {seq}]) CONTENT {{ json: {json}, \
+             version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text} }}"
+        ));
+        sql.run(self.tx()?).await.map_err(write_error)?;
         Ok(VersionMeta {
             version_id: op_id,
             version_seq,

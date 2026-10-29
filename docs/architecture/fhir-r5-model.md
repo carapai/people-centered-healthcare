@@ -74,7 +74,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - Only parameters declared **supported** in our CapabilityStatement are indexed.
   - Activating a configuration package that adds or changes a SearchParameter starts a background **reindex**. The parameter becomes searchable only when the reindex completes.
 - **Extraction at write time.**
-  1. Each supported parameter's FHIRPath `expression` is evaluated against the resource.
+  1. Each supported parameter's FHIRPath `expression` is evaluated against the resource. Extraction uses the **search subset** of FHIRPath, compiled once per parameter: unions of paths with `ofType`/`as`, `[n]`, `first()`, `.(a | b)`, `extension('url')`, `where(resolve() is T)` and `where(field = 'literal')`. It never computes values, so it needs none of the decimal arithmetic of ADR 0052. It compiles 1,211 of the 1,244 R5 core SearchParameters. The rest, such as `Patient.deceased.exists() and Patient.deceased != false`, compute a value; they cannot be supported until extraction runs them on the full engine.
   2. The results are normalized per search type into index entries:
 
      | Type | Normalized form |
