@@ -39,7 +39,7 @@ cargo llvm-cov nextest --package=<each domain and application crate> --fail-unde
 # rust-ci.yml, fhir-corpus job
 tools/fhir/fetch-r5-core.sh && tools/fhir/fetch-r5-examples.sh
 tools/fhir/check-element-table.sh target/fhir/r5-core/package
-HEALTH_FHIR_R5_EXAMPLES=target/fhir/r5-examples/json \
+HEALTH_FHIR_R5_EXAMPLES=$PWD/target/fhir/r5-examples/json \
   cargo test --release -p health-fhir-models -p health-fhir-validation
 
 # frontend-ci.yml (in apps/client)

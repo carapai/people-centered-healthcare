@@ -44,6 +44,10 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      # Full debug info for every test binary (SurrealDB, RocksDB) fills the runner's disk and
+      # the linker dies; line tables keep backtraces.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,6 +59,8 @@ jobs:
       - run: cargo build --workspace --all-targets --locked
       - run: cargo nextest run --workspace --locked --no-tests=pass
       - run: cargo test --workspace --doc --locked
+      - if: always()
+        run: df -h . && du -sh target
 
   fhir-corpus:
     name: FHIR corpus, element table, validation budget
