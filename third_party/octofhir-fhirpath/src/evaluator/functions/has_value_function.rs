@@ -33,7 +33,11 @@ impl HasValueFunctionEvaluator {
                     max_params: Some(0),
                 },
                 argument_evaluation: ArgumentEvaluationStrategy::Current,
-                null_propagation: NullPropagationStrategy::Focus,
+                // Patch 0004: hasValue() on an empty collection is false, not empty
+                // (FHIRPath). With `Focus` the evaluator skipped the function and returned
+                // empty, so `end.hasValue().not()` was empty for a Period without an end
+                // and every "absent or valid" invariant (`per-1`, `exp-2`, …) failed.
+                null_propagation: NullPropagationStrategy::Custom,
                 empty_propagation: EmptyPropagation::NoPropagation,
                 deterministic: true,
                 category: FunctionCategory::Existence,

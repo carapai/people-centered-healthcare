@@ -254,7 +254,9 @@ fn fhirpath_parser<'a>()
                     location: Some(span_to_loc(extra.span())),
                 })
             }),
-            prefix(11, just("not").padded(), |_, operand, extra| {
+            // Patch 0006: a whole keyword, so an identifier that starts with "not"
+            // (`notificationEvent`, `note`) is not read as `not` plus the rest.
+            prefix(11, text::keyword("not").padded(), |_, operand, extra| {
                 ExpressionNode::UnaryOperation(UnaryOperationNode {
                     operator: UnaryOperator::Not,
                     operand: Box::new(operand),

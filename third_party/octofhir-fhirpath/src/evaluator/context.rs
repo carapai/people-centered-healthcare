@@ -361,7 +361,9 @@ impl EvaluationContext {
         if let Some(ref root) = self.root_resource {
             match name {
                 "this" => return Some(root.as_ref().clone()),
-                "resource" | "%resource" | "context" | "%context" => {
+                "resource" | "%resource" | "context" | "%context"
+                // Patch 0003: `%rootResource` (R5 FHIRPath) is the evaluation root too.
+                | "rootResource" | "%rootResource" => {
                     // Only return if it's actually a Resource type
                     if matches!(root.as_ref(), FhirPathValue::Resource(_, _, _)) {
                         return Some(root.as_ref().clone());

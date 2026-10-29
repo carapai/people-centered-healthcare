@@ -42,7 +42,9 @@ impl SubsetOfFunctionEvaluator {
                     max_params: Some(1),
                 },
                 argument_evaluation: ArgumentEvaluationStrategy::Current,
-                null_propagation: NullPropagationStrategy::Focus,
+                // Patch 0004: FHIRPath defines this function on an empty input, so the
+                // evaluator must call it instead of returning empty.
+                null_propagation: NullPropagationStrategy::Custom,
                 empty_propagation: EmptyPropagation::NoPropagation,
                 deterministic: true,
                 category: FunctionCategory::Subsetting,
@@ -71,19 +73,20 @@ impl PureFunctionEvaluator for SubsetOfFunctionEvaluator {
             ));
         }
 
-        // Handle empty other argument - propagate empty collections
-        if args[0].is_empty() {
-            return Ok(EvaluationResult {
-                value: crate::core::Collection::single(FhirPathValue::boolean(false)),
-            });
-        }
-
         let other = &args[0];
 
-        // Empty set is a subset of any set
+        // Patch 0004: the empty set is a subset of any set, including the empty set, so
+        // this is checked before the empty-argument case.
         if input.is_empty() {
             return Ok(EvaluationResult {
                 value: crate::core::Collection::single(FhirPathValue::boolean(true)),
+            });
+        }
+
+        // A non-empty input is not a subset of the empty set.
+        if other.is_empty() {
+            return Ok(EvaluationResult {
+                value: crate::core::Collection::single(FhirPathValue::boolean(false)),
             });
         }
 

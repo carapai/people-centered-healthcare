@@ -1272,7 +1272,7 @@ impl FhirPathValue {
         code: Option<String>,
         system: Option<String>,
     ) -> Self {
-        let mut resolved_system = system;
+        let resolved_system = system;
 
         let (ucum_unit, calendar_unit) = if let Some(ref code_str) = code {
             let normalized = normalize_ucum_unit(code_str);
@@ -1281,9 +1281,9 @@ impl FhirPathValue {
             } else {
                 match find_unit(normalized.as_ref()) {
                     Some(ucum) => {
-                        if resolved_system.is_none() {
-                            resolved_system = Some("http://unitsofmeasure.org".to_string());
-                        }
+                        // Patch 0002: the UCUM unit is resolved for arithmetic, but
+                        // `system` stays what the element says, so `.system` navigation
+                        // never reports a system the resource does not have.
                         (Some(Arc::new(ucum.clone())), None)
                     }
                     None => (None, None),
@@ -1296,9 +1296,9 @@ impl FhirPathValue {
             } else {
                 match find_unit(normalized.as_ref()) {
                     Some(ucum) => {
-                        if resolved_system.is_none() {
-                            resolved_system = Some("http://unitsofmeasure.org".to_string());
-                        }
+                        // Patch 0002: the UCUM unit is resolved for arithmetic, but
+                        // `system` stays what the element says, so `.system` navigation
+                        // never reports a system the resource does not have.
                         (Some(Arc::new(ucum.clone())), None)
                     }
                     None => (None, None),

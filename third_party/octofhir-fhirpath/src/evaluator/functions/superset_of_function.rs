@@ -42,7 +42,9 @@ impl SupersetOfFunctionEvaluator {
                     max_params: Some(1),
                 },
                 argument_evaluation: ArgumentEvaluationStrategy::Current,
-                null_propagation: NullPropagationStrategy::Focus,
+                // Patch 0004: FHIRPath defines this function on an empty input, so the
+                // evaluator must call it instead of returning empty.
+                null_propagation: NullPropagationStrategy::Custom,
                 empty_propagation: EmptyPropagation::NoPropagation,
                 deterministic: true,
                 category: FunctionCategory::Subsetting,

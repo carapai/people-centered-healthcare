@@ -924,7 +924,7 @@ impl Evaluator {
                     }
 
                     // Use ModelProvider to get element type information
-                    let property_type_info = if let Some(element_type) = self
+                    let model_element_type = self
                         .model_provider
                         .get_element_type(type_info, identifier)
                         .await
@@ -933,7 +933,12 @@ impl Evaluator {
                                 crate::core::error_code::FP0054,
                                 format!("Model provider error getting element type: {e}"),
                             )
-                        })? {
+                        })?;
+                    // Patch 0005: when the model names `identifier` as an ordinary element,
+                    // a missing key means the element is absent; it is not a choice stem.
+                    // Otherwise `asNeeded` matched `asNeededFor` as if it were a `[x]` type.
+                    let model_resolved = model_element_type.is_some();
+                    let property_type_info = if let Some(element_type) = model_element_type {
                         element_type
                     } else {
                         // Fallback type info
@@ -968,7 +973,7 @@ impl Evaluator {
                                 .await?;
                             result_values.extend(flattened_values);
                         }
-                    } else {
+                    } else if !model_resolved {
                         // Use atomic-ehr pattern: detect choice values first
                         let choice_results = self.detect_choice_values(json, identifier).await?;
                         if !choice_results.is_empty() {
@@ -1121,7 +1126,13 @@ impl Evaluator {
                         }
                     }
                 }
-                FhirPathValue::Quantity { value, unit, .. } => {
+                FhirPathValue::Quantity {
+                    value,
+                    unit,
+                    code,
+                    system,
+                    ..
+                } => {
                     // Handle quantity property access
                     match identifier {
                         "value" => {
@@ -1134,10 +1145,17 @@ impl Evaluator {
                             }
                             // If no unit, return empty (standard FHIRPath behavior)
                         }
+                        // Patch 0002: `code` and `system` are the FHIR Quantity's own
+                        // elements, not aliases of `unit` (which made `qty-3`,
+                        // "code.empty() or system.exists()", fail on every coded Quantity).
                         "code" => {
-                            // For FHIR compatibility, code is an alias for unit
-                            if let Some(unit_str) = unit {
-                                result_values.push(FhirPathValue::string(unit_str.clone()));
+                            if let Some(code_str) = code {
+                                result_values.push(FhirPathValue::string(code_str.clone()));
+                            }
+                        }
+                        "system" => {
+                            if let Some(system_str) = system {
+                                result_values.push(FhirPathValue::string(system_str.clone()));
                             }
                         }
                         _ => {
@@ -1937,23 +1955,11 @@ impl Evaluator {
             None
         };
 
-        // Determine canonical code/system for UCUM handling
-        let mut canonical_code = if !code.is_empty() {
-            Some(code.to_string())
-        } else {
-            None
-        };
-
-        let unit_for_detection = if !code.is_empty() { code } else { unit };
-        if canonical_code.is_none()
-            && (system == "http://unitsofmeasure.org"
-                || self.looks_like_ucum_unit(unit_for_detection))
-        {
-            let normalized = self.normalize_ucum_unit(unit_for_detection);
-            if !normalized.is_empty() {
-                canonical_code = Some(normalized);
-            }
-        }
+        // Patch 0002: `code` is the element's own code, never one derived from `unit`, so
+        // navigating `.code` sees the resource as written (`qty-3`). UCUM arithmetic still
+        // works: `quantity_with_components` resolves the UCUM unit from `unit` when there is
+        // no code.
+        let canonical_code = (!code.is_empty()).then(|| code.to_string());
 
         Some(FhirPathValue::quantity_with_components(
             value,
@@ -1968,6 +1974,8 @@ impl Evaluator {
     }
 
     /// Check if a unit string looks like a UCUM unit
+    // Unused since patch 0002; kept to keep the diff small.
+    #[allow(dead_code)]
     fn looks_like_ucum_unit(&self, unit: &str) -> bool {
         // Common UCUM patterns
         unit.contains("/") || // Division like "mg/dL"
@@ -1979,6 +1987,8 @@ impl Evaluator {
     }
 
     /// Normalize UCUM units to standard form
+    // Unused since patch 0002; kept to keep the diff small.
+    #[allow(dead_code)]
     fn normalize_ucum_unit(&self, unit: &str) -> String {
         // Basic UCUM normalization - could be enhanced with a full UCUM parser
         match unit {
