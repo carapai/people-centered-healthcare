@@ -34,7 +34,7 @@ A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.su
 
 | Field | Content |
 |---|---|
-| `resource` | The full canonical R5 JSON (`object FLEXIBLE`), the resource of record |
+| `json` | The stored bytes of the resource of record: the validated input JSON stamped with `id` and `meta`, as a string (ADR 0051). Storing a SurrealDB object would lose decimal text and key order |
 | `version_id` | UUID; equal to `meta.versionId`, which is the `op_id` of the write (ADR 0018) |
 | `version_seq` | Integer assigned by the Authority Node, monotonic per resource |
 | `last_updated` | `meta.lastUpdated` |
@@ -49,7 +49,7 @@ A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.su
 
 | Field | Content |
 |---|---|
-| `resource` | The full resource for that version (never a diff) |
+| `json` | The full resource for that version as stored bytes (never a diff) |
 | `version_id`, `parent_version_id` | For sync ancestry |
 | `op_id`, `origin_node`, `hlc`, author | Provenance of the write |
 | `last_updated`, `deleted` | |
@@ -80,9 +80,24 @@ Each supported SearchParameter writes entries into one table per search type. Ea
 - **Writes.** On every write, the transaction deletes the entries listed in the head's `index_keys` and writes the new ones. No scan is needed.
 - **Reindex.** Activating a configuration package that adds or changes a SearchParameter starts a **resumable background reindex job**. The parameter becomes searchable only when the job completes.
 
+### In code
+
+`health-fhir-search` (contracts) extracts and parses; `health-surrealdb::search` stores and compiles. Migration `0002_search_index` defines the tables.
+
+- **Keys.** Each table's record id is the array above, ending with the resource id. Dates are SurrealDB datetimes and numbers and quantity values are decimals, so the ids sort by value. `rt` and `param` fields repeat the first two elements so secondary indexes can lead with them: `idx_token(rt, param, code)` for a code without a system, `idx_date(rt, param, end)`, `idx_reference(rt, param, target_id)` for an id without a type, and `idx_quantity(rt, param, value)` and `(rt, param, code, value)` for a quantity whose unit system or unit is left open. `idx_string` carries the exact text for `:exact`.
+- **`:missing` and `:not`.** A supported parameter with no value writes a marker in `idx_missing` (`[type, param, resource_uuid]`), so `:missing=true` is a range scan too, and `:not` is (entries ∪ markers) minus the matches.
+- **Composites.** A composite's leading components must give their whole key (a `system|code` token, a typed reference or a uri); its last component may be any value or range. Other composite searches are refused.
+- **Results.** Each clause's scans return resource ids, a clause's values are unioned, and clauses are intersected smallest first. Pages are keyset by resource id. `total` is exact for every indexed search; the unfiltered listing of a type is a record-id range over the head table and does not count.
+- **Policy.** Clauses from the policy decision point (`SearchPolicy`) are ANDed into every search, including the unfiltered listing, so `total` never counts what the caller cannot see.
+- **Reindex.** New parameters enter the registry as `Reindexing`: every write from then on indexes them, and searches using them are refused. The job walks the head table in id order, one batch per transaction, and records the last id in `reindex_job`; a restart resumes there. When it reports done, the parameter is activated.
+
 ## The write transaction
 
-Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work:
+Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work.
+- **Contract.** `health-persistence` defines the `Store` and `Transaction` traits: read, write with a `Precondition`, delete as a tombstone, claim and release guards, `next_sequence`, append to the outbox, and commit. It also defines `stamp_meta`, `RawJson` and `RetryPolicy`.
+- **Test fake.** `health-persistence-memory` (testing layer) implements the contract with snapshot isolation and first-committer-wins, for domain and application tests.
+
+The write sequence:
 
 ```mermaid
 sequenceDiagram
@@ -105,6 +120,12 @@ sequenceDiagram
   Note over UoW,DB: write-write conflict → retry ≤3 with jitter; on retry the If-Match check yields 412 if the other writer won
 ```
 
+- **Implementation (#56).** `health-surrealdb::SurrealStore` runs each unit of work as one SurrealDB interactive transaction.
+  - **Preconditions** are checked against the head read inside the transaction.
+  - **Conflicts.** A concurrent commit to the same head, guard or counter fails the later commit, which surfaces as `WriteError::Conflict`. The rerun then sees the winner and gets 412.
+  - **Guard records** (`guard`) and **counters** (`counter`, advanced by `SequenceState::next`) are records in that same transaction, never read-then-check.
+  - **Measured on 3.3.5.** 8 concurrent writers on one counter minted 200 values with no duplicates or gaps, but retried about 1,200 conflicts, roughly 6 per value. That exceeds `RetryPolicy`'s default of 4 attempts. One hot counter per facility is fine at clinic rates; a hotter one would need sharding or a longer retry budget.
+  - **Tables.** Migration `0001_resource_tables` creates head and history tables for the 84 resource types in the ownership registry (`health-surrealdb::ownership`), plus `guard`, `counter` and `outbox`. Not yet included: `facility`, `authority_node`, `security_labels`, `index_keys` and hot projections, which arrive with search (#57) and authorization.
 - **`If-Match` is required** on updates from our clients. Creates use `PUT [type]/[client-uuid]` (update-as-create, `updateCreate=true`). `POST` create works for external clients, and the server then mints a UUIDv7.
 - **Concurrent writers.** Two writers of the same resource both write its head record, so SurrealDB snapshot isolation reports a retryable conflict.
 - **Multi-record invariants** are never enforced by read-then-check, because snapshot isolation allows write skew. They use **guard records** or **UNIQUE indexes** written in the same transaction. Examples: one active MRN per facility, one open Encounter per patient per service point, unique business identifiers within their system.
@@ -140,5 +161,12 @@ We write our own migrations runner as a module of `health-surrealdb`. SurrealKit
 - **Schema migrations** are versioned, forward-only `.surql` files embedded in the binary. CI validates them with `surreal validate` and formats them with `surql-fmt`.
 - **Data migrations** (resource rewrites) are written in Rust.
 - **Startup.** Pending migrations are applied before the node reports ready (ADR 0007) and recorded in `_migration` with checksums. If an already-applied migration has been modified, startup fails.
+  - **Implementation.** `health-surrealdb::migrate` creates the `_migration` ledger itself (`SCHEMAFULL`: `name`, `checksum` as SHA-256 hex, `applied_at`).
+  - **Refusals before any change:** a modified applied migration, an applied migration the binary does not know (the binary is older than the data), or an out-of-order list.
+  - **Per-migration transaction.** Each pending migration runs in one transaction with its ledger row, so a failing migration applies nothing.
+  - **Layout.** Files live in `crates/infrastructure/health-surrealdb/migrations/NNNN_name.surql` and are listed in `MIGRATIONS`. A test checks the folder and the list match.
+  - **Snapshot.** The schema after migrating a fresh database is compared with `tests/fixtures/schema.snapshot`.
+- **Engines.** `Target::RocksDb` always opens `rocksdb://<path>?sync=every`. `Target::Remote` is central's server over WebSocket, with root sign-in. `Target::Memory` is for tests. Features `embedded`, `remote` and `memory` choose what is compiled in.
+- **Block cache.** The RocksDB block cache is capped through the service environment (`SURREAL_ROCKSDB_BLOCK_CACHE_SIZE`); SDK 3.3.5 reads RocksDB tuning from its config map, not the connection string. Whether the embedded engine honours the variable is unverified, and is to be measured with the edge hardware spikes.
 - **Reindexing** is a separate resumable job, never a migration.
 - **Testing.** Every migration also runs on the export → import round-trip fixture ([backup-and-recovery.md](backup-and-recovery.md)).

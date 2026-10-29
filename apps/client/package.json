@@ -1,0 +1,41 @@
+{
+  "name": "@health/client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "codegen": "panda codegen",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "lint": "oxlint --deny-warnings src scripts && bun scripts/check-boundaries.ts",
+    "build": "bunx --bun vite build",
+    "build:tauri": "bunx --bun vite build --mode tauri",
+    "scan": "bun scripts/scan-bundle.ts dist",
+    "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-router": "1.170.46",
+    "@tauri-apps/api": "2.12.4",
+    "lossless-json": "4.3.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "8.0.9",
+    "@pandacss/dev": "2.4.0",
+    "@pandacss/preset-base": "2.4.0",
+    "@pandacss/preset-panda": "2.4.0",
+    "@pandacss/vite": "2.4.0",
+    "@rolldown/plugin-babel": "0.2.4",
+    "@tanstack/router-plugin": "1.168.48",
+    "@types/bun": "1.4.2",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "babel-plugin-react-compiler": "1.0.0",
+    "oxlint": "1.90.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

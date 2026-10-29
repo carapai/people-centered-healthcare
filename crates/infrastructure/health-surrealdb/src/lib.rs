@@ -1,3 +1,23 @@
-//! SurrealDB adapter: unit of work, repositories, search translation and migrations (ADRs 0017–0018).
+//! SurrealDB adapter (persistence.md; ADRs 0007, 0017, 0018).
 //!
-//! Placeholder created with the workspace scaffold; filled in by Build the health-surrealdb adapter and migrations runner (#55).
+//! - [`connect`] opens the one database a node uses: embedded RocksDB on the edge and desktop
+//!   (always `sync=every`), a server at central, or the in-memory engine in tests. Which engines
+//!   are compiled in is chosen with the `embedded`, `remote` and `memory` features.
+//! - [`migrate`] applies the forward-only [`MIGRATIONS`] before the node reports ready, and
+//!   refuses to start if an applied migration was modified.
+//!
+//! - [`SurrealStore`] implements the `health-persistence` unit of work on SurrealDB interactive
+//!   transactions: heads, history, guards, counters, the outbox and search index entries.
+//! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
+//! - [`ownership`] declares which Owner each table and record belongs to.
+
+mod connection;
+mod migrations;
+pub mod ownership;
+pub mod search;
+mod store;
+
+pub use connection::{Connection, ConnectionError, Settings, Target, connect};
+pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
+pub use search::{ReindexJob, ReindexProgress, SearchFailure, SearchPage};
+pub use store::{SurrealStore, SurrealTx};

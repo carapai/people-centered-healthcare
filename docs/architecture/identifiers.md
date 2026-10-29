@@ -29,6 +29,8 @@ In Rust, every id is a typed newtype in `health-identifiers` (e.g. `PatientId`, 
 
 Anything produced deterministically from another record gets `UUIDv5(platform_namespace, name)`. Replaying the derivation on any node then converges on one id.
 
+The platform namespace is **`83664680-8814-416c-a4bb-2cc772956887`**, fixed in `health-identifiers` as `PLATFORM_NAMESPACE`. It never changes: changing it would fork every derived id in the deployment. Any `|version` on a mapping or rule canonical is dropped before hashing, and the name is hashed as UTF-8.
+
 | Derivation | Name |
 |---|---|
 | QuestionnaireResponse extraction | `{QuestionnaireResponse.id}\|{mapping canonical URL, no version}\|{target linkId path}#{repeat instance key}\|{target resource type}` — the key is the stable `QuestionnaireResponse.item.id` our form filler stamps on each repeat instance, or the repeat index only for imported responses without item ids |
@@ -53,6 +55,11 @@ Business identifiers live in `identifier`. Each system is declared by a NamingSy
 
 - **Default format:** `{facility code}-{node short code}-{sequence}`. The counter lives in the minting node's store and is incremented in the same transaction as the record. Collisions are impossible and the sequence cannot run out.
 - **Per-type format:** each identifier type's format is a Published Definition in the country package: prefix, zero-padding, an optional check digit (e.g. Luhn mod N), and an optional yearly reset with a year segment.
+  - **Layout.** `health-identifiers` writes the number as `[{prefix}-]{facility}-{node}[-{year}]-{sequence}[check]`.
+  - **Codes.** Facility, node and prefix codes are 1–8 characters of `A–Z0–9`.
+  - **Check character.** It is Luhn mod 36, computed over the number without hyphens.
+  - **Counter rules.** A yearly-reset counter restarts at 1 only in a later year, and is refused for an earlier one, so numbers never repeat.
+  - **Atomic increment.** The increment itself happens in the store's write transaction ([Implement head/history storage and the write transaction](https://github.com/carapai/people-centered-healthcare/issues/56)).
 - **Who mints:**
   - The Facility Authority Node mints for its facility.
   - A desktop mints under its own short code only while it is the Authority Node for the scope, i.e. as a standalone desktop or under an Authority Lease.

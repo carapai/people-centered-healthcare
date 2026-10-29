@@ -44,4 +44,4 @@ A one-page checklist of rules that every change must keep. Each rule links to wh
 
 ## How the rules are checked
 
-`tools/architecture-checks` (cargo metadata), `cargo-deny`, `clippy -D warnings`, ESLint import rules, the production bundle scan, the table-ownership test and the ownership doc-sync test. The full list is in [deployment.md § Architecture enforcement](../architecture/deployment.md#architecture-enforcement-109).
+`tools/architecture-checks` (cargo metadata), `cargo-deny`, `clippy -D warnings`, oxlint import rules plus `apps/client/scripts/check-boundaries.ts`, the production bundle scan, the table-ownership test and the ownership doc-sync test. The full list is in [deployment.md § Architecture enforcement](../architecture/deployment.md#architecture-enforcement-109).

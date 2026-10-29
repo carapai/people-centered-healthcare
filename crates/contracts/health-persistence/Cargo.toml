@@ -13,3 +13,7 @@ layer = "contracts"
 workspace = true
 
 [dependencies]
+health-identifiers = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

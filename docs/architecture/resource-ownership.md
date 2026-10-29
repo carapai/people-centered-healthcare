@@ -16,6 +16,19 @@ This document names the single **Owner** (a Module inside a Bounded Context) of 
 8. Read Models own nothing and are rebuilt from events.
 9. Within one Deployable, one application-layer transaction may span several Owners, each writing only through its own repository. Across Deployables, contexts integrate by events and sagas.
 
+## In code
+
+`health-surrealdb::ownership` holds this matrix as data. Each stored FHIR type has one head table (plus history), a default Owner, and category partitions where rule 2 splits a type:
+- **Observation:** `laboratory` goes to laboratory, `imaging` to imaging, and everything else to clinical-data.
+- **DiagnosticReport:** imaging categories in v2-0074 (`RAD`, `CT`, `RUS`, `NMR`, …) go to imaging, and everything else to laboratory.
+- **ServiceRequest:** SNOMED `3457005` (referral) goes to referrals, and everything else to orders.
+
+`tests/ownership.rs` checks that every table has exactly one Owner, that partitions are disjoint, that the migrated schema matches the registry, and that every Owner is a module listed here.
+
+**Not yet in the registry:**
+- **Location** (administrative areas versus facility-internal), **QuestionnaireResponse** (patient-reported versus staff-captured) and **Provenance** (owned by its target's Owner). Each needs a discriminator other than category, still to be decided. Until then, Location defaults to facility-registry and QuestionnaireResponse to clinical-documentation, and Provenance has no table.
+- **The DiagnosticReport default** (laboratory for non-imaging categories) is an assumption, to be confirmed.
+
 ## Bounded contexts and modules
 
 | Bounded Context | Modules |

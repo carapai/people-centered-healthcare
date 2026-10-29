@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    // Third-party Babel 7/8 and Panda declarations clash; checked here only (ADR 0054).
+    "skipLibCheck": true,
+    "types": ["node", "bun"]
+  },
+  "include": ["vite.config.ts", "panda.config.ts", "scripts"]
+}

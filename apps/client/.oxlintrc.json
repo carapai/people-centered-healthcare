@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      { "patterns": [{ "group": ["@tauri-apps/**"], "message": "Tauri APIs are confined to src/platform/** (client-application.md)." }] }
+    ]
+  },
+  "overrides": [
+    { "files": ["src/platform/**"], "rules": { "no-restricted-imports": "off" } }
+  ]
+}
