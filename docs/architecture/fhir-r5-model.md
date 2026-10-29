@@ -58,6 +58,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 - **Vendored engine.** `octofhir-fhirpath 0.4.57` is vendored in `third_party/` and pinned with `[patch.crates-io]`, together with its dependency `octofhir-ucum 0.5.2`. Each crate has an unchanged vendoring commit, then patches listed in its `PATCHES.md`, with the diffs in `patches/` to offer upstream.
   - Engine patch 0001 is ADR 0052: decimals are built from the JSON number's text and fail closed beyond 28 digits.
   - Engine patches 0002–0007 make the R5 core invariants evaluate correctly: Quantity `code`/`system`, `%rootResource`, functions defined on empty input, choice detection, the `not` keyword and `htmlChecks()` attributes.
+  - Engine patch 0008 makes `as` cast FHIR primitives (`as dateTime`), which the vital-signs profile's `vs-1` needs.
   - UCUM patch 0001 stops a panic on non-ASCII units such as `m²`.
 - **Model provider.** The engine's model provider is `TableModelProvider`, built from the tier 1 element table. `octofhir-fhirschema` would add about 120 crates, including an HTTP client, SQLite and a CLI.
 - **Containment.** The engine runs in its own task, so a panic inside it fails the evaluation closed instead of dropping the request.
@@ -75,7 +76,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - `exs-1`, whose `memberOf()` needs the terminology service (#90).
 - **Write paths.** Every REST write runs tier 2 after tier 1. Failures are 400 with the invariant key and location.
 - **Corpus.** All 2,824 official examples hold their invariants except 171 genuine errors in HL7's examples: 161 Questionnaires with repeated linkIds (`que-2`) and 10 StructureDefinitions with a base but no derivation (`sdf-27`). A check that does not use FHIRPath confirms each one in the test.
-- **Performance.** On 731 clinical examples, in a release build on a development laptop, tiers 1 and 2 together take p50 0.92 ms and **p95 3.06 ms**. That is already over the 2 ms p95 budget for tiers 1–3 (ADR 0053); reducing it is part of the tier 3 work (#145). Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
+- **Performance.** On 731 clinical examples, in a release build on a development laptop, tiers 1 and 2 together take p50 0.92 ms and **p95 3.06 ms**. That is already over the 2 ms p95 budget for tiers 1–3 (ADR 0053); reducing it is [Bring validation tiers 1–3 within the 2 ms p95 budget](https://github.com/carapai/people-centered-healthcare/issues/170) (#170). Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
 - Whether CQL is needed stays in the map's Not yet specified.
 
 ## Validation (ADR 0016)
@@ -116,6 +117,36 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - tier 2 invariants and the decimal-exact FHIRPath engine ([#165](https://github.com/carapai/people-centered-healthcare/issues/165));
   - the HL7 Java validator cross-check ([#166](https://github.com/carapai/people-centered-healthcare/issues/166));
   - the Inbound Dead Letter and quarantine ([#167](https://github.com/carapai/people-centered-healthcare/issues/167)).
+
+### Tier 3 in code
+
+`ProfileSet::compile` turns StructureDefinition snapshots into a rule tree per profile; `SnapshotValidator` walks the raw JSON against it behind the `ProfileValidator` trait (ADR 0053). Wiring it into the write path and package activation is [Implement validation tiers 3–4 (profiles and bindings)](https://github.com/carapai/people-centered-healthcare/issues/91) (#91).
+
+- **Compilation refuses, never guesses.** A `CompileError` names the profile, the element and the reason for each of:
+  - a profile with no snapshot (differential-only), or a derivation other than `constraint`;
+  - re-slicing, or slicing on the root;
+  - a `resolve()` discriminator path, or a discriminator type outside `value`, `pattern`, `exists`, `type` and `profile`;
+  - a `value` or `pattern` discriminator with no fixed or pattern value at its path, on an ancestor, or in a required nested slice (the BP profile's components are sliced by `code.coding.code`, fixed inside the nested coding slices);
+  - an extension context other than `element`;
+  - a type or target profile that is neither a base type nor in the set.
+
+  Package Validation at central ([#88](https://github.com/carapai/people-centered-healthcare/issues/88)) compiles the package with its dependencies, and any error fails it. Activation ([#89](https://github.com/carapai/people-centered-healthcare/issues/89)) compiles the active set once per node.
+- **Checks:**
+  - cardinality, `fixed[x]` and `pattern[x]`, and allowed types, choice types included;
+  - target profiles of literal references, by resource type; whether the target itself conforms is out of v1;
+  - extensions with a definition in the set: their value, and their contexts by element path or type;
+  - profile invariants, evaluated with the tier 2 engine by indexed path; base-resource invariants are left to tier 2;
+  - slicing: each item is assigned to the slices it matches; `closed` rejects unassigned items, `openAtEnd` rejects them before the last slice, `ordered` enforces slice order, and each slice has its own cardinality;
+  - the profiles of a type (`SimpleQuantity` on `valueQuantity`), recursively.
+- **Datatypes.** A snapshot does not expand datatypes, so members the profile does not constrain are walked through the core element table; extensions below them (`Patient.name[0].extension`) are still checked.
+- **One report per failure.** An invariant repeated in a derived profile's snapshot is evaluated once, and an extension checked both as a slice's type profile and by its definition is reported once.
+- **Unknown or mismatched profiles.** A profile not in the active set is `processing`; a profile for another resource type is `structure`.
+- **Tests** (`tests/profiles.rs`):
+  - the official vital-signs, heart-rate and BP profiles: the valid examples pass; a missing category, a wrong LOINC code, a wrong fixed unit and a missing systolic component each fail;
+  - with `HEALTH_FHIR_R5_EXAMPLES` set, all 12 official examples that claim one of these profiles conform;
+  - custom fixtures (`tests/fixtures/custom-profiles/`) cover every supported construct and the compile refusals.
+- **Performance.** In a release build on a development laptop, tier 3 adds p95 0.45 ms to the heart-rate example and 0.90 ms to the BP example. With tiers 1–2, the BP example is about 2.0 ms p95, at the budget; [#170](https://github.com/carapai/people-centered-healthcare/issues/170) brings tiers 1–3 within it on reference edge hardware.
+- **Follow-ups:** the HL7 Java validator differential joins the tier 1 cross-check in [#166](https://github.com/carapai/people-centered-healthcare/issues/166). The `octofhir-fhirschema` slicing-merge bug is to be reported upstream.
 
 ## Search parameters and indexed projections
 

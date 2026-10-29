@@ -27,7 +27,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#159](https://github.com/carapai/people-centered-healthcare/issues/159) | Enforce reference integrity on write and delete | 2 | #158 |  |
 | [#59](https://github.com/carapai/people-centered-healthcare/issues/59) | Implement validation tiers 1–2 on the write path | 2 | #53 |  |
 | [#165](https://github.com/carapai/people-centered-healthcare/issues/165) | Enforce the core invariants (tier 2) with the decimal-exact FHIRPath engine | 2 | #59 |  |
-| [#166](https://github.com/carapai/people-centered-healthcare/issues/166) | Cross-check the tier 1 element table against the HL7 Java validator | 2 | #59 |  |
+| [#166](https://github.com/carapai/people-centered-healthcare/issues/166) | Cross-check tiers 1 and 3 against the HL7 Java validator | 2 | #59, #145 |  |
 | [#167](https://github.com/carapai/people-centered-healthcare/issues/167) | Implement the Inbound Dead Letter and the quarantine queue | 2 | #59 |  |
 | [#60](https://github.com/carapai/people-centered-healthcare/issues/60) | Implement the content-addressed blob store | 2 | #55 |  |
 | [#61](https://github.com/carapai/people-centered-healthcare/issues/61) | Implement encrypted logical backup and the round-trip fixture | 2 | #55, #60 |  |
@@ -61,6 +61,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#89](https://github.com/carapai/people-centered-healthcare/issues/89) | Implement scoped activation, staging and rollback on nodes | 6 | #88, #81 |  |
 | [#90](https://github.com/carapai/people-centered-healthcare/issues/90) | Implement the terminology service | 6 | #86, #58 |  |
 | [#145](https://github.com/carapai/people-centered-healthcare/issues/145) | Build the snapshot-driven profile validator (tier 3) | 6 | #59, #165 |  |
+| [#170](https://github.com/carapai/people-centered-healthcare/issues/170) | Bring validation tiers 1–3 within the 2 ms p95 budget | 6 | #145 |  |
 | [#91](https://github.com/carapai/people-centered-healthcare/issues/91) | Implement validation tiers 3–4 (profiles and bindings) | 6 | #59, #90, #145 |  |
 | [#92](https://github.com/carapai/people-centered-healthcare/issues/92) | Build the Questionnaire renderer and Form Layouts | 6 | #62, #86, #45 |  |
 | [#93](https://github.com/carapai/people-centered-healthcare/issues/93) | Implement extraction and CompleteQuestionnaireResponse | 6 | #91, #92, #87 |  |

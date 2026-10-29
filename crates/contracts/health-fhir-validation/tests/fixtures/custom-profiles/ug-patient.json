@@ -1,0 +1,305 @@
+{
+ "resourceType": "StructureDefinition",
+ "id": "ug-patient",
+ "url": "http://example.org/fhir/StructureDefinition/ug-patient",
+ "name": "UgPatient",
+ "status": "draft",
+ "kind": "resource",
+ "abstract": false,
+ "type": "Patient",
+ "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Patient",
+ "derivation": "constraint",
+ "snapshot": {
+  "element": [
+   {
+    "id": "Patient",
+    "path": "Patient",
+    "min": 0,
+    "max": "*",
+    "constraint": [
+     {
+      "key": "ug-1",
+      "severity": "error",
+      "human": "A patient needs a name",
+      "expression": "name.exists()",
+      "source": "http://example.org/fhir/StructureDefinition/ug-patient"
+     }
+    ]
+   },
+   {
+    "id": "Patient.identifier",
+    "path": "Patient.identifier",
+    "min": 1,
+    "max": "*",
+    "slicing": {
+     "discriminator": [
+      {
+       "type": "value",
+       "path": "system"
+      }
+     ],
+     "rules": "closed"
+    }
+   },
+   {
+    "id": "Patient.identifier:nin",
+    "path": "Patient.identifier",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "Identifier"
+     }
+    ]
+   },
+   {
+    "id": "Patient.identifier:nin.system",
+    "path": "Patient.identifier.system",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "uri"
+     }
+    ],
+    "fixedUri": "urn:ug:nin"
+   },
+   {
+    "id": "Patient.identifier:mrn",
+    "path": "Patient.identifier",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "Identifier"
+     }
+    ]
+   },
+   {
+    "id": "Patient.identifier:mrn.system",
+    "path": "Patient.identifier.system",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "uri"
+     }
+    ],
+    "fixedUri": "urn:ug:mrn"
+   },
+   {
+    "id": "Patient.name",
+    "path": "Patient.name",
+    "min": 0,
+    "max": "*",
+    "slicing": {
+     "discriminator": [
+      {
+       "type": "value",
+       "path": "use"
+      }
+     ],
+     "rules": "openAtEnd",
+     "ordered": true
+    }
+   },
+   {
+    "id": "Patient.name:official",
+    "path": "Patient.name",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "HumanName"
+     }
+    ]
+   },
+   {
+    "id": "Patient.name:official.use",
+    "path": "Patient.name.use",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "code"
+     }
+    ],
+    "fixedCode": "official"
+   },
+   {
+    "id": "Patient.name:usual",
+    "path": "Patient.name",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "HumanName"
+     }
+    ]
+   },
+   {
+    "id": "Patient.name:usual.use",
+    "path": "Patient.name.use",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "code"
+     }
+    ],
+    "fixedCode": "usual"
+   },
+   {
+    "id": "Patient.telecom",
+    "path": "Patient.telecom",
+    "min": 0,
+    "max": "*",
+    "slicing": {
+     "discriminator": [
+      {
+       "type": "exists",
+       "path": "period"
+      }
+     ],
+     "rules": "open"
+    }
+   },
+   {
+    "id": "Patient.telecom:current",
+    "path": "Patient.telecom",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "ContactPoint"
+     }
+    ]
+   },
+   {
+    "id": "Patient.telecom:current.period",
+    "path": "Patient.telecom.period",
+    "min": 0,
+    "max": "0"
+   },
+   {
+    "id": "Patient.multipleBirth[x]",
+    "path": "Patient.multipleBirth[x]",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "boolean"
+     }
+    ]
+   },
+   {
+    "id": "Patient.deceased[x]",
+    "path": "Patient.deceased[x]",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "boolean"
+     },
+     {
+      "code": "dateTime"
+     }
+    ],
+    "slicing": {
+     "discriminator": [
+      {
+       "type": "type",
+       "path": "$this"
+      }
+     ],
+     "rules": "closed"
+    }
+   },
+   {
+    "id": "Patient.deceased[x]:deceasedBoolean",
+    "path": "Patient.deceased[x]",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "boolean"
+     }
+    ]
+   },
+   {
+    "id": "Patient.maritalStatus",
+    "path": "Patient.maritalStatus",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "CodeableConcept"
+     }
+    ],
+    "patternCodeableConcept": {
+     "coding": [
+      {
+       "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+       "code": "M"
+      }
+     ]
+    }
+   },
+   {
+    "id": "Patient.generalPractitioner",
+    "path": "Patient.generalPractitioner",
+    "min": 0,
+    "max": "*",
+    "type": [
+     {
+      "code": "Reference",
+      "targetProfile": [
+       "http://hl7.org/fhir/StructureDefinition/Practitioner"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "Patient.extension",
+    "path": "Patient.extension",
+    "min": 0,
+    "max": "*",
+    "slicing": {
+     "discriminator": [
+      {
+       "type": "value",
+       "path": "url"
+      }
+     ],
+     "rules": "open"
+    }
+   },
+   {
+    "id": "Patient.extension:tribe",
+    "path": "Patient.extension",
+    "min": 0,
+    "max": "1",
+    "type": [
+     {
+      "code": "Extension",
+      "profile": [
+       "http://example.org/fhir/StructureDefinition/ug-tribe"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "Patient.extension:tribe.url",
+    "path": "Patient.extension.url",
+    "min": 1,
+    "max": "1",
+    "type": [
+     {
+      "code": "uri"
+     }
+    ],
+    "fixedUri": "http://example.org/fhir/StructureDefinition/ug-tribe"
+   }
+  ]
+ }
+}

@@ -299,3 +299,12 @@ async fn the_official_corpus_holds_its_invariants_when_available() {
     assert_eq!(failures, Vec::<String>::new());
     assert_eq!(confirmed, 171, "161 que-2 and 10 sdf-27");
 }
+
+#[tokio::test]
+async fn as_casts_fhir_primitives() {
+    // `vs-1` in the vital-signs profile; as() once dropped every FHIR primitive except the
+    // System ones (third_party/octofhir-fhirpath patch 0008).
+    let json = r#"{"resourceType":"Observation","status":"final","code":{"text":"x"},"effectiveDateTime":"2026-01-01"}"#;
+    let cast = evaluate(json, "Observation.effective.ofType(dateTime).select(($this as dateTime).toString().length() >= 8)").await;
+    assert_eq!(cast, Ok(vec![FhirPathItem::Boolean(true)]));
+}
