@@ -1707,6 +1707,10 @@ version = "0.1.0"
 name = "health-surrealdb"
 version = "0.1.0"
 dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde_json",
  "sha2 0.11.1",
  "surrealdb",
  "thiserror",

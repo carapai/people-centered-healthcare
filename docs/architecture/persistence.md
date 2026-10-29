@@ -34,7 +34,7 @@ A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.su
 
 | Field | Content |
 |---|---|
-| `resource` | The full canonical R5 JSON (`object FLEXIBLE`), the resource of record |
+| `json` | The stored bytes of the resource of record: the validated input JSON stamped with `id` and `meta`, as a string (ADR 0051). Storing a SurrealDB object would lose decimal text and key order |
 | `version_id` | UUID; equal to `meta.versionId`, which is the `op_id` of the write (ADR 0018) |
 | `version_seq` | Integer assigned by the Authority Node, monotonic per resource |
 | `last_updated` | `meta.lastUpdated` |
@@ -49,7 +49,7 @@ A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.su
 
 | Field | Content |
 |---|---|
-| `resource` | The full resource for that version (never a diff) |
+| `json` | The full resource for that version as stored bytes (never a diff) |
 | `version_id`, `parent_version_id` | For sync ancestry |
 | `op_id`, `origin_node`, `hlc`, author | Provenance of the write |
 | `last_updated`, `deleted` | |
@@ -109,6 +109,12 @@ sequenceDiagram
   Note over UoW,DB: write-write conflict → retry ≤3 with jitter; on retry the If-Match check yields 412 if the other writer won
 ```
 
+- **Implementation (#56).** `health-surrealdb::SurrealStore` runs each unit of work as one SurrealDB interactive transaction.
+  - **Preconditions** are checked against the head read inside the transaction.
+  - **Conflicts.** A concurrent commit to the same head, guard or counter fails the later commit, which surfaces as `WriteError::Conflict`. The rerun then sees the winner and gets 412.
+  - **Guard records** (`guard`) and **counters** (`counter`, advanced by `SequenceState::next`) are records in that same transaction, never read-then-check.
+  - **Measured on 3.3.5.** 8 concurrent writers on one counter minted 200 values with no duplicates or gaps, but retried about 1,200 conflicts, roughly 6 per value. That exceeds `RetryPolicy`'s default of 4 attempts. One hot counter per facility is fine at clinic rates; a hotter one would need sharding or a longer retry budget.
+  - **Tables.** Migration `0001_resource_tables` creates head and history tables for the 84 resource types in the ownership registry (`health-surrealdb::ownership`), plus `guard`, `counter` and `outbox`. Not yet included: `facility`, `authority_node`, `security_labels`, `index_keys` and hot projections, which arrive with search (#57) and authorization.
 - **`If-Match` is required** on updates from our clients. Creates use `PUT [type]/[client-uuid]` (update-as-create, `updateCreate=true`). `POST` create works for external clients, and the server then mints a UUIDv7.
 - **Concurrent writers.** Two writers of the same resource both write its head record, so SurrealDB snapshot isolation reports a retryable conflict.
 - **Multi-record invariants** are never enforced by read-then-check, because snapshot isolation allows write skew. They use **guard records** or **UNIQUE indexes** written in the same transaction. Examples: one active MRN per facility, one open Encounter per patient per service point, unique business identifiers within their system.

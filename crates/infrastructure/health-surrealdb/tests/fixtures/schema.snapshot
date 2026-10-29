@@ -2,3 +2,1106 @@ DEFINE TABLE _migration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD applied_at ON _migration TYPE datetime PERMISSIONS FULL
   DEFINE FIELD checksum ON _migration TYPE string PERMISSIONS FULL
   DEFINE FIELD name ON _migration TYPE string PERMISSIONS FULL
+DEFINE TABLE account TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON account TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON account TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON account TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON account TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON account TYPE int PERMISSIONS FULL
+DEFINE TABLE account_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON account_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON account_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON account_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON account_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON account_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX account_history_last_updated ON account_history FIELDS last_updated, version_seq
+DEFINE TABLE activity_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON activity_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON activity_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON activity_definition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON activity_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON activity_definition TYPE int PERMISSIONS FULL
+DEFINE TABLE activity_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON activity_definition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON activity_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON activity_definition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON activity_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON activity_definition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX activity_definition_history_last_updated ON activity_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE allergy_intolerance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON allergy_intolerance TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON allergy_intolerance TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON allergy_intolerance TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON allergy_intolerance TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON allergy_intolerance TYPE int PERMISSIONS FULL
+DEFINE TABLE allergy_intolerance_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON allergy_intolerance_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON allergy_intolerance_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON allergy_intolerance_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON allergy_intolerance_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON allergy_intolerance_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX allergy_intolerance_history_last_updated ON allergy_intolerance_history FIELDS last_updated, version_seq
+DEFINE TABLE appointment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON appointment TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON appointment TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON appointment TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON appointment TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON appointment TYPE int PERMISSIONS FULL
+DEFINE TABLE appointment_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON appointment_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON appointment_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON appointment_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON appointment_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON appointment_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX appointment_history_last_updated ON appointment_history FIELDS last_updated, version_seq
+DEFINE TABLE appointment_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON appointment_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON appointment_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON appointment_response TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON appointment_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON appointment_response TYPE int PERMISSIONS FULL
+DEFINE TABLE appointment_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON appointment_response_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON appointment_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON appointment_response_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON appointment_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON appointment_response_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX appointment_response_history_last_updated ON appointment_response_history FIELDS last_updated, version_seq
+DEFINE TABLE audit_event TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON audit_event TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON audit_event TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON audit_event TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON audit_event TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON audit_event TYPE int PERMISSIONS FULL
+DEFINE TABLE audit_event_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON audit_event_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON audit_event_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON audit_event_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON audit_event_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON audit_event_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX audit_event_history_last_updated ON audit_event_history FIELDS last_updated, version_seq
+DEFINE TABLE capability_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON capability_statement TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON capability_statement TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON capability_statement TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON capability_statement TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON capability_statement TYPE int PERMISSIONS FULL
+DEFINE TABLE capability_statement_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON capability_statement_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON capability_statement_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON capability_statement_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON capability_statement_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON capability_statement_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX capability_statement_history_last_updated ON capability_statement_history FIELDS last_updated, version_seq
+DEFINE TABLE care_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON care_plan TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON care_plan TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON care_plan TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON care_plan TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON care_plan TYPE int PERMISSIONS FULL
+DEFINE TABLE care_plan_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON care_plan_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON care_plan_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON care_plan_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON care_plan_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON care_plan_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX care_plan_history_last_updated ON care_plan_history FIELDS last_updated, version_seq
+DEFINE TABLE care_team TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON care_team TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON care_team TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON care_team TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON care_team TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON care_team TYPE int PERMISSIONS FULL
+DEFINE TABLE care_team_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON care_team_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON care_team_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON care_team_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON care_team_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON care_team_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX care_team_history_last_updated ON care_team_history FIELDS last_updated, version_seq
+DEFINE TABLE charge_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON charge_item TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON charge_item TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON charge_item TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON charge_item TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON charge_item TYPE int PERMISSIONS FULL
+DEFINE TABLE charge_item_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON charge_item_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON charge_item_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON charge_item_definition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON charge_item_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON charge_item_definition TYPE int PERMISSIONS FULL
+DEFINE TABLE charge_item_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON charge_item_definition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON charge_item_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON charge_item_definition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON charge_item_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON charge_item_definition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX charge_item_definition_history_last_updated ON charge_item_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE charge_item_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON charge_item_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON charge_item_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON charge_item_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON charge_item_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON charge_item_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX charge_item_history_last_updated ON charge_item_history FIELDS last_updated, version_seq
+DEFINE TABLE claim TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON claim TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON claim TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON claim TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON claim TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON claim TYPE int PERMISSIONS FULL
+DEFINE TABLE claim_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON claim_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON claim_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON claim_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON claim_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON claim_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX claim_history_last_updated ON claim_history FIELDS last_updated, version_seq
+DEFINE TABLE claim_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON claim_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON claim_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON claim_response TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON claim_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON claim_response TYPE int PERMISSIONS FULL
+DEFINE TABLE claim_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON claim_response_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON claim_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON claim_response_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON claim_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON claim_response_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX claim_response_history_last_updated ON claim_response_history FIELDS last_updated, version_seq
+DEFINE TABLE clinical_impression TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON clinical_impression TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON clinical_impression TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON clinical_impression TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON clinical_impression TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON clinical_impression TYPE int PERMISSIONS FULL
+DEFINE TABLE clinical_impression_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON clinical_impression_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON clinical_impression_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON clinical_impression_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON clinical_impression_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON clinical_impression_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX clinical_impression_history_last_updated ON clinical_impression_history FIELDS last_updated, version_seq
+DEFINE TABLE code_system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON code_system TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON code_system TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON code_system TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON code_system TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON code_system TYPE int PERMISSIONS FULL
+DEFINE TABLE code_system_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON code_system_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON code_system_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON code_system_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON code_system_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON code_system_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX code_system_history_last_updated ON code_system_history FIELDS last_updated, version_seq
+DEFINE TABLE composition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON composition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON composition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON composition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON composition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON composition TYPE int PERMISSIONS FULL
+DEFINE TABLE composition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON composition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON composition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON composition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON composition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON composition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX composition_history_last_updated ON composition_history FIELDS last_updated, version_seq
+DEFINE TABLE concept_map TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON concept_map TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON concept_map TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON concept_map TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON concept_map TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON concept_map TYPE int PERMISSIONS FULL
+DEFINE TABLE concept_map_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON concept_map_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON concept_map_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON concept_map_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON concept_map_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON concept_map_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX concept_map_history_last_updated ON concept_map_history FIELDS last_updated, version_seq
+DEFINE TABLE condition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON condition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON condition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON condition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON condition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON condition TYPE int PERMISSIONS FULL
+DEFINE TABLE condition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON condition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON condition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON condition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON condition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON condition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX condition_history_last_updated ON condition_history FIELDS last_updated, version_seq
+DEFINE TABLE consent TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON consent TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON consent TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON consent TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON consent TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON consent TYPE int PERMISSIONS FULL
+DEFINE TABLE consent_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON consent_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON consent_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON consent_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON consent_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON consent_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX consent_history_last_updated ON consent_history FIELDS last_updated, version_seq
+DEFINE TABLE contract TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON contract TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON contract TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON contract TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON contract TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON contract TYPE int PERMISSIONS FULL
+DEFINE TABLE contract_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON contract_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON contract_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON contract_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON contract_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON contract_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX contract_history_last_updated ON contract_history FIELDS last_updated, version_seq
+DEFINE TABLE counter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD last ON counter TYPE int PERMISSIONS FULL
+  DEFINE FIELD year ON counter TYPE none | int PERMISSIONS FULL
+DEFINE TABLE coverage TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage TYPE int PERMISSIONS FULL
+DEFINE TABLE coverage_eligibility_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage_eligibility_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage_eligibility_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage_eligibility_request TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage_eligibility_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage_eligibility_request TYPE int PERMISSIONS FULL
+DEFINE TABLE coverage_eligibility_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage_eligibility_request_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage_eligibility_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage_eligibility_request_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage_eligibility_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage_eligibility_request_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX coverage_eligibility_request_history_last_updated ON coverage_eligibility_request_history FIELDS last_updated, version_seq
+DEFINE TABLE coverage_eligibility_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage_eligibility_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage_eligibility_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage_eligibility_response TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage_eligibility_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage_eligibility_response TYPE int PERMISSIONS FULL
+DEFINE TABLE coverage_eligibility_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage_eligibility_response_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage_eligibility_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage_eligibility_response_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage_eligibility_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage_eligibility_response_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX coverage_eligibility_response_history_last_updated ON coverage_eligibility_response_history FIELDS last_updated, version_seq
+DEFINE TABLE coverage_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON coverage_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON coverage_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON coverage_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON coverage_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON coverage_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX coverage_history_last_updated ON coverage_history FIELDS last_updated, version_seq
+DEFINE TABLE detected_issue TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON detected_issue TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON detected_issue TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON detected_issue TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON detected_issue TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON detected_issue TYPE int PERMISSIONS FULL
+DEFINE TABLE detected_issue_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON detected_issue_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON detected_issue_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON detected_issue_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON detected_issue_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON detected_issue_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX detected_issue_history_last_updated ON detected_issue_history FIELDS last_updated, version_seq
+DEFINE TABLE device_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_definition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_definition TYPE int PERMISSIONS FULL
+DEFINE TABLE device_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_definition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_definition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_definition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX device_definition_history_last_updated ON device_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE device_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_request TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_request TYPE int PERMISSIONS FULL
+DEFINE TABLE device_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_request_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_request_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_request_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX device_request_history_last_updated ON device_request_history FIELDS last_updated, version_seq
+DEFINE TABLE diagnostic_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON diagnostic_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON diagnostic_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON diagnostic_report TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON diagnostic_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON diagnostic_report TYPE int PERMISSIONS FULL
+DEFINE TABLE diagnostic_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON diagnostic_report_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON diagnostic_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON diagnostic_report_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON diagnostic_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON diagnostic_report_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX diagnostic_report_history_last_updated ON diagnostic_report_history FIELDS last_updated, version_seq
+DEFINE TABLE document_reference TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON document_reference TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON document_reference TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON document_reference TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON document_reference TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON document_reference TYPE int PERMISSIONS FULL
+DEFINE TABLE document_reference_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON document_reference_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON document_reference_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON document_reference_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON document_reference_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON document_reference_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX document_reference_history_last_updated ON document_reference_history FIELDS last_updated, version_seq
+DEFINE TABLE encounter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON encounter TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON encounter TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON encounter TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON encounter TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON encounter TYPE int PERMISSIONS FULL
+DEFINE TABLE encounter_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON encounter_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON encounter_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON encounter_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON encounter_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON encounter_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX encounter_history_last_updated ON encounter_history FIELDS last_updated, version_seq
+DEFINE TABLE endpoint TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON endpoint TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON endpoint TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON endpoint TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON endpoint TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON endpoint TYPE int PERMISSIONS FULL
+DEFINE TABLE endpoint_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON endpoint_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON endpoint_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON endpoint_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON endpoint_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON endpoint_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX endpoint_history_last_updated ON endpoint_history FIELDS last_updated, version_seq
+DEFINE TABLE episode_of_care TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON episode_of_care TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON episode_of_care TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON episode_of_care TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON episode_of_care TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON episode_of_care TYPE int PERMISSIONS FULL
+DEFINE TABLE episode_of_care_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON episode_of_care_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON episode_of_care_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON episode_of_care_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON episode_of_care_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON episode_of_care_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX episode_of_care_history_last_updated ON episode_of_care_history FIELDS last_updated, version_seq
+DEFINE TABLE explanation_of_benefit TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON explanation_of_benefit TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON explanation_of_benefit TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON explanation_of_benefit TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON explanation_of_benefit TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON explanation_of_benefit TYPE int PERMISSIONS FULL
+DEFINE TABLE explanation_of_benefit_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON explanation_of_benefit_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON explanation_of_benefit_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON explanation_of_benefit_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON explanation_of_benefit_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON explanation_of_benefit_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX explanation_of_benefit_history_last_updated ON explanation_of_benefit_history FIELDS last_updated, version_seq
+DEFINE TABLE family_member_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON family_member_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON family_member_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON family_member_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON family_member_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON family_member_history TYPE int PERMISSIONS FULL
+DEFINE TABLE family_member_history_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON family_member_history_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON family_member_history_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON family_member_history_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON family_member_history_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON family_member_history_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX family_member_history_history_last_updated ON family_member_history_history FIELDS last_updated, version_seq
+DEFINE TABLE flag TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON flag TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON flag TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON flag TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON flag TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON flag TYPE int PERMISSIONS FULL
+DEFINE TABLE flag_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON flag_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON flag_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON flag_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON flag_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON flag_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX flag_history_last_updated ON flag_history FIELDS last_updated, version_seq
+DEFINE TABLE goal TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON goal TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON goal TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON goal TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON goal TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON goal TYPE int PERMISSIONS FULL
+DEFINE TABLE goal_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON goal_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON goal_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON goal_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON goal_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON goal_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX goal_history_last_updated ON goal_history FIELDS last_updated, version_seq
+DEFINE TABLE group TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON group TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON group TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON group TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON group TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON group TYPE int PERMISSIONS FULL
+DEFINE TABLE group_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON group_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON group_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON group_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON group_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON group_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX group_history_last_updated ON group_history FIELDS last_updated, version_seq
+DEFINE TABLE guard TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD held ON guard TYPE bool PERMISSIONS FULL
+DEFINE TABLE guidance_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON guidance_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON guidance_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON guidance_response TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON guidance_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON guidance_response TYPE int PERMISSIONS FULL
+DEFINE TABLE guidance_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON guidance_response_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON guidance_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON guidance_response_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON guidance_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON guidance_response_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX guidance_response_history_last_updated ON guidance_response_history FIELDS last_updated, version_seq
+DEFINE TABLE healthcare_service TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON healthcare_service TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON healthcare_service TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON healthcare_service TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON healthcare_service TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON healthcare_service TYPE int PERMISSIONS FULL
+DEFINE TABLE healthcare_service_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON healthcare_service_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON healthcare_service_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON healthcare_service_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON healthcare_service_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON healthcare_service_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX healthcare_service_history_last_updated ON healthcare_service_history FIELDS last_updated, version_seq
+DEFINE TABLE imaging_study TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON imaging_study TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON imaging_study TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON imaging_study TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON imaging_study TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON imaging_study TYPE int PERMISSIONS FULL
+DEFINE TABLE imaging_study_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON imaging_study_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON imaging_study_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON imaging_study_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON imaging_study_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON imaging_study_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX imaging_study_history_last_updated ON imaging_study_history FIELDS last_updated, version_seq
+DEFINE TABLE immunization TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization TYPE int PERMISSIONS FULL
+DEFINE TABLE immunization_evaluation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization_evaluation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization_evaluation TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization_evaluation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization_evaluation TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization_evaluation TYPE int PERMISSIONS FULL
+DEFINE TABLE immunization_evaluation_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization_evaluation_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization_evaluation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization_evaluation_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization_evaluation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization_evaluation_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX immunization_evaluation_history_last_updated ON immunization_evaluation_history FIELDS last_updated, version_seq
+DEFINE TABLE immunization_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX immunization_history_last_updated ON immunization_history FIELDS last_updated, version_seq
+DEFINE TABLE immunization_recommendation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization_recommendation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization_recommendation TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization_recommendation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization_recommendation TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization_recommendation TYPE int PERMISSIONS FULL
+DEFINE TABLE immunization_recommendation_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON immunization_recommendation_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON immunization_recommendation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON immunization_recommendation_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON immunization_recommendation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON immunization_recommendation_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX immunization_recommendation_history_last_updated ON immunization_recommendation_history FIELDS last_updated, version_seq
+DEFINE TABLE implementation_guide TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON implementation_guide TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON implementation_guide TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON implementation_guide TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON implementation_guide TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON implementation_guide TYPE int PERMISSIONS FULL
+DEFINE TABLE implementation_guide_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON implementation_guide_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON implementation_guide_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON implementation_guide_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON implementation_guide_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON implementation_guide_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX implementation_guide_history_last_updated ON implementation_guide_history FIELDS last_updated, version_seq
+DEFINE TABLE insurance_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON insurance_plan TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON insurance_plan TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON insurance_plan TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON insurance_plan TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON insurance_plan TYPE int PERMISSIONS FULL
+DEFINE TABLE insurance_plan_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON insurance_plan_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON insurance_plan_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON insurance_plan_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON insurance_plan_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON insurance_plan_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX insurance_plan_history_last_updated ON insurance_plan_history FIELDS last_updated, version_seq
+DEFINE TABLE inventory_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON inventory_item TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON inventory_item TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON inventory_item TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON inventory_item TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON inventory_item TYPE int PERMISSIONS FULL
+DEFINE TABLE inventory_item_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON inventory_item_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON inventory_item_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON inventory_item_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON inventory_item_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON inventory_item_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX inventory_item_history_last_updated ON inventory_item_history FIELDS last_updated, version_seq
+DEFINE TABLE inventory_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON inventory_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON inventory_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON inventory_report TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON inventory_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON inventory_report TYPE int PERMISSIONS FULL
+DEFINE TABLE inventory_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON inventory_report_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON inventory_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON inventory_report_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON inventory_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON inventory_report_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX inventory_report_history_last_updated ON inventory_report_history FIELDS last_updated, version_seq
+DEFINE TABLE invoice TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON invoice TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON invoice TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON invoice TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON invoice TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON invoice TYPE int PERMISSIONS FULL
+DEFINE TABLE invoice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON invoice_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON invoice_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON invoice_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON invoice_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON invoice_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX invoice_history_last_updated ON invoice_history FIELDS last_updated, version_seq
+DEFINE TABLE library TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON library TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON library TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON library TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON library TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON library TYPE int PERMISSIONS FULL
+DEFINE TABLE library_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON library_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON library_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON library_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON library_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON library_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX library_history_last_updated ON library_history FIELDS last_updated, version_seq
+DEFINE TABLE location TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON location TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON location TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON location TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON location TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON location TYPE int PERMISSIONS FULL
+DEFINE TABLE location_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON location_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON location_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON location_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON location_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON location_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX location_history_last_updated ON location_history FIELDS last_updated, version_seq
+DEFINE TABLE measure TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON measure TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON measure TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON measure TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON measure TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON measure TYPE int PERMISSIONS FULL
+DEFINE TABLE measure_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON measure_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON measure_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON measure_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON measure_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON measure_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX measure_history_last_updated ON measure_history FIELDS last_updated, version_seq
+DEFINE TABLE measure_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON measure_report TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON measure_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON measure_report TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON measure_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON measure_report TYPE int PERMISSIONS FULL
+DEFINE TABLE measure_report_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON measure_report_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON measure_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON measure_report_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON measure_report_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON measure_report_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX measure_report_history_last_updated ON measure_report_history FIELDS last_updated, version_seq
+DEFINE TABLE medication TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_administration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_administration TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_administration TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_administration TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_administration TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_administration TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_administration_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_administration_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_administration_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_administration_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_administration_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_administration_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_administration_history_last_updated ON medication_administration_history FIELDS last_updated, version_seq
+DEFINE TABLE medication_dispense TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_dispense TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_dispense TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_dispense TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_dispense TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_dispense TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_dispense_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_dispense_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_dispense_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_dispense_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_dispense_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_dispense_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_dispense_history_last_updated ON medication_dispense_history FIELDS last_updated, version_seq
+DEFINE TABLE medication_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_history_last_updated ON medication_history FIELDS last_updated, version_seq
+DEFINE TABLE medication_knowledge TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_knowledge TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_knowledge TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_knowledge TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_knowledge TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_knowledge TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_knowledge_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_knowledge_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_knowledge_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_knowledge_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_knowledge_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_knowledge_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_knowledge_history_last_updated ON medication_knowledge_history FIELDS last_updated, version_seq
+DEFINE TABLE medication_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_request TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_request TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_request_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_request_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_request_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_request_history_last_updated ON medication_request_history FIELDS last_updated, version_seq
+DEFINE TABLE medication_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_statement TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_statement TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_statement TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_statement TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_statement TYPE int PERMISSIONS FULL
+DEFINE TABLE medication_statement_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON medication_statement_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON medication_statement_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON medication_statement_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON medication_statement_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON medication_statement_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX medication_statement_history_last_updated ON medication_statement_history FIELDS last_updated, version_seq
+DEFINE TABLE naming_system TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON naming_system TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON naming_system TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON naming_system TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON naming_system TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON naming_system TYPE int PERMISSIONS FULL
+DEFINE TABLE naming_system_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON naming_system_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON naming_system_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON naming_system_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON naming_system_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON naming_system_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX naming_system_history_last_updated ON naming_system_history FIELDS last_updated, version_seq
+DEFINE TABLE nutrition_order TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON nutrition_order TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON nutrition_order TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON nutrition_order TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON nutrition_order TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON nutrition_order TYPE int PERMISSIONS FULL
+DEFINE TABLE nutrition_order_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON nutrition_order_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON nutrition_order_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON nutrition_order_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON nutrition_order_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON nutrition_order_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX nutrition_order_history_last_updated ON nutrition_order_history FIELDS last_updated, version_seq
+DEFINE TABLE observation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON observation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON observation TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON observation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON observation TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON observation TYPE int PERMISSIONS FULL
+DEFINE TABLE observation_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON observation_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON observation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON observation_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON observation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON observation_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX observation_history_last_updated ON observation_history FIELDS last_updated, version_seq
+DEFINE TABLE organization TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON organization TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON organization TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON organization TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON organization TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON organization TYPE int PERMISSIONS FULL
+DEFINE TABLE organization_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON organization_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON organization_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON organization_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON organization_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON organization_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX organization_history_last_updated ON organization_history FIELDS last_updated, version_seq
+DEFINE TABLE outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD created_at ON outbox TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD kind ON outbox TYPE string PERMISSIONS FULL
+  DEFINE FIELD op_id ON outbox TYPE string PERMISSIONS FULL
+  DEFINE FIELD payload ON outbox TYPE string PERMISSIONS FULL
+  DEFINE INDEX outbox_created_at ON outbox FIELDS created_at
+DEFINE TABLE patient TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON patient TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON patient TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON patient TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON patient TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON patient TYPE int PERMISSIONS FULL
+DEFINE TABLE patient_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON patient_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON patient_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON patient_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON patient_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON patient_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX patient_history_last_updated ON patient_history FIELDS last_updated, version_seq
+DEFINE TABLE payment_notice TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON payment_notice TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON payment_notice TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON payment_notice TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON payment_notice TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON payment_notice TYPE int PERMISSIONS FULL
+DEFINE TABLE payment_notice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON payment_notice_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON payment_notice_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON payment_notice_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON payment_notice_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON payment_notice_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX payment_notice_history_last_updated ON payment_notice_history FIELDS last_updated, version_seq
+DEFINE TABLE payment_reconciliation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON payment_reconciliation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON payment_reconciliation TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON payment_reconciliation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON payment_reconciliation TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON payment_reconciliation TYPE int PERMISSIONS FULL
+DEFINE TABLE payment_reconciliation_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON payment_reconciliation_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON payment_reconciliation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON payment_reconciliation_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON payment_reconciliation_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON payment_reconciliation_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX payment_reconciliation_history_last_updated ON payment_reconciliation_history FIELDS last_updated, version_seq
+DEFINE TABLE person TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON person TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON person TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON person TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON person TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON person TYPE int PERMISSIONS FULL
+DEFINE TABLE person_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON person_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON person_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON person_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON person_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON person_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX person_history_last_updated ON person_history FIELDS last_updated, version_seq
+DEFINE TABLE plan_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON plan_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON plan_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON plan_definition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON plan_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON plan_definition TYPE int PERMISSIONS FULL
+DEFINE TABLE plan_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON plan_definition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON plan_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON plan_definition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON plan_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON plan_definition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX plan_definition_history_last_updated ON plan_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE practitioner TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON practitioner TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON practitioner TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON practitioner TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON practitioner TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON practitioner TYPE int PERMISSIONS FULL
+DEFINE TABLE practitioner_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON practitioner_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON practitioner_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON practitioner_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON practitioner_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON practitioner_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX practitioner_history_last_updated ON practitioner_history FIELDS last_updated, version_seq
+DEFINE TABLE practitioner_role TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON practitioner_role TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON practitioner_role TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON practitioner_role TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON practitioner_role TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON practitioner_role TYPE int PERMISSIONS FULL
+DEFINE TABLE practitioner_role_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON practitioner_role_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON practitioner_role_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON practitioner_role_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON practitioner_role_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON practitioner_role_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX practitioner_role_history_last_updated ON practitioner_role_history FIELDS last_updated, version_seq
+DEFINE TABLE procedure TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON procedure TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON procedure TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON procedure TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON procedure TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON procedure TYPE int PERMISSIONS FULL
+DEFINE TABLE procedure_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON procedure_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON procedure_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON procedure_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON procedure_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON procedure_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX procedure_history_last_updated ON procedure_history FIELDS last_updated, version_seq
+DEFINE TABLE questionnaire TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON questionnaire TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON questionnaire TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON questionnaire TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON questionnaire TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON questionnaire TYPE int PERMISSIONS FULL
+DEFINE TABLE questionnaire_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON questionnaire_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON questionnaire_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON questionnaire_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON questionnaire_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON questionnaire_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX questionnaire_history_last_updated ON questionnaire_history FIELDS last_updated, version_seq
+DEFINE TABLE questionnaire_response TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON questionnaire_response TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON questionnaire_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON questionnaire_response TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON questionnaire_response TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON questionnaire_response TYPE int PERMISSIONS FULL
+DEFINE TABLE questionnaire_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON questionnaire_response_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON questionnaire_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON questionnaire_response_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON questionnaire_response_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON questionnaire_response_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX questionnaire_response_history_last_updated ON questionnaire_response_history FIELDS last_updated, version_seq
+DEFINE TABLE related_person TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON related_person TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON related_person TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON related_person TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON related_person TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON related_person TYPE int PERMISSIONS FULL
+DEFINE TABLE related_person_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON related_person_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON related_person_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON related_person_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON related_person_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON related_person_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX related_person_history_last_updated ON related_person_history FIELDS last_updated, version_seq
+DEFINE TABLE request_orchestration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON request_orchestration TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON request_orchestration TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON request_orchestration TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON request_orchestration TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON request_orchestration TYPE int PERMISSIONS FULL
+DEFINE TABLE request_orchestration_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON request_orchestration_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON request_orchestration_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON request_orchestration_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON request_orchestration_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON request_orchestration_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX request_orchestration_history_last_updated ON request_orchestration_history FIELDS last_updated, version_seq
+DEFINE TABLE risk_assessment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON risk_assessment TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON risk_assessment TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON risk_assessment TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON risk_assessment TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON risk_assessment TYPE int PERMISSIONS FULL
+DEFINE TABLE risk_assessment_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON risk_assessment_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON risk_assessment_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON risk_assessment_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON risk_assessment_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON risk_assessment_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX risk_assessment_history_last_updated ON risk_assessment_history FIELDS last_updated, version_seq
+DEFINE TABLE schedule TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON schedule TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON schedule TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON schedule TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON schedule TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON schedule TYPE int PERMISSIONS FULL
+DEFINE TABLE schedule_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON schedule_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON schedule_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON schedule_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON schedule_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON schedule_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX schedule_history_last_updated ON schedule_history FIELDS last_updated, version_seq
+DEFINE TABLE search_parameter TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON search_parameter TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON search_parameter TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON search_parameter TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON search_parameter TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON search_parameter TYPE int PERMISSIONS FULL
+DEFINE TABLE search_parameter_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON search_parameter_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON search_parameter_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON search_parameter_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON search_parameter_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON search_parameter_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX search_parameter_history_last_updated ON search_parameter_history FIELDS last_updated, version_seq
+DEFINE TABLE service_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON service_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON service_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON service_request TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON service_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON service_request TYPE int PERMISSIONS FULL
+DEFINE TABLE service_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON service_request_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON service_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON service_request_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON service_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON service_request_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX service_request_history_last_updated ON service_request_history FIELDS last_updated, version_seq
+DEFINE TABLE slot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON slot TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON slot TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON slot TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON slot TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON slot TYPE int PERMISSIONS FULL
+DEFINE TABLE slot_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON slot_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON slot_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON slot_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON slot_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON slot_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX slot_history_last_updated ON slot_history FIELDS last_updated, version_seq
+DEFINE TABLE specimen TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON specimen TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON specimen TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON specimen TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON specimen TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON specimen TYPE int PERMISSIONS FULL
+DEFINE TABLE specimen_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON specimen_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON specimen_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON specimen_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON specimen_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON specimen_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX specimen_history_last_updated ON specimen_history FIELDS last_updated, version_seq
+DEFINE TABLE structure_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON structure_definition TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON structure_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON structure_definition TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON structure_definition TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON structure_definition TYPE int PERMISSIONS FULL
+DEFINE TABLE structure_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON structure_definition_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON structure_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON structure_definition_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON structure_definition_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON structure_definition_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX structure_definition_history_last_updated ON structure_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE supply_delivery TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON supply_delivery TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON supply_delivery TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON supply_delivery TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON supply_delivery TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON supply_delivery TYPE int PERMISSIONS FULL
+DEFINE TABLE supply_delivery_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON supply_delivery_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON supply_delivery_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON supply_delivery_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON supply_delivery_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON supply_delivery_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX supply_delivery_history_last_updated ON supply_delivery_history FIELDS last_updated, version_seq
+DEFINE TABLE supply_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON supply_request TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON supply_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON supply_request TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON supply_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON supply_request TYPE int PERMISSIONS FULL
+DEFINE TABLE supply_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON supply_request_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON supply_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON supply_request_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON supply_request_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON supply_request_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX supply_request_history_last_updated ON supply_request_history FIELDS last_updated, version_seq
+DEFINE TABLE task TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON task TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON task TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON task TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON task TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON task TYPE int PERMISSIONS FULL
+DEFINE TABLE task_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON task_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON task_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON task_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON task_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON task_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX task_history_last_updated ON task_history FIELDS last_updated, version_seq
+DEFINE TABLE value_set TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON value_set TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON value_set TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON value_set TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON value_set TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON value_set TYPE int PERMISSIONS FULL
+DEFINE TABLE value_set_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON value_set_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON value_set_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON value_set_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON value_set_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON value_set_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX value_set_history_last_updated ON value_set_history FIELDS last_updated, version_seq

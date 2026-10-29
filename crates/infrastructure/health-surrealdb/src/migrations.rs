@@ -26,9 +26,12 @@ impl Migration {
     }
 }
 
-/// The platform's migrations, in order. The first schema migration arrives with the write
-/// transaction (#56); the `_migration` ledger itself is created by [`migrate`].
-pub const MIGRATIONS: &[Migration] = &[];
+/// The platform's migrations, in order. The `_migration` ledger itself is created by [`migrate`].
+pub const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    name: "0001_resource_tables",
+    sql: include_str!("../migrations/0001_resource_tables.surql"),
+}];
 
 /// The ledger of applied migrations, defined before anything else runs.
 const LEDGER: &str = "

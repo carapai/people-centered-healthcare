@@ -20,9 +20,14 @@ remote = ["surrealdb/protocol-ws", "surrealdb/rustls"]
 memory = ["surrealdb/kv-mem"]
 
 [dependencies]
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 surrealdb = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 surrealdb = { workspace = true, features = ["kv-mem"] }

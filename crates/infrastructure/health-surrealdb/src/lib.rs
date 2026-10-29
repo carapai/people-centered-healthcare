@@ -6,11 +6,16 @@
 //! - [`migrate`] applies the forward-only [`MIGRATIONS`] before the node reports ready, and
 //!   refuses to start if an applied migration was modified.
 //!
-//! The `health-persistence` unit of work over heads, history and index entries lands with
-//! [Implement head/history storage and the write transaction](https://github.com/carapai/people-centered-healthcare/issues/56).
+//! - [`SurrealStore`] implements the `health-persistence` unit of work on SurrealDB interactive
+//!   transactions: heads, history, guards, counters and the outbox. Search index entries arrive
+//!   with the search task (#57).
+//! - [`ownership`] declares which Owner each table and record belongs to.
 
 mod connection;
 mod migrations;
+pub mod ownership;
+mod store;
 
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
+pub use store::{SurrealStore, SurrealTx};

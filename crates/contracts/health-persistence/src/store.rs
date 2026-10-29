@@ -12,6 +12,9 @@ pub enum StoreError {
     /// The store is unreachable or failed; the message never contains resource bodies.
     #[error("store unavailable: {0}")]
     Unavailable(String),
+    /// The platform stores no records of this resource type (there is no table for it).
+    #[error("no table for resource type `{0}`")]
+    UnknownResourceType(String),
 }
 
 /// Why a write or commit was refused.
