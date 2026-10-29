@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0054), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Three AFK validation spikes and one grilling ticket remain open and gate specific tasks ([dependencies](dependencies.md)).
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0055), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Three AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -64,15 +64,15 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - Which profile and slicing validator does tier 3 use? (#144) — see ADR 0053, `docs/research/fhir-r5.md`; added the task [Build the snapshot-driven profile validator (tier 3)](https://github.com/carapai/people-centered-healthcare/issues/145) (#145).
 - Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38) — every item passes (Bun only, TS 7.0.2, Panda presets explicit); fhirpath.js in lossless precise mode over a gated subset; see ADR 0054, `docs/research/frontend.md`.
 - Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37) — storage holds; base keys too broad; see `docs/research/patient-identity.md`; raised #146.
+- Which default blocking keys and stop-list do the Matching Rules use? (#146) — see ADR 0055, `docs/architecture/patient-identity.md`, `GLOSSARY.md`.
 
-Wayfinder tickets open: three AFK validation spikes and one grilling ticket. Frontier (open, unblocked, unclaimed), in map order:
+Wayfinder tickets open: three AFK validation spikes, all needing facility hardware. Frontier (open, unblocked, unclaimed), in map order:
 
 1. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34): AFK task; needs facility hardware
 2. Does the per-node commit counter sustain facility write rates on edge hardware? (#36): AFK task; needs edge hardware
 3. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39): AFK task; needs Windows facility PCs
-4. [Which default blocking keys and stop-list do the Matching Rules use?](https://github.com/carapai/people-centered-healthcare/issues/146) (#146): grilling; blocks #69
 
-Recommended next: the grilling ticket [Which default blocking keys and stop-list do the Matching Rules use?](https://github.com/carapai/people-centered-healthcare/issues/146). Start implementation with [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42) and [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44). The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
+Recommended next: every decision ticket is resolved. Start implementation with [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42) and [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44). The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware, and gate their own tasks only.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 

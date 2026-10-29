@@ -56,7 +56,7 @@ A condensed version of the research ticket [What patient matching and MPI approa
 - **Matching must work without a NIN**, because many people have none.
 - **Name variability and shared phones** reduce discriminating power.
 - **Calibration data access** falls under the DPPA.
-- **Scale.** SurrealDB handles exact-key blocking well, but the base key set is too broad at 45M (spike below). Key design is open in [Which default blocking keys and stop-list do the Matching Rules use?](https://github.com/carapai/people-centered-healthcare/issues/146).
+- **Scale.** SurrealDB handles exact-key blocking well, but the base key set is too broad at 45M (spike below). The default keys and stop-list are in ADR 0055.
 
 ## Matching-scale spike (2026-10-29)
 

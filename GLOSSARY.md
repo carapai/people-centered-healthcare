@@ -52,6 +52,10 @@ _Avoid_: Subscription, partition
 The kept raw copy of an external payload that was rejected for failing structural validation. It is held for review and replay so the data is never lost.
 _Avoid_: Quarantine (that is for profile or terminology failures), error queue
 
+**Blocking Key**:
+A coarse value, such as a phonetic name with a birth year, that limits which existing patients are compared with a new record. Only patients who share at least one blocking key are scored.
+_Avoid_: Index key, match key
+
 **Reconciliation Record**:
 A record raised when ledger operations that are each valid break an invariant together, such as a stock balance going negative, and that an accountable person settles with further operations rather than by choosing a version.
 _Avoid_: Conflict (for ledgers), discrepancy

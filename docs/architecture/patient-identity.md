@@ -72,7 +72,7 @@ flowchart TD
   Q[Candidate Patient] --> D{Verified NIN / ECID / program id?}
   D -- match --> AL[auto-link]
   D -- conflicting verified id --> NM[hard non-match for that pair]
-  D -- none --> B[Blocking: phonetic family + birth year · NIN · phone · district + given initial]
+  D -- none --> B[Blocking: NIN · phone · family+yob+district · family+given+yob · district+given+yob+sex, minus stop-listed blocks]
   B --> S[Fellegi–Sunter score, term-frequency adjusted]
   S -->|≥ upper| AL
   S -->|between| PR[potential match → registry review]
@@ -96,14 +96,21 @@ flowchart TD
     - Range-scan cost follows the block size, not the table size (about 4 µs per row).
     - The storage design holds, and the tantivy fallback is **not** needed for exact-key candidate generation.
     - The base key set is too broad: 99% of queries exceed 2,000 candidates at 45M, mostly because of district + given initial.
-    - The default keys and the stop-list are decided in [Which default blocking keys and stop-list do the Matching Rules use?](https://github.com/carapai/people-centered-healthcare/issues/146).
+    - **Default keys (ADR 0055):**
+      - `nin` and `phone`;
+      - `fam_yob_dist`;
+      - `fam_given_yob`, with the phonetic codes sorted and birth year ±1, or ±5 when the birth date is estimated;
+      - `dist_given_yob_sex`.
+    - **Stop-list.** Block counts are recomputed hourly into `block_count`, and blocks over `max_block` (1,000) are skipped.
+    - **Too little data.** If every key is absent or skipped, `$match` returns an OperationOutcome and the clerk falls back to manual search.
+    - **Blocking recall** must be ≥ 99% on a CI corruption benchmark, and is measured on NIN-verified real pairs before launch.
     - Latency at 45M on central hardware, under concurrent load, is an acceptance criterion of the matching task.
 
 ### "Did you mean" at registration
 
 1. **Online:** the edge first calls central's `$match`, with a 3 s timeout.
 2. **Offline or timed out:** the same engine runs against the edge's **own local scope**, i.e. patients who already have records at the facility. The edge holds no extra regional cache purely for matching.
-3. **The clerk** picks a candidate or registers a new patient.
+3. **The clerk** picks a candidate or registers a new patient. If `$match` reports too little identifying data (ADR 0055), the clerk searches the registry manually by name, birth year, and village or parish first.
 
 ## Provisional registration and reconciliation
 
