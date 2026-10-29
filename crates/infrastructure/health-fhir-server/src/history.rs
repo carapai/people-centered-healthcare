@@ -74,7 +74,7 @@ fn entry(server: &FhirServer, e: HistoryEntry) -> Entry {
         }),
     );
     Entry {
-        full_url: server.url(&path),
+        full_url: Some(server.url(&path)),
         resource: (!e.version.deleted).then(|| e.json.as_str().to_owned()),
         rest,
     }

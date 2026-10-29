@@ -469,9 +469,22 @@ async fn the_capability_statement_matches_behaviour() {
             assert_eq!(reply.status, StatusCode::OK, "{t}?{name}: {}", reply.body);
         }
     }
+    let system_codes: Vec<&str> = rest["interaction"]
+        .as_array()
+        .expect("interactions")
+        .iter()
+        .map(|i| i["code"].as_str().expect("code"))
+        .collect();
+    assert_eq!(system_codes, ["transaction", "batch", "history-system"]);
     let system = send(&router, "GET", "/_history?_count=3", &[], String::new()).await;
-    assert_eq!(rest["interaction"][0]["code"], "history-system");
     assert_eq!(system.status, StatusCode::OK);
+    for kind in ["transaction", "batch"] {
+        let bundle = format!(
+            r#"{{"resourceType":"Bundle","type":"{kind}","entry":[{{"resource":{{"resourceType":"Patient"}},"request":{{"method":"POST","url":"Patient"}}}}]}}"#
+        );
+        let reply = send(&router, "POST", "/", &json, bundle).await;
+        assert_eq!(reply.status, StatusCode::OK, "{kind}: {}", reply.body);
+    }
 }
 
 /// Two concurrent conditional creates under the same condition make one resource.

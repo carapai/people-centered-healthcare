@@ -1,0 +1,158 @@
+{
+ "name": "16-batch",
+ "spec": "https://hl7.org/fhir/R5/http.html#transaction",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "BA1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:p}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "entries succeed or fail on their own",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "prefer": "return=minimal"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "batch",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "BA2"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "BA1"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ],
+        "id": "{{uuid:p}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:p}}",
+        "ifMatch": "W/\"{{uuid:stale}}\""
+       }
+      },
+      {
+       "request": {
+        "method": "GET",
+        "url": "Patient/{{uuid:never}}"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "coding": [
+          {
+           "system": "http://loinc.org",
+           "code": "8480-6"
+          }
+         ]
+        },
+        "subject": {
+         "reference": "urn:uuid:{{uuid:x}}"
+        },
+        "valueQuantity": {
+         "value": 120,
+         "unit": "mmHg"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      },
+      {
+       "request": {
+        "method": "GET",
+        "url": "Patient/{{uuid:p}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/type": "batch-response",
+     "/entry/0/response/status": "201 Created",
+     "/entry/1/response/status": "412 Precondition Failed",
+     "/entry/1/response/outcome/resourceType": "OperationOutcome",
+     "/entry/2/response/status": "404 Not Found",
+     "/entry/3/response/status": "400 Bad Request",
+     "/entry/4/response/status": "200 OK",
+     "/entry/4/resource/id": "{{uuid:p}}"
+    },
+    "json_absent": [
+     "/entry/0/resource"
+    ]
+   }
+  },
+  {
+   "note": "the first entry was kept although others failed",
+   "request": {
+    "method": "GET",
+    "path": "Patient?identifier=urn:ug:nin|BA2"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 1
+    }
+   }
+  }
+ ]
+}

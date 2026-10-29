@@ -161,7 +161,16 @@ Its CapabilityStatement is generated from what is implemented, and a test exerci
   - **Delete** (`DELETE [type]?…`): 0 or 1 matches → 204; more than 1 → 412 (`conditionalDelete = single`).
 
   The condition is searched inside the write transaction with the caller's `SearchPolicy`. A write that creates under a condition also writes and removes a `condition_lock` record keyed by the condition's hash (migration `0003_condition_lock`). Two concurrent creates under the same condition therefore conflict, and the loser's rerun finds the winner's resource. The lock only serializes writes stating the **same** condition. A plain create, or a create under a different condition that matches the same resource, is not serialized against it.
-- **Not done here:** transaction and batch Bundles (#158) and reference integrity (#159). Until then they are not declared and their requests are refused.
+- **Transaction Bundles** (`POST [base]`) run in one SurrealDB transaction in the R5 order, whatever the order of the entries:
+  1. DELETE;
+  2. POST, planned first so each create has its id (a conditional create may resolve to its match);
+  3. PUT;
+  4. GET, after the writes.
+
+  `urn:uuid:` `fullUrl`s are rewritten to `Type/id` in every `reference` before anything is written, and an unresolved `urn:uuid:` reference is 400. A failing entry fails the whole Bundle with its status and an OperationOutcome naming the entry. A resource or `fullUrl` may appear only once. A write-write conflict reruns the whole Bundle.
+- **Batch entries** run alone, each in its own transaction, with per-entry status and outcome. A `urn:uuid:` reference in a batch fails its entry.
+- **Bundle entry limits:** GET entries support read and vread; search entries and PATCH are refused.
+- **Not done here:** reference integrity (#159).
 
 ## Reference integrity
 

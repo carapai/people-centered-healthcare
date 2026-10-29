@@ -14,7 +14,9 @@
      "/fhirVersion": "5.0.0",
      "/kind": "instance",
      "/rest/0/mode": "server",
-     "/rest/0/interaction/0/code": "history-system"
+     "/rest/0/interaction/0/code": "transaction",
+     "/rest/0/interaction/1/code": "batch",
+     "/rest/0/interaction/2/code": "history-system"
     }
    }
   }

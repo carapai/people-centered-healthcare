@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 /// One Bundle entry.
 #[derive(Debug, Default)]
 pub(crate) struct Entry {
-    pub(crate) full_url: String,
+    pub(crate) full_url: Option<String>,
     /// The stored resource JSON, embedded verbatim.
     pub(crate) resource: Option<String>,
     /// Everything else in the entry (`search`, `request`, `response`).
@@ -42,15 +42,17 @@ pub(crate) fn bundle(
         let entries: Vec<String> = entries
             .into_iter()
             .map(|entry| {
-                let mut text = format!(r#"{{"fullUrl":{}"#, quote(&entry.full_url));
+                let mut fields = Vec::new();
+                if let Some(full_url) = &entry.full_url {
+                    fields.push(format!(r#""fullUrl":{}"#, quote(full_url)));
+                }
                 if let Some(resource) = entry.resource {
-                    text.push_str(r#","resource":"#);
-                    text.push_str(&resource);
+                    fields.push(format!(r#""resource":{resource}"#));
                 }
                 for (key, value) in entry.rest {
-                    text.push_str(&format!(",{}:{value}", quote(&key)));
+                    fields.push(format!("{}:{value}", quote(&key)));
                 }
-                text.push('}');
+                let text = format!("{{{}}}", fields.join(","));
                 text
             })
             .collect();

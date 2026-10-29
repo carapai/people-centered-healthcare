@@ -1,0 +1,478 @@
+{
+ "name": "15-transaction",
+ "spec": "https://hl7.org/fhir/R5/http.html#transaction",
+ "steps": [
+  {
+   "note": "entry order does not matter: the Observation refers to the Patient created after it",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "fullUrl": "urn:uuid:{{uuid:o1}}",
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "coding": [
+          {
+           "system": "http://loinc.org",
+           "code": "8480-6"
+          }
+         ]
+        },
+        "subject": {
+         "reference": "urn:uuid:{{uuid:p1}}"
+        },
+        "valueQuantity": {
+         "value": 120,
+         "unit": "mmHg"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      },
+      {
+       "fullUrl": "urn:uuid:{{uuid:p1}}",
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX1"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX2"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ],
+        "id": "{{uuid:q}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:q}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/resourceType": "Bundle",
+     "/type": "transaction-response",
+     "/entry/0/response/status": "201 Created",
+     "/entry/1/response/status": "201 Created",
+     "/entry/2/response/status": "201 Created",
+     "/entry/1/resource/resourceType": "Patient"
+    },
+    "json_len": {
+     "/entry": 3
+    }
+   },
+   "save": {
+    "pid": "/entry/1/resource/id",
+    "oid": "/entry/0/resource/id",
+    "subject": "/entry/0/resource/subject/reference",
+    "qvid": "/entry/2/resource/meta/versionId"
+   }
+  },
+  {
+   "note": "the urn:uuid reference was rewritten to the created id",
+   "request": {
+    "method": "GET",
+    "path": "Observation?subject=Patient/{{pid}}"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 1,
+     "/entry/0/resource/id": "{{oid}}",
+     "/entry/0/resource/subject/reference": "Patient/{{pid}}"
+    }
+   }
+  },
+  {
+   "note": "all or nothing: a failing entry rolls the others back",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX-ROLLBACK"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX2"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ],
+        "id": "{{uuid:q}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:q}}",
+        "ifMatch": "W/\"{{uuid:stale}}\""
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 412,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    },
+    "body_contains": [
+     "entry 1:"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?identifier=urn:ug:nin|TX-ROLLBACK"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 0
+    }
+   }
+  },
+  {
+   "note": "conditional create in a transaction: the match's id is used for references",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "fullUrl": "urn:uuid:{{uuid:p2}}",
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX1"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient",
+        "ifNoneExist": "identifier=urn:ug:nin|TX1"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "coding": [
+          {
+           "system": "http://loinc.org",
+           "code": "8480-6"
+          }
+         ]
+        },
+        "subject": {
+         "reference": "urn:uuid:{{uuid:p2}}"
+        },
+        "valueQuantity": {
+         "value": 120,
+         "unit": "mmHg"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/entry/0/response/status": "200 OK",
+     "/entry/0/resource/id": "{{pid}}",
+     "/entry/1/resource/subject/reference": "Patient/{{pid}}"
+    }
+   }
+  },
+  {
+   "note": "update, delete and read together",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "request": {
+        "method": "GET",
+        "url": "Patient/{{pid}}"
+       }
+      },
+      {
+       "request": {
+        "method": "DELETE",
+        "url": "Observation/{{oid}}"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX2-CHANGED"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ],
+        "id": "{{uuid:q}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:q}}",
+        "ifMatch": "W/\"{{qvid}}\""
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/entry/0/response/status": "200 OK",
+     "/entry/0/resource/id": "{{pid}}",
+     "/entry/1/response/status": "204 No Content",
+     "/entry/2/response/status": "200 OK",
+     "/entry/2/resource/identifier/0/value": "TX2-CHANGED"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Observation/{{oid}}"
+   },
+   "expect": {
+    "status": 410
+   }
+  },
+  {
+   "note": "an unresolved urn:uuid reference fails the transaction",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "coding": [
+          {
+           "system": "http://loinc.org",
+           "code": "8480-6"
+          }
+         ]
+        },
+        "subject": {
+         "reference": "urn:uuid:{{uuid:nowhere}}"
+        },
+        "valueQuantity": {
+         "value": 120,
+         "unit": "mmHg"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400,
+    "body_contains": [
+     "entry 0:"
+    ]
+   }
+  },
+  {
+   "note": "a resource may appear only once",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "request": {
+        "method": "DELETE",
+        "url": "Patient/{{pid}}"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "identifier": [
+         {
+          "system": "urn:ug:nin",
+          "value": "TX1"
+         }
+        ],
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ],
+        "id": "{{pid}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{pid}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "collection",
+     "entry": []
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "request": {
+        "method": "PATCH",
+        "url": "Patient/{{pid}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  }
+ ]
+}
