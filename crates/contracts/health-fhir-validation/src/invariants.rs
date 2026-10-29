@@ -12,6 +12,8 @@
 //!   (`#id`) resolve. **Bundle entry and Parameters resources** are validated as roots of their
 //!   own.
 //! - **Severity.** Error invariants are enforced. Warnings are not reported yet.
+//! - **Shapes.** [`HOLDS_BY_SHAPE`] skips a few hot invariants on a node whose shape proves
+//!   they hold, which halves tier 2's cost on clinical resources.
 //! - **Fail closed.** A decimal beyond 28 significant digits cannot be evaluated exactly, so the
 //!   resource fails with `processing` (ADR 0052). An invariant the engine cannot evaluate also
 //!   fails it, unless it is in [`KNOWN_ENGINE_GAPS`] with a reason.
@@ -36,6 +38,82 @@ pub const KNOWN_ENGINE_GAPS: &[(&str, &str)] = &[
 
 fn skipped(key: &str) -> bool {
     KNOWN_ENGINE_GAPS.iter().any(|(k, _)| *k == key)
+}
+
+/// A predicate on the node an invariant applies to: true when the invariant holds there.
+type Shape = fn(&Map<String, Value>) -> bool;
+
+/// Invariants that provably hold on a node of a given shape, so the engine is not asked
+/// there. Together they are most of tier 2's cost on clinical resources (#170). A unit test
+/// evaluates every check they skip over the official corpus, and each must hold.
+const HOLDS_BY_SHAPE: &[(&str, Shape)] = &[
+    // `contained.….empty()` and `contained.where(…).empty()`.
+    ("dom-2", no_contained),
+    ("dom-3", |node| {
+        no_contained(node) || contained_are_referenced(node)
+    }),
+    ("dom-4", no_contained),
+    ("dom-5", no_contained),
+    // `reference.exists() implies (reference.startsWith('#').not() or …)`.
+    ("ref-1", |node| {
+        !node.contains_key("_reference")
+            && node
+                .get("reference")
+                .is_none_or(|r| r.as_str().is_some_and(|r| !r.starts_with('#')))
+    }),
+    // `reference.exists() or …`.
+    ("ref-2", |node| {
+        node.get("reference").is_some_and(Value::is_string)
+    }),
+    // `code.empty() or system.exists()`.
+    ("qty-3", |node| {
+        !node.contains_key("code") && !node.contains_key("_code")
+            || node.get("system").is_some_and(Value::is_string)
+    }),
+];
+
+fn no_contained(node: &Map<String, Value>) -> bool {
+    !node.contains_key("contained")
+}
+
+/// `dom-3` holds when every contained resource has an id that some `reference` in the
+/// resource names as `#id`; otherwise the engine decides (it also accepts canonicals and
+/// `#` references to the container).
+fn contained_are_referenced(node: &Map<String, Value>) -> bool {
+    fn references<'a>(value: &'a Value, out: &mut BTreeSet<&'a str>) {
+        match value {
+            Value::Object(object) => {
+                for (key, value) in object {
+                    match (key.as_str(), value) {
+                        ("reference", Value::String(r)) => {
+                            out.insert(r);
+                        }
+                        _ => references(value, out),
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|v| references(v, out)),
+            _ => {}
+        }
+    }
+    let Some(Value::Array(contained)) = node.get("contained") else {
+        return false;
+    };
+    let mut found = BTreeSet::new();
+    node.values().for_each(|v| references(v, &mut found));
+    contained.iter().all(|c| {
+        c.get("id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| found.contains(format!("#{id}").as_str()))
+    })
+}
+
+fn holds_by_shape(key: &str, node: Option<&Map<String, Value>>) -> bool {
+    node.is_some_and(|node| {
+        HOLDS_BY_SHAPE
+            .iter()
+            .any(|(k, holds)| *k == key && holds(node))
+    })
 }
 
 /// One invariant to evaluate at one path of the resource.
@@ -68,12 +146,7 @@ pub async fn validate_invariants(engine: &dyn FhirPathEngine, resource: &Value) 
             });
             continue;
         }
-        let mut walker = Walker {
-            table: table(),
-            checks: Vec::new(),
-            seen: BTreeSet::new(),
-            nested: Vec::new(),
-        };
+        let mut walker = Walker::new();
         if let Some(object) = resource.as_object() {
             walker.resource_root(&resource_type, object, &here);
         }
@@ -162,16 +235,51 @@ struct Walker {
     seen: BTreeSet<String>,
     /// Bundle entry and Parameters resources, validated as roots of their own.
     nested: Vec<(Value, String)>,
+    /// The checks [`HOLDS_BY_SHAPE`] skipped, kept only when testing it.
+    by_shape: Option<Vec<Check>>,
 }
 
 impl Walker {
+    fn new() -> Self {
+        Self {
+            table: table(),
+            checks: Vec::new(),
+            seen: BTreeSet::new(),
+            nested: Vec::new(),
+            by_shape: None,
+        }
+    }
+
     /// Adds the error invariants `type_name` defines at `path`, evaluated over `fhirpath`.
-    fn add(&mut self, type_name: &str, path: &str, fhirpath: &str, location: &str) {
+    /// `node` is the one value they apply to here, when there is one.
+    fn add(
+        &mut self,
+        type_name: &str,
+        path: &str,
+        fhirpath: &str,
+        location: &str,
+        node: Option<&Map<String, Value>>,
+    ) {
         let Some(def) = self.table.types.get(type_name) else {
             return;
         };
         for constraint in def.constraints.get(path).into_iter().flatten() {
             if constraint.severity != "error" || skipped(&constraint.key) {
+                continue;
+            }
+            if holds_by_shape(&constraint.key, node) {
+                // Other values at the same path may still need it, so `seen` is not updated.
+                if let Some(by_shape) = &mut self.by_shape {
+                    by_shape.push(Check {
+                        location: location.to_owned(),
+                        key: constraint.key.clone(),
+                        human: constraint.human.clone(),
+                        expression: format!(
+                            "{fhirpath}.all({})",
+                            bind(&constraint.expression, location)
+                        ),
+                    });
+                }
                 continue;
             }
             let expression = format!("{fhirpath}.all({})", bind(&constraint.expression, location));
@@ -189,7 +297,7 @@ impl Walker {
     fn resource_root(&mut self, resource_type: &str, object: &Map<String, Value>, location: &str) {
         let lineage: Vec<&str> = self.table.lineage(resource_type).collect();
         for ancestor in lineage {
-            self.add(ancestor, "", resource_type, location);
+            self.add(ancestor, "", resource_type, location, Some(object));
         }
         self.members(resource_type, "", object, resource_type, location);
     }
@@ -223,7 +331,7 @@ impl Walker {
             };
             let child = format!("{fhirpath}.{step}");
             let child_location = format!("{location}.{key}");
-            self.add(type_name, path, &child, &child_location);
+            self.add(type_name, path, &child, &child_location, None);
             let items: Vec<(usize, &Value)> = match value {
                 Value::Array(items) => items.iter().enumerate().collect(),
                 single => vec![(0, single)],
@@ -250,7 +358,7 @@ impl Walker {
                         let nested = format!("{child}.ofType({nested_type})");
                         let lineage: Vec<&str> = table.lineage(nested_type).collect();
                         for ancestor in lineage {
-                            self.add(ancestor, "", &nested, &item_location);
+                            self.add(ancestor, "", &nested, &item_location, Some(object));
                         }
                         self.members(nested_type, "", object, &nested, &item_location);
                     } else {
@@ -263,11 +371,100 @@ impl Walker {
                 } else if !is_primitive(&chosen) {
                     let lineage: Vec<&str> = table.lineage(&chosen).collect();
                     for ancestor in lineage {
-                        self.add(ancestor, "", &child, &item_location);
+                        self.add(ancestor, "", &child, &item_location, Some(object));
                     }
                     self.members(&chosen, "", object, &child, &item_location);
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::OctofhirEngine;
+
+    /// Every check [`HOLDS_BY_SHAPE`] skips, and whether the engine agrees it holds.
+    async fn skipped_checks(engine: &OctofhirEngine, resource: &Value) -> Vec<(String, bool)> {
+        let mut found = Vec::new();
+        let mut pending = vec![(resource.clone(), None::<String>)];
+        while let Some((resource, at)) = pending.pop() {
+            let Some(resource_type) = resource["resourceType"].as_str().map(str::to_owned) else {
+                continue;
+            };
+            let here = at.unwrap_or_else(|| resource_type.clone());
+            let mut walker = Walker::new();
+            walker.by_shape = Some(Vec::new());
+            if let Some(object) = resource.as_object() {
+                walker.resource_root(&resource_type, object, &here);
+            }
+            let skipped = walker.by_shape.take().unwrap_or_default();
+            let expressions: Vec<String> = skipped.iter().map(|c| c.expression.clone()).collect();
+            let results = engine.evaluate_many(&resource, &expressions).await;
+            for (check, result) in skipped.iter().zip(results) {
+                let held = matches!(result, Ok(items) if holds(&items));
+                found.push((
+                    format!("{} at {}: {}", check.key, check.location, check.expression),
+                    held,
+                ));
+            }
+            pending.extend(walker.nested.into_iter().map(|(v, l)| (v, Some(l))));
+        }
+        found
+    }
+
+    #[tokio::test]
+    async fn shapes_skip_only_invariants_that_hold() {
+        let engine = OctofhirEngine::new();
+        let resource: Value = serde_json::from_str(
+            r##"{"resourceType":"Observation","status":"final","code":{"text":"x"},
+                "subject":{"reference":"Patient/p"},"performer":[{"display":"A"}],
+                "valueQuantity":{"value":1,"unit":"kg"}}"##,
+        )
+        .expect("json");
+        let found = skipped_checks(&engine, &resource).await;
+        let keys: BTreeSet<&str> = found
+            .iter()
+            .filter_map(|(c, _)| c.split(' ').next())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "dom-2", "dom-3", "dom-4", "dom-5", "qty-3", "ref-1", "ref-2"
+            ]
+            .into(),
+            "{found:?}"
+        );
+        assert!(found.iter().all(|(_, held)| *held), "{found:?}");
+    }
+
+    /// With `HEALTH_FHIR_R5_EXAMPLES` set: over the whole official corpus, the engine agrees
+    /// with every check a shape skipped.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shapes_agree_with_the_engine_on_the_corpus_when_available() {
+        let Some(dir) = std::env::var_os("HEALTH_FHIR_R5_EXAMPLES") else {
+            eprintln!("skipped: set HEALTH_FHIR_R5_EXAMPLES (tools/fhir/fetch-r5-examples.sh)");
+            return;
+        };
+        let engine = OctofhirEngine::new();
+        let (mut checked, mut disagreements) = (0, Vec::new());
+        for entry in std::fs::read_dir(dir).expect("corpus").flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "json") {
+                continue;
+            }
+            let resource: Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
+            for (check, held) in skipped_checks(&engine, &resource).await {
+                checked += 1;
+                if !held {
+                    disagreements.push(format!("{}: {check}", path.display()));
+                }
+            }
+        }
+        eprintln!("{checked} skipped checks evaluated");
+        assert!(checked > 10_000, "{checked}");
+        assert_eq!(disagreements, Vec::<String>::new());
     }
 }
