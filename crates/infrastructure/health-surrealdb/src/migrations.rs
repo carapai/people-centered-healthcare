@@ -27,11 +27,18 @@ impl Migration {
 }
 
 /// The platform's migrations, in order. The `_migration` ledger itself is created by [`migrate`].
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "0001_resource_tables",
-    sql: include_str!("../migrations/0001_resource_tables.surql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "0001_resource_tables",
+        sql: include_str!("../migrations/0001_resource_tables.surql"),
+    },
+    Migration {
+        version: 2,
+        name: "0002_search_index",
+        sql: include_str!("../migrations/0002_search_index.surql"),
+    },
+];
 
 /// The ledger of applied migrations, defined before anything else runs.
 const LEDGER: &str = "

@@ -4,6 +4,7 @@ members = [
     "crates/foundation/health-errors",
     "crates/foundation/health-identifiers",
     "crates/foundation/health-time",
+    "crates/contracts/health-fhir-search",
     "crates/contracts/health-persistence",
     "crates/domains/health-client-registry",
     "crates/application/health-registries-app",
@@ -21,6 +22,7 @@ publish = false
 
 # Every crate, workspace or external, is declared here once; members use `{ workspace = true }`.
 [workspace.dependencies]
+health-fhir-search = { path = "crates/contracts/health-fhir-search" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-persistence = { path = "crates/contracts/health-persistence" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
@@ -30,6 +32,7 @@ anyhow = "1.0.104"
 cargo_metadata = "0.23.1"
 jiff = "0.2.38"
 pollster = "1.0.1"
+rust_decimal = "1.43.0"
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"
 # Decimals keep their source text and objects keep key order (ADRs 0051, 0052).
@@ -40,6 +43,7 @@ tempfile = "3.27.0"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
 toml = "1.1.8"
+unicode-normalization = "0.1.26"
 uuid = { version = "1.29.0", features = ["v5", "v7"] }
 
 [workspace.lints.rust]
