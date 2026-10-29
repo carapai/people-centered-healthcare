@@ -70,6 +70,8 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 
 macOS is not a supported target for any artifact in v1, so no macOS build is produced or claimed.
 
+**Build runners.** Release builds run on runners with at least **8 GiB of RAM** (ADR 0050). The serde code for the R5 `Resource` enum peaks at about 6.2 GiB of rustc memory, and it is built in `health-fhir-models`. The facade's `parse_resource` and `to_json` keep it from being rebuilt in every crate that parses resources. The model crate is cached between CI runs.
+
 ## Releases (ADR 0045)
 
 ```mermaid

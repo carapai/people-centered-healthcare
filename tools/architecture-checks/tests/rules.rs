@@ -130,7 +130,15 @@ fn write(dir: &Path, krates: &[Krate]) {
         .iter()
         .map(|k| format!("{} = {{ path = \"{}\" }}", k.name, k.path))
         .collect();
-    deps.extend(["serde = \"1\"", "tokio = \"1\"", "uuid = \"1\""].map(str::to_owned));
+    deps.extend(
+        [
+            "serde = \"1\"",
+            "tokio = \"1\"",
+            "uuid = \"1\"",
+            "fhir-r5 = \"=4.2.3\"",
+        ]
+        .map(str::to_owned),
+    );
     fs::write(
         dir.join("Cargo.toml"),
         format!(
@@ -173,6 +181,7 @@ fn allowlist() -> Allowlist {
         domain_externals: ["serde", "thiserror", "uuid"].map(str::to_owned).into(),
         domain_forbidden: ["tokio"].map(str::to_owned).into(),
         lint_exempt: Default::default(),
+        facades: [("fhir-r5".to_owned(), "health-persistence".to_owned())].into(),
     }
 }
 
@@ -351,6 +360,26 @@ fn domain_external_not_allowlisted() {
     assert_eq!(
         found,
         only(Rule::DomainExternal, "health-facility-registry")
+    );
+}
+
+#[test]
+fn only_the_facade_uses_a_faceted_crate() {
+    let owner = with(|k| {
+        find(k, "health-persistence")
+            .deps
+            .push("fhir-r5 = { workspace = true }".to_owned());
+    });
+    assert_eq!(owner, Vec::new(), "the facade itself may");
+    let bypass = with(|k| {
+        find(k, "health-registries-contract")
+            .dev_deps
+            .push("fhir-r5 = { workspace = true }".to_owned());
+    });
+    assert_eq!(
+        bypass,
+        only(Rule::FacadeBypass, "health-registries-contract"),
+        "not even as a dev-dependency"
     );
 }
 

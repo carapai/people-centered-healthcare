@@ -75,11 +75,12 @@ Arrows point from the depended-on layer to the dependent layer. "Presentation" (
    - a testing crate is used as a non-dev dependency;
    - a dependency declares an inline version instead of `workspace = true`;
    - a crate does not inherit workspace lints;
-   - there is a dependency cycle.
+   - there is a dependency cycle;
+   - a crate other than its facade depends on a facaded external, e.g. anything but `health-fhir-models` on `fhir-r5` (`[facade-bypass]`, ADRs 0015 and 0050). Dev-dependencies count here.
 
    It is implemented in [`tools/architecture-checks`](../../tools/architecture-checks/README.md), and runs with `cargo run -p architecture-checks`.
    - **Rule names.** Each violation names the crate, the edge and a rule name (for example `[domain-to-domain]`).
-   - **Policy file.** The domain allowlist and lint exemptions live in `tools/architecture-checks/allowlist.toml`.
+   - **Policy file.** The domain allowlist, lint exemptions and facades live in `tools/architecture-checks/allowlist.toml`.
    - **Limits.** Dev-dependencies are exempt from the layer direction rules. The "`tracing` macros only" part of rule 5 is not checked mechanically.
 3. **`cargo-deny`** checks licences, advisories, duplicate versions and workspace-wide bans.
 4. **Workspace lints** in the root `Cargo.toml`, plus `clippy` with `-D warnings`.

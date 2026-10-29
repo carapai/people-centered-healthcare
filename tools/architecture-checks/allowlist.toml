@@ -19,3 +19,9 @@ domain-forbidden = [
 
 # Crates allowed not to inherit [workspace.lints].
 lint-exempt = []
+
+# External crates only their facade may depend on (ADR 0050; ADR 0015: domain code imports only
+# the facade, so a crate swap stays inside it).
+[facades]
+fhir-r5 = "health-fhir-models"
+fhir-r4 = "health-fhir-mapping"

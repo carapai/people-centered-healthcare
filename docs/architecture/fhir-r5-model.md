@@ -32,6 +32,15 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - Every converted resource gets a Provenance pointing to its source.
 - **JSON first.** XML is out of v1.
 
+### In code
+
+`health-fhir-models` (contracts) depends on `fhir-r5 =4.2.3`. It re-exports `resources`, `types`, `codes`, `coded` and `validate` under its own paths, and provides `parse_resource`, `to_json` and `round_trip`.
+- **Facade enforcement.** No other crate may depend on `fhir-r5`, which the `facade-bypass` architecture check enforces. ADR 0050's "no `fhir-r5` type in the public API" is read this way: consumers name model types only through `health_fhir_models::…`, so a swap changes the facade, not its users. Wrapping every generated type would defeat ADR 0015's "domain code works on typed models".
+- **Round-trip.** The corpus test round-trips all 2,824 official examples: 2,823 exact, plus `questionnaireresponse-example-f201-lifelines.json` on the known-invalid list. Committed fixtures cover the edge cases on every PR. `tools/fhir/fetch-r5-examples.sh` fetches the full corpus with a pinned SHA-256 for CI.
+- **Findings.**
+  - The model writes `1.0e3` as `1.0e+3`: the same value and precision, but different text. Stored resources are the client's bytes and never re-serialized (ADR 0051), so only JSON *produced* from typed models is affected.
+  - An element the type does not allow is dropped, e.g. `Observation.valueInteger64`, since `integer64` is not an Observation value type. Tier 1 runs first for that reason.
+
 ## FHIRPath
 
 - FHIRPath runs behind a `FhirPathEngine` trait in `health-fhir-validation`.
