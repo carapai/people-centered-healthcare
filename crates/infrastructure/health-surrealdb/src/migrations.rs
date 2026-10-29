@@ -38,6 +38,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0002_search_index",
         sql: include_str!("../migrations/0002_search_index.surql"),
     },
+    Migration {
+        version: 3,
+        name: "0003_condition_lock",
+        sql: include_str!("../migrations/0003_condition_lock.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.

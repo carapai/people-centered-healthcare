@@ -12,13 +12,16 @@
 //! | search-type | `GET /{type}`, `POST /{type}/_search` |
 //! | history | `GET /{type}/{id}/_history`, `/{type}/_history`, `/_history` |
 //!
-//! Conditional interactions, transaction and batch Bundles, and reference integrity are separate
-//! tasks; until then the CapabilityStatement does not declare them and the requests are refused.
+//! | conditional create, update, delete | `POST /{type}` with `If-None-Exist`; `PUT`, `DELETE /{type}?…` |
+//!
+//! Transaction and batch Bundles and reference integrity are separate tasks; until then the
+//! CapabilityStatement does not declare them and the requests are refused.
 //! Request bodies are checked only for shape (a JSON object of the path's type) until validation
 //! tiers 1–2 (#59) are on the write path.
 
 mod bundle;
 mod capability;
+mod conditional;
 mod history;
 mod http;
 mod interactions;
@@ -73,7 +76,13 @@ impl FhirServer {
         Router::new()
             .route("/metadata", get(interactions::metadata))
             .route("/_history", get(history::system))
-            .route("/{type}", get(search::get).post(interactions::create))
+            .route(
+                "/{type}",
+                get(search::get)
+                    .post(interactions::create)
+                    .put(conditional::update)
+                    .delete(conditional::delete),
+            )
             .route("/{type}/_search", post(search::post))
             .route("/{type}/_history", get(history::of_type))
             .route(

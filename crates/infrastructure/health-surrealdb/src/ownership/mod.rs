@@ -53,6 +53,7 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "idx_composite",
     "idx_missing",
     "reindex_job",
+    "condition_lock",
 ];
 
 /// Every owned resource type, sorted by type.

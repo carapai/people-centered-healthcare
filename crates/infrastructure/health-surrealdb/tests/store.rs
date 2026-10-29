@@ -307,3 +307,40 @@ async fn unknown_resource_types_have_no_table() {
         Err(StoreError::UnknownResourceType("Basic".into()))
     );
 }
+
+#[tokio::test]
+async fn condition_locks_serialize_the_same_condition_and_leave_nothing() {
+    let (store, connection) = store().await;
+    let condition = |v: &str| vec![("identifier".to_owned(), v.to_owned())];
+    let mut a = store.begin().await.expect("a");
+    let mut b = store.begin().await.expect("b");
+    a.lock_condition(&obs(), &condition("urn:x|1"))
+        .await
+        .expect("a locks");
+    b.lock_condition(&obs(), &condition("urn:x|1"))
+        .await
+        .expect("b locks in its snapshot");
+    a.commit().await.expect("a commits");
+    assert_eq!(b.commit().await, Err(WriteError::Conflict));
+
+    let mut c = store.begin().await.expect("c");
+    let mut d = store.begin().await.expect("d");
+    c.lock_condition(&obs(), &condition("urn:x|2"))
+        .await
+        .expect("c");
+    d.lock_condition(&obs(), &condition("urn:x|3"))
+        .await
+        .expect("d");
+    c.commit()
+        .await
+        .expect("different conditions do not conflict");
+    d.commit()
+        .await
+        .expect("different conditions do not conflict");
+
+    let mut left = connection
+        .query("RETURN count(SELECT * FROM condition_lock)")
+        .await
+        .expect("count");
+    assert_eq!(left.take::<Option<i64>>(0).expect("count"), Some(0));
+}

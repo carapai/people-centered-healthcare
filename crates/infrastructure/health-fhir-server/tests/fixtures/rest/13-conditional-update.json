@@ -1,0 +1,270 @@
+{
+ "name": "13-conditional-update",
+ "spec": "https://hl7.org/fhir/R5/http.html#cond-update",
+ "steps": [
+  {
+   "note": "no match, no id: create",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU1",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 201,
+    "headers": {
+     "location": "*"
+    }
+   },
+   "save": {
+    "id": "/id",
+    "vid": "/meta/versionId"
+   }
+  },
+  {
+   "note": "one match without If-Match",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU1",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Atim"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 428
+   }
+  },
+  {
+   "note": "one match: update it",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU1",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-match": "W/\"{{vid}}\""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Atim"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/id": "{{id}}",
+     "/name/0/family": "Atim"
+    }
+   },
+   "save": {
+    "vid2": "/meta/versionId"
+   }
+  },
+  {
+   "note": "one match, different body id: 400",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU1",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-match": "W/\"{{vid2}}\""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:other}}"
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "note": "no match, new id: update-as-create",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU2",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:fresh}}"
+    }
+   },
+   "expect": {
+    "status": 201,
+    "json": {
+     "/id": "{{uuid:fresh}}"
+    }
+   }
+  },
+  {
+   "note": "no match, id of an existing resource: 409",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU3",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU3"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{id}}"
+    }
+   },
+   "expect": {
+    "status": 409
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:twin}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:twin}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "more than one match: 412",
+   "request": {
+    "method": "PUT",
+    "path": "Patient?identifier=urn:ug:nin|CU2",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 412
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CU4"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  }
+ ]
+}

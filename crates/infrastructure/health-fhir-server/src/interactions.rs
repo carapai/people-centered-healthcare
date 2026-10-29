@@ -80,7 +80,7 @@ pub(crate) async fn vread(
 
 /// The request body as a resource of `resource_type`, with the id it carries. Validation tiers
 /// 1–2 replace this shape check (#59).
-fn body(
+pub(crate) fn body(
     resource_type: &ResourceType,
     headers: &HeaderMap,
     bytes: &Bytes,
@@ -103,7 +103,7 @@ fn body(
 }
 
 /// One attempt of a write use case.
-enum Attempt {
+pub(crate) enum Attempt {
     Conflict,
     Fail(FhirError),
 }
@@ -130,10 +130,10 @@ impl From<FhirError> for Attempt {
 }
 
 /// What a write did.
-struct Written {
-    created: bool,
-    version: VersionMeta,
-    stored: RawJson,
+pub(crate) struct Written {
+    pub(crate) created: bool,
+    pub(crate) version: VersionMeta,
+    pub(crate) stored: RawJson,
 }
 
 impl FhirServer {
@@ -191,7 +191,7 @@ impl FhirServer {
         }
     }
 
-    fn written(
+    pub(crate) fn written(
         &self,
         resource_type: &ResourceType,
         id: ResourceId,
@@ -232,20 +232,23 @@ impl FhirServer {
     }
 }
 
-/// `POST /{type}`: the server mints a UUIDv7 and ignores any id in the body (R5 http).
+/// `POST /{type}`: the server mints a UUIDv7 and ignores any id in the body (R5 http). With
+/// `If-None-Exist` it is a conditional create.
 pub(crate) async fn create(
     State(server): State<FhirServer>,
     Path(type_name): Path<String>,
     headers: HeaderMap,
     bytes: Bytes,
 ) -> Result<Response, FhirError> {
-    if headers.contains_key("if-none-exist") {
-        return Err(FhirError::not_supported(
-            "conditional create is not supported yet",
-        ));
-    }
     let resource_type = resource_type(&type_name)?;
     let (json, _ignored_id) = body(&resource_type, &headers, &bytes)?;
+    if let Some(condition) = headers.get("if-none-exist") {
+        let condition = condition
+            .to_str()
+            .map_err(|_| FhirError::bad_request("If-None-Exist is not ASCII"))?;
+        return crate::conditional::create(&server, &resource_type, condition, &json, &headers)
+            .await;
+    }
     let id = ResourceId::new();
     let written = server
         .put_version(&resource_type, id, &json, |_| {

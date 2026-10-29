@@ -256,6 +256,46 @@ impl SurrealTx {
     }
 }
 
+impl SurrealTx {
+    /// Serializes conditional writes on the same condition (a resource type and its search
+    /// parameters, in any order). Call it before a write the condition allows; a concurrent
+    /// transaction that locked the same condition makes one of the two commits fail with
+    /// [`WriteError::Conflict`]. Nothing is left behind: the lock record is written and removed
+    /// in this transaction.
+    pub async fn lock_condition(
+        &mut self,
+        resource_type: &ResourceType,
+        condition: &[(String, String)],
+    ) -> Result<(), WriteError> {
+        use sha2::{Digest, Sha256};
+        let mut sorted = condition.to_vec();
+        sorted.sort();
+        let mut hasher = Sha256::new();
+        hasher.update(resource_type.as_str().as_bytes());
+        for (name, value) in &sorted {
+            hasher.update([0]);
+            hasher.update(name.as_bytes());
+            hasher.update([1]);
+            hasher.update(value.as_bytes());
+        }
+        let key: String = hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        self.tx()?
+            .query(
+                "UPSERT type::record('condition_lock', $key) SET at = time::now(); \
+                 DELETE type::record('condition_lock', $key);",
+            )
+            .bind(("key", key))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(write_error)?;
+        Ok(())
+    }
+}
+
 impl Transaction for SurrealTx {
     async fn read(
         &mut self,

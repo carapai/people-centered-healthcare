@@ -5,7 +5,7 @@ _Update after each task (AGENTS.md process step 4)._
 | Phase | Done | Total |
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 4 | 10 |
-| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 6 | 14 |
+| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 7 | 14 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 10 of 104 implementation tasks done. Validation spikes open: 3.
+Total: 11 of 104 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -40,3 +40,4 @@ Total: 10 of 104 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #57 health-fhir-search (catalog over the FHIRPath search subset: 1,211 of 1,244 core parameters; registry; extraction; strict parser; SearchPolicy) and health-surrealdb search: migration 0002 index tables with `index_keys` on heads, range-scan compiler with EXPLAIN tests, keyset paging, resumable reindex.
 - 2026-10-29: #49 health-observability (allowlist export layer, OTLP/HTTP, JSON logs, redaction test with a negative control), health-http (`/health`, `/ready`, request tracing by route template) and the central-server binary (env config, password from a file, background connect-and-migrate with backoff, graceful shutdown).
 - 2026-10-29: #58 health-fhir-server: read, vread, create, update (If-Match required; update-as-create), delete, instance/type/system history, search GET/POST with keyset links, CapabilityStatement generated from behaviour; 11 R5 REST conformance fixtures. Split out #157 (conditional interactions), #158 (transaction and batch Bundles), #159 (reference integrity).
+- 2026-10-29: #157 conditional create, update and delete per the R5 matrices, resolved through the search index in the write transaction; `condition_lock` (migration 0003) serializes creates under the same condition; 3 fixtures and an 8-way race test.
