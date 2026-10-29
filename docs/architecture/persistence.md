@@ -82,7 +82,11 @@ Each supported SearchParameter writes entries into one table per search type. Ea
 
 ## The write transaction
 
-Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work:
+Every accepted write is **one** `BEGIN … COMMIT`, issued through the `health-persistence` unit of work.
+- **Contract.** `health-persistence` defines the `Store` and `Transaction` traits: read, write with a `Precondition`, delete as a tombstone, claim and release guards, `next_sequence`, append to the outbox, and commit. It also defines `stamp_meta`, `RawJson` and `RetryPolicy`.
+- **Test fake.** `health-persistence-memory` (testing layer) implements the contract with snapshot isolation and first-committer-wins, for domain and application tests.
+
+The write sequence:
 
 ```mermaid
 sequenceDiagram

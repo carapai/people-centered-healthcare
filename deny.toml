@@ -39,6 +39,8 @@ allow = ["BUSL-1.1"]
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Workspace crates are unpublished path dependencies (publish = false).
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
