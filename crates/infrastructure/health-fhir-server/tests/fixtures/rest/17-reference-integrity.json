@@ -1,0 +1,447 @@
+{
+ "name": "17-reference-integrity",
+ "spec": "persistence.md § Reference integrity",
+ "steps": [
+  {
+   "note": "a local reference must resolve",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "Patient/{{uuid:never}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 422,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/code": "not-found"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "Patient/not-a-uuid"
+     }
+    }
+   },
+   "expect": {
+    "status": 422
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "NotAType/{{uuid:x}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 422
+   }
+  },
+  {
+   "note": "urn references only make sense inside a Bundle",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "urn:uuid:{{uuid:x}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 422
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "Patient/{{uuid:p}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 201
+   },
+   "save": {
+    "o": "/id",
+    "ov": "/meta/versionId"
+   }
+  },
+  {
+   "note": "an absolute reference to this server is local",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "http://test/fhir/Patient/{{uuid:p}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 201
+   },
+   "save": {
+    "o2": "/id"
+   }
+  },
+  {
+   "note": "references to other servers and contained resources are not checked",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "https://other.example/fhir/Patient/1"
+     },
+     "performer": [
+      {
+       "reference": "#c1"
+      }
+     ],
+     "contained": [
+      {
+       "resourceType": "Practitioner",
+       "id": "c1"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "a referenced resource cannot be deleted",
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 409,
+    "json": {
+     "/issue/0/code": "conflict"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 200
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient?_id={{uuid:p}}"
+   },
+   "expect": {
+    "status": 409
+   }
+  },
+  {
+   "note": "a transaction may delete the referrers with what they reference",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "request": {
+        "method": "DELETE",
+        "url": "Patient/{{uuid:p}}"
+       }
+      },
+      {
+       "request": {
+        "method": "DELETE",
+        "url": "Observation/{{o2}}"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "text": "bp"
+        },
+        "subject": {
+         "reference": "Patient/{{uuid:q}}"
+        },
+        "id": "{{o}}"
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Observation/{{o}}",
+        "ifMatch": "W/\"{{ov}}\""
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "id": "{{uuid:q}}",
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:q}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/entry/0/response/status": "204 No Content"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 410
+   }
+  },
+  {
+   "note": "a reference to a deleted resource does not resolve",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "bp"
+     },
+     "subject": {
+      "reference": "Patient/{{uuid:p}}"
+     }
+    }
+   },
+   "expect": {
+    "status": 422,
+    "body_contains": [
+     "deleted"
+    ]
+   }
+  },
+  {
+   "note": "a transaction that leaves a dangling reference fails whole",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "request": {
+        "method": "DELETE",
+        "url": "Patient/{{uuid:q}}"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "id": "{{uuid:r}}",
+        "name": [
+         {
+          "family": "Akello"
+         }
+        ]
+       },
+       "request": {
+        "method": "PUT",
+        "url": "Patient/{{uuid:r}}"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 409,
+    "body_contains": [
+     "entry 0:"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:r}}"
+   },
+   "expect": {
+    "status": 404
+   }
+  },
+  {
+   "note": "batch entries are checked one by one",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "batch",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "text": "bp"
+        },
+        "subject": {
+         "reference": "Patient/{{uuid:never}}"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+         "text": "bp"
+        },
+        "subject": {
+         "reference": "Patient/{{uuid:q}}"
+        }
+       },
+       "request": {
+        "method": "POST",
+        "url": "Observation"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/entry/0/response/status": "422 Unprocessable Entity",
+     "/entry/1/response/status": "201 Created"
+    }
+   }
+  }
+ ]
+}

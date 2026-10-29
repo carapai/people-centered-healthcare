@@ -270,12 +270,13 @@ pub(crate) async fn conditional_delete(
     resource_type: &ResourceType,
     condition: &Condition,
     expected: Option<OpId>,
-) -> Result<Option<VersionMeta>, Attempt> {
+) -> Result<Option<(ResourceId, VersionMeta)>, Attempt> {
     match matches(server, tx, condition).await? {
-        Some(matched) => Ok(Some(
+        Some(matched) => Ok(Some((
+            matched.id,
             tx.delete(resource_type, matched.id, OpId::new(), expected)
                 .await?,
-        )),
+        ))),
         None => Ok(None),
     }
 }

@@ -1,6 +1,7 @@
 //! Index-entry maintenance inside the write transaction (persistence.md § Search index tables:
 //! a write deletes the entries listed in the head's `index_keys` and writes the new ones).
 
+use health_fhir_search::normalize::ReferenceKey;
 use health_fhir_search::{Extraction, IndexValue, ParamType};
 
 use super::sql::{Bind, Sql};
@@ -63,15 +64,46 @@ fn fields(value: &IndexValue) -> Vec<(&'static str, Bind)> {
     }
 }
 
-/// Appends statements that replace the head's index entries with `extraction`'s, and returns
-/// the expression for its new `index_keys`. With `only`, just those parameters' entries are
-/// replaced (a reindex job); otherwise all of them.
+/// The literal `Type/id` references in a resource, deduplicated: what `idx_ref_in` holds.
+/// Contained (`#id`), `urn:` and other references that name no type are not included.
+pub(crate) fn references(resource: &serde_json::Value) -> Vec<ReferenceKey> {
+    fn walk(value: &serde_json::Value, out: &mut Vec<ReferenceKey>) {
+        match value {
+            serde_json::Value::Object(object) => {
+                for (key, child) in object {
+                    match (key.as_str(), child) {
+                        ("reference", serde_json::Value::String(reference)) => {
+                            let key = ReferenceKey::parse(reference);
+                            if !key.target_type.is_empty() {
+                                out.push(key);
+                            }
+                        }
+                        _ => walk(child, out),
+                    }
+                }
+            }
+            serde_json::Value::Array(items) => items.iter().for_each(|item| walk(item, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    walk(resource, &mut out);
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Appends statements that replace the head's index entries with `extraction`'s and its
+/// reverse `references`, and returns the expression for its new `index_keys`. With `only`,
+/// just those parameters' entries are replaced (a reindex job) and references are kept;
+/// otherwise every entry is replaced.
 pub(crate) fn replace_entries(
     sql: &mut Sql,
     head_table: &str,
     resource_type: &str,
     resource_id: &str,
     extraction: &Extraction,
+    references: &[ReferenceKey],
     only: Option<&[String]>,
 ) -> String {
     let head = sql.str(head_table);
@@ -125,6 +157,18 @@ pub(crate) fn replace_entries(
     }
     for param in &extraction.missing {
         write(sql, "idx_missing", param, Vec::new(), Vec::new());
+    }
+    for target in references {
+        let (target_type, target_id) = (
+            sql.str(target.target_type.as_str()),
+            sql.str(target.target_id.as_str()),
+        );
+        let key = sql.variable("k");
+        sql.push(format!(
+            "LET {key} = type::record('idx_ref_in', [{target_type}, {target_id}, {rt}, {rid}])"
+        ));
+        sql.push(format!("UPSERT {key}"));
+        keys.push(key);
     }
     format!(
         "array::distinct(array::concat(array::complement({old}, {drop}), [{}]))",

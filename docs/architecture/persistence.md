@@ -170,7 +170,7 @@ Its CapabilityStatement is generated from what is implemented, and a test exerci
   `urn:uuid:` `fullUrl`s are rewritten to `Type/id` in every `reference` before anything is written, and an unresolved `urn:uuid:` reference is 400. A failing entry fails the whole Bundle with its status and an OperationOutcome naming the entry. A resource or `fullUrl` may appear only once. A write-write conflict reruns the whole Bundle.
 - **Batch entries** run alone, each in its own transaction, with per-entry status and outcome. A `urn:uuid:` reference in a batch fails its entry.
 - **Bundle entry limits:** GET entries support read and vread; search entries and PATCH are refused.
-- **Not done here:** reference integrity (#159).
+- **Reference integrity** is checked on every write and delete (§ Reference integrity, In code).
 
 ## Reference integrity
 
@@ -185,6 +185,21 @@ Checked in application code on write, not with SurrealDB `REFERENCE` constraints
 
 - **Deletion.** A resource that live records still reference cannot be deleted (409). Clinical corrections use `entered-in-error`, not delete.
 - **Physical purge** happens only when a node's scope shrinks or a retention period expires. It runs as an audited background job.
+
+### In code
+
+`health-fhir-server::references` checks references inside the write transaction, after the writes. For a Bundle, that means after all of its writes, so entries may refer to each other in any order.
+
+| Reference | Rule |
+|---|---|
+| `#id` (contained) | not checked |
+| An absolute URL on another server | allowed |
+| `urn:…` outside a Bundle | 422 (inside a transaction it is rewritten first) |
+| `Type/id`, or an absolute URL on this server | must name a live resource (422 otherwise), unless `ReferenceScope::must_resolve` says the target is out of scope |
+
+- **Reverse references.** Each live version writes `idx_ref_in` entries `[target_type, target_id, source_type, source_id]` for its literal references (migration `0004_reference_index`). They are listed in `index_keys` like search entries and replaced on every write; tombstones write none. `SurrealTx::referrers` reads them with a record-id range, and a delete that leaves a referrer is 409.
+- **Scope.** The default `ReferenceScope` is `AllMustResolve`, until node scope exists.
+- **Not done yet:** flagging out-of-scope references `unresolved` for checking at central. It needs node scope and the sync tasks to decide where the flag lives.
 
 ## Migrations
 

@@ -14,6 +14,7 @@ use serde_json::Value;
 use crate::http::{Return, fhir_json, if_match, prefer, require_json_body, version_headers};
 use crate::ops::{self, Attempt, Condition, CreateTarget};
 use crate::outcome::{FhirError, operation_outcome};
+use crate::references;
 use crate::{FhirServer, capability_statement, resource_id, resource_type};
 
 /// `GET /metadata`.
@@ -205,6 +206,7 @@ pub(crate) async fn create(
                         Precondition::MustNotExist,
                     )
                     .await?;
+                    references::check_written(&server, &mut tx, &stored).await?;
                     tx.commit().await?;
                     let written = Written {
                         created: true,
@@ -243,6 +245,7 @@ pub(crate) async fn update(
         let plan = ops::plan_update(&mut tx, &resource_type, id_value, expected).await?;
         let (version, stored) =
             ops::write(&mut tx, &resource_type, plan.id, &json, plan.precondition).await?;
+        references::check_written(&server, &mut tx, &stored).await?;
         tx.commit().await?;
         let written = Written {
             created: plan.creates(),
@@ -267,6 +270,9 @@ pub(crate) async fn delete(
     retrying!(server, async {
         let mut tx = server.store.begin().await?;
         let version = ops::delete(&mut tx, &resource_type, id, expected).await?;
+        if version.is_some() {
+            references::check_deletable(&mut tx, &resource_type, id).await?;
+        }
         tx.commit().await?;
         Ok::<_, Attempt>(deleted(version))
     })
