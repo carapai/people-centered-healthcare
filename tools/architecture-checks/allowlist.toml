@@ -1,0 +1,21 @@
+# Policy read by tools/architecture-checks (docs/architecture/dependency-rules.md).
+# Changing this file is reviewed like an ADR.
+
+# External crates a domain crate may use (rule 5). The time crate is added once it is chosen.
+domain-externals = ["serde", "thiserror", "rust_decimal", "uuid", "tracing"]
+
+# Externals rule 5 names as forbidden in domain crates; listed so failures say so.
+domain-forbidden = [
+    "tokio",
+    "axum",
+    "tower",
+    "surrealdb",
+    "reqwest",
+    "tauri",
+    "tracing-subscriber",
+    "opentelemetry",
+    "anyhow",
+]
+
+# Crates allowed not to inherit [workspace.lints].
+lint-exempt = []
