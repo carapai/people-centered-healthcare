@@ -41,11 +41,16 @@ pub fn to_json(resource: &Resource) -> Result<String, ModelError> {
     serde_json::to_string(resource).map_err(|e| ModelError::Serialize(e.to_string()))
 }
 
-/// The official R5 examples that are invalid R5 and so cannot parse (ADR 0050).
-pub const KNOWN_INVALID_EXAMPLES: &[&str] = &[
-    // Missing the required `QuestionnaireResponse.questionnaire`.
-    "questionnaireresponse-example-f201-lifelines.json",
-];
+/// The official R5 examples the model crate cannot parse although they are valid R5.
+///
+/// ADR 0050 recorded this example as invalid, "missing the required
+/// `QuestionnaireResponse.questionnaire`". In fact it carries `_questionnaire`, an
+/// extension-only primitive, which R5 allows for a required primitive and tier 1 accepts.
+/// `fhir-r5` treats the element as missing, so this is a gap of the crate, worth reporting
+/// upstream. Such resources are stored and served as they are, and only typed domain
+/// operations on them fail (ADR 0051).
+pub const KNOWN_UNPARSEABLE_EXAMPLES: &[&str] =
+    &["questionnaireresponse-example-f201-lifelines.json"];
 
 /// The outcome of parsing and re-serializing JSON.
 #[derive(Debug, Clone, PartialEq, Eq)]

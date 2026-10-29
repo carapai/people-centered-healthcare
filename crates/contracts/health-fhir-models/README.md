@@ -11,7 +11,7 @@ Layer: **contracts**. The FHIR R5 model facade over `fhir-r5 =4.2.3` (ADRs 0015 
 `tests/round_trip.rs` covers:
 - the committed official examples and hand-written edge cases: decimal text, `integer64` as a string beyond 2^53, primitive `_field` extensions with nulls, and unknown codes;
 - strictness;
-- with `HEALTH_FHIR_R5_EXAMPLES` set, the whole corpus: all 2,824 examples, 2,823 exact and 1 known-invalid.
+- with `HEALTH_FHIR_R5_EXAMPLES` set, the whole corpus: all 2,824 examples, 2,823 exact and 1 the model crate cannot parse although it is valid R5 (`KNOWN_UNPARSEABLE_EXAMPLES`).
 
 ```sh
 tools/fhir/fetch-r5-examples.sh            # into target/fhir/r5-examples, SHA-256 checked

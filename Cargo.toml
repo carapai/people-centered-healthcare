@@ -6,6 +6,7 @@ members = [
     "crates/foundation/health-time",
     "crates/contracts/health-fhir-models",
     "crates/contracts/health-fhir-search",
+    "crates/contracts/health-fhir-validation",
     "crates/contracts/health-persistence",
     "crates/domains/health-client-registry",
     "crates/application/health-registries-app",
@@ -16,6 +17,7 @@ members = [
     "crates/testing/health-persistence-memory",
     "apps/server/central-server",
     "tools/architecture-checks",
+    "tools/fhir-element-table",
 ]
 
 [workspace.package]
@@ -30,6 +32,7 @@ health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
 health-http = { path = "crates/infrastructure/health-http" }
+health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
@@ -49,6 +52,7 @@ opentelemetry = { version = "0.33.1", default-features = false, features = ["tra
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
 pollster = "1.0.1"
+regex = "1.13.1"
 rust_decimal = "1.43.0"
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"

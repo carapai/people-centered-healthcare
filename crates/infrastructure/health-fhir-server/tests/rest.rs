@@ -323,7 +323,11 @@ async fn the_capability_statement_matches_behaviour() {
         assert_eq!(resource["conditionalDelete"], "single");
 
         let id = ResourceId::new();
-        let body = format!(r#"{{"resourceType":"{t}","id":"{id}"}}"#);
+        // A minimal valid instance: every required element, placeholder values (tier 1).
+        let mut skeleton = health_fhir_validation::skeleton(t).expect("skeleton");
+        let body_without_id = skeleton.to_string();
+        skeleton["id"] = Value::String(id.to_string());
+        let body = skeleton.to_string();
         let created = send(&router, "PUT", &format!("/{t}/{id}"), &json, body.clone()).await;
         assert_eq!(
             created.status,
@@ -389,7 +393,7 @@ async fn the_capability_statement_matches_behaviour() {
                 "POST",
                 format!("/{t}"),
                 &json,
-                format!(r#"{{"resourceType":"{t}"}}"#),
+                body_without_id.clone(),
                 StatusCode::CREATED,
             ),
         ];
@@ -410,7 +414,7 @@ async fn the_capability_statement_matches_behaviour() {
         if declares_id {
             // create mints the id, so the second create's condition names the minted one.
             let unused = ResourceId::new();
-            let body = format!(r#"{{"resourceType":"{t}"}}"#);
+            let body = body_without_id.clone();
             let condition = |id: &str| {
                 let mut headers = json.clone();
                 headers.push(("if-none-exist".into(), format!("_id={id}")));

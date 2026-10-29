@@ -1,0 +1,187 @@
+{
+ "name": "18-structural-validation",
+ "spec": "ADR 0051: tier 1 on raw JSON; fhir-r5-model.md § Validation",
+ "steps": [
+  {
+   "note": "every problem is an issue with its FHIRPath location",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "code": {
+      "text": ""
+     },
+     "nickname": "x",
+     "valueQuantity": {
+      "value": "1.5"
+     }
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/severity": "error"
+    },
+    "json_len": {
+     "/issue": 4
+    },
+    "body_contains": [
+     "\"expression\":[\"Observation.nickname\"]",
+     "\"expression\":[\"Observation.status\"]",
+     "\"code\":\"required\""
+    ]
+   }
+  },
+  {
+   "note": "an element the type does not allow is rejected, never dropped",
+   "request": {
+    "method": "PUT",
+    "path": "Observation/{{uuid:o}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "id": "{{uuid:o}}",
+     "status": "final",
+     "code": {
+      "text": "x"
+     },
+     "valueInteger64": "1"
+    }
+   },
+   "expect": {
+    "status": 400,
+    "body_contains": [
+     "Observation.valueInteger64"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Observation/{{uuid:o}}"
+   },
+   "expect": {
+    "status": 404
+   }
+  },
+  {
+   "note": "a required primitive may carry only an extension",
+   "request": {
+    "method": "POST",
+    "path": "QuestionnaireResponse",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "QuestionnaireResponse",
+     "status": "completed",
+     "_questionnaire": {
+      "extension": [
+       {
+        "url": "http://hl7.org/fhir/StructureDefinition/display",
+        "valueString": "Lifelines"
+       }
+      ]
+     }
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "in a transaction the location names the entry",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Patient"
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "birthDate": "1990-13-01"
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "value",
+     "/issue/0/expression/0": "Bundle.entry[1].resource.birthDate"
+    }
+   }
+  },
+  {
+   "note": "a batch entry fails alone with its issues",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "batch",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "gender": [
+         "female"
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient"
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/entry/0/response/status": "400 Bad Request",
+     "/entry/0/response/outcome/issue/0/expression/0": "Patient.gender",
+     "/entry/1/response/status": "201 Created"
+    }
+   }
+  }
+ ]
+}

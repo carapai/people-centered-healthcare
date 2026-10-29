@@ -126,17 +126,46 @@ impl Outcome {
     }
 
     fn failed(error: &FhirError) -> Self {
+        let outcome = if error.issues.is_empty() {
+            operation_outcome("error", error.code, &error.diagnostics)
+        } else {
+            json!({ "resourceType": "OperationOutcome", "issue": error.issues })
+        };
         Self {
             status: error.status.as_u16(),
-            outcome: Some(operation_outcome("error", error.code, &error.diagnostics)),
+            outcome: Some(outcome),
             ..Self::default()
         }
     }
 }
 
 fn entry_error(index: usize, error: FhirError) -> FhirError {
+    // Issue locations are relative to the entry's resource: `Patient.name[0]` becomes
+    // `Bundle.entry[3].resource.name[0]`.
+    let issues = error
+        .issues
+        .iter()
+        .cloned()
+        .map(|mut issue| {
+            if let Some(Value::Array(expressions)) = issue.get_mut("expression") {
+                for expression in expressions {
+                    if let Value::String(text) = expression {
+                        let rest = text.split_once('.').map_or("", |(_, rest)| rest);
+                        let base = format!("Bundle.entry[{index}].resource");
+                        *text = if rest.is_empty() {
+                            base
+                        } else {
+                            format!("{base}.{rest}")
+                        };
+                    }
+                }
+            }
+            issue
+        })
+        .collect();
     FhirError {
         diagnostics: format!("entry {index}: {}", error.diagnostics),
+        issues,
         ..error
     }
 }
@@ -206,6 +235,10 @@ fn parse_request(server: &FhirServer, index: usize, entry: &Value) -> Result<Req
             return Err(FhirError::bad_request(format!(
                 "the resource is not a {resource_type}"
             )));
+        }
+        let found = health_fhir_validation::validate_value(body);
+        if !found.is_empty() {
+            return Err(FhirError::invalid_resource(&found));
         }
         if let Target::Instance(id) = &target
             && body.get("id").and_then(Value::as_str) != Some(id.to_string().as_str())

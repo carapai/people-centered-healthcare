@@ -1,0 +1,17 @@
+[package]
+name = "fhir-element-table"
+description = "Generates health-fhir-validation's R5 element table from the core package's StructureDefinitions (ADR 0051)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "tooling"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde_json = { workspace = true }

@@ -1361,6 +1361,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhir-element-table"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+]
+
+[[package]]
 name = "fhir-r5"
 version = "4.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1816,6 +1824,7 @@ dependencies = [
  "axum",
  "form_urlencoded",
  "health-fhir-search",
+ "health-fhir-validation",
  "health-identifiers",
  "health-persistence",
  "health-surrealdb",
@@ -1827,6 +1836,15 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
+]
+
+[[package]]
+name = "health-fhir-validation"
+version = "0.1.0"
+dependencies = [
+ "health-fhir-models",
+ "regex",
+ "serde_json",
 ]
 
 [[package]]
