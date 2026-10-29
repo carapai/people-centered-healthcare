@@ -23,7 +23,8 @@ It exits with 0 when the workspace is clean, 1 when it finds violations, and 2 o
 | `inline-version` | A dependency is not `{ workspace = true }`, including path dependencies and `target.*` tables |
 | `missing-workspace-lints` | `[lints] workspace = true` is missing and the crate is not lint-exempt |
 | `cycle` | The normal and build dependency graph has a cycle |
+| `facade-bypass` | A crate other than its facade depends on a facaded external, such as anything but `health-fhir-models` on `fhir-r5`. Dev-dependencies count |
 
-`allowlist.toml` holds the reviewed policy: domain externals, the explicitly forbidden list, and lint exemptions. Changing it is reviewed like an ADR.
+`allowlist.toml` holds the reviewed policy: domain externals, the explicitly forbidden list, lint exemptions, and `[facades]` (external → the one crate that may use it). Changing it is reviewed like an ADR.
 
 The tests in `tests/rules.rs` generate a valid fixture workspace, break one rule at a time, and also run the checks on this repository.

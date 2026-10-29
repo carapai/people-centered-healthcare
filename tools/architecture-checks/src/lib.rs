@@ -105,6 +105,9 @@ pub enum Rule {
     MissingWorkspaceLints,
     /// The normal and build dependency graph has a cycle.
     Cycle,
+    /// A crate uses an external crate that only its facade may use (ADR 0050: only
+    /// `health-fhir-models` depends on `fhir-r5`).
+    FacadeBypass,
 }
 
 impl fmt::Display for Rule {
@@ -123,6 +126,7 @@ impl fmt::Display for Rule {
             Self::InlineVersion => "inline-version",
             Self::MissingWorkspaceLints => "missing-workspace-lints",
             Self::Cycle => "cycle",
+            Self::FacadeBypass => "facade-bypass",
         };
         f.write_str(name)
     }
@@ -154,6 +158,8 @@ pub struct Allowlist {
     pub domain_forbidden: BTreeSet<String>,
     /// Crates allowed not to inherit `[workspace.lints]`.
     pub lint_exempt: BTreeSet<String>,
+    /// External crates that only one workspace crate (their facade) may depend on.
+    pub facades: BTreeMap<String, String>,
 }
 
 impl Allowlist {
@@ -177,10 +183,26 @@ impl Allowlist {
                 Some(_) => bail!("`{key}` must be an array"),
             }
         };
+        let facades = match value.get("facades") {
+            None => BTreeMap::new(),
+            Some(toml::Value::Table(table)) => table
+                .iter()
+                .map(|(external, owner)| {
+                    owner
+                        .as_str()
+                        .map(|owner| (external.clone(), owner.to_owned()))
+                        .with_context(|| {
+                            format!("facade owner of `{external}` must be a crate name")
+                        })
+                })
+                .collect::<Result<_>>()?,
+            Some(_) => bail!("`facades` must be a table"),
+        };
         Ok(Self {
             domain_externals: list("domain-externals")?,
             domain_forbidden: list("domain-forbidden")?,
             lint_exempt: list("lint-exempt")?,
+            facades,
         })
     }
 }
@@ -293,6 +315,19 @@ pub fn check(manifest_path: &Path, allowlist: &Allowlist) -> Result<Vec<Violatio
                     }
                 }
                 Some(_) => {}
+                None if allowlist
+                    .facades
+                    .get(&dep.name)
+                    .is_some_and(|owner| owner != name) =>
+                {
+                    flag(
+                        Rule::FacadeBypass,
+                        format!(
+                            "depends on `{}`, which only `{}` may use; import it through that crate",
+                            dep.name, allowlist.facades[&dep.name]
+                        ),
+                    );
+                }
                 None if !dev
                     && me.layer == Some(Layer::Domain)
                     && !allowlist.domain_externals.contains(&dep.name) =>

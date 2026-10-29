@@ -5,7 +5,7 @@ _Update after each task (AGENTS.md process step 4)._
 | Phase | Done | Total |
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 4 | 10 |
-| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 9 | 14 |
+| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 10 | 14 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 13 of 104 implementation tasks done. Validation spikes open: 3.
+Total: 14 of 104 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -43,3 +43,4 @@ Total: 13 of 104 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #157 conditional create, update and delete per the R5 matrices, resolved through the search index in the write transaction; `condition_lock` (migration 0003) serializes creates under the same condition; 3 fixtures and an 8-way race test.
 - 2026-10-29: #158 transaction Bundles (one SurrealDB transaction in R5 order, `urn:uuid` rewriting, all or nothing, rerun on conflict) and batch Bundles (independent entries); write steps factored into `ops`; 2 fixtures.
 - 2026-10-29: #159 reference integrity: local references must resolve (422) at the end of each write transaction; `idx_ref_in` reverse references (migration 0004) make referenced deletes 409; `ReferenceScope` hook for out-of-scope targets.
+- 2026-10-29: #53 health-fhir-models facade over `fhir-r5 =4.2.3`; full R5 corpus round-trips (2,823 exact + 1 known-invalid); `facade-bypass` architecture check; corpus fetch script with a pinned SHA-256.
