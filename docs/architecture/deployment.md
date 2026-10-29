@@ -116,6 +116,7 @@ flowchart LR
 - **No personal health data in telemetry.** A tracing-layer attribute allowlist and a CI redaction test enforce it.
   - **Allowed:** UUIDs, node and facility ids, operation names, non-sensitive codes, durations and counts.
   - **Never allowed:** names, phone numbers, NINs, free text, or codes from sensitive ValueSets.
+  - **In code** (`health-observability`): the export layer is the only exporter. A field is exported only if its name is on the allowlist and its value has that name's shape (a UUID for `*_id`, a short identifier with no run of seven or more digits, a route template, a code, or a number). Event messages, error values and `?Debug` values are never exported. Dropped fields are counted in `telemetry.redacted_fields`. HTTP spans record the route template, never the path or query (`health-http`). Codes from sensitive ValueSets are not detected by shape, so callers must not record them.
 - **Indicators and alerts:**
 
   | Area | Indicators |
