@@ -51,6 +51,31 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - A platform decimal conformance suite runs on every engine bump.
 - The official FHIRPath test suite runs in CI against the configured engine.
 - Terminology functions (`memberOf`, `subsumes`) delegate to the local terminology service.
+
+### FHIRPath in code
+
+`health-fhir-validation` defines the `FhirPathEngine` trait. `OctofhirEngine` is the default:
+- **Vendored engine.** `octofhir-fhirpath 0.4.57` is vendored in `third_party/` and pinned with `[patch.crates-io]`, together with its dependency `octofhir-ucum 0.5.2`. Each crate has an unchanged vendoring commit, then patches listed in its `PATCHES.md`, with the diffs in `patches/` to offer upstream.
+  - Engine patch 0001 is ADR 0052: decimals are built from the JSON number's text and fail closed beyond 28 digits.
+  - Engine patches 0002–0007 make the R5 core invariants evaluate correctly: Quantity `code`/`system`, `%rootResource`, functions defined on empty input, choice detection, the `not` keyword and `htmlChecks()` attributes.
+  - UCUM patch 0001 stops a panic on non-ASCII units such as `m²`.
+- **Model provider.** The engine's model provider is `TableModelProvider`, built from the tier 1 element table. `octofhir-fhirschema` would add about 120 crates, including an HTTP client, SQLite and a CLI.
+- **Containment.** The engine runs in its own task, so a panic inside it fails the evaluation closed instead of dropping the request.
+- **No trace output.** `trace()` output is discarded; the engine's default prints traced values to stderr (ADR 0047).
+
+### Tier 2 in code
+
+`validate_invariants` evaluates the R5 core invariants with severity error. Warnings are not reported yet. The generator emits them with each type's base type.
+- **Evaluation by path.** It walks the resource to find where each type occurs (`Observation.effective.ofType(Period)`) and evaluates `<path>.all(<invariant>)` from the root, so expression strings repeat across resources and hit the engine's plan cache.
+  - **Contained resources** are walked from their container. **Bundle entry and Parameters resources** are validated as roots of their own.
+  - **`%context`** is bound to the node with `defineVariable`.
+- **Fail closed.** A decimal beyond 28 significant digits is a `processing` failure (ADR 0052), and so is an invariant the engine cannot evaluate.
+- **Not evaluated** (`KNOWN_ENGINE_GAPS`, with reasons):
+  - `ele-1`, which tier 1 enforces structurally;
+  - `exs-1`, whose `memberOf()` needs the terminology service (#90).
+- **Write paths.** Every REST write runs tier 2 after tier 1. Failures are 400 with the invariant key and location.
+- **Corpus.** All 2,824 official examples hold their invariants except 171 genuine errors in HL7's examples: 161 Questionnaires with repeated linkIds (`que-2`) and 10 StructureDefinitions with a base but no derivation (`sdf-27`). A check that does not use FHIRPath confirms each one in the test.
+- **Performance.** On 731 clinical examples, in a release build on a development laptop, tiers 1 and 2 together take p50 0.92 ms and **p95 3.06 ms**. That is already over the 2 ms p95 budget for tiers 1–3 (ADR 0053); reducing it is part of the tier 3 work (#145). Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
 - Whether CQL is needed stays in the map's Not yet specified.
 
 ## Validation (ADR 0016)

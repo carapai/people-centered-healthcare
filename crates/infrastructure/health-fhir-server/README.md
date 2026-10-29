@@ -4,7 +4,8 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 
 - **`FhirServer::new(store, base_url, policy).router()`** returns the routes relative to the FHIR base, to nest under e.g. `/fhir`. They cover `metadata`, read, vread, create, update, delete, conditional create/update/delete, transaction and batch Bundles (`POST /`), instance/type/system `_history` and `search-type` over GET and POST. The write steps live in `ops` and run inside a caller's transaction, so single requests and Bundles share them.
 - **Responses:** FHIR JSON bodies with weak ETags (`W/"<versionId>"`) and `Last-Modified`. Errors are OperationOutcomes. Stored bytes are embedded as they are stored (ADR 0051).
-- **Not mounted in `central-server` yet:** there is no authentication or authorization until #63–#65, and request bodies are checked only for shape until validation tiers 1–2 (#59).
+- **Validation:** request bodies pass tier 1 (structure) and tier 2 (core invariants) before anything else reads them. `with_fhirpath_engine` replaces the default engine.
+- **Not mounted in `central-server` yet:** there is no authentication or authorization until #63–#65.
 - **Reference integrity:** local references must resolve (422), and a referenced resource cannot be deleted (409). `with_reference_scope` lets a node allow out-of-scope targets (persistence.md § Reference integrity).
 
 ## Tests

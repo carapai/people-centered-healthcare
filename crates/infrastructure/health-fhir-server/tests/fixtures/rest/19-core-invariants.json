@@ -1,0 +1,150 @@
+{
+ "name": "19-core-invariants",
+ "spec": "ADR 0016: tier 2, the R5 core invariants",
+ "steps": [
+  {
+   "note": "pat-1: a contact needs details or an organization",
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "contact": [
+      {
+       "gender": "female"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/code": "invariant",
+     "/issue/0/expression/0": "Patient.contact"
+    },
+    "body_contains": [
+     "pat-1"
+    ]
+   }
+  },
+  {
+   "note": "per-1: a Period may not end before it starts",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "x"
+     },
+     "effectivePeriod": {
+      "start": "2026-02-01",
+      "end": "2026-01-01"
+     }
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/expression/0": "Observation.effectivePeriod"
+    },
+    "body_contains": [
+     "per-1"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "status": "final",
+     "code": {
+      "text": "x"
+     },
+     "effectivePeriod": {
+      "start": "2026-01-01"
+     }
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "in a transaction the location names the entry",
+   "request": {
+    "method": "POST",
+    "path": "",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Bundle",
+     "type": "transaction",
+     "entry": [
+      {
+       "resource": {
+        "resourceType": "Patient"
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      },
+      {
+       "resource": {
+        "resourceType": "Patient",
+        "contact": [
+         {
+          "gender": "male"
+         }
+        ]
+       },
+       "request": {
+        "method": "POST",
+        "url": "Patient"
+       }
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "invariant",
+     "/issue/0/expression/0": "Bundle.entry[1].resource.contact"
+    }
+   }
+  },
+  {
+   "note": "a decimal beyond 28 significant digits cannot be evaluated exactly and fails closed",
+   "request": {
+    "method": "POST",
+    "path": "Observation",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "form": "{\"resourceType\":\"Observation\",\"status\":\"final\",\"code\":{\"text\":\"x\"},\"valueQuantity\":{\"value\":1.2345678901234567890123456789}}"
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "processing"
+    }
+   }
+  }
+ ]
+}

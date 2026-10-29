@@ -40,7 +40,7 @@ pub(crate) async fn update(
         &resource_type,
         query.as_deref().unwrap_or_default(),
     )?;
-    let (json, body_id) = body(&resource_type, &headers, &bytes)?;
+    let (json, body_id) = body(&server, &resource_type, &headers, &bytes).await?;
     let body_id: Option<ResourceId> = body_id
         .map(|id| {
             id.parse().map_err(|_| {

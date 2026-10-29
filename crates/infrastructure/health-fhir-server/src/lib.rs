@@ -16,7 +16,8 @@
 //!
 //! | transaction, batch | `POST /` with a `transaction` or `batch` Bundle |
 //!
-//! Every write checks reference integrity, and a delete is refused while live records
+//! Every write is validated (tier 1 structure, tier 2 core invariants) and checks reference
+//! integrity, and a delete is refused while live records
 //! reference the resource ([`ReferenceScope`]).
 //! Request bodies are checked only for shape (a JSON object of the path's type) until validation
 //! tiers 1–2 (#59) are on the write path.
@@ -66,6 +67,7 @@ use std::time::Duration;
 use axum::Router;
 use axum::routing::{get, post};
 use health_fhir_search::SearchPolicy;
+use health_fhir_validation::{FhirPathEngine, OctofhirEngine, validate_invariants};
 use health_identifiers::ResourceId;
 use health_persistence::{ResourceType, RetryPolicy};
 use health_surrealdb::{SurrealStore, ownership};
@@ -84,6 +86,7 @@ pub struct FhirServer {
     base: Arc<str>,
     policy: Arc<dyn SearchPolicy>,
     references: Arc<dyn ReferenceScope>,
+    fhirpath: Arc<dyn FhirPathEngine>,
     retry: RetryPolicy,
     started: Timestamp,
 }
@@ -101,6 +104,7 @@ impl FhirServer {
             base: base.into().trim_end_matches('/').into(),
             policy,
             references: Arc::new(AllMustResolve),
+            fhirpath: Arc::new(OctofhirEngine::new()),
             retry: RetryPolicy::default(),
             started: Timestamp::now(),
         }
@@ -111,6 +115,24 @@ impl FhirServer {
     pub fn with_reference_scope(mut self, scope: Arc<dyn ReferenceScope>) -> Self {
         self.references = scope;
         self
+    }
+
+    /// This server, evaluating tier 2 invariants with `engine` instead of the default
+    /// [`OctofhirEngine`].
+    #[must_use]
+    pub fn with_fhirpath_engine(mut self, engine: Arc<dyn FhirPathEngine>) -> Self {
+        self.fhirpath = engine;
+        self
+    }
+
+    /// Tier 2: the core invariants of a resource that passed tier 1 (400 otherwise).
+    async fn check_invariants(&self, resource: &serde_json::Value) -> Result<(), FhirError> {
+        let found = validate_invariants(self.fhirpath.as_ref(), resource).await;
+        if found.is_empty() {
+            Ok(())
+        } else {
+            Err(FhirError::invalid_resource(&found))
+        }
     }
 
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
