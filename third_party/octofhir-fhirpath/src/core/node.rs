@@ -35,6 +35,20 @@ pub enum FhirNode {
     Object(Arc<[(Arc<str>, FhirNode)]>),
 }
 
+/// A JSON number as an exact decimal, built from its text (ADR 0052 patch). With
+/// `serde_json/arbitrary_precision` the text is the number as written, so `0.010` stays
+/// `0.010` instead of becoming `0.0100000000000000002081668171` through `f64`. Values that
+/// `rust_decimal` cannot hold exactly (more than 28 significant digits) are `None`: callers
+/// fail closed instead of approximating.
+pub fn decimal_from_number(n: &serde_json::Number) -> Option<rust_decimal::Decimal> {
+    let text = n.to_string();
+    if text.contains(['e', 'E']) {
+        rust_decimal::Decimal::from_scientific(&text).ok()
+    } else {
+        rust_decimal::Decimal::from_str_exact(&text).ok()
+    }
+}
+
 impl FhirNode {
     /// Navigate a JSON Pointer without materializing subtrees.
     pub fn pointer(&self, pointer: &str) -> Option<&Self> {
@@ -158,6 +172,15 @@ impl FhirNode {
     pub fn as_u64(&self) -> Option<u64> {
         match self {
             FhirNode::Number(n) => n.as_u64(),
+            _ => None,
+        }
+    }
+
+    /// This number as an exact decimal (ADR 0052 patch; see [`decimal_from_number`]).
+    #[inline]
+    pub fn as_decimal(&self) -> Option<rust_decimal::Decimal> {
+        match self {
+            FhirNode::Number(n) => decimal_from_number(n),
             _ => None,
         }
     }

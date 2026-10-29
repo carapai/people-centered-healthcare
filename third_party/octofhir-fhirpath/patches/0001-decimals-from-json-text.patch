@@ -1,0 +1,321 @@
+diff --git a/third_party/octofhir-fhirpath/src/core/node.rs b/third_party/octofhir-fhirpath/src/core/node.rs
+index 6506074..3d29d04 100644
+--- a/third_party/octofhir-fhirpath/src/core/node.rs
++++ b/third_party/octofhir-fhirpath/src/core/node.rs
+@@ -35,6 +35,20 @@ pub enum FhirNode {
+     Object(Arc<[(Arc<str>, FhirNode)]>),
+ }
+ 
++/// A JSON number as an exact decimal, built from its text (ADR 0052 patch). With
++/// `serde_json/arbitrary_precision` the text is the number as written, so `0.010` stays
++/// `0.010` instead of becoming `0.0100000000000000002081668171` through `f64`. Values that
++/// `rust_decimal` cannot hold exactly (more than 28 significant digits) are `None`: callers
++/// fail closed instead of approximating.
++pub fn decimal_from_number(n: &serde_json::Number) -> Option<rust_decimal::Decimal> {
++    let text = n.to_string();
++    if text.contains(['e', 'E']) {
++        rust_decimal::Decimal::from_scientific(&text).ok()
++    } else {
++        rust_decimal::Decimal::from_str_exact(&text).ok()
++    }
++}
++
+ impl FhirNode {
+     /// Navigate a JSON Pointer without materializing subtrees.
+     pub fn pointer(&self, pointer: &str) -> Option<&Self> {
+@@ -162,6 +176,15 @@ impl FhirNode {
+         }
+     }
+ 
++    /// This number as an exact decimal (ADR 0052 patch; see [`decimal_from_number`]).
++    #[inline]
++    pub fn as_decimal(&self) -> Option<rust_decimal::Decimal> {
++        match self {
++            FhirNode::Number(n) => decimal_from_number(n),
++            _ => None,
++        }
++    }
++
+     #[inline]
+     pub fn as_f64(&self) -> Option<f64> {
+         match self {
+diff --git a/third_party/octofhir-fhirpath/src/core/types.rs b/third_party/octofhir-fhirpath/src/core/types.rs
+index d75fb56..579f776 100644
+--- a/third_party/octofhir-fhirpath/src/core/types.rs
++++ b/third_party/octofhir-fhirpath/src/core/types.rs
+@@ -1795,13 +1795,11 @@ fn json_to_evaluation_result(value: &JsonValue) -> EvaluationResult {
+         JsonValue::Number(n) => {
+             if let Some(i) = n.as_i64() {
+                 EvaluationResult::integer(i)
+-            } else if let Some(f) = n.as_f64() {
+-                f.to_string()
+-                    .parse::<Decimal>()
++            } else {
++                // ADR 0052 patch: exact, from the number's text.
++                crate::core::node::decimal_from_number(n)
+                     .map(EvaluationResult::decimal)
+                     .unwrap_or(EvaluationResult::Empty)
+-            } else {
+-                EvaluationResult::Empty
+             }
+         }
+         JsonValue::String(s) => EvaluationResult::string(s.clone()),
+@@ -2449,15 +2447,8 @@ impl TypeConstraint {
+                         }
+                     }
+                     (FhirPathValue::Decimal(val, _, _), JsonValue::Number(min)) => {
+-                        if let Some(min_f64) = min.as_f64() {
+-                            if let Ok(val_f64) = val.to_string().parse::<f64>() {
+-                                Ok(val_f64 >= min_f64)
+-                            } else {
+-                                Ok(false)
+-                            }
+-                        } else {
+-                            Ok(false)
+-                        }
++                        // ADR 0052 patch: compare exact decimals.
++                        Ok(crate::core::node::decimal_from_number(min).is_some_and(|min| *val >= min))
+                     }
+                     _ => Ok(false),
+                 }
+@@ -2473,15 +2464,8 @@ impl TypeConstraint {
+                         }
+                     }
+                     (FhirPathValue::Decimal(val, _, _), JsonValue::Number(max)) => {
+-                        if let Some(max_f64) = max.as_f64() {
+-                            if let Ok(val_f64) = val.to_string().parse::<f64>() {
+-                                Ok(val_f64 <= max_f64)
+-                            } else {
+-                                Ok(false)
+-                            }
+-                        } else {
+-                            Ok(false)
+-                        }
++                        // ADR 0052 patch: compare exact decimals.
++                        Ok(crate::core::node::decimal_from_number(max).is_some_and(|max| *val <= max))
+                     }
+                     _ => Ok(false),
+                 }
+diff --git a/third_party/octofhir-fhirpath/src/core/value.rs b/third_party/octofhir-fhirpath/src/core/value.rs
+index bddbe0b..d246417 100644
+--- a/third_party/octofhir-fhirpath/src/core/value.rs
++++ b/third_party/octofhir-fhirpath/src/core/value.rs
+@@ -64,7 +64,6 @@ pub mod utils {
+     use super::{FhirPathValue, JsonValue, async_recursion};
+     use crate::core::model_provider::ModelProvider;
+     use rust_decimal::Decimal;
+-    use rust_decimal::prelude::FromPrimitive;
+     use std::sync::Arc;
+ 
+     /// Infer FHIR type from JSON object structure
+@@ -83,18 +82,12 @@ pub mod utils {
+         // Extract value - handle both string and number representations
+         let value = obj
+             .get("value")
+-            .and_then(|v| {
+-                // Try as number first
+-                if let Some(f) = v.as_f64() {
+-                    Some(f)
+-                } else if let Some(s) = v.as_str() {
+-                    // Try to parse string as number
+-                    s.parse::<f64>().ok()
+-                } else {
+-                    None
+-                }
++            .and_then(|v| match v {
++                // ADR 0052 patch: exact decimals from the number's text.
++                JsonValue::Number(n) => crate::core::node::decimal_from_number(n),
++                JsonValue::String(s) => Decimal::from_str_exact(s).ok(),
++                _ => None,
+             })
+-            .map(|f| Decimal::from_f64(f).unwrap_or(Decimal::ZERO))
+             .unwrap_or_default();
+ 
+         let unit_display = obj
+@@ -120,13 +113,12 @@ pub mod utils {
+             JsonValue::Number(n) => {
+                 if let Some(i) = n.as_i64() {
+                     FhirPathValue::integer(i)
+-                } else if let Some(f) = n.as_f64() {
+-                    if let Some(decimal) = Decimal::from_f64(f) {
+-                        FhirPathValue::decimal(decimal)
+-                    } else {
+-                        FhirPathValue::string(n.to_string())
+-                    }
++                } else if let Some(decimal) = crate::core::node::decimal_from_number(&n) {
++                    // ADR 0052 patch: exact, from the number's text.
++                    FhirPathValue::decimal(decimal)
+                 } else {
++                    // Beyond 28 significant digits there is no exact decimal. Callers that need
++                    // a decision fail closed before evaluating (health-fhir-validation, ADR 0052).
+                     FhirPathValue::string(n.to_string())
+                 }
+             }
+@@ -182,16 +174,15 @@ pub mod utils {
+             JsonValue::Number(n) => {
+                 if let Some(i) = n.as_i64() {
+                     Ok(FhirPathValue::integer(i))
+-                } else if let Some(f) = n.as_f64() {
+-                    let decimal = Decimal::from_f64(f).ok_or_else(|| {
++                } else {
++                    // ADR 0052 patch: exact, from the number's text, or fail closed.
++                    let decimal = crate::core::node::decimal_from_number(&n).ok_or_else(|| {
+                         crate::core::FhirPathError::evaluation_error(
+                             crate::core::error_code::FP0054,
+-                            format!("Invalid decimal value: {f}"),
++                            format!("decimal {n} has more than 28 significant digits"),
+                         )
+                     })?;
+                     Ok(FhirPathValue::decimal(decimal))
+-                } else {
+-                    Ok(FhirPathValue::string(n.to_string()))
+                 }
+             }
+             JsonValue::String(s) => Ok(FhirPathValue::string(s)),
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/evaluator.rs b/third_party/octofhir-fhirpath/src/evaluator/evaluator.rs
+index 91d726e..4521ea1 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/evaluator.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/evaluator.rs
+@@ -1917,10 +1917,10 @@ impl Evaluator {
+     ) -> Option<FhirPathValue> {
+         // Handle both numeric and string values in FHIR JSON
+         let value_node = json.get("value")?;
+-        let value = if let Some(n) = value_node.as_f64() {
+-            n
+-        } else {
+-            value_node.as_str()?.parse::<f64>().ok()?
++        // ADR 0052 patch: exact, from the number's text.
++        let value = match value_node.as_decimal() {
++            Some(d) => d,
++            None => rust_decimal::Decimal::from_str_exact(value_node.as_str()?).ok()?,
+         };
+ 
+         // Get unit information with UCUM support
+@@ -1956,7 +1956,7 @@ impl Evaluator {
+         }
+ 
+         Some(FhirPathValue::quantity_with_components(
+-            rust_decimal::Decimal::from_f64_retain(value)?,
++            value,
+             display_unit,
+             canonical_code,
+             if system.is_empty() {
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/functions/children_function.rs b/third_party/octofhir-fhirpath/src/evaluator/functions/children_function.rs
+index 7fc50f6..ff765fa 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/functions/children_function.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/functions/children_function.rs
+@@ -103,11 +103,9 @@ fn push_typed(node: &FhirNode, child_type: Option<&Arc<TypeInfo>>, out: &mut Vec
+                 FhirNode::Number(n) => {
+                     if let Some(i) = n.as_i64() {
+                         FhirPathValue::integer(i)
+-                    } else if let Some(f) = n.as_f64() {
+-                        match rust_decimal::Decimal::try_from(f) {
+-                            Ok(d) => FhirPathValue::decimal(d),
+-                            Err(_) => return,
+-                        }
++                    } else if let Some(d) = crate::core::node::decimal_from_number(n) {
++                        // ADR 0052 patch: exact, from the number's text.
++                        FhirPathValue::decimal(d)
+                     } else {
+                         return;
+                     }
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/functions/weight_function.rs b/third_party/octofhir-fhirpath/src/evaluator/functions/weight_function.rs
+index ab92a77..242eb54 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/functions/weight_function.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/functions/weight_function.rs
+@@ -62,8 +62,9 @@ impl WeightFunctionEvaluator {
+                             && (url == ITEM_WEIGHT_EXTENSION_URL
+                                 || url == ORDINAL_VALUE_EXTENSION_URL)
+                         {
+-                            if let Some(val) = ext.get("valueDecimal").and_then(|v| v.as_f64()) {
+-                                return Decimal::try_from(val).ok();
++                            if let Some(val) = ext.get("valueDecimal").and_then(|v| v.as_decimal()) {
++                                // ADR 0052 patch: exact, from the number's text.
++                                return Some(val);
+                             }
+                             if let Some(val) = ext.get("valueInteger").and_then(|v| v.as_i64()) {
+                                 return Some(Decimal::from(val));
+@@ -81,8 +82,9 @@ impl WeightFunctionEvaluator {
+                             || ext.url == ORDINAL_VALUE_EXTENSION_URL
+                         {
+                             let json = ext.to_json();
+-                            if let Some(val) = json.get("valueDecimal").and_then(|v| v.as_f64()) {
+-                                return Decimal::try_from(val).ok();
++                            if let Some(serde_json::Value::Number(val)) = json.get("valueDecimal") {
++                                // ADR 0052 patch: exact, from the number's text.
++                                return crate::core::node::decimal_from_number(val);
+                             }
+                             if let Some(val) = json.get("valueInteger").and_then(|v| v.as_i64()) {
+                                 return Some(Decimal::from(val));
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/operations/equals_operator.rs b/third_party/octofhir-fhirpath/src/evaluator/operations/equals_operator.rs
+index 44c66c8..570bc5e 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/operations/equals_operator.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/operations/equals_operator.rs
+@@ -47,10 +47,10 @@ impl EqualsOperatorEvaluator {
+     ) -> Option<FhirPathValue> {
+         // Handle both numeric and string values in FHIR JSON
+         let value_node = json.get("value")?;
+-        let value = if let Some(n) = value_node.as_f64() {
+-            n
+-        } else {
+-            value_node.as_str()?.parse::<f64>().ok()?
++        // ADR 0052 patch: exact, from the number's text.
++        let value = match value_node.as_decimal() {
++            Some(d) => d,
++            None => rust_decimal::Decimal::from_str_exact(value_node.as_str()?).ok()?,
+         };
+         let unit_display = json
+             .get("unit")
+@@ -66,7 +66,7 @@ impl EqualsOperatorEvaluator {
+             .map(|s| s.to_string());
+ 
+         Some(FhirPathValue::quantity_with_components(
+-            rust_decimal::Decimal::from_f64_retain(value)?,
++            value,
+             unit_display,
+             code,
+             system,
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/operations/equivalent_operator.rs b/third_party/octofhir-fhirpath/src/evaluator/operations/equivalent_operator.rs
+index f32b646..20182b2 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/operations/equivalent_operator.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/operations/equivalent_operator.rs
+@@ -5,7 +5,6 @@
+ 
+ use async_trait::async_trait;
+ use rust_decimal::Decimal;
+-use rust_decimal::prelude::FromPrimitive;
+ use std::sync::Arc;
+ 
+ use crate::core::model_provider::TypeInfo;
+@@ -77,8 +76,9 @@ impl EquivalentOperatorEvaluator {
+             // Convert FHIR value to Decimal (could be integer, float, or string)
+             let fhir_decimal = if let Some(int_val) = fhir_value.as_i64() {
+                 Decimal::from(int_val)
+-            } else if let Some(float_val) = fhir_value.as_f64() {
+-                Decimal::from_f64(float_val)?
++            } else if let Some(exact) = fhir_value.as_decimal() {
++                // ADR 0052 patch: exact, from the number's text.
++                exact
+             } else if let Some(str_val) = fhir_value.as_str() {
+                 // Handle string values (common in FHIR JSON)
+                 str_val.parse::<Decimal>().ok()?
+diff --git a/third_party/octofhir-fhirpath/src/evaluator/result.rs b/third_party/octofhir-fhirpath/src/evaluator/result.rs
+index 5596d3c..1a27855 100644
+--- a/third_party/octofhir-fhirpath/src/evaluator/result.rs
++++ b/third_party/octofhir-fhirpath/src/evaluator/result.rs
+@@ -234,12 +234,9 @@ fn json_value_to_eval_result(value: &serde_json::Value) -> ModelEvalResult {
+         serde_json::Value::Number(n) => {
+             if let Some(i) = n.as_i64() {
+                 ModelEvalResult::integer(i)
+-            } else if let Some(f) = n.as_f64() {
+-                if let Some(d) = rust_decimal::Decimal::from_f64_retain(f) {
+-                    ModelEvalResult::decimal(d)
+-                } else {
+-                    ModelEvalResult::Empty
+-                }
++            } else if let Some(d) = crate::core::node::decimal_from_number(n) {
++                // ADR 0052 patch: exact, from the number's text.
++                ModelEvalResult::decimal(d)
+             } else {
+                 ModelEvalResult::Empty
+             }

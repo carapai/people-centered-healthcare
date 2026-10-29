@@ -47,10 +47,10 @@ impl EqualsOperatorEvaluator {
     ) -> Option<FhirPathValue> {
         // Handle both numeric and string values in FHIR JSON
         let value_node = json.get("value")?;
-        let value = if let Some(n) = value_node.as_f64() {
-            n
-        } else {
-            value_node.as_str()?.parse::<f64>().ok()?
+        // ADR 0052 patch: exact, from the number's text.
+        let value = match value_node.as_decimal() {
+            Some(d) => d,
+            None => rust_decimal::Decimal::from_str_exact(value_node.as_str()?).ok()?,
         };
         let unit_display = json
             .get("unit")
@@ -66,7 +66,7 @@ impl EqualsOperatorEvaluator {
             .map(|s| s.to_string());
 
         Some(FhirPathValue::quantity_with_components(
-            rust_decimal::Decimal::from_f64_retain(value)?,
+            value,
             unit_display,
             code,
             system,

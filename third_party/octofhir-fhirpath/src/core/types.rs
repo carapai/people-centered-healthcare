@@ -1795,13 +1795,11 @@ fn json_to_evaluation_result(value: &JsonValue) -> EvaluationResult {
         JsonValue::Number(n) => {
             if let Some(i) = n.as_i64() {
                 EvaluationResult::integer(i)
-            } else if let Some(f) = n.as_f64() {
-                f.to_string()
-                    .parse::<Decimal>()
+            } else {
+                // ADR 0052 patch: exact, from the number's text.
+                crate::core::node::decimal_from_number(n)
                     .map(EvaluationResult::decimal)
                     .unwrap_or(EvaluationResult::Empty)
-            } else {
-                EvaluationResult::Empty
             }
         }
         JsonValue::String(s) => EvaluationResult::string(s.clone()),
@@ -2449,15 +2447,8 @@ impl TypeConstraint {
                         }
                     }
                     (FhirPathValue::Decimal(val, _, _), JsonValue::Number(min)) => {
-                        if let Some(min_f64) = min.as_f64() {
-                            if let Ok(val_f64) = val.to_string().parse::<f64>() {
-                                Ok(val_f64 >= min_f64)
-                            } else {
-                                Ok(false)
-                            }
-                        } else {
-                            Ok(false)
-                        }
+                        // ADR 0052 patch: compare exact decimals.
+                        Ok(crate::core::node::decimal_from_number(min).is_some_and(|min| *val >= min))
                     }
                     _ => Ok(false),
                 }
@@ -2473,15 +2464,8 @@ impl TypeConstraint {
                         }
                     }
                     (FhirPathValue::Decimal(val, _, _), JsonValue::Number(max)) => {
-                        if let Some(max_f64) = max.as_f64() {
-                            if let Ok(val_f64) = val.to_string().parse::<f64>() {
-                                Ok(val_f64 <= max_f64)
-                            } else {
-                                Ok(false)
-                            }
-                        } else {
-                            Ok(false)
-                        }
+                        // ADR 0052 patch: compare exact decimals.
+                        Ok(crate::core::node::decimal_from_number(max).is_some_and(|max| *val <= max))
                     }
                     _ => Ok(false),
                 }

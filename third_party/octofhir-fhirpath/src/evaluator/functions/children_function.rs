@@ -103,11 +103,9 @@ fn push_typed(node: &FhirNode, child_type: Option<&Arc<TypeInfo>>, out: &mut Vec
                 FhirNode::Number(n) => {
                     if let Some(i) = n.as_i64() {
                         FhirPathValue::integer(i)
-                    } else if let Some(f) = n.as_f64() {
-                        match rust_decimal::Decimal::try_from(f) {
-                            Ok(d) => FhirPathValue::decimal(d),
-                            Err(_) => return,
-                        }
+                    } else if let Some(d) = crate::core::node::decimal_from_number(n) {
+                        // ADR 0052 patch: exact, from the number's text.
+                        FhirPathValue::decimal(d)
                     } else {
                         return;
                     }

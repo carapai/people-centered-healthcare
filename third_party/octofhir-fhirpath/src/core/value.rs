@@ -64,7 +64,6 @@ pub mod utils {
     use super::{FhirPathValue, JsonValue, async_recursion};
     use crate::core::model_provider::ModelProvider;
     use rust_decimal::Decimal;
-    use rust_decimal::prelude::FromPrimitive;
     use std::sync::Arc;
 
     /// Infer FHIR type from JSON object structure
@@ -83,18 +82,12 @@ pub mod utils {
         // Extract value - handle both string and number representations
         let value = obj
             .get("value")
-            .and_then(|v| {
-                // Try as number first
-                if let Some(f) = v.as_f64() {
-                    Some(f)
-                } else if let Some(s) = v.as_str() {
-                    // Try to parse string as number
-                    s.parse::<f64>().ok()
-                } else {
-                    None
-                }
+            .and_then(|v| match v {
+                // ADR 0052 patch: exact decimals from the number's text.
+                JsonValue::Number(n) => crate::core::node::decimal_from_number(n),
+                JsonValue::String(s) => Decimal::from_str_exact(s).ok(),
+                _ => None,
             })
-            .map(|f| Decimal::from_f64(f).unwrap_or(Decimal::ZERO))
             .unwrap_or_default();
 
         let unit_display = obj
@@ -120,13 +113,12 @@ pub mod utils {
             JsonValue::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     FhirPathValue::integer(i)
-                } else if let Some(f) = n.as_f64() {
-                    if let Some(decimal) = Decimal::from_f64(f) {
-                        FhirPathValue::decimal(decimal)
-                    } else {
-                        FhirPathValue::string(n.to_string())
-                    }
+                } else if let Some(decimal) = crate::core::node::decimal_from_number(&n) {
+                    // ADR 0052 patch: exact, from the number's text.
+                    FhirPathValue::decimal(decimal)
                 } else {
+                    // Beyond 28 significant digits there is no exact decimal. Callers that need
+                    // a decision fail closed before evaluating (health-fhir-validation, ADR 0052).
                     FhirPathValue::string(n.to_string())
                 }
             }
@@ -182,16 +174,15 @@ pub mod utils {
             JsonValue::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     Ok(FhirPathValue::integer(i))
-                } else if let Some(f) = n.as_f64() {
-                    let decimal = Decimal::from_f64(f).ok_or_else(|| {
+                } else {
+                    // ADR 0052 patch: exact, from the number's text, or fail closed.
+                    let decimal = crate::core::node::decimal_from_number(&n).ok_or_else(|| {
                         crate::core::FhirPathError::evaluation_error(
                             crate::core::error_code::FP0054,
-                            format!("Invalid decimal value: {f}"),
+                            format!("decimal {n} has more than 28 significant digits"),
                         )
                     })?;
                     Ok(FhirPathValue::decimal(decimal))
-                } else {
-                    Ok(FhirPathValue::string(n.to_string()))
                 }
             }
             JsonValue::String(s) => Ok(FhirPathValue::string(s)),

@@ -7,3 +7,6 @@ dist/
 .DS_Store
 styled-system/
 .claude/worktrees/
+
+# Build output of vendored crates tested on their own
+third_party/*/target/
