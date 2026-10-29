@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0055), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). Implementation has started: [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42) is done. Three AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0055), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). Implementation has started: [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42, PR #147) and [Build tools/architecture-checks](https://github.com/carapai/people-centered-healthcare/issues/43) (#43, stacked on #147) are done, pending review. Three AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -72,7 +72,7 @@ Wayfinder tickets open: three AFK validation spikes, all needing facility hardwa
 2. Does the per-node commit counter sustain facility write rates on edge hardware? (#36): AFK task; needs edge hardware
 3. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39): AFK task; needs Windows facility PCs
 
-Recommended next: [Build tools/architecture-checks](https://github.com/carapai/people-centered-healthcare/issues/43) (#43), which enforces the layer rules on the new workspace; then [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44). Also unblocked now: #49, #51, #52, #53 and #54. The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
+Recommended next: review and merge PR #147, then the stacked architecture-checks PR. After that, take [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44). Also unblocked: #49, #51, #52, #53 and #54. The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 

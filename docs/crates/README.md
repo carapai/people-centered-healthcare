@@ -14,6 +14,7 @@ The workspace scaffold created one placeholder crate per layer, so that the laye
 | `health-registries-app` | application (registries) | The first Registries use case |
 | `health-surrealdb` | infrastructure | Build the health-surrealdb adapter and migrations runner (#55) |
 | `central-server` | runtime | Create central-server with the shared Axum router and telemetry (#49) |
+| `architecture-checks` | tooling | Built (#43); see [tools/architecture-checks](../../tools/architecture-checks/README.md) |
 
 ## What a crate page covers
 
