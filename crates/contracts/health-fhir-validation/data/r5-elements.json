@@ -89,6 +89,7 @@
     "Account": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "balance": [
           0,
@@ -552,11 +553,28 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "diagnosis",
+          "key": "act-1",
+          "severity": "error",
+          "expression": "condition.reference.empty().not() implies dateOfDiagnosis.empty()",
+          "human": "The dateOfDiagnosis is not valid when using a reference to a diagnosis"
+        },
+        {
+          "path": "procedure",
+          "key": "act-2",
+          "severity": "error",
+          "expression": "code.reference.empty().not() implies dateOfService.empty()",
+          "human": "The dateOfService is not valid when using a reference to a procedure"
+        }
+      ]
     },
     "ActivityDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -1056,11 +1074,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "ActorDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "capabilities": [
           0,
@@ -1273,11 +1308,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Address": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "city": [
           0,
@@ -1363,11 +1415,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "AdministrableProductDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "administrableDoseForm": [
           0,
@@ -1697,11 +1751,21 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "apd-1",
+          "severity": "error",
+          "expression": "AdministrableProductDefinition.formOf.resolve().route.empty()",
+          "human": "RouteOfAdministration cannot be used when the 'formOf' product already uses MedicinalProductDefinition.route (and vice versa)"
+        }
+      ]
     },
     "AdverseEvent": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actuality": [
           1,
@@ -2158,11 +2222,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Age": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "Quantity",
       "elements": {
         "code": [
           0,
@@ -2213,11 +2279,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "age-1",
+          "severity": "error",
+          "expression": "(code.exists() or value.empty()) and (system.empty() or system = %ucum) and (value.empty() or value.hasValue().not() or value > 0)",
+          "human": "There SHALL be a code if there is a value and it SHALL be an expression of time.  If system is present, it SHALL be UCUM.  If value is present, it SHALL be positive."
+        }
+      ]
     },
     "AllergyIntolerance": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -2489,11 +2565,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Annotation": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "author[x]": [
           0,
@@ -2531,11 +2609,13 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Appointment": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "account": [
           0,
@@ -3118,11 +3198,63 @@
             "VirtualServiceDetail"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "app-2",
+          "severity": "error",
+          "expression": "start.exists() = end.exists()",
+          "human": "Either start and end are specified, or neither"
+        },
+        {
+          "path": "",
+          "key": "app-3",
+          "severity": "error",
+          "expression": "(start.exists() and end.exists()) or (status in ('proposed' | 'cancelled' | 'waitlist'))",
+          "human": "Only proposed or cancelled appointments can be missing start/end dates"
+        },
+        {
+          "path": "",
+          "key": "app-4",
+          "severity": "error",
+          "expression": "cancellationReason.exists() implies (status='noshow' or status='cancelled')",
+          "human": "Cancellation reason is only used for appointments that have been cancelled, or noshow"
+        },
+        {
+          "path": "",
+          "key": "app-5",
+          "severity": "error",
+          "expression": "start.exists() implies start <= end",
+          "human": "The start must be less than or equal to the end"
+        },
+        {
+          "path": "",
+          "key": "app-6",
+          "severity": "warning",
+          "expression": "originatingAppointment.exists().not() or recurrenceTemplate.exists().not()",
+          "human": "An appointment may have an originatingAppointment or recurrenceTemplate, but not both"
+        },
+        {
+          "path": "",
+          "key": "app-7",
+          "severity": "error",
+          "expression": "cancellationDate.exists() implies (status='noshow' or status='cancelled')",
+          "human": "Cancellation date is only used for appointments that have been cancelled, or noshow"
+        },
+        {
+          "path": "participant",
+          "key": "app-1",
+          "severity": "error",
+          "expression": "type.exists() or actor.exists()",
+          "human": "Either the type or actor on the participant SHALL be specified"
+        }
+      ]
     },
     "AppointmentResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actor": [
           0,
@@ -3264,11 +3396,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "apr-1",
+          "severity": "error",
+          "expression": "participantType.exists() or actor.exists()",
+          "human": "Either the participantType or actor must be specified"
+        }
+      ]
     },
     "ArtifactAssessment": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -3496,11 +3638,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Attachment": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "contentType": [
           0,
@@ -3607,11 +3751,21 @@
             "positiveInt"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "att-1",
+          "severity": "error",
+          "expression": "data.empty() or contentType.exists()",
+          "human": "If the Attachment has data, it SHALL have a contentType"
+        }
+      ]
     },
     "AuditEvent": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "action": [
           0,
@@ -4031,11 +4185,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Availability": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "availableTime": [
           0,
@@ -4135,11 +4291,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "availableTime",
+          "key": "av-1",
+          "severity": "error",
+          "expression": "allDay.exists().not() or (allDay implies availableStartTime.exists().not() and availableEndTime.exists().not())",
+          "human": "Cannot include start/end times when selecting all day availability."
+        }
+      ]
     },
     "BackboneElement": {
       "kind": "complex-type",
       "abstract": true,
+      "base": "Element",
       "elements": {
         "extension": [
           0,
@@ -4162,11 +4328,13 @@
             "Extension"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "BackboneType": {
       "kind": "complex-type",
       "abstract": true,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -4189,16 +4357,20 @@
             "Extension"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Base": {
       "kind": "complex-type",
       "abstract": true,
-      "elements": {}
+      "base": null,
+      "elements": {},
+      "constraints": []
     },
     "Basic": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -4291,11 +4463,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Binary": {
       "kind": "resource",
       "abstract": false,
+      "base": "Resource",
       "elements": {
         "contentType": [
           1,
@@ -4346,11 +4520,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "BiologicallyDerivedProduct": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "biologicalSourceEvent": [
           0,
@@ -4585,11 +4761,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "BiologicallyDerivedProductDispense": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -4794,11 +4972,13 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "BodyStructure": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -5051,11 +5231,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Bundle": {
       "kind": "resource",
       "abstract": false,
+      "base": "Resource",
       "elements": {
         "entry": [
           0,
@@ -5392,11 +5574,147 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "bdl-1",
+          "severity": "error",
+          "expression": "total.empty() or (type = 'searchset') or (type = 'history')",
+          "human": "total only when a search or history"
+        },
+        {
+          "path": "",
+          "key": "bdl-2",
+          "severity": "error",
+          "expression": "(type = 'searchset') or entry.search.empty()",
+          "human": "entry.search only when a search"
+        },
+        {
+          "path": "",
+          "key": "bdl-7",
+          "severity": "error",
+          "expression": "(type = 'history') or entry.where(fullUrl.exists()).select(fullUrl&iif(resource.meta.versionId.exists(), resource.meta.versionId, '')).isDistinct()",
+          "human": "FullUrl must be unique in a bundle, or else entries with the same fullUrl must have different meta.versionId (except in history bundles)"
+        },
+        {
+          "path": "",
+          "key": "bdl-9",
+          "severity": "error",
+          "expression": "type = 'document' implies (identifier.system.exists() and identifier.value.exists())",
+          "human": "A document must have an identifier with a system and a value"
+        },
+        {
+          "path": "",
+          "key": "bdl-10",
+          "severity": "error",
+          "expression": "type = 'document' implies (timestamp.hasValue())",
+          "human": "A document must have a date"
+        },
+        {
+          "path": "",
+          "key": "bdl-11",
+          "severity": "error",
+          "expression": "type = 'document' implies entry.first().resource.is(Composition)",
+          "human": "A document must have a Composition as the first resource"
+        },
+        {
+          "path": "",
+          "key": "bdl-12",
+          "severity": "error",
+          "expression": "type = 'message' implies entry.first().resource.is(MessageHeader)",
+          "human": "A message must have a MessageHeader as the first resource"
+        },
+        {
+          "path": "",
+          "key": "bdl-13",
+          "severity": "error",
+          "expression": "type = 'subscription-notification' implies entry.first().resource.is(SubscriptionStatus)",
+          "human": "A subscription-notification must have a SubscriptionStatus as the first resource"
+        },
+        {
+          "path": "",
+          "key": "bdl-14",
+          "severity": "error",
+          "expression": "type = 'history' implies entry.request.method != 'PATCH'",
+          "human": "entry.request.method PATCH not allowed for history"
+        },
+        {
+          "path": "",
+          "key": "bdl-15",
+          "severity": "error",
+          "expression": "type='transaction' or type='transaction-response' or type='batch' or type='batch-response' or entry.all(fullUrl.exists() or request.method='POST')",
+          "human": "Bundle resources where type is not transaction, transaction-response, batch, or batch-response or when the request is a POST SHALL have Bundle.entry.fullUrl populated"
+        },
+        {
+          "path": "",
+          "key": "bdl-16",
+          "severity": "error",
+          "expression": "issues.exists() implies (issues.issue.severity = 'information' or issues.issue.severity = 'warning')",
+          "human": "Issue.severity for all issues within the OperationOutcome must be either 'information' or 'warning'."
+        },
+        {
+          "path": "",
+          "key": "bdl-17",
+          "severity": "error",
+          "expression": "type = 'document' implies issues.empty()",
+          "human": "Use and meaning of issues for documents has not been validated because the content will not be rendered in the document."
+        },
+        {
+          "path": "",
+          "key": "bdl-18",
+          "severity": "error",
+          "expression": "type = 'searchset' implies link.where(relation = 'self' and url.exists()).exists()",
+          "human": "Self link is required for searchsets."
+        },
+        {
+          "path": "",
+          "key": "bdl-3a",
+          "severity": "error",
+          "expression": "type in ('document' | 'message' | 'searchset' | 'collection') implies entry.all(resource.exists() and request.empty() and response.empty())",
+          "human": "For collections of type document, message, searchset or collection, all entries must contain resources, and not have request or response elements"
+        },
+        {
+          "path": "",
+          "key": "bdl-3b",
+          "severity": "error",
+          "expression": "type = 'history' implies entry.all(request.exists() and response.exists() and ((request.method in ('POST' | 'PATCH' | 'PUT')) = resource.exists()))",
+          "human": "For collections of type history, all entries must contain request or response elements, and resources if the method is POST, PUT or PATCH"
+        },
+        {
+          "path": "",
+          "key": "bdl-3c",
+          "severity": "error",
+          "expression": "type in ('transaction' | 'batch') implies entry.all(request.method.exists() and ((request.method in ('POST' | 'PATCH' | 'PUT')) = resource.exists()))",
+          "human": "For collections of type transaction or batch, all entries must contain request elements, and resources if the method is POST, PUT or PATCH"
+        },
+        {
+          "path": "",
+          "key": "bdl-3d",
+          "severity": "error",
+          "expression": "type in ('transaction-response' | 'batch-response') implies entry.all(response.exists())",
+          "human": "For collections of type transaction-response or batch-response, all entries must contain response elements"
+        },
+        {
+          "path": "entry",
+          "key": "bdl-5",
+          "severity": "error",
+          "expression": "resource.exists() or request.exists() or response.exists()",
+          "human": "must be a resource unless there's a request or response"
+        },
+        {
+          "path": "entry",
+          "key": "bdl-8",
+          "severity": "error",
+          "expression": "fullUrl.exists() implies fullUrl.contains('/_history/').not()",
+          "human": "fullUrl cannot be a version specific reference"
+        }
+      ]
     },
     "CanonicalResource": {
       "kind": "resource",
       "abstract": true,
+      "base": "DomainResource",
       "elements": {
         "contact": [
           0,
@@ -5574,11 +5892,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "CapabilityStatement": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "acceptLanguage": [
           0,
@@ -6517,11 +6852,98 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "cpb-1",
+          "severity": "error",
+          "expression": "rest.exists() or messaging.exists() or document.exists()",
+          "human": "A Capability Statement SHALL have at least one of REST, messaging or document element."
+        },
+        {
+          "path": "",
+          "key": "cpb-2",
+          "severity": "error",
+          "expression": "(description.count() + software.count() + implementation.count()) > 0",
+          "human": "A Capability Statement SHALL have at least one of description, software, or implementation element."
+        },
+        {
+          "path": "",
+          "key": "cpb-3",
+          "severity": "error",
+          "expression": "messaging.endpoint.empty() or kind = 'instance'",
+          "human": "Messaging end-point is only permitted when a capability statement is for an implementation."
+        },
+        {
+          "path": "",
+          "key": "cpb-4",
+          "severity": "error",
+          "expression": "rest.mode.isDistinct()",
+          "human": "There should only be one CapabilityStatement.rest per mode."
+        },
+        {
+          "path": "",
+          "key": "cpb-7",
+          "severity": "error",
+          "expression": "document.select(profile&mode).isDistinct()",
+          "human": "The set of documents must be unique by the combination of profile and mode."
+        },
+        {
+          "path": "",
+          "key": "cpb-14",
+          "severity": "error",
+          "expression": "(kind != 'instance') or implementation.exists()",
+          "human": "If kind = instance, implementation must be present and software may be present"
+        },
+        {
+          "path": "",
+          "key": "cpb-15",
+          "severity": "error",
+          "expression": "(kind != 'capability') or (implementation.exists().not() and software.exists())",
+          "human": "If kind = capability, implementation must be absent, software must be present"
+        },
+        {
+          "path": "",
+          "key": "cpb-16",
+          "severity": "error",
+          "expression": "(kind!='requirements') or (implementation.exists().not() and software.exists().not())",
+          "human": "If kind = requirements, implementation and software must be absent"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "rest",
+          "key": "cpb-9",
+          "severity": "error",
+          "expression": "resource.select(type).isDistinct()",
+          "human": "A given resource can only be described once per RESTful mode."
+        },
+        {
+          "path": "rest.resource",
+          "key": "cpb-12",
+          "severity": "error",
+          "expression": "searchParam.select(name).isDistinct()",
+          "human": "Search parameter names must be unique in the context of a resource."
+        }
+      ]
     },
     "CarePlan": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "activity": [
           0,
@@ -6782,11 +7204,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CareTeam": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -6971,11 +7395,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "participant",
+          "key": "ctm-1",
+          "severity": "error",
+          "expression": "onBehalfOf.exists() implies (member.resolve() is Practitioner)",
+          "human": "CareTeam.participant.onBehalfOf can only be populated when CareTeam.participant.member is a Practitioner"
+        },
+        {
+          "path": "participant",
+          "key": "ctm-2",
+          "severity": "warning",
+          "expression": "role.exists() or member.exists()",
+          "human": "CareTeam.participant.role or CareTeam.participant.member exists"
+        }
+      ]
     },
     "ChargeItem": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "account": [
           0,
@@ -7252,11 +7693,13 @@
             "MonetaryComponent"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ChargeItemDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "applicability": [
           0,
@@ -7573,11 +8016,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Citation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -8840,11 +9300,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Claim": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "accident": [
           0,
@@ -10077,11 +10554,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ClaimResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "addItem": [
           0,
@@ -11378,11 +11857,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ClinicalImpression": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "changePattern": [
           0,
@@ -11609,11 +12090,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ClinicalUseDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -12092,11 +12575,21 @@
             "Extension"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cud-1",
+          "severity": "error",
+          "expression": "(ClinicalUseDefinition.indication.count() + ClinicalUseDefinition.contraindication.count() + ClinicalUseDefinition.interaction.count() + ClinicalUseDefinition.undesirableEffect.count() + ClinicalUseDefinition.warning.count())  < 2",
+          "human": "Indication, Contraindication, Interaction, UndesirableEffect and Warning cannot be used in the same instance"
+        }
+      ]
     },
     "CodeSystem": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -12664,11 +13157,63 @@
             "boolean"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "csd-1",
+          "severity": "error",
+          "expression": "concept.exists() implies concept.code.combine(%resource.concept.descendants().concept.code).isDistinct()",
+          "human": "Within a code system definition, all the codes SHALL be unique"
+        },
+        {
+          "path": "",
+          "key": "csd-2",
+          "severity": "warning",
+          "expression": "concept.concept.exists() implies hierarchyMeaning.exists()",
+          "human": "If there is an explicit hierarchy, a hierarchyMeaning should be provided"
+        },
+        {
+          "path": "",
+          "key": "csd-3",
+          "severity": "warning",
+          "expression": "concept.where(property.code = 'parent' or property.code = 'child').exists() implies hierarchyMeaning.exists()",
+          "human": "If there is an implicit hierarchy, a hierarchyMeaning should be provided"
+        },
+        {
+          "path": "",
+          "key": "csd-4",
+          "severity": "error",
+          "expression": "CodeSystem.content = 'supplement' implies CodeSystem.supplements.exists()",
+          "human": "If the code system content = supplement, it must nominate what it's a supplement for"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "concept.designation",
+          "key": "csd-5",
+          "severity": "error",
+          "expression": "additionalUse.exists() implies use.exists()",
+          "human": "Must have a value for concept.designation.use if concept.designation.additionalUse is present"
+        }
+      ]
     },
     "CodeableConcept": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "coding": [
           0,
@@ -12698,11 +13243,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CodeableReference": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "concept": [
           0,
@@ -12732,11 +13279,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Coding": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "code": [
           0,
@@ -12787,11 +13336,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cod-1",
+          "severity": "warning",
+          "expression": "code.exists().not() implies display.exists().not()",
+          "human": "A Coding SHOULD NOT have a display unless a code is also present.  Computation on Coding.display alone is generally unsafe.  Consider using CodeableConcept.text"
+        }
+      ]
     },
     "Communication": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "about": [
           0,
@@ -13033,11 +13592,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CommunicationRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "about": [
           0,
@@ -13280,11 +13841,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CompartmentDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "code": [
           1,
@@ -13511,11 +14074,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Composition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "attester": [
           0,
@@ -13866,11 +14446,28 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "section",
+          "key": "cmp-1",
+          "severity": "error",
+          "expression": "text.exists() or entry.exists() or section.exists()",
+          "human": "A section must contain at least one of text, entries, or sub-sections"
+        },
+        {
+          "path": "section",
+          "key": "cmp-2",
+          "severity": "error",
+          "expression": "emptyReason.empty() or entry.empty()",
+          "human": "A section can only have an emptyReason if it is empty"
+        }
+      ]
     },
     "ConceptMap": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "additionalAttribute": [
           0,
@@ -14584,11 +15181,105 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "property",
+          "key": "cmd-11",
+          "severity": "error",
+          "expression": "type = 'code' implies system.exists()",
+          "human": "If the property type is code, a system SHALL be specified"
+        },
+        {
+          "path": "group.element",
+          "key": "cmd-4",
+          "severity": "error",
+          "expression": "(noMap.exists() and noMap=true) implies target.empty()",
+          "human": "If noMap is present, target SHALL NOT be present"
+        },
+        {
+          "path": "group.element",
+          "key": "cmd-5",
+          "severity": "error",
+          "expression": "(code.exists() and valueSet.empty()) or (code.empty() and valueSet.exists())",
+          "human": "Either code or valueSet SHALL be present but not both."
+        },
+        {
+          "path": "group.element.target",
+          "key": "cmd-1",
+          "severity": "error",
+          "expression": "comment.exists() or (%resource.status = 'draft') or relationship.empty() or ((relationship != 'source-is-broader-than-target') and (relationship != 'not-related-to'))",
+          "human": "If the map is source-is-broader-than-target or not-related-to, there SHALL be some comments, unless the status is 'draft'"
+        },
+        {
+          "path": "group.element.target",
+          "key": "cmd-7",
+          "severity": "error",
+          "expression": "(code.exists() and valueSet.empty()) or (code.empty() and valueSet.exists())",
+          "human": "Either code or valueSet SHALL be present but not both."
+        },
+        {
+          "path": "group.element.target.dependsOn",
+          "key": "cmd-6",
+          "severity": "error",
+          "expression": "(value.exists() and valueSet.empty()) or (value.empty() and valueSet.exists())",
+          "human": "One of value[x] or valueSet must exist, but not both."
+        },
+        {
+          "path": "group.unmapped",
+          "key": "cmd-2",
+          "severity": "error",
+          "expression": "(mode = 'fixed') implies ((code.exists() and valueSet.empty()) or (code.empty() and valueSet.exists()))",
+          "human": "If the mode is 'fixed', either a code or valueSet must be provided, but not both."
+        },
+        {
+          "path": "group.unmapped",
+          "key": "cmd-3",
+          "severity": "error",
+          "expression": "(mode = 'other-map') implies otherMap.exists()",
+          "human": "If the mode is 'other-map', a url for the other map must be provided"
+        },
+        {
+          "path": "group.unmapped",
+          "key": "cmd-8",
+          "severity": "error",
+          "expression": "(mode != 'fixed') implies (code.empty() and display.empty() and valueSet.empty())",
+          "human": "If the mode is not 'fixed', code, display and valueSet are not allowed"
+        },
+        {
+          "path": "group.unmapped",
+          "key": "cmd-9",
+          "severity": "error",
+          "expression": "(mode != 'other-map') implies relationship.exists()",
+          "human": "If the mode is not 'other-map', relationship must be provided"
+        },
+        {
+          "path": "group.unmapped",
+          "key": "cmd-10",
+          "severity": "error",
+          "expression": "(mode != 'other-map') implies otherMap.empty()",
+          "human": "If the mode is not 'other-map', otherMap is not allowed"
+        }
+      ]
     },
     "Condition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "abatement[x]": [
           0,
@@ -14843,11 +15534,35 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "con-2",
+          "severity": "warning",
+          "expression": "category.coding.where(system='http://terminology.hl7.org/CodeSystem/condition-category' and code='problem-list-item').exists() implies clinicalStatus.coding.where(system='http://terminology.hl7.org/CodeSystem/condition-clinical' and code='unknown').exists().not()",
+          "human": "If category is problems list item, the clinicalStatus should not be unknown"
+        },
+        {
+          "path": "",
+          "key": "con-3",
+          "severity": "error",
+          "expression": "abatement.exists() implies (clinicalStatus.coding.where(system='http://terminology.hl7.org/CodeSystem/condition-clinical' and (code='inactive' or code='resolved' or code='remission')).exists())",
+          "human": "If condition is abated, then clinicalStatus must be either inactive, resolved, or remission."
+        },
+        {
+          "path": "stage",
+          "key": "con-1",
+          "severity": "error",
+          "expression": "summary.exists() or assessment.exists()",
+          "human": "Stage SHALL have summary or assessment"
+        }
+      ]
     },
     "ConditionDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "bodySite": [
           0,
@@ -15292,11 +16007,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Consent": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -15745,11 +16477,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ContactDetail": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -15779,11 +16513,13 @@
             "ContactPoint"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ContactPoint": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -15834,11 +16570,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cpt-2",
+          "severity": "error",
+          "expression": "value.empty() or system.exists()",
+          "human": "A system is required if a value is provided."
+        }
+      ]
     },
     "Contract": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "alias": [
           0,
@@ -17118,11 +17864,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Contributor": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "contact": [
           0,
@@ -17159,11 +17907,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Count": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "Quantity",
       "elements": {
         "code": [
           0,
@@ -17214,11 +17964,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnt-3",
+          "severity": "error",
+          "expression": "(code.exists() or value.empty()) and (system.empty() or system = %ucum) and (code.empty() or code = '1') and (value.empty() or value.hasValue().not() or value.toString().contains('.').not())",
+          "human": "There SHALL be a code with a value of \"1\" if there is a value. If system is present, it SHALL be UCUM.  If present, the value SHALL be a whole number."
+        }
+      ]
     },
     "Coverage": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "beneficiary": [
           1,
@@ -17599,11 +18359,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CoverageEligibilityRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -18007,11 +18769,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "CoverageEligibilityResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -18467,11 +19231,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "insurance.item",
+          "key": "ces-1",
+          "severity": "error",
+          "expression": "category.exists() xor productOrService.exists()",
+          "human": "SHALL contain a category or a billcode but not both."
+        }
+      ]
     },
     "DataRequirement": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "codeFilter": [
           0,
@@ -18702,11 +19476,28 @@
             "Duration"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "codeFilter",
+          "key": "drq-1",
+          "severity": "error",
+          "expression": "path.exists() xor searchParam.exists()",
+          "human": "Either a path or a searchParam must be provided, but not both"
+        },
+        {
+          "path": "dateFilter",
+          "key": "drq-2",
+          "severity": "error",
+          "expression": "path.exists() xor searchParam.exists()",
+          "human": "Either a path or a searchParam must be provided, but not both"
+        }
+      ]
     },
     "DataType": {
       "kind": "complex-type",
       "abstract": true,
+      "base": "Element",
       "elements": {
         "extension": [
           0,
@@ -18722,11 +19513,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DetectedIssue": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -18967,11 +19760,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Device": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "availabilityStatus": [
           0,
@@ -19490,11 +20285,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "dev-1",
+          "severity": "error",
+          "expression": "name.where(display=true).count() <= 1",
+          "human": "only one Device.name.display SHALL be true when there is more than one Device.name"
+        }
+      ]
     },
     "DeviceAssociation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "bodyStructure": [
           0,
@@ -19657,11 +20462,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DeviceDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "chargeItem": [
           0,
@@ -20605,11 +21412,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DeviceDispense": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -20849,11 +21658,13 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DeviceMetric": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "calibration": [
           0,
@@ -21016,11 +21827,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DeviceRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "asNeeded": [
           0,
@@ -21300,11 +22113,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DeviceUsage": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "adherence": [
           0,
@@ -21518,11 +22333,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "DiagnosticReport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -21798,11 +22615,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "dgr-1",
+          "severity": "error",
+          "expression": "composition.exists() implies (composition.resolve().section.entry.reference.where(resolve() is Observation) in (result.reference|result.reference.resolve().hasMember.reference))",
+          "human": "When a Composition is referenced in `Diagnostic.composition`, all Observation resources referenced in `Composition.entry` must also be referenced in `Diagnostic.entry` or in the references Observations in `Observation.hasMember`"
+        }
+      ]
     },
     "Distance": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "Quantity",
       "elements": {
         "code": [
           0,
@@ -21853,11 +22680,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "dis-1",
+          "severity": "error",
+          "expression": "(code.exists() or value.empty()) and (system.empty() or system = %ucum)",
+          "human": "There SHALL be a code if there is a value and it SHALL be an expression of length.  If system is present, it SHALL be UCUM."
+        }
+      ]
     },
     "DocumentReference": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "attester": [
           0,
@@ -22218,11 +23055,28 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "docRef-1",
+          "severity": "warning",
+          "expression": "facilityType.empty() or context.where(resolve() is Encounter).empty()",
+          "human": "facilityType SHALL only be present if context is not an encounter"
+        },
+        {
+          "path": "",
+          "key": "docRef-2",
+          "severity": "warning",
+          "expression": "practiceSetting.empty() or context.where(resolve() is Encounter).empty()",
+          "human": "practiceSetting SHALL only be present if context is not present"
+        }
+      ]
     },
     "DomainResource": {
       "kind": "resource",
       "abstract": true,
+      "base": "Resource",
       "elements": {
         "contained": [
           0,
@@ -22280,11 +23134,49 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "dom-2",
+          "severity": "error",
+          "expression": "contained.contained.empty()",
+          "human": "If the resource is contained in another resource, it SHALL NOT contain nested Resources"
+        },
+        {
+          "path": "",
+          "key": "dom-3",
+          "severity": "error",
+          "expression": "contained.where((('#'+id in (%resource.descendants().reference | %resource.descendants().ofType(canonical) | %resource.descendants().ofType(uri) | %resource.descendants().ofType(url))) or descendants().where(reference = '#').exists() or descendants().where(ofType(canonical) = '#').exists() or descendants().where(ofType(canonical) = '#').exists()).not()).trace('unmatched', id).empty()",
+          "human": "If the resource is contained in another resource, it SHALL be referred to from elsewhere in the resource or SHALL refer to the containing resource"
+        },
+        {
+          "path": "",
+          "key": "dom-4",
+          "severity": "error",
+          "expression": "contained.meta.versionId.empty() and contained.meta.lastUpdated.empty()",
+          "human": "If a resource is contained in another resource, it SHALL NOT have a meta.versionId or a meta.lastUpdated"
+        },
+        {
+          "path": "",
+          "key": "dom-5",
+          "severity": "error",
+          "expression": "contained.meta.security.empty()",
+          "human": "If a resource is contained in another resource, it SHALL NOT have a security label"
+        },
+        {
+          "path": "",
+          "key": "dom-6",
+          "severity": "warning",
+          "expression": "text.`div`.exists()",
+          "human": "A resource should have narrative for robust management"
+        }
+      ]
     },
     "Dosage": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "BackboneType",
       "elements": {
         "additionalInstruction": [
           0,
@@ -22443,11 +23335,21 @@
             "Timing"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "dos-1",
+          "severity": "error",
+          "expression": "asNeededFor.empty() or asNeeded.empty() or asNeeded",
+          "human": "AsNeededFor can only be set if AsNeeded is empty or true"
+        }
+      ]
     },
     "Duration": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "Quantity",
       "elements": {
         "code": [
           0,
@@ -22498,11 +23400,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "drt-1",
+          "severity": "error",
+          "expression": "code.exists() implies ((system = %ucum) and value.exists())",
+          "human": "There SHALL be a code if there is a value and it SHALL be an expression of time.  If system is present, it SHALL be UCUM."
+        }
+      ]
     },
     "Element": {
       "kind": "complex-type",
       "abstract": true,
+      "base": "Base",
       "elements": {
         "extension": [
           0,
@@ -22518,11 +23430,28 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ele-1",
+          "severity": "error",
+          "expression": "hasValue() or (children().count() > id.count())",
+          "human": "All FHIR elements must have a @value or children"
+        },
+        {
+          "path": "extension",
+          "key": "ele-1",
+          "severity": "error",
+          "expression": "hasValue() or (children().count() > id.count())",
+          "human": "All FHIR elements must have a @value or children"
+        }
+      ]
     },
     "ElementDefinition": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "BackboneType",
       "elements": {
         "alias": [
           0,
@@ -23412,11 +24341,189 @@
             "canonical"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "eld-2",
+          "severity": "error",
+          "expression": "min.empty() or max.empty() or (max = '*') or iif(max != '*', min <= max.toInteger())",
+          "human": "Min <= Max"
+        },
+        {
+          "path": "",
+          "key": "eld-5",
+          "severity": "error",
+          "expression": "contentReference.empty() or (type.empty() and defaultValue.empty() and fixed.empty() and pattern.empty() and example.empty() and minValue.empty() and maxValue.empty() and maxLength.empty() and binding.empty())",
+          "human": "if the element definition has a contentReference, it cannot have type, defaultValue, fixed, pattern, example, minValue, maxValue, maxLength, or binding"
+        },
+        {
+          "path": "",
+          "key": "eld-6",
+          "severity": "error",
+          "expression": "fixed.empty() or (type.count()  <= 1)",
+          "human": "Fixed value may only be specified if there is one type"
+        },
+        {
+          "path": "",
+          "key": "eld-7",
+          "severity": "error",
+          "expression": "pattern.empty() or (type.count() <= 1)",
+          "human": "Pattern may only be specified if there is one type"
+        },
+        {
+          "path": "",
+          "key": "eld-8",
+          "severity": "error",
+          "expression": "pattern.empty() or fixed.empty()",
+          "human": "Pattern and fixed are mutually exclusive"
+        },
+        {
+          "path": "",
+          "key": "eld-11",
+          "severity": "error",
+          "expression": "binding.empty() or type.code.empty() or type.code.contains(\":\") or type.select((code = 'code') or (code = 'Coding') or (code='CodeableConcept') or (code = 'Quantity') or (code = 'string') or (code = 'uri') or (code = 'Duration')).exists()",
+          "human": "Binding can only be present for coded elements, string, and uri if using FHIR-defined types"
+        },
+        {
+          "path": "",
+          "key": "eld-13",
+          "severity": "error",
+          "expression": "type.select(code).isDistinct()",
+          "human": "Types must be unique by code"
+        },
+        {
+          "path": "",
+          "key": "eld-14",
+          "severity": "error",
+          "expression": "constraint.select(key).isDistinct()",
+          "human": "Constraints must be unique by key"
+        },
+        {
+          "path": "",
+          "key": "eld-15",
+          "severity": "error",
+          "expression": "defaultValue.empty() or meaningWhenMissing.empty()",
+          "human": "default value and meaningWhenMissing are mutually exclusive"
+        },
+        {
+          "path": "",
+          "key": "eld-16",
+          "severity": "error",
+          "expression": "sliceName.empty() or sliceName.matches('^[a-zA-Z0-9\\\\/\\\\-_\\\\[\\\\]\\\\@]+$')",
+          "human": "sliceName must be composed of proper tokens separated by \"/\""
+        },
+        {
+          "path": "",
+          "key": "eld-18",
+          "severity": "error",
+          "expression": "(isModifier.exists() and isModifier) implies isModifierReason.exists()",
+          "human": "Must have a modifier reason if isModifier = true"
+        },
+        {
+          "path": "",
+          "key": "eld-19",
+          "severity": "error",
+          "expression": "path.matches('^[^\\\\s\\\\.,:;\\\\\\'\"\\\\/|?!@#$%&*()\\\\[\\\\]{}]{1,64}(\\\\.[^\\\\s\\\\.,:;\\\\\\'\"\\\\/|?!@#$%&*()\\\\[\\\\]{}]{1,64}(\\\\[x\\\\])?(\\\\:[^\\\\s\\\\.]+)?)*$')",
+          "human": "Element path SHALL be expressed as a set of '.'-separated components with each component restricted to a maximum of 64 characters and with some limits on the allowed choice of characters"
+        },
+        {
+          "path": "",
+          "key": "eld-20",
+          "severity": "warning",
+          "expression": "path.matches('^[A-Za-z][A-Za-z0-9]{0,63}(\\\\.[a-z][A-Za-z0-9]{0,63}(\\\\[x])?)*$')",
+          "human": "The first component of the path should be UpperCamelCase.  Additional components (following a '.') should be lowerCamelCase.  If this syntax is not adhered to, code generation tools may be broken. Logical models may be less concerned about this implication."
+        },
+        {
+          "path": "",
+          "key": "eld-22",
+          "severity": "error",
+          "expression": "sliceIsConstraining.exists() implies sliceName.exists()",
+          "human": "sliceIsConstraining can only appear if slicename is present"
+        },
+        {
+          "path": "",
+          "key": "eld-24",
+          "severity": "warning",
+          "expression": "fixed.exists().not()",
+          "human": "pattern[x] should be used rather than fixed[x]"
+        },
+        {
+          "path": "",
+          "key": "eld-25",
+          "severity": "warning",
+          "expression": "orderMeaning.empty() implies slicing.where(rules='openAtEnd' or ordered).exists().not()",
+          "human": "Order has no meaning (and cannot be asserted to have meaning), so enforcing rules on order is improper"
+        },
+        {
+          "path": "",
+          "key": "eld-27",
+          "severity": "warning",
+          "expression": "mapping.select(identity).isDistinct()",
+          "human": "Mappings SHOULD be unique by key"
+        },
+        {
+          "path": "",
+          "key": "eld-28",
+          "severity": "error",
+          "expression": "mustHaveValue.value implies valueAlternatives.empty()",
+          "human": "Can't have valueAlternatives if mustHaveValue is true"
+        },
+        {
+          "path": "max",
+          "key": "eld-3",
+          "severity": "error",
+          "expression": "empty() or ($this = '*') or (toInteger() >= 0)",
+          "human": "Max SHALL be a number or \"*\""
+        },
+        {
+          "path": "type",
+          "key": "eld-4",
+          "severity": "error",
+          "expression": "aggregation.empty() or (code = 'Reference') or (code = 'canonical') or (code = 'CodeableReference')",
+          "human": "Aggregation may only be specified if one of the allowed types for the element is a reference"
+        },
+        {
+          "path": "type",
+          "key": "eld-17",
+          "severity": "error",
+          "expression": "(code='Reference' or code = 'canonical' or code = 'CodeableReference') or targetProfile.empty()",
+          "human": "targetProfile is only allowed if the type is Reference or canonical"
+        },
+        {
+          "path": "constraint",
+          "key": "eld-21",
+          "severity": "warning",
+          "expression": "expression.exists()",
+          "human": "Constraints should have an expression or else validators will not be able to enforce them"
+        },
+        {
+          "path": "constraint",
+          "key": "eld-26",
+          "severity": "error",
+          "expression": "(severity = 'error') implies suppress.empty()",
+          "human": "Errors cannot be suppressed"
+        },
+        {
+          "path": "binding",
+          "key": "eld-12",
+          "severity": "error",
+          "expression": "valueSet.exists() implies (valueSet.startsWith('http:') or valueSet.startsWith('https') or valueSet.startsWith('urn:') or valueSet.startsWith('#'))",
+          "human": "ValueSet SHALL start with http:// or https:// or urn: or #"
+        },
+        {
+          "path": "binding",
+          "key": "eld-23",
+          "severity": "error",
+          "expression": "description.exists() or valueSet.exists()",
+          "human": "binding SHALL have either description or valueSet"
+        }
+      ]
     },
     "Encounter": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "account": [
           0,
@@ -23894,11 +25001,28 @@
             "VirtualServiceDetail"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "participant",
+          "key": "enc-1",
+          "severity": "error",
+          "expression": "actor.exists() or type.exists()",
+          "human": "A type must be provided when no explicit actor is specified"
+        },
+        {
+          "path": "participant",
+          "key": "enc-2",
+          "severity": "error",
+          "expression": "actor.exists(resolve() is Patient or resolve() is Group) implies type.exists().not()",
+          "human": "A type cannot be provided for a patient or group participant"
+        }
+      ]
     },
     "EncounterHistory": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actualPeriod": [
           0,
@@ -24082,11 +25206,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Endpoint": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "address": [
           1,
@@ -24263,11 +25389,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "EnrollmentRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "candidate": [
           0,
@@ -24374,11 +25502,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "EnrollmentResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -24492,11 +25622,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "EpisodeOfCare": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "account": [
           0,
@@ -24750,11 +25882,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "EventDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -25024,11 +26158,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Evidence": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -25750,11 +26901,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "EvidenceReport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -26215,11 +27383,21 @@
             "UsageContext"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "EvidenceVariable": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actual": [
           0,
@@ -26807,11 +27985,35 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "characteristic",
+          "key": "evv-1",
+          "severity": "error",
+          "expression": "(definitionReference.count() + definitionCanonical.count() + definitionCodeableConcept.count() + definitionId.count() + definitionByTypeAndValue.count() + definitionByCombination.count())  < 2",
+          "human": "In a characteristic, at most one of these six elements shall be used: definitionReference or definitionCanonical or definitionCodeableConcept or definitionId or definitionByTypeAndValue or definitionByCombination"
+        }
+      ]
     },
     "ExampleScenario": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actor": [
           0,
@@ -27469,11 +28671,189 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "exs-3",
+          "severity": "error",
+          "expression": "status='active' or status='retired' implies actor.exists()",
+          "human": "Must have actors if status is active or required"
+        },
+        {
+          "path": "",
+          "key": "exs-4",
+          "severity": "error",
+          "expression": "status='active' or status='retired' implies process.exists()",
+          "human": "Must have processes if status is active or required"
+        },
+        {
+          "path": "",
+          "key": "exs-6",
+          "severity": "error",
+          "expression": "actor.key.count() = actor.key.distinct().count()",
+          "human": "Actor keys must be unique"
+        },
+        {
+          "path": "",
+          "key": "exs-7",
+          "severity": "error",
+          "expression": "actor.title.count() = actor.title.distinct().count()",
+          "human": "Actor titles must be unique"
+        },
+        {
+          "path": "",
+          "key": "exs-8",
+          "severity": "error",
+          "expression": "instance.key.count() = instance.key.distinct().count()",
+          "human": "Instance keys must be unique"
+        },
+        {
+          "path": "",
+          "key": "exs-9",
+          "severity": "error",
+          "expression": "instance.title.count() = instance.title.distinct().count()",
+          "human": "Instance titles must be unique"
+        },
+        {
+          "path": "",
+          "key": "exs-12",
+          "severity": "error",
+          "expression": "process.title.count() = process.title.distinct().count()",
+          "human": "Process titles must be unique"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "actor",
+          "key": "exs-19",
+          "severity": "warning",
+          "expression": "%resource.process.descendants().select(operation).where(initiator=%context.key or receiver=%context.key).exists()",
+          "human": "Actor should be referenced in at least one operation"
+        },
+        {
+          "path": "actor",
+          "key": "exs-23",
+          "severity": "error",
+          "expression": "key != 'OTHER'",
+          "human": "actor.key canot be 'OTHER'"
+        },
+        {
+          "path": "instance",
+          "key": "exs-1",
+          "severity": "error",
+          "expression": "structureType.exists() and structureType.memberOf('http://hl7.org/fhir/ValueSet/resource-types').not() implies structureVersion.exists()",
+          "human": "StructureVersion is required if structureType is not FHIR (but may still be present even if FHIR)"
+        },
+        {
+          "path": "instance",
+          "key": "exs-2",
+          "severity": "error",
+          "expression": "content.exists() implies version.empty()",
+          "human": "instance.content is only allowed if there are no instance.versions"
+        },
+        {
+          "path": "instance",
+          "key": "exs-10",
+          "severity": "error",
+          "expression": "version.key.count() = version.key.distinct().count()",
+          "human": "Version keys must be unique within an instance"
+        },
+        {
+          "path": "instance",
+          "key": "exs-11",
+          "severity": "error",
+          "expression": "version.title.count() = version.title.distinct().count()",
+          "human": "Version titles must be unique within an instance"
+        },
+        {
+          "path": "instance",
+          "key": "exs-20",
+          "severity": "warning",
+          "expression": "%resource.process.descendants().select(instanceReference).where($this=%context.key).exists()",
+          "human": "Instance should be referenced in at least one location"
+        },
+        {
+          "path": "instance",
+          "key": "exs-21",
+          "severity": "warning",
+          "expression": "version.exists() implies version.key.intersect(%resource.process.descendants().where(instanceReference = %context.key).versionReference).exists()",
+          "human": "Instance version should be referenced in at least one operation"
+        },
+        {
+          "path": "instance.containedInstance",
+          "key": "exs-14",
+          "severity": "error",
+          "expression": "%resource.instance.where(key=%context.instanceReference).exists()",
+          "human": "InstanceReference must be a key of an instance defined in the ExampleScenario"
+        },
+        {
+          "path": "instance.containedInstance",
+          "key": "exs-15",
+          "severity": "error",
+          "expression": "versionReference.empty() implies %resource.instance.where(key=%context.instanceReference).version.empty()",
+          "human": "versionReference must be specified if the referenced instance defines versions"
+        },
+        {
+          "path": "instance.containedInstance",
+          "key": "exs-16",
+          "severity": "error",
+          "expression": "versionReference.exists() implies %resource.instance.where(key=%context.instanceReference).version.where(key=%context.versionReference).exists()",
+          "human": "versionReference must be a key of a version within the instance pointed to by instanceReference"
+        },
+        {
+          "path": "process",
+          "key": "exs-5",
+          "severity": "error",
+          "expression": "%resource.status='active' or %resource.status='retired' implies step.exists()",
+          "human": "Processes must have steps if ExampleScenario status is active or required"
+        },
+        {
+          "path": "process.step",
+          "key": "exs-13",
+          "severity": "error",
+          "expression": "alternative.title.count() = alternative.title.distinct().count()",
+          "human": "Alternative titles must be unique within a step"
+        },
+        {
+          "path": "process.step",
+          "key": "exs-22",
+          "severity": "error",
+          "expression": "(process.exists() implies workflow.empty() and operation.empty()) and (workflow.exists() implies operation.empty())",
+          "human": "Can have a process, a workflow, one or more operations or none of these, but cannot have a combination"
+        },
+        {
+          "path": "process.step.operation",
+          "key": "exs-17",
+          "severity": "error",
+          "expression": "initiator.exists() implies initiator = 'OTHER' or %resource.actor.where(key=%context.initiator).exists()",
+          "human": "If specified, initiator must be a key of an actor within the ExampleScenario"
+        },
+        {
+          "path": "process.step.operation",
+          "key": "exs-18",
+          "severity": "error",
+          "expression": "receiver.exists() implies receiver = 'OTHER' or %resource.actor.where(key=%context.receiver).exists()",
+          "human": "If specified, receiver must be a key of an actor within the ExampleScenario"
+        }
+      ]
     },
     "ExplanationOfBenefit": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "accident": [
           0,
@@ -29688,11 +31068,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Expression": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "description": [
           0,
@@ -29743,11 +31125,28 @@
             "uri"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "exp-1",
+          "severity": "error",
+          "expression": "expression.exists() or reference.exists()",
+          "human": "An expression or a reference must be provided"
+        },
+        {
+          "path": "",
+          "key": "exp-2",
+          "severity": "error",
+          "expression": "name.hasValue() implies name.matches('[A-Za-z][A-Za-z0-9\\\\_]{0,63}')",
+          "human": "The name must be a valid variable name in most computer languages"
+        }
+      ]
     },
     "ExtendedContactDetail": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "address": [
           0,
@@ -29805,11 +31204,13 @@
             "ContactPoint"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Extension": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -29892,11 +31293,28 @@
             "Meta"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ext-1",
+          "severity": "error",
+          "expression": "extension.exists() != value.exists()",
+          "human": "Must have either extensions or value[x], not both"
+        },
+        {
+          "path": "extension",
+          "key": "ext-1",
+          "severity": "error",
+          "expression": "extension.exists() != value.exists()",
+          "human": "Must have either extensions or value[x], not both"
+        }
+      ]
     },
     "FamilyMemberHistory": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "age[x]": [
           0,
@@ -30249,11 +31667,35 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "fhs-1",
+          "severity": "error",
+          "expression": "age.empty() or born.empty()",
+          "human": "Can have age[x] or born[x], but not both"
+        },
+        {
+          "path": "",
+          "key": "fhs-2",
+          "severity": "error",
+          "expression": "age.exists() or estimatedAge.empty()",
+          "human": "Can only have estimatedAge if age[x] is present"
+        },
+        {
+          "path": "",
+          "key": "fhs-3",
+          "severity": "error",
+          "expression": "age.empty() or deceased.empty()",
+          "human": "Can have age[x] or deceased[x], but not both"
+        }
+      ]
     },
     "Flag": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -30367,11 +31809,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "FormularyItem": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "code": [
           0,
@@ -30450,11 +31894,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "GenomicStudy": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "analysis": [
           0,
@@ -30912,11 +32358,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Goal": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "achievementStatus": [
           0,
@@ -31136,11 +32584,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "target",
+          "key": "gol-1",
+          "severity": "error",
+          "expression": "(detail.exists() and measure.exists()) or detail.exists().not()",
+          "human": "Goal.target.measure is required if Goal.target.detail is populated"
+        }
+      ]
     },
     "GraphDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contact": [
           0,
@@ -31528,11 +32986,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Group": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -31762,11 +33237,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "GuidanceResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -31924,11 +33401,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "HealthcareService": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -32182,11 +33661,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "HumanName": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -32251,11 +33732,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Identifier": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "assigner": [
           0,
@@ -32313,11 +33796,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ident-1",
+          "severity": "warning",
+          "expression": "value.exists()",
+          "human": "Identifier with no value has limited utility.  If communicating that an identifier value has been suppressed or missing, the value element SHOULD be present with an extension indicating the missing semantic - e.g. data-absent-reason"
+        }
+      ]
     },
     "ImagingSelection": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -32662,11 +34155,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ImagingStudy": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -33039,11 +34534,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Immunization": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "administeredProduct": [
           0,
@@ -33466,11 +34963,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ImmunizationEvaluation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authority": [
           0,
@@ -33619,11 +35118,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ImmunizationRecommendation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authority": [
           0,
@@ -33856,11 +35357,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "recommendation",
+          "key": "imr-1",
+          "severity": "error",
+          "expression": "vaccineCode.exists() or targetDisease.exists()",
+          "human": "One of vaccineCode or targetDisease SHALL be present"
+        }
+      ]
     },
     "ImplementationGuide": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contact": [
           0,
@@ -34613,11 +36124,49 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "ig-2",
+          "severity": "error",
+          "expression": "definition.resource.fhirVersion.all(%context.fhirVersion contains $this)",
+          "human": "If a resource has a fhirVersion, it must be one of the versions defined for the Implementation Guide"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "definition",
+          "key": "ig-1",
+          "severity": "error",
+          "expression": "resource.groupingId.all(%context.grouping.id contains $this)",
+          "human": "If a resource has a groupingId, it must refer to a grouping defined in the Implementation Guide"
+        },
+        {
+          "path": "definition.page",
+          "key": "ig-3",
+          "severity": "error",
+          "expression": "generation='generated' implies source.empty()",
+          "human": "Source must be absent if 'generated' is generated"
+        }
+      ]
     },
     "Ingredient": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "allergenicIndicator": [
           0,
@@ -34949,11 +36498,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ing-1",
+          "severity": "error",
+          "expression": "Ingredient.where(allergenicIndicator=true).count() + Ingredient.substance.code.reference.count()  < 2",
+          "human": "If an ingredient is noted as an allergen (allergenicIndicator) then its substance should be a code. If the substance is a SubstanceDefinition, then the allegen information should be documented in that resource"
+        }
+      ]
     },
     "InsurancePlan": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "administeredBy": [
           0,
@@ -35459,11 +37018,21 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ipn-1",
+          "severity": "error",
+          "expression": "(identifier.count() + name.count()) > 0",
+          "human": "The organization SHALL at least have a name or an identifier, and possibly more than one"
+        }
+      ]
     },
     "InventoryItem": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "association": [
           0,
@@ -35876,11 +37445,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "InventoryReport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -36099,11 +37670,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Invoice": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "account": [
           0,
@@ -36374,11 +37947,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Library": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -36669,11 +38244,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Linkage": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -36787,11 +38379,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "lnk-1",
+          "severity": "error",
+          "expression": "item.count()>1",
+          "human": "Must have at least two items"
+        }
+      ]
     },
     "List": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "code": [
           0,
@@ -36989,11 +38591,21 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "lst-1",
+          "severity": "error",
+          "expression": "emptyReason.empty() or entry.empty()",
+          "human": "A list can only have an emptyReason if it is empty"
+        }
+      ]
     },
     "Location": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "address": [
           0,
@@ -37219,11 +38831,13 @@
             "VirtualServiceDetail"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ManufacturedItemDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "component": [
           0,
@@ -37502,11 +39116,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MarketingStatus": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "BackboneType",
       "elements": {
         "country": [
           0,
@@ -37564,11 +39180,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Measure": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -38336,11 +39954,70 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "mea-1",
+          "severity": "error",
+          "expression": "group.stratifier.all((code | description | criteria).exists() xor component.exists())",
+          "human": "Stratifier SHALL be either a single criteria or a set of criteria components"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "group.linkId",
+          "key": "mea-2",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        },
+        {
+          "path": "group.population.linkId",
+          "key": "mea-3",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        },
+        {
+          "path": "group.stratifier.linkId",
+          "key": "mea-4",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        },
+        {
+          "path": "group.stratifier.component.linkId",
+          "key": "mea-5",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        },
+        {
+          "path": "supplementalData.linkId",
+          "key": "mea-6",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        }
+      ]
     },
     "MeasureReport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -38857,11 +40534,28 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "mrp-1",
+          "severity": "error",
+          "expression": "(type != 'data-exchange') or group.exists().not()",
+          "human": "Measure Reports used for data collection SHALL NOT communicate group and score information"
+        },
+        {
+          "path": "",
+          "key": "mrp-2",
+          "severity": "error",
+          "expression": "group.stratifier.stratum.all(value.exists() xor component.exists())",
+          "human": "Stratifiers SHALL be either a single criteria or a set of criteria components"
+        }
+      ]
     },
     "Medication": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "batch": [
           0,
@@ -39061,11 +40755,13 @@
             "Quantity"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MedicationAdministration": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -39371,11 +41067,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "dosage",
+          "key": "mad-1",
+          "severity": "error",
+          "expression": "(dose.exists() or rate.exists() or text.exists())",
+          "human": "If dosage attribute is present then SHALL have at least one of dosage.text or dosage.dose or dosage.rate[x]"
+        }
+      ]
     },
     "MedicationDispense": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authorizingPrescription": [
           0,
@@ -39706,11 +41412,21 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "mdd-1",
+          "severity": "error",
+          "expression": "whenHandedOver.empty() or whenPrepared.empty() or whenHandedOver >= whenPrepared",
+          "human": "whenHandedOver cannot be before whenPrepared"
+        }
+      ]
     },
     "MedicationKnowledge": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "associatedMedication": [
           0,
@@ -40640,11 +42356,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MedicationRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authoredOn": [
           0,
@@ -41088,11 +42806,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MedicationStatement": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "adherence": [
           0,
@@ -41306,11 +43026,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MedicinalProductDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "additionalMonitoringIndicator": [
           0,
@@ -41857,11 +43579,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MessageDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "allowedResponse": [
           0,
@@ -42187,11 +43911,35 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "focus",
+          "key": "md-1",
+          "severity": "error",
+          "expression": "max='*' or (max.toInteger() > 0)",
+          "human": "Max must be postive int or *"
+        }
+      ]
     },
     "MessageHeader": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -42469,11 +44217,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Meta": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -42531,11 +44281,13 @@
             "id"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "MetadataResource": {
       "kind": "resource",
       "abstract": true,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -42776,11 +44528,21 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "MolecularSequence": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -43085,11 +44847,28 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "relative.startingSequence",
+          "key": "msq-5",
+          "severity": "error",
+          "expression": "chromosome.exists() = genomeAssembly.exists()",
+          "human": "Both genomeAssembly and chromosome must be both contained if either one of them is contained"
+        },
+        {
+          "path": "relative.startingSequence",
+          "key": "msq-6",
+          "severity": "error",
+          "expression": "genomeAssembly.exists() xor sequence.exists()",
+          "human": "Have and only have one of the following elements in startingSequence: 1. genomeAssembly; 2 sequence"
+        }
+      ]
     },
     "MonetaryComponent": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "amount": [
           0,
@@ -43133,11 +44912,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Money": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "currency": [
           0,
@@ -43167,11 +44948,13 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "NamingSystem": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -43510,11 +45293,49 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "nsd-1",
+          "severity": "error",
+          "expression": "kind != 'root' or uniqueId.all(type != 'uuid')",
+          "human": "Root systems cannot have uuid identifiers"
+        },
+        {
+          "path": "",
+          "key": "nsd-2",
+          "severity": "error",
+          "expression": "uniqueId.where(preferred = true).select(type).isDistinct()",
+          "human": "Can't have more than one preferred identifier for a type"
+        },
+        {
+          "path": "",
+          "key": "nsd-3",
+          "severity": "error",
+          "expression": "uniqueId.where(authoritative = 'true').select(type.toString() & period.start.toString() & period.end.toString()).isDistinct()",
+          "human": "Can't have more than one authoritative identifier for a type/period combination (only one authoritative identifier allowed at any given point of time)"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "Narrative": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "div": [
           1,
@@ -43544,11 +45365,28 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "div",
+          "key": "txt-1",
+          "severity": "error",
+          "expression": "htmlChecks()",
+          "human": "The narrative SHALL contain only the basic html formatting elements and attributes described in chapters 7-11 (except section 4 of chapter 9) and 15 of the HTML 4.0 standard, <a> elements (either name or href), images and internally contained style attributes"
+        },
+        {
+          "path": "div",
+          "key": "txt-2",
+          "severity": "error",
+          "expression": "htmlChecks()",
+          "human": "The narrative SHALL have some non-whitespace content"
+        }
+      ]
     },
     "NutritionIntake": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -43888,11 +45726,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "NutritionOrder": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "allergyIntolerance": [
           0,
@@ -44595,11 +46435,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "nor-1",
+          "severity": "warning",
+          "expression": "oralDiet.exists() or supplement.exists() or enteralFormula.exists()",
+          "human": "Nutrition Order SHALL contain either Oral Diet , Supplement, or Enteral Formula class"
+        }
+      ]
     },
     "NutritionProduct": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -44907,11 +46757,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Observation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -45353,11 +47205,49 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "obs-6",
+          "severity": "error",
+          "expression": "dataAbsentReason.empty() or value.empty()",
+          "human": "dataAbsentReason SHALL only be present if Observation.value[x] is not present"
+        },
+        {
+          "path": "",
+          "key": "obs-7",
+          "severity": "error",
+          "expression": "value.empty() or component.code.where(coding.intersect(%resource.code.coding).exists()).empty()",
+          "human": "If Observation.component.code is the same as Observation.code, then Observation.value SHALL NOT be present (the Observation.component.value[x] holds the value)."
+        },
+        {
+          "path": "",
+          "key": "obs-8",
+          "severity": "error",
+          "expression": "bodySite.exists() implies bodyStructure.empty()",
+          "human": "bodyStructure SHALL only be present if Observation.bodySite is not present"
+        },
+        {
+          "path": "specimen",
+          "key": "obs-9",
+          "severity": "error",
+          "expression": "(reference.resolve().exists() and reference.resolve() is Group) implies reference.resolve().member.entity.resolve().all($this is Specimen)",
+          "human": "If Observation.specimen is a reference to Group, the group can only have specimens"
+        },
+        {
+          "path": "referenceRange",
+          "key": "obs-3",
+          "severity": "error",
+          "expression": "low.exists() or high.exists() or text.exists()",
+          "human": "Must have at least a low or a high or text"
+        }
+      ]
     },
     "ObservationDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -45828,11 +47718,35 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "obd-0",
+          "severity": "error",
+          "expression": "permittedUnit.exists() implies (permittedDataType = 'Quantity').exists()",
+          "human": "If permittedUnit exists, then permittedDataType=Quantity must exist."
+        },
+        {
+          "path": "component",
+          "key": "obd-1",
+          "severity": "error",
+          "expression": "permittedUnit.exists() implies (permittedDataType = 'Quantity').exists()",
+          "human": "If permittedUnit exists, then permittedDataType=Quantity must exist."
+        }
+      ]
     },
     "OperationDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "affectsState": [
           0,
@@ -46317,11 +48231,77 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "opd-5",
+          "severity": "error",
+          "expression": "(kind = 'query') implies (instance = false)",
+          "human": "A query operation cannot be defined at the instance level"
+        },
+        {
+          "path": "",
+          "key": "opd-6",
+          "severity": "error",
+          "expression": "(kind = 'query') implies (parameter.all((use = 'in' and searchType.exists()) or (use != 'in')))",
+          "human": "A query operation requires input parameters to have a search type"
+        },
+        {
+          "path": "",
+          "key": "opd-7",
+          "severity": "error",
+          "expression": "(kind = 'query') implies ((parameter.where(use = 'out').count() = 1) and (parameter.where(use = 'out').all(name = 'result' and type = 'Bundle')))",
+          "human": "Named queries always have a single output parameter named 'result' of type Bundle"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "parameter",
+          "key": "opd-1",
+          "severity": "error",
+          "expression": "type.exists() or part.exists()",
+          "human": "Either a type must be provided, or parts"
+        },
+        {
+          "path": "parameter",
+          "key": "opd-2",
+          "severity": "error",
+          "expression": "searchType.exists() implies type = 'string'",
+          "human": "A search type can only be specified for parameters of type string"
+        },
+        {
+          "path": "parameter",
+          "key": "opd-3",
+          "severity": "error",
+          "expression": "targetProfile.exists() implies (type = 'Reference' or type = 'canonical' or type.memberOf('http://hl7.org/fhir/ValueSet/resource-types'))",
+          "human": "A targetProfile can only be specified for parameters of type Reference, Canonical, or a Resource"
+        },
+        {
+          "path": "parameter",
+          "key": "opd-4",
+          "severity": "error",
+          "expression": "(use = 'out') implies searchType.empty()",
+          "human": "SearchParamType can only be specified on in parameters"
+        }
+      ]
     },
     "OperationOutcome": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -46449,11 +48429,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Organization": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -46630,11 +48612,35 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "org-1",
+          "severity": "error",
+          "expression": "(identifier.count() + name.count()) > 0",
+          "human": "The organization SHALL at least have a name or an identifier, and possibly more than one"
+        },
+        {
+          "path": "contact",
+          "key": "org-3",
+          "severity": "error",
+          "expression": "telecom.where(use = 'home').empty()",
+          "human": "The telecom of an organization can never be of use 'home'"
+        },
+        {
+          "path": "contact",
+          "key": "org-4",
+          "severity": "error",
+          "expression": "address.where(use = 'home').empty()",
+          "human": "The address of an organization can never be of use 'home'"
+        }
+      ]
     },
     "OrganizationAffiliation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -46776,11 +48782,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "contact",
+          "key": "org-3",
+          "severity": "error",
+          "expression": "telecom.where(use = 'home').empty()",
+          "human": "The telecom of an organization can never be of use 'home'"
+        },
+        {
+          "path": "contact",
+          "key": "org-4",
+          "severity": "error",
+          "expression": "address.where(use = 'home').empty()",
+          "human": "The address of an organization can never be of use 'home'"
+        }
+      ]
     },
     "PackagedProductDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "attachedDocument": [
           0,
@@ -47148,11 +49171,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ParameterDefinition": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "documentation": [
           0,
@@ -47217,11 +49242,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Parameters": {
       "kind": "resource",
       "abstract": false,
+      "base": "Resource",
       "elements": {
         "id": [
           0,
@@ -47359,11 +49386,21 @@
             "Meta"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "parameter",
+          "key": "inv-1",
+          "severity": "error",
+          "expression": "(part.exists() and value.empty() and resource.empty()) or (part.empty() and (value.exists() xor resource.exists()))",
+          "human": "A parameter must have one and only one of (value, resource, part)"
+        }
+      ]
     },
     "Patient": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -47675,11 +49712,21 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "contact",
+          "key": "pat-1",
+          "severity": "error",
+          "expression": "name.exists() or telecom.exists() or address.exists() or organization.exists()",
+          "human": "SHALL at least contain a contact's details or a reference to an organization"
+        }
+      ]
     },
     "PaymentNotice": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "amount": [
           1,
@@ -47821,11 +49868,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "PaymentReconciliation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "accountNumber": [
           0,
@@ -48235,11 +50284,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Period": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "end": [
           0,
@@ -48269,11 +50320,21 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "per-1",
+          "severity": "error",
+          "expression": "start.hasValue().not() or end.hasValue().not() or (start.lowBoundary() <= end.highBoundary())",
+          "human": "If present, start SHALL have a lower or equal value than end"
+        }
+      ]
     },
     "Permission": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "asserter": [
           0,
@@ -48590,11 +50651,13 @@
             "Period"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Person": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -48814,11 +50877,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "PlanDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "action": [
           0,
@@ -49830,11 +51895,56 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "pld-3",
+          "severity": "warning",
+          "expression": "%context.repeat(action).where((goalId in %context.goal.id).not()).exists().not()",
+          "human": "goalid should reference the id of a goal definition"
+        },
+        {
+          "path": "",
+          "key": "pld-4",
+          "severity": "warning",
+          "expression": "%context.repeat(action).relatedAction.where((targetId in %context.repeat(action).id).not()).exists().not()",
+          "human": "targetId should reference the id of an action"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "action.input",
+          "key": "pld-0",
+          "severity": "error",
+          "expression": "requirement.exists() xor relatedData.exists()",
+          "human": "Input data elements must have a requirement or a relatedData, but not both"
+        },
+        {
+          "path": "action.output",
+          "key": "pld-1",
+          "severity": "error",
+          "expression": "requirement.exists() xor relatedData.exists()",
+          "human": "Output data element must have a requirement or a relatedData, but not both"
+        }
+      ]
     },
     "Practitioner": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -50054,11 +52164,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "PractitionerRole": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -50214,11 +52326,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "PrimitiveType": {
       "kind": "complex-type",
       "abstract": true,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -50234,11 +52348,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Procedure": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -50582,11 +52698,21 @@
             "CodeableReference"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "performer",
+          "key": "prc-1",
+          "severity": "error",
+          "expression": "onBehalfOf.exists() and actor.resolve().exists() implies actor.resolve().where($this is Practitioner or $this is PractitionerRole).empty()",
+          "human": "Procedure.performer.onBehalfOf can only be populated when performer.actor isn't Practitioner or PractitionerRole"
+        }
+      ]
     },
     "ProductShelfLife": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "BackboneType",
       "elements": {
         "extension": [
           0,
@@ -50631,11 +52757,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Provenance": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "activity": [
           0,
@@ -50875,11 +53003,35 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "agent",
+          "key": "prov-1",
+          "severity": "error",
+          "expression": "who.resolve().exists() and onBehalfOf.resolve().exists() implies who.resolve() != onBehalfOf.resolve()",
+          "human": "Who and onBehalfOf cannot be the same"
+        },
+        {
+          "path": "agent",
+          "key": "prov-2",
+          "severity": "error",
+          "expression": "who.resolve().ofType(PractitionerRole).practitioner.resolve().exists() and onBehalfOf.resolve().ofType(Practitioner).exists() implies who.resolve().practitioner.resolve() != onBehalfOf.resolve()",
+          "human": "If who is a PractitionerRole, onBehalfOf can't reference the same Practitioner"
+        },
+        {
+          "path": "agent",
+          "key": "prov-3",
+          "severity": "error",
+          "expression": "who.resolve().ofType(Organization).exists() and onBehalfOf.resolve().ofType(PractitionerRole).organization.resolve().exists() implies who.resolve() != onBehalfOf.resolve().organization.resolve()",
+          "human": "If who is an organization, onBehalfOf can't be a PractitionerRole within that organization"
+        }
+      ]
     },
     "Quantity": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "code": [
           0,
@@ -50930,11 +53082,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "qty-3",
+          "severity": "error",
+          "expression": "code.empty() or system.exists()",
+          "human": "If a code for the unit is present, the system SHALL also be present"
+        }
+      ]
     },
     "Questionnaire": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -51437,11 +53599,147 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "que-2",
+          "severity": "error",
+          "expression": "descendants().linkId.isDistinct()",
+          "human": "The link ids for groups and questions must be unique within the questionnaire"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "item",
+          "key": "que-1a",
+          "severity": "error",
+          "expression": "(type='group' and %resource.status='complete') implies item.empty().not()",
+          "human": "Group items must have nested items when Questionanire is complete"
+        },
+        {
+          "path": "item",
+          "key": "que-1b",
+          "severity": "warning",
+          "expression": "type='group' implies item.empty().not()",
+          "human": "Groups should have items"
+        },
+        {
+          "path": "item",
+          "key": "que-1c",
+          "severity": "error",
+          "expression": "type='display' implies item.empty()",
+          "human": "Display items cannot have child items"
+        },
+        {
+          "path": "item",
+          "key": "que-3",
+          "severity": "error",
+          "expression": "type!='display' or code.empty()",
+          "human": "Display items cannot have a \"code\" asserted"
+        },
+        {
+          "path": "item",
+          "key": "que-4",
+          "severity": "error",
+          "expression": "answerOption.empty() or answerValueSet.empty()",
+          "human": "A question cannot have both answerOption and answerValueSet"
+        },
+        {
+          "path": "item",
+          "key": "que-5",
+          "severity": "error",
+          "expression": "(type='coding' or type = 'decimal' or type = 'integer' or type = 'date' or type = 'dateTime' or type = 'time' or type = 'string' or type = 'quantity') or (answerValueSet.empty() and answerOption.empty())",
+          "human": "Only coding, decimal, integer, date, dateTime, time, string or quantity  items can have answerOption or answerValueSet"
+        },
+        {
+          "path": "item",
+          "key": "que-6",
+          "severity": "error",
+          "expression": "type!='display' or (required.empty() and repeats.empty())",
+          "human": "Required and repeat aren't permitted for display items"
+        },
+        {
+          "path": "item",
+          "key": "que-8",
+          "severity": "error",
+          "expression": "(type!='group' and type!='display') or initial.empty()",
+          "human": "Initial values can't be specified for groups or display items"
+        },
+        {
+          "path": "item",
+          "key": "que-9",
+          "severity": "error",
+          "expression": "type!='display' or readOnly.empty()",
+          "human": "Read-only can't be specified for \"display\" items"
+        },
+        {
+          "path": "item",
+          "key": "que-10",
+          "severity": "error",
+          "expression": "(type in ('boolean' | 'decimal' | 'integer' | 'string' | 'text' | 'url')) or answerConstraint='optionOrString' or maxLength.empty()",
+          "human": "Maximum length can only be declared for simple question types"
+        },
+        {
+          "path": "item",
+          "key": "que-11",
+          "severity": "error",
+          "expression": "answerOption.empty() or initial.empty()",
+          "human": "If one or more answerOption is present, initial cannot be present.  Use answerOption.initialSelected instead"
+        },
+        {
+          "path": "item",
+          "key": "que-12",
+          "severity": "error",
+          "expression": "enableWhen.count() > 1 implies enableBehavior.exists()",
+          "human": "If there are more than one enableWhen, enableBehavior must be specified"
+        },
+        {
+          "path": "item",
+          "key": "que-13",
+          "severity": "error",
+          "expression": "repeats=true or initial.count() <= 1",
+          "human": "Can only have multiple initial values for repeating items"
+        },
+        {
+          "path": "item",
+          "key": "que-14",
+          "severity": "warning",
+          "expression": "answerConstraint.exists() implies answerOption.exists() or answerValueSet.exists()",
+          "human": "Can only have answerConstraint if answerOption or answerValueSet are present.  (This is a warning because extensions may serve the same purpose)"
+        },
+        {
+          "path": "item.linkId",
+          "key": "que-15",
+          "severity": "warning",
+          "expression": "$this.length() <= 255",
+          "human": "Link ids should be 255 characters or less"
+        },
+        {
+          "path": "item.enableWhen",
+          "key": "que-7",
+          "severity": "error",
+          "expression": "operator = 'exists' implies (answer is boolean)",
+          "human": "If the operator is 'exists', the value must be a boolean"
+        }
+      ]
     },
     "QuestionnaireResponse": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "author": [
           0,
@@ -51676,11 +53974,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "item",
+          "key": "qrs-1",
+          "severity": "error",
+          "expression": "(answer.exists() and item.exists()).not()",
+          "human": "Item cannot contain both item and answer"
+        },
+        {
+          "path": "item",
+          "key": "qrs-2",
+          "severity": "error",
+          "expression": "repeat(answer|item).select(item.where(answer.value.exists()).linkId.isDistinct()).allTrue()",
+          "human": "Repeated answers are combined in the answers array of a single item"
+        }
+      ]
     },
     "Range": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "extension": [
           0,
@@ -51710,11 +54025,21 @@
             "Quantity"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "rng-2",
+          "severity": "error",
+          "expression": "low.value.empty() or high.value.empty() or low.lowBoundary().comparable(high.highBoundary()).not() or (low.lowBoundary() <= high.highBoundary())",
+          "human": "If present, low SHALL have a lower value than high"
+        }
+      ]
     },
     "Ratio": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "denominator": [
           0,
@@ -51744,11 +54069,21 @@
             "Quantity"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "rat-1",
+          "severity": "error",
+          "expression": "(numerator.exists() and denominator.exists()) or (numerator.empty() and denominator.empty() and extension.exists())",
+          "human": "Numerator and denominator SHALL both be present, or both are absent. If both are absent, there SHALL be some extension present"
+        }
+      ]
     },
     "RatioRange": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "denominator": [
           0,
@@ -51785,11 +54120,28 @@
             "Quantity"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ratrng-1",
+          "severity": "error",
+          "expression": "((lowNumerator.exists() or highNumerator.exists()) and denominator.exists()) or (lowNumerator.empty() and highNumerator.empty() and denominator.empty() and extension.exists())",
+          "human": "One of lowNumerator or highNumerator and denominator SHALL be present, or all are absent. If all are absent, there SHALL be some extension present"
+        },
+        {
+          "path": "",
+          "key": "ratrng-2",
+          "severity": "error",
+          "expression": "lowNumerator.hasValue().not() or highNumerator.hasValue().not()  or (lowNumerator.lowBoundary() <= highNumerator.highBoundary())",
+          "human": "If present, lowNumerator SHALL have a lower value than highNumerator"
+        }
+      ]
     },
     "Reference": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "display": [
           0,
@@ -51833,11 +54185,28 @@
             "uri"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "ref-1",
+          "severity": "error",
+          "expression": "reference.exists()  implies (reference.startsWith('#').not() or (reference.substring(1).trace('url') in %rootResource.contained.id.trace('ids')) or (reference='#' and %rootResource!=%resource))",
+          "human": "SHALL have a contained resource if a local reference is provided"
+        },
+        {
+          "path": "",
+          "key": "ref-2",
+          "severity": "error",
+          "expression": "reference.exists() or identifier.exists() or display.exists() or extension.exists()",
+          "human": "At least one of reference, identifier and display SHALL be present (unless an extension is provided)."
+        }
+      ]
     },
     "RegulatedAuthorization": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "attachedDocument": [
           0,
@@ -52056,11 +54425,13 @@
             "Period"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "RelatedArtifact": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "citation": [
           0,
@@ -52146,11 +54517,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "RelatedPerson": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -52327,11 +54700,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "RequestOrchestration": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "action": [
           0,
@@ -52998,11 +55373,35 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "action",
+          "key": "rqg-1",
+          "severity": "error",
+          "expression": "resource.exists() != action.exists()",
+          "human": "Must have resource or action but not both"
+        },
+        {
+          "path": "action.input",
+          "key": "pld-0",
+          "severity": "error",
+          "expression": "requirement.exists() xor relatedData.exists()",
+          "human": "Input data elements must have a requirement or a relatedData, but not both"
+        },
+        {
+          "path": "action.output",
+          "key": "pld-1",
+          "severity": "error",
+          "expression": "requirement.exists() xor relatedData.exists()",
+          "human": "Output data element must have a requirement or a relatedData, but not both"
+        }
+      ]
     },
     "Requirements": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actor": [
           0,
@@ -53299,11 +55698,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "ResearchStudy": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "associatedParty": [
           0,
@@ -53921,11 +56337,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ResearchSubject": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "actualComparisonGroup": [
           0,
@@ -54109,11 +56527,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Resource": {
       "kind": "resource",
       "abstract": true,
+      "base": "Base",
       "elements": {
         "id": [
           0,
@@ -54143,11 +56563,13 @@
             "Meta"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "RiskAssessment": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -54383,11 +56805,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "prediction",
+          "key": "ras-2",
+          "severity": "error",
+          "expression": "probability.empty() or ((probability is decimal) implies ((probability as decimal) <= 100))",
+          "human": "Probability as a deciml must be <= 100"
+        },
+        {
+          "path": "prediction.probability[x]",
+          "key": "ras-1",
+          "severity": "error",
+          "expression": "(low.empty() or ((low.code = '%') and (low.system = %ucum))) and (high.empty() or ((high.code = '%') and (high.system = %ucum)))",
+          "human": "low and high must be percentages, if present"
+        }
+      ]
     },
     "SampledData": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "codeMap": [
           0,
@@ -54473,11 +56912,21 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "sdd-1",
+          "severity": "error",
+          "expression": "interval.exists().not() xor offsets.exists().not()",
+          "human": "A SampledData SAHLL have either an interval and offsets but not both"
+        }
+      ]
     },
     "Schedule": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "active": [
           0,
@@ -54598,11 +57047,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SearchParameter": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "base": [
           1,
@@ -54913,11 +57364,49 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "spd-1",
+          "severity": "error",
+          "expression": "expression.empty() or processingMode.exists()",
+          "human": "If an expression is present, there SHALL be a processingMode"
+        },
+        {
+          "path": "",
+          "key": "spd-2",
+          "severity": "error",
+          "expression": "chain.empty() or type = 'reference'",
+          "human": "Search parameters can only have chain names when the search parameter type is 'reference'"
+        },
+        {
+          "path": "",
+          "key": "spd-3",
+          "severity": "error",
+          "expression": "comparator.empty() or (type in ('number' | 'date' | 'quantity' | 'special'))",
+          "human": "Search parameters comparator can only be used on type 'number', 'date', 'quantity' or 'special'."
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "ServiceRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "asNeeded[x]": [
           0,
@@ -55316,11 +57805,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "bdystr-1",
+          "severity": "error",
+          "expression": "bodySite.exists() implies bodyStructure.empty()",
+          "human": "bodyStructure SHALL only be present if bodySite is not present"
+        },
+        {
+          "path": "",
+          "key": "prr-1",
+          "severity": "error",
+          "expression": "orderDetail.empty() or code.exists()",
+          "human": "orderDetail SHALL only be present if code is present"
+        }
+      ]
     },
     "Signature": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "data": [
           0,
@@ -55385,11 +57891,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Slot": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "appointmentType": [
           0,
@@ -55524,11 +58032,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Specimen": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "accessionIdentifier": [
           0,
@@ -55911,11 +58421,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SpecimenDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -56418,11 +58930,13 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "StructureDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "abstract": [
           1,
@@ -56824,11 +59338,231 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "sdf-1",
+          "severity": "error",
+          "expression": "derivation = 'constraint' or snapshot.element.select(path).isDistinct()",
+          "human": "Element paths must be unique unless the structure is a constraint"
+        },
+        {
+          "path": "",
+          "key": "sdf-4",
+          "severity": "error",
+          "expression": "abstract = true or baseDefinition.exists()",
+          "human": "If the structure is not abstract, then there SHALL be a baseDefinition"
+        },
+        {
+          "path": "",
+          "key": "sdf-5",
+          "severity": "error",
+          "expression": "type != 'Extension' or derivation = 'specialization' or (context.exists())",
+          "human": "If the structure defines an extension then the structure must have context information"
+        },
+        {
+          "path": "",
+          "key": "sdf-6",
+          "severity": "error",
+          "expression": "snapshot.exists() or differential.exists()",
+          "human": "A structure must have either a differential, or a snapshot (or both)"
+        },
+        {
+          "path": "",
+          "key": "sdf-11",
+          "severity": "error",
+          "expression": "kind != 'logical' implies snapshot.empty() or snapshot.element.first().path = type",
+          "human": "If there's a type, its content must match the path name in the first element of a snapshot"
+        },
+        {
+          "path": "",
+          "key": "sdf-14",
+          "severity": "error",
+          "expression": "snapshot.element.all(id.exists()) and differential.element.all(id.exists())",
+          "human": "All element definitions must have an id"
+        },
+        {
+          "path": "",
+          "key": "sdf-15",
+          "severity": "error",
+          "expression": "kind!='logical'  implies snapshot.element.first().type.empty()",
+          "human": "The first element in a snapshot has no type unless model is a logical model."
+        },
+        {
+          "path": "",
+          "key": "sdf-15a",
+          "severity": "error",
+          "expression": "(kind!='logical'  and differential.element.first().path.contains('.').not()) implies differential.element.first().type.empty()",
+          "human": "If the first element in a differential has no \".\" in the path and it's not a logical model, it has no type"
+        },
+        {
+          "path": "",
+          "key": "sdf-9",
+          "severity": "error",
+          "expression": "children().element.where(path.contains('.').not()).label.empty() and children().element.where(path.contains('.').not()).code.empty() and children().element.where(path.contains('.').not()).requirements.empty()",
+          "human": "In any snapshot or differential, no label, code or requirements on an element without a \".\" in the path (e.g. the first element)"
+        },
+        {
+          "path": "",
+          "key": "sdf-16",
+          "severity": "error",
+          "expression": "snapshot.element.all(id.exists()) and snapshot.element.id.trace('ids').isDistinct()",
+          "human": "All element definitions must have unique ids (snapshot)"
+        },
+        {
+          "path": "",
+          "key": "sdf-17",
+          "severity": "error",
+          "expression": "differential.element.all(id.exists()) and differential.element.id.trace('ids').isDistinct()",
+          "human": "All element definitions must have unique ids (diff)"
+        },
+        {
+          "path": "",
+          "key": "sdf-18",
+          "severity": "error",
+          "expression": "contextInvariant.exists() implies type = 'Extension'",
+          "human": "Context Invariants can only be used for extensions"
+        },
+        {
+          "path": "",
+          "key": "sdf-19",
+          "severity": "error",
+          "expression": "url.startsWith('http://hl7.org/fhir/StructureDefinition') implies (differential | snapshot).element.type.code.all(matches('^[a-zA-Z0-9]+$') or matches('^http:\\\\/\\\\/hl7\\\\.org\\\\/fhirpath\\\\/System\\\\.[A-Z][A-Za-z]+$'))",
+          "human": "FHIR Specification models only use FHIR defined types"
+        },
+        {
+          "path": "",
+          "key": "sdf-21",
+          "severity": "error",
+          "expression": "differential.element.defaultValue.exists() implies (derivation = 'specialization')",
+          "human": "Default values can only be specified on specializations"
+        },
+        {
+          "path": "",
+          "key": "sdf-22",
+          "severity": "error",
+          "expression": "url.startsWith('http://hl7.org/fhir/StructureDefinition') implies (snapshot.element.defaultValue.empty() and differential.element.defaultValue.empty())",
+          "human": "FHIR Specification models never have default values"
+        },
+        {
+          "path": "",
+          "key": "sdf-23",
+          "severity": "error",
+          "expression": "(snapshot | differential).element.all(path.contains('.').not() implies sliceName.empty())",
+          "human": "No slice name on root"
+        },
+        {
+          "path": "",
+          "key": "sdf-27",
+          "severity": "error",
+          "expression": "baseDefinition.exists() implies derivation.exists()",
+          "human": "If there's a base definition, there must be a derivation "
+        },
+        {
+          "path": "",
+          "key": "sdf-29",
+          "severity": "warning",
+          "expression": "((kind in 'resource' | 'complex-type') and (derivation = 'specialization')) implies differential.element.where((min != 0 and min != 1) or (max != '1' and max != '*')).empty()",
+          "human": "Elements in Resources must have a min cardinality or 0 or 1 and a max cardinality of 1 or *"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "mapping",
+          "key": "sdf-2",
+          "severity": "error",
+          "expression": "name.exists() or uri.exists()",
+          "human": "Must have at least a name or a uri (or both)"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-3",
+          "severity": "error",
+          "expression": "%resource.kind = 'logical' or element.all(definition.exists() and min.exists() and max.exists())",
+          "human": "Each element definition in a snapshot must have a formal definition and cardinalities, unless model is a logical model"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-8",
+          "severity": "error",
+          "expression": "(%resource.kind = 'logical' or element.first().path = %resource.type) and element.tail().all(path.startsWith(%resource.snapshot.element.first().path&'.'))",
+          "human": "All snapshot elements must start with the StructureDefinition's specified type for non-logical models, or with the same type name for logical models"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-24",
+          "severity": "error",
+          "expression": "element.where(type.where(code='Reference').exists() and path.endsWith('.reference') and type.targetProfile.exists() and (path.substring(0,$this.path.length()-10) in %context.element.where(type.where(code='CodeableReference').exists()).path)).exists().not()",
+          "human": "For CodeableReference elements, target profiles must be listed on the CodeableReference, not the CodeableReference.reference"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-25",
+          "severity": "error",
+          "expression": "element.where(type.where(code='CodeableConcept').exists() and path.endsWith('.concept') and binding.exists() and (path.substring(0,$this.path.length()-8) in %context.element.where(type.where(code='CodeableReference').exists()).path)).exists().not()",
+          "human": "For CodeableReference elements, bindings must be listed on the CodeableReference, not the CodeableReference.concept"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-26",
+          "severity": "warning",
+          "expression": "$this.where(element[0].mustSupport='true').exists().not()",
+          "human": "The root element of a profile should not have mustSupport = true"
+        },
+        {
+          "path": "snapshot",
+          "key": "sdf-8b",
+          "severity": "error",
+          "expression": "element.all(base.exists())",
+          "human": "All snapshot elements must have a base definition"
+        },
+        {
+          "path": "snapshot.element",
+          "key": "sdf-10",
+          "severity": "error",
+          "expression": "binding.empty() or binding.valueSet.exists() or binding.description.exists()",
+          "human": "provide either a binding reference or a description (or both)"
+        },
+        {
+          "path": "snapshot.element",
+          "key": "sdf-28",
+          "severity": "error",
+          "expression": "slicing.exists().not() or (slicing.discriminator.exists() or slicing.description.exists())",
+          "human": "If there are no discriminators, there must be a definition"
+        },
+        {
+          "path": "differential",
+          "key": "sdf-20",
+          "severity": "error",
+          "expression": "element.where(path.contains('.').not()).slicing.empty()",
+          "human": "No slicing on the root element"
+        },
+        {
+          "path": "differential",
+          "key": "sdf-8a",
+          "severity": "error",
+          "expression": "(%resource.kind = 'logical' or element.first().path.startsWith(%resource.type)) and (element.tail().empty() or  element.tail().all(path.startsWith(%resource.differential.element.first().path.replaceMatches('\\\\..*','')&'.')))",
+          "human": "In any differential, all the elements must start with the StructureDefinition's specified type for non-logical models, or with the same type name for logical models"
+        }
+      ]
     },
     "StructureMap": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "const": [
           0,
@@ -57529,11 +60263,35 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "group.rule.target",
+          "key": "smp-1",
+          "severity": "error",
+          "expression": "element.exists() implies context.exists()",
+          "human": "Can only have an element if you have a context"
+        }
+      ]
     },
     "Subscription": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "channelType": [
           1,
@@ -57801,11 +60559,21 @@
             "canonical"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "filterBy",
+          "key": "scr-1",
+          "severity": "error",
+          "expression": "(comparator.exists() and modifier.exists()).not()",
+          "human": "Subscription filters may only contain a modifier or a comparator"
+        }
+      ]
     },
     "SubscriptionStatus": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -57961,11 +60729,28 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "sst-1",
+          "severity": "error",
+          "expression": "(type = 'event-notification' or type = 'query-event') implies notificationEvent.exists()",
+          "human": "Event notifications must contain events"
+        },
+        {
+          "path": "",
+          "key": "sst-2",
+          "severity": "error",
+          "expression": "type = 'query-status' implies status.exists()",
+          "human": "Status messages must contain status"
+        }
+      ]
     },
     "SubscriptionTopic": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -58458,11 +61243,13 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Substance": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -58619,11 +61406,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstanceDefinition": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "characterization": [
           0,
@@ -59505,11 +62294,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstanceNucleicAcid": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "areaOfHybridisation": [
           0,
@@ -59770,11 +62561,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstancePolymer": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "class": [
           0,
@@ -60161,11 +62954,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstanceProtein": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -60328,11 +63123,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstanceReferenceInformation": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "comment": [
           0,
@@ -60581,11 +63378,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SubstanceSourceMaterial": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -61021,11 +63820,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SupplyDelivery": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "basedOn": [
           0,
@@ -61198,11 +63999,13 @@
             "CodeableConcept"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "SupplyRequest": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authoredOn": [
           0,
@@ -61412,11 +64215,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "Task": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authoredOn": [
           0,
@@ -61958,11 +64763,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "inv-1",
+          "severity": "error",
+          "expression": "lastModified.exists().not() or authoredOn.exists().not() or lastModified >= authoredOn",
+          "human": "Last modified date must be greater than or equal to authored-on date."
+        },
+        {
+          "path": "",
+          "key": "tsk-1",
+          "severity": "error",
+          "expression": "restriction.exists() implies code.coding.where(code='fulfill' and system='http://hl7.org/fhir/CodeSystem/task-code').exists() and focus.exists()",
+          "human": "Task.restriction is only allowed if the Task is seeking fulfillment and a focus is specified."
+        }
+      ]
     },
     "TerminologyCapabilities": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "closure": [
           0,
@@ -62602,11 +65424,84 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "",
+          "key": "tcp-2",
+          "severity": "error",
+          "expression": "(description.count() + software.count() + implementation.count()) > 0",
+          "human": "A Terminology Capability statement SHALL have at least one of description, software, or implementation element"
+        },
+        {
+          "path": "",
+          "key": "tcp-3",
+          "severity": "error",
+          "expression": "(kind != 'instance') or implementation.exists()",
+          "human": "If kind = instance, implementation must be present and software may be present"
+        },
+        {
+          "path": "",
+          "key": "tcp-4",
+          "severity": "error",
+          "expression": "(kind != 'capability') or (implementation.exists().not() and software.exists())",
+          "human": "If kind = capability, implementation must be absent, software must be present"
+        },
+        {
+          "path": "",
+          "key": "tcp-5",
+          "severity": "error",
+          "expression": "(kind!='requirements') or (implementation.exists().not() and software.exists().not())",
+          "human": "If kind = requirements, implementation and software must be absent"
+        },
+        {
+          "path": "",
+          "key": "tcp-6",
+          "severity": "error",
+          "expression": "codeSystem.uri.isDistinct()",
+          "human": "Each instance of the codeSystem element must represent a distinct code system."
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "codeSystem",
+          "key": "tcp-1",
+          "severity": "error",
+          "expression": "version.count() > 1 implies version.all(code.exists())",
+          "human": "If there is more than one version, a version code must be defined"
+        },
+        {
+          "path": "codeSystem",
+          "key": "tcp-7",
+          "severity": "error",
+          "expression": "version.code.isDistinct()",
+          "human": "Each version.code element must be distinct for a particular code system."
+        },
+        {
+          "path": "codeSystem",
+          "key": "tcp-8",
+          "severity": "error",
+          "expression": "version.where(isDefault = true).count() <= 1",
+          "human": "A codeSystem element instance may have at most one version.isDefault element with a value of 'true'."
+        }
+      ]
     },
     "TestPlan": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "category": [
           0,
@@ -63115,11 +66010,28 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        }
+      ]
     },
     "TestReport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -63616,11 +66528,28 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "setup.action",
+          "key": "inv-1",
+          "severity": "error",
+          "expression": "operation.exists() xor assert.exists()",
+          "human": "Setup action SHALL contain either an operation or assert but not both."
+        },
+        {
+          "path": "test.action",
+          "key": "inv-2",
+          "severity": "error",
+          "expression": "operation.exists() xor assert.exists()",
+          "human": "Test action SHALL contain either an operation or assert but not both."
+        }
+      ]
     },
     "TestScript": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contact": [
           0,
@@ -64846,11 +67775,119 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "metadata",
+          "key": "tst-4",
+          "severity": "error",
+          "expression": "capability.required.exists() or capability.validated.exists()",
+          "human": "TestScript metadata capability SHALL contain required or validated or both."
+        },
+        {
+          "path": "variable",
+          "key": "tst-3",
+          "severity": "error",
+          "expression": "expression.empty() or headerField.empty() or path.empty()",
+          "human": "Variable can only contain one of expression, headerField or path."
+        },
+        {
+          "path": "setup.action",
+          "key": "tst-1",
+          "severity": "error",
+          "expression": "operation.exists() xor assert.exists()",
+          "human": "Setup action SHALL contain either an operation or assert but not both."
+        },
+        {
+          "path": "setup.action.operation",
+          "key": "tst-7",
+          "severity": "error",
+          "expression": "sourceId.exists() or (targetId.count() + url.count() + params.count() = 1) or (type.code in ('capabilities' |'search' | 'transaction' | 'history'))",
+          "human": "Setup operation SHALL contain either sourceId or targetId or params or url."
+        },
+        {
+          "path": "setup.action.assert",
+          "key": "tst-5",
+          "severity": "error",
+          "expression": "extension.exists() or (contentType.count() + expression.count() + headerField.count() + minimumId.count() + navigationLinks.count() + path.count() + requestMethod.count() + resource.count() + responseCode.count() + response.count() + validateProfileId.count() <=1) or (((expression.count() + minimumId.count() <=2) or (expression.count() + validateProfileId.count() <=2)) and (expression.count() + path.count() <=1) and (minimumId.count() + validateProfileId.count() <=1)) or (((path.count() + minimumId.count() <=2) or (path.count() + validateProfileId.count() <=2)) and (expression.count() + path.count() <=1) and (minimumId.count() + validateProfileId.count() <=1))",
+          "human": "Only a single assertion SHALL be present within setup action assert element."
+        },
+        {
+          "path": "setup.action.assert",
+          "key": "tst-10",
+          "severity": "error",
+          "expression": "compareToSourceId.empty() xor (compareToSourceExpression.exists() or compareToSourcePath.exists())",
+          "human": "Setup action assert SHALL contain either compareToSourceId and compareToSourceExpression, compareToSourceId and compareToSourcePath or neither."
+        },
+        {
+          "path": "setup.action.assert",
+          "key": "tst-12",
+          "severity": "error",
+          "expression": "(response.empty() and responseCode.empty() and direction = 'request') or direction.empty() or direction = 'response'",
+          "human": "Setup action assert response and responseCode SHALL be empty when direction equals request"
+        },
+        {
+          "path": "test.action",
+          "key": "tst-2",
+          "severity": "error",
+          "expression": "operation.exists() xor assert.exists()",
+          "human": "Test action SHALL contain either an operation or assert but not both."
+        },
+        {
+          "path": "test.action.operation",
+          "key": "tst-8",
+          "severity": "error",
+          "expression": "sourceId.exists() or (targetId.count() + url.count() + params.count() = 1) or (type.code in ('capabilities' | 'search' | 'transaction' | 'history'))",
+          "human": "Test operation SHALL contain either sourceId or targetId or params or url."
+        },
+        {
+          "path": "test.action.assert",
+          "key": "tst-6",
+          "severity": "error",
+          "expression": "extension.exists() or (contentType.count() + expression.count() + headerField.count() + minimumId.count() + navigationLinks.count() + path.count() + requestMethod.count() + resource.count() + responseCode.count() + response.count() + validateProfileId.count() <=1) or (((expression.count() + minimumId.count() <=2) or (expression.count() + validateProfileId.count() <=2)) and (expression.count() + path.count() <=1) and (minimumId.count() + validateProfileId.count() <=1)) or (((path.count() + minimumId.count() <=2) or (path.count() + validateProfileId.count() <=2)) and (expression.count() + path.count() <=1) and (minimumId.count() + validateProfileId.count() <=1))",
+          "human": "Only a single assertion SHALL be present within test action assert element."
+        },
+        {
+          "path": "test.action.assert",
+          "key": "tst-11",
+          "severity": "error",
+          "expression": "compareToSourceId.empty() xor (compareToSourceExpression.exists() or compareToSourcePath.exists())",
+          "human": "Test action assert SHALL contain either compareToSourceId and compareToSourceExpression, compareToSourceId and compareToSourcePath or neither."
+        },
+        {
+          "path": "test.action.assert",
+          "key": "tst-13",
+          "severity": "error",
+          "expression": "(response.empty() and responseCode.empty() and direction = 'request') or direction.empty() or direction = 'response'",
+          "human": "Test action assert response and response and responseCode SHALL be empty when direction equals request"
+        },
+        {
+          "path": "teardown.action.operation",
+          "key": "tst-9",
+          "severity": "error",
+          "expression": "sourceId.exists() or (targetId.count() + url.count() + params.count() = 1) or (type.code in ('capabilities' | 'search' | 'transaction' | 'history'))",
+          "human": "Teardown operation SHALL contain either sourceId or targetId or params or url."
+        }
+      ]
     },
     "Timing": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "BackboneType",
       "elements": {
         "code": [
           0,
@@ -65015,11 +68052,77 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "repeat",
+          "key": "tim-1",
+          "severity": "error",
+          "expression": "duration.empty() or durationUnit.exists()",
+          "human": "if there's a duration, there needs to be duration units"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-2",
+          "severity": "error",
+          "expression": "period.empty() or periodUnit.exists()",
+          "human": "if there's a period, there needs to be period units"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-4",
+          "severity": "error",
+          "expression": "duration.exists() implies duration >= 0",
+          "human": "duration SHALL be a non-negative value"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-5",
+          "severity": "error",
+          "expression": "period.exists() implies period >= 0",
+          "human": "period SHALL be a non-negative value"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-6",
+          "severity": "error",
+          "expression": "periodMax.empty() or period.exists()",
+          "human": "If there's a periodMax, there must be a period"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-7",
+          "severity": "error",
+          "expression": "durationMax.empty() or duration.exists()",
+          "human": "If there's a durationMax, there must be a duration"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-8",
+          "severity": "error",
+          "expression": "countMax.empty() or count.exists()",
+          "human": "If there's a countMax, there must be a count"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-9",
+          "severity": "error",
+          "expression": "offset.empty() or (when.exists() and when.select($this in ('C' | 'CM' | 'CD' | 'CV')).allFalse())",
+          "human": "If there's an offset, there must be a when (and not C, CM, CD, CV)"
+        },
+        {
+          "path": "repeat",
+          "key": "tim-10",
+          "severity": "error",
+          "expression": "timeOfDay.empty() or when.empty()",
+          "human": "If there's a timeOfDay, there cannot be a when, or vice versa"
+        }
+      ]
     },
     "Transport": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "authoredOn": [
           0,
@@ -65519,11 +68622,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "TriggerDefinition": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "code": [
           0,
@@ -65591,11 +68696,35 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "trd-1",
+          "severity": "error",
+          "expression": "data.empty() or timing.empty()",
+          "human": "Either timing, or a data requirement, but not both"
+        },
+        {
+          "path": "",
+          "key": "trd-2",
+          "severity": "error",
+          "expression": "condition.exists() implies data.exists()",
+          "human": "A condition only if there is a data requirement"
+        },
+        {
+          "path": "",
+          "key": "trd-3",
+          "severity": "error",
+          "expression": "(type = 'named-event' implies name.exists()) and (type = 'periodic' implies timing.exists()) and (type.startsWith('data-') implies data.exists())",
+          "human": "A named event requires a name, a periodic event requires timing, and a data event requires data"
+        }
+      ]
     },
     "UsageContext": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "code": [
           1,
@@ -65628,11 +68757,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "ValueSet": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "approvalDate": [
           0,
@@ -66511,11 +69642,77 @@
             "Coding"
           ]
         ]
-      }
+      },
+      "constraints": [
+        {
+          "path": "",
+          "key": "cnl-0",
+          "severity": "warning",
+          "expression": "name.exists() implies name.matches('^[A-Z]([A-Za-z0-9_]){1,254}$')",
+          "human": "Name should be usable as an identifier for the module by machine processing applications such as code generation"
+        },
+        {
+          "path": "url",
+          "key": "cnl-1",
+          "severity": "warning",
+          "expression": "exists() implies matches('^[^|# ]+$')",
+          "human": "URL should not contain | or # - these characters make processing canonical references problematic"
+        },
+        {
+          "path": "compose.include",
+          "key": "vsd-1",
+          "severity": "error",
+          "expression": "valueSet.exists() or system.exists()",
+          "human": "A value set include/exclude SHALL have a value set or a system"
+        },
+        {
+          "path": "compose.include",
+          "key": "vsd-2",
+          "severity": "error",
+          "expression": "(concept.exists() or filter.exists()) implies system.exists()",
+          "human": "A value set with concepts or filters SHALL include a system"
+        },
+        {
+          "path": "compose.include",
+          "key": "vsd-3",
+          "severity": "error",
+          "expression": "concept.empty() or filter.empty()",
+          "human": "Cannot have both concept and filter"
+        },
+        {
+          "path": "compose.include.concept.designation",
+          "key": "vsd-11",
+          "severity": "error",
+          "expression": "additionalUse.exists() implies use.exists()",
+          "human": "Must have a value for concept.designation.use if concept.designation.additionalUse is present"
+        },
+        {
+          "path": "expansion.contains",
+          "key": "vsd-6",
+          "severity": "error",
+          "expression": "code.exists() or display.exists()",
+          "human": "SHALL have a code or a display"
+        },
+        {
+          "path": "expansion.contains",
+          "key": "vsd-9",
+          "severity": "error",
+          "expression": "code.exists() or abstract = true",
+          "human": "SHALL have a code if not abstract"
+        },
+        {
+          "path": "expansion.contains",
+          "key": "vsd-10",
+          "severity": "error",
+          "expression": "code.empty() or system.exists()",
+          "human": "SHALL have a system if a code is present"
+        }
+      ]
     },
     "VerificationResult": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "attestation": [
           0,
@@ -66860,11 +70057,13 @@
             "Reference"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "VirtualServiceDetail": {
       "kind": "complex-type",
       "abstract": false,
+      "base": "DataType",
       "elements": {
         "additionalInfo": [
           0,
@@ -66918,11 +70117,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "VisionPrescription": {
       "kind": "resource",
       "abstract": false,
+      "base": "DomainResource",
       "elements": {
         "contained": [
           0,
@@ -67190,11 +70391,13 @@
             "Narrative"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "base64Binary": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67217,11 +70420,13 @@
             "base64Binary"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "boolean": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67244,11 +70449,13 @@
             "boolean"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "canonical": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "uri",
       "elements": {
         "extension": [
           0,
@@ -67271,11 +70478,13 @@
             "canonical"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "code": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "string",
       "elements": {
         "extension": [
           0,
@@ -67298,11 +70507,13 @@
             "code"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "date": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67325,11 +70536,13 @@
             "date"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "dateTime": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67352,11 +70565,13 @@
             "dateTime"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "decimal": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67379,11 +70594,13 @@
             "decimal"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "id": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "string",
       "elements": {
         "extension": [
           0,
@@ -67406,11 +70623,13 @@
             "id"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "instant": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67433,11 +70652,13 @@
             "instant"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "integer": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67460,11 +70681,13 @@
             "integer"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "integer64": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67487,11 +70710,13 @@
             "integer64"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "markdown": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "string",
       "elements": {
         "extension": [
           0,
@@ -67514,11 +70739,13 @@
             "markdown"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "oid": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "uri",
       "elements": {
         "extension": [
           0,
@@ -67541,11 +70768,13 @@
             "oid"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "positiveInt": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "integer",
       "elements": {
         "extension": [
           0,
@@ -67568,11 +70797,13 @@
             "positiveInt"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "string": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67595,11 +70826,13 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "time": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67622,11 +70855,13 @@
             "time"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "unsignedInt": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "integer",
       "elements": {
         "extension": [
           0,
@@ -67649,11 +70884,13 @@
             "unsignedInt"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "uri": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "PrimitiveType",
       "elements": {
         "extension": [
           0,
@@ -67676,11 +70913,13 @@
             "uri"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "url": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "uri",
       "elements": {
         "extension": [
           0,
@@ -67703,11 +70942,13 @@
             "url"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "uuid": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "uri",
       "elements": {
         "extension": [
           0,
@@ -67730,11 +70971,13 @@
             "uuid"
           ]
         ]
-      }
+      },
+      "constraints": []
     },
     "xhtml": {
       "kind": "primitive-type",
       "abstract": false,
+      "base": "Element",
       "elements": {
         "extension": [
           0,
@@ -67757,7 +71000,8 @@
             "string"
           ]
         ]
-      }
+      },
+      "constraints": []
     }
   }
 }

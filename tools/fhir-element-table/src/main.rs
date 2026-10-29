@@ -8,7 +8,8 @@
 //!
 //! It keeps the base definitions only (`derivation = specialization`, not profiles). Each
 //! element is listed by its path relative to its type, with its cardinality, its type codes,
-//! and the target of a `contentReference`. A primitive gets its JSON representation and the
+//! and the target of a `contentReference`. Each type also lists its base type and the
+//! invariants it defines (key, severity, FHIRPath expression, text), for tier 2. A primitive gets its JSON representation and the
 //! `regex` of its `value`. The output is deterministic, so the committed table can be checked
 //! for drift.
 
@@ -108,8 +109,39 @@ fn main() -> Result<()> {
             }
             primitives.insert(name.clone(), Value::Object(primitive));
         }
+        let url = sd["url"].as_str().context("url")?;
         let mut table = BTreeMap::new();
+        let mut constraints = Vec::new();
         for element in elements {
+            // The invariants this type defines itself; inherited ones (`ele-1` on every
+            // element) belong to the type that defines them.
+            let path = element["path"].as_str().context("path")?;
+            let relative = path
+                .strip_prefix(&name)
+                .unwrap_or(path)
+                .trim_start_matches('.');
+            for constraint in element
+                .get("constraint")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let own = constraint
+                    .get("source")
+                    .and_then(Value::as_str)
+                    .is_none_or(|s| s == url);
+                if let (true, Some(expression)) =
+                    (own, constraint.get("expression").and_then(Value::as_str))
+                {
+                    constraints.push(json!({
+                        "path": relative,
+                        "key": constraint["key"],
+                        "severity": constraint["severity"],
+                        "expression": expression,
+                        "human": constraint["human"],
+                    }));
+                }
+            }
             let path = element["path"].as_str().context("path")?;
             let Some(relative) = path.strip_prefix(&format!("{name}.")) else {
                 continue;
@@ -139,12 +171,19 @@ fn main() -> Result<()> {
             }
             table.insert(relative.to_owned(), Value::Array(entry));
         }
+        let base = sd
+            .get("baseDefinition")
+            .and_then(Value::as_str)
+            .and_then(|b| b.rsplit('/').next())
+            .map(str::to_owned);
         types.insert(
             name,
             json!({
                 "kind": kind,
                 "abstract": sd["abstract"].as_bool().unwrap_or(false),
+                "base": base,
                 "elements": table,
+                "constraints": constraints,
             }),
         );
     }

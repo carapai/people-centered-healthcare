@@ -27,6 +27,11 @@ pub enum IssueCode {
     Required,
     /// A primitive value is malformed.
     Value,
+    /// A core invariant does not hold (tier 2).
+    Invariant,
+    /// The resource could not be validated, e.g. a decimal beyond 28 significant digits that
+    /// FHIRPath cannot evaluate exactly; it fails closed.
+    Processing,
 }
 
 impl IssueCode {
@@ -36,6 +41,8 @@ impl IssueCode {
             Self::Structure => "structure",
             Self::Required => "required",
             Self::Value => "value",
+            Self::Invariant => "invariant",
+            Self::Processing => "processing",
         }
     }
 }
@@ -51,35 +58,55 @@ pub struct Issue {
     pub message: String,
 }
 
-struct Element {
-    min: u64,
+pub(crate) struct Element {
+    pub(crate) min: u64,
     /// `None` for `*`.
-    max: Option<u64>,
-    types: Vec<String>,
-    content_reference: Option<String>,
+    pub(crate) max: Option<u64>,
+    pub(crate) types: Vec<String>,
+    pub(crate) content_reference: Option<String>,
 }
 
-struct TypeDef {
-    kind: String,
-    is_abstract: bool,
-    elements: HashMap<String, Element>,
+/// An invariant a type defines at one of its element paths ("" for the type itself).
+pub(crate) struct Constraint {
+    pub(crate) key: String,
+    pub(crate) severity: String,
+    pub(crate) expression: String,
+    pub(crate) human: String,
+}
+
+pub(crate) struct TypeDef {
+    pub(crate) kind: String,
+    pub(crate) is_abstract: bool,
+    pub(crate) base: Option<String>,
+    pub(crate) elements: HashMap<String, Element>,
     /// Parent path ("" for the root) to the paths of its direct children.
-    children: HashMap<String, Vec<String>>,
+    pub(crate) children: HashMap<String, Vec<String>>,
+    /// Element path ("" for the root) to the invariants defined there.
+    pub(crate) constraints: HashMap<String, Vec<Constraint>>,
 }
 
-struct Primitive {
+pub(crate) struct Primitive {
     json: String,
     regex: Option<Regex>,
 }
 
-struct Table {
-    types: HashMap<String, TypeDef>,
-    primitives: HashMap<String, Primitive>,
+pub(crate) struct Table {
+    pub(crate) types: HashMap<String, TypeDef>,
+    pub(crate) primitives: HashMap<String, Primitive>,
+}
+
+impl Table {
+    /// `type_name` and its ancestors, nearest first.
+    pub(crate) fn lineage<'a>(&'a self, type_name: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+        std::iter::successors(Some(type_name), |t| {
+            self.types.get(*t).and_then(|d| d.base.as_deref())
+        })
+    }
 }
 
 const TABLE_JSON: &str = include_str!("../data/r5-elements.json");
 
-fn table() -> &'static Table {
+pub(crate) fn table() -> &'static Table {
     static TABLE: OnceLock<Table> = OnceLock::new();
     TABLE.get_or_init(|| {
         // The table is generated and checked in CI, so a malformed table is a build defect.
@@ -114,13 +141,28 @@ fn table() -> &'static Table {
                 let parent = path.rsplit_once('.').map_or("", |(p, _)| p).to_owned();
                 children.entry(parent).or_default().push(path.clone());
             }
+            let mut constraints: HashMap<String, Vec<Constraint>> = HashMap::new();
+            for c in def["constraints"].as_array().into_iter().flatten() {
+                let text = |key: &str| c[key].as_str().unwrap_or_default().to_owned();
+                constraints
+                    .entry(text("path"))
+                    .or_default()
+                    .push(Constraint {
+                        key: text("key"),
+                        severity: text("severity"),
+                        expression: text("expression"),
+                        human: text("human"),
+                    });
+            }
             types.insert(
                 name.clone(),
                 TypeDef {
                     kind: def["kind"].as_str().unwrap_or_default().to_owned(),
                     is_abstract: def["abstract"].as_bool().unwrap_or(false),
+                    base: def["base"].as_str().map(str::to_owned),
                     elements,
                     children,
+                    constraints,
                 },
             );
         }
@@ -189,7 +231,7 @@ fn join(base: &str, name: &str) -> String {
     }
 }
 
-fn is_primitive(type_code: &str) -> bool {
+pub(crate) fn is_primitive(type_code: &str) -> bool {
     type_code.starts_with(|c: char| c.is_ascii_lowercase())
 }
 
@@ -532,7 +574,11 @@ impl Walker {
 
 /// The element a JSON key names under `base`: a direct child, or a choice `[x]` element with
 /// the type its suffix names.
-fn resolve<'a>(def: &'a TypeDef, base: &str, name: &str) -> Option<(&'a str, &'a Element, String)> {
+pub(crate) fn resolve<'a>(
+    def: &'a TypeDef,
+    base: &str,
+    name: &str,
+) -> Option<(&'a str, &'a Element, String)> {
     let direct = join(base, name);
     if let Some((path, element)) = def.elements.get_key_value(&direct)
         && !path.ends_with("[x]")
@@ -566,9 +612,10 @@ fn resolve<'a>(def: &'a TypeDef, base: &str, name: &str) -> Option<(&'a str, &'a
     None
 }
 
-/// A minimal instance of `resource_type` that passes tier 1: every required element at its
-/// minimum, with placeholder values. For tests and tooling that need a valid resource of any
-/// type; never for clinical data.
+/// A minimal instance of `resource_type` that passes tiers 1 and 2: every required element at
+/// its minimum with placeholder values, plus what the type's core invariants need
+/// (a short per-type list). For tests and tooling that need a valid resource of any type;
+/// never for clinical data.
 pub fn skeleton(resource_type: &str) -> Option<Value> {
     let table = table();
     let def = table.types.get(resource_type)?;
@@ -580,7 +627,51 @@ pub fn skeleton(resource_type: &str) -> Option<Value> {
         "resourceType".into(),
         Value::String(resource_type.to_owned()),
     );
+    if let Some(Value::Object(extra)) = invariant_members(resource_type) {
+        object.extend(extra);
+    }
     Some(Value::Object(object))
+}
+
+/// Members a type's skeleton needs to hold its core invariants, beyond its required elements.
+fn invariant_members(resource_type: &str) -> Option<Value> {
+    let placeholder = || serde_json::json!({ "extension": [{ "url": "http://example.org/x", "valueString": "x" }] });
+    Some(match resource_type {
+        // app-3 (no dates unless proposed), app-1 (a participant type or actor)
+        "Appointment" => serde_json::json!({
+            "status": "proposed",
+            "participant": [{ "status": "accepted", "type": [{ "text": "x" }] }],
+        }),
+        // apr-1: a participant type or actor
+        "AppointmentResponse" => serde_json::json!({ "participantType": [{ "text": "x" }] }),
+        // cpb-1 (rest, messaging or document), cpb-2 (a description, software or implementation)
+        "CapabilityStatement" => serde_json::json!({
+            "document": [{ "mode": "producer", "profile": "http://example.org/x" }],
+            "software": { "name": "x" },
+        }),
+        // imr-1: a vaccine code or target disease
+        "ImmunizationRecommendation" => serde_json::json!({
+            "recommendation": [{ "targetDisease": [{ "text": "x" }], "forecastStatus": { "text": "x" } }],
+        }),
+        // ipn-1, org-1: an identifier or a name
+        "InsurancePlan" | "Organization" => serde_json::json!({ "name": "x" }),
+        // lnk-1: at least two items
+        "Linkage" => serde_json::json!({
+            "item": [
+                { "type": "source", "resource": placeholder() },
+                { "type": "alternate", "resource": placeholder() },
+            ],
+        }),
+        // sdf-6 (a snapshot or a differential), sdf-14/17 (unique element ids), sdf-8a
+        // (paths start with the type)
+        "StructureDefinition" => serde_json::json!({
+            "type": "Patient",
+            "differential": { "element": [{ "id": "Patient", "path": "Patient" }] },
+        }),
+        // tcp-2: a description, software or implementation
+        "TerminologyCapabilities" => serde_json::json!({ "software": { "name": "x" } }),
+        _ => return None,
+    })
 }
 
 fn placeholder(type_code: &str) -> Value {

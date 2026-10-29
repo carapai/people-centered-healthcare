@@ -5,7 +5,7 @@ _Update after each task (AGENTS.md process step 4)._
 | Phase | Done | Total |
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 4 | 10 |
-| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 11 | 17 |
+| [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 12 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 15 of 107 implementation tasks done. Validation spikes open: 3.
+Total: 16 of 107 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -45,3 +45,4 @@ Total: 15 of 107 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #159 reference integrity: local references must resolve (422) at the end of each write transaction; `idx_ref_in` reverse references (migration 0004) make referenced deletes 409; `ReferenceScope` hook for out-of-scope targets.
 - 2026-10-29: #53 health-fhir-models facade over `fhir-r5 =4.2.3`; full R5 corpus round-trips (2,823 exact + 1 known-invalid); `facade-bypass` architecture check; corpus fetch script with a pinned SHA-256.
 - 2026-10-29: #59 (tier 1): health-fhir-validation structural check on raw JSON from a generated element table (tools/fhir-element-table); on every REST write path; full corpus passes and agrees with typed parsing (one recorded fhir-r5 gap). Split out #165 (tier 2 and FHIRPath), #166 (Java validator cross-check), #167 (Inbound Dead Letter and quarantine).
+- 2026-10-29: #165 tier 2: the vendored, patched octofhir-fhirpath (decimals, plus six invariant-correctness patches) and octofhir-ucum (panic on non-ASCII units); FhirPathEngine trait with our own model provider; R5 core invariants on every REST write; decimal conformance suite; corpus holds except 171 independently confirmed example errors. Tiers 1–2 p95 3.06 ms on clinical resources, over the tiers 1–3 budget.

@@ -675,6 +675,14 @@ pub(crate) async fn post(
                 .enumerate()
                 .map(|(i, e)| parse_request(&server, i, e).map_err(|err| entry_error(i, err)))
                 .collect::<Result<Vec<_>, _>>()?;
+            for request in &requests {
+                if let Some(resource) = &request.resource {
+                    server
+                        .check_invariants(resource)
+                        .await
+                        .map_err(|e| entry_error(request.index, e))?;
+                }
+            }
             check_unique(&requests)?;
             retrying!(server, transaction(&server, &requests))?
         }
@@ -682,8 +690,17 @@ pub(crate) async fn post(
             let mut outcomes = Vec::with_capacity(entries.len());
             for (i, entry) in entries.iter().enumerate() {
                 let outcome = match parse_request(&server, i, entry) {
-                    Ok(request) => retrying!(server, batch_entry(&server, &request))
-                        .unwrap_or_else(|e| Outcome::failed(&e)),
+                    Ok(request) => {
+                        let invariants = match &request.resource {
+                            Some(resource) => server.check_invariants(resource).await,
+                            None => Ok(()),
+                        };
+                        match invariants {
+                            Ok(()) => retrying!(server, batch_entry(&server, &request))
+                                .unwrap_or_else(|e| Outcome::failed(&e)),
+                            Err(error) => Outcome::failed(&error),
+                        }
+                    }
                     Err(error) => Outcome::failed(&error),
                 };
                 outcomes.push(outcome);

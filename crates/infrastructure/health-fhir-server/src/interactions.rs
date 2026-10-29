@@ -79,9 +79,10 @@ pub(crate) async fn vread(
     Ok(response)
 }
 
-/// The request body as a resource of `resource_type` that passed tier 1, with the id it
-/// carries.
-pub(crate) fn body(
+/// The request body as a resource of `resource_type` that passed tiers 1 and 2, with the id
+/// it carries.
+pub(crate) async fn body(
+    server: &FhirServer,
     resource_type: &ResourceType,
     headers: &HeaderMap,
     bytes: &Bytes,
@@ -105,6 +106,7 @@ pub(crate) fn body(
     if !found.is_empty() {
         return Err(FhirError::invalid_resource(&found));
     }
+    server.check_invariants(&value).await?;
     let id = object.get("id").and_then(Value::as_str).map(str::to_owned);
     Ok((RawJson::from_validated(text), id))
 }
@@ -188,7 +190,7 @@ pub(crate) async fn create(
     bytes: Bytes,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
-    let (json, _ignored_id) = body(&resource_type, &headers, &bytes)?;
+    let (json, _ignored_id) = body(&server, &resource_type, &headers, &bytes).await?;
     let condition = headers
         .get("if-none-exist")
         .map(|v| {
@@ -238,7 +240,7 @@ pub(crate) async fn update(
     let id_value: ResourceId = id.parse().map_err(|_| {
         FhirError::bad_request("resource ids are client-generated UUIDs (ADR 0013)")
     })?;
-    let (json, body_id) = body(&resource_type, &headers, &bytes)?;
+    let (json, body_id) = body(&server, &resource_type, &headers, &bytes).await?;
     if body_id.as_deref() != Some(id.as_str()) {
         return Err(FhirError::bad_request(
             "the resource id must be present and match the URL",

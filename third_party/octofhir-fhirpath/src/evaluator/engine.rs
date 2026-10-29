@@ -1,0 +1,862 @@
+//! Real FHIRPath evaluation engine implementation
+//!
+//! This module provides the actual FhirPathEngine implementation that replaces
+//! the stub, using the new registry-based evaluator architecture.
+
+use std::sync::Arc;
+
+use crate::ast::ExpressionNode;
+use crate::core::trace::SharedTraceProvider;
+use crate::core::{FhirPathValue, ModelProvider, Result};
+use crate::parser;
+
+use async_trait::async_trait;
+use octofhir_fhir_model::{
+    CompiledExpression, ErrorSeverity, EvaluationResult as ModelEvaluationResult,
+    FhirPathConstraint, FhirPathEvaluator, JsonVariables, ServerProvider, TerminologyProvider,
+    ValidationError, ValidationProvider, ValidationResult,
+};
+use serde_json::Value as JsonValue;
+
+use super::context::EvaluationContext;
+use super::element_type_cache::ElementTypeCache;
+use super::evaluator::Evaluator;
+use super::function_registry::{FunctionRegistry, create_function_registry};
+use super::operator_registry::{OperatorRegistry, create_standard_operator_registry};
+use super::plan::CompiledPlan;
+use super::result::{EvaluationResult, EvaluationResultWithMetadata};
+
+/// Maximum number of compiled expressions to cache
+/// Trade-off: Higher values use more memory but reduce parsing overhead for diverse expressions
+/// 256 entries at ~1KB each ≈ 256KB memory overhead
+const AST_CACHE_MAX_ENTRIES: u64 = 256;
+
+/// FHIRPath evaluation engine with registry-based architecture
+pub struct FhirPathEngine {
+    /// The core evaluator
+    evaluator: Evaluator,
+    /// Function registry for introspection
+    function_registry: Arc<FunctionRegistry>,
+    /// Model provider for type information
+    model_provider: Arc<dyn ModelProvider + Send + Sync>,
+    /// Optional terminology provider
+    terminology_provider: Option<Arc<dyn TerminologyProvider>>,
+    /// Optional trace provider
+    trace_provider: Option<SharedTraceProvider>,
+    /// Optional validation provider for profile validation
+    validation_provider: Option<Arc<dyn ValidationProvider>>,
+    /// Optional server provider for %server operations and resolve() fallback
+    server_provider: Option<Arc<dyn ServerProvider>>,
+    /// AST compilation cache to avoid reparsing hot expressions
+    /// Uses LRU eviction when cache is full
+    ast_cache: moka::sync::Cache<String, Arc<CompiledPlan>>,
+    pub(super) plan_owner: Arc<()>,
+    prepared_roots: super::prepared::PreparedRoots,
+    /// Element-type resolution cache shared across every context this engine
+    /// builds. Element types are a pure function of the loaded schema set, so
+    /// caching `(parentType, property) -> TypeInfo` across evaluations turns the
+    /// per-element `children()`/`descendants()` type lookups (which dominate FHIR
+    /// constraint validation) from repeated schema walks into hash hits. Key
+    /// space is bounded by the schema set; [`Self::clear_element_type_cache`]
+    /// drops it when schemas change.
+    element_type_cache: Arc<ElementTypeCache>,
+}
+
+impl FhirPathEngine {
+    /// Create new engine with function registry and model provider
+    pub async fn new(
+        function_registry: Arc<FunctionRegistry>,
+        model_provider: Arc<dyn ModelProvider + Send + Sync>,
+    ) -> Result<Self> {
+        // Create standard operator registry
+        let operator_registry = Arc::new(create_standard_operator_registry());
+
+        // Create the evaluator
+        let evaluator = Evaluator::new(
+            operator_registry,
+            function_registry.clone(),
+            model_provider.clone(),
+            None,
+        );
+
+        // Create AST cache with LRU eviction
+        let ast_cache = moka::sync::Cache::builder()
+            .max_capacity(AST_CACHE_MAX_ENTRIES)
+            .build();
+
+        Ok(Self {
+            evaluator,
+            function_registry,
+            model_provider,
+            terminology_provider: None,
+            trace_provider: None,
+            validation_provider: None,
+            server_provider: None,
+            ast_cache,
+            plan_owner: Arc::new(()),
+            prepared_roots: Default::default(),
+            element_type_cache: Arc::new(ElementTypeCache::default()),
+        })
+    }
+
+    /// Create new engine with custom registries
+    pub async fn new_with_registries(
+        operator_registry: Arc<OperatorRegistry>,
+        function_registry: Arc<FunctionRegistry>,
+        model_provider: Arc<dyn ModelProvider + Send + Sync>,
+    ) -> Result<Self> {
+        let evaluator = Evaluator::new(
+            operator_registry,
+            function_registry.clone(),
+            model_provider.clone(),
+            None,
+        );
+
+        // Create AST cache with LRU eviction
+        let ast_cache = moka::sync::Cache::builder()
+            .max_capacity(AST_CACHE_MAX_ENTRIES)
+            .build();
+
+        Ok(Self {
+            evaluator,
+            function_registry,
+            model_provider,
+            terminology_provider: None,
+            trace_provider: None,
+            validation_provider: None,
+            server_provider: None,
+            ast_cache,
+            plan_owner: Arc::new(()),
+            prepared_roots: Default::default(),
+            element_type_cache: Arc::new(ElementTypeCache::default()),
+        })
+    }
+
+    /// Clear the shared element-type resolution cache.
+    ///
+    /// Call this whenever the model provider's schema set changes (e.g. a FHIR
+    /// package is (re)installed), since cached `(type, property) -> TypeInfo`
+    /// entries would otherwise be stale.
+    /// In-flight misses from the old generation are discarded. Previously prepared
+    /// contexts, validation sessions and model-trait resources must be recreated:
+    /// evaluation rejects them instead of mixing old root/descendant type data
+    /// with a new schema set. Compiled expression handles remain reusable.
+    pub fn clear_element_type_cache(&self) {
+        self.element_type_cache.invalidate();
+    }
+
+    /// Add terminology provider to engine
+    pub fn with_terminology_provider(mut self, provider: Arc<dyn TerminologyProvider>) -> Self {
+        self.terminology_provider = Some(provider.clone());
+        self.evaluator = self.evaluator.with_terminology_provider(provider);
+        self
+    }
+
+    /// Add trace provider to engine
+    pub fn with_trace_provider(mut self, provider: SharedTraceProvider) -> Self {
+        self.trace_provider = Some(provider.clone());
+        self.evaluator = self.evaluator.with_trace_provider(provider);
+        self
+    }
+
+    /// Add validation provider to engine
+    pub fn with_validation_provider(mut self, provider: Arc<dyn ValidationProvider>) -> Self {
+        self.validation_provider = Some(provider);
+        self
+    }
+
+    /// Add server provider to engine for %server operations and resolve() fallback
+    pub fn with_server_provider(mut self, provider: Arc<dyn ServerProvider>) -> Self {
+        self.server_provider = Some(provider);
+        self
+    }
+
+    /// Get the function registry for introspection
+    pub fn get_function_registry(&self) -> &Arc<FunctionRegistry> {
+        &self.function_registry
+    }
+
+    /// Get model provider
+    pub fn get_model_provider(&self) -> Arc<dyn ModelProvider + Send + Sync> {
+        self.model_provider.clone()
+    }
+
+    /// Get terminology provider
+    pub fn get_terminology_provider(&self) -> Option<Arc<dyn TerminologyProvider>> {
+        self.terminology_provider.clone()
+    }
+
+    /// Get trace provider
+    pub fn get_trace_provider(&self) -> Option<SharedTraceProvider> {
+        self.trace_provider.clone()
+    }
+
+    /// Get validation provider
+    pub fn get_validation_provider(&self) -> Option<Arc<dyn ValidationProvider>> {
+        self.validation_provider.clone()
+    }
+
+    /// Get server provider
+    pub fn get_server_provider(&self) -> Option<Arc<dyn ServerProvider>> {
+        self.server_provider.clone()
+    }
+
+    /// Build evaluation context with JSON variables directly (no EvaluationResult round-trip).
+    ///
+    /// `context_type` is the declared FHIR type of the context node, when the
+    /// caller knows it; see [`Collection::from_json_typed_arc`] for why it
+    /// matters for nodes that are not whole resources.
+    async fn build_context_with_json_variables(
+        &self,
+        context: Arc<JsonValue>,
+        context_type: Option<&str>,
+        variables: &JsonVariables,
+    ) -> octofhir_fhir_model::Result<EvaluationContext> {
+        let schema_generation = self.element_type_cache.generation();
+        let collection = if context.is_object()
+            && (context_type.is_none() || context.get("resourceType").is_some())
+        {
+            let mut value = self.prepared_value(context.clone());
+            if let Some(name) = context.get("resourceType").and_then(JsonValue::as_str)
+                && let Ok(Some(info)) = self.model_provider.get_type(name).await
+                && let FhirPathValue::Resource(node, _, _) = value
+            {
+                value = FhirPathValue::Resource(node, Arc::new(info), None);
+            }
+            crate::core::Collection::single(value)
+        } else {
+            crate::core::Collection::from_json_typed_arc(
+                context,
+                context_type,
+                Some(self.model_provider.clone()),
+            )
+            .await
+            .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?
+        };
+
+        let eval_context = EvaluationContext::new_with_schema_cache(
+            collection,
+            self.model_provider.clone(),
+            self.terminology_provider.clone(),
+            self.validation_provider.clone(),
+            self.trace_provider.clone(),
+            self.server_provider.clone(),
+            self.element_type_cache.clone(),
+            schema_generation,
+        );
+
+        // Convert Arc<JsonValue> variables directly to FhirPathValue::Resource (no deep clone)
+        for (name, json_arc) in variables.iter() {
+            let fhir_value = self.prepared_value(json_arc.clone());
+
+            eval_context.set_variable(name.clone(), fhir_value.clone());
+            if !name.starts_with('%') {
+                eval_context.set_variable(format!("%{}", name), fhir_value);
+            }
+        }
+
+        eval_context.ensure_current_schema().map_err(|error| {
+            octofhir_fhir_model::ModelError::evaluation_error(error.to_string())
+        })?;
+        Ok(eval_context)
+    }
+
+    pub(super) fn prepared_value(&self, json: Arc<JsonValue>) -> FhirPathValue {
+        self.prepared_roots.value(json)
+    }
+
+    /// Prepare typed input and variables. Repeated root conversions coalesce
+    /// behind a cache with a 32 MiB estimated JSON-plus-tree budget. Cache
+    /// entries own the input Arc, preventing mutation and address reuse.
+    pub async fn prepare_context(
+        &self,
+        context: Arc<JsonValue>,
+        context_type: Option<&str>,
+        variables: &JsonVariables,
+    ) -> octofhir_fhir_model::Result<EvaluationContext> {
+        self.build_context_with_json_variables(context, context_type, variables)
+            .await
+    }
+
+    /// Prepare one immutable resource for all node-level invariant groups.
+    pub async fn validation_session(
+        &self,
+        resource: Arc<JsonValue>,
+    ) -> Result<super::prepared::ValidationSession<'_>> {
+        super::prepared::ValidationSession::new(self, resource).await
+    }
+
+    /// Auto-prepend resource type if expression doesn't start with capital letter
+    #[allow(dead_code)]
+    async fn maybe_prepend_resource_type(
+        &self,
+        expression: &str,
+        context: &EvaluationContext,
+    ) -> Result<String> {
+        // Check if expression already starts with capital letter (explicit resource type)
+        if expression
+            .chars()
+            .next()
+            .map(|c| c.is_uppercase())
+            .unwrap_or(false)
+        {
+            return Ok(expression.to_string());
+        }
+
+        // Try to auto-extract resource type from input
+        if let Some(resource_type) = self.extract_resource_type_from_context(context).await? {
+            // Prepend the resource type
+            Ok(format!("{resource_type}.{expression}"))
+        } else {
+            // No resource type found, use expression as-is
+            Ok(expression.to_string())
+        }
+    }
+
+    /// Extract resource type from evaluation context
+    #[allow(dead_code)]
+    async fn extract_resource_type_from_context(
+        &self,
+        context: &EvaluationContext,
+    ) -> Result<Option<String>> {
+        for item in context.input_collection().iter() {
+            if let FhirPathValue::Resource(json, _, _) = item
+                && let Some(resource_type) = json.get("resourceType").and_then(|rt| rt.as_str())
+            {
+                // Validate that this is a known FHIR resource type
+                if self.model_provider.get_type(resource_type).await.is_ok() {
+                    return Ok(Some(resource_type.to_string()));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Compile once and retain an AST handle independently of cache eviction.
+    /// Concurrent misses for the same expression share one parser invocation.
+    pub fn compile_ast(&self, expression: &str) -> Result<Arc<ExpressionNode>> {
+        self.compile_plan(expression).map(|plan| plan.ast.clone())
+    }
+
+    /// Compile to a retained executable handle. The cache coalesces concurrent
+    /// misses; retained handles remain executable after cache eviction.
+    pub fn compile_plan(&self, expression: &str) -> Result<Arc<CompiledPlan>> {
+        self.ast_cache
+            .try_get_with_by_ref(expression, || {
+                let ast = Arc::new(parser::parse_ast(expression)?);
+                Ok(Arc::new(CompiledPlan::new(
+                    ast,
+                    &self.evaluator,
+                    self.plan_owner.clone(),
+                )))
+            })
+            .map_err(|error: Arc<crate::core::FhirPathError>| (*error).clone())
+    }
+
+    /// Execute a compiled handle without any string-keyed cache lookup.
+    pub async fn evaluate_plan(
+        &self,
+        plan: &CompiledPlan,
+        context: &EvaluationContext,
+    ) -> Result<EvaluationResult> {
+        if !Arc::ptr_eq(&plan.owner, &self.plan_owner) {
+            return Err(crate::core::FhirPathError::evaluation_error(
+                crate::core::error_code::FP0054,
+                "Evaluation plan belongs to a different engine",
+            ));
+        }
+        context.ensure_current_schema()?;
+        let result = plan.evaluate(&self.evaluator, context).await;
+        context.ensure_current_schema()?;
+        result
+    }
+
+    /// Evaluate expression
+    pub async fn evaluate(
+        &self,
+        expression: &str,
+        context: &EvaluationContext,
+    ) -> Result<EvaluationResult> {
+        // Check cache first for compiled AST
+        let plan = self.compile_plan(expression)?;
+
+        // Evaluate using the cached or freshly parsed AST
+        self.evaluate_plan(&plan, context).await
+    }
+
+    /// Evaluate AST directly
+    pub async fn evaluate_ast(
+        &self,
+        ast: &ExpressionNode,
+        context: &EvaluationContext,
+    ) -> Result<EvaluationResult> {
+        context.ensure_current_schema()?;
+        let result = self.evaluator.evaluate_node(ast, context).await;
+        context.ensure_current_schema()?;
+        result
+    }
+
+    /// Evaluate expression with metadata
+    pub async fn evaluate_with_metadata(
+        &self,
+        expression: &str,
+        context: &EvaluationContext,
+    ) -> Result<EvaluationResultWithMetadata> {
+        // Check cache first for compiled AST
+        let ast = self.compile_ast(expression)?;
+
+        // Evaluate with metadata using the cached or freshly parsed AST
+        self.evaluate_ast_with_metadata(&ast, context).await
+    }
+
+    /// Evaluate AST with metadata
+    pub async fn evaluate_ast_with_metadata(
+        &self,
+        ast: &ExpressionNode,
+        context: &EvaluationContext,
+    ) -> Result<EvaluationResultWithMetadata> {
+        context.ensure_current_schema()?;
+        let result = self
+            .evaluator
+            .evaluate_node_with_metadata(ast, context)
+            .await;
+        context.ensure_current_schema()?;
+        result
+    }
+
+    /// Get AST cache statistics (for testing and monitoring)
+    /// Returns (entry_count, weighted_size)
+    pub fn cache_stats(&self) -> (u64, u64) {
+        (self.ast_cache.entry_count(), self.ast_cache.weighted_size())
+    }
+
+    /// Get maximum cache capacity
+    pub const fn cache_capacity() -> u64 {
+        AST_CACHE_MAX_ENTRIES
+    }
+}
+
+/// Create engine with mock provider for testing (transitional compatibility)
+pub async fn create_engine_with_mock_provider() -> Result<FhirPathEngine> {
+    use octofhir_fhir_model::EmptyModelProvider;
+
+    let registry = Arc::new(create_function_registry());
+    let provider = Arc::new(EmptyModelProvider);
+    FhirPathEngine::new(registry, provider).await
+}
+
+// === FhirPathEvaluator trait implementation ===
+
+#[async_trait]
+impl FhirPathEvaluator for FhirPathEngine {
+    async fn compile_handle(
+        &self,
+        expression: &str,
+    ) -> octofhir_fhir_model::Result<octofhir_fhir_model::ExecutableExpression> {
+        let plan = self
+            .compile_plan(expression)
+            .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+        Ok(octofhir_fhir_model::ExecutableExpression::with_payload(
+            expression, plan,
+        ))
+    }
+
+    async fn prepare_resource(
+        &self,
+        resource: Arc<JsonValue>,
+        variables: &JsonVariables,
+    ) -> octofhir_fhir_model::Result<Option<octofhir_fhir_model::PreparedResource>> {
+        super::model_prepared::prepare(self, resource, variables).await
+    }
+
+    async fn evaluate_prepared_constraints(
+        &self,
+        resource: &octofhir_fhir_model::PreparedResource,
+        node: octofhir_fhir_model::NodeId,
+        context: &JsonValue,
+        context_type: Option<&str>,
+        variables: &JsonVariables,
+        expressions: &[Arc<octofhir_fhir_model::ExecutableExpression>],
+    ) -> octofhir_fhir_model::Result<Vec<octofhir_fhir_model::Result<bool>>> {
+        super::model_prepared::evaluate(
+            self,
+            resource,
+            node,
+            context,
+            context_type,
+            variables,
+            expressions,
+        )
+        .await
+    }
+
+    /// Core evaluation method
+    async fn evaluate(
+        &self,
+        expression: &str,
+        context: Arc<JsonValue>,
+    ) -> octofhir_fhir_model::Result<ModelEvaluationResult> {
+        let schema_generation = self.element_type_cache.generation();
+        // Convert JsonValue to our Collection format (zero-copy via Arc)
+        let collection = crate::core::Collection::from_json_resource_arc(
+            context,
+            Some(self.model_provider.clone()),
+        )
+        .await
+        .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+
+        // Create evaluation context
+        let eval_context = EvaluationContext::new_with_schema_cache(
+            collection,
+            self.model_provider.clone(),
+            self.terminology_provider.clone(),
+            self.validation_provider.clone(),
+            self.trace_provider.clone(),
+            self.server_provider.clone(),
+            self.element_type_cache.clone(),
+            schema_generation,
+        );
+
+        // Evaluate using our internal engine
+        let result = self
+            .evaluate(expression, &eval_context)
+            .await
+            .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+
+        // Convert to ModelEvaluationResult
+        Ok(result.to_evaluation_result())
+    }
+
+    /// Evaluate with variables
+    async fn evaluate_with_variables(
+        &self,
+        expression: &str,
+        context: Arc<JsonValue>,
+        variables: &JsonVariables,
+    ) -> octofhir_fhir_model::Result<ModelEvaluationResult> {
+        let eval_context = self
+            .build_context_with_json_variables(context, None, variables)
+            .await?;
+
+        // Evaluate using our internal engine
+        let result = self
+            .evaluate(expression, &eval_context)
+            .await
+            .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+
+        // Convert to ModelEvaluationResult
+        Ok(result.to_evaluation_result())
+    }
+
+    /// Optimized constraint evaluation that skips expensive result conversion.
+    async fn evaluate_constraint_with_variables(
+        &self,
+        expression: &str,
+        context: Arc<JsonValue>,
+        variables: &JsonVariables,
+    ) -> octofhir_fhir_model::Result<bool> {
+        let eval_context = self
+            .build_context_with_json_variables(context, None, variables)
+            .await?;
+
+        let result = self
+            .evaluate(expression, &eval_context)
+            .await
+            .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+
+        Ok(result.is_constraint_satisfied())
+    }
+
+    /// Build the FHIRPath data model + evaluation context for `context` and
+    /// `variables` once, then evaluate every expression against that shared
+    /// context. Result semantics match `evaluate_constraint_with_variables`
+    /// (empty / non-boolean / `Boolean(true)` => satisfied), so this only
+    /// removes the per-constraint context rebuild — it does not change outcomes.
+    ///
+    async fn evaluate_constraints_shared_context(
+        &self,
+        context: Arc<JsonValue>,
+        variables: &JsonVariables,
+        expressions: &[&str],
+    ) -> octofhir_fhir_model::Result<Vec<octofhir_fhir_model::Result<bool>>> {
+        self.evaluate_constraints_shared_context_typed(context, None, variables, expressions)
+            .await
+    }
+
+    /// `context_type` models the context node as the FHIR type the caller
+    /// declares it to be, which is what invariants on primitive elements
+    /// (`$this is dateTime implies ...`) need to see.
+    async fn evaluate_constraints_shared_context_typed(
+        &self,
+        context: Arc<JsonValue>,
+        context_type: Option<&str>,
+        variables: &JsonVariables,
+        expressions: &[&str],
+    ) -> octofhir_fhir_model::Result<Vec<octofhir_fhir_model::Result<bool>>> {
+        let eval_context = self
+            .build_context_with_json_variables(context, context_type, variables)
+            .await?;
+
+        let mut out = Vec::with_capacity(expressions.len());
+        for expression in expressions {
+            let result = self
+                .evaluate(expression, &eval_context.nest())
+                .await
+                .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))
+                .map(|res| res.is_constraint_satisfied());
+            out.push(result);
+        }
+        Ok(out)
+    }
+
+    /// Compile an expression for reuse
+    async fn compile(&self, expression: &str) -> octofhir_fhir_model::Result<CompiledExpression> {
+        // Check cache first, or parse and cache the AST
+        let ast_result = self.compile_plan(expression).map(|_| ());
+
+        // Return compilation result
+        match ast_result {
+            Ok(()) => Ok(CompiledExpression::new(
+                expression.to_string(),
+                expression.to_string(), // Expression is now cached in AST cache
+                true,
+            )),
+            Err(e) => Ok(CompiledExpression::invalid(
+                expression.to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
+    /// Validate expression syntax
+    async fn validate_expression(
+        &self,
+        expression: &str,
+    ) -> octofhir_fhir_model::Result<ValidationResult> {
+        match crate::parser::parse_ast(expression) {
+            Ok(_ast) => Ok(ValidationResult::success()),
+            Err(e) => {
+                let error = ValidationError::new(format!("Syntax error: {e}"))
+                    .with_code("SYNTAX_ERROR".to_string());
+                Ok(ValidationResult::with_errors(vec![error]))
+            }
+        }
+    }
+
+    /// Get the ModelProvider for this evaluator
+    fn model_provider(&self) -> &dyn octofhir_fhir_model::ModelProvider {
+        self.model_provider.as_ref()
+    }
+
+    /// Get the ValidationProvider for this evaluator (if available)
+    fn validation_provider(&self) -> Option<&dyn ValidationProvider> {
+        self.validation_provider.as_ref().map(|p| p.as_ref())
+    }
+
+    /// Validate FHIR constraints
+    async fn validate_constraints(
+        &self,
+        resource: Arc<JsonValue>,
+        constraints: &[FhirPathConstraint],
+    ) -> octofhir_fhir_model::Result<ValidationResult> {
+        let schema_generation = self.element_type_cache.generation();
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        // OPTIMIZATION: Create Collection and EvaluationContext ONCE, reuse for all constraints
+        // This avoids expensive cloning and context creation for each constraint
+        let collection = crate::core::Collection::from_json_resource_arc(
+            resource,
+            Some(self.model_provider.clone()),
+        )
+        .await
+        .map_err(|e| octofhir_fhir_model::ModelError::evaluation_error(e.to_string()))?;
+
+        let eval_context = EvaluationContext::new_with_schema_cache(
+            collection.clone(),
+            self.model_provider.clone(),
+            self.terminology_provider.clone(),
+            self.validation_provider.clone(),
+            self.trace_provider.clone(),
+            self.server_provider.clone(),
+            self.element_type_cache.clone(),
+            schema_generation,
+        );
+
+        eval_context.ensure_current_schema().map_err(|error| {
+            octofhir_fhir_model::ModelError::evaluation_error(error.to_string())
+        })?;
+        if let Some(first_value) = collection.first() {
+            eval_context.set_variable("rootResource".to_string(), first_value.clone());
+        }
+
+        for constraint in constraints {
+            // Evaluate the constraint expression using internal engine method
+            match FhirPathEngine::evaluate(self, &constraint.expression, &eval_context).await {
+                Ok(result) => {
+                    // Check if the result is truthy
+                    if !result.to_boolean() {
+                        let error = ValidationError::new(constraint.description.clone())
+                            .with_code(constraint.key.clone())
+                            .with_location(constraint.expression.clone());
+
+                        match constraint.severity {
+                            ErrorSeverity::Error | ErrorSeverity::Fatal => {
+                                errors.push(error);
+                            }
+                            ErrorSeverity::Warning => {
+                                let warning = octofhir_fhir_model::ValidationWarning::new(
+                                    constraint.description.clone(),
+                                )
+                                .with_code(constraint.key.clone())
+                                .with_location(constraint.expression.clone());
+                                warnings.push(warning);
+                            }
+                            ErrorSeverity::Information => {
+                                // Info level - add as warning but don't fail validation
+                                let warning = octofhir_fhir_model::ValidationWarning::new(
+                                    constraint.description.clone(),
+                                )
+                                .with_code(constraint.key.clone())
+                                .with_location(constraint.expression.clone());
+                                warnings.push(warning);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Evaluation error - treat as constraint failure
+                    let error = ValidationError::new(format!("Constraint evaluation failed: {e}"))
+                        .with_code(constraint.key.clone())
+                        .with_location(constraint.expression.clone());
+                    errors.push(error);
+                }
+            }
+        }
+
+        let mut result = if errors.is_empty() {
+            ValidationResult::success()
+        } else {
+            ValidationResult::with_errors(errors)
+        };
+
+        for warning in warnings {
+            result = result.with_warning(warning);
+        }
+
+        Ok(result)
+    }
+
+    /// Check if the evaluator supports a specific feature
+    fn supports_feature(&self, feature: &str) -> bool {
+        match feature {
+            "compilation" => true,
+            "variables" => true,
+            "constraints" => true,
+            "terminology" => self.terminology_provider.is_some(),
+            "tracing" => self.trace_provider.is_some(),
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use octofhir_fhir_model::EmptyModelProvider;
+
+    #[tokio::test]
+    async fn test_ast_cache_functionality() {
+        // Create engine
+        let registry = Arc::new(create_function_registry());
+        let provider = Arc::new(EmptyModelProvider);
+        let engine = FhirPathEngine::new(registry, provider).await.unwrap();
+
+        // Initially cache should be empty
+        let (initial_count, _) = engine.cache_stats();
+        assert_eq!(initial_count, 0, "Cache should start empty");
+
+        // Compile a few expressions
+        let expr1 = "Patient.name";
+        let expr2 = "Patient.gender";
+        let expr3 = "1 + 2";
+
+        let result1 = engine.compile(expr1).await.unwrap();
+        assert!(result1.is_valid, "Expression 1 should be valid");
+
+        // Force synchronization
+        engine.ast_cache.run_pending_tasks();
+
+        let (count_after_1, _) = engine.cache_stats();
+        println!("Count after expr1: {}", count_after_1);
+        assert_eq!(
+            count_after_1, 1,
+            "Cache should have 1 entry after first compile"
+        );
+
+        let result2 = engine.compile(expr2).await.unwrap();
+        assert!(result2.is_valid, "Expression 2 should be valid");
+        engine.ast_cache.run_pending_tasks();
+
+        let (count_after_2, _) = engine.cache_stats();
+        assert_eq!(count_after_2, 2, "Cache should have 2 entries");
+
+        let result3 = engine.compile(expr3).await.unwrap();
+        assert!(result3.is_valid, "Expression 3 should be valid");
+        engine.ast_cache.run_pending_tasks();
+
+        let (count_after_3, _) = engine.cache_stats();
+        assert_eq!(count_after_3, 3, "Cache should have 3 entries");
+
+        // Recompile same expression - should not increase cache size
+        engine.compile(expr1).await.unwrap();
+        engine.ast_cache.run_pending_tasks();
+
+        let (count_after_recompile, _) = engine.cache_stats();
+        assert_eq!(
+            count_after_recompile, 3,
+            "Cache should still have 3 entries after recompile"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_uses_cache() {
+        use crate::core::Collection;
+
+        // Create engine
+        let registry = Arc::new(create_function_registry());
+        let provider = Arc::new(EmptyModelProvider);
+        let engine = FhirPathEngine::new(registry, provider.clone())
+            .await
+            .unwrap();
+
+        // Create empty context
+        let collection = Collection::empty();
+        let context = EvaluationContext::new(collection, provider, None, None, None);
+
+        // Cache should be empty initially
+        let (count_before, _) = engine.cache_stats();
+        assert_eq!(count_before, 0);
+
+        // Evaluate expression
+        let expr = "1 + 2";
+        let _ = engine.evaluate(expr, &context).await.unwrap();
+
+        // Force cache synchronization
+        engine.ast_cache.run_pending_tasks();
+
+        // Cache should now have 1 entry
+        let (count_after, _) = engine.cache_stats();
+        assert_eq!(count_after, 1, "Evaluate should cache the AST");
+
+        // Evaluate same expression again
+        let _ = engine.evaluate(expr, &context).await.unwrap();
+
+        // Force cache synchronization
+        engine.ast_cache.run_pending_tasks();
+
+        // Cache should still have 1 entry (reused)
+        let (count_after_reuse, _) = engine.cache_stats();
+        assert_eq!(count_after_reuse, 1, "Cache should be reused");
+    }
+}
