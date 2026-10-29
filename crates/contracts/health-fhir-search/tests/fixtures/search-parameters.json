@@ -1,0 +1,507 @@
+{
+ "resourceType": "Bundle",
+ "type": "collection",
+ "entry": [
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "CanonicalResource-url",
+    "url": "http://hl7.org/fhir/SearchParameter/CanonicalResource-url",
+    "name": "url",
+    "code": "url",
+    "base": [
+     "ActivityDefinition",
+     "ActorDefinition",
+     "CapabilityStatement",
+     "ChargeItemDefinition",
+     "Citation",
+     "CodeSystem",
+     "CompartmentDefinition",
+     "ConceptMap",
+     "ConditionDefinition",
+     "EventDefinition",
+     "Evidence",
+     "EvidenceReport",
+     "EvidenceVariable",
+     "ExampleScenario",
+     "GraphDefinition",
+     "ImplementationGuide",
+     "Library",
+     "Measure",
+     "MessageDefinition",
+     "NamingSystem",
+     "ObservationDefinition",
+     "OperationDefinition",
+     "PlanDefinition",
+     "Questionnaire",
+     "Requirements",
+     "SearchParameter",
+     "SpecimenDefinition",
+     "StructureDefinition",
+     "StructureMap",
+     "SubscriptionTopic",
+     "TerminologyCapabilities",
+     "TestPlan",
+     "TestScript",
+     "ValueSet"
+    ],
+    "type": "uri",
+    "expression": "ActivityDefinition.url | ActorDefinition.url | CapabilityStatement.url | ChargeItemDefinition.url | Citation.url | CodeSystem.url | CompartmentDefinition.url | ConceptMap.url | ConditionDefinition.url | EventDefinition.url | Evidence.url | EvidenceReport.url | EvidenceVariable.url | ExampleScenario.url | GraphDefinition.url | ImplementationGuide.url | Library.url | Measure.url | MessageDefinition.url | NamingSystem.url | ObservationDefinition.url | OperationDefinition.url | PlanDefinition.url | Questionnaire.url | Requirements.url | SearchParameter.url | SpecimenDefinition.url | StructureDefinition.url | StructureMap.url | SubscriptionTopic.url | TerminologyCapabilities.url | TestPlan.url | TestScript.url | ValueSet.url"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Encounter-subject",
+    "url": "http://hl7.org/fhir/SearchParameter/Encounter-subject",
+    "name": "subject",
+    "code": "subject",
+    "base": [
+     "Encounter"
+    ],
+    "type": "reference",
+    "expression": "Encounter.subject",
+    "target": [
+     "Group",
+     "Patient"
+    ]
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Observation-category",
+    "url": "http://hl7.org/fhir/SearchParameter/Observation-category",
+    "name": "category",
+    "code": "category",
+    "base": [
+     "Observation"
+    ],
+    "type": "token",
+    "expression": "Observation.category"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Observation-code-value-quantity",
+    "url": "http://hl7.org/fhir/SearchParameter/Observation-code-value-quantity",
+    "name": "code-value-quantity",
+    "code": "code-value-quantity",
+    "base": [
+     "Observation"
+    ],
+    "type": "composite",
+    "expression": "Observation",
+    "component": [
+     {
+      "definition": "http://hl7.org/fhir/SearchParameter/clinical-code",
+      "expression": "code"
+     },
+     {
+      "definition": "http://hl7.org/fhir/SearchParameter/Observation-value-quantity",
+      "expression": "value.ofType(Quantity)"
+     }
+    ]
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Observation-status",
+    "url": "http://hl7.org/fhir/SearchParameter/Observation-status",
+    "name": "status",
+    "code": "status",
+    "base": [
+     "Observation"
+    ],
+    "type": "token",
+    "expression": "Observation.status"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Observation-subject",
+    "url": "http://hl7.org/fhir/SearchParameter/Observation-subject",
+    "name": "subject",
+    "code": "subject",
+    "base": [
+     "Observation"
+    ],
+    "type": "reference",
+    "expression": "Observation.subject",
+    "target": [
+     "Device",
+     "Organization",
+     "Procedure",
+     "NutritionProduct",
+     "Group",
+     "Practitioner",
+     "BiologicallyDerivedProduct",
+     "Substance",
+     "Location",
+     "Patient",
+     "Medication"
+    ]
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Observation-value-quantity",
+    "url": "http://hl7.org/fhir/SearchParameter/Observation-value-quantity",
+    "name": "value-quantity",
+    "code": "value-quantity",
+    "base": [
+     "Observation"
+    ],
+    "type": "quantity",
+    "expression": "Observation.value.ofType(Quantity) | Observation.value.ofType(SampledData)"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Patient-deceased",
+    "url": "http://hl7.org/fhir/SearchParameter/Patient-deceased",
+    "name": "deceased",
+    "code": "deceased",
+    "base": [
+     "Patient"
+    ],
+    "type": "token",
+    "expression": "Patient.deceased.exists() and Patient.deceased != false"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Patient-general-practitioner",
+    "url": "http://hl7.org/fhir/SearchParameter/Patient-general-practitioner",
+    "name": "general-practitioner",
+    "code": "general-practitioner",
+    "base": [
+     "Patient"
+    ],
+    "type": "reference",
+    "expression": "Patient.generalPractitioner",
+    "target": [
+     "Organization",
+     "PractitionerRole",
+     "Practitioner"
+    ]
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Patient-identifier",
+    "url": "http://hl7.org/fhir/SearchParameter/Patient-identifier",
+    "name": "identifier",
+    "code": "identifier",
+    "base": [
+     "Patient"
+    ],
+    "type": "token",
+    "expression": "Patient.identifier"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Patient-name",
+    "url": "http://hl7.org/fhir/SearchParameter/Patient-name",
+    "name": "name",
+    "code": "name",
+    "base": [
+     "Patient"
+    ],
+    "type": "string",
+    "expression": "Patient.name"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Resource-id",
+    "url": "http://hl7.org/fhir/SearchParameter/Resource-id",
+    "name": "_id",
+    "code": "_id",
+    "base": [
+     "Resource"
+    ],
+    "type": "token",
+    "expression": "Resource.id"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "Resource-lastUpdated",
+    "url": "http://hl7.org/fhir/SearchParameter/Resource-lastUpdated",
+    "name": "_lastUpdated",
+    "code": "_lastUpdated",
+    "base": [
+     "Resource"
+    ],
+    "type": "date",
+    "expression": "Resource.meta.lastUpdated"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "RiskAssessment-probability",
+    "url": "http://hl7.org/fhir/SearchParameter/RiskAssessment-probability",
+    "name": "probability",
+    "code": "probability",
+    "base": [
+     "RiskAssessment"
+    ],
+    "type": "number",
+    "expression": "RiskAssessment.prediction.probability.ofType(decimal)"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "clinical-code",
+    "url": "http://hl7.org/fhir/SearchParameter/clinical-code",
+    "name": "code",
+    "code": "code",
+    "base": [
+     "AdverseEvent",
+     "AllergyIntolerance",
+     "AuditEvent",
+     "Basic",
+     "ChargeItem",
+     "Condition",
+     "DetectedIssue",
+     "DeviceRequest",
+     "DiagnosticReport",
+     "FamilyMemberHistory",
+     "ImagingSelection",
+     "List",
+     "Medication",
+     "MedicationAdministration",
+     "MedicationDispense",
+     "MedicationRequest",
+     "MedicationStatement",
+     "NutritionIntake",
+     "Observation",
+     "Procedure",
+     "RequestOrchestration",
+     "Task"
+    ],
+    "type": "token",
+    "expression": "AdverseEvent.code | AllergyIntolerance.code | AllergyIntolerance.reaction.substance | AuditEvent.code | Basic.code | ChargeItem.code | Condition.code | DetectedIssue.code | DeviceRequest.code.concept | DiagnosticReport.code | FamilyMemberHistory.condition.code | ImagingSelection.status | List.code | Medication.code | MedicationAdministration.medication.concept | MedicationDispense.medication.concept | MedicationRequest.medication.concept | MedicationStatement.medication.concept | NutritionIntake.code | Observation.code | Procedure.code | RequestOrchestration.code | Task.code"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "clinical-date",
+    "url": "http://hl7.org/fhir/SearchParameter/clinical-date",
+    "name": "date",
+    "code": "date",
+    "base": [
+     "AdverseEvent",
+     "AllergyIntolerance",
+     "Appointment",
+     "AuditEvent",
+     "CarePlan",
+     "CareTeam",
+     "ClinicalImpression",
+     "Composition",
+     "Consent",
+     "DiagnosticReport",
+     "DocumentReference",
+     "Encounter",
+     "EpisodeOfCare",
+     "FamilyMemberHistory",
+     "Flag",
+     "Immunization",
+     "ImmunizationEvaluation",
+     "ImmunizationRecommendation",
+     "Invoice",
+     "List",
+     "MeasureReport",
+     "NutritionIntake",
+     "Observation",
+     "Procedure",
+     "ResearchSubject",
+     "RiskAssessment",
+     "SupplyRequest"
+    ],
+    "type": "date",
+    "expression": "AdverseEvent.occurrence.ofType(dateTime) | AdverseEvent.occurrence.ofType(Period) | AdverseEvent.occurrence.ofType(Timing) | AllergyIntolerance.recordedDate | (start | requestedPeriod.start).first() | AuditEvent.recorded | CarePlan.period | ClinicalImpression.date | Composition.date | Consent.date | DiagnosticReport.effective.ofType(dateTime) | DiagnosticReport.effective.ofType(Period) | DocumentReference.date | Encounter.actualPeriod | EpisodeOfCare.period | FamilyMemberHistory.date | Flag.period | (Immunization.occurrence.ofType(dateTime)) | ImmunizationEvaluation.date | ImmunizationRecommendation.date | Invoice.date | List.date | MeasureReport.date | NutritionIntake.occurrence.ofType(dateTime) | NutritionIntake.occurrence.ofType(Period) | Observation.effective.ofType(dateTime) | Observation.effective.ofType(Period) | Observation.effective.ofType(Timing) | Observation.effective.ofType(instant) | Procedure.occurrence.ofType(dateTime) | Procedure.occurrence.ofType(Period) | Procedure.occurrence.ofType(Timing) | ResearchSubject.period | (RiskAssessment.occurrence.ofType(dateTime)) | SupplyRequest.authoredOn"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "clinical-patient",
+    "url": "http://hl7.org/fhir/SearchParameter/clinical-patient",
+    "name": "patient",
+    "code": "patient",
+    "base": [
+     "Account",
+     "AdverseEvent",
+     "AllergyIntolerance",
+     "Appointment",
+     "AppointmentResponse",
+     "AuditEvent",
+     "Basic",
+     "BodyStructure",
+     "CarePlan",
+     "CareTeam",
+     "ChargeItem",
+     "Claim",
+     "ClaimResponse",
+     "ClinicalImpression",
+     "Communication",
+     "CommunicationRequest",
+     "Composition",
+     "Condition",
+     "Consent",
+     "Contract",
+     "Coverage",
+     "CoverageEligibilityRequest",
+     "CoverageEligibilityResponse",
+     "DetectedIssue",
+     "DeviceRequest",
+     "DeviceUsage",
+     "DiagnosticReport",
+     "DocumentReference",
+     "Encounter",
+     "EnrollmentRequest",
+     "EpisodeOfCare",
+     "ExplanationOfBenefit",
+     "FamilyMemberHistory",
+     "Flag",
+     "Goal",
+     "GuidanceResponse",
+     "ImagingSelection",
+     "ImagingStudy",
+     "Immunization",
+     "ImmunizationEvaluation",
+     "ImmunizationRecommendation",
+     "Invoice",
+     "List",
+     "MeasureReport",
+     "MedicationAdministration",
+     "MedicationDispense",
+     "MedicationRequest",
+     "MedicationStatement",
+     "MolecularSequence",
+     "NutritionIntake",
+     "NutritionOrder",
+     "Observation",
+     "Person",
+     "Procedure",
+     "Provenance",
+     "QuestionnaireResponse",
+     "RelatedPerson",
+     "RequestOrchestration",
+     "ResearchSubject",
+     "RiskAssessment",
+     "ServiceRequest",
+     "Specimen",
+     "SupplyDelivery",
+     "SupplyRequest",
+     "Task",
+     "VisionPrescription"
+    ],
+    "type": "reference",
+    "expression": "Account.subject.where(resolve() is Patient) | AdverseEvent.subject.where(resolve() is Patient) | AllergyIntolerance.patient | Appointment.participant.actor.where(resolve() is Patient) | Appointment.subject.where(resolve() is Patient) | AppointmentResponse.actor.where(resolve() is Patient) | AuditEvent.patient | Basic.subject.where(resolve() is Patient) | BodyStructure.patient | CarePlan.subject.where(resolve() is Patient) | CareTeam.subject.where(resolve() is Patient) | ChargeItem.subject.where(resolve() is Patient) | Claim.patient | ClaimResponse.patient | ClinicalImpression.subject.where(resolve() is Patient) | Communication.subject.where(resolve() is Patient) | CommunicationRequest.subject.where(resolve() is Patient) | Composition.subject.where(resolve() is Patient) | Condition.subject.where(resolve() is Patient) | Consent.subject.where(resolve() is Patient) | Contract.subject.where(resolve() is Patient) | Coverage.beneficiary | CoverageEligibilityRequest.patient | CoverageEligibilityResponse.patient | DetectedIssue.subject.where(resolve() is Patient) | DeviceRequest.subject.where(resolve() is Patient) | DeviceUsage.patient | DiagnosticReport.subject.where(resolve() is Patient) | DocumentReference.subject.where(resolve() is Patient) | Encounter.subject.where(resolve() is Patient) | EnrollmentRequest.candidate | EpisodeOfCare.patient | ExplanationOfBenefit.patient | FamilyMemberHistory.patient | Flag.subject.where(resolve() is Patient) | Goal.subject.where(resolve() is Patient) | GuidanceResponse.subject.where(resolve() is Patient) | ImagingSelection.subject.where(resolve() is Patient) | ImagingStudy.subject.where(resolve() is Patient) | Immunization.patient | ImmunizationEvaluation.patient | ImmunizationRecommendation.patient | Invoice.subject.where(resolve() is Patient) | List.subject.where(resolve() is Patient) | MeasureReport.subject.where(resolve() is Patient) | MedicationAdministration.subject.where(resolve() is Patient) | MedicationDispense.subject.where(resolve() is Patient) | MedicationRequest.subject.where(resolve() is Patient) | MedicationStatement.subject.where(resolve() is Patient) | MolecularSequence.subject.where(resolve() is Patient) | NutritionIntake.subject.where(resolve() is Patient) | NutritionOrder.subject.where(resolve() is Patient) | Observation.subject.where(resolve() is Patient) | Person.link.target.where(resolve() is Patient) | Procedure.subject.where(resolve() is Patient) | Provenance.patient | QuestionnaireResponse.subject.where(resolve() is Patient) | RelatedPerson.patient | RequestOrchestration.subject.where(resolve() is Patient) | ResearchSubject.subject.where(resolve() is Patient) | RiskAssessment.subject.where(resolve() is Patient) | ServiceRequest.subject.where(resolve() is Patient) | Specimen.subject.where(resolve() is Patient) | SupplyDelivery.patient | SupplyRequest.deliverFor | Task.for.where(resolve() is Patient) | VisionPrescription.patient",
+    "target": [
+     "Patient"
+    ]
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "individual-address",
+    "url": "http://hl7.org/fhir/SearchParameter/individual-address",
+    "name": "address",
+    "code": "address",
+    "base": [
+     "Patient",
+     "Person",
+     "Practitioner",
+     "RelatedPerson"
+    ],
+    "type": "string",
+    "expression": "Patient.address | Person.address | Practitioner.address | RelatedPerson.address"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "individual-birthdate",
+    "url": "http://hl7.org/fhir/SearchParameter/individual-birthdate",
+    "name": "birthdate",
+    "code": "birthdate",
+    "base": [
+     "Patient",
+     "Person",
+     "RelatedPerson"
+    ],
+    "type": "date",
+    "expression": "Patient.birthDate | Person.birthDate | RelatedPerson.birthDate"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "individual-family",
+    "url": "http://hl7.org/fhir/SearchParameter/individual-family",
+    "name": "family",
+    "code": "family",
+    "base": [
+     "Patient",
+     "Practitioner"
+    ],
+    "type": "string",
+    "expression": "Patient.name.family | Practitioner.name.family"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "individual-gender",
+    "url": "http://hl7.org/fhir/SearchParameter/individual-gender",
+    "name": "gender",
+    "code": "gender",
+    "base": [
+     "Patient",
+     "Person",
+     "Practitioner",
+     "RelatedPerson"
+    ],
+    "type": "token",
+    "expression": "Patient.gender | Person.gender | Practitioner.gender | RelatedPerson.gender"
+   }
+  },
+  {
+   "resource": {
+    "resourceType": "SearchParameter",
+    "id": "individual-phone",
+    "url": "http://hl7.org/fhir/SearchParameter/individual-phone",
+    "name": "phone",
+    "code": "phone",
+    "base": [
+     "Patient",
+     "Person",
+     "Practitioner",
+     "PractitionerRole",
+     "RelatedPerson"
+    ],
+    "type": "token",
+    "expression": "Patient.telecom.where(system='phone') | Person.telecom.where(system='phone') | Practitioner.telecom.where(system='phone') | PractitionerRole.contact.telecom.where(system='phone') | RelatedPerson.telecom.where(system='phone')"
+   }
+  }
+ ]
+}

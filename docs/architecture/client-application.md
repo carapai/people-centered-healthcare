@@ -70,6 +70,9 @@ flowchart TD
 
 - **Distribution.** It is provided through React context and the TanStack Router context. Repositories are created from it once.
 - **Lint rules:** `@tauri-apps/*` may only be imported in `src/platform/**`, and no runtime checks are allowed in feature code.
+  - **Imports:** oxlint's `no-restricted-imports` (`apps/client/.oxlintrc.json`) enforces the `@tauri-apps/**` rule. We use oxlint because typescript-eslint has no TypeScript 7 support.
+  - **Runtime checks and storage:** `apps/client/scripts/check-boundaries.ts` rejects runtime checks (`__TAURI`, `import.meta.env.MODE`, `platform.mode`) outside `src/platform/` and the status area. It also rejects browser storage APIs outside `src/platform/preferences.ts` (ADR 0037).
+  - **Bundle scan:** `scripts/scan-bundle.ts` fails a web build that contains Tauri or devtools code, or Panda CSS without token variables.
 
 ### Types
 

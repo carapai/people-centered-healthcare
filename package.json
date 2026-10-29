@@ -1,0 +1,9 @@
+{
+  "name": "health-platform",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/client"],
+  "scripts": {
+    "check": "bun run --filter '*' check"
+  }
+}
