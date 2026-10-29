@@ -1,0 +1,26 @@
+# Paths that need a code owner's review (deployment.md § Git and merge rules; ADR 0045).
+# Later lines take precedence. ADR changes also need two approvals (adr-approvals.yml).
+
+# Decisions and architecture.
+/docs/adr/                        @carapai
+/docs/architecture/               @carapai
+/MASTER_PROMPT.md                 @carapai
+/tools/architecture-checks/       @carapai
+
+# CI, release and repository policy.
+/.github/                         @carapai
+/deny.toml                        @carapai
+/renovate.json                    @carapai
+
+# Security: identity, authentication, consent, audit, keys and the node identity.
+/crates/**/health-auth/           @carapai
+/crates/**/health-crypto/         @carapai
+/crates/**/health-audit/          @carapai
+/crates/**/health-audit-domain/   @carapai
+/crates/**/health-identity/       @carapai
+/crates/**/health-consent/        @carapai
+/crates/**/health-node-identity/  @carapai
+
+# Synchronization.
+/crates/**/health-sync-protocol/  @carapai
+/crates/**/health-sync-server/    @carapai

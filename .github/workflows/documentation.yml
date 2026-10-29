@@ -1,15 +1,9 @@
 # Documentation checks (deployment.md § Workflows).
 name: documentation
 
+# No path filter: its jobs are required checks, and a filtered-out workflow never reports.
 on:
   pull_request:
-    paths:
-      - "**/*.md"
-      - "**/*.surql"
-      - ".markdownlint-cli2.jsonc"
-      - "lychee.toml"
-      - "tools/docs/**"
-      - ".github/workflows/documentation.yml"
   merge_group:
 
 permissions:

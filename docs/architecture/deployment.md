@@ -18,6 +18,19 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
   - lockfiles are committed (`Cargo.lock`, `bun.lock`);
   - Renovate groups updates weekly, auto-merges dev-dependency patches after checks, and raises security updates immediately.
 
+### Git and merge rules in code
+
+- **`tools/github/configure-repository.sh`** applies the settings by API, idempotently (#48):
+  - squash-only merging, with the PR title as the commit subject, and head branches deleted on merge;
+  - secret scanning with push protection;
+  - a `main` ruleset with no deletion or force push, linear history, a PR with one approval, code-owner review and resolved conversations, and every required check passing on an up-to-date branch.
+- **`.github/CODEOWNERS`** covers `docs/adr/`, `docs/architecture/`, `MASTER_PROMPT.md`, `tools/architecture-checks/`, `.github/`, `deny.toml`, `renovate.json`, and the security and sync crates by name, before they exist.
+- **`pr-title.yml`** checks that the PR title is a Conventional Commit, since squash merges use it as the commit subject.
+- **`adr-approvals.yml`** requires a second approval when `docs/adr/` changes; GitHub rulesets cannot set approval counts per path.
+- **Bypass.** Repository admins may bypass the ruleset through a PR only. While the maintainer is the only reviewer, GitHub does not let them approve their own PR, so merges use this bypass, which GitHub records. It is removed once a second reviewer exists.
+- **Merge queue.** It needs an organization-owned repository. The workflows already listen for `merge_group`, so the queue can be turned on after a transfer. Until then, the strict status-check policy (an up-to-date branch) stands in for it.
+- **Public repository.** Rulesets, code scanning, dependency review and push protection on this account need a public repository; so the repository is public (#48).
+
 ## Workflows (§111–113)
 
 | Workflow | Trigger | Jobs |
@@ -38,9 +51,9 @@ Five workflows are in `.github/workflows/` (#47); every action is pinned to a fu
 
 - **`rust-ci.yml`** runs the table's jobs, plus a `fhir-corpus` job. That job fetches the R5 core package and examples with pinned SHA-256s (`tools/fhir/fetch-r5-core.sh`, `fetch-r5-examples.sh`), checks the element table, and runs the corpus and validation-budget tests in release. Coverage measures the crates whose `layer` is `domain` or `application`.
 - **`frontend-ci.yml`** runs install, `panda codegen`, `tsc`, lint with the boundary rule, the production build and the bundle scan. Vitest and component tests join it when the client has tests ([#173](https://github.com/carapai/people-centered-healthcare/issues/173)); the OpenAPI/TS type diff comes with [#50](https://github.com/carapai/people-centered-healthcare/issues/50).
-- **`security.yml`** and **`dependency-review.yml`** run as specified. CodeQL, the dependency graph behind dependency review, and push protection need GitHub Advanced Security while the repository is private, so those jobs fail until it is enabled. zizmor reports in the log instead of uploading SARIF.
-- **`documentation.yml`**: markdownlint (`.markdownlint-cli2.jsonc`), lychee (`lychee.toml`; this private repository's own URLs are excluded, and relative links are checked), Mermaid rendering (`tools/docs/render-mermaid.sh`), `surreal validate` with the pinned 3.3.5 binary, `surql-fmt --check`, and `tools/docs/check-adr-index.sh`. An applied migration is immutable (the runner records its SHA-256 and refuses a changed file), so `surql-fmt` checks a migration only in the PR that adds it, and never asks for an applied one to be reformatted.
-- **Not yet:** `integration-tests.yml`, `desktop-build.yml`, `edge-build.yml` and `release.yml` come with their tasks; branch protection, the merge queue and CODEOWNERS are [#48](https://github.com/carapai/people-centered-healthcare/issues/48).
+- **`security.yml`** and **`dependency-review.yml`** run as specified. CodeQL, dependency review and push protection need the repository to be public on this account (or GitHub Advanced Security). zizmor reports in the log instead of uploading SARIF.
+- **`documentation.yml`** runs on every PR, since its jobs are required checks: markdownlint (`.markdownlint-cli2.jsonc`), lychee (`lychee.toml`; this private repository's own URLs are excluded, and relative links are checked), Mermaid rendering (`tools/docs/render-mermaid.sh`), `surreal validate` with the pinned 3.3.5 binary, `surql-fmt --check`, and `tools/docs/check-adr-index.sh`. An applied migration is immutable (the runner records its SHA-256 and refuses a changed file), so `surql-fmt` checks a migration only in the PR that adds it, and never asks for an applied one to be reformatted.
+- **Not yet:** `integration-tests.yml`, `desktop-build.yml`, `edge-build.yml` and `release.yml` come with their tasks; branch protection and CODEOWNERS are below (§ Git and merge rules in code).
 
 ### Architecture enforcement (§109)
 

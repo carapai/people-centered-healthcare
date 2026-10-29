@@ -1,7 +1,8 @@
 # lychee link check (documentation.yml). Relative links between docs are always checked.
 
-# This repository is private, so its issue and file URLs are 404 to an unauthenticated
-# checker; the docs link the same files relatively, and those links are checked.
+# This repository's own GitHub URLs (about 380 issue and file links) are not checked: GitHub
+# rate-limits unauthenticated checkers, and the docs link the same files relatively, which
+# lychee does check.
 exclude = ["^https://github\\.com/carapai/people-centered-healthcare"]
 
 exclude_path = ["node_modules", "target", "third_party", ".claude", "MASTER_PROMPT.md"]

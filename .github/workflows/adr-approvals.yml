@@ -1,0 +1,43 @@
+# ADR changes need two approvals (ADR 0045; deployment.md § Git and merge rules). The
+# ruleset requires one approval and code-owner review; this check adds the second for
+# docs/adr/.
+name: adr-approvals
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+
+jobs:
+  approvals:
+    name: two approvals on ADR changes
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Count approvals when docs/adr/ changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          adr_files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename | select(startswith("docs/adr/"))')
+          if [[ -z "$adr_files" ]]; then
+            echo "No ADR changes."
+            exit 0
+          fi
+          # Each reviewer's latest decisive review counts; the author cannot approve.
+          approvals=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" --jq '.[] | select(.state != "COMMENTED") | [.user.login, .state] | @tsv' \
+            | awk -F'\t' -v author="$AUTHOR" '$1 != author { latest[$1] = $2 } END { n = 0; for (u in latest) if (latest[u] == "APPROVED") n++; print n }')
+          echo "ADR files changed:"
+          echo "$adr_files"
+          echo "Approvals: $approvals"
+          if (( approvals < 2 )); then
+            echo "::error::ADR changes need two approvals; this PR has $approvals."
+            exit 1
+          fi

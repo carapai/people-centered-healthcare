@@ -4,7 +4,7 @@ _Update after each task (AGENTS.md process step 4)._
 
 | Phase | Done | Total |
 |---|---|---|
-| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 5 | 11 |
+| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 6 | 11 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 12 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 19 of 109 implementation tasks done. Validation spikes open: 3.
+Total: 20 of 109 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -49,3 +49,4 @@ Total: 19 of 109 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #145 tier 3: `ProfileSet::compile` over StructureDefinition snapshots (refuses differential-only profiles and unsupported constructs) and `SnapshotValidator` behind `ProfileValidator`: cardinality, fixed/pattern, types, target profiles, extension definitions and contexts, profile invariants, slicing (value, pattern, exists, type, profile; closed, open, openAtEnd, ordered). Official vital-signs, heart-rate and BP profiles; every official example claiming them conforms. Engine patch 0008 (`as` on FHIR primitives). Split out #170 (2 ms budget); the Java differential joins #166; wiring is #91.
 - 2026-10-29: #170 validation budget: `HOLDS_BY_SHAPE` skips the hot core invariants (`dom-2`–`dom-5`, `ref-1`, `ref-2`, `qty-3`) where the node's shape proves they hold, each verified against the engine over the corpus; `tests/performance.rs` holds tiers 1–3 to p95 ≤ 2 ms. Tiers 1–3 p95 1.12 ms on 731 clinical examples (laptop), from 2.5–3.1 ms for tiers 1–2 alone; reference edge hardware pending.
 - 2026-10-29: #47 CI: rust-ci (fmt, clippy, build, nextest, doc tests, doc, architecture checks, deny, coverage ≥ 80% on domain and application crates, and a FHIR corpus job with checksum-verified downloads), frontend-ci, security, dependency-review and documentation workflows; actions pinned to SHAs by pinact; Renovate config; markdownlint config and doc fixes; ADR index check and Mermaid render scripts. CodeQL and dependency review wait for GitHub Advanced Security. Split out #173 (Vitest and component tests).
+- 2026-10-29: #48 merge rules: CODEOWNERS, PR-title Conventional Commit check, ADR two-approvals check, and tools/github/configure-repository.sh (squash only, push protection, the `main` ruleset with every CI job required). Needs the repository public on this account; the merge queue needs an organization.
