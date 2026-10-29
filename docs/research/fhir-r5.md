@@ -100,7 +100,7 @@ The spike was [Which R5 model crate passes the round-trip spike: helios-fhir or 
 - **`octofhir-fhirpath` 0.4.57.**
   - Paths, extensions and `ofType` gave the same results over JSON from both crates. `ofType` needs `octofhir-fhirschema` 0.3.30's `EmbeddedSchemaProvider::r5()`.
   - The README's example code does not compile against 0.4.57.
-  - **It loses decimal precision:** 0.010 became 0.0100000000000000002081668171, and a 30-digit value became `"1.2345678901234568e+29"`. Follow-up: [How does FHIRPath evaluation stay decimal-exact?](https://github.com/carapai/people-centered-healthcare/issues/143).
+  - **It loses decimal precision:** 0.010 became 0.0100000000000000002081668171, and a 30-digit value became `"1.2345678901234568e+29"`. The cause is that 14 places in 9 files go through `as_f64()` and `Decimal::from_f64_retain`. ADR 0052 fixes it with a patched fork.
 - **`helios-fhir-validator` 0.2.6** works on raw JSON.
   - On a hand-written profile with a `pattern` discriminator, it reports cardinality, slices and unknown elements correctly.
   - On the official vital-signs profile, which uses `value` discriminators, it gave a false positive. Its documentation says only `pattern` discriminators are evaluated.

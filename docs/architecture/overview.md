@@ -143,6 +143,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0049](../adr/0049-engine-native-definitions-as-profiled-library-and-plandefinition.md) | Engine-native Published Definitions are profiled Library resources, programs are profiled PlanDefinitions, and configuration stays JSON pinned by the manifest |
 | [0050](../adr/0050-fhir-r5-is-the-adopted-model-crate.md) | `fhir-r5` is the adopted R5 model crate, pinned exactly and guarded by a corpus round-trip in CI |
 | [0051](../adr/0051-raw-json-structural-check-before-typed-parsing.md) | Tier 1 runs on raw JSON before typed parsing; stored JSON is the validated input; failed external payloads go to an Inbound Dead Letter |
+| [0052](../adr/0052-fhirpath-decimals-are-exact-or-fail-closed.md) | FHIRPath decimals are exact or fail closed: a patched `octofhir-fhirpath`, and explicitly rounded stored computed values |
 
 ## Still open
 

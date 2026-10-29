@@ -148,4 +148,7 @@ A mapping can be published only if:
 1. every FHIRPath expression parses and type-checks against the Questionnaire's items;
 2. every target is accepted by its Owner's opt-in list;
 3. every fixture response produces exactly its expected Bundle;
-4. every output validates against its declared profile (ADR 0016 tiers).
+4. every output validates against its declared profile (ADR 0016 tiers);
+5. every value expression that does arithmetic or calls a floating-point function wraps its result in an explicit `round(n)` (ADR 0052).
+
+Decimal results keep their source scale when written, and the server recomputes every `calculatedExpression` on submit. If the server's value differs from the browser's, the server's value is stored (ADR 0052).

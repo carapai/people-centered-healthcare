@@ -20,4 +20,5 @@ We chose this because form logic evaluated on every keystroke cannot afford a ne
 
 ## Consequences
 
+- **Refined by ADR 0052:** the server recomputes every `calculatedExpression` on submit, and its value is stored.
 - Two engines can diverge. The conformance suite and the publication gate catch divergence before a form goes live.

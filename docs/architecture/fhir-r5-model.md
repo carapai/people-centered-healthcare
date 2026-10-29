@@ -1,6 +1,6 @@
 # FHIR R5 model, validation and search
 
-Status: **accepted** (ADRs 0015, 0016, 0050, 0051). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
+Status: **accepted** (ADRs 0015, 0016, 0050, 0051, 0052). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
 
 The physical storage of resources, history and index entries in SurrealDB is in [persistence.md](persistence.md). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
 
@@ -36,7 +36,10 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
 - FHIRPath runs behind a `FhirPathEngine` trait in `health-fhir-validation`.
 - The default implementation is `octofhir-fhirpath` over JSON, which passes 1176/1176 official tests and is independent of the model crate.
-- The spike found that it loses decimal precision (0.010 → 0.0100000000000000002…). The fix is decided in [How does FHIRPath evaluation stay decimal-exact?](https://github.com/carapai/people-centered-healthcare/issues/143).
+- **Decimal-exact (ADR 0052).** 0.4.57 converts JSON numbers through f64. We carry a patched fork, offered upstream, that builds decimals from the number's text.
+  - Results keep their source scale, so 1.50 stays 1.50.
+  - An expression over a decimal of more than 28 significant digits fails closed.
+  - A platform decimal conformance suite runs on every engine bump.
 - The official FHIRPath test suite runs in CI against the configured engine.
 - Terminology functions (`memberOf`, `subsumes`) delegate to the local terminology service.
 - Whether CQL is needed stays in the map's Not yet specified.

@@ -126,7 +126,7 @@ flowchart TD
 - **Renderer.** One `QuestionnaireRenderer` built on TanStack Form renders a Questionnaire with its Form Layout (configuration.md).
 - **Live behaviour** is evaluated client-side with **fhirpath.js**: `enableWhenExpression`, `calculatedExpression`, answer constraints, population preview.
 - **Server re-validation.** The server re-validates every submission, and extraction is Rust-only.
-- **Conformance.** A shared FHIRPath conformance suite runs in CI against fhirpath.js and `octofhir-fhirpath`. Expressions in published Questionnaires must evaluate identically in both, which is a publication gate.
+- **Conformance.** A shared FHIRPath conformance suite runs in CI against fhirpath.js and `octofhir-fhirpath`. Expressions in published Questionnaires must evaluate identically in both, which is a publication gate. The suite includes decimal fixtures. The server recomputes `calculatedExpression` values on submit, and its value wins (ADR 0052).
 - **Ordinary command forms** use TanStack Form with Zod schemas generated from the OpenAPI document.
 
 ## App shell
