@@ -144,5 +144,12 @@ We write our own migrations runner as a module of `health-surrealdb`. SurrealKit
 - **Schema migrations** are versioned, forward-only `.surql` files embedded in the binary. CI validates them with `surreal validate` and formats them with `surql-fmt`.
 - **Data migrations** (resource rewrites) are written in Rust.
 - **Startup.** Pending migrations are applied before the node reports ready (ADR 0007) and recorded in `_migration` with checksums. If an already-applied migration has been modified, startup fails.
+  - **Implementation.** `health-surrealdb::migrate` creates the `_migration` ledger itself (`SCHEMAFULL`: `name`, `checksum` as SHA-256 hex, `applied_at`).
+  - **Refusals before any change:** a modified applied migration, an applied migration the binary does not know (the binary is older than the data), or an out-of-order list.
+  - **Per-migration transaction.** Each pending migration runs in one transaction with its ledger row, so a failing migration applies nothing.
+  - **Layout.** Files live in `crates/infrastructure/health-surrealdb/migrations/NNNN_name.surql` and are listed in `MIGRATIONS`. A test checks the folder and the list match.
+  - **Snapshot.** The schema after migrating a fresh database is compared with `tests/fixtures/schema.snapshot`.
+- **Engines.** `Target::RocksDb` always opens `rocksdb://<path>?sync=every`. `Target::Remote` is central's server over WebSocket, with root sign-in. `Target::Memory` is for tests. Features `embedded`, `remote` and `memory` choose what is compiled in.
+- **Block cache.** The RocksDB block cache is capped through the service environment (`SURREAL_ROCKSDB_BLOCK_CACHE_SIZE`); SDK 3.3.5 reads RocksDB tuning from its config map, not the connection string. Whether the embedded engine honours the variable is unverified, and is to be measured with the edge hardware spikes.
 - **Reindexing** is a separate resumable job, never a migration.
 - **Testing.** Every migration also runs on the export → import round-trip fixture ([backup-and-recovery.md](backup-and-recovery.md)).
