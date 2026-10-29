@@ -1,0 +1,95 @@
+{
+ "name": "09-content-negotiation",
+ "spec": "https://hl7.org/fhir/R5/http.html#mime-type",
+ "steps": [
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+xml"
+    },
+    "form": "<Patient/>"
+   },
+   "expect": {
+    "status": 415
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "form": "{not json"
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "prefer": "return=minimal"
+    },
+    "body": {
+     "resourceType": "Patient"
+    }
+   },
+   "expect": {
+    "status": 201,
+    "headers": {
+     "location": "*",
+     "etag": "*"
+    },
+    "empty_body": true
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "prefer": "return=OperationOutcome"
+    },
+    "body": {
+     "resourceType": "Patient"
+    }
+   },
+   "expect": {
+    "status": 201,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    }
+   }
+  },
+  {
+   "note": "conditional create is not declared and is refused",
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "identifier=x|y"
+    },
+    "body": {
+     "resourceType": "Patient"
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "not-supported"
+    }
+   }
+  }
+ ]
+}

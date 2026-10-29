@@ -1,0 +1,93 @@
+{
+ "name": "03-update-requires-matching-id",
+ "spec": "https://hl7.org/fhir/R5/http.html#update",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:a}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:b}}",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:a}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient"
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/not-a-uuid",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "not-a-uuid",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "note": "the body must be the path's type",
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:a}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Observation",
+     "id": "{{uuid:a}}"
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  }
+ ]
+}

@@ -1,0 +1,101 @@
+{
+ "name": "01-create-read-vread",
+ "spec": "https://hl7.org/fhir/R5/http.html#create, #read, #vread",
+ "steps": [
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "client-chosen",
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "meta": {
+      "versionId": "client"
+     }
+    }
+   },
+   "expect": {
+    "status": 201,
+    "headers": {
+     "etag": "*",
+     "last-modified": "*",
+     "location": "*",
+     "content-type": "application/fhir+json; charset=utf-8"
+    },
+    "json": {
+     "/resourceType": "Patient",
+     "/name/0/family": "Akello"
+    }
+   },
+   "save": {
+    "id": "/id",
+    "vid": "/meta/versionId"
+   }
+  },
+  {
+   "note": "the server SHALL ignore the client id and versionId",
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{id}}"
+   },
+   "expect": {
+    "status": 200,
+    "headers": {
+     "etag": "W/\"{{vid}}\""
+    },
+    "json": {
+     "/id": "{{id}}",
+     "/meta/versionId": "{{vid}}"
+    },
+    "json_not": {
+     "/id": "client-chosen"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{id}}/_history/{{vid}}"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/meta/versionId": "{{vid}}"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{id}}",
+    "headers": {
+     "if-none-match": "W/\"{{vid}}\""
+    }
+   },
+   "expect": {
+    "status": 304
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{id}}/_history/{{uuid:other}}"
+   },
+   "expect": {
+    "status": 404,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/code": "not-found"
+    }
+   }
+  }
+ ]
+}

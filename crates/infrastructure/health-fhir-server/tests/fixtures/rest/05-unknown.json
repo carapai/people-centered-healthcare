@@ -1,0 +1,49 @@
+{
+ "name": "05-unknown",
+ "spec": "https://hl7.org/fhir/R5/http.html#read",
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:never}}"
+   },
+   "expect": {
+    "status": 404,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/code": "not-found"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/not-a-uuid"
+   },
+   "expect": {
+    "status": 404
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "NotAType/{{uuid:never}}"
+   },
+   "expect": {
+    "status": 404,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PATCH",
+    "path": "Patient/{{uuid:never}}"
+   },
+   "expect": {
+    "status": 405
+   }
+  }
+ ]
+}

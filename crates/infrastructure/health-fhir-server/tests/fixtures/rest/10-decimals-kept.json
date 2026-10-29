@@ -1,0 +1,55 @@
+{
+ "name": "10-decimals-kept",
+ "spec": "ADR 0051: reads serve the stored bytes",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Observation/{{uuid:o}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "form": "{\"resourceType\":\"Observation\",\"id\":\"{{uuid:o}}\",\"status\":\"final\",\"code\":{\"text\":\"x\"},\"valueQuantity\":{\"value\":1.50,\"unit\":\"kg\"}}"
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Observation/{{uuid:o}}"
+   },
+   "expect": {
+    "status": 200,
+    "body_contains": [
+     "\"value\":1.50"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Observation?_id={{uuid:o}}"
+   },
+   "expect": {
+    "status": 200,
+    "body_contains": [
+     "\"value\":1.50"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Observation/{{uuid:o}}/_history"
+   },
+   "expect": {
+    "status": 200,
+    "body_contains": [
+     "\"value\":1.50"
+    ]
+   }
+  }
+ ]
+}

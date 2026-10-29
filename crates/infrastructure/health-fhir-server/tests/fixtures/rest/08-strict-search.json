@@ -1,0 +1,80 @@
+{
+ "name": "08-strict-search",
+ "spec": "https://hl7.org/fhir/R5/search.html#errors",
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?nickname=x"
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/resourceType": "OperationOutcome",
+     "/issue/0/code": "not-supported"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?nickname=x",
+    "headers": {
+     "prefer": "handling=lenient"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/type": "searchset"
+    }
+   }
+  },
+  {
+   "note": "unsupported modifiers are rejected even when lenient",
+   "request": {
+    "method": "GET",
+    "path": "Patient?gender:text=f",
+    "headers": {
+     "prefer": "handling=lenient"
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?_sort=family"
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "not-supported"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?birthdate=1990-13"
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "invalid"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?_format=xml"
+   },
+   "expect": {
+    "status": 406
+   }
+  }
+ ]
+}

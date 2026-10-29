@@ -1,0 +1,22 @@
+{
+ "name": "11-metadata",
+ "spec": "https://hl7.org/fhir/R5/http.html#capabilities",
+ "steps": [
+  {
+   "request": {
+    "method": "GET",
+    "path": "metadata"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/resourceType": "CapabilityStatement",
+     "/fhirVersion": "5.0.0",
+     "/kind": "instance",
+     "/rest/0/mode": "server",
+     "/rest/0/interaction/0/code": "history-system"
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,163 @@
+{
+ "name": "02-update-as-create-and-if-match",
+ "spec": "https://hl7.org/fhir/R5/http.html#update, #concurrency",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 201,
+    "headers": {
+     "location": "*"
+    }
+   },
+   "save": {
+    "v1": "/meta/versionId"
+   }
+  },
+  {
+   "note": "an update without If-Match is refused",
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Atim",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 428,
+    "json": {
+     "/resourceType": "OperationOutcome"
+    }
+   }
+  },
+  {
+   "note": "a stale ETag is 412",
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-match": "W/\"{{uuid:stale}}\""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Atim",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 412,
+    "json": {
+     "/issue/0/code": "conflict"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-match": "W/\"{{v1}}\""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Atim",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "headers": {
+     "etag": "*"
+    },
+    "headers_absent": [
+     "location"
+    ],
+    "json": {
+     "/name/0/family": "Atim"
+    }
+   },
+   "save": {
+    "v2": "/meta/versionId"
+   }
+  },
+  {
+   "note": "the old version is still readable",
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}/_history/{{v1}}"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/name/0/family": "Akello"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 200,
+    "headers": {
+     "etag": "W/\"{{v2}}\""
+    }
+   }
+  }
+ ]
+}

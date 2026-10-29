@@ -1,0 +1,178 @@
+{
+ "name": "06-history",
+ "spec": "https://hl7.org/fhir/R5/http.html#history",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 201
+   },
+   "save": {
+    "v1": "/meta/versionId"
+   }
+  },
+  {
+   "note": "versions in distinct milliseconds, so _since is exact",
+   "sleep_ms": 5
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-match": "W/\"{{v1}}\""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Atim",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 200
+   },
+   "save": {
+    "v2": "/meta/versionId",
+    "t2": "/meta/lastUpdated"
+   }
+  },
+  {
+   "sleep_ms": 5
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 204
+   }
+  },
+  {
+   "note": "newest first (oldest last), deletes included without a resource",
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}/_history"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/resourceType": "Bundle",
+     "/type": "history",
+     "/entry/0/request/method": "DELETE",
+     "/entry/1/request/method": "PUT",
+     "/entry/1/resource/meta/versionId": "{{v2}}",
+     "/entry/2/request/method": "POST",
+     "/entry/2/resource/meta/versionId": "{{v1}}",
+     "/entry/2/response/etag": "W/\"{{v1}}\""
+    },
+    "json_len": {
+     "/entry": 3
+    },
+    "json_absent": [
+     "/entry/0/resource"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}/_history?_count=1"
+   },
+   "expect": {
+    "status": 200,
+    "json_len": {
+     "/entry": 1
+    },
+    "json": {
+     "/entry/0/request/method": "DELETE"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}/_history?_since={{t2}}"
+   },
+   "expect": {
+    "status": 200,
+    "json_len": {
+     "/entry": 2
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/_history"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/type": "history"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "_history?_count=2"
+   },
+   "expect": {
+    "status": 200,
+    "json_len": {
+     "/entry": 2
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:never}}/_history"
+   },
+   "expect": {
+    "status": 404
+   }
+  },
+  {
+   "note": "_at is not supported yet and is refused, not ignored",
+   "request": {
+    "method": "GET",
+    "path": "Patient/_history?_at=2026"
+   },
+   "expect": {
+    "status": 400
+   }
+  }
+ ]
+}
