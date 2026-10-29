@@ -1,0 +1,42 @@
+# Licence policy for actions/dependency-review-action (deployment.md § Licences; ADR 0045).
+# The same allowlist as deny.toml; SurrealDB's BSL 1.1 is allowed only for its own crates.
+fail-on-severity: moderate
+license-check: true
+allow-licenses:
+  - MIT
+  - MIT-0
+  - Apache-2.0
+  - Apache-2.0 WITH LLVM-exception
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - Unicode-3.0
+  - Zlib
+  - MPL-2.0
+allow-dependencies-licenses:
+  - pkg:cargo/surrealdb
+  - pkg:cargo/surrealdb-catalog
+  - pkg:cargo/surrealdb-cnf
+  - pkg:cargo/surrealdb-collections
+  - pkg:cargo/surrealdb-common
+  - pkg:cargo/surrealdb-core
+  - pkg:cargo/surrealdb-datastore
+  - pkg:cargo/surrealdb-engine-api
+  - pkg:cargo/surrealdb-engine-local
+  - pkg:cargo/surrealdb-expr
+  - pkg:cargo/surrealdb-iam
+  - pkg:cargo/surrealdb-idx
+  - pkg:cargo/surrealdb-keyspace-macro
+  - pkg:cargo/surrealdb-kvs
+  - pkg:cargo/surrealdb-kvs-any
+  - pkg:cargo/surrealdb-kvs-mem
+  - pkg:cargo/surrealdb-kvs-rocksdb
+  - pkg:cargo/surrealdb-observe
+  - pkg:cargo/surrealdb-parse-common
+  - pkg:cargo/surrealdb-rpc
+  - pkg:cargo/surrealdb-runtime
+  - pkg:cargo/surrealdb-sql
+  - pkg:cargo/surrealdb-strand
+  - pkg:cargo/surrealdb-syn
+  - pkg:cargo/surrealdb-types
+  - pkg:cargo/surrealdb-types-derive

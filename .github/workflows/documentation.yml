@@ -1,0 +1,72 @@
+# Documentation checks (deployment.md § Workflows).
+name: documentation
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "**/*.surql"
+      - ".markdownlint-cli2.jsonc"
+      - "lychee.toml"
+      - "tools/docs/**"
+      - ".github/workflows/documentation.yml"
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  markdown:
+    name: markdownlint, ADR index, Mermaid
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bunx markdownlint-cli2@0.18.1
+      - run: tools/docs/check-adr-index.sh
+      - name: Render the Mermaid diagrams
+        run: |
+          bun add --global @mermaid-js/mermaid-cli@12.0.0
+          tools/docs/render-mermaid.sh
+
+  links:
+    name: lychee
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --config lychee.toml --no-progress "./**/*.md"
+          fail: true
+
+  surrealql:
+    name: surreal validate, surql-fmt
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Install SurrealDB 3.3.5 (the pinned server version)
+        run: |
+          curl --fail --silent --show-error --location --output surreal.tgz \
+            https://download.surrealdb.com/v3.3.5/surreal-v3.3.5.linux-amd64.tgz
+          echo "8f3bc163405085343fc6db9746a8e0cd55503c939802ad2b35a466675a9c09cf  surreal.tgz" | sha256sum --check
+          tar -xzf surreal.tgz
+          ./surreal version
+      - run: git ls-files '*.surql' | xargs ./surreal validate
+      - run: git ls-files '*.surql' | xargs bunx @surrealdb/surql-fmt@0.1.0-beta.3 --check

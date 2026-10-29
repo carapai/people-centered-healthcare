@@ -32,6 +32,16 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 | `release.yml` | Release tag | Build matrix, signing, SBOMs, provenance, publishing (below) |
 | `documentation.yml` | PR touching `docs/` or `*.surql` | markdownlint; `lychee` link check; Mermaid render; `surreal validate` plus `surql-fmt --check`; ADR numbering and index check |
 
+### Workflows in code
+
+Five workflows are in `.github/workflows/` (#47); every action is pinned to a full commit SHA by `pinact`, and Renovate (`renovate.json`) keeps the pins and groups updates weekly, with security fixes at any time.
+
+- **`rust-ci.yml`** runs the table's jobs, plus a `fhir-corpus` job. That job fetches the R5 core package and examples with pinned SHA-256s (`tools/fhir/fetch-r5-core.sh`, `fetch-r5-examples.sh`), checks the element table, and runs the corpus and validation-budget tests in release. Coverage measures the crates whose `layer` is `domain` or `application`.
+- **`frontend-ci.yml`** runs install, `panda codegen`, `tsc`, lint with the boundary rule, the production build and the bundle scan. Vitest and component tests join it when the client has tests ([#173](https://github.com/carapai/people-centered-healthcare/issues/173)); the OpenAPI/TS type diff comes with [#50](https://github.com/carapai/people-centered-healthcare/issues/50).
+- **`security.yml`** and **`dependency-review.yml`** run as specified. CodeQL, the dependency graph behind dependency review, and push protection need GitHub Advanced Security while the repository is private, so those jobs fail until it is enabled. zizmor reports in the log instead of uploading SARIF.
+- **`documentation.yml`**: markdownlint (`.markdownlint-cli2.jsonc`), lychee (`lychee.toml`; this private repository's own URLs are excluded, and relative links are checked), Mermaid rendering (`tools/docs/render-mermaid.sh`), `surreal validate` with the pinned 3.3.5 binary and `surql-fmt --check`, and `tools/docs/check-adr-index.sh`.
+- **Not yet:** `integration-tests.yml`, `desktop-build.yml`, `edge-build.yml` and `release.yml` come with their tasks; branch protection, the merge queue and CODEOWNERS are [#48](https://github.com/carapai/people-centered-healthcare/issues/48).
+
 ### Architecture enforcement (§109)
 
 | Detects | Check |

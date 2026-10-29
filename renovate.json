@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Weekly grouped updates, security fixes immediately, actions pinned to full SHAs (ADR 0045).",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver"],
+  "timezone": "Africa/Kampala",
+  "schedule": ["before 6am on monday"],
+  "semanticCommits": "enabled",
+  "dependencyDashboard": true,
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
+  "vulnerabilityAlerts": { "schedule": ["at any time"], "labels": ["security"] },
+  "osvVulnerabilityAlerts": true,
+  "ignorePaths": ["third_party/**"],
+  "packageRules": [
+    {
+      "description": "Actions: one weekly PR, pinned to SHAs with version comments.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Rust crates: one weekly PR for non-major updates.",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Rust crates"
+    },
+    {
+      "description": "Client packages: one weekly PR for non-major updates.",
+      "matchManagers": ["bun", "npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Client packages"
+    },
+    {
+      "description": "Exact pins (=x.y.z) are reviewed decisions: fhir-r5, surrealdb and the vendored engine. Bump them by hand.",
+      "matchManagers": ["cargo"],
+      "matchCurrentValue": "/^=/",
+      "enabled": false
+    }
+  ]
+}

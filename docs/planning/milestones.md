@@ -2,7 +2,6 @@
 
 _Generated from the backlog spec when the backlog was created (2026-10-28). GitHub issues are authoritative; update this file when the plan changes._
 
-
 ## [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1)
 
 Cargo and Bun workspaces, shared React app shell, central gateway skeleton, design system, CI and architecture checks (§125).
@@ -17,6 +16,7 @@ Cargo and Bun workspaces, shared React app shell, central gateway skeleton, desi
 - [Create central-server with the shared Axum router and telemetry](https://github.com/carapai/people-centered-healthcare/issues/49)
 - [Generate FHIR R5 TypeScript types and the OpenAPI client types](https://github.com/carapai/people-centered-healthcare/issues/50)
 - [Build tools/synthetic-data](https://github.com/carapai/people-centered-healthcare/issues/51)
+- [Run Vitest and component tests in frontend-ci](https://github.com/carapai/people-centered-healthcare/issues/173)
 
 ## [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2)
 

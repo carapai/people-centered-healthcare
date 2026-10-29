@@ -1,0 +1,13 @@
+# lychee link check (documentation.yml). Relative links between docs are always checked.
+
+# This repository is private, so its issue and file URLs are 404 to an unauthenticated
+# checker; the docs link the same files relatively, and those links are checked.
+exclude = ["^https://github\\.com/carapai/people-centered-healthcare"]
+
+exclude_path = ["node_modules", "target", "third_party", ".claude", "MASTER_PROMPT.md"]
+
+# Code spans and blocks hold example URLs, not links.
+include_verbatim = false
+
+max_retries = 3
+accept = ["200..=299", "429"]
