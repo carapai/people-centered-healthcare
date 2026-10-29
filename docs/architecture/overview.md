@@ -145,6 +145,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0051](../adr/0051-raw-json-structural-check-before-typed-parsing.md) | Tier 1 runs on raw JSON before typed parsing; stored JSON is the validated input; failed external payloads go to an Inbound Dead Letter |
 | [0052](../adr/0052-fhirpath-decimals-are-exact-or-fail-closed.md) | FHIRPath decimals are exact or fail closed: a patched `octofhir-fhirpath`, and explicitly rounded stored computed values |
 | [0053](../adr/0053-own-snapshot-driven-profile-validator.md) | Tier 3 profile validation is our own snapshot-driven validator, sharing the raw-JSON walker with tier 1 |
+| [0054](../adr/0054-frontend-toolchain-and-precise-fhirpath-js.md) | The frontend runs on Bun with TypeScript 7, and fhirpath.js runs in lossless precise mode over a gated expression subset |
 
 ## Still open
 

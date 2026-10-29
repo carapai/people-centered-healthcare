@@ -126,7 +126,7 @@ flowchart TD
 - **Renderer.** One `QuestionnaireRenderer` built on TanStack Form renders a Questionnaire with its Form Layout (configuration.md).
 - **Live behaviour** is evaluated client-side with **fhirpath.js**: `enableWhenExpression`, `calculatedExpression`, answer constraints, population preview.
 - **Server re-validation.** The server re-validates every submission, and extraction is Rust-only.
-- **Conformance.** A shared FHIRPath conformance suite runs in CI against fhirpath.js and `octofhir-fhirpath`. Expressions in published Questionnaires must evaluate identically in both, which is a publication gate. The suite includes decimal fixtures. The server recomputes `calculatedExpression` values on submit, and its value wins (ADR 0052).
+- **Conformance.** A shared FHIRPath conformance suite runs in CI against fhirpath.js and `octofhir-fhirpath`. Expressions in published Questionnaires must evaluate identically in both, and may use only constructs whose fixtures pass in both engines (ADR 0054); this is a publication gate. The suite includes decimal fixtures. The server recomputes `calculatedExpression` values on submit, and its value wins (ADR 0052).
 - **Ordinary command forms** use TanStack Form with Zod schemas generated from the OpenAPI document.
 
 ## App shell
@@ -162,13 +162,17 @@ flowchart TD
 - **Accessibility:** WCAG 2.2 AA; axe in CI; manual NVDA testing on Windows.
 - **Hardware targets:** low-end Windows PCs at 1366×768, and tablets with touch-target sizes.
 - **i18n:** ICU messages, externalized from the first screen. English first; the library is chosen in the scaffold.
-- **Pinned majors:** React 19, Router 1, Query 5, Form 1, Table 9, Virtual 3, XState 5, Ark UI 5, Panda 2, Zod 4, Vite 8, Bun 1.4. Prerelease majors are not adopted.
+- **Pinned majors:** React 19, Router 1, Query 5, Form 1, Table 9, Virtual 3, XState 5, Ark UI 5, Panda 2, Zod 4, Vite 8, Bun 1.4, TypeScript 7. Prerelease majors are not adopted.
 
-## Open checks
+## Toolchain verified (ADR 0054)
 
-[Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7?](https://github.com/carapai/people-centered-healthcare/issues/38) covers:
-- Panda under Bun, or the need for Node 22 instead;
-- TypeScript 7 compatibility;
-- the React Compiler's build cost;
-- the IPC round trip;
-- fhirpath.js conformance.
+These were checked by the spike [Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7?](https://github.com/carapai/people-centered-healthcare/issues/38).
+- **Bun.** Dev and build run under `bunx --bun vite`, and Node is not required.
+- **TypeScript 7.** We pin `typescript@7.0.2`. Tooling config files are checked separately with `skipLibCheck`.
+- **Panda 2.4.** The presets must be listed explicitly, and CI asserts that emitted CSS contains token variables.
+- **React Compiler.** It costs about 15 ms per component file.
+- **Tauri.** The `oneshot` IPC round trip into the Axum router matches HTTP.
+- **fhirpath.js 5.2:**
+  - It runs only over `lossless-json`-parsed resources with `preciseMath` and `keepDecimalTypes` on.
+  - It passes 1,139 of the official suite's 1,307 tests.
+  - Published Questionnaire expressions are limited to constructs that pass in both engines.
