@@ -1,0 +1,879 @@
+//! Addition (+) operator implementation
+//!
+//! Implements FHIRPath addition for numeric types and string concatenation.
+//! Uses octofhir_ucum for quantity arithmetic and handles temporal arithmetic.
+//!
+//! ## UCUM Unit Conversion for Quantities
+//!
+//! When adding quantities with different units, the operator attempts UCUM-based conversion:
+//! - Both quantities must have UCUM units (same system)
+//! - Units must be convertible (same dimension, e.g., length, mass, time)
+//! - Result is returned in the left operand's unit
+//! - If units are incompatible or non-UCUM, the operation returns empty
+
+use async_trait::async_trait;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
+use std::sync::Arc;
+
+use crate::core::temporal::CalendarDuration;
+use crate::core::{Collection, FhirPathType, FhirPathValue, Result, TypeSignature};
+use crate::evaluator::operator_registry::{
+    Associativity, EmptyPropagation, OperationEvaluator, OperatorMetadata, OperatorSignature,
+};
+use crate::evaluator::quantity_utils::convert_quantity;
+use crate::evaluator::{EvaluationContext, EvaluationResult};
+
+/// Addition operator evaluator
+pub struct AddOperatorEvaluator {
+    metadata: OperatorMetadata,
+}
+
+impl Default for AddOperatorEvaluator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AddOperatorEvaluator {
+    /// Create a new addition operator evaluator
+    pub fn new() -> Self {
+        Self {
+            metadata: create_add_metadata(),
+        }
+    }
+
+    /// Create an Arc-wrapped instance for registry registration
+    pub fn create() -> Arc<dyn OperationEvaluator> {
+        Arc::new(Self::new())
+    }
+
+    /// Perform addition on two FhirPathValues
+    fn add_values(&self, left: &FhirPathValue, right: &FhirPathValue) -> Option<FhirPathValue> {
+        match (left, right) {
+            // Integer addition
+            (FhirPathValue::Integer(l, _, _), FhirPathValue::Integer(r, _, _)) => {
+                Some(FhirPathValue::integer(l + r))
+            }
+
+            // Decimal addition
+            (FhirPathValue::Decimal(l, _, _), FhirPathValue::Decimal(r, _, _)) => {
+                Some(FhirPathValue::decimal(*l + *r))
+            }
+
+            // Integer + Decimal = Decimal
+            (FhirPathValue::Integer(l, _, _), FhirPathValue::Decimal(r, _, _)) => {
+                let left_decimal = Decimal::from(*l);
+                Some(FhirPathValue::decimal(left_decimal + *r))
+            }
+            (FhirPathValue::Decimal(l, _, _), FhirPathValue::Integer(r, _, _)) => {
+                let right_decimal = Decimal::from(*r);
+                Some(FhirPathValue::decimal(*l + right_decimal))
+            }
+
+            // Quantity addition - requires same units or compatible units via UCUM
+            (
+                FhirPathValue::Quantity {
+                    value: lv,
+                    unit: lu,
+                    code: lc,
+                    system: ls,
+                    ucum_unit: lu_ucum,
+                    ..
+                },
+                FhirPathValue::Quantity {
+                    value: rv,
+                    unit: ru,
+                    code: rc,
+                    system: rs,
+                    ucum_unit: ru_ucum,
+                    ..
+                },
+            ) => {
+                if lu == ru {
+                    // Same units - simple addition
+                    Some(FhirPathValue::quantity_with_components(
+                        *lv + *rv,
+                        lu.clone(),
+                        lc.clone().or_else(|| rc.clone()),
+                        ls.clone().or_else(|| rs.clone()),
+                    ))
+                } else if lu_ucum.is_some() && ru_ucum.is_some() {
+                    // Different units but both have UCUM - attempt conversion
+                    self.add_quantities_with_ucum(
+                        *lv,
+                        lu.clone(),
+                        lc.clone(),
+                        ls.clone(),
+                        *rv,
+                        ru.clone(),
+                        rc.clone(),
+                    )
+                } else {
+                    // Different units without UCUM or mixed UCUM/non-UCUM - incompatible
+                    None
+                }
+            }
+
+            // Date + Quantity (time-valued) = Date
+            (
+                FhirPathValue::Date(date, _, _),
+                FhirPathValue::Quantity {
+                    value,
+                    unit,
+                    ucum_unit,
+                    calendar_unit,
+                    ..
+                },
+            ) => {
+                if let Some(unit_str) = unit {
+                    self.add_temporal_quantity_with_type(
+                        &FhirPathValue::date(date.clone()),
+                        *value,
+                        unit_str,
+                        ucum_unit.is_some(),
+                        *calendar_unit,
+                    )
+                } else {
+                    None
+                }
+            }
+
+            // DateTime + Quantity (time-valued) = DateTime
+            (
+                FhirPathValue::DateTime(datetime, _, _),
+                FhirPathValue::Quantity {
+                    value,
+                    unit,
+                    ucum_unit,
+                    calendar_unit,
+                    ..
+                },
+            ) => {
+                if let Some(unit_str) = unit {
+                    self.add_temporal_quantity_with_type(
+                        &FhirPathValue::datetime(datetime.clone()),
+                        *value,
+                        unit_str,
+                        ucum_unit.is_some(),
+                        *calendar_unit,
+                    )
+                } else {
+                    None
+                }
+            }
+
+            // Time + Quantity (time-valued) = Time
+            (
+                FhirPathValue::Time(time, _, _),
+                FhirPathValue::Quantity {
+                    value,
+                    unit,
+                    ucum_unit,
+                    calendar_unit,
+                    ..
+                },
+            ) => {
+                if let Some(unit_str) = unit {
+                    self.add_temporal_quantity_with_type(
+                        &FhirPathValue::time(time.clone()),
+                        *value,
+                        unit_str,
+                        ucum_unit.is_some(),
+                        *calendar_unit,
+                    )
+                } else {
+                    None
+                }
+            }
+
+            // String concatenation (+ operator acts as concatenation for strings)
+            (FhirPathValue::String(l, _, _), FhirPathValue::String(r, _, _)) => {
+                Some(FhirPathValue::string(format!("{l}{r}")))
+            }
+
+            // Invalid combinations
+            _ => None,
+        }
+    }
+
+    /// Add two quantities with UCUM unit conversion
+    ///
+    /// Attempts to convert the right quantity to the left quantity's unit and perform addition.
+    /// Returns None if the units are not convertible (different dimensions).
+    fn add_quantities_with_ucum(
+        &self,
+        left_value: Decimal,
+        left_unit_str: Option<String>,
+        left_code: Option<String>,
+        left_system: Option<String>,
+        right_value: Decimal,
+        right_unit_str: Option<String>,
+        right_code: Option<String>,
+    ) -> Option<FhirPathValue> {
+        // Get the target unit (left operand) - prefer code, fallback to unit string
+        let target_unit = left_code.as_deref().or(left_unit_str.as_deref())?;
+
+        // Get the source unit (right operand) - prefer code, fallback to unit string
+        let source_unit_for_ref = right_code.as_ref().or(right_unit_str.as_ref())?;
+
+        // Try to convert right quantity to left unit using existing conversion infrastructure
+        let converted = convert_quantity(
+            right_value,
+            &Some(source_unit_for_ref.clone()),
+            &None, // calendar_unit - we know both are UCUM units
+            target_unit,
+        )
+        .ok()?;
+
+        // Perform addition in left unit
+        let result_value = left_value + converted.value;
+
+        // Return result in left operand's unit
+        Some(FhirPathValue::quantity_with_components(
+            result_value,
+            left_unit_str,
+            left_code,
+            left_system,
+        ))
+    }
+
+    /// Add a time-valued quantity to a temporal value with type information
+    fn add_temporal_quantity_with_type(
+        &self,
+        temporal: &FhirPathValue,
+        quantity_value: Decimal,
+        _unit: &str,
+        is_ucum_unit: bool,
+        calendar_unit: Option<crate::core::CalendarUnit>,
+    ) -> Option<FhirPathValue> {
+        use crate::core::CalendarUnit;
+
+        // Check for UCUM units that should trigger execution errors
+        // Per FHIRPath spec, only calendar unit names are valid for temporal arithmetic
+        if is_ucum_unit {
+            return None; // This will cause an evaluation error
+        }
+
+        // Use the already parsed calendar unit
+        let calendar_unit = calendar_unit?;
+
+        // Per FHIRPath spec: "For precisions above seconds, the decimal portion is ignored"
+        // For seconds and milliseconds, we can still handle fractional conversion
+        let value = match calendar_unit {
+            CalendarUnit::Second | CalendarUnit::Millisecond => {
+                if quantity_value.fract() == Decimal::ZERO {
+                    quantity_value.to_i64()?
+                } else {
+                    // For fractional values with fixed-duration units, convert to smaller unit
+                    match calendar_unit {
+                        CalendarUnit::Second => {
+                            // Convert fractional seconds to milliseconds
+                            let ms = quantity_value * Decimal::from(1000);
+                            if ms.fract() == Decimal::ZERO {
+                                let duration =
+                                    CalendarDuration::new(ms.to_i64()?, CalendarUnit::Millisecond);
+                                return self.apply_calendar_duration(temporal, duration);
+                            } else {
+                                return None; // Can't handle sub-millisecond precision
+                            }
+                        }
+                        CalendarUnit::Minute => {
+                            // Convert fractional minutes to seconds
+                            let seconds = quantity_value * Decimal::from(60);
+                            if seconds.fract() == Decimal::ZERO {
+                                let duration =
+                                    CalendarDuration::new(seconds.to_i64()?, CalendarUnit::Second);
+                                return self.apply_calendar_duration(temporal, duration);
+                            } else {
+                                // Try milliseconds
+                                let ms = seconds * Decimal::from(1000);
+                                if ms.fract() == Decimal::ZERO {
+                                    let duration = CalendarDuration::new(
+                                        ms.to_i64()?,
+                                        CalendarUnit::Millisecond,
+                                    );
+                                    return self.apply_calendar_duration(temporal, duration);
+                                } else {
+                                    return None; // Can't handle sub-millisecond precision
+                                }
+                            }
+                        }
+                        CalendarUnit::Hour => {
+                            // Convert fractional hours to minutes
+                            let minutes = quantity_value * Decimal::from(60);
+                            if minutes.fract() == Decimal::ZERO {
+                                let duration =
+                                    CalendarDuration::new(minutes.to_i64()?, CalendarUnit::Minute);
+                                return self.apply_calendar_duration(temporal, duration);
+                            } else {
+                                // Try seconds
+                                let seconds = minutes * Decimal::from(60);
+                                if seconds.fract() == Decimal::ZERO {
+                                    let duration = CalendarDuration::new(
+                                        seconds.to_i64()?,
+                                        CalendarUnit::Second,
+                                    );
+                                    return self.apply_calendar_duration(temporal, duration);
+                                } else {
+                                    // Try milliseconds
+                                    let ms = seconds * Decimal::from(1000);
+                                    if ms.fract() == Decimal::ZERO {
+                                        let duration = CalendarDuration::new(
+                                            ms.to_i64()?,
+                                            CalendarUnit::Millisecond,
+                                        );
+                                        return self.apply_calendar_duration(temporal, duration);
+                                    } else {
+                                        return None; // Can't handle sub-millisecond precision
+                                    }
+                                }
+                            }
+                        }
+                        CalendarUnit::Day => {
+                            // Convert fractional days to hours
+                            let hours = quantity_value * Decimal::from(24);
+                            if hours.fract() == Decimal::ZERO {
+                                let duration =
+                                    CalendarDuration::new(hours.to_i64()?, CalendarUnit::Hour);
+                                return self.apply_calendar_duration(temporal, duration);
+                            } else {
+                                // Try minutes
+                                let minutes = hours * Decimal::from(60);
+                                if minutes.fract() == Decimal::ZERO {
+                                    let duration = CalendarDuration::new(
+                                        minutes.to_i64()?,
+                                        CalendarUnit::Minute,
+                                    );
+                                    return self.apply_calendar_duration(temporal, duration);
+                                } else {
+                                    // Try seconds
+                                    let seconds = minutes * Decimal::from(60);
+                                    if seconds.fract() == Decimal::ZERO {
+                                        let duration = CalendarDuration::new(
+                                            seconds.to_i64()?,
+                                            CalendarUnit::Second,
+                                        );
+                                        return self.apply_calendar_duration(temporal, duration);
+                                    } else {
+                                        // Try milliseconds (7.7 days = 7.7 * 24 * 60 * 60 * 1000 = 665,280,000 ms)
+                                        let ms = seconds * Decimal::from(1000);
+                                        if ms.fract() == Decimal::ZERO {
+                                            let duration = CalendarDuration::new(
+                                                ms.to_i64()?,
+                                                CalendarUnit::Millisecond,
+                                            );
+                                            return self
+                                                .apply_calendar_duration(temporal, duration);
+                                        } else {
+                                            return None; // Can't handle sub-millisecond precision
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        CalendarUnit::Week => {
+                            // Convert fractional weeks to days
+                            let days = quantity_value * Decimal::from(7);
+                            if days.fract() == Decimal::ZERO {
+                                let duration =
+                                    CalendarDuration::new(days.to_i64()?, CalendarUnit::Day);
+                                return self.apply_calendar_duration(temporal, duration);
+                            } else {
+                                // Continue converting down the chain like days
+                                let hours = days * Decimal::from(24);
+                                if hours.fract() == Decimal::ZERO {
+                                    let duration =
+                                        CalendarDuration::new(hours.to_i64()?, CalendarUnit::Hour);
+                                    return self.apply_calendar_duration(temporal, duration);
+                                } else {
+                                    let minutes = hours * Decimal::from(60);
+                                    if minutes.fract() == Decimal::ZERO {
+                                        let duration = CalendarDuration::new(
+                                            minutes.to_i64()?,
+                                            CalendarUnit::Minute,
+                                        );
+                                        return self.apply_calendar_duration(temporal, duration);
+                                    } else {
+                                        let seconds = minutes * Decimal::from(60);
+                                        if seconds.fract() == Decimal::ZERO {
+                                            let duration = CalendarDuration::new(
+                                                seconds.to_i64()?,
+                                                CalendarUnit::Second,
+                                            );
+                                            return self
+                                                .apply_calendar_duration(temporal, duration);
+                                        } else {
+                                            let ms = seconds * Decimal::from(1000);
+                                            if ms.fract() == Decimal::ZERO {
+                                                let duration = CalendarDuration::new(
+                                                    ms.to_i64()?,
+                                                    CalendarUnit::Millisecond,
+                                                );
+                                                return self
+                                                    .apply_calendar_duration(temporal, duration);
+                                            } else {
+                                                return None; // Can't handle sub-millisecond precision
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => return None, // Calendar units like month/year don't support fractional values in FHIRPath
+                    }
+                }
+            }
+            _ => {
+                // For all other calendar units, truncate fractional values per FHIRPath spec
+                quantity_value.trunc().to_i64()?
+            }
+        };
+
+        let duration = CalendarDuration::new(value, calendar_unit);
+        self.apply_calendar_duration(temporal, duration)
+    }
+
+    /// Apply a calendar duration to a temporal value
+    fn apply_calendar_duration(
+        &self,
+        temporal: &FhirPathValue,
+        duration: CalendarDuration,
+    ) -> Option<FhirPathValue> {
+        match temporal {
+            FhirPathValue::Date(precision_date, _, _) => duration
+                .add_to_date(precision_date)
+                .ok()
+                .map(FhirPathValue::date),
+            FhirPathValue::DateTime(precision_datetime, _, _) => duration
+                .add_to_datetime(precision_datetime)
+                .ok()
+                .map(FhirPathValue::datetime),
+            FhirPathValue::Time(precision_time, _, _) => {
+                // For time arithmetic, we need to handle time-only duration addition
+                self.add_duration_to_time(precision_time, &duration)
+            }
+            _ => None,
+        }
+    }
+
+    /// Add a calendar duration to a time value (handles wrapping around 24 hours)
+    fn add_duration_to_time(
+        &self,
+        time: &crate::core::temporal::PrecisionTime,
+        duration: &CalendarDuration,
+    ) -> Option<FhirPathValue> {
+        use crate::core::temporal::PrecisionTime;
+        use chrono::Timelike;
+
+        // Only time units make sense for time addition
+        let total_ms = duration.to_milliseconds()?;
+
+        // Convert time to total milliseconds since midnight
+        let time_ms = time.time.hour() as i64 * 3_600_000
+            + time.time.minute() as i64 * 60_000
+            + time.time.second() as i64 * 1_000
+            + time.time.nanosecond() as i64 / 1_000_000;
+
+        // Add duration and handle wrap-around
+        let new_time_ms = (time_ms + total_ms) % (24 * 3_600_000);
+        let positive_time_ms = if new_time_ms < 0 {
+            new_time_ms + (24 * 3_600_000)
+        } else {
+            new_time_ms
+        };
+
+        // Convert back to time components
+        let hours = (positive_time_ms / 3_600_000) as u32;
+        let minutes = ((positive_time_ms % 3_600_000) / 60_000) as u32;
+        let seconds = ((positive_time_ms % 60_000) / 1_000) as u32;
+        let milliseconds = (positive_time_ms % 1_000) as u32;
+
+        // Create new time
+        let nanoseconds = milliseconds * 1_000_000;
+        let new_time = chrono::NaiveTime::from_hms_nano_opt(hours, minutes, seconds, nanoseconds)?;
+        let precision_time = PrecisionTime::new(new_time, time.precision);
+
+        Some(FhirPathValue::time(precision_time))
+    }
+}
+
+#[async_trait]
+impl OperationEvaluator for AddOperatorEvaluator {
+    async fn evaluate(
+        &self,
+        __input: Collection,
+        _context: &EvaluationContext,
+        left: Collection,
+        right: Collection,
+    ) -> Result<EvaluationResult> {
+        self.evaluate_sync(__input, _context, left, right)
+    }
+
+    fn supports_sync(&self) -> bool {
+        true
+    }
+
+    fn evaluate_sync(
+        &self,
+        __input: Collection,
+        _context: &EvaluationContext,
+        left: Collection,
+        right: Collection,
+    ) -> Result<EvaluationResult> {
+        // Empty propagation: if either operand is empty, result is empty
+        if left.is_empty() || right.is_empty() {
+            return Ok(EvaluationResult {
+                value: Collection::empty(),
+            });
+        }
+
+        // For arithmetic, we use the first elements (singleton evaluation)
+        let left_value = left.first().unwrap();
+        let right_value = right.first().unwrap();
+
+        match self.add_values(left_value, right_value) {
+            Some(result) => Ok(EvaluationResult {
+                value: Collection::single(result),
+            }),
+            None => {
+                // Check for specific error cases that should throw execution errors
+                match (left_value, right_value) {
+                    (
+                        FhirPathValue::Date(_, _, _),
+                        FhirPathValue::Quantity {
+                            unit, ucum_unit, ..
+                        },
+                    )
+                    | (
+                        FhirPathValue::DateTime(_, _, _),
+                        FhirPathValue::Quantity {
+                            unit, ucum_unit, ..
+                        },
+                    )
+                    | (
+                        FhirPathValue::Time(_, _, _),
+                        FhirPathValue::Quantity {
+                            unit, ucum_unit, ..
+                        },
+                    ) => {
+                        if let Some(unit_str) = unit {
+                            // Check for UCUM units that should trigger execution errors
+                            if ucum_unit.is_some() {
+                                return Err(crate::core::FhirPathError::evaluation_error(
+                                    crate::core::error_code::FP0081, // Invalid UCUM unit in temporal arithmetic
+                                    format!(
+                                        "Cannot add UCUM unit '{unit_str}' to a temporal value. Use word units instead"
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                Ok(EvaluationResult {
+                    value: Collection::empty(),
+                })
+            }
+        }
+    }
+
+    fn metadata(&self) -> &OperatorMetadata {
+        &self.metadata
+    }
+}
+
+/// Create metadata for the addition operator
+fn create_add_metadata() -> OperatorMetadata {
+    let signature = TypeSignature::polymorphic(
+        vec![FhirPathType::Any, FhirPathType::Any],
+        FhirPathType::Any, // Return type depends on operands
+    );
+
+    OperatorMetadata {
+        name: "+".to_string(),
+        description: "Addition for numeric types, temporal arithmetic, and string concatenation"
+            .to_string(),
+        signature: OperatorSignature {
+            signature,
+            overloads: vec![
+                // Numeric addition
+                TypeSignature::new(
+                    vec![FhirPathType::Integer, FhirPathType::Integer],
+                    FhirPathType::Integer,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::Decimal, FhirPathType::Decimal],
+                    FhirPathType::Decimal,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::Integer, FhirPathType::Decimal],
+                    FhirPathType::Decimal,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::Decimal, FhirPathType::Integer],
+                    FhirPathType::Decimal,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::Quantity, FhirPathType::Quantity],
+                    FhirPathType::Quantity,
+                ),
+                // Temporal arithmetic
+                TypeSignature::new(
+                    vec![FhirPathType::Date, FhirPathType::Quantity],
+                    FhirPathType::Date,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::DateTime, FhirPathType::Quantity],
+                    FhirPathType::DateTime,
+                ),
+                TypeSignature::new(
+                    vec![FhirPathType::Time, FhirPathType::Quantity],
+                    FhirPathType::Time,
+                ),
+                // String concatenation
+                TypeSignature::new(
+                    vec![FhirPathType::String, FhirPathType::String],
+                    FhirPathType::String,
+                ),
+            ],
+        },
+        empty_propagation: EmptyPropagation::Propagate,
+        deterministic: true,
+        precedence: 7, // FHIRPath arithmetic precedence
+        associativity: Associativity::Left,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::Collection;
+
+    #[tokio::test]
+    async fn test_add_integers() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::integer(5)];
+        let right = vec![FhirPathValue::integer(3)];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        assert_eq!(result.value.first().unwrap().as_integer(), Some(8));
+    }
+
+    #[tokio::test]
+    async fn test_add_decimals() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::decimal(Decimal::new(55, 1))];
+        let right = vec![FhirPathValue::decimal(Decimal::new(32, 1))];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        assert_eq!(
+            result.value.first().unwrap().as_decimal(),
+            Some(Decimal::new(87, 1))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_integer_decimal() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::integer(5)];
+        let right = vec![FhirPathValue::decimal(Decimal::new(35, 1))];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        assert_eq!(
+            result.value.first().unwrap().as_decimal(),
+            Some(Decimal::from_f64_retain(8.5).unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_strings() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::string("Hello".to_string())];
+        let right = vec![FhirPathValue::string(" World".to_string())];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        assert_eq!(
+            result.value.first().unwrap().as_string(),
+            Some("Hello World")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_quantities_same_unit() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::quantity(
+            Decimal::new(5, 0),
+            Some("kg".to_string()),
+        )];
+        let right = vec![FhirPathValue::quantity(
+            Decimal::new(3, 0),
+            Some("kg".to_string()),
+        )];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        if let FhirPathValue::Quantity { value, unit, .. } = result.value.first().unwrap() {
+            assert_eq!(*value, Decimal::from_f64_retain(8.0).unwrap());
+            assert_eq!(unit.as_deref(), Some("kg"));
+        } else {
+            panic!("Expected quantity result");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_empty_propagation() {
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        let left = vec![FhirPathValue::integer(5)];
+        let right = vec![]; // Empty collection
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert!(result.value.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_add_quantities_with_ucum_conversion() {
+        // Test adding 1000 mg + 2 g = 3 g (or 3000 mg, depending on left operand)
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        // Left: 2 g, Right: 1000 mg
+        // Expected: 3 g (result in left operand's unit)
+        let left = vec![FhirPathValue::quantity(
+            Decimal::new(2, 0),
+            Some("g".to_string()),
+        )];
+        let right = vec![FhirPathValue::quantity(
+            Decimal::new(1000, 0),
+            Some("mg".to_string()),
+        )];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        assert_eq!(result.value.len(), 1);
+        if let FhirPathValue::Quantity { value, unit, .. } = result.value.first().unwrap() {
+            // Result should be 3 g (2 g + 1 g from converted 1000 mg)
+            assert_eq!(*value, Decimal::new(3, 0));
+            assert_eq!(unit.as_deref(), Some("g"));
+        } else {
+            panic!("Expected quantity result");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_quantities_incompatible_units() {
+        // Test that incompatible units (e.g., length + mass) return empty
+        let evaluator = AddOperatorEvaluator::new();
+        let context = EvaluationContext::new(
+            Collection::empty(),
+            std::sync::Arc::new(crate::core::types::test_utils::create_test_model_provider()),
+            None,
+            None,
+            None,
+        );
+
+        // Left: 5 kg (mass), Right: 10 m (length)
+        let left = vec![FhirPathValue::quantity(
+            Decimal::new(5, 0),
+            Some("kg".to_string()),
+        )];
+        let right = vec![FhirPathValue::quantity(
+            Decimal::new(10, 0),
+            Some("m".to_string()),
+        )];
+
+        let result = evaluator
+            .evaluate(Collection::empty(), &context, left.into(), right.into())
+            .await
+            .unwrap();
+
+        // Incompatible dimensions should return empty
+        assert!(result.value.is_empty());
+    }
+}

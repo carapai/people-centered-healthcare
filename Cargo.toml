@@ -19,6 +19,8 @@ members = [
     "tools/architecture-checks",
     "tools/fhir-element-table",
 ]
+# Vendored upstream crates are path dependencies through [patch.crates-io], not members.
+exclude = ["third_party"]
 
 [workspace.package]
 version = "0.1.0"
@@ -48,6 +50,8 @@ fhir-r5 = "=4.2.3"
 form_urlencoded = "1.2.2"
 http-body-util = "0.1.3"
 jiff = "0.2.38"
+# Patched for decimal-exact evaluation (ADR 0052); see third_party/octofhir-fhirpath.
+octofhir-fhirpath = "=0.4.57"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
@@ -82,3 +86,7 @@ dbg_macro = "warn"
 todo = "warn"
 unwrap_used = "warn"
 print_stdout = "warn"
+
+[patch.crates-io]
+# ADR 0052: the decimal-exact fork, vendored with its patches listed in PATCHES.md.
+octofhir-fhirpath = { path = "third_party/octofhir-fhirpath" }

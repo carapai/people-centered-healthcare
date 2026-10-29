@@ -1,0 +1,216 @@
+//! DefineVariable function implementation
+//!
+//! The defineVariable function allows defining a variable within an expression scope.
+//! It evaluates the value expression and makes it available under the specified variable name.
+//! Syntax: defineVariable(name, value)
+
+use std::sync::Arc;
+
+use crate::ast::ExpressionNode;
+use crate::core::{Collection, FhirPathError, FhirPathValue, Result};
+use crate::evaluator::function_registry::{
+    ArgumentEvaluationStrategy, EmptyPropagation, FunctionCategory, FunctionMetadata,
+    FunctionParameter, FunctionSignature, LazyFunctionEvaluator, NullPropagationStrategy,
+};
+use crate::evaluator::{AsyncNodeEvaluator, EvaluationContext, EvaluationResult};
+
+/// DefineVariable function evaluator
+pub struct DefineVariableFunctionEvaluator {
+    metadata: FunctionMetadata,
+}
+
+impl DefineVariableFunctionEvaluator {
+    /// Create a new defineVariable function evaluator
+    pub fn create() -> Arc<dyn LazyFunctionEvaluator> {
+        Arc::new(Self {
+            metadata: FunctionMetadata {
+                name: "defineVariable".to_string(),
+                description: "Defines a variable within an expression scope. Evaluates the value expression and makes it available under the specified variable name.".to_string(),
+                signature: FunctionSignature {
+                    input_type: "Collection".to_string(),
+                    parameters: vec![
+                        FunctionParameter {
+                            name: "name".to_string(),
+                            parameter_type: vec!["String".to_string()],
+                            optional: false,
+                            is_expression: false,
+                            description: "The variable name to define".to_string(),
+                            default_value: None,
+                        },
+                        FunctionParameter {
+                            name: "value".to_string(),
+                            parameter_type: vec!["Any".to_string()],
+                            optional: true,
+                            is_expression: true,
+                            description: "The value expression to assign to the variable (optional)".to_string(),
+                            default_value: None,
+                        }
+                    ],
+                    return_type: "Collection".to_string(),
+                    polymorphic: true,
+                    min_params: 1,
+                    max_params: Some(2),
+                },
+                argument_evaluation: ArgumentEvaluationStrategy::Current,
+                null_propagation: NullPropagationStrategy::Focus,
+                empty_propagation: EmptyPropagation::NoPropagation,
+                deterministic: true,
+                category: FunctionCategory::Utility,
+                requires_terminology: false,
+                requires_model: false,
+            },
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl LazyFunctionEvaluator for DefineVariableFunctionEvaluator {
+    async fn evaluate(
+        &self,
+        input: Collection,
+        context: &EvaluationContext,
+        args: Vec<ExpressionNode>,
+        evaluator: AsyncNodeEvaluator<'_>,
+    ) -> Result<EvaluationResult> {
+        self.evaluate_borrowed(input, context, &args, evaluator)
+            .await
+    }
+
+    async fn evaluate_borrowed(
+        &self,
+        input: Collection,
+        context: &EvaluationContext,
+        args: &[ExpressionNode],
+        evaluator: AsyncNodeEvaluator<'_>,
+    ) -> Result<EvaluationResult> {
+        if args.is_empty() || args.len() > 2 {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0053,
+                "defineVariable function requires one or two arguments (name, [value])".to_string(),
+            ));
+        }
+
+        // Evaluate the variable name in an isolated nested scope so that variables defined
+        // inside the name expression do not leak into other parameters or the outer scope.
+        let name_ctx = context.nest();
+        let name_result = evaluator.evaluate(&args[0], &name_ctx).await?;
+        let name_values: Vec<FhirPathValue> = name_result.value.iter().cloned().collect();
+
+        if name_values.len() != 1 {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0056,
+                "defineVariable function name argument must evaluate to a single value".to_string(),
+            ));
+        }
+
+        let variable_name = match &name_values[0] {
+            FhirPathValue::String(s, _, _) => s.clone(),
+            _ => {
+                return Err(FhirPathError::evaluation_error(
+                    crate::core::error_code::FP0057,
+                    "defineVariable function name argument must be a string".to_string(),
+                ));
+            }
+        };
+
+        // Validate variable name
+        if variable_name.is_empty() {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0057,
+                "defineVariable function name cannot be empty".to_string(),
+            ));
+        }
+
+        // Reserved/system variables that cannot be overridden
+        let is_reserved = matches!(
+            variable_name.as_str(),
+            "this"
+                | "$this"
+                | "index"
+                | "$index"
+                | "total"
+                | "$total"
+                | "context"
+                | "%context"
+                | "resource"
+                | "%resource"
+                | "terminologies"
+                | "sct"
+                | "loinc"
+        ) || variable_name.starts_with("vs-")
+            || variable_name.starts_with("ext-");
+        if is_reserved {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0058,
+                format!("Variable name '{variable_name}' is reserved and cannot be redefined"),
+            ));
+        }
+
+        // Check for valid identifier pattern (letters, numbers, underscore, but not starting with number)
+        if !variable_name.chars().next().unwrap_or('0').is_alphabetic()
+            && !variable_name.starts_with('_')
+        {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0057,
+                "defineVariable function name must start with a letter or underscore".to_string(),
+            ));
+        }
+
+        if !variable_name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_')
+        {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0057,
+                "defineVariable function name can only contain letters, numbers, and underscores"
+                    .to_string(),
+            ));
+        }
+
+        if context.get_variable(&variable_name).is_some() {
+            return Err(FhirPathError::evaluation_error(
+                crate::core::error_code::FP0058,
+                format!("Variable '{variable_name}' is already defined in this scope"),
+            ));
+        }
+
+        if args.len() == 1 {
+            // Single-parameter form: defineVariable(name) - assign current focus
+            let variable_value = if input.is_empty() {
+                FhirPathValue::Empty
+            } else if input.len() == 1 {
+                input.first().cloned().unwrap_or(FhirPathValue::Empty)
+            } else {
+                FhirPathValue::Collection(input.clone())
+            };
+            context.set_variable(variable_name, variable_value);
+        } else {
+            // Two-parameter form: defineVariable(name, value) - evaluate value expression
+            // Evaluate the value expression in an isolated child scope based on the current input
+            let child_context = context.create_child_context(input.clone());
+            let value_ctx = child_context.nest();
+            let value_result = evaluator.evaluate(&args[1], &value_ctx).await?;
+
+            let variable_value = if value_result.value.is_empty() {
+                FhirPathValue::Empty
+            } else if value_result.value.len() == 1 {
+                value_result
+                    .value
+                    .iter()
+                    .next()
+                    .cloned()
+                    .unwrap_or(FhirPathValue::Empty)
+            } else {
+                FhirPathValue::Collection(value_result.value.clone())
+            };
+            context.set_variable(variable_name, variable_value);
+        }
+
+        // Return original focus (input collection) - variable is now available in current scope
+        Ok(EvaluationResult { value: input })
+    }
+
+    fn metadata(&self) -> &FunctionMetadata {
+        &self.metadata
+    }
+}
