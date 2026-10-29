@@ -81,6 +81,7 @@ Packages, lifecycle, activation, terminology service, validation, forms and extr
 - [Implement the publication lifecycle at central](https://github.com/carapai/people-centered-healthcare/issues/88)
 - [Implement scoped activation, staging and rollback on nodes](https://github.com/carapai/people-centered-healthcare/issues/89)
 - [Implement the terminology service](https://github.com/carapai/people-centered-healthcare/issues/90)
+- [Build the snapshot-driven profile validator (tier 3)](https://github.com/carapai/people-centered-healthcare/issues/145)
 - [Implement validation tiers 3–4 (profiles and bindings)](https://github.com/carapai/people-centered-healthcare/issues/91)
 - [Build the Questionnaire renderer and Form Layouts](https://github.com/carapai/people-centered-healthcare/issues/92)
 - [Implement extraction and CompleteQuestionnaireResponse](https://github.com/carapai/people-centered-healthcare/issues/93)

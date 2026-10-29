@@ -54,7 +54,8 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#88](https://github.com/carapai/people-centered-healthcare/issues/88) | Implement the publication lifecycle at central | 6 | #86, #65 |  |
 | [#89](https://github.com/carapai/people-centered-healthcare/issues/89) | Implement scoped activation, staging and rollback on nodes | 6 | #88, #81 |  |
 | [#90](https://github.com/carapai/people-centered-healthcare/issues/90) | Implement the terminology service | 6 | #86, #58 |  |
-| [#91](https://github.com/carapai/people-centered-healthcare/issues/91) | Implement validation tiers 3–4 (profiles and bindings) | 6 | #59, #90 |  |
+| [#145](https://github.com/carapai/people-centered-healthcare/issues/145) | Build the snapshot-driven profile validator (tier 3) | 6 | #59 |  |
+| [#91](https://github.com/carapai/people-centered-healthcare/issues/91) | Implement validation tiers 3–4 (profiles and bindings) | 6 | #59, #90, #145 |  |
 | [#92](https://github.com/carapai/people-centered-healthcare/issues/92) | Build the Questionnaire renderer and Form Layouts | 6 | #62, #86, #45 |  |
 | [#93](https://github.com/carapai/people-centered-healthcare/issues/93) | Implement extraction and CompleteQuestionnaireResponse | 6 | #91, #92, #87 |  |
 | [#94](https://github.com/carapai/people-centered-healthcare/issues/94) | Implement $populate | 6 | #93 |  |
