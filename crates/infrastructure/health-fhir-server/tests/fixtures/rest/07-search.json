@@ -1,0 +1,127 @@
+{
+ "name": "07-search",
+ "spec": "https://hl7.org/fhir/R5/search.html",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:a}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:a}}",
+     "name": [
+      {
+       "family": "Okwir",
+       "given": [
+        "Moses"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:b}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:b}}",
+     "name": [
+      {
+       "family": "Okwir",
+       "given": [
+        "Ruth"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?family=okwir&_count=1"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/resourceType": "Bundle",
+     "/type": "searchset",
+     "/total": 2,
+     "/entry/0/search/mode": "match",
+     "/link/0/relation": "self",
+     "/link/1/relation": "next"
+    },
+    "json_len": {
+     "/entry": 1
+    }
+   },
+   "save": {
+    "next": "/link/1/url"
+   }
+  },
+  {
+   "note": "following next returns the rest",
+   "request": {
+    "method": "GET",
+    "url_from": "next"
+   },
+   "expect": {
+    "status": 200,
+    "json_len": {
+     "/entry": 1
+    },
+    "json_absent": [
+     "/link/1"
+    ]
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient/_search",
+    "headers": {
+     "content-type": "application/x-www-form-urlencoded"
+    },
+    "form": "name=ruth&family=okwir"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 1,
+     "/entry/0/resource/id": "{{uuid:b}}",
+     "/entry/0/fullUrl": "http://test/fhir/Patient/{{uuid:b}}"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?_id={{uuid:a}}"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 1
+    }
+   }
+  }
+ ]
+}

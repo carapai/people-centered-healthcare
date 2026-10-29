@@ -8,16 +8,20 @@
 //!
 //! - [`SurrealStore`] implements the `health-persistence` unit of work on SurrealDB interactive
 //!   transactions: heads, history, guards, counters, the outbox and search index entries.
+//! - [`SurrealTx::version`] and [`SurrealTx::history`] read stored versions for `vread` and
+//!   `_history`.
 //! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
 mod connection;
+mod history;
 mod migrations;
 pub mod ownership;
 pub mod search;
 mod store;
 
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
+pub use history::{HistoryEntry, HistoryScope};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
-pub use search::{ReindexJob, ReindexProgress, SearchFailure, SearchPage};
+pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SurrealStore, SurrealTx};

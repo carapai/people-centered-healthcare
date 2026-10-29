@@ -1,0 +1,128 @@
+{
+ "name": "04-delete",
+ "spec": "https://hl7.org/fhir/R5/http.html#delete",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 201
+   },
+   "save": {
+    "v1": "/meta/versionId"
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "if-match": "W/\"{{uuid:stale}}\""
+    }
+   },
+   "expect": {
+    "status": 412
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 204,
+    "headers": {
+     "etag": "*"
+    }
+   }
+  },
+  {
+   "note": "a deleted resource is 410",
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 410,
+    "json": {
+     "/issue/0/code": "deleted"
+    }
+   }
+  },
+  {
+   "note": "earlier versions stay readable",
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}/_history/{{v1}}"
+   },
+   "expect": {
+    "status": 200
+   }
+  },
+  {
+   "note": "deleting again has no effect",
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 204
+   }
+  },
+  {
+   "note": "a deleted resource is not recreated by update",
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "id": "{{uuid:p}}",
+     "name": [
+      {
+       "family": "Akello",
+       "given": [
+        "Grace"
+       ]
+      }
+     ],
+     "gender": "female",
+     "birthDate": "1990-05-17"
+    }
+   },
+   "expect": {
+    "status": 410
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient/{{uuid:never}}"
+   },
+   "expect": {
+    "status": 404
+   }
+  }
+ ]
+}

@@ -22,6 +22,9 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#56](https://github.com/carapai/people-centered-healthcare/issues/56) | Implement head/history storage and the write transaction | 2 | #55, #53, #52 |  |
 | [#57](https://github.com/carapai/people-centered-healthcare/issues/57) | Implement search index tables and the search compiler | 2 | #56 |  |
 | [#58](https://github.com/carapai/people-centered-healthcare/issues/58) | Implement the FHIR REST API | 2 | #56, #57, #49 |  |
+| [#157](https://github.com/carapai/people-centered-healthcare/issues/157) | Implement conditional create, update and delete | 2 | #58 |  |
+| [#158](https://github.com/carapai/people-centered-healthcare/issues/158) | Implement transaction and batch Bundles | 2 | #157 |  |
+| [#159](https://github.com/carapai/people-centered-healthcare/issues/159) | Enforce reference integrity on write and delete | 2 | #158 |  |
 | [#59](https://github.com/carapai/people-centered-healthcare/issues/59) | Implement validation tiers 1–2 on the write path | 2 | #53 |  |
 | [#60](https://github.com/carapai/people-centered-healthcare/issues/60) | Implement the content-addressed blob store | 2 | #55 |  |
 | [#61](https://github.com/carapai/people-centered-healthcare/issues/61) | Implement encrypted logical backup and the round-trip fixture | 2 | #55, #60 |  |

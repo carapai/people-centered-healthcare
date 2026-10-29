@@ -140,6 +140,23 @@ sequenceDiagram
 - `_history` at instance, type and system level: Bundle type `history`, oldest last, deletes included, `_since`, `_at` and `_count`.
 - `transaction` Bundles are one SurrealDB transaction, all or nothing. `batch` entries are independent transactions with per-entry results.
 
+### In code
+
+`health-fhir-server` serves these interactions over `health-surrealdb`:
+- read, vread, create, update and delete;
+- instance, type and system `_history`;
+- `search-type` over GET and POST.
+
+Its CapabilityStatement is generated from what is implemented, and a test exercises every interaction it declares. These rules are fixed:
+- **Updates.** Updating an existing resource without `If-Match` is 428. `PUT` to an unknown UUID creates it (`updateCreate`).
+- **Create.** `POST` ignores the client's `id` and mints a UUIDv7.
+- **Delete.** `DELETE` writes a tombstone and returns 204. Deleting again is 204, and deleting an unknown resource is 404. A deleted resource is not recreated by `PUT` (410).
+- **Conflicts.** A write that loses a write-write conflict reruns the whole use case, as `RetryPolicy` allows.
+- **History.** Bundles are newest first and take `_since` and `_count`; `_at` is refused for now. A version's `request.method` is inferred: DELETE for a tombstone, POST for the first version, PUT after that.
+- **Search.** `next` links use `_cursor` (keyset by resource id).
+- **Bodies.** Reads, search and history embed the stored bytes as they are stored.
+- **Not done here:** conditional interactions (#157), transaction and batch Bundles (#158) and reference integrity (#159). Until then they are not declared and their requests are refused.
+
 ## Reference integrity
 
 Checked in application code on write, not with SurrealDB `REFERENCE` constraints, because some dangling references are legitimate.

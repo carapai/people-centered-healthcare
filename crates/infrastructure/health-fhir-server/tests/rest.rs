@@ -1,0 +1,410 @@
+//! R5 REST conformance fixtures (`tests/fixtures/rest/*.json`) and the check that the
+//! CapabilityStatement matches behaviour, on SurrealDB 3.3.5 (in-memory engine).
+//!
+//! A fixture is a list of steps: a request, the expected status, headers and JSON (by JSON
+//! pointer), and values to save for later steps. `{{name}}` substitutes a saved value, and
+//! `{{uuid:name}}` a fresh UUIDv7 per fixture.
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Method, Request, StatusCode};
+use health_fhir_search::{Catalog, ParamState, Registry, Unrestricted};
+use health_fhir_server::{FhirServer, TYPE_INTERACTIONS};
+use health_identifiers::ResourceId;
+use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
+use health_time::SystemClock;
+use http_body_util::BodyExt;
+use serde_json::Value;
+use tower::ServiceExt;
+
+const BASE: &str = "http://test/fhir";
+
+fn registry() -> Registry {
+    let bundle: Value = serde_json::from_str(include_str!(
+        "../../../contracts/health-fhir-search/tests/fixtures/search-parameters.json"
+    ))
+    .expect("fixture");
+    let catalog = Catalog::from_definitions(
+        bundle["entry"]
+            .as_array()
+            .expect("entries")
+            .iter()
+            .map(|e| &e["resource"]),
+    );
+    let mut registry = Registry::new(jiff::tz::Offset::from_hours(3).expect("offset"));
+    for (resource_type, codes) in [
+        (
+            "Patient",
+            &[
+                "_id",
+                "_lastUpdated",
+                "name",
+                "family",
+                "birthdate",
+                "gender",
+                "identifier",
+            ][..],
+        ),
+        (
+            "Observation",
+            &["_id", "code", "subject", "date", "status"][..],
+        ),
+    ] {
+        for code in codes {
+            registry
+                .support(&catalog, resource_type, code, ParamState::Active)
+                .expect(code);
+        }
+    }
+    registry
+}
+
+async fn router() -> Router {
+    let settings = Settings {
+        target: Target::Memory,
+        namespace: "test".into(),
+        database: "main".into(),
+    };
+    let connection = Connection::open(&settings).await.expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let store = SurrealStore::new(connection, Arc::new(SystemClock)).with_registry(registry());
+    FhirServer::new(store, BASE, Arc::new(Unrestricted)).router()
+}
+
+struct Reply {
+    status: StatusCode,
+    headers: axum::http::HeaderMap,
+    body: String,
+}
+
+async fn send(
+    router: &Router,
+    method: &str,
+    path: &str,
+    headers: &[(String, String)],
+    body: String,
+) -> Reply {
+    let mut request = Request::builder()
+        .method(Method::from_bytes(method.as_bytes()).expect("method"))
+        .uri(path);
+    for (name, value) in headers {
+        request = request.header(name, value);
+    }
+    let response = router
+        .clone()
+        .oneshot(request.body(Body::from(body)).expect("request"))
+        .await
+        .expect("infallible");
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    Reply {
+        status,
+        headers,
+        body: String::from_utf8(bytes.to_vec()).expect("utf-8"),
+    }
+}
+
+struct Vars(BTreeMap<String, String>);
+
+impl Vars {
+    fn substitute(&mut self, text: &str) -> String {
+        let mut out = String::new();
+        let mut rest = text;
+        while let Some(start) = rest.find("{{") {
+            out.push_str(&rest[..start]);
+            let end = rest[start..].find("}}").expect("closing }}") + start;
+            let name = &rest[start + 2..end];
+            let value = if let Some(fresh) = name.strip_prefix("uuid:") {
+                self.0
+                    .entry(format!("uuid:{fresh}"))
+                    .or_insert_with(|| ResourceId::new().to_string())
+                    .clone()
+            } else {
+                self.0
+                    .get(name)
+                    .unwrap_or_else(|| panic!("unset {{{{{name}}}}}"))
+                    .clone()
+            };
+            out.push_str(&value);
+            rest = &rest[end + 2..];
+        }
+        out.push_str(rest);
+        out
+    }
+}
+
+async fn run_fixture(router: &Router, fixture: &Value) {
+    let name = fixture["name"].as_str().expect("name");
+    let mut vars = Vars(BTreeMap::new());
+    for (index, step) in fixture["steps"]
+        .as_array()
+        .expect("steps")
+        .iter()
+        .enumerate()
+    {
+        let at = format!("{name} step {index}");
+        if let Some(ms) = step["sleep_ms"].as_u64() {
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            continue;
+        }
+        let request = &step["request"];
+        let method = request["method"].as_str().expect("method");
+        let path = match request["url_from"].as_str() {
+            Some(var) => vars.0[var]
+                .strip_prefix(BASE)
+                .expect("absolute link")
+                .to_owned(),
+            None => format!(
+                "/{}",
+                vars.substitute(request["path"].as_str().expect("path"))
+            ),
+        };
+        let headers: Vec<(String, String)> = request["headers"]
+            .as_object()
+            .map(|h| {
+                h.iter()
+                    .map(|(k, v)| (k.clone(), vars.substitute(v.as_str().expect("header"))))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let body = match (&request["body"], request["form"].as_str()) {
+            (Value::Null, Some(form)) => vars.substitute(form),
+            (Value::Null, None) => String::new(),
+            (json, _) => vars.substitute(&json.to_string()),
+        };
+        let reply = send(router, method, &path, &headers, body).await;
+
+        let expect = &step["expect"];
+        assert_eq!(
+            u64::from(reply.status.as_u16()),
+            expect["status"].as_u64().expect("status"),
+            "{at}: {method} {path} → {}",
+            reply.body
+        );
+        for (header, value) in expect["headers"].as_object().into_iter().flatten() {
+            let actual = reply.headers.get(header).and_then(|v| v.to_str().ok());
+            let wanted = vars.substitute(value.as_str().expect("header value"));
+            if wanted == "*" {
+                assert!(actual.is_some(), "{at}: missing {header}");
+            } else {
+                assert_eq!(actual, Some(wanted.as_str()), "{at}: {header}");
+            }
+        }
+        for header in expect["headers_absent"].as_array().into_iter().flatten() {
+            let header = header.as_str().expect("header");
+            assert!(
+                !reply.headers.contains_key(header),
+                "{at}: unexpected {header}"
+            );
+        }
+        if expect["empty_body"] == Value::Bool(true) {
+            assert!(reply.body.is_empty(), "{at}: body {}", reply.body);
+        }
+        for needle in expect["body_contains"].as_array().into_iter().flatten() {
+            let needle = needle.as_str().expect("text");
+            assert!(
+                reply.body.contains(needle),
+                "{at}: body lacks {needle}: {}",
+                reply.body
+            );
+        }
+        let json: Value = if reply.body.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(&reply.body).unwrap_or_else(|e| panic!("{at}: not JSON ({e})"))
+        };
+        for (pointer, value) in expect["json"].as_object().into_iter().flatten() {
+            let wanted = match value {
+                Value::String(s) => Value::String(vars.substitute(s)),
+                other => other.clone(),
+            };
+            assert_eq!(
+                json.pointer(pointer),
+                Some(&wanted),
+                "{at}: {pointer} in {json}"
+            );
+        }
+        for (pointer, value) in expect["json_not"].as_object().into_iter().flatten() {
+            assert_ne!(json.pointer(pointer), Some(value), "{at}: {pointer}");
+        }
+        for pointer in expect["json_absent"].as_array().into_iter().flatten() {
+            let pointer = pointer.as_str().expect("pointer");
+            assert_eq!(json.pointer(pointer), None, "{at}: {pointer} present");
+        }
+        for (pointer, length) in expect["json_len"].as_object().into_iter().flatten() {
+            let actual = json
+                .pointer(pointer)
+                .and_then(Value::as_array)
+                .map(Vec::len);
+            let wanted = usize::try_from(length.as_u64().expect("length")).expect("usize");
+            assert_eq!(actual, Some(wanted), "{at}: length of {pointer}");
+        }
+        for (var, pointer) in step["save"].as_object().into_iter().flatten() {
+            let value = json
+                .pointer(pointer.as_str().expect("pointer"))
+                .and_then(Value::as_str)
+                .unwrap_or_else(|| panic!("{at}: nothing at {pointer} to save"));
+            vars.0.insert(var.clone(), value.to_owned());
+        }
+    }
+}
+
+#[tokio::test]
+async fn r5_rest_conformance_fixtures_pass() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rest");
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .expect("fixtures")
+        .map(|e| e.expect("entry").path())
+        .filter(|p| p.extension().is_some_and(|e| e == "json"))
+        .collect();
+    files.sort();
+    assert!(files.len() >= 11, "{files:?}");
+    let router = router().await;
+    for file in files {
+        let fixture: Value =
+            serde_json::from_str(&std::fs::read_to_string(&file).expect("read")).expect("json");
+        run_fixture(&router, &fixture).await;
+    }
+}
+
+/// An interaction, its request (method, path, headers, body) and its expected status.
+type Check<'a> = (
+    &'a str,
+    &'a str,
+    String,
+    &'a [(String, String)],
+    String,
+    StatusCode,
+);
+
+/// Exercises every interaction the CapabilityStatement declares on every declared type, and
+/// every declared search parameter, so a declaration without behaviour fails here.
+#[tokio::test]
+async fn the_capability_statement_matches_behaviour() {
+    let router = router().await;
+    let metadata = send(&router, "GET", "/metadata", &[], String::new()).await;
+    assert_eq!(metadata.status, StatusCode::OK);
+    let statement: Value = serde_json::from_str(&metadata.body).expect("json");
+    let rest = &statement["rest"][0];
+    let json = vec![(
+        "content-type".to_owned(),
+        "application/fhir+json".to_owned(),
+    )];
+    let resources = rest["resource"].as_array().expect("resources");
+    assert_eq!(resources.len(), 84);
+    for resource in resources {
+        let t = resource["type"].as_str().expect("type");
+        let codes: Vec<&str> = resource["interaction"]
+            .as_array()
+            .expect("interactions")
+            .iter()
+            .map(|i| i["code"].as_str().expect("code"))
+            .collect();
+        assert_eq!(codes, TYPE_INTERACTIONS, "{t}");
+        assert_eq!(resource["conditionalCreate"], false);
+
+        let id = ResourceId::new();
+        let body = format!(r#"{{"resourceType":"{t}","id":"{id}"}}"#);
+        let created = send(&router, "PUT", &format!("/{t}/{id}"), &json, body.clone()).await;
+        assert_eq!(
+            created.status,
+            StatusCode::CREATED,
+            "update-as-create {t}: {}",
+            created.body
+        );
+        let etag = created.headers["etag"].to_str().expect("etag").to_owned();
+        let vid = etag.trim_start_matches("W/").trim_matches('"').to_owned();
+        let mut with_etag = json.clone();
+        with_etag.push(("if-match".into(), etag));
+        let checks: [Check<'_>; 7] = [
+            (
+                "read",
+                "GET",
+                format!("/{t}/{id}"),
+                &[],
+                String::new(),
+                StatusCode::OK,
+            ),
+            (
+                "vread",
+                "GET",
+                format!("/{t}/{id}/_history/{vid}"),
+                &[],
+                String::new(),
+                StatusCode::OK,
+            ),
+            (
+                "update",
+                "PUT",
+                format!("/{t}/{id}"),
+                &with_etag,
+                body,
+                StatusCode::OK,
+            ),
+            (
+                "history-instance",
+                "GET",
+                format!("/{t}/{id}/_history"),
+                &[],
+                String::new(),
+                StatusCode::OK,
+            ),
+            (
+                "history-type",
+                "GET",
+                format!("/{t}/_history?_count=1"),
+                &[],
+                String::new(),
+                StatusCode::OK,
+            ),
+            (
+                "search-type",
+                "GET",
+                format!("/{t}?_count=1"),
+                &[],
+                String::new(),
+                StatusCode::OK,
+            ),
+            (
+                "create",
+                "POST",
+                format!("/{t}"),
+                &json,
+                format!(r#"{{"resourceType":"{t}"}}"#),
+                StatusCode::CREATED,
+            ),
+        ];
+        for (code, method, path, headers, body, status) in checks {
+            assert!(codes.contains(&code));
+            let reply = send(&router, method, &path, headers, body).await;
+            assert_eq!(reply.status, status, "{t} {code}: {}", reply.body);
+        }
+        let deleted = send(&router, "DELETE", &format!("/{t}/{id}"), &[], String::new()).await;
+        assert_eq!(deleted.status, StatusCode::NO_CONTENT, "{t} delete");
+
+        for param in resource["searchParam"].as_array().expect("searchParam") {
+            let name = param["name"].as_str().expect("name");
+            let reply = send(
+                &router,
+                "GET",
+                &format!("/{t}?{name}:missing=true"),
+                &[],
+                String::new(),
+            )
+            .await;
+            assert_eq!(reply.status, StatusCode::OK, "{t}?{name}: {}", reply.body);
+        }
+    }
+    let system = send(&router, "GET", "/_history?_count=3", &[], String::new()).await;
+    assert_eq!(rest["interaction"][0]["code"], "history-system");
+    assert_eq!(system.status, StatusCode::OK);
+}

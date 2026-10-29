@@ -8,6 +8,7 @@ members = [
     "crates/contracts/health-persistence",
     "crates/domains/health-client-registry",
     "crates/application/health-registries-app",
+    "crates/infrastructure/health-fhir-server",
     "crates/infrastructure/health-http",
     "crates/infrastructure/health-observability",
     "crates/infrastructure/health-surrealdb",
@@ -24,6 +25,7 @@ publish = false
 
 # Every crate, workspace or external, is declared here once; members use `{ workspace = true }`.
 [workspace.dependencies]
+health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
 health-http = { path = "crates/infrastructure/health-http" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
@@ -36,6 +38,7 @@ health-time = { path = "crates/foundation/health-time" }
 anyhow = "1.0.104"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
 cargo_metadata = "0.23.1"
+form_urlencoded = "1.2.2"
 http-body-util = "0.1.3"
 jiff = "0.2.38"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
