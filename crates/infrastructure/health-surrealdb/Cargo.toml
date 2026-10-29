@@ -1,6 +1,6 @@
 [package]
 name = "health-surrealdb"
-description = "SurrealDB adapter: unit of work, repositories, search translation and migrations (ADRs 0017–0018)."
+description = "SurrealDB adapter: connections, migrations, and (from #56) the unit of work and repositories (ADRs 0017-0018)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,4 +12,18 @@ layer = "infrastructure"
 [lints]
 workspace = true
 
+[features]
+# Adapters are chosen per runtime (dependency-rules.md rule 6): the edge and desktop embed RocksDB,
+# central connects to a server, and tests use the in-memory engine.
+embedded = ["surrealdb/kv-rocksdb"]
+remote = ["surrealdb/protocol-ws", "surrealdb/rustls"]
+memory = ["surrealdb/kv-mem"]
+
 [dependencies]
+sha2 = { workspace = true }
+surrealdb = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

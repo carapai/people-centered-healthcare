@@ -5,6 +5,15 @@ all-features = true
 
 [advisories]
 yanked = "deny"
+# Transitive through SurrealDB 3.3.5, with no semver-compatible fix. Each is reviewed on every
+# SurrealDB bump and removed as soon as the bump clears it (reviewed in #55).
+ignore = [
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 via jsonwebtoken in SurrealDB's own JWT access methods, which we do not use; fix needs 0.7" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack via jsonwebtoken in SurrealDB's JWT access methods, which we do not use; no fixed release" },
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained, via surrealmx in the in-memory engine used only by tests" },
+]
 
 [licenses]
 confidence-threshold = 0.9
@@ -27,18 +36,261 @@ allow = [
 [licenses.private]
 ignore = true
 
-# SurrealDB's Business Source License 1.1 is a documented exception (ADR 0045).
+# SurrealDB's Business Source License 1.1 is a documented exception (ADR 0045). The SurrealDB
+# crates ship the BSL text as LICENSE without a licence field, so each is clarified against that
+# file's hash (a changed licence text fails the check) and only these crates may be BUSL-1.1.
+[[licenses.clarify]]
+crate = "surrealdb"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-catalog"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-cnf"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-collections"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-common"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-core"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-datastore"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-engine-api"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-engine-local"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-expr"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-iam"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-idx"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-keyspace-macro"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-kvs"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-kvs-any"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-kvs-mem"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-kvs-rocksdb"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-observe"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-parse-common"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-rpc"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-runtime"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-sql"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-strand"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-syn"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-types"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-types-derive"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
 [[licenses.exceptions]]
 crate = "surrealdb"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-catalog"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-cnf"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-collections"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-common"
 allow = ["BUSL-1.1"]
 
 [[licenses.exceptions]]
 crate = "surrealdb-core"
 allow = ["BUSL-1.1"]
 
+[[licenses.exceptions]]
+crate = "surrealdb-datastore"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-engine-api"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-engine-local"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-expr"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-iam"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-idx"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-keyspace-macro"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-kvs"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-kvs-any"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-kvs-mem"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-kvs-rocksdb"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-observe"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-parse-common"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-rpc"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-runtime"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-sql"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-strand"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-syn"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-types"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-types-derive"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-protocol"
+allow = ["BUSL-1.1"]
+
+# Permissive licences outside the allowlist, allowed for one crate each (reviewed in #55).
+[[licenses.exceptions]]
+crate = "ext-sort" # pulled in by surrealdb-core
+allow = ["Unlicense"]
+
+[[licenses.exceptions]]
+crate = "webpki-roots" # Mozilla CA bundle, used by rustls for the remote engine
+allow = ["CDLA-Permissive-2.0"]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Workspace crates are unpublished path dependencies (publish = false).
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
