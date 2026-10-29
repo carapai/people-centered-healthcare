@@ -658,7 +658,8 @@ fn split_prefix(code: &str) -> Option<(crate::types::Prefix, &str)> {
     // Slower path: try 2-3 character prefixes
     // This handles cases like "da" (deca), "Ki" (kibi), etc.
     for len in (2..=3).rev() {
-        if len <= code.len() {
+        // Patch 0001: slice only at character boundaries.
+        if len <= code.len() && code.is_char_boundary(len) {
             let prefix_candidate = &code[..len];
             if let Some(prefix) = find_prefix_optimized(prefix_candidate) {
                 let remainder = &code[len..];

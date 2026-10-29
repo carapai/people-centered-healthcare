@@ -1,0 +1,73 @@
+diff --git a/third_party/octofhir-ucum/build.rs b/third_party/octofhir-ucum/build.rs
+index 500ba17..f6de3b8 100644
+--- a/third_party/octofhir-ucum/build.rs
++++ b/third_party/octofhir-ucum/build.rs
+@@ -903,7 +903,7 @@ fn main() {
+ 
+     // lookup functions
+     out.push_str("pub fn find_prefix(sym: &str) -> Option<&'static Prefix> {\n    PREFIXES.binary_search_by(|p| p.symbol.cmp(sym)).ok().map(|i| &PREFIXES[i])\n}\n\n");
+-    out.push_str("pub fn find_unit(code: &str) -> Option<&'static UnitRecord> {\n    // First try direct lookup\n    if let Ok(i) = UNITS.binary_search_by(|u| u.code.cmp(code)) {\n        return Some(&UNITS[i]);\n    }\n    \n    // If direct lookup fails, try to decompose into prefix + base unit\n    // Check all possible prefix lengths (longest first to avoid ambiguity)\n    for prefix_len in (1..code.len()).rev() {\n        let (prefix_part, unit_part) = code.split_at(prefix_len);\n        \n        // Check if prefix_part is a valid prefix and unit_part is a valid unit\n        if let (Some(_prefix), Some(_unit)) = (\n            find_prefix(prefix_part),\n            UNITS.binary_search_by(|u| u.code.cmp(unit_part)).ok().map(|i| &UNITS[i])\n        ) {\n            // For prefixed units, we don't return the base unit record directly\n            // because the caller would need to apply the prefix factor.\n            // Instead, we return None to indicate this should be handled by the parser.\n            // However, since the issue asks for find_unit to work with \"mg\",\n            // we'll return the base unit for now.\n            return Some(_unit);\n        }\n    }\n    \n    None\n}\n");
++    out.push_str("pub fn find_unit(code: &str) -> Option<&'static UnitRecord> {\n    // First try direct lookup\n    if let Ok(i) = UNITS.binary_search_by(|u| u.code.cmp(code)) {\n        return Some(&UNITS[i]);\n    }\n    \n    // If direct lookup fails, try to decompose into prefix + base unit\n    // Check all possible prefix lengths (longest first to avoid ambiguity)\n    for prefix_len in (1..code.len()).rev() {\n        // Patch 0001: split only at character boundaries (`m²` is not ASCII).\n        if !code.is_char_boundary(prefix_len) {\n            continue;\n        }\n        let (prefix_part, unit_part) = code.split_at(prefix_len);\n        \n        // Check if prefix_part is a valid prefix and unit_part is a valid unit\n        if let (Some(_prefix), Some(_unit)) = (\n            find_prefix(prefix_part),\n            UNITS.binary_search_by(|u| u.code.cmp(unit_part)).ok().map(|i| &UNITS[i])\n        ) {\n            // For prefixed units, we don't return the base unit record directly\n            // because the caller would need to apply the prefix factor.\n            // Instead, we return None to indicate this should be handled by the parser.\n            // However, since the issue asks for find_unit to work with \"mg\",\n            // we'll return the base unit for now.\n            return Some(_unit);\n        }\n    }\n    \n    None\n}\n");
+ 
+     fs::write(&dest, out).expect("write registry.rs");
+ 
+diff --git a/third_party/octofhir-ucum/src/evaluator.rs b/third_party/octofhir-ucum/src/evaluator.rs
+index 4a60c29..0113778 100644
+--- a/third_party/octofhir-ucum/src/evaluator.rs
++++ b/third_party/octofhir-ucum/src/evaluator.rs
+@@ -658,7 +658,8 @@ fn split_prefix(code: &str) -> Option<(crate::types::Prefix, &str)> {
+     // Slower path: try 2-3 character prefixes
+     // This handles cases like "da" (deca), "Ki" (kibi), etc.
+     for len in (2..=3).rev() {
+-        if len <= code.len() {
++        // Patch 0001: slice only at character boundaries.
++        if len <= code.len() && code.is_char_boundary(len) {
+             let prefix_candidate = &code[..len];
+             if let Some(prefix) = find_prefix_optimized(prefix_candidate) {
+                 let remainder = &code[len..];
+diff --git a/third_party/octofhir-ucum/src/lib.rs b/third_party/octofhir-ucum/src/lib.rs
+index 7d7a6c9..4bac6d1 100644
+--- a/third_party/octofhir-ucum/src/lib.rs
++++ b/third_party/octofhir-ucum/src/lib.rs
+@@ -1137,6 +1137,10 @@ pub fn get_common_display(code: &str) -> String {
+             // This is a prefixed unit, we need to construct the display name
+             // Check if it's a prefix + base unit combination
+             for prefix_len in (1..code.len()).rev() {
++                // Patch 0001: split only at character boundaries.
++                if !code.is_char_boundary(prefix_len) {
++                    continue;
++                }
+                 let (prefix_part, unit_part) = code.split_at(prefix_len);
+ 
+                 if let (Some(prefix), Some(base_unit)) =
+diff --git a/third_party/octofhir-ucum/src/parser.rs b/third_party/octofhir-ucum/src/parser.rs
+index ae9aef4..d2cfb59 100644
+--- a/third_party/octofhir-ucum/src/parser.rs
++++ b/third_party/octofhir-ucum/src/parser.rs
+@@ -288,8 +288,9 @@ impl<'a> Tokenizer<'a> {
+             let symbol = &self.input[start..self.pos];
+ 
+             // Check for implicit exponent (e.g., "m2")
+-            if let Some(exp_start) = symbol.rfind(|c: char| !c.is_ascii_digit()) {
+-                let exp_start = exp_start + 1;
++            if let Some((at, c)) = symbol.char_indices().rev().find(|(_, c)| !c.is_ascii_digit()) {
++                // Patch 0001: step over the whole character, which may be multi-byte (`²`).
++                let exp_start = at + c.len_utf8();
+                 if exp_start < symbol.len()
+                     && let Ok(_exp) = symbol[exp_start..].parse::<i32>()
+                 {
+diff --git a/third_party/octofhir-ucum/src/performance.rs b/third_party/octofhir-ucum/src/performance.rs
+index be019d1..4d55663 100644
+--- a/third_party/octofhir-ucum/src/performance.rs
++++ b/third_party/octofhir-ucum/src/performance.rs
+@@ -273,6 +273,10 @@ pub fn find_unit_optimized(code: &str) -> Option<&'static UnitRecord> {
+     // If direct lookup fails, try to decompose into prefix + base unit
+     // Check all possible prefix lengths (longest first to avoid ambiguity)
+     for prefix_len in (1..code.len()).rev() {
++        // Patch 0001: split only at character boundaries (`m²` is not ASCII).
++        if !code.is_char_boundary(prefix_len) {
++            continue;
++        }
+         let (prefix_part, unit_part) = code.split_at(prefix_len);
+ 
+         // Check if prefix_part is a valid prefix and unit_part is a valid unit

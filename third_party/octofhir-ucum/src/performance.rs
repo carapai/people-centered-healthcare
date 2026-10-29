@@ -273,6 +273,10 @@ pub fn find_unit_optimized(code: &str) -> Option<&'static UnitRecord> {
     // If direct lookup fails, try to decompose into prefix + base unit
     // Check all possible prefix lengths (longest first to avoid ambiguity)
     for prefix_len in (1..code.len()).rev() {
+        // Patch 0001: split only at character boundaries (`m²` is not ASCII).
+        if !code.is_char_boundary(prefix_len) {
+            continue;
+        }
         let (prefix_part, unit_part) = code.split_at(prefix_len);
 
         // Check if prefix_part is a valid prefix and unit_part is a valid unit

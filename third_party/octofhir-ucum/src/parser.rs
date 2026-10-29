@@ -288,8 +288,9 @@ impl<'a> Tokenizer<'a> {
             let symbol = &self.input[start..self.pos];
 
             // Check for implicit exponent (e.g., "m2")
-            if let Some(exp_start) = symbol.rfind(|c: char| !c.is_ascii_digit()) {
-                let exp_start = exp_start + 1;
+            if let Some((at, c)) = symbol.char_indices().rev().find(|(_, c)| !c.is_ascii_digit()) {
+                // Patch 0001: step over the whole character, which may be multi-byte (`²`).
+                let exp_start = at + c.len_utf8();
                 if exp_start < symbol.len()
                     && let Ok(_exp) = symbol[exp_start..].parse::<i32>()
                 {

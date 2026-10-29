@@ -1137,6 +1137,10 @@ pub fn get_common_display(code: &str) -> String {
             // This is a prefixed unit, we need to construct the display name
             // Check if it's a prefix + base unit combination
             for prefix_len in (1..code.len()).rev() {
+                // Patch 0001: split only at character boundaries.
+                if !code.is_char_boundary(prefix_len) {
+                    continue;
+                }
                 let (prefix_part, unit_part) = code.split_at(prefix_len);
 
                 if let (Some(prefix), Some(base_unit)) =
