@@ -1,6 +1,6 @@
 # FHIR R5 model, validation and search
 
-Status: **accepted** (ADRs 0015, 0016, 0050, 0051, 0052). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
+Status: **accepted** (ADRs 0015, 0016, 0050, 0051, 0052, 0053). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
 
 The physical storage of resources, history and index entries in SurrealDB is in [persistence.md](persistence.md). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
 
@@ -60,7 +60,12 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 | External or legacy inbound (integrations, R4 adapters) | Tier 1 strict; tiers 2–4 | Tier 1 failure: reject, and keep the raw payload in the **Inbound Dead Letter** (ADR 0051). Tier 2–4 failure: **quarantine** review queue |
 
 - If a code is missing from the node's **local** terminology snapshot, an offline write gets a warning, and central re-checks the code on ingest.
-- **Profile validator.** v1 starts with our structural and invariant checks plus profile snapshot evaluation. The spike found that `helios-fhir-validator` evaluates only `pattern` discriminators. The tier 3 engine is decided in [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).
+- **Profile validator (ADR 0053).** Tier 3 is our own validator behind a `ProfileValidator` trait. It extends the tier 1 raw-JSON walker and is driven by compiled snapshots.
+  - **Coverage:** cardinality, `fixed[x]` and `pattern[x]`, type and target-profile restrictions, extension contexts, profile invariants, and slicing with all five discriminator types and the `closed`, `open` and `openAtEnd` rules.
+  - **Snapshots and compilation.** Packages must ship snapshots, and a differential-only profile fails publication. Profiles are compiled at activation.
+  - **Unsupported constructs** fail package Validation.
+  - **Budget:** p95 ≤ 2 ms per resource for tiers 1–3 on reference edge hardware.
+  - **Rejected crates.** `helios-fhir-validator` cannot share a build with `fhir-r5`, and `octofhir-fhirschema` 0.3.30 drops slicing on base elements and never enforces `fixed` or `pattern`.
 - **HL7 Java validator.** It is a **CI oracle only**: test fixtures and generated examples are cross-checked against it. It is never shipped.
 
 ## Search parameters and indexed projections

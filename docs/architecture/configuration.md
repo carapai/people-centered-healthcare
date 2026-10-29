@@ -65,7 +65,7 @@ stateDiagram-v2
 | Step | What happens |
 |---|---|
 | Draft | Authored in the Clinical Metadata Studio at **central only**. Drafts never sync |
-| Validation | Automated: FHIR validation of every artefact; dependency resolution; FHIRPath type-checks; JSON Schema for configuration; the semver diff check; extraction fixtures; Owner opt-in check for mapping targets; override-point check; the R4 → R5 conversion report for imports |
+| Validation | Automated: FHIR validation of every artefact; every profile carries a snapshot, compiles, and uses only constructs the tier 3 validator supports (ADR 0053); dependency resolution; FHIRPath type-checks; JSON Schema for configuration; the semver diff check; extraction fixtures; Owner opt-in check for mapping targets; override-point check; the R4 → R5 conversion report for imports |
 | Simulation | `tests/` cases run in a sandbox: form fill and extraction, workflow paths, indicator outputs. The tooling UX is in the map's Studio fog |
 | Review | A reviewer who is not the author |
 | Approval | Two distinct approvers (neither the author) for clinical content (national core, terminology, program); one for configuration |

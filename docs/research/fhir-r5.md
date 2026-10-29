@@ -104,7 +104,17 @@ The spike was [Which R5 model crate passes the round-trip spike: helios-fhir or 
 - **`helios-fhir-validator` 0.2.6** works on raw JSON.
   - On a hand-written profile with a `pattern` discriminator, it reports cardinality, slices and unknown elements correctly.
   - On the official vital-signs profile, which uses `value` discriminators, it gave a false positive. Its documentation says only `pattern` discriminators are evaluated.
-  - Follow-up: [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).
+  - It cannot share a build with `fhir-r5` or `octofhir-fhirpath`: Cargo fails on its `serde =1.0.224` pin (checked 2026-10-29).
+- **`octofhir-fhirschema` 0.3.30** (checked 2026-10-29) embeds 307 R5 schemas and resolves alongside `fhir-r5` and `octofhir-fhirpath`.
+  - **What works:** base checks catch unknown elements and missing required elements; invariants run through the FHIRPath engine; about 0.3 ms per Observation.
+  - **What fails:**
+    - `merge_elements` drops `slicing` on elements that exist in the base, so a missing vital-signs category or a duplicated slice passes;
+    - `fixed` and `pattern` values are never enforced;
+    - two `value[x]` fields are missed;
+    - it gives false positives on `integer64` strings and on extension-only primitives;
+    - 485 of the 2,824 official examples are flagged, nearly all wrongly.
+  - **Other concerns:** heavy dependencies (two `reqwest` versions, `rusqlite`), one maintainer, and no LICENSE file.
+  - **Outcome:** ADR 0053 builds our own tier 3 validator.
 
 ### Not run
 

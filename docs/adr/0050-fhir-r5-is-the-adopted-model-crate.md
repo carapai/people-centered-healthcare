@@ -27,4 +27,4 @@ We chose this because it was the clear winner of the spike [Which R5 model crate
 - **Lost `_id` extension.** An extension on `Resource.id` (`_id`) is dropped. The corpus contains none. The stored form is the validated input JSON (ADR 0051), so the loss affects only typed domain logic.
 - **R4** comes from the sibling crate `fhir-r4 =4.2.2`, used only in `health-fhir-mapping`.
 - **FHIRPath precision.** The spike found that `octofhir-fhirpath` loses decimal precision. ADR 0052 fixes this with a patched fork.
-- **Profile validator.** The spike found that `helios-fhir-validator` evaluates only pattern discriminators. That is decided in [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).
+- **Profile validator.** The spike found that `helios-fhir-validator` evaluates only pattern discriminators. ADR 0053 builds our own tier 3 validator instead.

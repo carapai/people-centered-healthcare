@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0052), the §8 docs are written, and the known-scope backlog exists as 100 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Five AFK validation spikes and one grilling ticket surfaced by the model-crate spike remain open and gate specific tasks ([dependencies](dependencies.md)).
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0053), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). No implementation has started. Five AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -61,17 +61,17 @@ Findings live on unmerged `research/<name>` branches, linked from each ticket's 
 - Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5? (#35) — `fhir-r5 =4.2.3`; see `docs/research/fhir-r5.md`, ADR 0050. Raised three grilling tickets (#142–#144).
 - What happens to inbound R5 JSON that the strict model crate cannot parse? (#142) — see ADR 0051, `docs/architecture/fhir-r5-model.md`, `GLOSSARY.md`.
 - How does FHIRPath evaluation stay decimal-exact? (#143) — see ADR 0052, `docs/architecture/fhir-r5-model.md`, `docs/architecture/questionnaire-extraction.md`.
+- Which profile and slicing validator does tier 3 use? (#144) — see ADR 0053, `docs/research/fhir-r5.md`; added the task [Build the snapshot-driven profile validator (tier 3)](https://github.com/carapai/people-centered-healthcare/issues/145) (#145).
 
-Wayfinder tickets open: five AFK validation spikes and one grilling ticket. Frontier (open, unblocked, unclaimed), in map order:
+Wayfinder tickets open: the five AFK validation spikes. Frontier (open, unblocked, unclaimed), in map order:
 
 1. Does embedded SurrealDB RocksDB survive hard power loss on facility hardware? (#34): AFK task; needs facility hardware
 2. Does the per-node commit counter sustain facility write rates on edge hardware? (#36): AFK task; needs edge hardware
 3. Can SurrealDB blocking indexes serve patient matching at 45M-person scale? (#37): AFK task
 4. Does the frontend scaffold build on Bun, Vite 8, Panda 2, React Compiler and TS 7? (#38): AFK task; can run locally
 5. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39): AFK task; needs Windows facility PCs
-6. [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144) (#144): grilling; blocks #91
 
-Recommended next: the grilling ticket [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144), the last decision gating validation. In parallel, start [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42) and run the frontend-scaffold spike (#38).
+Recommended next: the decision tickets surfaced by the model-crate spike are all resolved, and only the five spikes remain on the map. Start implementation with [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42), and run the frontend-scaffold spike (#38) and the matching-scale spike (#37), which can run locally. The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 

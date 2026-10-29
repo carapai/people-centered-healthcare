@@ -10,6 +10,8 @@ A write that fails is rejected. The Authority Node and central re-run the same v
 
 **Refined by ADR 0051:** structural checks run on raw JSON before typed parsing, and an external structural failure keeps its raw payload in the Inbound Dead Letter.
 
+**Refined by ADR 0053:** tier 3 is our own snapshot-driven validator. The Java validator stays a CI oracle only.
+
 We want invalid clinical data stopped at the point of entry, including on an offline edge or desktop. Because the same Rust validation code runs everywhere (ADR 0001), the result does not depend on where the data was written. Strict rejection would discard legitimate data from systems we don't control, so external data is quarantined instead.
 
 ## Consequences

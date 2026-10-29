@@ -11,7 +11,7 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | API contract | OpenAPI and generated TypeScript types match; HTTP and IPC transports return identical envelopes | Every PR |
 | FHIR conformance | Round-trip of the R5 examples; profile validation of fixtures, with the HL7 Java validator as an oracle | Every PR (fixtures); nightly (oracle) |
 | Workflow | Definition scenarios from `tests/`; SCXML conformance subset | Every PR |
-| Metadata and terminology | Package validation; semver diff rules; extraction fixtures; FHIRPath conformance across fhirpath.js and octofhir, including the decimal conformance suite (ADR 0052) | Every PR |
+| Metadata and terminology | Package validation; semver diff rules; extraction fixtures; FHIRPath conformance across fhirpath.js and octofhir, including the decimal conformance suite (ADR 0052); tier 3 differential test against the HL7 Java validator and the 2 ms p95 validation budget (ADR 0053) | Every PR |
 | Pricing | Price Book and Price Rule fixtures through all six stages, coverage splits, rounding and largest-remainder allocation | Every PR |
 | Payer adapters | Contract tests per payer adapter against recorded or mock payer responses (eligibility, claim, remittance) | Every PR (mock); nightly (sandbox where available) |
 | Frontend | Vitest unit tests; component tests; axe accessibility checks | Every PR |
