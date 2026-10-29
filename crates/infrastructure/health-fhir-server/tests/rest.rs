@@ -63,6 +63,10 @@ fn registry() -> Registry {
 }
 
 async fn router() -> Router {
+    router_with(None).await
+}
+
+async fn router_with(scope: Option<Arc<dyn health_fhir_server::ReferenceScope>>) -> Router {
     let settings = Settings {
         target: Target::Memory,
         namespace: "test".into(),
@@ -71,7 +75,11 @@ async fn router() -> Router {
     let connection = Connection::open(&settings).await.expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
     let store = SurrealStore::new(connection, Arc::new(SystemClock)).with_registry(registry());
-    FhirServer::new(store, BASE, Arc::new(Unrestricted)).router()
+    let server = FhirServer::new(store, BASE, Arc::new(Unrestricted));
+    match scope {
+        Some(scope) => server.with_reference_scope(scope).router(),
+        None => server.router(),
+    }
 }
 
 struct Reply {
@@ -532,4 +540,55 @@ async fn concurrent_conditional_creates_make_one_resource() {
     .await;
     let bundle: Value = serde_json::from_str(&search.body).expect("json");
     assert_eq!(bundle["total"], 1);
+}
+
+/// A node whose scope excludes Encounters: another facility's Encounter may be referenced
+/// without being stored here (persistence.md § Reference integrity, out-of-scope row).
+struct EncountersOutOfScope;
+
+impl health_fhir_server::ReferenceScope for EncountersOutOfScope {
+    fn must_resolve(
+        &self,
+        target_type: &health_persistence::ResourceType,
+        _id: ResourceId,
+    ) -> bool {
+        target_type.as_str() != "Encounter"
+    }
+}
+
+#[tokio::test]
+async fn out_of_scope_targets_may_be_unresolved() {
+    let router = router_with(Some(Arc::new(EncountersOutOfScope))).await;
+    let json = vec![(
+        "content-type".to_owned(),
+        "application/fhir+json".to_owned(),
+    )];
+    let referral = |target: String| {
+        format!(
+            r#"{{"resourceType":"Observation","status":"final","code":{{"text":"x"}},"encounter":{{"reference":"{target}"}}}}"#
+        )
+    };
+    let elsewhere = send(
+        &router,
+        "POST",
+        "/Observation",
+        &json,
+        referral(format!("Encounter/{}", ResourceId::new())),
+    )
+    .await;
+    assert_eq!(elsewhere.status, StatusCode::CREATED, "{}", elsewhere.body);
+    let in_scope = send(
+        &router,
+        "POST",
+        "/Observation",
+        &json,
+        referral(format!("Patient/{}", ResourceId::new())),
+    )
+    .await;
+    assert_eq!(
+        in_scope.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "{}",
+        in_scope.body
+    );
 }

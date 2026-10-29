@@ -344,3 +344,52 @@ async fn condition_locks_serialize_the_same_condition_and_leave_nothing() {
         .expect("count");
     assert_eq!(left.take::<Option<i64>>(0).expect("count"), Some(0));
 }
+
+#[tokio::test]
+async fn reverse_references_follow_the_current_version() {
+    let (store, _) = store().await;
+    let patient: ResourceType = "Patient".parse().expect("type");
+    let p = ResourceId::new();
+    let o = ResourceId::new();
+    let write = |id: ResourceId, json: String, precondition| WriteRequest {
+        resource_type: obs(),
+        id,
+        json: RawJson::from_validated(json),
+        op_id: OpId::new(),
+        precondition,
+    };
+    let referring = format!(
+        r#"{{"resourceType":"Observation","subject":{{"reference":"Patient/{p}"}},"performer":[{{"reference":"https://x.ug/fhir/Patient/{p}"}},{{"reference":"Observation/{o}"}}]}}"#
+    );
+    let mut tx = store.begin().await.expect("begin");
+    let v1 = tx
+        .write(write(o, referring, Precondition::MustNotExist))
+        .await
+        .expect("write");
+    tx.commit().await.expect("commit");
+
+    let mut tx = store.begin().await.expect("begin");
+    assert_eq!(
+        tx.referrers(&patient, p, 10).await.expect("referrers"),
+        vec![(obs(), o)]
+    );
+    assert_eq!(
+        tx.referrers(&obs(), o, 10).await.expect("self"),
+        vec![],
+        "self-references do not count"
+    );
+    let v2 = tx
+        .write(write(
+            o,
+            r#"{"resourceType":"Observation"}"#.to_owned(),
+            Precondition::IfMatch(v1.version_id),
+        ))
+        .await
+        .expect("update");
+    assert_eq!(
+        tx.referrers(&patient, p, 10).await.expect("after update"),
+        vec![]
+    );
+    tx.commit().await.expect("commit");
+    let _ = v2;
+}

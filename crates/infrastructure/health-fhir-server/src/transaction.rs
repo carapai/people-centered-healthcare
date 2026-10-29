@@ -28,6 +28,7 @@ use crate::bundle::{Entry, bundle};
 use crate::http::{Return, fhir_json, prefer, require_json_body};
 use crate::ops::{self, Attempt, Condition, CreateTarget, UpdatePlan};
 use crate::outcome::{FhirError, operation_outcome};
+use crate::references;
 use crate::{FhirServer, etag, resource_type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,6 +73,10 @@ struct Outcome {
     resource: Option<RawJson>,
     /// GET results always carry their resource; writes follow `Prefer: return`.
     from_read: bool,
+    /// This entry wrote `resource`, so its references are checked before commit.
+    written: bool,
+    /// This entry deleted the resource, so it must not be referenced at commit.
+    deleted: Option<(ResourceType, ResourceId)>,
     outcome: Option<Value>,
 }
 
@@ -91,16 +96,33 @@ impl Outcome {
             location: created,
             resource: Some(stored),
             from_read: false,
+            written: true,
+            deleted: None,
             outcome: None,
         }
     }
 
-    fn deleted(version: Option<VersionMeta>) -> Self {
+    fn deleted(deleted: Option<(ResourceType, ResourceId, VersionMeta)>) -> Self {
         Self {
             status: 204,
-            version,
+            version: deleted.as_ref().map(|(_, _, v)| *v),
+            deleted: deleted.map(|(t, id, _)| (t, id)),
             ..Self::default()
         }
+    }
+
+    /// The reference-integrity checks of what this entry did, run after every write of the
+    /// transaction it is part of.
+    async fn check(&self, server: &FhirServer, tx: &mut SurrealTx) -> Result<(), Attempt> {
+        if self.written
+            && let Some(stored) = &self.resource
+        {
+            references::check_written(server, tx, stored).await?;
+        }
+        if let Some((resource_type, id)) = &self.deleted {
+            references::check_deletable(tx, resource_type, *id).await?;
+        }
+        Ok(())
     }
 
     fn failed(error: &FhirError) -> Self {
@@ -303,10 +325,10 @@ async fn delete(
     tx: &mut SurrealTx,
     request: &Request,
 ) -> Result<Outcome, Attempt> {
-    let version = match &request.target {
-        Target::Instance(id) => {
-            ops::delete(tx, &request.resource_type, *id, request.if_match).await?
-        }
+    let deleted = match &request.target {
+        Target::Instance(id) => ops::delete(tx, &request.resource_type, *id, request.if_match)
+            .await?
+            .map(|version| (*id, version)),
         Target::Conditional(condition) => {
             ops::conditional_delete(
                 server,
@@ -319,7 +341,9 @@ async fn delete(
         }
         _ => return Err(FhirError::bad_request("unsupported DELETE").into()),
     };
-    Ok(Outcome::deleted(version))
+    Ok(Outcome::deleted(deleted.map(|(id, version)| {
+        (request.resource_type.clone(), id, version)
+    })))
 }
 
 async fn plan_update(
@@ -461,6 +485,16 @@ async fn transaction(server: &FhirServer, requests: &[Request]) -> Result<Vec<Ou
     for request in of(Method::Get) {
         outcomes[request.index] = Some(read(&mut tx, request).await.map_err(fail(request))?);
     }
+    // Reference integrity holds for the transaction's end state, so entries may refer to each
+    // other in any order and a referrer may be deleted with what it references.
+    for (request, outcome) in requests.iter().zip(&outcomes) {
+        if let Some(outcome) = outcome {
+            outcome
+                .check(server, &mut tx)
+                .await
+                .map_err(fail(request))?;
+        }
+    }
     tx.commit().await?;
     Ok(outcomes
         .into_iter()
@@ -526,6 +560,7 @@ async fn batch_entry(server: &FhirServer, request: &Request) -> Result<Outcome, 
             )
         }
     };
+    outcome.check(server, &mut tx).await?;
     tx.commit().await?;
     Ok(outcome)
 }

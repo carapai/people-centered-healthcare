@@ -210,13 +210,16 @@ impl SurrealTx {
         let version_seq = previous_seq + 1;
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
-        let extraction = if deleted {
-            // A tombstone keeps its body but is never found by search.
-            health_fhir_search::Extraction::default()
+        let (extraction, references) = if deleted {
+            // A tombstone keeps its body but is never found by search and references nothing.
+            (health_fhir_search::Extraction::default(), Vec::new())
         } else {
             let resource: Value = serde_json::from_str(stamped.as_str())
                 .map_err(|e| StoreError::Unavailable(format!("stamped JSON: {e}")))?;
-            extract(&self.registry, resource_type.as_str(), &resource, None)
+            (
+                extract(&self.registry, resource_type.as_str(), &resource, None),
+                crate::search::write::references(&resource),
+            )
         };
         let mut sql = Sql::default();
         let id_text = id.to_string();
@@ -226,6 +229,7 @@ impl SurrealTx {
             resource_type.as_str(),
             &id_text,
             &extraction,
+            &references,
             None,
         );
         let head = sql.str(table);
@@ -257,6 +261,45 @@ impl SurrealTx {
 }
 
 impl SurrealTx {
+    /// Up to `limit` live resources whose current version references `resource_type/id`, not
+    /// counting the resource itself (persistence.md § Reference integrity). A record-id range
+    /// over `idx_ref_in`.
+    pub async fn referrers(
+        &mut self,
+        resource_type: &ResourceType,
+        id: ResourceId,
+        limit: usize,
+    ) -> Result<Vec<(ResourceType, ResourceId)>, StoreError> {
+        let rows: Vec<Vec<String>> = self
+            .tx()?
+            .query(format!(
+                "SELECT VALUE array::slice(record::id(id), 2) FROM idx_ref_in:[$t, $i]..[$t, $i, {{}}] \
+                 WHERE !(record::id(id)[2] = $t AND record::id(id)[3] = $i) LIMIT {limit}"
+            ))
+            .bind(("t", resource_type.to_string()))
+            .bind(("i", id.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        rows.into_iter()
+            .map(|row| match row.as_slice() {
+                [t, i] => Ok((
+                    t.parse().map_err(|_| {
+                        StoreError::Unavailable("idx_ref_in has an invalid type".into())
+                    })?,
+                    i.parse().map_err(|_| {
+                        StoreError::Unavailable("idx_ref_in has an invalid id".into())
+                    })?,
+                )),
+                _ => Err(StoreError::Unavailable(
+                    "idx_ref_in has an invalid key".into(),
+                )),
+            })
+            .collect()
+    }
+
     /// Serializes conditional writes on the same condition (a resource type and its search
     /// parameters, in any order). Call it before a write the condition allows; a concurrent
     /// transaction that locked the same condition makes one of the two commits fail with

@@ -138,6 +138,7 @@ impl SurrealStore {
                 &job.rt,
                 &head.rid,
                 &extraction,
+                &[],
                 Some(&job.params),
             );
             let table = sql.str(head_table);

@@ -600,6 +600,7 @@ DEFINE TABLE idx_quantity TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD rt ON idx_quantity TYPE string PERMISSIONS FULL
   DEFINE INDEX idx_quantity_code_value ON idx_quantity FIELDS rt, param, code, `value`
   DEFINE INDEX idx_quantity_value ON idx_quantity FIELDS rt, param, `value`
+DEFINE TABLE idx_ref_in TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE idx_reference TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD param ON idx_reference TYPE string PERMISSIONS FULL
   DEFINE FIELD rt ON idx_reference TYPE string PERMISSIONS FULL

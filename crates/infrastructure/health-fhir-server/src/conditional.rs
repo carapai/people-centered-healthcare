@@ -23,6 +23,7 @@ use crate::http::{if_match, prefer};
 use crate::interactions::{Written, body, deleted};
 use crate::ops::{self, Attempt, Condition};
 use crate::outcome::FhirError;
+use crate::references;
 use crate::{FhirServer, resource_type};
 
 /// `PUT /{type}?…`.
@@ -62,6 +63,7 @@ pub(crate) async fn update(
         .await?;
         let (version, stored) =
             ops::write(&mut tx, &resource_type, plan.id, &json, plan.precondition).await?;
+        references::check_written(&server, &mut tx, &stored).await?;
         tx.commit().await?;
         let written = Written {
             created: plan.creates(),
@@ -90,7 +92,10 @@ pub(crate) async fn delete(
         let mut tx = server.store.begin().await?;
         let version =
             ops::conditional_delete(&server, &mut tx, &resource_type, &condition, expected).await?;
+        if let Some((id, _)) = version {
+            references::check_deletable(&mut tx, &resource_type, id).await?;
+        }
         tx.commit().await?;
-        Ok::<_, Attempt>(deleted(version))
+        Ok::<_, Attempt>(deleted(version.map(|(_, v)| v)))
     })
 }

@@ -16,7 +16,8 @@
 //!
 //! | transaction, batch | `POST /` with a `transaction` or `batch` Bundle |
 //!
-//! Reference integrity is a separate task (#159).
+//! Every write checks reference integrity, and a delete is refused while live records
+//! reference the resource ([`ReferenceScope`]).
 //! Request bodies are checked only for shape (a JSON object of the path's type) until validation
 //! tiers 1–2 (#59) are on the write path.
 
@@ -55,6 +56,7 @@ mod http;
 mod interactions;
 mod ops;
 mod outcome;
+mod references;
 mod search;
 mod transaction;
 
@@ -72,6 +74,7 @@ use health_time::Timestamp;
 pub use capability::{TYPE_INTERACTIONS, capability_statement};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use outcome::{FhirError, operation_outcome};
+pub use references::{AllMustResolve, ReferenceScope};
 pub use search::CURSOR;
 
 /// The FHIR REST server for one node.
@@ -80,6 +83,7 @@ pub struct FhirServer {
     store: SurrealStore,
     base: Arc<str>,
     policy: Arc<dyn SearchPolicy>,
+    references: Arc<dyn ReferenceScope>,
     retry: RetryPolicy,
     started: Timestamp,
 }
@@ -96,9 +100,17 @@ impl FhirServer {
             store,
             base: base.into().trim_end_matches('/').into(),
             policy,
+            references: Arc::new(AllMustResolve),
             retry: RetryPolicy::default(),
             started: Timestamp::now(),
         }
+    }
+
+    /// This server, deciding with `scope` which reference targets must resolve locally.
+    #[must_use]
+    pub fn with_reference_scope(mut self, scope: Arc<dyn ReferenceScope>) -> Self {
+        self.references = scope;
+        self
     }
 
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
