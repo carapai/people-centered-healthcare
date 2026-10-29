@@ -4,7 +4,7 @@ _Last updated: 2026-10-28_
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0055), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). Implementation has started: [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42, PR #147) and [Build tools/architecture-checks](https://github.com/carapai/people-centered-healthcare/issues/43) (#43, stacked on #147) are done, pending review. Three AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
+Phase 0 (research and Wayfinder) is complete: every decision ticket is resolved (ADRs 0001–0055), the §8 docs are written, and the known-scope backlog exists as 101 implementation issues in 17 milestones ([roadmap](roadmap.md), [task index](task-index.md)). Implementation has started: [Create the Cargo workspace with the six-layer layout](https://github.com/carapai/people-centered-healthcare/issues/42) (#42, PR #147) and [Build tools/architecture-checks](https://github.com/carapai/people-centered-healthcare/issues/43) (#43, stacked on #147) are done, pending review. [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44) is done, stacked on #148, pending review. Three AFK validation spikes remain open and gate specific tasks ([dependencies](dependencies.md)).
 
 ## Wayfinder map
 
@@ -72,7 +72,7 @@ Wayfinder tickets open: three AFK validation spikes, all needing facility hardwa
 2. Does the per-node commit counter sustain facility write rates on edge hardware? (#36): AFK task; needs edge hardware
 3. Does embedded SurrealDB run reliably inside the Tauri process on facility PCs? (#39): AFK task; needs Windows facility PCs
 
-Recommended next: review and merge PR #147, then the stacked architecture-checks PR. After that, take [Create the Bun workspace and the React app shell with the platform boundary](https://github.com/carapai/people-centered-healthcare/issues/44) (#44). Also unblocked: #49, #51, #52, #53 and #54. The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
+Recommended next: review and merge PRs #147 and #148 and the client-shell PR, in that order. Then [Build @health/design-system on Panda CSS 2 and Ark UI](https://github.com/carapai/people-centered-healthcare/issues/45) (#45) on the client side, or [Create central-server with the shared Axum router and telemetry](https://github.com/carapai/people-centered-healthcare/issues/49) (#49), [Implement typed identifiers and node-prefixed sequences](https://github.com/carapai/people-centered-healthcare/issues/52) (#52) or [Define health-persistence unit-of-work, outbox and versioning traits](https://github.com/carapai/people-centered-healthcare/issues/54) (#54) on the Rust side. The power-loss (#34), commit-counter (#36) and Tauri-on-facility-PC (#39) spikes need facility hardware.
 
 Research also surfaced legal questions (SurrealDB BSL hosting, Bank of Uganda payment licensing, DPPA consent basis) and validation spikes; these sit in the map's Not yet specified section.
 
@@ -82,7 +82,7 @@ Fixed by the Cargo workspace scaffold:
 - the toolchain is `1.98.0`, and `rust-version = "1.98"`;
 - the layer tag is spelled `domain` (singular), while the directory stays `crates/domains/`.
 
-Still open, recorded by the documentation consistency check. Each is an implementation detail to fix when the relevant scaffold lands, not an architectural decision: the time crate; the directory of `health-node-identity`; the location of reference package sources; event naming and versioning convention; the `.surql` migrations directory and naming; command DTO and OpenAPI output paths; feature-module layout in `apps/client/src/`. The persistence sketch was validated with `surreal` 3.2.4, not the 3.3 pin.
+Still open, recorded by the documentation consistency check. Each is an implementation detail to fix when the relevant scaffold lands, not an architectural decision: the time crate; the directory of `health-node-identity`; the location of reference package sources; event naming and versioning convention; the `.surql` migrations directory and naming; command DTO and OpenAPI output paths; feature-module layout in `apps/client/src/` beyond one folder per Bounded Context under `src/features/`. The persistence sketch was validated with `surreal` 3.2.4, not the 3.3 pin.
 
 ## Known blockers
 

@@ -36,7 +36,7 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 
 | Detects | Check |
 |---|---|
-| Circular dependencies, forbidden imports | `tools/architecture-checks`; ESLint import rules |
+| Circular dependencies, forbidden imports | `tools/architecture-checks`; oxlint `no-restricted-imports` and `apps/client/scripts/check-boundaries.ts` |
 | Cross-domain database access | Repositories declare the tables they own. A test asserts that every table has exactly one owner, and that each repository's queries touch only its own tables or the shared infrastructure tables |
 | Duplicate resource ownership | An ownership registry in code, with a doc-sync test against `resource-ownership.md` |
 | Desktop imports in web builds | Lint rule, plus a scan of the production bundle |

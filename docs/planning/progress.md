@@ -4,7 +4,7 @@ _Update after each task (AGENTS.md process step 4)._
 
 | Phase | Done | Total |
 |---|---|---|
-| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 2 | 10 |
+| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 3 | 10 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 0 | 11 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 2 of 101 implementation tasks done. Validation spikes open: 3.
+Total: 3 of 101 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -32,3 +32,4 @@ Total: 2 of 101 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: matching-scale spike resolved at reduced scale; raised #146.
 - 2026-10-29: #42 Cargo workspace created: six-layer layout with one placeholder crate per layer, rust-toolchain 1.98.0 and `deny.toml`.
 - 2026-10-29: #43 tools/architecture-checks built: 13 rules, 24 fixture tests; clean on the real workspace.
+- 2026-10-29: #44 Bun workspace and React app shell with the platform boundary, the oxlint and boundary guards, and the bundle scan.
