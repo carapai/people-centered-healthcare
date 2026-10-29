@@ -1,0 +1,16 @@
+[package]
+name = "health-client-registry"
+description = "Client registry Module: Source Patients, golden records and matching rules (ADRs 0027–0029)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "registries"
+
+[lints]
+workspace = true
+
+[dependencies]

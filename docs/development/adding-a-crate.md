@@ -1,6 +1,6 @@
 # Adding a crate
 
-> Status: planned layout. No code exists yet; the root `Cargo.toml` and `tools/architecture-checks` are created by the scaffold.
+> Status: the root `Cargo.toml` exists (#42). `tools/architecture-checks` is still to come (#43).
 
 ## When to use
 
@@ -14,7 +14,11 @@ Any new workspace member. Crates are created lazily, when the first implementati
    ```toml
    [package]
    name = "health-<name>"
-   edition.workspace = true   # exact inherited keys to be fixed by the scaffold
+   description = "<one line>"
+   version.workspace = true
+   edition.workspace = true
+   rust-version.workspace = true
+   publish.workspace = true
 
    [package.metadata.health]
    layer = "domain"           # foundation | contracts | domain | application | infrastructure | runtime | testing

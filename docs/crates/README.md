@@ -1,6 +1,19 @@
 # Crate documentation
 
-This folder will hold one page per workspace crate, written when the crate is created. No crate exists yet; crates are created lazily, when the first implementation task needs them ([crate-catalogue.md](../architecture/crate-catalogue.md)).
+This folder holds one page per workspace crate, written when the crate gets real content. Crates are created lazily, when the first implementation task needs them ([crate-catalogue.md](../architecture/crate-catalogue.md)).
+
+## Current members
+
+The workspace scaffold created one placeholder crate per layer, so that the layer rules can be checked from the start. Each has only a crate README until its task fills it:
+
+| Crate | Layer | Filled by |
+|---|---|---|
+| `health-errors` | foundation | Implement typed identifiers and node-prefixed sequences (#52) |
+| `health-persistence` | contracts | Define health-persistence unit-of-work, outbox and versioning traits (#54) |
+| `health-client-registry` | domain (registries) | Implement the matching engine and Patient/$match (#69) |
+| `health-registries-app` | application (registries) | The first Registries use case |
+| `health-surrealdb` | infrastructure | Build the health-surrealdb adapter and migrations runner (#55) |
+| `central-server` | runtime | Create central-server with the shared Axum router and telemetry (#49) |
 
 ## What a crate page covers
 
