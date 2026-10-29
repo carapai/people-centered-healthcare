@@ -310,7 +310,9 @@ async fn the_capability_statement_matches_behaviour() {
             .map(|i| i["code"].as_str().expect("code"))
             .collect();
         assert_eq!(codes, TYPE_INTERACTIONS, "{t}");
-        assert_eq!(resource["conditionalCreate"], false);
+        assert_eq!(resource["conditionalCreate"], true);
+        assert_eq!(resource["conditionalUpdate"], true);
+        assert_eq!(resource["conditionalDelete"], "single");
 
         let id = ResourceId::new();
         let body = format!(r#"{{"resourceType":"{t}","id":"{id}"}}"#);
@@ -391,6 +393,69 @@ async fn the_capability_statement_matches_behaviour() {
         let deleted = send(&router, "DELETE", &format!("/{t}/{id}"), &[], String::new()).await;
         assert_eq!(deleted.status, StatusCode::NO_CONTENT, "{t} delete");
 
+        // Conditional interactions need a search parameter to state the condition with.
+        let declares_id = resource["searchParam"]
+            .as_array()
+            .expect("searchParam")
+            .iter()
+            .any(|p| p["name"] == "_id");
+        if declares_id {
+            // create mints the id, so the second create's condition names the minted one.
+            let unused = ResourceId::new();
+            let body = format!(r#"{{"resourceType":"{t}"}}"#);
+            let condition = |id: &str| {
+                let mut headers = json.clone();
+                headers.push(("if-none-exist".into(), format!("_id={id}")));
+                headers
+            };
+            let created = send(
+                &router,
+                "POST",
+                &format!("/{t}"),
+                &condition(&unused.to_string()),
+                body.clone(),
+            )
+            .await;
+            assert_eq!(
+                created.status,
+                StatusCode::CREATED,
+                "{t} conditional create"
+            );
+            let minted: Value = serde_json::from_str(&created.body).expect("json");
+            let id = minted["id"].as_str().expect("id").to_owned();
+            let again = send(
+                &router,
+                "POST",
+                &format!("/{t}"),
+                &condition(&id),
+                body.clone(),
+            )
+            .await;
+            assert_eq!(
+                again.status,
+                StatusCode::OK,
+                "{t} conditional create, one match"
+            );
+            let etag = again.headers["etag"].to_str().expect("etag").to_owned();
+            let mut with_etag = json.clone();
+            with_etag.push(("if-match".into(), etag));
+            let updated = send(&router, "PUT", &format!("/{t}?_id={id}"), &with_etag, body).await;
+            assert_eq!(updated.status, StatusCode::OK, "{t} conditional update");
+            let deleted = send(
+                &router,
+                "DELETE",
+                &format!("/{t}?_id={id}"),
+                &[],
+                String::new(),
+            )
+            .await;
+            assert_eq!(
+                deleted.status,
+                StatusCode::NO_CONTENT,
+                "{t} conditional delete"
+            );
+        }
+
         for param in resource["searchParam"].as_array().expect("searchParam") {
             let name = param["name"].as_str().expect("name");
             let reply = send(
@@ -407,4 +472,51 @@ async fn the_capability_statement_matches_behaviour() {
     let system = send(&router, "GET", "/_history?_count=3", &[], String::new()).await;
     assert_eq!(rest["interaction"][0]["code"], "history-system");
     assert_eq!(system.status, StatusCode::OK);
+}
+
+/// Two concurrent conditional creates under the same condition make one resource.
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn concurrent_conditional_creates_make_one_resource() {
+    let router = router().await;
+    let headers = vec![
+        (
+            "content-type".to_owned(),
+            "application/fhir+json".to_owned(),
+        ),
+        (
+            "if-none-exist".to_owned(),
+            "identifier=urn:ug:nin|RACE".to_owned(),
+        ),
+    ];
+    let body =
+        r#"{"resourceType":"Patient","identifier":[{"system":"urn:ug:nin","value":"RACE"}]}"#;
+    let mut tasks = Vec::new();
+    for _ in 0..8 {
+        let (router, headers) = (router.clone(), headers.clone());
+        tasks.push(tokio::spawn(async move {
+            send(&router, "POST", "/Patient", &headers, body.to_owned())
+                .await
+                .status
+        }));
+    }
+    let mut statuses = Vec::new();
+    for task in tasks {
+        statuses.push(task.await.expect("task"));
+    }
+    let created = statuses
+        .iter()
+        .filter(|s| **s == StatusCode::CREATED)
+        .count();
+    let found = statuses.iter().filter(|s| **s == StatusCode::OK).count();
+    assert_eq!((created, found), (1, 7), "{statuses:?}");
+    let search = send(
+        &router,
+        "GET",
+        "/Patient?identifier=urn:ug:nin|RACE",
+        &[],
+        String::new(),
+    )
+    .await;
+    let bundle: Value = serde_json::from_str(&search.body).expect("json");
+    assert_eq!(bundle["total"], 1);
 }

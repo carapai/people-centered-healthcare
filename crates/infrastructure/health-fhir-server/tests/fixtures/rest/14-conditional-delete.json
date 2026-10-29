@@ -1,0 +1,147 @@
+{
+ "name": "14-conditional-delete",
+ "spec": "https://hl7.org/fhir/R5/http.html#cdelete",
+ "steps": [
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:p}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CD1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:p}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "path": "Patient?identifier=urn:ug:nin|CD1"
+   },
+   "expect": {
+    "status": 204,
+    "headers": {
+     "etag": "*"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:p}}"
+   },
+   "expect": {
+    "status": 410
+   }
+  },
+  {
+   "note": "no match: nothing to delete",
+   "request": {
+    "method": "DELETE",
+    "path": "Patient?identifier=urn:ug:nin|CD1"
+   },
+   "expect": {
+    "status": 204
+   }
+  },
+  {
+   "note": "a condition is required",
+   "request": {
+    "method": "DELETE",
+    "path": "Patient"
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:a}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CD2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:a}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:b}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CD2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:b}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "conditionalDelete is single: several matches are 412",
+   "request": {
+    "method": "DELETE",
+    "path": "Patient?identifier=urn:ug:nin|CD2"
+   },
+   "expect": {
+    "status": 412
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient/{{uuid:a}}"
+   },
+   "expect": {
+    "status": 200
+   }
+  }
+ ]
+}

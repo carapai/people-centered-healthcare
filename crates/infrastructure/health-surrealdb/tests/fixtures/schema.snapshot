@@ -272,6 +272,8 @@ DEFINE TABLE condition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON condition_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON condition_history TYPE int PERMISSIONS FULL
   DEFINE INDEX condition_history_last_updated ON condition_history FIELDS last_updated, version_seq
+DEFINE TABLE condition_lock TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD at ON condition_lock TYPE datetime PERMISSIONS FULL
 DEFINE TABLE consent TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON consent TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON consent TYPE array<record> DEFAULT [] PERMISSIONS FULL

@@ -113,11 +113,6 @@ pub(crate) async fn get(
     RawQuery(query): RawQuery,
     headers: HeaderMap,
 ) -> Result<Response, FhirError> {
-    if query.as_deref().is_some_and(|q| !q.is_empty()) && headers.contains_key("if-none-exist") {
-        return Err(FhirError::not_supported(
-            "conditional interactions are not supported yet",
-        ));
-    }
     run(&server, &type_name, pairs(query.as_deref()), &headers).await
 }
 

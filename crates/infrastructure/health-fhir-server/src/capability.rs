@@ -53,10 +53,10 @@ pub fn capability_statement(registry: &Registry, base: &str, date: Timestamp) ->
                 "versioning": "versioned-update",
                 "readHistory": true,
                 "updateCreate": true,
-                "conditionalCreate": false,
+                "conditionalCreate": true,
                 "conditionalRead": "not-supported",
-                "conditionalUpdate": false,
-                "conditionalDelete": "not-supported",
+                "conditionalUpdate": true,
+                "conditionalDelete": "single",
                 "searchParam": search_params,
             })
         })

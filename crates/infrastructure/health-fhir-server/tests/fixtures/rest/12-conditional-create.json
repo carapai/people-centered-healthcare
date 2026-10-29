@@ -1,0 +1,260 @@
+{
+ "name": "12-conditional-create",
+ "spec": "https://hl7.org/fhir/R5/http.html#ccreate",
+ "steps": [
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "identifier=urn:ug:nin|CC1"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 201,
+    "headers": {
+     "location": "*"
+    }
+   },
+   "save": {
+    "id": "/id",
+    "vid": "/meta/versionId"
+   }
+  },
+  {
+   "note": "one match: 200 with the match, nothing created",
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "identifier=urn:ug:nin|CC1"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Other"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200,
+    "headers": {
+     "etag": "W/\"{{vid}}\""
+    },
+    "headers_absent": [
+     "location"
+    ],
+    "json": {
+     "/id": "{{id}}",
+     "/name/0/family": "Akello"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "path": "Patient?identifier=urn:ug:nin|CC1"
+   },
+   "expect": {
+    "status": 200,
+    "json": {
+     "/total": 1
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "path": "Patient/{{uuid:b}}",
+    "headers": {
+     "content-type": "application/fhir+json"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ],
+     "id": "{{uuid:b}}"
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "note": "more than one match: 412",
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "identifier=urn:ug:nin|CC1"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC1"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 412,
+    "json": {
+     "/issue/0/code": "multiple-matches"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "nickname=x"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400,
+    "json": {
+     "/issue/0/code": "not-supported"
+    }
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": ""
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC2"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 400
+   }
+  },
+  {
+   "note": "a full search URL is accepted too",
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "Patient?identifier=urn:ug:nin|CC3"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC3"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 201
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "path": "Patient",
+    "headers": {
+     "content-type": "application/fhir+json",
+     "if-none-exist": "identifier=urn:ug:nin|CC3"
+    },
+    "body": {
+     "resourceType": "Patient",
+     "identifier": [
+      {
+       "system": "urn:ug:nin",
+       "value": "CC3"
+      }
+     ],
+     "name": [
+      {
+       "family": "Akello"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "status": 200
+   }
+  }
+ ]
+}

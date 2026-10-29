@@ -155,7 +155,13 @@ Its CapabilityStatement is generated from what is implemented, and a test exerci
 - **History.** Bundles are newest first and take `_since` and `_count`; `_at` is refused for now. A version's `request.method` is inferred: DELETE for a tombstone, POST for the first version, PUT after that.
 - **Search.** `next` links use `_cursor` (keyset by resource id).
 - **Bodies.** Reads, search and history embed the stored bytes as they are stored.
-- **Not done here:** conditional interactions (#157), transaction and batch Bundles (#158) and reference integrity (#159). Until then they are not declared and their requests are refused.
+- **Conditional interactions** follow the R5 matrices:
+  - **Create** (`If-None-Exist`): 0 matches → create; 1 → 200 with the match; more than 1 → 412.
+  - **Update** (`PUT [type]?…`): 0 matches → create, or 409 when the body id names an existing resource; 1 → update it (`If-Match` required; 400 if the body id differs); more than 1 → 412.
+  - **Delete** (`DELETE [type]?…`): 0 or 1 matches → 204; more than 1 → 412 (`conditionalDelete = single`).
+
+  The condition is searched inside the write transaction with the caller's `SearchPolicy`. A write that creates under a condition also writes and removes a `condition_lock` record keyed by the condition's hash (migration `0003_condition_lock`). Two concurrent creates under the same condition therefore conflict, and the loser's rerun finds the winner's resource. The lock only serializes writes stating the **same** condition. A plain create, or a create under a different condition that matches the same resource, is not serialized against it.
+- **Not done here:** transaction and batch Bundles (#158) and reference integrity (#159). Until then they are not declared and their requests are refused.
 
 ## Reference integrity
 
