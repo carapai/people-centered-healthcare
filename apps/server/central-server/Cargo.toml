@@ -13,3 +13,10 @@ layer = "runtime"
 workspace = true
 
 [dependencies]
+axum = { workspace = true }
+health-http = { workspace = true }
+health-observability = { workspace = true }
+health-surrealdb = { workspace = true, features = ["remote"] }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["net", "signal", "sync"] }
+tracing = { workspace = true }

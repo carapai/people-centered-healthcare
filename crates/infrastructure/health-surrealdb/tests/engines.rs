@@ -12,6 +12,7 @@ const TABLE_A: Migration = Migration {
     sql: "DEFINE TABLE table_a SCHEMAFULL; DEFINE FIELD label ON table_a TYPE string;",
 };
 
+#[cfg(feature = "embedded")]
 async fn round_trip(target: Target) {
     let settings = Settings {
         target,

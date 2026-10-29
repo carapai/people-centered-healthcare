@@ -4,7 +4,7 @@ _Update after each task (AGENTS.md process step 4)._
 
 | Phase | Done | Total |
 |---|---|---|
-| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 3 | 10 |
+| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 4 | 10 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 5 | 11 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 8 of 101 implementation tasks done. Validation spikes open: 3.
+Total: 9 of 101 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -38,3 +38,4 @@ Total: 8 of 101 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #55 health-surrealdb: connections (embedded RocksDB `sync=every`, remote, memory) and the forward-only migrations runner with checksums and a schema snapshot; SurrealDB pinned `=3.3.5`.
 - 2026-10-29: #56 SurrealStore on interactive transactions (heads, history, guards, counters, outbox); migration 0001 for 84 owned types; ownership registry with category partitions and its architecture test.
 - 2026-10-29: #57 health-fhir-search (catalog over the FHIRPath search subset: 1,211 of 1,244 core parameters; registry; extraction; strict parser; SearchPolicy) and health-surrealdb search: migration 0002 index tables with `index_keys` on heads, range-scan compiler with EXPLAIN tests, keyset paging, resumable reindex.
+- 2026-10-29: #49 health-observability (allowlist export layer, OTLP/HTTP, JSON logs, redaction test with a negative control), health-http (`/health`, `/ready`, request tracing by route template) and the central-server binary (env config, password from a file, background connect-and-migrate with backoff, graceful shutdown).
