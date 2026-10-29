@@ -57,6 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0 # the base branch, to find the migrations this PR adds
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -69,13 +70,23 @@ jobs:
           tar -xzf surreal.tgz
           ./surreal version
       - run: git ls-files '*.surql' | xargs ./surreal validate
+      # An applied migration is immutable: the runner records its SHA-256 and refuses a changed
+      # file. So migrations are checked when a PR adds them, and never reformatted afterwards.
       - name: surql-fmt --check (with the diff for any unformatted file)
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
+          {
+            git ls-files '*.surql' | grep -v '/migrations/' || true
+            if [[ -n "$BASE_REF" ]]; then
+              git diff --name-only --diff-filter=A "origin/$BASE_REF...HEAD" -- '*/migrations/*.surql'
+            fi
+          } > formatted.txt
           status=0
           while IFS= read -r file; do
             if ! bunx @surrealdb/surql-fmt@0.1.0-beta.3 --check "$file"; then
               bunx @surrealdb/surql-fmt@0.1.0-beta.3 "$file" | diff -u "$file" - || true
               status=1
             fi
-          done < <(git ls-files '*.surql')
+          done < formatted.txt
           exit $status
