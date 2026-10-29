@@ -8,6 +8,7 @@ The workspace scaffold created one placeholder crate per layer, so that the laye
 
 | Crate | Layer | Filled by |
 |---|---|---|
+| `health-identifiers` | foundation | Built (#52): typed ids, UUIDv5 derivation and number formats; see its [README](../../crates/foundation/health-identifiers/README.md) |
 | `health-errors` | foundation | Implement typed identifiers and node-prefixed sequences (#52) |
 | `health-persistence` | contracts | Define health-persistence unit-of-work, outbox and versioning traits (#54) |
 | `health-client-registry` | domain (registries) | Implement the matching engine and Patient/$match (#69) |
