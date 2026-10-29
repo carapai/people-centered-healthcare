@@ -123,6 +123,15 @@ impl AsFunctionEvaluator {
                 }
             }
             _ => {
+                // FHIR primitives (`dateTime`, `code`, ...) and FHIR-namespaced types match as
+                // they do for is() (patch 0008).
+                if super::is_function::IsFunctionEvaluator::is_type_compatible(
+                    value,
+                    target_type,
+                    _context.model_provider().as_ref(),
+                ) {
+                    return Some(value.clone());
+                }
                 // For complex/resource types: allow exact match or inheritance per ModelProvider
                 let type_info = value.type_info();
                 let actual_type = type_info.name.as_deref().unwrap_or(&type_info.type_name);
