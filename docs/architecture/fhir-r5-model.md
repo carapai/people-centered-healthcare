@@ -19,7 +19,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
 - **Adopted crate.** One generated R5 (5.0.0) model crate, pinned to an exact version with only R5 enabled.
   - It is **`fhir-r5 =4.2.3`** (ADR 0050), the choice of the spike [Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5?](https://github.com/carapai/people-centered-healthcare/issues/35). R4 conversion uses its sibling `fhir-r4 =4.2.2`.
-  - CI round-trips the whole official R5 example corpus on every bump, with a short list of known-invalid examples excluded.
+  - CI round-trips the whole official R5 example corpus on every bump, with a short list of examples the model crate cannot parse excluded.
   - Only rarely changing crates name the whole `Resource` enum, because its serde code is rebuilt in each crate that uses it.
   - Parsing is strict: a missing required element is a parse error, and unknown elements are dropped. So typed parsing is never the validator or the stored form (ADR 0051).
 - **Raw JSON first (ADR 0051).** Tier 1 runs on raw JSON before any typed parse, using an element table generated from `definitions.json.zip`. The stored resource is the validated input JSON in canonical form, with the server-set `id` and `meta` fields. Reads, search, `_history` and sync serve the stored bytes and never re-parse them.
@@ -36,7 +36,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
 `health-fhir-models` (contracts) depends on `fhir-r5 =4.2.3`. It re-exports `resources`, `types`, `codes`, `coded` and `validate` under its own paths, and provides `parse_resource`, `to_json` and `round_trip`.
 - **Facade enforcement.** No other crate may depend on `fhir-r5`, which the `facade-bypass` architecture check enforces. ADR 0050's "no `fhir-r5` type in the public API" is read this way: consumers name model types only through `health_fhir_models::…`, so a swap changes the facade, not its users. Wrapping every generated type would defeat ADR 0015's "domain code works on typed models".
-- **Round-trip.** The corpus test round-trips all 2,824 official examples: 2,823 exact, plus `questionnaireresponse-example-f201-lifelines.json` on the known-invalid list. Committed fixtures cover the edge cases on every PR. `tools/fhir/fetch-r5-examples.sh` fetches the full corpus with a pinned SHA-256 for CI.
+- **Round-trip.** The corpus test round-trips all 2,824 official examples: 2,823 exact, plus `questionnaireresponse-example-f201-lifelines.json`. ADR 0050 called it invalid, but it is valid R5: it carries `_questionnaire`, an extension-only required primitive, which tier 1 accepts and `fhir-r5` refuses. It is listed as `KNOWN_UNPARSEABLE_EXAMPLES`, a crate gap worth reporting upstream. Committed fixtures cover the edge cases on every PR. `tools/fhir/fetch-r5-examples.sh` fetches the full corpus with a pinned SHA-256 for CI.
 - **Findings.**
   - The model writes `1.0e3` as `1.0e+3`: the same value and precision, but different text. Stored resources are the client's bytes and never re-serialized (ADR 0051), so only JSON *produced* from typed models is affected.
   - An element the type does not allow is dropped, e.g. `Observation.valueInteger64`, since `integer64` is not an Observation value type. Tier 1 runs first for that reason.
@@ -76,6 +76,21 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - **Budget:** p95 ≤ 2 ms per resource for tiers 1–3 on reference edge hardware.
   - **Rejected crates.** `helios-fhir-validator` cannot share a build with `fhir-r5`, and `octofhir-fhirschema` 0.3.30 drops slicing on base elements and never enforces `fixed` or `pattern`.
 - **HL7 Java validator.** It is a **CI oracle only**: test fixtures and generated examples are cross-checked against it. It is never shipped.
+
+### Tier 1 in code
+
+`health-fhir-validation::validate_structure` walks the raw JSON against `data/r5-elements.json`. That table is generated from the core package's base StructureDefinitions by `tools/fhir-element-table`, and `tools/fhir/check-element-table.sh` fails on drift.
+
+- **Write paths.** Every REST write (create, update, conditional writes and each Bundle entry) runs tier 1 before anything else reads the body. A failure is 400 with one OperationOutcome issue per problem, each with its FHIRPath `expression`; inside a Bundle the expression is rewritten to `Bundle.entry[n].resource…`.
+- **Two deliberate departures from the snapshots:**
+  - `Element.id` is checked as `string`, not `id`. ElementDefinition ids hold `:` and exceed 64 characters in the official examples.
+  - Decimals are any JSON number, not the core regex's 18 digits (ADR 0052: tier 1 accepts longer values and stores them unchanged).
+- **Corpus.** All 2,824 official examples pass tier 1. Every one that passes also parses into `fhir-r5`, except `questionnaireresponse-example-f201-lifelines.json`. That example is valid R5, with an extension-only required primitive, but `fhir-r5` refuses it, so it is listed as `KNOWN_UNPARSEABLE_EXAMPLES`. ADR 0050 called it invalid, which was a misreading.
+- **`skeleton(type)`** builds a minimal valid instance of any resource type, for tests and tooling.
+- **Follow-ups:**
+  - tier 2 invariants and the decimal-exact FHIRPath engine ([#165](https://github.com/carapai/people-centered-healthcare/issues/165));
+  - the HL7 Java validator cross-check ([#166](https://github.com/carapai/people-centered-healthcare/issues/166));
+  - the Inbound Dead Letter and quarantine ([#167](https://github.com/carapai/people-centered-healthcare/issues/167)).
 
 ## Search parameters and indexed projections
 

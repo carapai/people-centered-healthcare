@@ -79,8 +79,8 @@ pub(crate) async fn vread(
     Ok(response)
 }
 
-/// The request body as a resource of `resource_type`, with the id it carries. Validation tiers
-/// 1–2 replace this shape check (#59).
+/// The request body as a resource of `resource_type` that passed tier 1, with the id it
+/// carries.
 pub(crate) fn body(
     resource_type: &ResourceType,
     headers: &HeaderMap,
@@ -98,6 +98,12 @@ pub(crate) fn body(
         return Err(FhirError::bad_request(format!(
             "the body is not a {resource_type} resource"
         )));
+    }
+    // Tier 1 on the raw JSON before anything else reads it (ADR 0051). Tiers 2–4 follow with
+    // their tasks.
+    let found = health_fhir_validation::validate_value(&value);
+    if !found.is_empty() {
+        return Err(FhirError::invalid_resource(&found));
     }
     let id = object.get("id").and_then(Value::as_str).map(str::to_owned);
     Ok((RawJson::from_validated(text), id))

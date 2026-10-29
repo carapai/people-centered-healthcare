@@ -16,6 +16,7 @@ workspace = true
 axum = { workspace = true, features = ["query", "form"] }
 form_urlencoded = { workspace = true }
 health-fhir-search = { workspace = true }
+health-fhir-validation = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-surrealdb = { workspace = true }

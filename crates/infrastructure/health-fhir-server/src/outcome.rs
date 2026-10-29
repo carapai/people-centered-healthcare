@@ -19,6 +19,9 @@ pub struct FhirError {
     pub code: &'static str,
     /// The diagnostics shown to the client.
     pub diagnostics: String,
+    /// Validation issues, each an OperationOutcome `issue` with its FHIRPath `expression`.
+    /// When present they are the response's issues; otherwise it has the one issue above.
+    pub issues: Vec<serde_json::Value>,
 }
 
 impl FhirError {
@@ -28,6 +31,31 @@ impl FhirError {
             status,
             code,
             diagnostics: diagnostics.into(),
+            issues: Vec::new(),
+        }
+    }
+
+    /// A resource that failed tier 1 structural validation (ADR 0051): 400, one issue per
+    /// problem.
+    pub fn invalid_resource(found: &[health_fhir_validation::Issue]) -> Self {
+        let first = found.first().map_or("invalid", |i| i.code.as_str());
+        Self {
+            issues: found
+                .iter()
+                .map(|issue| {
+                    json!({
+                        "severity": "error",
+                        "code": issue.code.as_str(),
+                        "diagnostics": issue.message,
+                        "expression": [issue.location],
+                    })
+                })
+                .collect(),
+            ..Self::new(
+                StatusCode::BAD_REQUEST,
+                first,
+                format!("the resource is not valid R5 ({} issues)", found.len()),
+            )
         }
     }
 
@@ -63,8 +91,12 @@ impl IntoResponse for FhirError {
         } else {
             "error"
         };
-        let body = operation_outcome(severity, self.code, &self.diagnostics).to_string();
-        fhir_json(self.status, body)
+        let body = if self.issues.is_empty() {
+            operation_outcome(severity, self.code, &self.diagnostics)
+        } else {
+            json!({ "resourceType": "OperationOutcome", "issue": self.issues })
+        };
+        fhir_json(self.status, body.to_string())
     }
 }
 

@@ -2,7 +2,7 @@
 //!
 //! - `tests/fixtures/examples/` holds official R5 examples chosen for their edge cases
 //!   (primitive `_field` extensions, nulls in arrays, contained resources, decimals with
-//!   trailing zeros), plus the one known-invalid example.
+//!   trailing zeros), plus the one known-unparseable example.
 //! - `tests/fixtures/edge/` holds hand-written edge cases (decimal text, `integer64`, unknown
 //!   codes).
 //! - Set `HEALTH_FHIR_R5_EXAMPLES` to the unpacked official `examples-json.zip` to run the whole
@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use health_fhir_models::{
-    KNOWN_INVALID_EXAMPLES, Resource, RoundTrip, parse_resource, round_trip, to_json,
+    KNOWN_UNPARSEABLE_EXAMPLES, Resource, RoundTrip, parse_resource, round_trip, to_json,
 };
 
 fn json_files(dir: &Path) -> Vec<PathBuf> {
@@ -50,13 +50,13 @@ fn run(files: &[PathBuf]) -> Report {
             .and_then(|n| n.to_str())
             .unwrap_or_default();
         let text = std::fs::read_to_string(file).expect("read");
-        let known_invalid = KNOWN_INVALID_EXAMPLES.contains(&name);
+        let known_invalid = KNOWN_UNPARSEABLE_EXAMPLES.contains(&name);
         match (round_trip(&text), known_invalid) {
             (Ok(RoundTrip::Exact), false) => report.exact += 1,
             (Err(_), true) => report.known_invalid += 1,
             (Ok(RoundTrip::Exact), true) => {
                 report.failures.push(format!(
-                    "{name}: listed as known-invalid but parses; remove it from the list"
+                    "{name}: listed as known-unparseable but parses; remove it from the list"
                 ));
             }
             (Ok(RoundTrip::Differs { pointer }), _) => report
@@ -148,7 +148,7 @@ fn the_official_corpus_round_trips_when_available() {
     let files = json_files(Path::new(&dir));
     let report = run(&files);
     eprintln!(
-        "{} files: {} exact, {} known-invalid, {} failures",
+        "{} files: {} exact, {} known-unparseable, {} failures",
         files.len(),
         report.exact,
         report.known_invalid,
@@ -160,5 +160,5 @@ fn the_official_corpus_round_trips_when_available() {
         files.len()
     );
     assert_eq!(report.failures, Vec::<String>::new());
-    assert_eq!(report.known_invalid, KNOWN_INVALID_EXAMPLES.len());
+    assert_eq!(report.known_invalid, KNOWN_UNPARSEABLE_EXAMPLES.len());
 }
