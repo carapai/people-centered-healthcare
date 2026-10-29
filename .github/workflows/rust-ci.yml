@@ -62,7 +62,8 @@ jobs:
     permissions:
       contents: read
     env:
-      HEALTH_FHIR_R5_EXAMPLES: target/fhir/r5-examples/json
+      # Absolute: each crate's tests run from the crate's own directory.
+      HEALTH_FHIR_R5_EXAMPLES: ${{ github.workspace }}/target/fhir/r5-examples/json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
