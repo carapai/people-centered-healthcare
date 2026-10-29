@@ -172,7 +172,7 @@ The HL7 validator is a CI oracle only (above). `tools/fhir/java-differential.sh`
   - a literal reference to a type the profile does not allow: Java checks target types only on references it can resolve;
   - an unsliced value before a slice under `openAtEnd`: Java reports it only as information.
 - **Clinical examples.** 151 fail only in Java, for rules outside our tiers: terminology (tier 4), URL and narrative-link resolution, Java's refusal of example URLs, extensions we have no definition for, two profiles outside our set, and one Identifier rule stated in prose ([#176](https://github.com/carapai/people-centered-healthcare/issues/176)).
-- **Recorded disagreements** (`tests/fixtures/java-differential/known-disagreements.json`): each has a reason, either per file or as Java message ids for rules outside our tiers. A disagreement not explained there fails the test, and so does an entry that no longer explains one.
+- **Recorded disagreements** (`tests/fixtures/java-differential/known-disagreements.json`): each has a reason, either per file or as Java message ids for rules outside our tiers. A disagreement not explained there fails the test, and so does a file entry that no longer disagrees. Which Java-only rules fire depends on the validator's environment (its terminology cache), so an unused message id is only reported.
 - **What it found:** the `ele-1` gap in tier 1; versioned canonicals in generated snapshots; choice elements sliced by a non-type discriminator; and custom fixtures that were not real snapshots.
 
 ## Search parameters and indexed projections

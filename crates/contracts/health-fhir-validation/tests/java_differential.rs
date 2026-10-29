@@ -11,12 +11,13 @@
 //!   ones a file claims in `meta.profile`.
 //!
 //! Every disagreement must be explained, with its reason, in
-//! `tests/fixtures/java-differential/known-disagreements.json`, and every entry must still
-//! explain one:
+//! `tests/fixtures/java-differential/known-disagreements.json`, and every entry recorded
+//! by file must still disagree:
 //!
 //! - `files`: a case named by file, in either direction;
 //! - `javaMessageIds`: rules outside our tiers (terminology, URL resolution, Java policy). A file
-//!   that only Java fails is explained when every one of its Java errors has a listed id. The cases come from `examples/differential_cases.rs` and the official examples.
+//!   that only Java fails is explained when every one of its Java errors has a listed id. Which
+//!   of these fire depends on the validator's environment, so an unused id is only reported. The cases come from `examples/differential_cases.rs` and the official examples.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -203,7 +204,7 @@ async fn the_java_validator_agrees_except_where_recorded_when_available() {
             )
         })
         .collect();
-    let mut stale: Vec<String> = recorded
+    let stale: Vec<String> = recorded
         .keys()
         .filter(|name| {
             java.keys().any(|f| f.ends_with(name.as_str()))
@@ -211,12 +212,15 @@ async fn the_java_validator_agrees_except_where_recorded_when_available() {
         })
         .cloned()
         .collect();
-    stale.extend(
-        java_only
-            .keys()
-            .filter(|id| !ids_used.contains(*id))
-            .cloned(),
-    );
+    // Which Java-only rules fire depends on the validator's environment (its terminology
+    // cache, for one), so an unused message id is reported, not failed.
+    let unused: Vec<&String> = java_only
+        .keys()
+        .filter(|id| !ids_used.contains(*id))
+        .collect();
+    if !unused.is_empty() {
+        eprintln!("recorded Java message ids that explained nothing in this run: {unused:?}");
+    }
     // Every disagreement, one line each, so runs on different machines can be compared.
     for (name, (ours, _, _, java_errors)) in &disagreements {
         let mut ids: Vec<String> = java_errors.iter().map(|e| message_id(e)).collect();
@@ -241,6 +245,6 @@ async fn the_java_validator_agrees_except_where_recorded_when_available() {
     );
     assert!(
         stale.is_empty(),
-        "recorded files or message ids that no longer explain a disagreement: {stale:?}"
+        "recorded files that no longer disagree: {stale:?}"
     );
 }
