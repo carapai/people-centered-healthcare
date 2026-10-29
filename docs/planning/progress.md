@@ -9,7 +9,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
-| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 1 | 10 |
+| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 2 | 10 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 0 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 17 of 108 implementation tasks done. Validation spikes open: 3.
+Total: 18 of 108 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -47,3 +47,4 @@ Total: 17 of 108 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #59 (tier 1): health-fhir-validation structural check on raw JSON from a generated element table (tools/fhir-element-table); on every REST write path; full corpus passes and agrees with typed parsing (one recorded fhir-r5 gap). Split out #165 (tier 2 and FHIRPath), #166 (Java validator cross-check), #167 (Inbound Dead Letter and quarantine).
 - 2026-10-29: #165 tier 2: the vendored, patched octofhir-fhirpath (decimals, plus six invariant-correctness patches) and octofhir-ucum (panic on non-ASCII units); FhirPathEngine trait with our own model provider; R5 core invariants on every REST write; decimal conformance suite; corpus holds except 171 independently confirmed example errors. Tiers 1–2 p95 3.06 ms on clinical resources, over the tiers 1–3 budget.
 - 2026-10-29: #145 tier 3: `ProfileSet::compile` over StructureDefinition snapshots (refuses differential-only profiles and unsupported constructs) and `SnapshotValidator` behind `ProfileValidator`: cardinality, fixed/pattern, types, target profiles, extension definitions and contexts, profile invariants, slicing (value, pattern, exists, type, profile; closed, open, openAtEnd, ordered). Official vital-signs, heart-rate and BP profiles; every official example claiming them conforms. Engine patch 0008 (`as` on FHIR primitives). Split out #170 (2 ms budget); the Java differential joins #166; wiring is #91.
+- 2026-10-29: #170 validation budget: `HOLDS_BY_SHAPE` skips the hot core invariants (`dom-2`–`dom-5`, `ref-1`, `ref-2`, `qty-3`) where the node's shape proves they hold, each verified against the engine over the corpus; `tests/performance.rs` holds tiers 1–3 to p95 ≤ 2 ms. Tiers 1–3 p95 1.12 ms on 731 clinical examples (laptop), from 2.5–3.1 ms for tiers 1–2 alone; reference edge hardware pending.

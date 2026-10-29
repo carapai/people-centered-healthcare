@@ -76,7 +76,15 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - `exs-1`, whose `memberOf()` needs the terminology service (#90).
 - **Write paths.** Every REST write runs tier 2 after tier 1. Failures are 400 with the invariant key and location.
 - **Corpus.** All 2,824 official examples hold their invariants except 171 genuine errors in HL7's examples: 161 Questionnaires with repeated linkIds (`que-2`) and 10 StructureDefinitions with a base but no derivation (`sdf-27`). A check that does not use FHIRPath confirms each one in the test.
-- **Performance.** On 731 clinical examples, in a release build on a development laptop, tiers 1 and 2 together take p50 0.92 ms and **p95 3.06 ms**. That is already over the 2 ms p95 budget for tiers 1–3 (ADR 0053); reducing it is [Bring validation tiers 1–3 within the 2 ms p95 budget](https://github.com/carapai/people-centered-healthcare/issues/170) (#170). Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
+- **Shapes that prove an invariant holds** (`HOLDS_BY_SHAPE`, #170). A few invariants were most of tier 2's cost on clinical resources: the reference checks on every Reference, and the contained-resource checks on every resource. The checks skipped on a node whose shape proves they hold are:
+  - `dom-2`, `dom-4` and `dom-5` when there is no `contained`;
+  - `dom-3` when there is no `contained`, or when every contained resource's `#id` is the value of some `reference`;
+  - `ref-1` on a reference that is not local (`#…`);
+  - `ref-2` when `reference` is present;
+  - `qty-3` with no `code` or with a `system`.
+
+  Each is only a sufficient condition; otherwise the engine decides. A unit test evaluates every skipped check over the official corpus (about 41,800), and each holds.
+- **Performance** (`tests/performance.rs`). Over the 731 official clinical examples, in a release build on a development laptop, tiers 1–3 take p50 0.34 ms and **p95 1.12 ms**, against the 2 ms budget (ADR 0053). That is with the vital-signs profiles active: each example is checked against the profiles it claims, and every vital-signs Observation against `vitalsigns`. Before the shape checks, tiers 1–2 alone took p95 2.5–3.1 ms. The test fails over budget in a release build with the corpus; CI runs it once CI exists (#47). The measurement on reference edge hardware waits for that hardware. Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
 - Whether CQL is needed stays in the map's Not yet specified.
 
 ## Validation (ADR 0016)
@@ -145,7 +153,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - the official vital-signs, heart-rate and BP profiles: the valid examples pass; a missing category, a wrong LOINC code, a wrong fixed unit and a missing systolic component each fail;
   - with `HEALTH_FHIR_R5_EXAMPLES` set, all 12 official examples that claim one of these profiles conform;
   - custom fixtures (`tests/fixtures/custom-profiles/`) cover every supported construct and the compile refusals.
-- **Performance.** In a release build on a development laptop, tier 3 adds p95 0.45 ms to the heart-rate example and 0.90 ms to the BP example. With tiers 1–2, the BP example is about 2.0 ms p95, at the budget; [#170](https://github.com/carapai/people-centered-healthcare/issues/170) brings tiers 1–3 within it on reference edge hardware.
+- **Performance.** See § Tier 2 in code: in the budget test, the profiled examples take tiers 1–3 at p50 0.44 ms and at most 0.87 ms.
 - **Follow-ups:** the HL7 Java validator differential joins the tier 1 cross-check in [#166](https://github.com/carapai/people-centered-healthcare/issues/166). The `octofhir-fhirschema` slicing-merge bug is to be reported upstream.
 
 ## Search parameters and indexed projections
