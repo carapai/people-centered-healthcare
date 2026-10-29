@@ -69,4 +69,13 @@ jobs:
           tar -xzf surreal.tgz
           ./surreal version
       - run: git ls-files '*.surql' | xargs ./surreal validate
-      - run: git ls-files '*.surql' | xargs bunx @surrealdb/surql-fmt@0.1.0-beta.3 --check
+      - name: surql-fmt --check (with the diff for any unformatted file)
+        run: |
+          status=0
+          while IFS= read -r file; do
+            if ! bunx @surrealdb/surql-fmt@0.1.0-beta.3 --check "$file"; then
+              bunx @surrealdb/surql-fmt@0.1.0-beta.3 "$file" | diff -u "$file" - || true
+              status=1
+            fi
+          done < <(git ls-files '*.surql')
+          exit $status

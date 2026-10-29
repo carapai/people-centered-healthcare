@@ -26,9 +26,10 @@ done < <(git ls-files '*.md' | grep -v '^third_party/')
 for diagram in "$OUT"/*.mmd; do
   [[ -e "$diagram" ]] || continue
   count=$((count + 1))
-  if ! mmdc --quiet --puppeteerConfigFile "$OUT/puppeteer.json" --input "$diagram" --output "${diagram%.mmd}.svg" >/dev/null 2>&1; then
+  if ! error=$(mmdc --quiet --puppeteerConfigFile "$OUT/puppeteer.json" --input "$diagram" --output "${diagram%.mmd}.svg" 2>&1); then
     source_name=$(basename "${diagram%.mmd}")
     echo "Mermaid block does not render: ${source_name%_*} (line ${source_name##*_})" >&2
+    echo "$error" | grep -v '^\s*at ' | head -5 >&2
     status=1
   fi
 done

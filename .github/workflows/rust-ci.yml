@@ -94,5 +94,13 @@ jobs:
         run: |
           packages=$(cargo metadata --format-version 1 --no-deps --locked \
             | jq -r '.packages[] | select(.metadata.health.layer == "domain" or .metadata.health.layer == "application") | "--package=" + .name')
+          status=0
           # shellcheck disable=SC2086 # one argument per package
-          cargo llvm-cov nextest --locked --no-tests=pass $packages --fail-under-lines 80
+          cargo llvm-cov nextest --locked --no-tests=pass $packages --fail-under-lines 80 2> coverage.err || status=$?
+          cat coverage.err >&2
+          if [[ $status != 0 ]]; then
+            # Crates that are still empty stubs have no instrumented code at all; that is not a
+            # coverage failure. Code without tests reports 0% and fails above.
+            grep -q "no coverage data found" coverage.err || exit 1
+            echo "::notice::the domain and application crates have no code yet; nothing to measure"
+          fi

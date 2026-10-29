@@ -71,7 +71,7 @@ stateDiagram-v2
   Returning --> EdgeHolds: desktop outbox for scope drained and edge acknowledges
   Leased --> Frozen: lease expired, not returned
   Frozen --> Returning: desktop reconnects
-  Frozen --> EdgeHolds: admin-forced recovery (audited; unsynced lease ops reconciled)
+  Frozen --> EdgeHolds: admin-forced recovery (audited, unsynced lease ops reconciled)
 ```
 
 - **Desktop under an edge.**

@@ -84,10 +84,10 @@ sequenceDiagram
   participant D as Desktop
   C->>E: activation record (metadata lane)
   E->>C: fetch package blob(s) by hash
-  E->>E: verify signature + sha-256; stage
+  E->>E: verify signature + sha-256, stage
   E->>E: check dependencies, minSoftware, formatVersion
   alt incompatible or missing dependency
-    E-->>C: activation failed (reason); keep previous set
+    E-->>C: activation failed (reason), keep previous set
   else ok
     E->>E: at effective time: switch active set atomically
     E->>E: reindex if SearchParameters changed

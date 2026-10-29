@@ -162,7 +162,7 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> Draft
   Draft --> Submitted
-  Submitted --> Verification: OTP (level1); optional NIN or in-person check (level3)
+  Submitted --> Verification: OTP (level1), optional NIN or in-person check (level3)
   Verification --> Matching: $match
   Matching --> StaffReview: potential match, or below level3 matching an existing Patient
   Matching --> Link: level3 and certain match

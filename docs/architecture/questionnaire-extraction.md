@@ -48,7 +48,7 @@ sequenceDiagram
   UC->>O: for each target: create / version / retract (seed: create once)
   O-->>UC: ok | validation error
   alt any error (except authorization-only)
-    UC-->>UI: errors; QR stays in-progress
+    UC-->>UI: errors, QR stays in-progress
   else
     UC->>UoW: QR (completed, mapping recorded) + resources + Provenance + outbox, one transaction
     UoW-->>UI: committed
