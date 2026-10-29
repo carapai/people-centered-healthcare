@@ -217,6 +217,16 @@ async fn the_java_validator_agrees_except_where_recorded_when_available() {
             .filter(|id| !ids_used.contains(*id))
             .cloned(),
     );
+    // Every disagreement, one line each, so runs on different machines can be compared.
+    for (name, (ours, _, _, java_errors)) in &disagreements {
+        let mut ids: Vec<String> = java_errors.iter().map(|e| message_id(e)).collect();
+        ids.dedup();
+        eprintln!(
+            "disagreement {name}: ours {}, Java [{}]",
+            if *ours { "fails" } else { "passes" },
+            ids.join(" ")
+        );
+    }
     eprintln!(
         "{} files compared; {} disagreements ({} explained by recorded reasons)",
         java.len(),

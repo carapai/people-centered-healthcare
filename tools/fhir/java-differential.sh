@@ -25,6 +25,7 @@ for dir in tier3 tier1 corpus; do
   echo "validating $dir"
   java -Xmx6g -jar "$JAR" -version 5.0.0 -tx n/a -ig "$CUSTOM" \
     "$OUT/cases/$dir" -output "$OUT/results/$dir.json" > "$OUT/$dir.log" 2>&1 || true
+  grep -m1 "Package Summary" "$OUT/$dir.log" || true
   if [[ ! -s "$OUT/results/$dir.json" ]]; then
     echo "the Java validator wrote no results for $dir:" >&2
     tail -40 "$OUT/$dir.log" >&2
