@@ -1,0 +1,21 @@
+{
+ "resourceType": "StructureDefinition",
+ "id": "diff-only",
+ "url": "http://example.org/fhir/StructureDefinition/diff-only",
+ "name": "DiffOnly",
+ "status": "draft",
+ "kind": "resource",
+ "abstract": false,
+ "type": "Patient",
+ "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Patient",
+ "derivation": "constraint",
+ "differential": {
+  "element": [
+   {
+    "id": "Patient.birthDate",
+    "path": "Patient.birthDate",
+    "min": 1
+   }
+  ]
+ }
+}

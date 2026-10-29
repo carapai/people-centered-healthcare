@@ -37,4 +37,8 @@ Found by evaluating every R5 core invariant over all 2,824 official examples. Be
 - **0006, the `not` prefix operator.** It matched `not` with no word boundary, so `notificationEvent` parsed as `not` followed by `ificationEvent` ("Unsupported operator", `sst-1`). It now uses `text::keyword("not")`, as the analysis parser already did. File: `parser/pratt.rs`.
 - **0007, `htmlChecks()` attributes.** The other non-active HTML 4 attributes FHIR narratives allow are added: `span` on `col`, `summary`, `rules`, `start`, `value` and others. There are no event handlers or scripts. File: `evaluator/functions/html_checks_function.rs`.
 
+## 0008 — `as` casts FHIR primitives
+
+Found by the vital-signs profile's `vs-1`, `($this as dateTime).toString().length() >= 8`. `is(dateTime)` was true, but `as(dateTime)` returned empty: `as()` matched only the System primitives it converts and complex types by their static `TypeInfo` name, so every FHIR primitive (`dateTime`, `code`, `uri`, …) was dropped. Every official example claiming a vital-signs profile failed. `as()` now accepts a value whenever `is()` would; its conversions for `string`, `integer`, `decimal` and `boolean` are unchanged. Files: `evaluator/functions/type_checking/as_function.rs`, and `is_function.rs`, whose type check becomes a crate-visible associated function.
+
 The engine's own 546 unit tests pass with all patches applied.

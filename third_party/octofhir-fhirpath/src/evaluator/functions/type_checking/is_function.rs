@@ -52,14 +52,13 @@ impl IsFunctionEvaluator {
     }
 
     /// Check if a value type inherits from or is compatible with the target type
-    fn is_type_compatible(
-        &self,
+    pub(crate) fn is_type_compatible(
         value: &FhirPathValue,
         target_type: &str,
         model_provider: &dyn crate::core::ModelProvider,
     ) -> bool {
         // Get the actual type namespace and name using the same logic as type function
-        let (actual_namespace, actual_name) = self.get_actual_type_info(value);
+        let (actual_namespace, actual_name) = Self::get_actual_type_info(value);
         let full_actual_type = format!("{actual_namespace}.{actual_name}");
 
         // Parse target type
@@ -236,7 +235,7 @@ impl IsFunctionEvaluator {
     }
 
     /// Get actual type info using the same logic as the type function
-    fn get_actual_type_info(&self, value: &FhirPathValue) -> (String, String) {
+    fn get_actual_type_info(value: &FhirPathValue) -> (String, String) {
         match value {
             FhirPathValue::Boolean(_, type_info, _) => {
                 if type_info.namespace.as_deref() == Some("FHIR") {
@@ -377,7 +376,7 @@ impl LazyFunctionEvaluator for IsFunctionEvaluator {
         let mut results = Vec::new();
 
         for value in input {
-            let is_type = self.is_type_compatible(&value, &type_name, &**context.model_provider());
+            let is_type = Self::is_type_compatible(&value, &type_name, &**context.model_provider());
             results.push(FhirPathValue::boolean(is_type));
         }
 
