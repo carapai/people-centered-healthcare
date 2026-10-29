@@ -96,7 +96,7 @@ async fn run(
             let mut rest = Map::new();
             rest.insert("search".into(), json!({ "mode": "match" }));
             Entry {
-                full_url: server.url(&format!("{}/{}", r.resource_type, r.id)),
+                full_url: Some(server.url(&format!("{}/{}", r.resource_type, r.id))),
                 resource: Some(r.json.as_str().to_owned()),
                 rest,
             }

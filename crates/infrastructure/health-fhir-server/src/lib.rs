@@ -14,10 +14,38 @@
 //!
 //! | conditional create, update, delete | `POST /{type}` with `If-None-Exist`; `PUT`, `DELETE /{type}?…` |
 //!
-//! Transaction and batch Bundles and reference integrity are separate tasks; until then the
-//! CapabilityStatement does not declare them and the requests are refused.
+//! | transaction, batch | `POST /` with a `transaction` or `batch` Bundle |
+//!
+//! Reference integrity is a separate task (#159).
 //! Request bodies are checked only for shape (a JSON object of the path's type) until validation
 //! tiers 1–2 (#59) are on the write path.
+
+/// Reruns a use case (an `async` block returning `Result<T, ops::Attempt>`) on write-write
+/// conflicts, as `RetryPolicy` allows; evaluates to `Result<T, FhirError>`.
+macro_rules! retrying {
+    ($server:expr, $attempt:expr) => {{
+        let mut round = 1;
+        loop {
+            match $attempt.await {
+                Ok(value) => break Ok(value),
+                Err($crate::ops::Attempt::Conflict)
+                    if $server
+                        .retry
+                        .should_retry(round, &health_persistence::WriteError::Conflict) =>
+                {
+                    round += 1;
+                    $crate::FhirServer::back_off(round).await;
+                }
+                Err($crate::ops::Attempt::Conflict) => {
+                    break Err($crate::FhirError::from(
+                        health_persistence::WriteError::Conflict,
+                    ));
+                }
+                Err($crate::ops::Attempt::Fail(error)) => break Err(error),
+            }
+        }
+    }};
+}
 
 mod bundle;
 mod capability;
@@ -25,8 +53,10 @@ mod conditional;
 mod history;
 mod http;
 mod interactions;
+mod ops;
 mod outcome;
 mod search;
+mod transaction;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -74,6 +104,7 @@ impl FhirServer {
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
     pub fn router(self) -> Router {
         Router::new()
+            .route("/", post(transaction::post))
             .route("/metadata", get(interactions::metadata))
             .route("/_history", get(history::system))
             .route(

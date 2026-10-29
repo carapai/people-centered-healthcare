@@ -73,7 +73,11 @@ pub fn capability_statement(registry: &Registry, base: &str, date: Timestamp) ->
         "rest": [{
             "mode": "server",
             "resource": resources,
-            "interaction": [{ "code": "history-system" }],
+            "interaction": [
+                { "code": "transaction" },
+                { "code": "batch" },
+                { "code": "history-system" },
+            ],
         }],
     })
 }

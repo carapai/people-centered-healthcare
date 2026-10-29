@@ -8,11 +8,11 @@ use axum::response::Response;
 use health_identifiers::{OpId, ResourceId};
 use health_persistence::{
     Precondition, RawJson, ResourceType, Store, StoredResource, Transaction, VersionMeta,
-    WriteError, WriteRequest,
 };
 use serde_json::Value;
 
 use crate::http::{Return, fhir_json, if_match, prefer, require_json_body, version_headers};
+use crate::ops::{self, Attempt, Condition, CreateTarget};
 use crate::outcome::{FhirError, operation_outcome};
 use crate::{FhirServer, capability_statement, resource_id, resource_type};
 
@@ -102,33 +102,6 @@ pub(crate) fn body(
     Ok((RawJson::from_validated(text), id))
 }
 
-/// One attempt of a write use case.
-pub(crate) enum Attempt {
-    Conflict,
-    Fail(FhirError),
-}
-
-impl From<WriteError> for Attempt {
-    fn from(error: WriteError) -> Self {
-        match error {
-            WriteError::Conflict => Self::Conflict,
-            other => Self::Fail(other.into()),
-        }
-    }
-}
-
-impl From<health_persistence::StoreError> for Attempt {
-    fn from(error: health_persistence::StoreError) -> Self {
-        Self::Fail(error.into())
-    }
-}
-
-impl From<FhirError> for Attempt {
-    fn from(error: FhirError) -> Self {
-        Self::Fail(error)
-    }
-}
-
 /// What a write did.
 pub(crate) struct Written {
     pub(crate) created: bool,
@@ -137,60 +110,6 @@ pub(crate) struct Written {
 }
 
 impl FhirServer {
-    /// Writes a version in one transaction, choosing the precondition from the head read inside
-    /// it, and reruns the whole use case on a write-write conflict (persistence.md).
-    async fn put_version(
-        &self,
-        resource_type: &ResourceType,
-        id: ResourceId,
-        json: &RawJson,
-        decide: impl Fn(Option<&StoredResource>) -> Result<Precondition, FhirError>,
-    ) -> Result<Written, FhirError> {
-        let mut attempt = 1;
-        loop {
-            let result: Result<Written, Attempt> = async {
-                let mut tx = self.store.begin().await?;
-                let head = tx.read(resource_type, id).await?;
-                if head.as_ref().is_some_and(|h| h.version.deleted) {
-                    return Err(FhirError::gone().into());
-                }
-                let precondition = decide(head.as_ref())?;
-                let version = tx
-                    .write(WriteRequest {
-                        resource_type: resource_type.clone(),
-                        id,
-                        json: json.clone(),
-                        op_id: OpId::new(),
-                        precondition,
-                    })
-                    .await?;
-                let stored = tx.read(resource_type, id).await?.ok_or_else(|| {
-                    FhirError::from(health_persistence::StoreError::Unavailable(
-                        "written head is missing".into(),
-                    ))
-                })?;
-                tx.commit().await?;
-                Ok(Written {
-                    created: head.is_none(),
-                    version,
-                    stored: stored.json,
-                })
-            }
-            .await;
-            match result {
-                Ok(written) => return Ok(written),
-                Err(Attempt::Conflict)
-                    if self.retry.should_retry(attempt, &WriteError::Conflict) =>
-                {
-                    attempt += 1;
-                    Self::back_off(attempt).await;
-                }
-                Err(Attempt::Conflict) => return Err(WriteError::Conflict.into()),
-                Err(Attempt::Fail(error)) => return Err(error),
-            }
-        }
-    }
-
     pub(crate) fn written(
         &self,
         resource_type: &ResourceType,
@@ -230,6 +149,27 @@ impl FhirServer {
         }
         response
     }
+
+    /// The response to a conditional create that found its one match.
+    pub(crate) fn existing(existing: &StoredResource, ret: Return) -> Response {
+        let body = match ret {
+            Return::Minimal => String::new(),
+            _ => existing.json.as_str().to_owned(),
+        };
+        let mut response = fhir_json(StatusCode::OK, body);
+        version_headers(&mut response, &existing.version);
+        response
+    }
+}
+
+/// 204, with the tombstone's ETag when this request deleted the resource.
+pub(crate) fn deleted(version: Option<VersionMeta>) -> Response {
+    let mut response = Response::new(axum::body::Body::empty());
+    *response.status_mut() = StatusCode::NO_CONTENT;
+    if let Some(version) = version {
+        version_headers(&mut response, &version);
+    }
+    response
 }
 
 /// `POST /{type}`: the server mints a UUIDv7 and ignores any id in the body (R5 http). With
@@ -242,20 +182,40 @@ pub(crate) async fn create(
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
     let (json, _ignored_id) = body(&resource_type, &headers, &bytes)?;
-    if let Some(condition) = headers.get("if-none-exist") {
-        let condition = condition
-            .to_str()
-            .map_err(|_| FhirError::bad_request("If-None-Exist is not ASCII"))?;
-        return crate::conditional::create(&server, &resource_type, condition, &json, &headers)
-            .await;
-    }
-    let id = ResourceId::new();
-    let written = server
-        .put_version(&resource_type, id, &json, |_| {
-            Ok(Precondition::MustNotExist)
+    let condition = headers
+        .get("if-none-exist")
+        .map(|v| {
+            v.to_str()
+                .map_err(|_| FhirError::bad_request("If-None-Exist is not ASCII"))
+                .and_then(|text| Condition::parse(&server, &resource_type, text))
         })
-        .await?;
-    Ok(server.written(&resource_type, id, written, prefer(&headers).0))
+        .transpose()?;
+    let ret = prefer(&headers).0;
+    retrying!(server, async {
+        let mut tx = server.store.begin().await?;
+        let response =
+            match ops::plan_create(&server, &mut tx, &resource_type, condition.as_ref()).await? {
+                CreateTarget::Existing(existing) => FhirServer::existing(&existing, ret),
+                CreateTarget::New(id) => {
+                    let (version, stored) = ops::write(
+                        &mut tx,
+                        &resource_type,
+                        id,
+                        &json,
+                        Precondition::MustNotExist,
+                    )
+                    .await?;
+                    tx.commit().await?;
+                    let written = Written {
+                        created: true,
+                        version,
+                        stored,
+                    };
+                    server.written(&resource_type, id, written, ret)
+                }
+            };
+        Ok::<_, Attempt>(response)
+    })
 }
 
 /// `PUT /{type}/{id}`: update, or update-as-create with a client UUID. Updating an existing
@@ -277,22 +237,20 @@ pub(crate) async fn update(
         ));
     }
     let expected = if_match(&headers)?;
-    let written = server
-        .put_version(&resource_type, id_value, &json, |head| {
-            Ok(match (head, expected) {
-                (None, None) => Precondition::MustNotExist,
-                (_, Some(version)) => Precondition::IfMatch(version),
-                (Some(_), None) => {
-                    return Err(FhirError::new(
-                        StatusCode::PRECONDITION_REQUIRED,
-                        "business-rule",
-                        "updates require If-Match with the current ETag",
-                    ));
-                }
-            })
-        })
-        .await?;
-    Ok(server.written(&resource_type, id_value, written, prefer(&headers).0))
+    let ret = prefer(&headers).0;
+    retrying!(server, async {
+        let mut tx = server.store.begin().await?;
+        let plan = ops::plan_update(&mut tx, &resource_type, id_value, expected).await?;
+        let (version, stored) =
+            ops::write(&mut tx, &resource_type, plan.id, &json, plan.precondition).await?;
+        tx.commit().await?;
+        let written = Written {
+            created: plan.creates(),
+            version,
+            stored,
+        };
+        Ok::<_, Attempt>(server.written(&resource_type, plan.id, written, ret))
+    })
 }
 
 /// `DELETE /{type}/{id}`: writes a tombstone (204). Deleting a deleted resource is 204 again;
@@ -303,36 +261,13 @@ pub(crate) async fn delete(
     headers: HeaderMap,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
-    let not_found = || FhirError::not_found(format!("{type_name}/{id} is not known"));
-    let id = resource_id(&id).ok_or_else(not_found)?;
+    let id = resource_id(&id)
+        .ok_or_else(|| FhirError::not_found(format!("{type_name}/{id} is not known")))?;
     let expected = if_match(&headers)?;
-    let mut attempt = 1;
-    let version = loop {
-        let result: Result<Option<VersionMeta>, Attempt> = async {
-            let mut tx = server.store.begin().await?;
-            let head = tx.read(&resource_type, id).await?.ok_or_else(not_found)?;
-            if head.version.deleted {
-                return Ok(None);
-            }
-            let version = tx.delete(&resource_type, id, OpId::new(), expected).await?;
-            tx.commit().await?;
-            Ok(Some(version))
-        }
-        .await;
-        match result {
-            Ok(version) => break version,
-            Err(Attempt::Conflict) if server.retry.should_retry(attempt, &WriteError::Conflict) => {
-                attempt += 1;
-                FhirServer::back_off(attempt).await;
-            }
-            Err(Attempt::Conflict) => return Err(WriteError::Conflict.into()),
-            Err(Attempt::Fail(error)) => return Err(error),
-        }
-    };
-    let mut response = Response::new(axum::body::Body::empty());
-    *response.status_mut() = StatusCode::NO_CONTENT;
-    if let Some(version) = version {
-        version_headers(&mut response, &version);
-    }
-    Ok(response)
+    retrying!(server, async {
+        let mut tx = server.store.begin().await?;
+        let version = ops::delete(&mut tx, &resource_type, id, expected).await?;
+        tx.commit().await?;
+        Ok::<_, Attempt>(deleted(version))
+    })
 }
