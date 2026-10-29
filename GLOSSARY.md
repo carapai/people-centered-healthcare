@@ -48,6 +48,10 @@ _Avoid_: Checkout, offline copy
 The set of records a node receives from its upstream, such as a facility's records plus the global registries and approved definitions it needs.
 _Avoid_: Subscription, partition
 
+**Inbound Dead Letter**:
+The kept raw copy of an external payload that was rejected for failing structural validation. It is held for review and replay so the data is never lost.
+_Avoid_: Quarantine (that is for profile or terminology failures), error queue
+
 **Reconciliation Record**:
 A record raised when ledger operations that are each valid break an invariant together, such as a stock balance going negative, and that an accountable person settles with further operations rather than by choosing a version.
 _Avoid_: Conflict (for ledgers), discrepancy

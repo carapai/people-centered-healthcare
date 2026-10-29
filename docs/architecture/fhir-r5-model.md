@@ -1,6 +1,6 @@
 # FHIR R5 model, validation and search
 
-Status: **accepted** (ADRs 0015, 0016, 0050). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
+Status: **accepted** (ADRs 0015, 0016, 0050, 0051). Produced while resolving the Wayfinder ticket [How are FHIR R5 resources modelled, validated and searched in Rust?](https://github.com/carapai/people-centered-healthcare/issues/15). Background: [docs/research/fhir-r5.md](../research/fhir-r5.md).
 
 The physical storage of resources, history and index entries in SurrealDB is in [persistence.md](persistence.md). Layer placement is in [dependency-rules.md](dependency-rules.md) and [crate-catalogue.md](crate-catalogue.md).
 
@@ -21,7 +21,8 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - It is **`fhir-r5 =4.2.3`** (ADR 0050), the choice of the spike [Which R5 model crate passes the round-trip spike: helios-fhir or fhir-r5?](https://github.com/carapai/people-centered-healthcare/issues/35). R4 conversion uses its sibling `fhir-r4 =4.2.2`.
   - CI round-trips the whole official R5 example corpus on every bump, with a short list of known-invalid examples excluded.
   - Only rarely changing crates name the whole `Resource` enum, because its serde code is rebuilt in each crate that uses it.
-  - Parsing is strict: a missing required element is a parse error, and unknown elements are dropped. Inbound handling is in [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142).
+  - Parsing is strict: a missing required element is a parse error, and unknown elements are dropped. So typed parsing is never the validator or the stored form (ADR 0051).
+- **Raw JSON first (ADR 0051).** Tier 1 runs on raw JSON before any typed parse, using an element table generated from `definitions.json.zip`. The stored resource is the validated input JSON in canonical form, with the server-set `id` and `meta` fields. Reads, search, `_history` and sync serve the stored bytes and never re-parse them.
   - It lives in its own workspace member and is cached in CI, because generated models are expensive to compile.
 - **Facade only.** Domain crates import only `health-fhir-models`. A crate swap must not touch domain code.
 - **Typed in code, JSON at rest.** Domain logic works on typed models, and canonical R5 JSON is the stored resource of record.
@@ -44,7 +45,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
 | Tier | Checks | Error / warning |
 |---|---|---|
-| 1. Structural | Parse, cardinality, primitive formats, choice exclusivity, no empty objects or strings | Error |
+| 1. Structural | On raw JSON before typed parsing: syntax, known `resourceType`, **unknown elements**, cardinality, primitive formats, choice exclusivity, no empty objects or strings | Error |
 | 2. Core invariants | The 314 R5 core invariants via FHIRPath (`ele-1`, `dom-2`, …) | Error |
 | 3. Profiles | Core profiles, plus country and program profiles active in the node's configuration snapshot, including slicing | Error |
 | 4. Terminology | Required bindings are errors; extensible and preferred bindings are warnings | Per binding strength |
@@ -53,7 +54,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 |---|---|---|
 | Our UI or API on any node (central, edge, desktop) | Tiers 1–4 on the **writing node** | Reject with an OperationOutcome |
 | Sync ingest at the Authority Node, and at central | Tiers 1–4 again | Per-item `rejected` status plus a review record, never a silent drop |
-| External or legacy inbound (integrations, R4 adapters) | Tier 1 strict; tiers 2–4 | Tier 1 failure: reject. Tier 2–4 failure: **quarantine** review queue |
+| External or legacy inbound (integrations, R4 adapters) | Tier 1 strict; tiers 2–4 | Tier 1 failure: reject, and keep the raw payload in the **Inbound Dead Letter** (ADR 0051). Tier 2–4 failure: **quarantine** review queue |
 
 - If a code is missing from the node's **local** terminology snapshot, an offline write gets a warning, and central re-checks the code on ingest.
 - **Profile validator.** v1 starts with our structural and invariant checks plus profile snapshot evaluation. The spike found that `helios-fhir-validator` evaluates only `pattern` discriminators. The tier 3 engine is decided in [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).

@@ -8,6 +8,8 @@ Each of our own writes is validated fully on the node that writes it, whichever 
 
 A write that fails is rejected. The Authority Node and central re-run the same validation on ingest, and an item that fails there gets a per-item `rejected` status rather than being dropped silently. Sources outside our control (integrations and R4 adapters) are rejected only on structural failure. A profile or terminology failure from them goes to a quarantine review queue instead. A code missing from the node's local terminology snapshot is a warning offline, re-checked at central.
 
+**Refined by ADR 0051:** structural checks run on raw JSON before typed parsing, and an external structural failure keeps its raw payload in the Inbound Dead Letter.
+
 We want invalid clinical data stopped at the point of entry, including on an offline edge or desktop. Because the same Rust validation code runs everywhere (ADR 0001), the result does not depend on where the data was written. Strict rejection would discard legitimate data from systems we don't control, so external data is quarantined instead.
 
 ## Consequences

@@ -115,4 +115,4 @@ The spike was [Which R5 model crate passes the round-trip spike: helios-fhir or 
 
 ## Open items
 
-- Handling of strict-parse failures and dropped elements on inbound data: [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142).
+- Handling of strict-parse failures and dropped elements: decided in ADR 0051.

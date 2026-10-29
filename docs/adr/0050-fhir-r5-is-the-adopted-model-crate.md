@@ -22,9 +22,9 @@ We chose this because it was the clear winner of the spike [Which R5 model crate
 ## Consequences
 
 - **Maintainer risk.** `fhir-r5` has one maintainer, is about two and a half months old, and has had fast major-version churn. The exact pin, the facade and the CI corpus contain that risk, and the permissive licence option lets us fork.
-- **Strict parsing.** `fhir-r5` refuses any resource that is missing a required element. How inbound data handles that is decided by [What happens to inbound R5 JSON that the strict model crate cannot parse?](https://github.com/carapai/people-centered-healthcare/issues/142).
-- **Unknown elements are dropped.** Typed parsing silently drops unknown elements, and both crates do this. Typed parsing is therefore never the only check on inbound data: tier 1 validation runs on the raw JSON first (ADR 0016).
-- **Lost `_id` extension.** An extension on `Resource.id` (`_id`) is dropped. The corpus contains none, and we accept the loss.
+- **Strict parsing.** `fhir-r5` refuses any resource that is missing a required element. How inbound data handles that is decided in ADR 0051: tier 1 runs on the raw JSON first.
+- **Unknown elements are dropped.** Typed parsing silently drops unknown elements, and both crates do this. Typed parsing is therefore never the only check on inbound data: tier 1 validation runs on the raw JSON first and rejects unknown elements (ADR 0051).
+- **Lost `_id` extension.** An extension on `Resource.id` (`_id`) is dropped. The corpus contains none. The stored form is the validated input JSON (ADR 0051), so the loss affects only typed domain logic.
 - **R4** comes from the sibling crate `fhir-r4 =4.2.2`, used only in `health-fhir-mapping`.
 - **FHIRPath precision.** The spike found that `octofhir-fhirpath` loses decimal precision. That is decided separately in [How does FHIRPath evaluation stay decimal-exact?](https://github.com/carapai/people-centered-healthcare/issues/143).
 - **Profile validator.** The spike found that `helios-fhir-validator` evaluates only pattern discriminators. That is decided in [Which profile and slicing validator does tier 3 use?](https://github.com/carapai/people-centered-healthcare/issues/144).
