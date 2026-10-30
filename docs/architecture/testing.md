@@ -14,7 +14,7 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | Metadata and terminology | Package validation; semver diff rules; extraction fixtures; FHIRPath conformance across fhirpath.js and octofhir, including the decimal conformance suite (ADR 0052); tier 3 differential test against the HL7 Java validator and the 2 ms p95 validation budget (ADR 0053) | Every PR |
 | Pricing | Price Book and Price Rule fixtures through all six stages, coverage splits, rounding and largest-remainder allocation | Every PR |
 | Payer adapters | Contract tests per payer adapter against recorded or mock payer responses (eligibility, claim, remittance) | Every PR (mock); nightly (sandbox where available) |
-| Frontend | Vitest unit tests; component tests; axe accessibility checks | Every PR |
+| Frontend | Vitest unit tests; component tests and axe accessibility checks in Chromium (Vitest browser mode), axe over the design system's example page in every theme and density | Every PR |
 | End-to-end | Playwright on the web; Tauri via `tauri-driver` on Windows and Linux; the §117–119 scenarios | Nightly |
 | Offline and sync | Multi-node simulation (central, edge, desktop) with partitions, clock skew, long outages, `reseed_required`, restore and epoch change | Nightly |
 | Recovery | kill -9 loops; power-loss harness on hardware runners; export → import round trip; restore drills | Nightly / weekly |

@@ -1,8 +1,9 @@
 import { defineConfig } from '@pandacss/dev'
 
+// Tokens, conditions, recipes and presets come from @health/design-system (built with
+// `panda lib`); the app's own styles import `css` from '@health/design-system/css'.
 export default defineConfig({
-  // Panda 2 emits invalid, token-less CSS without these, and `panda doctor` still passes (ADR 0054).
-  presets: ['@pandacss/preset-base', '@pandacss/preset-panda'],
+  designSystem: '@health/design-system',
   preflight: true,
   include: ['./src/**/*.{ts,tsx}'],
   exclude: [],

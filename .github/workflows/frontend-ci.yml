@@ -31,6 +31,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      # Builds @health/design-system with `panda lib` first; the app loads it as its designSystem.
       - run: bun run codegen
       - run: bun run typecheck
       # oxlint plus the src/platform import rule (scripts/check-boundaries.ts).
@@ -38,3 +39,28 @@ jobs:
       - run: bun run build
       # No @tauri-apps or devtools code in the web bundle.
       - run: bun run scan
+
+  design-system:
+    name: design system lib, typecheck, lint, component and axe tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/design-system
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run lib
+      - run: bun run typecheck
+      - run: bun run lint
+      # Component tests and axe run in Chromium (vitest browser mode), on the example page in every
+      # theme and density.
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test
+      - run: bun run build:example

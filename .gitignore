@@ -6,6 +6,7 @@ dist/
 *.db
 .DS_Store
 styled-system/
+.vitest/
 .claude/worktrees/
 
 # Build output of vendored crates tested on their own

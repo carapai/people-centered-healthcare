@@ -1,0 +1,95 @@
+{
+  "name": "@health/design-system",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./panda/*": "./dist/panda/*",
+    "./css": {
+      "types": "./styled-system/css/index.d.ts",
+      "default": "./styled-system/css/index.js"
+    },
+    "./css/*": {
+      "types": "./styled-system/css/*.d.ts",
+      "default": "./styled-system/css/*.js"
+    },
+    "./recipes": {
+      "types": "./styled-system/recipes/index.d.ts",
+      "default": "./styled-system/recipes/index.js"
+    },
+    "./recipes/*": {
+      "types": "./styled-system/recipes/*.d.ts",
+      "default": "./styled-system/recipes/*.js"
+    },
+    "./patterns": {
+      "types": "./styled-system/patterns/index.d.ts",
+      "default": "./styled-system/patterns/index.js"
+    },
+    "./patterns/*": {
+      "types": "./styled-system/patterns/*.d.ts",
+      "default": "./styled-system/patterns/*.js"
+    },
+    "./jsx": {
+      "types": "./styled-system/jsx/index.d.ts",
+      "default": "./styled-system/jsx/index.js"
+    },
+    "./jsx/*": {
+      "types": "./styled-system/jsx/*.d.ts",
+      "default": "./styled-system/jsx/*.js"
+    },
+    "./tokens": {
+      "types": "./styled-system/tokens/index.d.ts",
+      "default": "./styled-system/tokens/index.js"
+    },
+    "./helpers": {
+      "types": "./styled-system/helpers.d.ts",
+      "default": "./styled-system/helpers.js"
+    },
+    "./types": {
+      "types": "./styled-system/types/index.d.ts"
+    }
+  },
+  "scripts": {
+    "codegen": "panda codegen",
+    "lib": "panda codegen && panda lib --include './src/**/*.{ts,tsx}'",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "lint": "oxlint --deny-warnings src example test",
+    "example": "bunx --bun vite example",
+    "build:example": "bunx --bun vite build example",
+    "test": "bunx --bun vitest run",
+    "check": "bun run lib && bun run typecheck && bun run lint && bun run test && bun run build:example"
+  },
+  "dependencies": {
+    "@ark-ui/react": "5.39.3",
+    "@internationalized/date": "3.12.4",
+    "lucide-react": "1.57.0",
+    "react-intl": "12.1.4"
+  },
+  "peerDependencies": {
+    "@pandacss/dev": "^2.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.21",
+    "@pandacss/dev": "2.4.0",
+    "@pandacss/preset-base": "2.4.0",
+    "@pandacss/preset-panda": "2.4.0",
+    "@pandacss/vite": "2.4.0",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitest/browser-playwright": "5.0.5",
+    "axe-core": "4.14.0",
+    "oxlint": "1.90.0",
+    "playwright": "1.64.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vitest-browser-react": "2.3.0"
+  }
+}
