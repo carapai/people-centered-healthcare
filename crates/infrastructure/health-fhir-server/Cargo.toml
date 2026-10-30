@@ -29,4 +29,6 @@ tracing = { workspace = true }
 http-body-util = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
+# The contract server (examples/contract_server.rs) listens on TCP.
+tokio = { workspace = true, features = ["net"] }
 tower = { workspace = true }

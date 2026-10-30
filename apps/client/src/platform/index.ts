@@ -1,4 +1,8 @@
+export { type AuthStrategy, bearerAuth, dpopAuth } from './auth'
 export { composePlatform } from './compose'
 export { PlatformProvider, usePlatform } from './context'
+export { type FhirClient, FhirError, type ResourceType } from './fhir'
+export type { OperationClient, OperationResult } from './operations'
 export { readPreferences, writePreferences } from './preferences'
+export { connectQueryCache, fhirKeys, historyQuery, invalidate, readQuery, searchQuery, vreadQuery, worklistKey } from './query'
 export type * from './types'

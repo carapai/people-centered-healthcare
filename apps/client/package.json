@@ -6,14 +6,18 @@
     "dev": "bunx --bun vite",
     "codegen": "bun run --cwd ../../packages/design-system lib && panda codegen",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "lint": "oxlint --deny-warnings src scripts && bun scripts/check-boundaries.ts",
+    "lint": "oxlint --deny-warnings src scripts test && bun scripts/check-boundaries.ts",
     "build": "bunx --bun vite build",
     "build:tauri": "bunx --bun vite build --mode tauri",
     "scan": "bun scripts/scan-bundle.ts dist",
-    "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan"
+    "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan",
+    "test": "bunx --bun vitest run",
+    "test:contract": "bunx --bun vitest run --config vitest.contract.config.ts"
   },
   "dependencies": {
+    "@health/api-client": "workspace:*",
     "@health/design-system": "workspace:*",
+    "@health/fhir-types": "workspace:*",
     "@tanstack/react-query": "5.105.0",
     "@tanstack/react-router": "1.170.46",
     "@tauri-apps/api": "2.12.4",
@@ -38,6 +42,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "oxlint": "1.90.0",
     "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   }
 }

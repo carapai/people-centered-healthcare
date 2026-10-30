@@ -8,7 +8,9 @@
     "apps/client": {
       "name": "@health/client",
       "dependencies": {
+        "@health/api-client": "workspace:*",
         "@health/design-system": "workspace:*",
+        "@health/fhir-types": "workspace:*",
         "@tanstack/react-query": "5.105.0",
         "@tanstack/react-router": "1.170.46",
         "@tauri-apps/api": "2.12.4",
@@ -34,6 +36,7 @@
         "oxlint": "1.90.0",
         "typescript": "7.0.2",
         "vite": "8.3.5",
+        "vitest": "5.0.5",
       },
     },
     "packages/api-client": {

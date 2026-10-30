@@ -6,6 +6,8 @@ The one React app served by central, by each edge, and inside the Tauri desktop 
 bun install --frozen-lockfile     # from the repository root
 bun run dev                       # Vite dev server under Bun
 bun run check                     # codegen, typecheck, lint, build, scan
+bun run test                      # platform-layer unit tests (Vitest, in Bun)
+bun run test:contract             # FhirClient against a central and an edge FhirServer (needs cargo)
 bun run build:tauri               # desktop webview bundle (--mode tauri)
 ```
 
@@ -13,7 +15,9 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 
 - `src/platform/` is the only place that knows the runtime.
   - `compose.ts` builds the `Platform`: it fetches `runtime.json` in the browser, and the `tauri` Vite mode builds the desktop variant.
-  - Transports: `http.ts` and `tauri.ts`.
+  - Transports: `http.ts` and `tauri.ts`. Auth strategies: `auth.ts` (central bearer; edge DPoP).
+  - Ports: `fhir.ts` (`FhirClient`), `operations.ts` (OpenAPI operations, validated with Zod; command ports build on it), `events.ts` (server-sent invalidation hints).
+  - `session.ts` keeps the token in memory. `query.ts` holds the Query keys and options, and `connectQueryCache` (invalidation hints, clearing on logout and lock).
   - JSON goes through `json.ts`, which uses `lossless-json`.
   - `preferences.ts` is the only browser storage.
 - `src/features/` holds one folder per Bounded Context. Feature code uses `usePlatform()` and the ports.
@@ -28,4 +32,6 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 |---|---|
 | `typecheck` | TS 7 errors in the app (full lib checking), or in tool configs (`tsconfig.node.json`, with `skipLibCheck`) |
 | `lint` | oxlint errors, including `@tauri-apps/**` imported outside `src/platform/**`; runtime checks or browser storage outside the allowlist (`scripts/check-boundaries.ts`) |
+| `test` | A platform-layer unit test fails (`test/`) |
+| `test:contract` | The `FhirClient` suite fails against either the central or the edge node (`test/contract/`; client-application.md § Ports) |
 | `scan` | The web bundle contains Tauri or devtools code, or Panda CSS has no token variables, has raw shorthands, or names an undefined z-index token |
