@@ -175,6 +175,29 @@ fn shape_rules_are_enforced() {
         "Patient.identifier[0]",
     );
     assert!(issues(r#"{"resourceType":"Patient","identifier":[{"id":"x","value":"1"}],"_gender":{"id":"y"},"gender":"male"}"#).is_empty());
+    // An Identifier with system urn:ietf:rfc:3986 holds an absolute URI (#176), also nested.
+    one(
+        r#"{"resourceType":"Patient","identifier":[{"system":"urn:ietf:rfc:3986","value":"2.16.840.1.113883.19.5"}]}"#,
+        IssueCode::Value,
+        "Patient.identifier[0].value",
+    );
+    one(
+        r#"{"resourceType":"Patient","generalPractitioner":[{"identifier":{"system":"urn:ietf:rfc:3986","value":"1234"}}]}"#,
+        IssueCode::Value,
+        "Patient.generalPractitioner[0].identifier.value",
+    );
+    for value in [
+        "urn:oid:2.16.840.1.113883.19.5",
+        "urn:uuid:a76d9bbf-f293-4fb7-ad4c-2851cac77162",
+        "https://example.org/p/1",
+        "a+b.c-d:x",
+    ] {
+        let json = format!(
+            r#"{{"resourceType":"Patient","identifier":[{{"system":"urn:ietf:rfc:3986","value":"{value}"}}]}}"#
+        );
+        assert!(issues(&json).is_empty(), "{value}");
+    }
+    assert!(issues(r#"{"resourceType":"Patient","identifier":[{"system":"http://example.org/mrn","value":"1234"}]}"#).is_empty());
     assert_eq!(
         issues(r#"{"resourceType":"Patient","name":[{"given":["a"],"_given":[null,null]}]}"#),
         vec![
@@ -211,10 +234,16 @@ const MODEL_GAPS: &[&str] = health_fhir_models::KNOWN_UNPARSEABLE_EXAMPLES;
 
 /// Official examples that genuinely fail tier 1, each with what is wrong. The HL7 Java
 /// validator agrees on each (#166).
-const INVALID_EXAMPLES: &[(&str, &str)] = &[(
-    "medicationexample0301.json",
-    "Medication.identifier[0] holds only an id (ele-1)",
-)];
+const INVALID_EXAMPLES: &[(&str, &str)] = &[
+    (
+        "medicationexample0301.json",
+        "Medication.identifier[0] holds only an id (ele-1)",
+    ),
+    (
+        "json-edge-cases.json",
+        "a contained Organization's identifier has system urn:ietf:rfc:3986 and the bare OID value 2.16.840.1.113883.19.5",
+    ),
+];
 
 /// Set `HEALTH_FHIR_R5_EXAMPLES` to the unpacked official corpus
 /// (`tools/fhir/fetch-r5-examples.sh`): every example must pass tier 1, apart from
