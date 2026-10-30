@@ -7,6 +7,9 @@
 //!    database is connected and migrated.
 //! 3. The database, connected and migrated in the background with backoff, so a slow or
 //!    restarting SurrealDB never stops central from reporting its state.
+//!
+//! `central-server openapi` prints central's OpenAPI document and exits, without configuration;
+//! `tools/codegen` generates `@health/api-client` from it (client-application.md § Types).
 
 mod config;
 
@@ -15,7 +18,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use health_http::{Readiness, ReadinessCheck, app};
+use health_http::{Readiness, ReadinessCheck, app, document};
 use health_observability::TelemetryConfig;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::OnceCell;
@@ -96,8 +99,19 @@ async fn shutdown_signal() {
     }
 }
 
+/// Central's OpenAPI document: its API routes (none are mounted yet) and the system routes.
+fn openapi() -> utoipa::openapi::OpenApi {
+    document("central-server", utoipa::openapi::OpenApi::default())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().nth(1).as_deref() == Some("openapi") {
+        let mut json = openapi().to_pretty_json()?;
+        json.push('\n');
+        std::io::Write::write_all(&mut std::io::stdout(), json.as_bytes())?;
+        return Ok(());
+    }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
     let _telemetry = health_observability::init(&TelemetryConfig {
         service: "central-server",

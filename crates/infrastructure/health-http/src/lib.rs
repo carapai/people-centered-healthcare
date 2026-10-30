@@ -9,7 +9,11 @@
 //! - Request spans carry the method, the matched route **template**, a request id, the status and
 //!   the duration. The concrete path, the query string and headers are never recorded, because
 //!   they can hold identifiers and search terms (ADR 0047).
+//! - Responses are typed and documented with `utoipa` (client-application.md § Types): [`system_api`]
+//!   carries the system routes' OpenAPI paths, and [`document`] builds a runtime's OpenAPI document,
+//!   from which `@health/api-client` generates TypeScript types and Zod schemas.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -20,9 +24,12 @@ use axum::extract::{MatchedPath, Request, State};
 use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Json, Response};
-use axum::routing::get;
-use serde_json::json;
+use serde::Serialize;
 use tracing::Instrument;
+use utoipa::ToSchema;
+use utoipa::openapi::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 /// The response header carrying the request id, for support without reading any record.
 pub const REQUEST_ID: &str = "x-request-id";
@@ -66,32 +73,110 @@ impl Readiness {
     }
 }
 
-async fn health() -> Response {
-    Json(json!({ "status": "pass" })).into_response()
+/// Liveness: the process answers.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Health {
+    /// Always `pass`.
+    pub status: HealthStatus,
 }
 
+/// Always `pass` when the process answers at all.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum HealthStatus {
+    /// The process answers.
+    Pass,
+}
+
+/// Readiness: whether every dependency the node needs is usable.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReadinessReport {
+    /// `ready` when every check passes.
+    pub status: ReadyStatus,
+    /// Each check's result, by its static name (e.g. `database`).
+    pub checks: BTreeMap<String, CheckStatus>,
+}
+
+/// `ready` when every check passes.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ReadyStatus {
+    /// Every check passes.
+    Ready,
+    /// At least one check fails.
+    NotReady,
+}
+
+/// One readiness check's result.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckStatus {
+    /// The dependency is usable.
+    Pass,
+    /// The dependency is unusable, or did not answer within [`CHECK_TIMEOUT`].
+    Fail,
+}
+
+/// Liveness: the process answers.
+#[utoipa::path(get, path = "/health", tag = "system", operation_id = "getHealth",
+    responses((status = 200, description = "The process answers", body = Health)))]
+async fn health() -> Json<Health> {
+    Json(Health {
+        status: HealthStatus::Pass,
+    })
+}
+
+/// Readiness: every readiness check passes.
+#[utoipa::path(get, path = "/ready", tag = "system", operation_id = "getReady",
+    responses(
+        (status = 200, description = "Every check passes", body = ReadinessReport),
+        (status = 503, description = "A check fails", body = ReadinessReport),
+    ))]
 async fn ready(State(readiness): State<Readiness>) -> Response {
     let results = readiness.evaluate().await;
     let all = results.iter().all(|(_, passed)| *passed);
-    let checks: serde_json::Map<String, serde_json::Value> = results
+    let checks = results
         .into_iter()
-        .map(|(name, passed)| (name.to_owned(), json!(if passed { "pass" } else { "fail" })))
+        .map(|(name, passed)| {
+            let status = if passed {
+                CheckStatus::Pass
+            } else {
+                CheckStatus::Fail
+            };
+            (name.to_owned(), status)
+        })
         .collect();
-    let status = if all {
-        StatusCode::OK
+    let (code, status) = if all {
+        (StatusCode::OK, ReadyStatus::Ready)
     } else {
-        StatusCode::SERVICE_UNAVAILABLE
+        (StatusCode::SERVICE_UNAVAILABLE, ReadyStatus::NotReady)
     };
-    let body = json!({ "status": if all { "ready" } else { "not-ready" }, "checks": checks });
-    (status, Json(body)).into_response()
+    (code, Json(ReadinessReport { status, checks })).into_response()
+}
+
+/// The system routes with their OpenAPI paths, for a runtime to merge into its own API.
+pub fn system_api() -> OpenApiRouter<Readiness> {
+    OpenApiRouter::new()
+        .routes(routes!(health))
+        .routes(routes!(ready))
 }
 
 /// `/health` (liveness: the process answers) and `/ready` (every [`ReadinessCheck`] passes).
 pub fn system_routes(readiness: Readiness) -> Router {
-    Router::new()
-        .route("/health", get(health))
-        .route("/ready", get(ready))
-        .with_state(readiness)
+    system_api().with_state(readiness).into()
+}
+
+/// A runtime's OpenAPI document: its `api` paths and schemas plus the system routes', under
+/// `title`, with the workspace version.
+pub fn document(title: &str, api: OpenApi) -> OpenApi {
+    let (_, system) = system_api().split_for_parts();
+    let mut document = api.merge_from(system);
+    document.info.title = title.to_owned();
+    document.info.version = env!("CARGO_PKG_VERSION").to_owned();
+    document.info.description = None;
+    document.info.license = None;
+    document.info.contact = None;
+    document
 }
 
 /// Traces one request: an `http.request` span with the method, route template and request id,

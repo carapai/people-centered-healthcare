@@ -49,6 +49,9 @@ tools/fhir/java-differential.sh target/fhir/r5-examples/json
 bun install --frozen-lockfile && bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan
 # frontend-ci.yml (in packages/design-system; bunx playwright install chromium once)
 bun run lib && bun run typecheck && bun run lint && bun run test && bun run build:example
+# frontend-ci.yml, generated types (in tools/codegen): regenerate and fail on drift
+bun run check && bun run typecheck && bun run lint && bun run test
+# then `bun run check` in packages/fhir-types and packages/api-client
 
 # documentation.yml
 bunx markdownlint-cli2@0.18.1
