@@ -4,7 +4,10 @@
   "type": "module",
   "workspaces": [
     "apps/client",
-    "packages/design-system"
+    "packages/design-system",
+    "packages/fhir-types",
+    "packages/api-client",
+    "tools/codegen"
   ],
   "scripts": {
     "check": "bun run --filter '*' check"

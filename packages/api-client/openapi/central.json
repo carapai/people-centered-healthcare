@@ -1,0 +1,125 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "central-server",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Liveness: the process answers.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "The process answers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Readiness: every readiness check passes.",
+        "operationId": "getReady",
+        "responses": {
+          "200": {
+            "description": "Every check passes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A check fails",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CheckStatus": {
+        "type": "string",
+        "description": "One readiness check's result.",
+        "enum": [
+          "pass",
+          "fail"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "description": "Liveness: the process answers.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus",
+            "description": "Always `pass`."
+          }
+        }
+      },
+      "HealthStatus": {
+        "type": "string",
+        "description": "Always `pass` when the process answers at all.",
+        "enum": [
+          "pass"
+        ]
+      },
+      "ReadinessReport": {
+        "type": "object",
+        "description": "Readiness: whether every dependency the node needs is usable.",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "object",
+            "description": "Each check's result, by its static name (e.g. `database`).",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CheckStatus"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReadyStatus",
+            "description": "`ready` when every check passes."
+          }
+        }
+      },
+      "ReadyStatus": {
+        "type": "string",
+        "description": "`ready` when every check passes.",
+        "enum": [
+          "ready",
+          "not-ready"
+        ]
+      }
+    }
+  }
+}

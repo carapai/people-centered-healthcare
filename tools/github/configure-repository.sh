@@ -35,6 +35,7 @@ REQUIRED_CHECKS=(
   # frontend-ci.yml
   "install, codegen, typecheck, lint, build, bundle scan"
   "design system lib, typecheck, lint, component and axe tests"
+  "generated FHIR and API types, typecheck, tests, drift"
   # security.yml
   "cargo-deny advisories"
   "osv-scanner (bun.lock)"

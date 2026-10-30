@@ -20,3 +20,4 @@ health-surrealdb = { workspace = true, features = ["remote"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["net", "signal", "sync"] }
 tracing = { workspace = true }
+utoipa = { workspace = true }

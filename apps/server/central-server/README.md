@@ -22,3 +22,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 3. The database is connected and migrated in the background, with capped exponential backoff (0.5 s to 30 s). Only an error kind is logged, never the message.
 
 SIGTERM or Ctrl-C shuts the server down gracefully.
+
+## OpenAPI
+
+`central-server openapi` prints central's OpenAPI document and exits, without reading any configuration. `tools/codegen` generates `@health/api-client` from it (`bun run generate`).

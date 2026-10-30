@@ -97,3 +97,28 @@ async fn a_hanging_check_times_out_as_not_ready() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["checks"]["collector"], "fail");
 }
+
+#[test]
+fn the_document_describes_the_system_routes_and_their_bodies() {
+    let document = serde_json::to_value(health_http::document(
+        "test",
+        utoipa::openapi::OpenApi::default(),
+    ))
+    .unwrap_or(Value::Null);
+    assert_eq!(document["info"]["title"], "test");
+    assert_eq!(
+        document["paths"]["/health"]["get"]["operationId"],
+        "getHealth"
+    );
+    let ready = &document["paths"]["/ready"]["get"]["responses"];
+    for status in ["200", "503"] {
+        assert_eq!(
+            ready[status]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/ReadinessReport"
+        );
+    }
+    assert_eq!(
+        document["components"]["schemas"]["ReadyStatus"]["enum"],
+        serde_json::json!(["ready", "not-ready"])
+    );
+}

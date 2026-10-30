@@ -6,6 +6,7 @@ Layer: **infrastructure**. The shared Axum router for central, edge and desktop 
 - **System routes:**
   - **`/health`** is liveness: the process answers.
   - **`/ready`** returns 200 only when every `ReadinessCheck` passes, each within 2 s, and 503 with the failing check names otherwise.
+- **OpenAPI (`utoipa`):** the system routes' bodies are typed (`Health`, `ReadinessReport`) and documented. `system_api()` is an `OpenApiRouter`, and `document(title, api)` merges a runtime's paths with the system routes' into its OpenAPI document. `@health/api-client` is generated from that document.
 - **`trace_request`** opens an `http.request` span with the method, the matched route **template**, a UUIDv7 request id (also sent as `x-request-id`), the status and the duration. The concrete path, the query string and headers are never recorded.
 - **Transport-agnostic:** handlers are plain services. The desktop IPC dispatch calls the same `Router` through `tower::ServiceExt::oneshot`, which is how the tests call it too.
 
