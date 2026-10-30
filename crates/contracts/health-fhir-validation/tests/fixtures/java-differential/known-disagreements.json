@@ -38,9 +38,5 @@
   {
     "reason": "Extensions without a definition in our active set are accepted (tier 3 checks the ones it has); the Java validator loads the HL7 extension packages and checks them. Depending on its environment, it also reads the R5 extended-contact-availability extension as allowing no types.",
     "javaMessageIds": ["Extension_EXT_Unknown_NotHere", "Validation_VAL_Profile_NoType", "Extension_EXT_Type"]
-  },
-  {
-    "reason": "A rule stated in the Identifier prose, not as an invariant: with system urn:ietf:rfc:3986 the value must be a URI. Not enforced yet.",
-    "javaMessageIds": ["TYPE_SPECIFIC_CHECKS_DT_IDENTIFIER_IETF_SYSTEM_VALUE"]
   }
 ]

@@ -120,7 +120,8 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - `Element.id` is checked as `string`, not `id`. ElementDefinition ids hold `:` and exceed 64 characters in the official examples.
   - Decimals are any JSON number, not the core regex's 18 digits (ADR 0052: tier 1 accepts longer values and stores them unchanged).
 - **`ele-1`.** An element whose only member is `id` has no value or children, and fails; the Java differential found this gap (#166).
-- **Corpus.** All 2,824 official examples pass tier 1 except `medicationexample0301.json`, whose `Medication.identifier[0]` holds only an id (`ele-1`); the Java validator agrees. Every one that passes also parses into `fhir-r5`, except `questionnaireresponse-example-f201-lifelines.json`. That example is valid R5, with an extension-only required primitive, but `fhir-r5` refuses it, so it is listed as `KNOWN_UNPARSEABLE_EXAMPLES`. ADR 0050 called it invalid, which was a misreading.
+- **Identifier URIs.** An Identifier with system `urn:ietf:rfc:3986` needs an absolute URI value (a scheme, then `:`), reported at its `value`. R5 states the rule in the Identifier prose, not as an invariant; the Java differential found it (#176).
+- **Corpus.** All 2,824 official examples pass tier 1 except two, and the Java validator agrees on both: `medicationexample0301.json`, whose `Medication.identifier[0]` holds only an id (`ele-1`), and `json-edge-cases.json`, whose contained Organization has a `urn:ietf:rfc:3986` identifier with the bare OID `2.16.840.1.113883.19.5`. Every one that passes also parses into `fhir-r5`, except `questionnaireresponse-example-f201-lifelines.json`. That example is valid R5, with an extension-only required primitive, but `fhir-r5` refuses it, so it is listed as `KNOWN_UNPARSEABLE_EXAMPLES`. ADR 0050 called it invalid, which was a misreading.
 - **`skeleton(type)`** builds a minimal valid instance of any resource type, for tests and tooling.
 - **Follow-ups:**
   - tier 2 invariants and the decimal-exact FHIRPath engine ([#165](https://github.com/carapai/people-centered-healthcare/issues/165));
@@ -171,9 +172,9 @@ The HL7 validator is a CI oracle only (above). `tools/fhir/java-differential.sh`
 - **Result.** Every tier 1 variant and every tier 3 case agrees, apart from two where ours follows the spec more strictly:
   - a literal reference to a type the profile does not allow: Java checks target types only on references it can resolve;
   - an unsliced value before a slice under `openAtEnd`: Java reports it only as information.
-- **Clinical examples.** 151 fail only in Java, for rules outside our tiers: terminology (tier 4), URL and narrative-link resolution, Java's refusal of example URLs, extensions we have no definition for, two profiles outside our set, and one Identifier rule stated in prose ([#176](https://github.com/carapai/people-centered-healthcare/issues/176)).
+- **Clinical examples.** 151 fail only in Java, for rules outside our tiers: terminology (tier 4), URL and narrative-link resolution, Java's refusal of example URLs, extensions we have no definition for, and two profiles outside our set. The count depends on the validator's terminology cache: 150 locally, fewer on a clean CI runner.
 - **Recorded disagreements** (`tests/fixtures/java-differential/known-disagreements.json`): each has a reason, either per file or as Java message ids for rules outside our tiers. A disagreement not explained there fails the test, and so does a file entry that no longer disagrees. Which Java-only rules fire depends on the validator's environment (its terminology cache), so an unused message id is only reported.
-- **What it found:** the `ele-1` gap in tier 1; versioned canonicals in generated snapshots; choice elements sliced by a non-type discriminator; and custom fixtures that were not real snapshots.
+- **What it found:** the `ele-1` gap and the Identifier URI rule (#176) in tier 1; versioned canonicals in generated snapshots; choice elements sliced by a non-type discriminator; and custom fixtures that were not real snapshots.
 
 ## Search parameters and indexed projections
 

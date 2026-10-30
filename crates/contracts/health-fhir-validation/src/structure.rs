@@ -231,6 +231,16 @@ fn join(base: &str, name: &str) -> String {
     }
 }
 
+/// RFC 3986 § 3.1: `scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`, then `:`.
+fn has_scheme(uri: &str) -> bool {
+    uri.split_once(':').is_some_and(|(scheme, _)| {
+        scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+    })
+}
+
 pub(crate) fn is_primitive(type_code: &str) -> bool {
     type_code.starts_with(|c: char| c.is_ascii_lowercase())
 }
@@ -479,8 +489,31 @@ impl Walker {
 
     fn complex(&mut self, type_name: &str, base: &str, value: &Value, location: &str) {
         match value.as_object() {
-            Some(object) => self.object(type_name, base, object, location, false),
+            Some(object) => {
+                self.object(type_name, base, object, location, false);
+                if type_name == "Identifier" && base.is_empty() {
+                    self.identifier(object, location);
+                }
+            }
             None => self.issue(IssueCode::Structure, location, "an object is expected"),
+        }
+    }
+
+    /// The Identifier prose rule (not an invariant; found by the HL7 Java validator
+    /// differential, #176): with system `urn:ietf:rfc:3986` the value is an absolute URI.
+    fn identifier(&mut self, object: &serde_json::Map<String, Value>, location: &str) {
+        let (Some("urn:ietf:rfc:3986"), Some(value)) = (
+            object.get("system").and_then(Value::as_str),
+            object.get("value").and_then(Value::as_str),
+        ) else {
+            return;
+        };
+        if !has_scheme(value) {
+            self.issue(
+                IssueCode::Value,
+                &join(location, "value"),
+                "with system urn:ietf:rfc:3986 the value must be an absolute URI",
+            );
         }
     }
 
