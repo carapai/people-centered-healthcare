@@ -2,8 +2,14 @@
   "name": "health-platform",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/client"],
+  "workspaces": [
+    "apps/client",
+    "packages/design-system"
+  ],
   "scripts": {
     "check": "bun run --filter '*' check"
+  },
+  "patchedDependencies": {
+    "@ark-ui/react@5.39.3": "patches/@ark-ui%2Freact@5.39.3.patch"
   }
 }

@@ -104,8 +104,8 @@ The edge and desktop runtimes reuse the same domain and application crates as ce
 | Package | Purpose | Source |
 |---|---|---|
 | `apps/client` | The one React app, with `src/platform/` as its composition boundary | client-application.md |
-| `@health/design-system` | Panda CSS 2 preset (`panda lib`), Ark UI recipes, DataTable | client-application.md |
+| `@health/design-system` (`packages/design-system`) | Panda CSS 2 preset (`panda lib`), Ark UI recipes, ICU messages; DataTable to come | client-application.md |
 | `@health/fhir-types` | R5 TypeScript types generated from the R5 definitions | ADR 0036 |
 | `@health/api-client` | TypeScript types and Zod schemas generated from the `utoipa` OpenAPI document | ADR 0036 |
 
-Package names other than `apps/client` are working names, to be fixed by the scaffold.
+Package names other than `apps/client` and `@health/design-system` are working names, fixed when each package is created.

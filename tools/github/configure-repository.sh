@@ -34,6 +34,7 @@ REQUIRED_CHECKS=(
   "HL7 Java validator differential"
   # frontend-ci.yml
   "install, codegen, typecheck, lint, build, bundle scan"
+  "design system lib, typecheck, lint, component and axe tests"
   # security.yml
   "cargo-deny advisories"
   "osv-scanner (bun.lock)"

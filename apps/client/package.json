@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bunx --bun vite",
-    "codegen": "panda codegen",
+    "codegen": "bun run --cwd ../../packages/design-system lib && panda codegen",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "lint": "oxlint --deny-warnings src scripts && bun scripts/check-boundaries.ts",
     "build": "bunx --bun vite build",
@@ -13,12 +13,14 @@
     "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan"
   },
   "dependencies": {
+    "@health/design-system": "workspace:*",
     "@tanstack/react-query": "5.105.0",
     "@tanstack/react-router": "1.170.46",
     "@tauri-apps/api": "2.12.4",
     "lossless-json": "4.3.3",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-intl": "12.1.4"
   },
   "devDependencies": {
     "@babel/core": "8.0.9",

@@ -1,6 +1,6 @@
+import { css } from '@health/design-system/css'
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
 
-import { css } from '../../styled-system/css'
 import { StatusArea } from '../features/status/StatusArea'
 import type { RouterContext } from '../router'
 
