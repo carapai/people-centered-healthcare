@@ -17,6 +17,9 @@ type Values = {
   datePickerPrevious: { view: DateView }
   datePickerNext: { view: DateView }
   datePickerView: { view: DateView; range: string }
+  dataTableColumns: {}
+  dataTableEmpty: {}
+  dataTableSorted: { column: string; direction: 'asc' | 'desc' | 'none' }
 }
 
 // Every string the design system shows or announces. Ids are `ds.<component>.<name>`; apps
@@ -46,6 +49,13 @@ export const messages = defineMessages<Values>({
     id: 'ds.datePicker.view',
     defaultMessage: '{range}, {view, select, day {choose a month} month {choose a year} other {choose a decade}}',
     description: 'Accessible name of the calendar heading button that zooms out; range is its visible text, such as October 2026',
+  },
+  dataTableColumns: { id: 'ds.dataTable.columns', defaultMessage: 'Columns', description: 'Button that opens the menu of columns to show or hide' },
+  dataTableEmpty: { id: 'ds.dataTable.empty', defaultMessage: 'No rows to show', description: 'Shown in a table with no rows' },
+  dataTableSorted: {
+    id: 'ds.dataTable.sorted',
+    defaultMessage: '{direction, select, asc {Sorted by {column}, ascending} desc {Sorted by {column}, descending} other {Not sorted}}',
+    description: 'Announced to screen readers when the sort order of a table changes',
   },
 })
 

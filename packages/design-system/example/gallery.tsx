@@ -1,10 +1,11 @@
 import { createListCollection } from '@ark-ui/react/collection'
 import { parseDate } from '@internationalized/date'
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { css } from '../styled-system/css'
 import {
   Combobox,
+  DataTable,
   DatePicker,
   Dialog,
   Field,
@@ -13,8 +14,12 @@ import {
   Select,
   Toaster,
   createToaster,
+  emptyView,
   englishMessages,
+  type DataTableColumn,
+  type DataTableView,
 } from '../src'
+import { patients, type Patient } from './patients'
 
 // The design system's example page (#45): every slot recipe, in every theme and density, with
 // the overlays open and rendered in place so each one is styled by its section's theme.
@@ -39,6 +44,16 @@ const facilities = createListCollection({
   ],
 })
 
+const patientRows = patients(200)
+
+export const patientColumns: DataTableColumn<Patient>[] = [
+  { id: 'name', header: 'Name', cell: (p) => p.name, sortValue: (p) => p.name, canHide: false, width: 'minmax(14rem, 2fr)' },
+  { id: 'sex', header: 'Sex', cell: (p) => p.sex, sortValue: (p) => p.sex, width: 'minmax(6rem, 1fr)' },
+  { id: 'age', header: 'Age', cell: (p) => p.age, sortValue: (p) => p.age, align: 'end', width: 'minmax(5rem, 1fr)' },
+  { id: 'village', header: 'Village', cell: (p) => p.village, sortValue: (p) => p.village },
+  { id: 'phone', header: 'Phone', cell: (p) => p.phone },
+]
+
 // Open popups stay below their triggers whatever the viewport.
 const noFlip = { flip: false }
 
@@ -53,6 +68,7 @@ function Card({ title, wide = false, children }: { title: string; wide?: boolean
 
 function Section({ theme, density }: { theme: (typeof themes)[number]; density: (typeof densities)[number] }) {
   const id = `${theme}-${density}`
+  const [view, setView] = useState<DataTableView>({ ...emptyView, sort: [{ id: 'age', desc: true }] })
   const toaster = useMemo(() => createToaster({ placement: 'bottom-end', overlap: false, gap: 8, duration: Infinity }), [])
   useEffect(() => {
     toaster.create({ title: 'Encounter saved', description: 'Synced to the facility server.', type: 'success' })
@@ -193,6 +209,10 @@ function Section({ theme, density }: { theme: (typeof themes)[number]; density: 
               </Dialog.Positioner>
             </Dialog.Root>
           </div>
+        </Card>
+
+        <Card title="DataTable" wide>
+          <DataTable caption="Patients" columns={patientColumns} data={patientRows} getRowId={(p) => p.id} view={view} onViewChange={setView} height="20rem" />
         </Card>
 
         <Card title="Toast" wide>

@@ -162,13 +162,18 @@ flowchart TD
   - Text pairs meet 4.5:1 and control borders 3:1 in each theme; axe checks colour contrast on the example page.
 - **Components:**
   - our own slot recipes for Ark UI 5 components; Park UI is not used. The first set is Field, Select, Combobox, Dialog, Menu, Toast and Date Picker: each part is the Ark part with its slot class, and the composed parts (close buttons, indicators, the calendar) carry localized accessible names;
-  - **DataTable** built on TanStack Table 9 and Virtual, with an ARIA grid, keyboard model and its own accessibility tests;
+  - **DataTable** built on TanStack Table 9 and Virtual, with an ARIA grid, keyboard model and its own accessibility tests:
+    - the [APG grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) keyboard model: arrows, Home/End, Ctrl+Home/End, PageUp/PageDown, and Enter or Space on a header to sort. The grid has one tab stop, and the focused row stays rendered when scrolled away;
+    - single-column sorting, cycling ascending, descending and off, with a status message; column visibility from a Columns menu;
+    - the view is plain data that the caller owns. `viewToSearch` and `viewFromSearch` map it to `?sort=-age&hide=phone`, so routes keep it in the URL, and unknown or unsortable column ids are dropped;
+    - manual NVDA checks are recorded in [accessibility-checks.md](../development/accessibility-checks.md);
   - icons from Lucide.
 - **Accessibility:** WCAG 2.2 AA; axe in CI; manual NVDA testing on Windows.
 - **Hardware targets:** low-end Windows PCs at 1366×768, and tablets with touch-target sizes.
 - **i18n:** ICU messages, externalized from the first screen. English first.
   - The library is **react-intl** (FormatJS), whose messages are ICU MessageFormat. `I18nProvider` from the design system sets react-intl's locale and catalog and Ark's locale (date formats, reading direction).
   - Message ids are `ds.<component>.<name>` in the design system and `app.<feature>.<name>` in the client. The client merges both into one catalog per locale. Each message has a description for translators, and typed values.
+- **Z-index tokens.** Panda 2's presets have none, so the design system defines `sticky`, `dropdown`, `overlay`, `modal` and `toast`. The bundle scan fails on a z-index that names an undefined token.
 - **Ark UI declarations.** Ark 5.39's menu group declarations clash with `exactOptionalPropertyTypes` on `id`; `patches/@ark-ui%2Freact@5.39.3.patch` omits the HTML `id` there, so the app keeps full library checking. Drop the patch when Ark fixes it.
 - **Pinned majors:** React 19, Router 1, Query 5, Form 1, Table 9, Virtual 3, XState 5, Ark UI 5, Panda 2, Zod 4, Vite 8, Bun 1.4, TypeScript 7. Prerelease majors are not adopted.
 

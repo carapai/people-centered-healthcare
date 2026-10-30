@@ -19,6 +19,9 @@ const recipeParts = [
   'datePicker__table',
   'dialog__content',
   'toast__root',
+  'dataTable__grid',
+  'dataTable__header',
+  'dataTable__cell',
 ]
 
 const sections = themes.flatMap((theme) => densities.map((density) => `${theme}-${density}`))

@@ -4,7 +4,7 @@ _Update after each task (AGENTS.md process step 4)._
 
 | Phase | Done | Total |
 |---|---|---|
-| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 7 | 11 |
+| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 8 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 13 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 23 of 110 implementation tasks done. Validation spikes open: 3.
+Total: 24 of 111 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -53,3 +53,4 @@ Total: 23 of 110 implementation tasks done. Validation spikes open: 3.
 - 2026-10-29: #166 HL7 Java validator differential (pinned 7.0.2, CI job): 1,373 files; every tier 1 variant and tier 3 case agrees except two where ours is stricter per spec; 151 clinical examples fail only in Java for rules outside our tiers, recorded with reasons. Found and fixed: tier 1 `ele-1` (id-only elements), versioned canonicals in generated snapshots, non-type slicing of choice elements; custom profile fixtures now have HL7-generated snapshots. Split out #176 (Identifier urn:ietf:rfc:3986 rule).
 - 2026-10-30: #176 tier 1 enforces the Identifier rule: with system `urn:ietf:rfc:3986` the value is an absolute URI. `json-edge-cases.json` is recorded as an invalid example (a bare OID); the Java differential's recorded reason for the rule is gone (152 disagreements, all explained).
 - 2026-10-30: #45 `@health/design-system` (`packages/design-system`): Panda 2 preset via `panda lib`; semantic tokens for light, dark and high-contrast (`data-theme`) and comfortable/compact density (`data-density`; 44 and 32 px controls); slot recipes and Ark UI 5 parts for Field, Select, Combobox, Dialog, Menu, Toast and Date Picker; ICU messages with react-intl (`ds.*`, typed values) and `I18nProvider`. The example page renders every recipe in all six theme × density combinations; 12 Vitest browser tests in Chromium, including axe (WCAG 2.2 AA tags, colour contrast checked) with no violations. The client loads it as its Panda `designSystem` and externalizes its strings (`app.*`). A `bun patch` fixes Ark 5.39's menu group declarations under `exactOptionalPropertyTypes`. New CI job in frontend-ci.
+- 2026-10-30: #46 DataTable in `@health/design-system`: TanStack Table 9 (sorting, column visibility) and Virtual 3, an ARIA grid with the APG keyboard model (arrows, Home/End, Ctrl+Home/End, PageUp/PageDown, Enter/Space to sort, one tab stop; the focused row stays rendered), a Columns menu, a status message on sort, and a view (`sort`, `hide`) that round-trips through URL search parameters with unknown ids dropped. Keyboard-only navigation of 10,000 rows is tested in Chromium with fewer than 80 rows in the DOM; axe reports no violations in any theme. Found and fixed: Panda 2 presets have no z-index tokens (the Dialog and popups emitted `z-index: modal`); the bundle scan now rejects unresolved z-index tokens. Split out #180 (NVDA manual check, needs Windows).
