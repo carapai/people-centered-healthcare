@@ -168,6 +168,13 @@ fn shape_rules_are_enforced() {
         IssueCode::Structure,
         "Patient.gender",
     );
+    // ele-1: an id alone is not a value.
+    one(
+        r#"{"resourceType":"Patient","identifier":[{"id":"x"}]}"#,
+        IssueCode::Structure,
+        "Patient.identifier[0]",
+    );
+    assert!(issues(r#"{"resourceType":"Patient","identifier":[{"id":"x","value":"1"}],"_gender":{"id":"y"},"gender":"male"}"#).is_empty());
     assert_eq!(
         issues(r#"{"resourceType":"Patient","name":[{"given":["a"],"_given":[null,null]}]}"#),
         vec![
@@ -202,8 +209,16 @@ fn skeletons_of_every_type_pass() {
 /// mismatch is reported and alerted).
 const MODEL_GAPS: &[&str] = health_fhir_models::KNOWN_UNPARSEABLE_EXAMPLES;
 
+/// Official examples that genuinely fail tier 1, each with what is wrong. The HL7 Java
+/// validator agrees on each (#166).
+const INVALID_EXAMPLES: &[(&str, &str)] = &[(
+    "medicationexample0301.json",
+    "Medication.identifier[0] holds only an id (ele-1)",
+)];
+
 /// Set `HEALTH_FHIR_R5_EXAMPLES` to the unpacked official corpus
-/// (`tools/fhir/fetch-r5-examples.sh`): every example must pass tier 1, and every one that
+/// (`tools/fhir/fetch-r5-examples.sh`): every example must pass tier 1, apart from
+/// `INVALID_EXAMPLES`, and every one that
 /// passes must parse into the typed model, apart from the recorded model gaps.
 #[test]
 fn the_official_corpus_passes_and_parses_when_available() {
@@ -226,6 +241,14 @@ fn the_official_corpus_passes_and_parses_when_available() {
             .unwrap_or_default();
         let text = std::fs::read_to_string(file).expect("read");
         let found = validate_structure(&text);
+        if INVALID_EXAMPLES.iter().any(|(n, _)| *n == name) {
+            if found.is_empty() {
+                failures.push(format!(
+                    "{name}: passes tier 1 now; remove it from the invalid examples"
+                ));
+            }
+            continue;
+        }
         if let Some(first) = found.first() {
             failures.push(format!(
                 "{name}: tier 1 {} at {}: {}",

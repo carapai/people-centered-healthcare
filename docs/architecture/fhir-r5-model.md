@@ -119,11 +119,12 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 - **Two deliberate departures from the snapshots:**
   - `Element.id` is checked as `string`, not `id`. ElementDefinition ids hold `:` and exceed 64 characters in the official examples.
   - Decimals are any JSON number, not the core regex's 18 digits (ADR 0052: tier 1 accepts longer values and stores them unchanged).
-- **Corpus.** All 2,824 official examples pass tier 1. Every one that passes also parses into `fhir-r5`, except `questionnaireresponse-example-f201-lifelines.json`. That example is valid R5, with an extension-only required primitive, but `fhir-r5` refuses it, so it is listed as `KNOWN_UNPARSEABLE_EXAMPLES`. ADR 0050 called it invalid, which was a misreading.
+- **`ele-1`.** An element whose only member is `id` has no value or children, and fails; the Java differential found this gap (#166).
+- **Corpus.** All 2,824 official examples pass tier 1 except `medicationexample0301.json`, whose `Medication.identifier[0]` holds only an id (`ele-1`); the Java validator agrees. Every one that passes also parses into `fhir-r5`, except `questionnaireresponse-example-f201-lifelines.json`. That example is valid R5, with an extension-only required primitive, but `fhir-r5` refuses it, so it is listed as `KNOWN_UNPARSEABLE_EXAMPLES`. ADR 0050 called it invalid, which was a misreading.
 - **`skeleton(type)`** builds a minimal valid instance of any resource type, for tests and tooling.
 - **Follow-ups:**
   - tier 2 invariants and the decimal-exact FHIRPath engine ([#165](https://github.com/carapai/people-centered-healthcare/issues/165));
-  - the HL7 Java validator cross-check ([#166](https://github.com/carapai/people-centered-healthcare/issues/166));
+  - the HL7 Java validator cross-check (#166; § The HL7 Java validator differential);
   - the Inbound Dead Letter and quarantine ([#167](https://github.com/carapai/people-centered-healthcare/issues/167)).
 
 ### Tier 3 in code
@@ -136,7 +137,8 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - a `resolve()` discriminator path, or a discriminator type outside `value`, `pattern`, `exists`, `type` and `profile`;
   - a `value` or `pattern` discriminator with no fixed or pattern value at its path, on an ancestor, or in a required nested slice (the BP profile's components are sliced by `code.coding.code`, fixed inside the nested coding slices);
   - an extension context other than `element`;
-  - a type or target profile that is neither a base type nor in the set.
+  - a choice element sliced by anything but the `type` discriminator, which the HL7 snapshot generator also refuses;
+  - a type or target profile that is neither a base type nor in the set. Canonical versions (`…/Organization|5.0.0`, as generated snapshots pin them) are ignored: the active set holds one version of each profile.
 
   Package Validation at central ([#88](https://github.com/carapai/people-centered-healthcare/issues/88)) compiles the package with its dependencies, and any error fails it. Activation ([#89](https://github.com/carapai/people-centered-healthcare/issues/89)) compiles the active set once per node.
 - **Checks:**
@@ -146,15 +148,32 @@ The physical storage of resources, history and index entries in SurrealDB is in 
   - profile invariants, evaluated with the tier 2 engine by indexed path; base-resource invariants are left to tier 2;
   - slicing: each item is assigned to the slices it matches; `closed` rejects unassigned items, `openAtEnd` rejects them before the last slice, `ordered` enforces slice order, and each slice has its own cardinality;
   - the profiles of a type (`SimpleQuantity` on `valueQuantity`), recursively.
+- **Choice elements.** Issues about a choice element are reported at the JSON key present (`Patient.deceasedDateTime`), not at `Patient.deceased[x]`.
 - **Datatypes.** A snapshot does not expand datatypes, so members the profile does not constrain are walked through the core element table; extensions below them (`Patient.name[0].extension`) are still checked.
 - **One report per failure.** An invariant repeated in a derived profile's snapshot is evaluated once, and an extension checked both as a slice's type profile and by its definition is reported once.
 - **Unknown or mismatched profiles.** A profile not in the active set is `processing`; a profile for another resource type is `structure`.
 - **Tests** (`tests/profiles.rs`):
   - the official vital-signs, heart-rate and BP profiles: the valid examples pass; a missing category, a wrong LOINC code, a wrong fixed unit and a missing systolic component each fail;
   - with `HEALTH_FHIR_R5_EXAMPLES` set, all 12 official examples that claim one of these profiles conform;
-  - custom fixtures (`tests/fixtures/custom-profiles/`) cover every supported construct and the compile refusals.
+  - custom fixtures (`tests/fixtures/custom-profiles/`) cover every supported construct and the compile refusals. They are written as differentials and their snapshots are generated by the HL7 validator (7.0.2), so they have the shape of real packages: complete, with versioned canonicals and `sliceName`s.
 - **Performance.** See § Tier 2 in code: in the budget test, the profiled examples take tiers 1–3 at p50 0.44 ms and at most 0.87 ms.
-- **Follow-ups:** the HL7 Java validator differential joins the tier 1 cross-check in [#166](https://github.com/carapai/people-centered-healthcare/issues/166). The `octofhir-fhirschema` slicing-merge bug is to be reported upstream.
+- **Follow-ups:** the `octofhir-fhirschema` slicing-merge bug is to be reported upstream.
+
+### The HL7 Java validator differential
+
+The HL7 validator is a CI oracle only (above). `tools/fhir/java-differential.sh` runs it (pinned 7.0.2, checksum-verified by `tools/fhir/fetch-java-validator.sh`, terminology off) and compares its verdict on each file with our tiers 1–3 (`tests/java_differential.rs`); `rust-ci.yml` runs it on every PR (#166).
+
+- **Cases** (`examples/differential_cases.rs`):
+  - the 731 official clinical examples; conformance resources are left out, and the validator crashes on some of them with terminology off;
+  - 621 tier 1 variants of one valid example per clinical type: an unknown element, a missing required element, a malformed `id`, a wrong JSON type and an empty string;
+  - 21 tier 3 cases claiming the vital-signs and custom profiles, one per slicing rule and discriminator.
+- **Verdict.** Java fails a file on any `error` or `fatal` issue; ours fails it on any tier 1–3 issue.
+- **Result.** Every tier 1 variant and every tier 3 case agrees, apart from two where ours follows the spec more strictly:
+  - a literal reference to a type the profile does not allow: Java checks target types only on references it can resolve;
+  - an unsliced value before a slice under `openAtEnd`: Java reports it only as information.
+- **Clinical examples.** 151 fail only in Java, for rules outside our tiers: terminology (tier 4), URL and narrative-link resolution, Java's refusal of example URLs, extensions we have no definition for, two profiles outside our set, and one Identifier rule stated in prose ([#176](https://github.com/carapai/people-centered-healthcare/issues/176)).
+- **Recorded disagreements** (`tests/fixtures/java-differential/known-disagreements.json`): each has a reason, either per file or as Java message ids for rules outside our tiers. A disagreement not explained there fails the test, and so does a file entry that no longer disagrees. Which Java-only rules fire depends on the validator's environment (its terminology cache), so an unused message id is only reported.
+- **What it found:** the `ele-1` gap in tier 1; versioned canonicals in generated snapshots; choice elements sliced by a non-type discriminator; and custom fixtures that were not real snapshots.
 
 ## Search parameters and indexed projections
 

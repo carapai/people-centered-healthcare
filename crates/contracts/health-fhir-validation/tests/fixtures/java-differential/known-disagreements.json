@@ -1,0 +1,46 @@
+[
+  {
+    "reason": "Reference target types: the profile allows Reference(Practitioner) and the reference is Organization/o1. The Java validator checks target types only on references it can resolve; ours reads the type from the literal reference, as the profile requires.",
+    "files": ["ug-patient.wrong-target.json"]
+  },
+  {
+    "reason": "openAtEnd slicing: R5 defines it as 'additional slices are allowed, but only at the end'. The Java validator (7.0.2) reports an unsliced value before a slice only as information; ours rejects it.",
+    "files": ["ug-patient.open-at-end.json"]
+  },
+  {
+    "reason": "The example claims the core bodytemp profile, which is not in our active set, and violates it (no effective[x]): an error in HL7's example.",
+    "files": ["observation-example-f202-temperature.json"]
+  },
+  {
+    "reason": "The example claims vhdir-location from the VhDir implementation guide, which is not in our active set.",
+    "files": ["location-wash-dc-metro.json"]
+  },
+  {
+    "reason": "Java policy, not an R5 conformance rule: example.org and example.com URLs are refused in some contexts.",
+    "javaMessageIds": ["TYPE_SPECIFIC_CHECKS_DT_URL_EXAMPLE"]
+  },
+  {
+    "reason": "Terminology: tier 4 (#90, #91). The differential runs the Java validator with terminology off; which of these it still reports depends on its terminology cache.",
+    "javaMessageIds": [
+      "UNABLE_TO_INFER_CODESYSTEM",
+      "Terminology_TX_NoValid_16",
+      "Display_Name_for__should_be_one_of__instead_of"
+    ]
+  },
+  {
+    "reason": "Resolution: the Java validator resolves canonical URLs and narrative links; our tiers do not dereference them.",
+    "javaMessageIds": [
+      "Type_Specific_Checks_DT_URL_Resolve",
+      "Type_Specific_Checks_DT_XHTML_Resolve",
+      "Type_Specific_Checks_DT_XHTML_Resolve_Img"
+    ]
+  },
+  {
+    "reason": "Extensions without a definition in our active set are accepted (tier 3 checks the ones it has); the Java validator loads the HL7 extension packages and checks them. Depending on its environment, it also reads the R5 extended-contact-availability extension as allowing no types.",
+    "javaMessageIds": ["Extension_EXT_Unknown_NotHere", "Validation_VAL_Profile_NoType", "Extension_EXT_Type"]
+  },
+  {
+    "reason": "A rule stated in the Identifier prose, not as an invariant: with system urn:ietf:rfc:3986 the value must be a URI. Not enforced yet.",
+    "javaMessageIds": ["TYPE_SPECIFIC_CHECKS_DT_IDENTIFIER_IETF_SYSTEM_VALUE"]
+  }
+]

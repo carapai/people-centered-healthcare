@@ -442,11 +442,25 @@ impl Walker {
         value: &Value,
         location: &str,
     ) {
-        if let Some(target) = &element.content_reference {
-            return self.complex(type_name, target, value, location);
-        }
         if is_primitive(chosen) {
             return self.primitive(chosen, value, location);
+        }
+        // ele-1: an element needs a value or children other than its id (found by the HL7 Java
+        // validator differential, #166). Resources are not elements.
+        if !matches!(chosen, "Resource" | "DomainResource")
+            && value
+                .as_object()
+                .is_some_and(|o| !o.is_empty() && o.keys().all(|k| k == "id"))
+        {
+            self.issue(
+                IssueCode::Structure,
+                location,
+                "an element needs children other than its id (ele-1)",
+            );
+            return;
+        }
+        if let Some(target) = &element.content_reference {
+            return self.complex(type_name, target, value, location);
         }
         match chosen {
             "Resource" | "DomainResource" => self.resource(value, Some(location)),

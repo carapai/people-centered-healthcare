@@ -31,6 +31,7 @@ REQUIRED_CHECKS=(
   "build, nextest, doc tests"
   "FHIR corpus, element table, validation budget"
   "coverage ≥ 80% lines (domain and application crates)"
+  "HL7 Java validator differential"
   # frontend-ci.yml
   "install, codegen, typecheck, lint, build, bundle scan"
   # security.yml

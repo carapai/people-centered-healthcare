@@ -89,6 +89,7 @@ Packages, lifecycle, activation, terminology service, validation, forms and extr
 - [Implement the terminology service](https://github.com/carapai/people-centered-healthcare/issues/90)
 - [Build the snapshot-driven profile validator (tier 3)](https://github.com/carapai/people-centered-healthcare/issues/145)
 - [Bring validation tiers 1–3 within the 2 ms p95 budget](https://github.com/carapai/people-centered-healthcare/issues/170)
+- [Enforce the urn:ietf:rfc:3986 Identifier value rule](https://github.com/carapai/people-centered-healthcare/issues/176)
 - [Implement validation tiers 3–4 (profiles and bindings)](https://github.com/carapai/people-centered-healthcare/issues/91)
 - [Build the Questionnaire renderer and Form Layouts](https://github.com/carapai/people-centered-healthcare/issues/92)
 - [Implement extraction and CompleteQuestionnaireResponse](https://github.com/carapai/people-centered-healthcare/issues/93)
