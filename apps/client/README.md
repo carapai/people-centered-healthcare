@@ -28,4 +28,4 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 |---|---|
 | `typecheck` | TS 7 errors in the app (full lib checking), or in tool configs (`tsconfig.node.json`, with `skipLibCheck`) |
 | `lint` | oxlint errors, including `@tauri-apps/**` imported outside `src/platform/**`; runtime checks or browser storage outside the allowlist (`scripts/check-boundaries.ts`) |
-| `scan` | The web bundle contains Tauri or devtools code, or Panda CSS has no token variables or has raw shorthands |
+| `scan` | The web bundle contains Tauri or devtools code, or Panda CSS has no token variables, has raw shorthands, or names an undefined z-index token |

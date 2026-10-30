@@ -17,6 +17,7 @@ Cargo and Bun workspaces, shared React app shell, central gateway skeleton, desi
 - [Generate FHIR R5 TypeScript types and the OpenAPI client types](https://github.com/carapai/people-centered-healthcare/issues/50)
 - [Build tools/synthetic-data](https://github.com/carapai/people-centered-healthcare/issues/51)
 - [Run Vitest and component tests in frontend-ci](https://github.com/carapai/people-centered-healthcare/issues/173)
+- [Run the NVDA manual check of the DataTable](https://github.com/carapai/people-centered-healthcare/issues/180) — needs a human
 
 ## [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2)
 

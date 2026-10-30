@@ -3,6 +3,7 @@ import { defineConfig } from '@pandacss/dev'
 import { conditions } from './src/theme/conditions'
 import { slotRecipes } from './src/theme/recipes'
 import { semanticTokens } from './src/theme/semantic-tokens'
+import { tokens } from './src/theme/tokens'
 
 // The @health/design-system preset (client-application.md § Design system). `panda lib` writes it
 // to dist/panda/; apps load it with `designSystem: '@health/design-system'`.
@@ -15,7 +16,7 @@ export default defineConfig({
   outdir: 'styled-system',
   jsxFramework: 'react',
   conditions: { extend: conditions },
-  theme: { extend: { semanticTokens, slotRecipes } },
+  theme: { extend: { tokens, semanticTokens, slotRecipes } },
   globalCss: {
     html: { colorScheme: 'light', '&[data-theme=dark]': { colorScheme: 'dark' } },
     body: { bg: 'bg.canvas', color: 'fg.default' },

@@ -31,7 +31,7 @@ A reusable component in the design system, or a screen in a feature module of th
 
 ## Tests
 
-- **Frontend:** Vitest unit tests, component tests, axe accessibility checks (every PR); manual NVDA testing on Windows.
+- **Frontend:** Vitest unit tests, component tests, axe accessibility checks (every PR); manual NVDA testing on Windows, recorded in [accessibility-checks.md](accessibility-checks.md).
 - `frontend-ci.yml`: `tsc`, lint (including the `src/platform` import rule), `panda codegen`, production build, bundle scan (no `@tauri-apps`, no devtools); for the design system, component and axe tests in Chromium over the example page in every theme and density.
 - **End-to-end:** Playwright on the web, `tauri-driver` on WebView2 and WebKitGTK (nightly).
 

@@ -37,6 +37,9 @@ for await (const path of files(distDir)) {
     // Without presets Panda writes shorthand properties verbatim, e.g. `.p_6{p:6}`.
     const raw = text.match(/\{\s*(p|px|py|m|bg|fontSize)\s*:/)
     if (raw !== null) problems.push(`${path}: Panda emitted raw shorthand \`${raw[0]}\`; check the presets`)
+    // A token name the theme does not define is emitted verbatim, e.g. `z-index:modal`.
+    const unresolved = text.match(/z-index:\s*(?!auto|inherit|initial|unset|revert|var\()[a-z][\w-]*/)
+    if (unresolved !== null) problems.push(`${path}: unresolved token \`${unresolved[0]}\`; define it in the design system`)
   }
 }
 

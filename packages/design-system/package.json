@@ -63,6 +63,8 @@
   "dependencies": {
     "@ark-ui/react": "5.39.3",
     "@internationalized/date": "3.12.4",
+    "@tanstack/react-table": "9.3.1",
+    "@tanstack/react-virtual": "3.14.20",
     "lucide-react": "1.57.0",
     "react-intl": "12.1.4"
   },
