@@ -7,6 +7,9 @@ on:
   push:
     branches: [main]
 
+# Cargo caches use actions/cache (MIT), keyed per job on the toolchain and Cargo.lock;
+# Swatinem/rust-cache is LGPL-3.0, which ADR 0045's licence allowlist excludes.
+
 permissions:
   contents: read
 
@@ -70,11 +73,21 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      CARGO_INCREMENTAL: 0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
