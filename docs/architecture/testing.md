@@ -22,6 +22,14 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | Payment reconciliation | Mock MoMo and Airtel with dropped callbacks, duplicates and statement mismatches | Nightly |
 | Security | Authorization-matrix suite (facility isolation, sensitive labels, adolescent confidentiality, break-glass); ZAP baseline against staging; telemetry redaction test | Every PR (matrix, redaction); nightly (ZAP) |
 
+### The client's FHIR contract
+
+- **One suite, two base URLs** (`apps/client/test/contract/`, `bun run test:contract`). The suite runs once against central, with a bearer token, and once against an edge, with DPoP proofs.
+- **What it covers:** read, vread, search over GET and POST (including a repeated parameter), instance and type history, a 404 as a `FhirError` carrying its OperationOutcome, and the credentials sent on every request.
+- **Decimals:** `3.50` and a 28-digit decimal must come back with their exact source text, both as `LosslessNumber` and when serialized again. Parsing with `JSON.parse` fails this test.
+- **Server:** the real `FhirServer`, from `health-fhir-server`'s `contract_server` example. It runs two nodes, each on its own SurrealDB memory engine and port. The example has no authentication: it ignores credentials, so the suite checks what the client sends, not the server's verification. `CONTRACT_SERVERS` points the suite at nodes that are already running.
+- **Unit tests** of the platform layer are in `apps/client/test/` (`bun run test`).
+
 ## Acceptance scenarios (§117–119)
 
 - The clinical, ART/TB and finance scenarios are automated end-to-end suites on staging.

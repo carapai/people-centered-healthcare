@@ -36,6 +36,7 @@ REQUIRED_CHECKS=(
   "install, codegen, typecheck, lint, build, bundle scan"
   "design system lib, typecheck, lint, component and axe tests"
   "generated FHIR and API types, typecheck, tests, drift"
+  "client FHIR contract, central and edge"
   # security.yml
   "cargo-deny advisories"
   "osv-scanner (bun.lock)"

@@ -33,6 +33,16 @@ flowchart TD
 
   The UI never assembles the FHIR writes for a business operation.
 - **`EventSource`:** server-sent events from central or the edge, or Tauri events. Events carry only invalidation hints (resource type and id, or a worklist key), which invalidate Query keys.
+- **In code** (`apps/client/src/platform/`):
+  - **`fhir.ts`:** `fhirClient(transport, base)`. It has no write methods. A non-2xx response, or a body of another resource type, throws a `FhirError` carrying the status and the server's OperationOutcome. Its message names only the issue codes, because diagnostics can quote clinical data. `$match` posts `Parameters` (`resource`, `onlyCertainMatches`, `count`). `$extract` and `$populate` accept their output bare or inside `Parameters`.
+  - **`operations.ts`:** `operationClient(transport).call(operationId, input)`. It calls an operation from `@health/api-client` and validates the response with `parseResponse`. The command ports of each Bounded Context build on it as their server use cases land; none exist yet. It loads the schemas (and Zod, about 84 KB) on the first call, not with the app shell.
+  - **`events.ts`:** `sseEventSource(url, auth)` reads `{apiBase}/events` with `fetch`, because `EventSource` cannot send the Authorization and DPoP headers.
+    - One connection serves every subscriber. It reconnects with `Last-Event-ID`, starting at the server's `retry:` delay and doubling it up to 30 s.
+    - It stops on a 4xx other than 401 or 429, or on a response that is not `text/event-stream` (for example, a web host's fallback page).
+    - It drops hints that are not string identifiers.
+  - **`query.ts`:** the query keys, `fhirKeys` and `worklistKey`. Everything for a resource type sits under `['fhir', type]`.
+    - `readQuery`, `vreadQuery` (never stale), `searchQuery` and `historyQuery` are `queryOptions` over the `FhirClient`.
+    - `connectQueryCache(platform, queryClient)` is called once in `main.tsx`. A resource hint invalidates that resource, its type's searches and histories, and system history. A type hint invalidates the whole type; a worklist hint invalidates its worklist.
 
 ### Transports
 
@@ -43,7 +53,15 @@ flowchart TD
 | `TauriLocalRepository` | `TauriIpcTransport` | Local desktop session, carried over IPC |
 
 - **One envelope everywhere:** method, path, query, headers subset and body. On the desktop, Rust dispatches IPC envelopes into the shared Axum router in-process (tower `oneshot`), with no loopback port.
+  - A query or form parameter may repeat (`date=ge…&date=le…`). Search over POST sends a form body.
+  - Over IPC, query parameters travel as ordered pairs and a form travels as its encoded text.
 - **Decimals.** FHIR decimals and money are parsed with a lossless JSON parser in the transport.
+- **Auth strategies** (`auth.ts`), chosen in `compose.ts`:
+  - **Central:** `bearerAuth` sends `Authorization: Bearer` with the session's token.
+  - **Edge:** `dpopAuth` sends `Authorization: DPoP` with an RFC 9449 proof for each request. The proof is ES256, signed with the device key, and carries `htm`, `htu` (no query or fragment), `iat`, a fresh `jti` and `ath`.
+    - A `DPoP-Nonce` from the server is used from then on. A 401 `use_dpop_nonce` is retried once.
+    - Enrollment ([#74](https://github.com/carapai/people-centered-healthcare/issues/74)) provides the non-extractable device key. Until then, edge requests carry no credentials.
+  - Neither strategy sends anything without a token.
 
 ### Composition boundary
 
@@ -129,6 +147,7 @@ flowchart TD
   2. unmount patient views;
   3. show the lock screen or the next user.
 - **Logout** clears everything except preferences and the device's DPoP key.
+- **In code:** `memorySession()` keeps the token in a closure. `session.end('logout' | 'lock')` forgets the token, and `connectQueryCache` clears the Query cache on either.
 
 ## Forms (ADR 0038)
 

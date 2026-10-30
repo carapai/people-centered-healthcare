@@ -7,7 +7,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { englishCatalog } from './i18n/catalog'
-import { PlatformProvider, composePlatform } from './platform'
+import { PlatformProvider, composePlatform, connectQueryCache } from './platform'
 import { makeQueryClient } from './queryClient'
 import { makeRouter } from './router'
 
@@ -18,6 +18,7 @@ if (root === null) {
 
 const platform = await composePlatform()
 const queryClient = makeQueryClient()
+connectQueryCache(platform, queryClient)
 const router = makeRouter({ platform, queryClient })
 
 createRoot(root).render(

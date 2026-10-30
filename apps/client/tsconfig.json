@@ -14,5 +14,6 @@
     "verbatimModuleSyntax": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "styled-system"]
+  "include": ["src", "styled-system", "test"],
+  "exclude": ["test/contract/server.ts"]
 }

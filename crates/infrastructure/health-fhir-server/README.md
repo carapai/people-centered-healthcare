@@ -15,3 +15,5 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **CapabilityStatement:** every declared interaction on all 84 types (conditional ones where `_id` is supported), and every declared search parameter. `concurrent_conditional_creates_make_one_resource` races 8 conditional creates. Without the condition lock it fails with 8 resources.
 
 All of it runs on the SurrealDB memory engine through `oneshot`.
+
+`examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.

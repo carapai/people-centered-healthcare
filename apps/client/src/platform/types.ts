@@ -1,13 +1,23 @@
 // The platform boundary (client-application.md § Composition boundary). Feature code sees only
 // these types; how a request travels (HTTP or Tauri IPC) is decided once, in compose.ts.
 
+import type { FhirClient } from './fhir'
+import type { OperationClient } from './operations'
+
+/** Query or form parameters; a list repeats the parameter (`date=ge2026&date=le2027`). */
+export type QueryParams = Readonly<Record<string, string | readonly string[]>>
+
 /** One request envelope for every transport. */
 export interface ApiRequest {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   path: string
-  query?: Record<string, string>
+  query?: QueryParams
   headers?: Record<string, string>
+  /** A JSON body, serialized losslessly. */
   body?: unknown
+  /** A form body (`application/x-www-form-urlencoded`), for FHIR search over POST. */
+  form?: QueryParams
+  signal?: AbortSignal
 }
 
 /** The response envelope. `body` is parsed losslessly, so decimals keep their source text. */
@@ -21,9 +31,15 @@ export interface Transport {
   request(request: ApiRequest): Promise<ApiResponse>
 }
 
+/** Why a session ended: the Query cache is cleared either way (client-application.md § Sessions). */
+export type SessionEnd = 'logout' | 'lock'
+
 export interface SessionPort {
   /** The access token for the current user, held in memory only (ADR 0037). */
   accessToken(): string | undefined
+  /** Forgets the token and tells every `onEnd` listener. */
+  end(reason: SessionEnd): void
+  onEnd(listener: (reason: SessionEnd) => void): () => void
 }
 
 /** Invalidation hints only: a resource type and id, or a worklist key. */
@@ -52,6 +68,10 @@ export type RuntimeMode = 'central' | 'edge' | 'tauri'
 export interface Platform {
   mode: RuntimeMode
   transport: Transport
+  /** FHIR reads, searches and operations (client-application.md § Ports). */
+  fhir: FhirClient
+  /** The runtime's documented HTTP operations, validated at the boundary; command ports build on it. */
+  operations: OperationClient
   session: SessionPort
   events: EventSourcePort
   capabilities: Capabilities
