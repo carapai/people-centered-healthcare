@@ -47,7 +47,7 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 
 ### Workflows in code
 
-Five workflows are in `.github/workflows/` (#47); every action is pinned to a full commit SHA by `pinact`, and Renovate (`renovate.json`) keeps the pins and groups updates weekly, with security fixes at any time.
+Five workflows are in `.github/workflows/` (#47); every action is pinned to a full commit SHA by `pinact`, and Renovate (`renovate.json`) keeps the pins and groups updates weekly, with security fixes at any time. Actions follow the same licence allowlist as dependencies (ADR 0045): Cargo builds are cached with `actions/cache`, keyed per job on `rust-toolchain.toml` and `Cargo.lock`, because `Swatinem/rust-cache` is LGPL-3.0.
 
 - **`rust-ci.yml`** runs the table's jobs, plus a `java-differential` job (the HL7 validator as a CI oracle, [fhir-r5-model.md](fhir-r5-model.md) § The HL7 Java validator differential) and a `fhir-corpus` job. That job fetches the R5 core package and examples with pinned SHA-256s (`tools/fhir/fetch-r5-core.sh`, `fetch-r5-examples.sh`), checks the element table, and runs the corpus and validation-budget tests in release. Coverage measures the crates whose `layer` is `domain` or `application`.
 - **`frontend-ci.yml`** has two jobs.
