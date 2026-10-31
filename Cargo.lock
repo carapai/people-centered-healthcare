@@ -5797,6 +5797,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "synthetic-data"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-identifiers",
+ "health-surrealdb",
+ "health-time",
+ "jiff",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "surrealdb",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "sysinfo"
 version = "0.37.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
