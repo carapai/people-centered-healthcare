@@ -15,10 +15,12 @@ workspace = true
 [dependencies]
 axum = { workspace = true, features = ["query", "form"] }
 form_urlencoded = { workspace = true }
+health-access-policy = { workspace = true }
 health-audit = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-validation = { workspace = true }
 health-identifiers = { workspace = true }
+health-identity-app = { workspace = true }
 health-persistence = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }

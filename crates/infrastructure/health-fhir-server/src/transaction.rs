@@ -24,13 +24,13 @@ use health_persistence::{Precondition, RawJson, ResourceType, Store, Transaction
 use health_surrealdb::SurrealTx;
 use serde_json::{Map, Value, json};
 
-use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{Return, fhir_json, prefer, require_json_body};
 use crate::ops::{self, Attempt, Condition, CreateTarget, UpdatePlan};
 use crate::outcome::{FhirError, operation_outcome};
 use crate::references;
 use crate::{FhirServer, etag, resource_type};
+use crate::{access, audit};
 use health_audit::Interaction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -351,6 +351,7 @@ async fn read(tx: &mut SurrealTx, request: &Request) -> Result<Outcome, Attempt>
     if version.deleted {
         return Err(FhirError::gone().into());
     }
+    access::readable(&json, not_found)?;
     let interaction = if request_is_version(request) {
         Interaction::Vread
     } else {

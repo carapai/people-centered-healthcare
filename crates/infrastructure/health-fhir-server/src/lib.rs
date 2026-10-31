@@ -49,6 +49,7 @@ macro_rules! retrying {
     }};
 }
 
+mod access;
 mod audit;
 mod bundle;
 mod capability;
@@ -67,6 +68,7 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::routing::{get, post};
+use health_access_policy::Pdp;
 use health_audit::Auditor;
 use health_fhir_search::SearchPolicy;
 use health_fhir_validation::{FhirPathEngine, OctofhirEngine, validate_invariants};
@@ -75,6 +77,7 @@ use health_persistence::{ResourceType, RetryPolicy};
 use health_surrealdb::{SurrealStore, ownership};
 use health_time::Timestamp;
 
+pub use access::{NoFacilityScope, RecordFacility};
 pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_statement};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use outcome::{FhirError, operation_outcome};
@@ -92,6 +95,7 @@ pub struct FhirServer {
     retry: RetryPolicy,
     started: Timestamp,
     audit: Option<Arc<Auditor>>,
+    access: Option<access::Control>,
 }
 
 impl FhirServer {
@@ -111,6 +115,7 @@ impl FhirServer {
             retry: RetryPolicy::default(),
             started: Timestamp::now(),
             audit: None,
+            access: None,
         }
     }
 
@@ -148,12 +153,23 @@ impl FhirServer {
         self
     }
 
+    /// This server, deciding every interaction with `pdp` for the request's
+    /// `health_access_policy::Subject` (a request extension the authentication layer inserts):
+    /// a request without one answers 401, except `/metadata`. `facility` finds the facility of a
+    /// facility-scope record. The construction-time search policy then no longer applies.
+    #[must_use]
+    pub fn with_access_control(mut self, pdp: Pdp, facility: Arc<dyn RecordFacility>) -> Self {
+        self.access = Some(access::Control { pdp, facility });
+        self
+    }
+
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
     pub fn router(self) -> Router {
-        let scope = axum::middleware::from_fn_with_state(self.clone(), audit::scope);
+        let audited = axum::middleware::from_fn_with_state(self.clone(), audit::scope);
+        let guarded = axum::middleware::from_fn_with_state(self.clone(), access::scope);
+        let open = Router::new().route("/metadata", get(interactions::metadata));
         Router::new()
             .route("/", post(transaction::post))
-            .route("/metadata", get(interactions::metadata))
             .route("/_history", get(history::system))
             .route(
                 "/{type}",
@@ -172,7 +188,9 @@ impl FhirServer {
             )
             .route("/{type}/{id}/_history", get(history::instance))
             .route("/{type}/{id}/_history/{vid}", get(interactions::vread))
-            .layer(scope)
+            .layer(guarded)
+            .merge(open)
+            .layer(audited)
             .with_state(self)
     }
 

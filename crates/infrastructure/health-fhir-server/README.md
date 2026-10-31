@@ -13,6 +13,13 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - AuditEvents do not count as referrers, so audited records can still be deleted.
 - **Reference integrity:** local references must resolve (422), and a referenced resource cannot be deleted (409). `with_reference_scope` lets a node allow out-of-scope targets (persistence.md § Reference integrity).
 
+- **Access control (#192):** `with_access_control(Pdp, RecordFacility)` decides every interaction for the request's `health_access_policy::Subject` request extension, which authentication inserts ([#209](https://github.com/carapai/people-centered-healthcare/issues/209)).
+  - Without a subject the answer is 401; `/metadata` stays open.
+  - Searches run under a per-request `SubjectSearchPolicy`, confined to a patient for `patient=` or a `subject=` naming a Patient; 403 when the type may not be searched.
+  - Reads, vreads and instance history are 404 when denied. Type and system history leave out the versions that are denied.
+  - Creates, updates and deletes are 403 when denied, decided on both the new resource and the version replaced.
+  - `RecordFacility` finds a facility-scope record's facility. The default, `NoFacilityScope`, treats no record as facility-scope until records name their facility ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
+
 ## Tests
 
 `tests/rest.rs` runs every fixture in `tests/fixtures/rest/` and checks that the CapabilityStatement matches behaviour:
@@ -22,6 +29,8 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 All of it runs on the SurrealDB memory engine through `oneshot`.
 
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
+
+`tests/authorization.rs` runs the authorization matrix through HTTP: no route without a subject, labels and purpose of use, permissions on every interaction (including a transaction Bundle), facility isolation in reads, writes and history, and break-glass confined to one patient.
 
 `tests/audit.rs` checks:
 - one event per write, with the agent, the entity version, the patient and the purpose;

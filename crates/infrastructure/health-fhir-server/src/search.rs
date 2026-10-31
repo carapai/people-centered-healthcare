@@ -10,11 +10,11 @@ use health_identifiers::ResourceId;
 use health_persistence::Store;
 use serde_json::{Map, json};
 
-use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{fhir_json, prefer, require_json_format};
 use crate::outcome::FhirError;
 use crate::{FhirServer, pairs, resource_type};
+use crate::{access, audit};
 use health_audit::Interaction;
 use health_persistence::Transaction as _;
 
@@ -59,6 +59,7 @@ async fn run(
     };
     let registry = server.store.registry();
     let query = parse_query(&registry, type_name, &search_params, handling)?;
+    let policy = access::search_policy(server, type_name, access::search_patient(&search_params))?;
     for (name, value) in &query.control {
         match name.as_str() {
             "_total" if matches!(value.as_str(), "none" | "estimate" | "accurate") => {}
@@ -70,7 +71,7 @@ async fn run(
         }
     }
     let mut tx = server.store.begin().await?;
-    let page = tx.search(&query, server.policy.as_ref(), after).await?;
+    let page = tx.search(&query, policy.as_ref(), after).await?;
     if audit::read(
         &mut tx,
         Interaction::Search,
