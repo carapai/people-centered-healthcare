@@ -11,12 +11,12 @@ use health_persistence::{
 };
 use serde_json::Value;
 
-use crate::audit;
 use crate::http::{Return, fhir_json, if_match, prefer, require_json_body, version_headers};
 use crate::ops::{self, Attempt, Condition, CreateTarget};
 use crate::outcome::{FhirError, operation_outcome};
 use crate::references;
 use crate::{FhirServer, capability_statement, resource_id, resource_type};
+use crate::{access, audit};
 use health_audit::Interaction;
 
 /// `GET /metadata`.
@@ -45,6 +45,7 @@ pub(crate) async fn read(
     if stored.version.deleted {
         return Err(FhirError::gone());
     }
+    access::readable(&stored.json, not_found)?;
     if audit::read(&mut tx, Interaction::Read, [&stored.json])
         .await
         .map_err(audit::failed)?
@@ -82,6 +83,7 @@ pub(crate) async fn vread(
     if entry.version.deleted {
         return Err(FhirError::gone());
     }
+    access::readable(&entry.json, not_found)?;
     if audit::read(&mut tx, Interaction::Vread, [&entry.json])
         .await
         .map_err(audit::failed)?

@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 10 | 19 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 11 | 22 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 41 of 120 implementation tasks done. Validation spikes open: 3.
+Total: 42 of 123 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -70,3 +70,4 @@ Total: 41 of 120 implementation tasks done. Validation spikes open: 3.
 - 2026-10-31: #61 encrypted logical backup. `health-surrealdb` gains `Connection::export_sql` (the SDK's snapshot-consistent export, on embedded engines) and `import_sql` (run in memory). `health-backup` has `create`: the export plus only-new blobs, each encrypted with XChaCha20-Poly1305 under the node key with role-binding associated data, a checksum manifest, and verification before it returns. It also has `verify`, and `restore`, which verifies first, then imports in memory and returns the blobs. The round-trip fixture restores every table row for row (decimals keep their text) and needs no migration afterwards; the schema has no `set<record>`; corruption, a wrong key, a swapped blob and a tampered manifest are detected and nothing is restored. Phase 2 is complete. Scheduling and retention stay with #78, and central's HTTP export and key escrow with #138.
 - 2026-10-31: #187 the authorization server's state in SurrealDB. Migration `0008_auth` (owned by identity) holds accounts with lockout, hashed codes, sessions, retired refresh hashes, jtis, snapshots and the clock floor. `SurrealTx` has methods for them, and `health_auth::SurrealAuthStore` uses one transaction per operation. A code is taken with `DELETE … RETURN`, so a race redeems it once; refresh rotation is a compare-and-set; `purge` removes expired rows. Tests: the flow survives a restart mid-session; four concurrent redemptions issue tokens once in each of five rounds; concurrent refreshes rotate at most once.
 - 2026-10-31: #188 sign-in at central, in two PRs. In #207, central-server mounts `health-auth` at `/auth`; it answers 503 until the database is migrated and runs over `SurrealAuthStore`, with signing keys from `HEALTH_AUTH_KEYS_FILE` (active key first; rotated-out keys still verify their tokens and stay in `/jwks`). The second PR adds `login_page`, which sends `/authorize` to the client's localized `/sign-in` page with refusals back as `error=refused`; `/api/session` as the first authorized route; and the client's PKCE sign-in (`platform/sign-in.ts`): state and issuer checks, in-memory tokens, refresh before expiry, and sign-out through `/revoke`. The OAuth transaction is the only new storage, allowed by `check-boundaries`, with no clinical data.
+- 2026-10-31: #188 merged (#208). #192 adds the PDP on every FHIR interaction: `FhirServer::with_access_control` requires the request's `Subject` (401 without one, except `/metadata`). Searches run under a per-request `SubjectSearchPolicy` (403 when the type may not be searched); reads, vreads and history are decided per record (a denial is 404); writes are decided on the new resource and the version replaced (403). `tests/authorization.rs` runs the matrix through HTTP. Split out: #209 (resolving the subject at central and mounting `/fhir`), #210 (break-glass over the API) and #211 (a record's facility, and facility isolation in searches).

@@ -2058,10 +2058,12 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "form_urlencoded",
+ "health-access-policy",
  "health-audit",
  "health-fhir-search",
  "health-fhir-validation",
  "health-identifiers",
+ "health-identity-app",
  "health-persistence",
  "health-surrealdb",
  "health-time",
@@ -2140,18 +2142,9 @@ dependencies = [
 name = "health-identity-app"
 version = "0.1.0"
 dependencies = [
- "axum",
  "health-access-policy",
  "health-fhir-search",
- "health-fhir-server",
- "health-surrealdb",
  "health-time",
- "http-body-util",
- "jiff",
- "serde_json",
- "surrealdb",
- "tokio",
- "tower",
 ]
 
 [[package]]

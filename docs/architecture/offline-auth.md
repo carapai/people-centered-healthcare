@@ -63,7 +63,15 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 - **Policy decision point** (#65):
   - `health-access-policy` (domain) decides from permissions (`{Type|*}.{cruds}`), facility isolation, sensitivity labels mapped to programs, purpose of use, and break-glass (one patient, 1 h, `BTG`, no extension, an event for audit and alert).
   - `health-identity-app`'s `SubjectSearchPolicy` turns its search filter into `_security:not=…` inside the database query.
-  - Wiring it into every FHIR request, per subject, is [#192](https://github.com/carapai/people-centered-healthcare/issues/192).
+  - **Every FHIR interaction** (#192): `FhirServer::with_access_control` decides each request for its `Subject`, a request extension the authentication layer inserts. Without one the request is 401; only `/metadata` is open.
+    - Searches run under `SubjectSearchPolicy`, confined to a patient for `patient=` or a `subject=` that names a Patient. A type the subject may not search gets 403.
+    - Reads, vreads and history go through `Pdp::decide` with the record's facility, labels and patient. A denied read is a 404, so the record's existence is not disclosed; type and system history leave out the versions the subject may not read.
+    - Creates, updates and deletes are decided on the resource written and on the version replaced. A denial is 403, and a transaction with one denied entry writes nothing.
+    - A record's facility comes from the `RecordFacility` port. Records do not name their facility yet, so the default treats none as facility-scope.
+    - Follow-ups:
+      - resolving the subject at central and mounting `/fhir` ([#209](https://github.com/carapai/people-centered-healthcare/issues/209));
+      - break-glass over the API, its audit and the in-charge's alert ([#210](https://github.com/carapai/people-centered-healthcare/issues/210));
+      - naming a record's facility, and facility isolation in searches ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);

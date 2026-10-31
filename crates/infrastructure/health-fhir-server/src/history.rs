@@ -10,11 +10,11 @@ use health_surrealdb::{DEFAULT_COUNT, HistoryEntry, HistoryScope};
 use health_time::Timestamp;
 use serde_json::{Map, json};
 
-use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{fhir_json, require_json_format};
 use crate::outcome::FhirError;
 use crate::{FhirServer, etag, pairs, resource_id, resource_type};
+use crate::{access, audit};
 use health_audit::Interaction;
 
 struct Params {
@@ -90,14 +90,20 @@ async fn respond(
 ) -> Result<Response, FhirError> {
     let params = params(query)?;
     let mut tx = server.store.begin().await?;
-    if let HistoryScope::Instance(resource_type, id) = &scope
-        && tx.read(resource_type, *id).await?.is_none()
-    {
-        return Err(FhirError::not_found(format!(
-            "{resource_type}/{id} is not known"
-        )));
+    match &scope {
+        HistoryScope::Instance(resource_type, id) => {
+            let not_found = || FhirError::not_found(format!("{resource_type}/{id} is not known"));
+            let head = tx.read(resource_type, *id).await?.ok_or_else(not_found)?;
+            access::readable(&head.json, not_found)?;
+        }
+        HistoryScope::Type(resource_type) => {
+            access::search_policy(server, resource_type.as_str(), None)?;
+        }
+        HistoryScope::System => {}
     }
-    let entries = tx.history(&scope, params.since, params.count).await?;
+    let mut entries = tx.history(&scope, params.since, params.count).await?;
+    // Versions the subject may not read are left out (a page may come back short).
+    entries.retain(|e| access::may_read(&e.json));
     let served = entries
         .iter()
         .filter(|e| !e.version.deleted)

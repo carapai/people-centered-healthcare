@@ -52,18 +52,6 @@ fn current() -> Option<Scope> {
     SCOPE.try_with(Clone::clone).ok()
 }
 
-/// The patient a resource is about: itself, or its `subject` / `patient` when that is a Patient.
-fn patient_of(json: &Value) -> Option<String> {
-    if json["resourceType"] == "Patient" {
-        return json["id"].as_str().map(|id| format!("Patient/{id}"));
-    }
-    ["subject", "patient"]
-        .iter()
-        .filter_map(|field| json[*field]["reference"].as_str())
-        .find(|r| r.starts_with("Patient/"))
-        .map(str::to_owned)
-}
-
 async fn append<T: Transaction>(
     tx: &mut T,
     scope: &Scope,
@@ -71,7 +59,7 @@ async fn append<T: Transaction>(
     records: &[Value],
 ) -> Result<(), Attempt> {
     let entities: Vec<Entity> = records.iter().filter_map(Entity::of).collect();
-    let patient = records.iter().find_map(patient_of);
+    let patient = records.iter().find_map(crate::access::patient_of);
     let event = scope.auditor.event(
         &scope.agent,
         interaction,

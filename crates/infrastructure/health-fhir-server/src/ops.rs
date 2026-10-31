@@ -14,9 +14,10 @@ use health_persistence::{
 };
 use health_surrealdb::SurrealTx;
 
-use crate::audit;
 use crate::outcome::FhirError;
 use crate::{FhirServer, pairs};
+use crate::{access, audit};
+use health_access_policy::Interaction as Decide;
 use health_audit::Interaction;
 
 /// One attempt of a use case: a write-write conflict reruns it, anything else ends it.
@@ -98,8 +99,13 @@ async fn matches(
     tx: &mut SurrealTx,
     condition: &Condition,
 ) -> Result<Option<StoredResource>, Attempt> {
+    let policy = access::search_policy(
+        server,
+        condition.query.resource_type.as_str(),
+        access::search_patient(&condition.pairs),
+    )?;
     let page = tx
-        .search(&condition.query, server.policy.as_ref(), None)
+        .search(&condition.query, policy.as_ref(), None)
         .await
         .map_err(|e| Attempt::Fail(e.into()))?;
     let total = page.total.unwrap_or(page.resources.len());
@@ -232,6 +238,26 @@ pub(crate) async fn write(
     precondition: Precondition,
 ) -> Result<(VersionMeta, RawJson), Attempt> {
     audit::writable(resource_type.as_str())?;
+    let interaction = if precondition == Precondition::MustNotExist {
+        Interaction::Create
+    } else {
+        Interaction::Update
+    };
+    if interaction == Interaction::Update
+        && let Some(head) = tx.read(resource_type, id).await?
+        && !head.version.deleted
+    {
+        // The version replaced must be updatable too: another facility's record stays theirs.
+        access::permitted(Decide::Update, &head.json)?;
+    }
+    access::permitted(
+        if interaction == Interaction::Create {
+            Decide::Create
+        } else {
+            Decide::Update
+        },
+        json,
+    )?;
     let version = tx
         .write(WriteRequest {
             resource_type: resource_type.clone(),
@@ -244,11 +270,6 @@ pub(crate) async fn write(
     let stored = tx.read(resource_type, id).await?.ok_or_else(|| {
         Attempt::Fail(StoreError::Unavailable("written head is missing".into()).into())
     })?;
-    let interaction = if precondition == Precondition::MustNotExist {
-        Interaction::Create
-    } else {
-        Interaction::Update
-    };
     audit::written(tx, interaction, &stored.json).await?;
     Ok((version, stored.json))
 }
@@ -268,6 +289,7 @@ pub(crate) async fn delete(
     if head.version.deleted {
         return Ok(None);
     }
+    access::permitted(Decide::Delete, &head.json)?;
     let version = tx.delete(resource_type, id, OpId::new(), expected).await?;
     audit::written(tx, Interaction::Delete, &head.json).await?;
     Ok(Some(version))
@@ -284,6 +306,7 @@ pub(crate) async fn conditional_delete(
     audit::writable(resource_type.as_str())?;
     match matches(server, tx, condition).await? {
         Some(matched) => {
+            access::permitted(Decide::Delete, &matched.json)?;
             let version = tx
                 .delete(resource_type, matched.id, OpId::new(), expected)
                 .await?;

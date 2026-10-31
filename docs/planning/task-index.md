@@ -47,7 +47,10 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#189](https://github.com/carapai/people-centered-healthcare/issues/189) | Check new passwords against a breached-password list | 3 | #63 |  |
 | [#192](https://github.com/carapai/people-centered-healthcare/issues/192) | Apply the policy decision point to every FHIR interaction | 3 | #65, #188 |  |
 | [#196](https://github.com/carapai/people-centered-healthcare/issues/196) | Store Provenance with its target's Owner | 3 | #68 |  |
-| [#197](https://github.com/carapai/people-centered-healthcare/issues/197) | Expose the client registry's link, unlink and $merge operations over FHIR | 3 | #68, #192 |  |
+| [#209](https://github.com/carapai/people-centered-healthcare/issues/209) | Resolve each request's subject at central and mount the FHIR API behind it | 3 | #192 |  |
+| [#210](https://github.com/carapai/people-centered-healthcare/issues/210) | Break-glass over the API: the request endpoint, stored grants, audit obligations and the in-charge alert | 3 | #192, #209 |  |
+| [#211](https://github.com/carapai/people-centered-healthcare/issues/211) | Name a record's facility and isolate facility-scope records in searches | 3 | #192 |  |
+| [#197](https://github.com/carapai/people-centered-healthcare/issues/197) | Expose the client registry's link, unlink and $merge operations over FHIR | 3 | #68, #192, #209 |  |
 | [#199](https://github.com/carapai/people-centered-healthcare/issues/199) | Store blocking keys and block counts, and serve Patient/$match | 3 | #69 |  |
 | [#200](https://github.com/carapai/people-centered-healthcare/issues/200) | Load-test patient matching at 45M on central-class hardware | 3 | #199 | yes |
 | [#203](https://github.com/carapai/people-centered-healthcare/issues/203) | Build the registry review screen | 3 | #70, #197 |  |
