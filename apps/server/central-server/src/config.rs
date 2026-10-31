@@ -43,6 +43,9 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_AUTH_REDIRECT_URIS`: the web client's redirect URIs, comma-separated. Required
     /// with an issuer.
     pub(crate) redirect_uris: Vec<String>,
+    /// `HEALTH_AUTH_LOGIN_PAGE`: the web client's sign-in page (e.g. `/sign-in`). Optional:
+    /// without it the authorization server shows its own minimal form.
+    pub(crate) login_page: Option<String>,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -89,6 +92,7 @@ impl Config {
                         .filter(|u| !u.is_empty())
                         .map(str::to_owned)
                         .collect(),
+                    login_page: get("HEALTH_AUTH_LOGIN_PAGE"),
                 }),
             },
         })

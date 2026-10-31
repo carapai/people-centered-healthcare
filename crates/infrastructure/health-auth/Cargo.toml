@@ -14,7 +14,7 @@ workspace = true
 
 [dependencies]
 argon2 = { workspace = true }
-axum = { workspace = true, features = ["form", "query"] }
+axum = { workspace = true, features = ["form", "original-uri", "query"] }
 base64 = { workspace = true }
 form_urlencoded = { workspace = true }
 health-identity = { workspace = true }

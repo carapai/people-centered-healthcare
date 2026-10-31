@@ -19,6 +19,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_AUTH_PEPPER_FILE` | none | The Argon2id pepper |
 | `HEALTH_AUTH_CLIENT_ID` | `health-client` | The web client |
 | `HEALTH_AUTH_REDIRECT_URIS` | required with an issuer | The web client's redirect URIs, comma-separated |
+| `HEALTH_AUTH_LOGIN_PAGE` | none | The web client's sign-in page, e.g. `/sign-in`; without it the authorization server shows its own minimal form |
 
 ## Startup
 
@@ -29,7 +30,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 
 ## Sign-in
 
-- **Routes:** `/auth` serves discovery, `/jwks`, `/authorize`, `/token` and `/revoke` (offline-auth.md).
+- **Routes:** `/auth` serves discovery, `/jwks`, `/authorize`, `/token` and `/revoke` (offline-auth.md). `/api/session` is the first authorized route: it answers 401 without a valid access token, and the signed-in principal with one.
 - **Key rotation:** add a new key as the first line of the keys file and keep the old one below it until its tokens have expired. Both keys are published in `/jwks`, and tokens signed with the old key still verify.
 - **Key storage:** keys and the pepper are read from secret files. Holding them in central KMS is part of central's key custody ([#138](https://github.com/carapai/people-centered-healthcare/issues/138)).
 - **The FHIR routes** mount behind `AccessVerifier` once the policy decision point is wired per request ([#192](https://github.com/carapai/people-centered-healthcare/issues/192)).

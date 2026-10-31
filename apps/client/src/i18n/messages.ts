@@ -8,4 +8,18 @@ export const messages = defineMessages({
   modeEdge: { id: 'app.status.mode.edge', defaultMessage: 'Facility edge', description: 'Status area: the client talks to its facility edge server' },
   modeTauri: { id: 'app.status.mode.tauri', defaultMessage: 'Local runtime', description: 'Status area: the desktop app runs its own local runtime' },
   syncPending: { id: 'app.status.syncPending', defaultMessage: 'Sync status pending', description: 'Status area: sync detail is not available yet' },
+  signInTitle: { id: 'app.signIn.title', defaultMessage: 'Sign in', description: 'Sign-in page heading' },
+  signInUsername: { id: 'app.signIn.username', defaultMessage: 'Username', description: 'Sign-in page: username field label' },
+  signInPassword: { id: 'app.signIn.password', defaultMessage: 'Password', description: 'Sign-in page: password field label' },
+  signInSubmit: { id: 'app.signIn.submit', defaultMessage: 'Sign in', description: 'Sign-in page: submit button' },
+  signInRefused: {
+    id: 'app.signIn.refused',
+    defaultMessage: 'The username or password is incorrect, or the account is locked.',
+    description: 'Sign-in page: one message for every refusal, so it does not reveal whether an account exists',
+  },
+  signInStart: { id: 'app.signIn.start', defaultMessage: 'Sign in', description: 'Home: button that starts sign-in' },
+  signOut: { id: 'app.signIn.signOut', defaultMessage: 'Sign out', description: 'Home: button that signs the user out' },
+  signedIn: { id: 'app.signIn.signedIn', defaultMessage: 'Signed in', description: 'Home: shown once the session is confirmed by the server' },
+  signInCompleting: { id: 'app.signIn.completing', defaultMessage: 'Signing you in…', description: 'Callback page while the code is redeemed' },
+  signInFailed: { id: 'app.signIn.failed', defaultMessage: 'Sign-in could not be completed. Please sign in again.', description: 'Callback page when sign-in fails' },
 })

@@ -23,8 +23,12 @@ const storageApis: [RegExp, string][] = [
   [/\bcaches\.open\b/, 'the Cache API'],
 ]
 
-/** Files allowed to use browser storage: user-keyed UI preferences only. */
-const storageAllowlist = new Set(['platform/preferences.ts'])
+/**
+ * Files allowed to use browser storage: user-keyed UI preferences, and the OAuth transaction
+ * (PKCE verifier and state) kept across the sign-in redirect, which is removed at the callback.
+ * Neither is clinical data.
+ */
+const storageAllowlist = new Set(['platform/preferences.ts', 'platform/sign-in.ts'])
 
 /** Code allowed to know the runtime: the composition boundary and the status area. */
 function mayCheckRuntime(file: string): boolean {

@@ -67,7 +67,10 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);
-  - mounting it, with key storage and the web client's sign-in ([#188](https://github.com/carapai/people-centered-healthcare/issues/188));
+  - **mounting it, with key storage and the web client's sign-in** (#188, done):
+    - central-server mounts it at `/auth`, with rotating keys from a secret file;
+    - `/api/session` is an authorized route;
+    - the web client signs in with PKCE through its own sign-in page;
   - the breached-password list ([#189](https://github.com/carapai/people-centered-healthcare/issues/189)).
 
 ## Authorization model

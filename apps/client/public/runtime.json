@@ -1,4 +1,5 @@
 {
   "mode": "central",
-  "apiBase": "/api"
+  "apiBase": "/api",
+  "auth": { "issuer": "/auth", "clientId": "health-client", "redirectPath": "/callback" }
 }

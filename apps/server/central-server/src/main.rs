@@ -154,6 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     id: files.client_id.clone(),
                     redirect_uris: files.redirect_uris.clone(),
                 }],
+                login_page: files.login_page.clone(),
             };
             Some((settings, Arc::new(OnceCell::new())))
         }

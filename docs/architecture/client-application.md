@@ -148,6 +148,13 @@ flowchart TD
   3. show the lock screen or the next user.
 - **Logout** clears everything except preferences and the device's DPoP key.
 - **In code:** `memorySession()` keeps the token in a closure. `session.end('logout' | 'lock')` forgets the token, and `connectQueryCache` clears the Query cache on either.
+- **Sign-in** (`src/platform/sign-in.ts`, #188): the authorization code flow with PKCE S256 against the node's authorization server, configured by `runtime.json`'s `auth` (`issuer`, `clientId`, `redirectPath`).
+  - **The redirect:** `start` leaves for `/authorize`, keeping the PKCE verifier and `state` in sessionStorage. That is the only storage besides preferences that `check-boundaries` allows, it holds no clinical data, and it is removed at the callback.
+  - **The callback:** `/callback` checks `state` and `iss` (RFC 9207), then redeems the code.
+  - **The sign-in page:** `/sign-in` is the localized page the server sends the browser to (`HEALTH_AUTH_LOGIN_PAGE`). It posts the credentials straight to `/authorize` as a plain form, so the password never passes through application code, and comes back with `error=refused` on any refusal.
+  - **Tokens:** the access token lives in `memorySession` and the refresh token in a closure. A refresh runs a minute before expiry, and a failed refresh signs out locally.
+  - **Sign-out:** revokes at `/revoke` and ends the session, which clears the Query cache.
+  - **Scope:** central only for now. Edges sign in with DPoP-bound tokens once devices are enrolled (#74, #75).
 
 ## Forms (ADR 0038)
 

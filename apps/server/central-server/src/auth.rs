@@ -28,6 +28,8 @@ pub(crate) struct AuthSettings {
     pub(crate) pepper: Vec<u8>,
     /// The registered clients.
     pub(crate) clients: Vec<Client>,
+    /// The web client's sign-in page, if it fronts `/authorize`.
+    pub(crate) login_page: Option<String>,
 }
 
 impl std::fmt::Debug for AuthSettings {
@@ -84,10 +86,15 @@ pub(crate) fn routes(
     );
     let mut config = AuthConfig::new(settings.issuer.as_str(), "central", false);
     config.clients.clone_from(&settings.clients);
-    Ok(AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock)).router())
+    config.login_page.clone_from(&settings.login_page);
+    let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
+    Ok(Router::new()
+        .nest("/auth", server.router())
+        .nest("/api", server.session_route()))
 }
 
-/// `/auth`, forwarding to the routes once they are built, and 503 until then.
+/// `/auth` and `/api/session`, forwarded (paths intact) to the routes once they are built, and
+/// 503 until then.
 pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
     let service = tower::service_fn(move |request: Request<Body>| {
         let ready = Arc::clone(&ready);
@@ -99,7 +106,9 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
             Ok::<Response, Infallible>(response)
         }
     });
-    Router::new().nest_service("/auth", service)
+    Router::new()
+        .route_service("/auth/{*rest}", service.clone())
+        .route_service("/api/session", service)
 }
 
 #[cfg(test)]
@@ -118,6 +127,7 @@ mod tests {
                 id: "health-client".into(),
                 redirect_uris: vec!["https://central.test/callback".into()],
             }],
+            login_page: Some("/sign-in".into()),
         }
     }
 
@@ -163,6 +173,7 @@ mod tests {
         );
         // Both keys are published: tokens signed before a rotation stay verifiable.
         let jwks = app
+            .clone()
             .oneshot(
                 Request::get("/auth/jwks")
                     .body(Body::empty())
@@ -174,6 +185,29 @@ mod tests {
             serde_json::from_slice(&jwks.into_body().collect().await.expect("body").to_bytes())
                 .expect("json");
         assert_eq!(keys["keys"].as_array().map(Vec::len), Some(2));
+        // The authorized route answers 401 without a token, and /authorize sends the browser to
+        // the web client's sign-in page.
+        let session = app
+            .clone()
+            .oneshot(
+                Request::get("/api/session")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(session.status(), StatusCode::UNAUTHORIZED);
+        let authorize = app
+            .oneshot(Request::get("/auth/authorize?response_type=code&client_id=health-client&redirect_uri=https%3A%2F%2Fcentral.test%2Fcallback&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256").body(Body::empty()).expect("request"))
+            .await
+            .expect("response");
+        assert_eq!(authorize.status(), StatusCode::SEE_OTHER);
+        assert!(
+            authorize.headers()["location"]
+                .to_str()
+                .expect("location")
+                .starts_with("/sign-in?")
+        );
     }
 
     #[test]
