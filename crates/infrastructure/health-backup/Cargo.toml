@@ -1,0 +1,33 @@
+[package]
+name = "health-backup"
+description = "Encrypted logical backups: a snapshot-consistent export, the content-addressed blobs, a checksum manifest, verification and restore (backup-and-recovery.md, ADR 0046)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+chacha20poly1305 = { workspace = true }
+health-files = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-client-registry = { workspace = true }
+health-fhir-search = { workspace = true }
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+jiff = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tempfile = { workspace = true }
+tokio = { workspace = true }

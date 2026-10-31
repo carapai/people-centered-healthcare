@@ -16,6 +16,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
   - `SurrealStore::recount_blocks()` recomputes `block_count` in one transaction. It is the hourly background job, so counts are never written in a write transaction.
 - **Inbound** (migration `0005_inbound`): `SurrealTx::put_inbound`, `inbound`, `inbound_pending`, `resolve_inbound` and `purge_inbound` hold the integration module's Inbound Dead Letter and quarantine.
 - **Registry review** (migration `0007_registry_review`): `SurrealTx` implements `health_client_registry::ReviewQueue`, storing each item's details as JSON. Recording a decision is a compare-and-set on `decision = NONE`.
+- **Export and import:** `Connection::export_sql` returns the snapshot-consistent SurrealQL export (embedded engines). `import_sql` runs one in memory into an empty database. `health-backup` encrypts and restores them.
 - **`ownership`** is the ownership registry: one default Owner per head table, plus category partitions (resource-ownership.md § In code).
 - **`migrate(&Connection, MIGRATIONS)`** creates the `_migration` ledger, refuses modified, unknown or out-of-order migrations before changing anything, and then applies each pending migration in its own transaction with its ledger row.
 - **Closing:** SDK 3.3.5 has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.

@@ -15,6 +15,7 @@ members = [
     "crates/application/health-registries-app",
     "crates/infrastructure/health-audit",
     "crates/infrastructure/health-auth",
+    "crates/infrastructure/health-backup",
     "crates/infrastructure/health-fhir-server",
     "crates/infrastructure/health-files",
     "crates/infrastructure/health-http",
@@ -41,6 +42,7 @@ publish = false
 health-access-policy = { path = "crates/domains/health-access-policy" }
 health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
+health-backup = { path = "crates/infrastructure/health-backup" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
@@ -65,9 +67,11 @@ async-trait = "0.1.92"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
 base64 = "0.22.1"
 cargo_metadata = "0.23.1"
+chacha20poly1305 = "0.10.1"
 # The adopted R5 model crate, exactly pinned (ADR 0050); only health-fhir-models may use it.
 fhir-r5 = "=4.2.3"
 form_urlencoded = "1.2.2"
+futures-util = { version = "0.3.34", default-features = false }
 http-body-util = "0.1.3"
 jiff = { version = "0.2.38", features = ["serde"] }
 # Patched for decimal-exact evaluation (ADR 0052); see third_party/octofhir-fhirpath.

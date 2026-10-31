@@ -12,6 +12,15 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
 - **Protection:** every backup is encrypted with a per-node backup key. The key is wrapped and escrowed in central KMS (custody in [deployment.md](deployment.md), ADR 0046).
 - **Integrity:** every backup is verified after it is written, using its checksum and manifest. CI runs an export→import round-trip test on representative data, and the schema avoids `set<record>` values because of SurrealDB bug #7621.
 
+### In code
+
+- **`health-backup`** handles the backup itself ([README](../../crates/infrastructure/health-backup/README.md)):
+  - `create` exports the database (`Connection::export_sql`) and encrypts it with XChaCha20-Poly1305 under the node key. It adds only new blobs, each encrypted under its hash, writes a checksum manifest, and verifies the backup before returning.
+  - `verify` checks every checksum, decryption and blob hash.
+  - `restore` verifies first, imports the export in memory into an empty database, and returns the blobs to the store.
+- **CI** runs the round-trip fixture and the `set<record>` check.
+- **Not here:** the schedule, retention and the weekly test restore are [#78](https://github.com/carapai/people-centered-healthcare/issues/78). Central's export over HTTP and key escrow are [#138](https://github.com/carapai/people-centered-healthcare/issues/138).
+
 ## Restore and failover
 
 - **No hot standby and no automatic failover** in v1 (ADR 0007).

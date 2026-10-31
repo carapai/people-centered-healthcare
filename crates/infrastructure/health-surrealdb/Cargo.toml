@@ -20,6 +20,7 @@ remote = ["surrealdb/protocol-ws", "surrealdb/rustls"]
 memory = ["surrealdb/kv-mem"]
 
 [dependencies]
+futures-util = { workspace = true }
 health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
 health-identifiers = { workspace = true }
