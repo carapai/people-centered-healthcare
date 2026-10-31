@@ -148,6 +148,7 @@ flowchart TD
   3. show the lock screen or the next user.
 - **Logout** clears everything except preferences and the device's DPoP key.
 - **In code:** `memorySession()` keeps the token in a closure. `session.end('logout' | 'lock')` forgets the token, and `connectQueryCache` clears the Query cache on either.
+- **Registry review** (`src/features/registry-review/`, #203): the review queue at `/registry/reviews`. Possible duplicates are compared side by side, field by field, and disagreeing values are shown with their trust and source. Decisions go to `/api/registry/reviews`.
 - **Registration** (`src/features/registration/`, #71): reception's "did you mean" screen at `/registration`. It never creates a duplicate without the clerk's explicit confirmation, which the server enforces too. Candidates are chosen by keyboard in a DataTable.
 - **FHIR base:** `runtime.json`'s optional `fhirBase` (central: `/fhir`) puts FHIR beside the API. Without it, FHIR is `{apiBase}/fhir`. The optional `ninSystem` names the national ID system.
 - **Break-glass screens** (`src/features/break-glass/`, #218): the in-charge's alert list (`/break-glass/alerts`) and the privacy officer's review queue (`/break-glass/reviews`), as DataTables keyed by the worklists `/api/events` hints. An open list therefore refreshes when a grant is made or reviewed.

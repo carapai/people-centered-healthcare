@@ -15,6 +15,7 @@ import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
+import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
   path: '/break-glass/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegistryReviewsRoute = RegistryReviewsRouteImport.update({
+  id: '/registry/reviews',
+  path: '/registry/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/registry/reviews': typeof RegistryReviewsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/registry/reviews': typeof RegistryReviewsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/registry/reviews': typeof RegistryReviewsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/registry/reviews'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/registry/reviews'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/registry/reviews'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
+  RegistryReviewsRoute: typeof RegistryReviewsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BreakGlassReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/registry/reviews': {
+      id: '/registry/reviews'
+      path: '/registry/reviews'
+      fullPath: '/registry/reviews'
+      preLoaderRoute: typeof RegistryReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
+  RegistryReviewsRoute: RegistryReviewsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

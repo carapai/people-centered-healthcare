@@ -77,6 +77,7 @@ flowchart LR
   - **Merges:** a merge is previewed, then approved by that reviewer. It is for records of the reviewer's own facility only (403): the session's facility code is the managing Organization's id or one of its identifiers. Records of two facilities are refused (422).
   - **Audit and review:** every version written is audited in its transaction, naming the reviewer, and a link's survivorship disagreements go to the review queue.
   - Central serves them when `HEALTH_REGISTRY_NIN_SYSTEM` is set.
+- **Review over HTTP** (#203): `/api/registry/reviews` lists pending items, oldest first and flagged overdue after 7 days, and takes each decision (`same-person`, `different-people`, `keep-current`, `take-incoming`), audited. The web client's queue is at `/registry/reviews`.
 - **Registration** (#226): `POST /Patient/$register` writes nothing until the clerk confirms the patient is none of the candidates. Then it creates the provisional source Patient with a facility MRN (`{facility}-{node}-{sequence}`, ADR 0014) and runs registration matching. Edges call central first and fall back to their own scope when the edge server exists.
 - **ECID:** 11 random characters plus the check character.
 - **Matching** (#69): `health_client_registry::matching` holds the rules, the deterministic layer, the five blocking keys with the stop-list plan, and Fellegi–Sunter scoring with grades. Double Metaphone comes from `rphonetic`, through a port.
