@@ -21,6 +21,7 @@ health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
 health-http = { workspace = true }
+health-identifiers = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
 health-registries-app = { workspace = true }

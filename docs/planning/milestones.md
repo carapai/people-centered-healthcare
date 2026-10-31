@@ -53,6 +53,7 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Implement source Patients, golden records and links](https://github.com/carapai/people-centered-healthcare/issues/68)
 - [Implement the matching engine and Patient/$match](https://github.com/carapai/people-centered-healthcare/issues/69)
 - [Build the registry review queue](https://github.com/carapai/people-centered-healthcare/issues/70)
+- [Register a patient: MRN minting, the provisional source Patient and registration matching](https://github.com/carapai/people-centered-healthcare/issues/226)
 - [Build the reception registration screen](https://github.com/carapai/people-centered-healthcare/issues/71)
 - [Persist the authorization server's state in SurrealDB](https://github.com/carapai/people-centered-healthcare/issues/187)
 - [Mount the authorization server in central-server, with its signing key and the client sign-in flow](https://github.com/carapai/people-centered-healthcare/issues/188)

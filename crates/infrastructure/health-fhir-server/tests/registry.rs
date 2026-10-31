@@ -442,3 +442,135 @@ async fn match_returns_ranked_candidates_the_subject_may_see() {
     let (status, _) = send(&anonymous, "POST", "/Patient/$match", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+fn registration_app(store: &SurrealStore, subject: &Subject) -> Router {
+    use health_registries_app::register::MrnSettings;
+    FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted))
+        .with_access_control(Pdp::default(), Arc::new(NoFacilityScope))
+        .with_audit(Auditor::new("test central", Vec::new()))
+        .with_client_registry(config(), rules())
+        .with_registration(MrnSettings {
+            node: "C1".parse().expect("node"),
+            format: health_identifiers::NumberFormat {
+                padding: 6,
+                ..health_identifiers::NumberFormat::default()
+            },
+            system: "urn:health:mrn".into(),
+        })
+        .router()
+        .layer(Extension(subject.clone()))
+}
+
+fn registration(patient: Value, confirmed_new: bool) -> Value {
+    json!({ "resourceType": "Parameters", "parameter": [
+        { "name": "resource", "resource": patient },
+        { "name": "confirmedNew", "valueBoolean": confirmed_new },
+    ] })
+}
+
+fn output<'a>(parameters: &'a Value, name: &str) -> &'a Value {
+    parameters["parameter"]
+        .as_array()
+        .and_then(|p| p.iter().find(|p| p["name"] == name))
+        .unwrap_or(&Value::Null)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn reception_registers_only_after_the_clerk_rules_out_the_candidates() {
+    let store = store().await;
+    let clerk = subject("clerk-1", "KAM013", &["Patient.crs"]);
+    let app = registration_app(&store, &clerk);
+    let grace = json!({
+        "resourceType": "Patient",
+        "meta": { "tag": [{ "system": "urn:health:registry:trust", "code": "staff-entered" }] },
+        "identifier": [{ "system": NIN, "value": "CF12345678ABCD" }],
+        "name": [{ "family": "Nakato", "given": ["Grace"] }],
+        "gender": "female",
+        "birthDate": "1990-04-02",
+    });
+
+    // Nobody like her yet: registered at once, with the facility's first MRN.
+    let (status, first) = send(
+        &app,
+        "POST",
+        "/Patient/$register",
+        Some(registration(grace.clone(), false)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{first}");
+    assert_eq!(output(&first, "mrn")["valueString"], "KAM013-C1-000001");
+    assert_eq!(output(&first, "outcome")["valueCode"], "new-identity");
+    let id = output(&first, "patient")["valueReference"]["reference"]
+        .as_str()
+        .and_then(|r| r.strip_prefix("Patient/"))
+        .expect("id")
+        .to_owned();
+    let stored = patient(&store, &id).await;
+    // Registered provisional; at central matching ran at once and linked it to its new golden
+    // record, which reconciles it (no longer provisional).
+    assert_eq!(stored["link"][0]["type"], "refer", "{stored}");
+    assert!(
+        stored["identifier"]
+            .to_string()
+            .contains("urn:health:mrn/KAM013"),
+        "{stored}"
+    );
+
+    // The same person again: the candidates come back and nothing is written.
+    let (status, again) = send(
+        &app,
+        "POST",
+        "/Patient/$register",
+        Some(registration(grace.clone(), false)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{again}");
+    let candidates = &output(&again, "candidates")["resource"];
+    assert_eq!(candidates["resourceType"], "Bundle");
+    assert!(
+        candidates["entry"].to_string().contains(&id),
+        "{candidates}"
+    );
+
+    // Only the clerk's confirmation creates another record, with the next MRN.
+    let (status, confirmed) = send(
+        &app,
+        "POST",
+        "/Patient/$register",
+        Some(registration(grace, true)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{confirmed}");
+    assert_eq!(output(&confirmed, "mrn")["valueString"], "KAM013-C1-000002");
+
+    // Too little to match on: the clerk is sent to the manual search first.
+    let (status, thin) = send(
+        &app,
+        "POST",
+        "/Patient/$register",
+        Some(registration(
+            json!({ "resourceType": "Patient", "gender": "male" }),
+            false,
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{thin}");
+    assert_eq!(
+        output(&thin, "candidates")["resource"]["issue"][0]["code"],
+        "incomplete"
+    );
+
+    // Registration needs Patient create.
+    let viewer = subject("viewer-1", "KAM013", &["Patient.rs"]);
+    let (status, _) = send(
+        &registration_app(&store, &viewer),
+        "POST",
+        "/Patient/$register",
+        Some(registration(
+            json!({ "resourceType": "Patient", "gender": "male" }),
+            true,
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

@@ -180,7 +180,25 @@ impl FhirServer {
         config: health_registries_app::fhir::RegistryConfig,
         rules: health_client_registry::matching::MatchingRules,
     ) -> Self {
-        self.registry = Some(Arc::new(registry::RegistrySettings { config, rules }));
+        self.registry = Some(Arc::new(registry::RegistrySettings {
+            config,
+            rules,
+            mrn: None,
+        }));
+        self
+    }
+
+    /// This server, serving reception's `Patient/$register`, minting MRNs with `mrn` (ADR 0014).
+    /// Call after [`with_client_registry`](Self::with_client_registry).
+    #[must_use]
+    pub fn with_registration(mut self, mrn: health_registries_app::register::MrnSettings) -> Self {
+        if let Some(settings) = self.registry.take() {
+            self.registry = Some(Arc::new(registry::RegistrySettings {
+                config: settings.config.clone(),
+                rules: settings.rules.clone(),
+                mrn: Some(mrn),
+            }));
+        }
         self
     }
 
@@ -200,6 +218,7 @@ impl FhirServer {
                     .delete(conditional::delete),
             )
             .route("/Patient/$match", post(registry::matches))
+            .route("/Patient/$register", post(registry::register))
             .route("/Patient/$merge", post(registry::merge))
             .route("/Patient/{id}/$link", post(registry::link))
             .route("/Patient/{id}/$unlink", post(registry::unlink))

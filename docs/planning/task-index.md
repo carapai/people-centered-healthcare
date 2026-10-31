@@ -41,7 +41,8 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#68](https://github.com/carapai/people-centered-healthcare/issues/68) | Implement source Patients, golden records and links | 3 | #58, #65 |  |
 | [#69](https://github.com/carapai/people-centered-healthcare/issues/69) | Implement the matching engine and Patient/$match | 3 | #68, #51, #37 |  |
 | [#70](https://github.com/carapai/people-centered-healthcare/issues/70) | Build the registry review queue | 3 | #69 |  |
-| [#71](https://github.com/carapai/people-centered-healthcare/issues/71) | Build the reception registration screen | 3 | #62, #69, #45 |  |
+| [#226](https://github.com/carapai/people-centered-healthcare/issues/226) | Register a patient: MRN minting, the provisional source Patient and registration matching | 3 | #69 |  |
+| [#71](https://github.com/carapai/people-centered-healthcare/issues/71) | Build the reception registration screen | 3 | #62, #69, #45, #226 |  |
 | [#187](https://github.com/carapai/people-centered-healthcare/issues/187) | Persist the authorization server's state in SurrealDB | 3 | #63 |  |
 | [#188](https://github.com/carapai/people-centered-healthcare/issues/188) | Mount the authorization server in central-server, with its signing key and the client sign-in flow | 3 | #63 |  |
 | [#189](https://github.com/carapai/people-centered-healthcare/issues/189) | Check new passwords against a breached-password list | 3 | #63 |  |

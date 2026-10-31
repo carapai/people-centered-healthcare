@@ -15,6 +15,7 @@
 
 pub mod fhir;
 pub mod matching;
+pub mod register;
 pub mod review;
 
 use std::future::Future;
@@ -182,7 +183,7 @@ where
         Ok((stored, json))
     }
 
-    async fn write(
+    pub(crate) async fn write(
         &self,
         tx: &mut S::Tx,
         actor: &str,

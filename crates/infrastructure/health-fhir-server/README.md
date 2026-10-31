@@ -21,7 +21,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `RecordFacility` finds a facility-scope record's facility. `FacilityTag` (ADR 0057) reads the `urn:health:facility` tag on the facility-scope types; `NoFacilityScope` treats no record as facility-scope (tests).
   - **Stamping (ADR 0057):** on create, a facility-scope record gets the session's facility tag. A tag naming another facility is 403, and an update keeps the facility of the version it replaces.
 
-- **Client registry (#197, #216):** `with_client_registry(RegistryConfig, MatchingRules)` serves `POST /Patient/$match` to anyone who may search Patients. Candidates they may not see are left out, and so is their count. It also serves the reviewer operations `POST /Patient/$merge` (preview, then the reviewer's approval), `POST /Patient/{id}/$link` and `POST /Patient/{id}/$unlink` (patient-identity.md).
+- **Client registry (#197, #216):** `with_client_registry(RegistryConfig, MatchingRules)` serves `POST /Patient/$match` to anyone who may search Patients. Candidates they may not see are left out, and so is their count. With `with_registration(MrnSettings)` it serves reception's `POST /Patient/$register` (`resource`, `confirmedNew`) to anyone who may create Patients. Until the clerk confirms, it answers with the candidates the subject may see and writes nothing. Then it creates the provisional source Patient with a facility MRN and runs registration matching. It also serves the reviewer operations `POST /Patient/$merge` (preview, then the reviewer's approval), `POST /Patient/{id}/$link` and `POST /Patient/{id}/$unlink` (patient-identity.md).
   - The reviewer is the request's `Subject`: without one the answer is 401, and without `registry.review` and `Patient` update it is 403.
   - A merge is for records of the reviewer's facility only.
   - Each version written is audited in its transaction, through `AuditTrail` over the server's `Auditor`, naming the reviewer.
@@ -37,7 +37,7 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
-`tests/registry.rs` covers the registry operations: `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+`tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
 
 `tests/facility.rs` covers the facility tag: stamped on create, refused for another facility, kept through updates, and facility-isolated searches at an edge and at central.
 

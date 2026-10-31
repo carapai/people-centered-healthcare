@@ -632,6 +632,7 @@ dependencies = [
  "health-fhir-search",
  "health-fhir-server",
  "health-http",
+ "health-identifiers",
  "health-identity",
  "health-observability",
  "health-registries-app",
