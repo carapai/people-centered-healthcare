@@ -4,7 +4,7 @@ _Update after each task (AGENTS.md process step 4)._
 
 | Phase | Done | Total |
 |---|---|---|
-| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 10 | 12 |
+| [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 14 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 0 | 10 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 27 of 111 implementation tasks done. Validation spikes open: 3.
+Total: 28 of 111 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -56,3 +56,4 @@ Total: 27 of 111 implementation tasks done. Validation spikes open: 3.
 - 2026-10-30: #46 DataTable in `@health/design-system`: TanStack Table 9 (sorting, column visibility) and Virtual 3, an ARIA grid with the APG keyboard model (arrows, Home/End, Ctrl+Home/End, PageUp/PageDown, Enter/Space to sort, one tab stop; the focused row stays rendered), a Columns menu, a status message on sort, and a view (`sort`, `hide`) that round-trips through URL search parameters with unknown ids dropped. Keyboard-only navigation of 10,000 rows is tested in Chromium with fewer than 80 rows in the DOM; axe reports no violations in any theme. Found and fixed: Panda 2 presets have no z-index tokens (the Dialog and popups emitted `z-index: modal`); the bundle scan now rejects unresolved z-index tokens. Split out #180 (NVDA manual check, needs Windows).
 - 2026-10-30: #50 generated client types: `@health/fhir-types` (158 resources, 43 data types, 630 backbone interfaces) from the R5 element table, with type-level tests; health-http's `/health` and `/ready` bodies typed and documented with utoipa 6 and utoipa-axum, `central-server openapi` prints central's document, and `@health/api-client` holds the generated Zod schemas, types, `operations` and `parseResponse`. The generators in `tools/codegen` print text because TypeScript 7 has no compiler API. New frontend-ci job regenerates everything and fails on drift.
 - 2026-10-30: #62 the client's FHIR access layer (`apps/client/src/platform/`): `FhirClient` (read, vread, search over GET and POST, history, `$match`, dry-run `$extract`, `$populate`; `FhirError` with the OperationOutcome), `operationClient` over `@health/api-client` (Zod loaded on first call), HttpTransport auth strategies (central bearer; edge RFC 9449 DPoP with nonce retry), a fetch-based server-sent-events `EventSource`, in-memory sessions, and the Query keys, options and `connectQueryCache` (hints invalidate, logout and lock clear). One contract suite passes against a central and an edge `FhirServer` (`health-fhir-server`'s `contract_server` example), including exact decimals; 31 unit tests. Also closes #173: the client's Vitest runs in frontend-ci, next to the design system's component tests. New frontend-ci job: the client FHIR contract. Per-context command ports wait for their server use cases.
+- 2026-10-31: #51 `tools/synthetic-data`. `generate` writes Ugandan synthetic data as NDJSON with a SHA-256 manifest, from its own PRNG so that a seed is byte-reproducible: 275 facilities in 45 districts, with their buildings, 740 stores, 20 medicines, about 12k stock balances, a price book, 4 payers with plans and contracts, and patients household by household. The patients have regional Zipf surname pools with Buganda clan surnames, Luo O-/A- gendering, Ganda twin names, shared and health-worker phones, NINs at about 75% with 0.1% duplicates, ADR 0014 MRNs and estimated ages. `load` sends batch Bundles of PUTs through the FHIR API. Every resource is tagged `urn:health:synthetic-data`. 1M patients generate in about 35 s, byte-identical across runs, and all 1,013,507 resources loaded through `FhirServer` in 27.4 min. The loader is HTTP only, because reqwest's TLS brings a CDLA-Permissive-2.0 crate.

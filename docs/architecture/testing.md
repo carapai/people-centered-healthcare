@@ -38,6 +38,10 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 ## Data
 
 - **Synthetic only.** `tools/synthetic-data` generates patients with Ugandan name, clan-name and phone-sharing distributions, plus facilities, stock, prices and payer contracts.
+  - **Reproducible:** a seed gives byte-identical NDJSON, with SHA-256s in its manifest. The tool uses its own PRNG.
+  - **Tagged:** every resource carries the `urn:health:synthetic-data` tag.
+  - **Loading:** batch Bundles through the FHIR API, so tiers 1 and 2 validate everything loaded.
+  - **Details:** [tools/synthetic-data/README.md](../../tools/synthetic-data/README.md).
 - **No real data** ever enters CI or staging.
 
 ## Coverage

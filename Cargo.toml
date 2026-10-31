@@ -18,6 +18,7 @@ members = [
     "apps/server/central-server",
     "tools/architecture-checks",
     "tools/fhir-element-table",
+    "tools/synthetic-data",
 ]
 # Vendored upstream crates are path dependencies through [patch.crates-io], not members.
 exclude = ["third_party"]
@@ -59,6 +60,7 @@ opentelemetry_sdk = { version = "0.33.1", default-features = false, features = [
 pollster = "1.0.1"
 regex = "1.13.1"
 rust_decimal = "1.43.0"
+reqwest = { version = "0.13.5", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.11.1"
 # Decimals keep their source text and objects keep key order (ADRs 0051, 0052).

@@ -1,0 +1,34 @@
+[package]
+name = "synthetic-data"
+description = "Synthetic Ugandan patients, facilities, stores, stock, prices and payer contracts, loaded through the FHIR API (testing.md § Data)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "tooling"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+health-identifiers = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+health-fhir-search = { workspace = true }
+health-fhir-server = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+jiff = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
+reqwest = { workspace = true, features = ["json"] }
