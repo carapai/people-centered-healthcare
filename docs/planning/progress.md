@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 16 | 24 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 17 | 24 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 47 of 125 implementation tasks done. Validation spikes open: 3.
+Total: 48 of 125 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -78,3 +78,4 @@ Total: 47 of 125 implementation tasks done. Validation spikes open: 3.
 - 2026-10-31: #197 merged (#217). #210: break-glass over the API. `POST /api/break-glass` grants one patient for one hour (403 without the permission, 400 without a reason or justification, 409 while one is active). It is stored for the session in `break_glass` (migration `0009`) with its `BTG` AuditEvent, in one transaction. The session's subject carries the grant, and its agent is flagged, so every access is audited with `BTG`. The in-charge (`break-glass.alerts`) lists and acknowledges alerts, and the review is due in 72 h. Split out: #218 (pushing alerts, and the privacy officer's review).
 - 2026-10-31: #210 merged (#219). #216: `POST /Patient/$match` (`resource`, `onlyCertainMatches`, `count`) through `FhirServer::with_client_registry(config, rules)`, for anyone who may search Patients. Candidates the subject may not see are left out before `count` applies, and results are audited like a search. With the registry on, central's store writes blocking keys and recounts blocks hourly.
 - 2026-10-31: #216 merged (#220). #211, ADR 0057: facility-scope records carry `meta.tag` `urn:health:facility|{code}`, on a fixed table of types taken from the authority matrix. The server stamps it on create, refuses another facility's tag (403), and keeps it through updates. Searches of facility-scope types add the `_tag` clause, except central's patient-confined searches and break-glass. Central registers `_tag` for every facility-scope type and decides with `FacilityTag`.
+- 2026-10-31: #211 merged (#221; ADR 0057 merged by the maintainer over the two-review gate). #189: SecLists' `xato-net-10-million-passwords-1000000` (MIT, pinned commit), chosen with the maintainer, ships in `health-auth` as a 1.8 MB Bloom filter with 999,996 entries and 0.1% false positives. `Credentials::set_password` applies `PasswordPolicy` with it, so a listed password is refused when set, offline as well as online.

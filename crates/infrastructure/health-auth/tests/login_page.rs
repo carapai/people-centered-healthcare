@@ -143,3 +143,27 @@ async fn the_sign_in_page_fronts_authorize_and_session_needs_a_token() {
     assert_eq!(principal["client_id"], "health-client");
     assert_eq!(principal["scope"], "openid");
 }
+
+#[test]
+fn new_passwords_are_checked_against_the_breached_list() {
+    use health_auth::{BreachedPasswords, SetPasswordError};
+    use health_identity::{PasswordPolicy, PasswordRejected};
+    let credentials = Credentials::new(Vec::new()).expect("credentials");
+    let policy = PasswordPolicy::default();
+    let list = BreachedPasswords::platform();
+    // Long enough, but one of the most common passwords: refused, with no network needed.
+    assert_eq!(
+        credentials.set_password(&policy, list, "password123", true),
+        Err(SetPasswordError::Rejected(PasswordRejected::Breached))
+    );
+    assert_eq!(
+        credentials.set_password(&policy, list, "short", true),
+        Err(SetPasswordError::Rejected(PasswordRejected::TooShort {
+            minimum: 8
+        }))
+    );
+    let hash = credentials
+        .set_password(&policy, list, "tumbling otter quarry 7919", true)
+        .expect("accepted");
+    assert!(credentials.verify("tumbling otter quarry 7919", &hash));
+}

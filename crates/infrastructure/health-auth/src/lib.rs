@@ -13,6 +13,7 @@
 //!   [`SnapshotGate`] requires a valid one for each login and refresh, behind the clock floor, and
 //!   tokens carry `facility` and `snapshot_version` and never outlive the snapshot.
 
+mod breached;
 mod credentials;
 pub mod jose;
 mod server;
@@ -21,7 +22,8 @@ mod store;
 mod subject;
 mod surreal;
 
-pub use credentials::{Credentials, HashError};
+pub use breached::{BreachedPasswords, InvalidFilter};
+pub use credentials::{Credentials, HashError, SetPasswordError};
 pub use jose::{InvalidKey, TokenSigner};
 pub use server::{AccessError, AccessVerifier, AuthConfig, AuthServer, Client, Principal};
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
