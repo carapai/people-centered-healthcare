@@ -1293,6 +1293,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
 dependencies = [
  "base16ct",
+ "base64ct",
  "crypto-bigint",
  "digest 0.10.7",
  "ff",
@@ -1303,6 +1304,8 @@ dependencies = [
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
+ "serde_json",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -1876,6 +1879,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-auth"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "axum",
+ "base64 0.22.1",
+ "form_urlencoded",
+ "health-identity",
+ "health-time",
+ "http-body-util",
+ "p256",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "thiserror",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "health-client-registry"
 version = "0.1.0"
 
@@ -1972,6 +1997,15 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "health-identity"
+version = "0.1.0"
+dependencies = [
+ "health-time",
  "thiserror",
  "uuid",
 ]
@@ -4620,6 +4654,7 @@ dependencies = [
  "der",
  "generic-array 0.14.7",
  "pkcs8",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -4775,6 +4810,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
 ]
 
 [[package]]
