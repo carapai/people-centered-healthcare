@@ -11,10 +11,12 @@ use axum::{Extension, Router};
 use health_access_policy::{Pdp, Permissions, Subject};
 use health_audit::{Agent, Auditor};
 use health_client_registry::ReviewQueue;
+use health_client_registry::matching::MatchingRules;
 use health_fhir_search::{Registry, Unrestricted};
 use health_fhir_server::{FhirServer, NoFacilityScope, REVIEW_PERMISSION};
 use health_persistence::Store;
-use health_registries_app::fhir::RegistryConfig;
+use health_registries_app::fhir::{ECID_SYSTEM, RegistryConfig};
+use health_registries_app::matching::RegistryBlocking;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::SystemClock;
 use http_body_util::BodyExt;
@@ -23,6 +25,16 @@ use tower::ServiceExt;
 
 const NIN: &str = "urn:health:synthetic-data/nin";
 const BASE: &str = "http://test/fhir";
+
+fn config() -> RegistryConfig {
+    RegistryConfig {
+        nin_system: NIN.into(),
+    }
+}
+
+fn rules() -> MatchingRules {
+    MatchingRules::platform_default(NIN, &[NIN, ECID_SYSTEM])
+}
 
 async fn store() -> SurrealStore {
     let settings = Settings {
@@ -34,6 +46,8 @@ async fn store() -> SurrealStore {
     migrate(&connection, MIGRATIONS).await.expect("migrate");
     SurrealStore::new(connection, Arc::new(SystemClock))
         .with_registry(Registry::new(jiff::tz::Offset::UTC))
+        // Source Patients carry their blocking keys, as at central.
+        .with_blocking(Arc::new(RegistryBlocking::new(rules(), config())))
 }
 
 fn subject(account: &str, facility: &str, permissions: &[&str]) -> Subject {
@@ -56,9 +70,7 @@ fn app(store: &SurrealStore, subject: Option<&Subject>) -> Router {
     let router = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted))
         .with_access_control(Pdp::default(), Arc::new(NoFacilityScope))
         .with_audit(Auditor::new("test central", Vec::new()))
-        .with_client_registry(RegistryConfig {
-            nin_system: NIN.into(),
-        })
+        .with_client_registry(config(), rules())
         .router();
     match subject {
         Some(subject) => router
@@ -327,4 +339,106 @@ async fn only_signed_in_reviewers_use_the_registry() {
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// `$match` for `family` with `nin`, as `subject`: the status and the candidates' names.
+async fn match_as(
+    store: &SurrealStore,
+    subject: &Subject,
+    pdp: Pdp,
+    query: Value,
+) -> (StatusCode, Vec<String>) {
+    let router = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted))
+        .with_access_control(pdp, Arc::new(NoFacilityScope))
+        .with_client_registry(config(), rules())
+        .router()
+        .layer(Extension(subject.clone()));
+    let (status, body) = send(
+        &router,
+        "POST",
+        "/Patient/$match",
+        Some(json!({ "resourceType": "Parameters", "parameter": [
+            { "name": "resource", "resource": query },
+            { "name": "count", "valueInteger": 5 },
+        ] })),
+    )
+    .await;
+    let names = body["entry"]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|e| {
+                    e["resource"]["name"][0]["family"]
+                        .as_str()
+                        .map(str::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    (status, names)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn match_returns_ranked_candidates_the_subject_may_see() {
+    const ACT: &str = "http://terminology.hl7.org/CodeSystem/v3-ActCode";
+    let store = store().await;
+    let admin = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted)).router();
+    let organization = organization(&store, "KAM013").await;
+    for (family, nin, labelled) in [
+        ("Nakato", "CF12345678ABCD", false),
+        ("Nakato", "CF12345678ABCE", true),
+        ("Achen", "CM98765432WXYZ", false),
+    ] {
+        let mut patient = json!({
+            "resourceType": "Patient",
+            "meta": { "tag": [{ "system": "urn:health:registry:trust", "code": "staff-entered" }] },
+            "identifier": [{ "system": NIN, "value": nin }],
+            "name": [{ "family": family, "given": ["Grace"] }],
+            "gender": "female",
+            "birthDate": "1990-04-02",
+            "managingOrganization": { "reference": format!("Organization/{organization}") },
+        });
+        if labelled {
+            patient["meta"]["security"] = json!([{ "system": ACT, "code": "HIV" }]);
+        }
+        let (status, body) = send(&admin, "POST", "/Patient", Some(patient)).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+    }
+    let query = json!({
+        "resourceType": "Patient",
+        "identifier": [{ "system": NIN, "value": "CF12345678ABCD" }],
+        "name": [{ "family": "Nakato", "given": ["Grace"] }],
+        "gender": "female",
+        "birthDate": "1990-04-02",
+    });
+    let pdp = || {
+        Pdp::new(vec![health_access_policy::LabelRule {
+            label: health_access_policy::Label::new(ACT, "HIV"),
+            program: "hiv".into(),
+        }])
+    };
+    let clerk = subject("clerk-1", "KAM013", &["Patient.rs"]);
+    let (status, names) = match_as(&store, &clerk, pdp(), query.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    // The exact NIN ranks first; the labelled namesake is not shown to a clerk without the
+    // program, and the unrelated patient is no candidate.
+    assert_eq!(names, vec!["Nakato".to_owned()]);
+    let counsellor = Subject {
+        programs: BTreeSet::from(["hiv".to_owned()]),
+        ..clerk.clone()
+    };
+    let (_, names) = match_as(&store, &counsellor, pdp(), query.clone()).await;
+    assert_eq!(names, vec!["Nakato".to_owned(), "Nakato".to_owned()]);
+    // Matching is a search: without Patient search permission it is refused.
+    let cashier = subject("cashier-1", "KAM013", &["Invoice.crus"]);
+    let (status, _) = match_as(&store, &cashier, pdp(), query).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    // And it needs a signed-in user.
+    let anonymous = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted))
+        .with_access_control(pdp(), Arc::new(NoFacilityScope))
+        .with_client_registry(config(), rules())
+        .router();
+    let (status, _) = send(&anonymous, "POST", "/Patient/$match", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }

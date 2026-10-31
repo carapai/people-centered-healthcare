@@ -21,7 +21,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_AUTH_REDIRECT_URIS` | required with an issuer | The web client's redirect URIs, comma-separated |
 | `HEALTH_AUTH_LOGIN_PAGE` | none | The web client's sign-in page, e.g. `/sign-in`; without it the authorization server shows its own minimal form |
 | `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` | none | Central's permission-snapshot signing keys, in the same format as the keys file. With it, each session acts for one facility, chosen at sign-in (ADR 0056) |
-| `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID identifier system. With it, `/fhir` serves the client registry's reviewer operations (`Patient/$merge`, `$link`, `$unlink`) |
+| `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID identifier system. With it, `/fhir` serves `Patient/$match` and the client registry's reviewer operations (`Patient/$merge`, `$link`, `$unlink`), source Patients carry their blocking keys, and block counts are recomputed hourly |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup

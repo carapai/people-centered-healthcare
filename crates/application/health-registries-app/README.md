@@ -49,7 +49,6 @@ Layer: **application** (Registries). The client registry's use cases over any `h
   - A searchset Bundle whose `search.score` is the match weight as a probability, with the `match-grade` extension.
   - Or, when nothing could be looked up, an OperationOutcome (`incomplete`) pointing to the manual registry search.
 - **Not here yet:**
-  - serving `Patient/$match` over HTTP ([#216](https://github.com/carapai/people-centered-healthcare/issues/216));
   - loading the Matching Rules from the configuration package (Phase 6), so for now it uses `MatchingRules::platform_default`;
   - term frequencies from counts (only the floors apply until then).
 

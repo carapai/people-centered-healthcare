@@ -2,11 +2,15 @@
 //!
 //! | Operation | Route | Parameters |
 //! |---|---|---|
+//! | `$match` (R5) | `POST /Patient/$match` | `resource` (Patient), `onlyCertainMatches` (boolean), `count` (integer) |
 //! | `$merge` (R5) | `POST /Patient/$merge` | `source-patient`, `target-patient` (References), `preview` (boolean) |
 //! | `$link` | `POST /Patient/{id}/$link` | `golden` (Reference, optional: a new golden record when absent) |
 //! | `$unlink` | `POST /Patient/{id}/$unlink` | none |
 //!
-//! - **Who:** the reviewer is the request's `Subject` (from the verified token). Without one the
+//! - **`$match`** is for anyone who may search Patients (403 otherwise). It returns the ranked
+//!   candidates the subject may see, as a searchset Bundle with `match-grade`. Candidates the
+//!   subject may not see are left out, and so is their count.
+//! - **Who:** for the other operations, the reviewer is the request's `Subject` (from the verified token). Without one the
 //!   answer is 401. The subject needs the [`REVIEW_PERMISSION`] use-case permission and
 //!   `Patient` update.
 //! - **Merges:**
@@ -104,6 +108,85 @@ impl AuditTrail<SurrealTx> for RegistryAudit {
 
 type Registry = ClientRegistry<health_surrealdb::SurrealStore, RegistryAudit>;
 
+/// The registry's configuration and Matching Rules.
+pub(crate) struct RegistrySettings {
+    pub(crate) config: health_registries_app::fhir::RegistryConfig,
+    pub(crate) rules: health_client_registry::matching::MatchingRules,
+}
+
+/// The most candidates `$match` returns; the default is 10.
+const MAX_MATCHES: usize = 100;
+
+/// `POST /Patient/$match`.
+pub(crate) async fn matches(
+    State(server): State<FhirServer>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, FhirError> {
+    let Some(settings) = server.registry.clone() else {
+        return Err(FhirError::not_found("the client registry is not enabled"));
+    };
+    // The same permission as a Patient search (403 without it).
+    crate::access::search_policy(&server, "Patient", None)?;
+    let parameters = parameters(&headers, &body)?;
+    let mut query = None;
+    let mut only_certain = false;
+    let mut count = 10;
+    for parameter in &parameters {
+        match parameter["name"].as_str().unwrap_or_default() {
+            "resource" => query = Some(parameter["resource"].clone()),
+            "onlyCertainMatches" => {
+                only_certain = parameter["valueBoolean"].as_bool().ok_or_else(|| {
+                    FhirError::bad_request("onlyCertainMatches must be a boolean")
+                })?;
+            }
+            "count" => {
+                count = parameter["valueInteger"]
+                    .as_u64()
+                    .and_then(|c| usize::try_from(c).ok())
+                    .filter(|c| *c > 0)
+                    .ok_or_else(|| FhirError::bad_request("count must be a positive integer"))?
+                    .min(MAX_MATCHES);
+            }
+            other => {
+                return Err(FhirError::not_supported(format!(
+                    "$match does not support {other}"
+                )));
+            }
+        }
+    }
+    let query = query
+        .filter(|q| q["resourceType"] == "Patient")
+        .ok_or_else(|| FhirError::bad_request("$match needs a Patient resource"))?;
+    let matcher = health_registries_app::matching::Matcher::new(
+        server.store.clone(),
+        settings.rules.clone(),
+        settings.config.clone(),
+    );
+    // Every candidate a block yields, so filtering cannot hide better ones behind `count`.
+    let mut matched = matcher.find(&query, usize::MAX, only_certain).await?;
+    matched
+        .candidates
+        .retain(|c| crate::access::may_list(&RawJson::from_validated(c.resource.to_string())));
+    matched.candidates.truncate(count);
+    let mut tx = server.store.begin().await?;
+    let served: Vec<RawJson> = matched
+        .candidates
+        .iter()
+        .map(|c| RawJson::from_validated(c.resource.to_string()))
+        .collect();
+    if crate::audit::read(&mut tx, Interaction::Search, served.iter())
+        .await
+        .map_err(crate::audit::failed)?
+    {
+        tx.commit().await?;
+    }
+    Ok(fhir_json(
+        StatusCode::OK,
+        health_registries_app::matching::bundle(&matched).to_string(),
+    ))
+}
+
 /// The reviewer of this request and the registry acting for them.
 fn reviewer(
     server: &FhirServer,
@@ -142,7 +225,7 @@ fn reviewer(
     };
     Ok((
         subject,
-        ClientRegistry::new(server.store.clone(), audit, (*config).clone()),
+        ClientRegistry::new(server.store.clone(), audit, config.config.clone()),
     ))
 }
 

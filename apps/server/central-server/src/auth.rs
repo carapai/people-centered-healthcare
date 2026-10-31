@@ -157,6 +157,46 @@ pub(crate) fn routes(
 
 /// The FHIR API: every interaction decided for the request's subject at central's scope, and
 /// audited (ADR 0056).
+/// The client registry's configuration and the platform's default Matching Rules (until the
+/// configuration package supplies them), when `HEALTH_REGISTRY_NIN_SYSTEM` is set.
+fn registry_rules(
+    settings: &AuthSettings,
+) -> Option<(
+    health_registries_app::fhir::RegistryConfig,
+    health_client_registry::matching::MatchingRules,
+)> {
+    let nin = settings.registry_nin_system.as_deref()?;
+    Some((
+        health_registries_app::fhir::RegistryConfig {
+            nin_system: nin.to_owned(),
+        },
+        health_client_registry::matching::MatchingRules::platform_default(
+            nin,
+            &[nin, health_registries_app::fhir::ECID_SYSTEM],
+        ),
+    ))
+}
+
+/// Recomputes block counts every hour (ADR 0055), starting now.
+fn recount_hourly(store: SurrealStore) {
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            every.tick().await;
+            match store.recount_blocks().await {
+                Ok(blocks) => tracing::info!(
+                    blocks,
+                    outcome = "blocks-recounted",
+                    "block counts recomputed"
+                ),
+                Err(_) => {
+                    tracing::warn!(error.kind = "recount-failed", "block counts not recomputed")
+                }
+            }
+        }
+    });
+}
+
 /// The policy's sensitive labels, as the auditor takes them.
 fn sensitive(policy: &AccessPolicy) -> Vec<(String, String)> {
     policy
@@ -172,6 +212,17 @@ fn fhir(
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
 ) -> Router {
+    // With the registry, source Patients carry their blocking keys, and block counts are kept.
+    let store = match registry_rules(settings) {
+        Some((config, rules)) => {
+            let store = store.with_blocking(Arc::new(
+                health_registries_app::matching::RegistryBlocking::new(rules, config),
+            ));
+            recount_hourly(store.clone());
+            store
+        }
+        None => store,
+    };
     let rules: Vec<LabelRule> = policy
         .labels
         .iter()
@@ -192,10 +243,8 @@ fn fhir(
             Arc::new(NoFacilityScope),
         )
         .with_audit(Auditor::new("central", sensitive(policy)));
-    if let Some(nin_system) = &settings.registry_nin_system {
-        fhir = fhir.with_client_registry(health_registries_app::fhir::RegistryConfig {
-            nin_system: nin_system.clone(),
-        });
+    if let Some(rules) = registry_rules(settings) {
+        fhir = fhir.with_client_registry(rules.0, rules.1);
     }
     fhir.router().layer(axum::middleware::from_fn_with_state(
         subjects,
@@ -568,6 +617,21 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+        // Patient/$match ranks candidates for anyone who may search Patients.
+        let (status, body, _) = send(
+            &app,
+            fhir(
+                "POST",
+                "/fhir/Patient/$match",
+                Some(serde_json::json!({ "resourceType": "Parameters", "parameter": [
+                    { "name": "resource", "resource": { "resourceType": "Patient", "name": [{ "family": "Nakato", "given": ["Grace"] }], "birthDate": "1990-04-02", "gender": "female" } },
+                ] })),
+                None,
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
         // The registry's operations are served, to reviewers only.
         let (status, body, _) = send(
             &app,
