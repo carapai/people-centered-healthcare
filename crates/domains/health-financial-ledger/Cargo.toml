@@ -1,0 +1,20 @@
+[package]
+name = "health-financial-ledger"
+description = "The facility's double-entry financial ledger: exact money, balanced append-only postings, reversals, chart-of-accounts templates and derived balances (billing-and-payments.md § The ledger; ADR 0030)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "financial-ledger"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

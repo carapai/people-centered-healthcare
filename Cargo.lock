@@ -2116,6 +2116,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-financial-ledger"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "rust_decimal",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "health-http"
 version = "0.1.0"
 dependencies = [
