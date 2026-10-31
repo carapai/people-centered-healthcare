@@ -14,6 +14,7 @@ Layer: **domain** (Identity & Access). The policy decision point's rules (offlin
 
   Break-glass for the record's patient overrides only steps 2 and 3, never permissions. A permit that relied on break-glass carries `Obligation::BreakGlassUsed`, for audit.
 - **`Pdp::search_filter(subject, type, patient, now)`** gives the labels a search must exclude: those whose program the subject lacks, or every sensitive label if no purpose is declared. Break-glass lifts the exclusions only for a search confined to the grant's patient.
+- **Facility scope (ADR 0057):** `FACILITY_SCOPE_TYPES`, `is_facility_scope` and `FACILITY_TAG_SYSTEM`. `SearchFilter::facility` is the facility a search of a facility-scope type is confined to. It is `None` for global types, central's patient-confined searches, and break-glass.
 - **`purpose_of_use(header)`** parses the `X-Purpose-Of-Use` header (ADR 0056). It is a v3 PurposeOfUse code from `PURPOSES_OF_USE`, `TREAT` when absent, and `UnknownPurpose` otherwise.
 - **`BreakGlassPolicy::grant`** needs the `break-glass` permission, the `BTG` reason and a justification. The grant covers one patient for 1 hour, and there is no extension or second grant while one is active. It returns the `BreakGlassEvent` to audit, alert on and review.
 

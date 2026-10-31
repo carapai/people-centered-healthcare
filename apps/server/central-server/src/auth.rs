@@ -17,7 +17,7 @@ use health_auth::{
     Subjects, SurrealAuthStore, TokenSigner, subject_layer,
 };
 use health_fhir_search::Unrestricted;
-use health_fhir_server::{FhirServer, NoFacilityScope};
+use health_fhir_server::{FacilityTag, FhirServer};
 use health_identity::SessionPolicy;
 use health_identity::snapshot::{RolePermissions, SnapshotPolicy};
 use health_surrealdb::{Connection, SurrealStore};
@@ -197,6 +197,35 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
+/// The search parameters central always supports: `_tag` on every facility-scope type, which
+/// facility isolation searches with (ADR 0057). The rest come with the configuration package.
+fn facility_registry() -> health_fhir_search::Registry {
+    let tag = serde_json::json!({
+        "resourceType": "SearchParameter",
+        "url": "http://hl7.org/fhir/SearchParameter/Resource-tag",
+        "code": "_tag",
+        "base": ["Resource"],
+        "type": "token",
+        "expression": "Resource.meta.tag",
+    });
+    let catalog = health_fhir_search::Catalog::from_definitions(std::iter::once(&tag));
+    let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
+    for resource_type in health_access_policy::FACILITY_SCOPE_TYPES {
+        if registry
+            .support(
+                &catalog,
+                resource_type,
+                "_tag",
+                health_fhir_search::ParamState::Active,
+            )
+            .is_err()
+        {
+            tracing::warn!(resource_type, "no _tag index for a facility-scope type");
+        }
+    }
+    registry
+}
+
 /// The policy's sensitive labels, as the auditor takes them.
 fn sensitive(policy: &AccessPolicy) -> Vec<(String, String)> {
     policy
@@ -212,6 +241,8 @@ fn fhir(
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
 ) -> Router {
+    // Facility-scope records are searched by their facility tag (ADR 0057).
+    let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
     let store = match registry_rules(settings) {
         Some((config, rules)) => {
@@ -240,7 +271,7 @@ fn fhir(
     let mut fhir = FhirServer::new(store, format!("{origin}/fhir"), Arc::new(Unrestricted))
         .with_access_control(
             Pdp::new(rules).with_scope(NodeScope::Central),
-            Arc::new(NoFacilityScope),
+            Arc::new(FacilityTag),
         )
         .with_audit(Auditor::new("central", sensitive(policy)));
     if let Some(rules) = registry_rules(settings) {
@@ -962,6 +993,31 @@ mod tests {
                     && e["authorization"].to_string().contains("BTG")),
             "{body}"
         );
+    }
+
+    #[test]
+    fn every_facility_scope_type_is_searchable_by_its_facility() {
+        let tag = serde_json::json!({
+            "resourceType": "SearchParameter",
+            "url": "http://hl7.org/fhir/SearchParameter/Resource-tag",
+            "code": "_tag",
+            "base": ["Resource"],
+            "type": "token",
+            "expression": "Resource.meta.tag",
+        });
+        let catalog = health_fhir_search::Catalog::from_definitions(std::iter::once(&tag));
+        let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
+        let failed: Vec<&str> = health_access_policy::FACILITY_SCOPE_TYPES
+            .iter()
+            .copied()
+            .filter(|t| {
+                registry
+                    .support(&catalog, t, "_tag", health_fhir_search::ParamState::Active)
+                    .is_err()
+            })
+            .collect();
+        assert!(failed.is_empty(), "{failed:?}");
+        let _ = facility_registry();
     }
 
     #[test]

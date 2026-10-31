@@ -113,6 +113,8 @@ pub enum Decision {
 pub struct SearchFilter {
     /// Labels whose records are excluded, sorted.
     pub excluded_labels: Vec<Label>,
+    /// The facility every record must belong to, for a facility-scope type (ADR 0057).
+    pub facility: Option<String>,
 }
 
 /// Where the PDP decides (ADR 0056).
@@ -245,8 +247,14 @@ impl Pdp {
             .collect();
         excluded.sort();
         excluded.dedup();
+        // Facility isolation: a facility-scope type is searched within the subject's facility,
+        // except at central for a search confined to one patient (ADR 0056).
+        let shared = self.scope == NodeScope::Central && patient.is_some();
+        let facility = (crate::facility::is_facility_scope(resource_type) && !shared)
+            .then(|| subject.facility.clone());
         Ok(SearchFilter {
             excluded_labels: excluded,
+            facility,
         })
     }
 }

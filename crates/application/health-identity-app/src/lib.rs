@@ -3,7 +3,9 @@
 //! records are excluded inside the database query (offline-auth.md § Authorization model:
 //! "repository searches receive its decision as a query filter").
 
-use health_access_policy::{Deny, Label, Pdp, Permissions, PurposeOfUse, Subject};
+use health_access_policy::{
+    Deny, FACILITY_TAG_SYSTEM, Label, Pdp, Permissions, PurposeOfUse, Subject,
+};
 use health_fhir_search::{Clause, ParamType, SearchPolicy, SearchValue, Test};
 use health_identity::snapshot::{PermissionSnapshot, RolePermissions};
 use health_time::Timestamp;
@@ -72,6 +74,10 @@ fn token(label: &Label) -> SearchValue {
     }
 }
 
+/// The `meta.tag` search parameter (`Resource-tag`), which carries a facility-scope record's
+/// facility (ADR 0057).
+pub const TAG_PARAM: &str = "_tag";
+
 impl SearchPolicy for SubjectSearchPolicy {
     fn clauses(&self, resource_type: &str) -> Vec<Clause> {
         match self.pdp.search_filter(
@@ -80,12 +86,27 @@ impl SearchPolicy for SubjectSearchPolicy {
             self.patient.as_deref(),
             self.now,
         ) {
-            Ok(filter) if filter.excluded_labels.is_empty() => Vec::new(),
-            Ok(filter) => vec![Clause {
-                param: SECURITY_PARAM.into(),
-                param_type: ParamType::Token,
-                test: Test::NoneOf(filter.excluded_labels.iter().map(token).collect()),
-            }],
+            Ok(filter) => {
+                let mut clauses = Vec::new();
+                if !filter.excluded_labels.is_empty() {
+                    clauses.push(Clause {
+                        param: SECURITY_PARAM.into(),
+                        param_type: ParamType::Token,
+                        test: Test::NoneOf(filter.excluded_labels.iter().map(token).collect()),
+                    });
+                }
+                if let Some(facility) = filter.facility {
+                    clauses.push(Clause {
+                        param: TAG_PARAM.into(),
+                        param_type: ParamType::Token,
+                        test: Test::Any(vec![SearchValue::Token {
+                            system: Some(FACILITY_TAG_SYSTEM.into()),
+                            code: Some(facility),
+                        }]),
+                    });
+                }
+                clauses
+            }
             // No search permission: a clause no record satisfies, so a caller that skipped
             // `check` still returns nothing.
             Err(_) => vec![Clause {

@@ -638,6 +638,7 @@ dependencies = [
  "health-surrealdb",
  "health-time",
  "http-body-util",
+ "jiff",
  "serde",
  "serde_json",
  "surrealdb",
