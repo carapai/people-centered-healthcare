@@ -75,7 +75,8 @@ flowchart LR
 - **ECID:** 11 random characters plus the check character.
 - **Matching** (#69): `health_client_registry::matching` holds the rules, the deterministic layer, the five blocking keys with the stop-list plan, and Fellegi–Sunter scoring with grades. Double Metaphone comes from `rphonetic`, through a port.
   - The CI corruption benchmark gives blocking recall 99.85%, candidate sets at most 97, and auto-link precision 100% on 60,000 synthetic people.
-  - The storage and `$match` are [#199](https://github.com/carapai/people-centered-healthcare/issues/199), and the 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
+  - **Storage and `$match`** (#199): `idx_block` rows are written in each source Patient's write transaction (`SurrealStore::with_blocking` with `RegistryBlocking`). `block_count` is recomputed in the background. `Matcher::find` and `bundle` answer `$match` with scores, `match-grade`, and the insufficient-data outcome.
+  - **Still to come:** the route mounts with the runtime (#188, #197), and the rules will load from the configuration package. The 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
 
 ## Matching (ADR 0028)
 

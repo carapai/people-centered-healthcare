@@ -16,8 +16,9 @@ use serde_json::Value;
 
 use health_identifiers::{NumberFormat, OpId, ResourceId, SequenceState};
 use health_persistence::{
-    CounterKey, GuardKey, OutboxEntry, OutboxPayload, Precondition, RawJson, ResourceType, Store,
-    StoreError, StoredResource, Transaction, VersionMeta, WriteError, WriteRequest, stamp_meta,
+    CounterKey, DerivedKeys, GuardKey, OutboxEntry, OutboxPayload, Precondition, RawJson,
+    ResourceType, Store, StoreError, StoredResource, Transaction, VersionMeta, WriteError,
+    WriteRequest, stamp_meta,
 };
 use health_time::{Clock, Timestamp};
 use surrealdb::engine::any::Any;
@@ -34,6 +35,7 @@ pub struct SurrealStore {
     pub(crate) connection: Connection,
     clock: Arc<dyn Clock>,
     registry: Arc<RwLock<Arc<Registry>>>,
+    blocking: Option<Arc<dyn DerivedKeys>>,
 }
 
 impl SurrealStore {
@@ -44,7 +46,43 @@ impl SurrealStore {
             connection,
             clock,
             registry: Arc::new(RwLock::new(Arc::new(Registry::new(Offset::UTC)))),
+            blocking: None,
         }
+    }
+
+    /// This store, writing `keys`' blocking keys with every live version (`idx_block`).
+    #[must_use]
+    pub fn with_blocking(mut self, keys: Arc<dyn DerivedKeys>) -> Self {
+        self.blocking = Some(keys);
+        self
+    }
+
+    /// Recomputes every block's size into `block_count` (ADR 0055: hourly, at central and on
+    /// each edge), in one transaction. Returns the number of blocks.
+    pub async fn recount_blocks(&self) -> Result<usize, StoreError> {
+        let db = self.connection.db();
+        db.query(
+            "BEGIN; \
+             DELETE block_count; \
+             LET $groups = SELECT array::slice(record::id(id), 0, 2) AS key, count() AS n \
+                 FROM idx_block GROUP BY key; \
+             FOR $g IN $groups { \
+                 CREATE type::record('block_count', $g.key) \
+                     SET count = $g.n, counted_at = time::now(); \
+             }; \
+             COMMIT;",
+        )
+        .await
+        .and_then(surrealdb::IndexedResults::check)
+        .map_err(unavailable)?;
+        let blocks: Option<i64> = db
+            .query("RETURN count(SELECT VALUE id FROM block_count)")
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        Ok(usize::try_from(blocks.unwrap_or(0)).unwrap_or(0))
     }
 
     /// This store, indexing the parameters `registry` supports.
@@ -85,6 +123,7 @@ impl Store for SurrealStore {
             tx: Some(tx),
             clock: Arc::clone(&self.clock),
             registry: self.registry(),
+            blocking: self.blocking.clone(),
         })
     }
 }
@@ -94,6 +133,7 @@ pub struct SurrealTx {
     tx: Option<SurrealTransaction<Any>>,
     clock: Arc<dyn Clock>,
     registry: Arc<Registry>,
+    blocking: Option<Arc<dyn DerivedKeys>>,
 }
 
 impl Drop for SurrealTx {
@@ -210,15 +250,26 @@ impl SurrealTx {
         let version_seq = previous_seq + 1;
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
-        let (extraction, references) = if deleted {
-            // A tombstone keeps its body but is never found by search and references nothing.
-            (health_fhir_search::Extraction::default(), Vec::new())
+        let (extraction, references, blocks) = if deleted {
+            // A tombstone keeps its body but is never found by search, references nothing and
+            // sits in no block.
+            (
+                health_fhir_search::Extraction::default(),
+                Vec::new(),
+                Vec::new(),
+            )
         } else {
             let resource: Value = serde_json::from_str(stamped.as_str())
                 .map_err(|e| StoreError::Unavailable(format!("stamped JSON: {e}")))?;
+            let blocks = self
+                .blocking
+                .as_ref()
+                .map(|b| b.keys(resource_type.as_str(), &resource))
+                .unwrap_or_default();
             (
                 extract(&self.registry, resource_type.as_str(), &resource, None),
                 crate::search::write::references(&resource),
+                blocks,
             )
         };
         let mut sql = Sql::default();
@@ -229,7 +280,10 @@ impl SurrealTx {
             resource_type.as_str(),
             &id_text,
             &extraction,
-            &references,
+            crate::search::write::Derived {
+                references: &references,
+                blocks: &blocks,
+            },
             None,
         );
         let head = sql.str(table);

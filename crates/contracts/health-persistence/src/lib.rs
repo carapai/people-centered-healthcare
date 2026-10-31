@@ -11,10 +11,12 @@
 //!   with [`WriteError::Conflict`], which [`RetryPolicy`] retries. Multi-record invariants use
 //!   [`Transaction::claim_guard`], never read-then-check.
 
+mod blocking;
 mod json;
 mod model;
 mod store;
 
+pub use blocking::{BlockingIndex, DerivedKeys};
 pub use json::{RawJson, RawJsonError, stamp_meta};
 pub use model::{
     CounterKey, GuardKey, OutboxEntry, OutboxPayload, Precondition, ResourceType,

@@ -198,6 +198,7 @@ Checked in application code on write, not with SurrealDB `REFERENCE` constraints
 | `Type/id`, or an absolute URL on this server | must name a live resource (422 otherwise), unless `ReferenceScope::must_resolve` says the target is out of scope |
 
 - **Reverse references.** Each live version writes `idx_ref_in` entries `[target_type, target_id, source_type, source_id]` for its literal references (migration `0004_reference_index`). They are listed in `index_keys` like search entries and replaced on every write; tombstones write none. `SurrealTx::referrers` reads them with a record-id range, skipping AuditEvent sources, and a delete that leaves a referrer is 409.
+- **Blocking keys.** With `SurrealStore::with_blocking`, each live version also writes `idx_block:[kind, value, id]` (migration `0006_blocking_index`; ADR 0055). The keys come from the client registry's `DerivedKeys`, and they are replaced and removed like search entries. `block_count` is recomputed in the background by `recount_blocks`, never in a write transaction.
 - **Scope.** The default `ReferenceScope` is `AllMustResolve`, until node scope exists.
 - **Not done yet:** flagging out-of-scope references `unresolved` for checking at central. It needs node scope and the sync tasks to decide where the flag lives.
 
