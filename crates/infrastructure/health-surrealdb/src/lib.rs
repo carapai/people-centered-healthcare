@@ -24,7 +24,7 @@ mod review;
 pub mod search;
 mod store;
 
-pub use auth::{AuthSessionRow, BreakGlassRow};
+pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
 pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};

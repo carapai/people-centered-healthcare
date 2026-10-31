@@ -407,6 +407,8 @@ async fn break_glass_grants_end_after_their_hour_and_alert_their_facility() {
             .checked_add(SignedDuration::from_hours(72))
             .expect("time"),
         acknowledged: false,
+        review: None,
+        escalated_at: None,
     };
     node.store
         .grant_break_glass(&record, None)
@@ -468,6 +470,69 @@ async fn break_glass_grants_end_after_their_hour_and_alert_their_facility() {
             .break_glass_alerts("KAM013")
             .await
             .expect("alerts")
+            .is_empty()
+    );
+    // The privacy officer's review: pending until decided, escalated once when overdue.
+    use health_auth::BreakGlassReview;
+    assert_eq!(
+        node.store
+            .break_glass_reviews(10)
+            .await
+            .expect("reviews")
+            .len(),
+        1
+    );
+    let before_due = at
+        .checked_add(SignedDuration::from_hours(71))
+        .expect("time");
+    let overdue = at
+        .checked_add(SignedDuration::from_hours(73))
+        .expect("time");
+    assert!(
+        node.store
+            .escalate_break_glass(before_due)
+            .await
+            .expect("escalate")
+            .is_empty()
+    );
+    let escalated = node
+        .store
+        .escalate_break_glass(overdue)
+        .await
+        .expect("escalate");
+    assert_eq!(escalated.len(), 1);
+    assert_eq!(escalated[0].escalated_at, Some(overdue));
+    assert!(
+        node.store
+            .escalate_break_glass(overdue)
+            .await
+            .expect("escalate")
+            .is_empty()
+    );
+    let decision = BreakGlassReview {
+        reviewer: "privacy-1".into(),
+        at: overdue,
+        appropriate: true,
+        note: "patient unconscious, confirmed".into(),
+    };
+    assert!(
+        node.store
+            .review_break_glass(&record.id, &decision, None)
+            .await
+            .expect("review")
+    );
+    assert!(
+        !node
+            .store
+            .review_break_glass(&record.id, &decision, None)
+            .await
+            .expect("review")
+    );
+    assert!(
+        node.store
+            .break_glass_reviews(10)
+            .await
+            .expect("reviews")
             .is_empty()
     );
 }

@@ -27,8 +27,12 @@ pub use credentials::{Credentials, HashError, SetPasswordError};
 pub use jose::{InvalidKey, TokenSigner};
 pub use server::{AccessError, AccessVerifier, AuthConfig, AuthServer, Client, Principal};
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
-pub use store::{AuthStore, AuthorizationCode, BreakGlassRecord, MemoryStore, Session, StoreError};
+pub use store::{
+    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, MemoryStore, Session,
+    StoreError,
+};
 pub use subject::{
-    ALERTS_PERMISSION, PURPOSE_HEADER, REVIEW_WITHIN, Refused, Subjects, subject_layer,
+    ALERTS_PERMISSION, ALERTS_WORKLIST, PURPOSE_HEADER, REVIEW_PERMISSION, REVIEW_WITHIN,
+    REVIEWS_WORKLIST, Refused, Subjects, subject_layer,
 };
 pub use surreal::SurrealAuthStore;

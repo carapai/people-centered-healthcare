@@ -124,14 +124,20 @@ DEFINE TABLE break_glass TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD account ON break_glass TYPE string PERMISSIONS FULL
   DEFINE FIELD acknowledged ON break_glass TYPE bool PERMISSIONS FULL
   DEFINE FIELD at ON break_glass TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD decision ON break_glass TYPE none | string ASSERT $value = NONE OR $value INSIDE ['appropriate', 'inappropriate'] PERMISSIONS FULL
+  DEFINE FIELD escalated_at ON break_glass TYPE none | datetime PERMISSIONS FULL
   DEFINE FIELD expires_at ON break_glass TYPE datetime PERMISSIONS FULL
   DEFINE FIELD facility ON break_glass TYPE string PERMISSIONS FULL
   DEFINE FIELD justification ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD note ON break_glass TYPE none | string PERMISSIONS FULL
   DEFINE FIELD patient ON break_glass TYPE string PERMISSIONS FULL
   DEFINE FIELD reason ON break_glass TYPE string PERMISSIONS FULL
   DEFINE FIELD review_due ON break_glass TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD reviewed_at ON break_glass TYPE none | datetime PERMISSIONS FULL
+  DEFINE FIELD reviewed_by ON break_glass TYPE none | string PERMISSIONS FULL
   DEFINE FIELD session ON break_glass TYPE string PERMISSIONS FULL
   DEFINE INDEX break_glass_alerts ON break_glass FIELDS facility, acknowledged, at
+  DEFINE INDEX break_glass_reviews ON break_glass FIELDS reviewed_by, review_due
   DEFINE INDEX break_glass_session ON break_glass FIELDS session, expires_at
 DEFINE TABLE capability_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON capability_statement TYPE bool PERMISSIONS FULL

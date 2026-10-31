@@ -1991,6 +1991,7 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-fhir-search",
+ "health-http",
  "health-identity",
  "health-identity-app",
  "health-persistence",
@@ -2118,6 +2119,7 @@ name = "health-http"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "futures-util",
  "health-observability",
  "http-body-util",
  "opentelemetry",

@@ -36,7 +36,7 @@ flowchart TD
 - **In code** (`apps/client/src/platform/`):
   - **`fhir.ts`:** `fhirClient(transport, base)`. It has no write methods. A non-2xx response, or a body of another resource type, throws a `FhirError` carrying the status and the server's OperationOutcome. Its message names only the issue codes, because diagnostics can quote clinical data. `$match` posts `Parameters` (`resource`, `onlyCertainMatches`, `count`). `$extract` and `$populate` accept their output bare or inside `Parameters`.
   - **`operations.ts`:** `operationClient(transport).call(operationId, input)`. It calls an operation from `@health/api-client` and validates the response with `parseResponse`. The command ports of each Bounded Context build on it as their server use cases land; none exist yet. It loads the schemas (and Zod, about 84 KB) on the first call, not with the app shell.
-  - **`events.ts`:** `sseEventSource(url, auth)` reads `{apiBase}/events` with `fetch`, because `EventSource` cannot send the Authorization and DPoP headers.
+  - **`events.ts`:** `sseEventSource(url, auth)` reads `{apiBase}/events` with `fetch`, because `EventSource` cannot send the Authorization and DPoP headers. Central serves the stream (`health_http::Events`, #218), filtered to the caller's facility and permissions.
     - One connection serves every subscriber. It reconnects with `Last-Event-ID`, starting at the server's `retry:` delay and doubling it up to 30 s.
     - It stops on a 4xx other than 401 or 429, or on a response that is not `text/event-stream` (for example, a web host's fallback page).
     - It drops hints that are not string identifiers.

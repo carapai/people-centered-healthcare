@@ -43,7 +43,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
   - A request without a token is 401, except `/fhir/metadata`.
   - Search parameters come with the configuration package. Until then the store's registry is empty, so `/fhir` serves reads, writes and history.
   - Facility-scope records carry the session's facility tag, and `_tag` is registered for every facility-scope type, so searches across patients stay within the facility (ADR 0057).
-- **Break-glass:** `/api/break-glass` grants one patient for one hour to roles with `break-glass`, audited with `BTG`. The facility in-charge (`break-glass.alerts`) lists and acknowledges the alerts at `/api/break-glass/alerts`.
+- **Break-glass:** `/api/break-glass` grants one patient for one hour to roles with `break-glass`, audited with `BTG`. The facility in-charge (`break-glass.alerts`) lists and acknowledges the alerts at `/api/break-glass/alerts`, and gets each new one at once over `/api/events`. The privacy officer (`break-glass.review`) works the queue at `/api/break-glass/reviews`. Overdue reviews are escalated hourly.
 - **Snapshots** are provisioned with `SurrealAuthStore::put_snapshot` until the workforce registry issues them.
 
 SIGTERM or Ctrl-C shuts the server down gracefully.
