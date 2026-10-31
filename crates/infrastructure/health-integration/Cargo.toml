@@ -1,0 +1,33 @@
+[package]
+name = "health-integration"
+description = "Inbound integrations: external payloads validated before they reach the store, with the Inbound Dead Letter and the quarantine queue (ADR 0051)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-audit = { workspace = true }
+health-fhir-validation = { workspace = true }
+health-persistence = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+health-fhir-search = { workspace = true }
+health-fhir-server = { workspace = true }
+http-body-util = { workspace = true }
+jiff = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
+tower = { workspace = true }

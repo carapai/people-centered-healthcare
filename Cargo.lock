@@ -2050,6 +2050,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-integration"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-audit",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-fhir-validation",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "http-body-util",
+ "jiff",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "health-observability"
 version = "0.1.0"
 dependencies = [

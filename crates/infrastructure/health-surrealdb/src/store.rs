@@ -123,7 +123,7 @@ struct CounterRow {
     last: i64,
 }
 
-fn unavailable(error: surrealdb::Error) -> StoreError {
+pub(crate) fn unavailable(error: surrealdb::Error) -> StoreError {
     StoreError::Unavailable(error.to_string())
 }
 

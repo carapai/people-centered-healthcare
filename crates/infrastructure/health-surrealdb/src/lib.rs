@@ -15,6 +15,7 @@
 
 mod connection;
 mod history;
+mod inbound;
 mod migrations;
 pub mod ownership;
 pub mod search;
@@ -22,6 +23,7 @@ mod store;
 
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
 pub use history::{HistoryEntry, HistoryScope};
+pub use inbound::{InboundEntry, InboundKind, InboundStatus};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
 pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SurrealStore, SurrealTx};

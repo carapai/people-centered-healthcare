@@ -57,6 +57,12 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "idx_ref_in",
 ];
 
+/// Tables a module owns that hold no FHIR resources: `(table, owner)`.
+pub const MODULE_TABLES: &[(&str, &str)] = &[
+    // The Inbound Dead Letter and quarantine queue (ADR 0051).
+    ("inbound", "integration"),
+];
+
 /// Every owned resource type, sorted by type.
 pub fn resources() -> &'static [ResourceOwnership] {
     generated::RESOURCES

@@ -69,7 +69,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-files` | crate |
 | `health-crypto` | crate |
 | `health-sync-server` | crate |
-| `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters) |
+| `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |
 
 ## 6 · runtime
 
