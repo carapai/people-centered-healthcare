@@ -77,6 +77,11 @@ flowchart LR
   - The CI corruption benchmark gives blocking recall 99.85%, candidate sets at most 97, and auto-link precision 100% on 60,000 synthetic people.
   - **Storage and `$match`** (#199): `idx_block` rows are written in each source Patient's write transaction (`SurrealStore::with_blocking` with `RegistryBlocking`). `block_count` is recomputed in the background. `Matcher::find` and `bundle` answer `$match` with scores, `match-grade`, and the insufficient-data outcome.
   - **Still to come:** the route mounts with the runtime (#188, #197), and the rules will load from the configuration package. The 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
+- **Review queue** (#70): `RegistryReview` matches each registration.
+  - It auto-links certain and probable matches, queues possible ones, and creates new identities. It skips every golden record that carries an adjudication marker for the source, so a separated pair is never re-linked automatically.
+  - Reviewers' decisions run in one transaction and are audited. Items pending more than 7 days are listed as overdue.
+  - Storage: the `registry_review` table, owned by the client registry.
+  - The screen is [#203](https://github.com/carapai/people-centered-healthcare/issues/203).
 
 ## Matching (ADR 0028)
 

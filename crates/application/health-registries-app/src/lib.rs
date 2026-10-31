@@ -15,6 +15,7 @@
 
 pub mod fhir;
 pub mod matching;
+pub mod review;
 
 use std::future::Future;
 
@@ -44,6 +45,14 @@ pub trait AuditTrail<T: Transaction>: Send + Sync {
         reason: &str,
         json: &RawJson,
     ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// `actor` decided `reason` about the non-FHIR record `what` (a review item) in `tx`.
+    fn recorded(
+        &self,
+        tx: &mut T,
+        actor: &str,
+        reason: &str,
+        what: &str,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
 }
 
 /// A registry use case failed.
@@ -70,6 +79,12 @@ pub enum RegistryError {
     /// The registry's rules refuse the merge.
     #[error(transparent)]
     Merge(#[from] MergeRefused),
+    /// The review queue refuses the decision.
+    #[error(transparent)]
+    Review(#[from] health_client_registry::ReviewRefused),
+    /// No such review item.
+    #[error("review item {0} is not known")]
+    NoSuchReview(String),
     /// A concurrent change won; rerun the use case.
     #[error("a concurrent change won; retry")]
     Conflict,
@@ -204,14 +219,14 @@ where
 
     /// Links source `source` to golden `golden`, or to a new golden record when `golden` is
     /// `None`. `actor` is the reviewer or the matching job.
-    pub async fn link(
+    pub async fn link_in(
         &self,
+        tx: &mut S::Tx,
         source: ResourceId,
         golden: Option<ResourceId>,
         actor: &str,
     ) -> Result<Linked, RegistryError> {
-        let mut tx = self.store.begin().await?;
-        let (source_head, source_json) = self.read(&mut tx, source).await?;
+        let (source_head, source_json) = self.read(tx, source).await?;
         Self::source_id(&source_json)?;
         if let Some(current) = linked(&source_json, "refer").into_iter().next() {
             return Err(RegistryError::AlreadyLinked {
@@ -222,7 +237,7 @@ where
         let record = source_record(&source_json, &self.config)?;
         let (golden_id, mut golden_rec, precondition, created) = match golden {
             Some(id) => {
-                let (head, json) = self.read(&mut tx, id).await?;
+                let (head, json) = self.read(tx, id).await?;
                 (
                     id,
                     golden_record(&json)?,
@@ -239,7 +254,7 @@ where
         };
         let review = golden_rec.link(&record)?;
         self.write(
-            &mut tx,
+            tx,
             actor,
             "link",
             golden_id,
@@ -249,7 +264,7 @@ where
         .await?;
         let updated = reconciled(&with_links(&source_json, "refer", &[golden_id.to_string()]));
         self.write(
-            &mut tx,
+            tx,
             actor,
             "link",
             source,
@@ -257,7 +272,6 @@ where
             Precondition::IfMatch(source_head.version.version_id),
         )
         .await?;
-        tx.commit().await?;
         Ok(Linked {
             golden: golden_id,
             ecid: golden_rec.ecid,
@@ -266,22 +280,35 @@ where
         })
     }
 
+    /// [`link_in`](Self::link_in) in its own transaction.
+    pub async fn link(
+        &self,
+        source: ResourceId,
+        golden: Option<ResourceId>,
+        actor: &str,
+    ) -> Result<Linked, RegistryError> {
+        let mut tx = self.store.begin().await?;
+        let linked = self.link_in(&mut tx, source, golden, actor).await?;
+        tx.commit().await?;
+        Ok(linked)
+    }
+
     /// Separates `source` from its golden record, a reviewer's decision. The golden record's
     /// values are recomputed from the sources that remain; with none left it becomes inactive.
-    pub async fn unlink(
+    pub async fn unlink_in(
         &self,
+        tx: &mut S::Tx,
         source: ResourceId,
         reviewer: &str,
     ) -> Result<ResourceId, RegistryError> {
-        let mut tx = self.store.begin().await?;
-        let (source_head, source_json) = self.read(&mut tx, source).await?;
+        let (source_head, source_json) = self.read(tx, source).await?;
         Self::source_id(&source_json)?;
         let golden_id: ResourceId = linked(&source_json, "refer")
             .into_iter()
             .next()
             .and_then(|g| g.parse().ok())
             .ok_or(RegistryError::Link(LinkRefused::NotLinked))?;
-        let (golden_head, golden_json_value) = self.read(&mut tx, golden_id).await?;
+        let (golden_head, golden_json_value) = self.read(tx, golden_id).await?;
         let mut golden_rec = golden_record(&golden_json_value)?;
         let mut remaining = Vec::new();
         for other in golden_rec
@@ -290,12 +317,12 @@ where
             .filter(|s| **s != source.to_string())
         {
             let Ok(id) = other.parse() else { continue };
-            let (_, json) = self.read(&mut tx, id).await?;
+            let (_, json) = self.read(tx, id).await?;
             remaining.push(source_record(&json, &self.config)?);
         }
         golden_rec.unlink(&source.to_string(), &remaining)?;
         self.write(
-            &mut tx,
+            tx,
             reviewer,
             "unlink",
             golden_id,
@@ -304,7 +331,7 @@ where
         )
         .await?;
         self.write(
-            &mut tx,
+            tx,
             reviewer,
             "unlink",
             source,
@@ -312,8 +339,89 @@ where
             Precondition::IfMatch(source_head.version.version_id),
         )
         .await?;
-        tx.commit().await?;
         Ok(golden_id)
+    }
+
+    /// [`unlink_in`](Self::unlink_in) in its own transaction.
+    pub async fn unlink(
+        &self,
+        source: ResourceId,
+        reviewer: &str,
+    ) -> Result<ResourceId, RegistryError> {
+        let mut tx = self.store.begin().await?;
+        let golden = self.unlink_in(&mut tx, source, reviewer).await?;
+        tx.commit().await?;
+        Ok(golden)
+    }
+
+    /// Records that `source` is not the person of golden record `golden` (a reviewer's
+    /// decision on a potential match it was never linked to): the adjudication marker means
+    /// matching never links them.
+    pub async fn separate_in(
+        &self,
+        tx: &mut S::Tx,
+        source: ResourceId,
+        golden: ResourceId,
+        reviewer: &str,
+    ) -> Result<(), RegistryError> {
+        let (head, json) = self.read(tx, golden).await?;
+        let mut record = golden_record(&json)?;
+        if record.sources.contains(&source.to_string()) {
+            return Err(RegistryError::WrongKind(
+                "the source is linked; unlink it instead".into(),
+            ));
+        }
+        record.separated.insert(source.to_string());
+        self.write(
+            tx,
+            reviewer,
+            "separate",
+            golden,
+            &golden_json(&golden.to_string(), &record, &self.config),
+            Precondition::IfMatch(head.version.version_id),
+        )
+        .await
+    }
+
+    /// A reviewer settles a survivorship disagreement in favour of `claim`.
+    pub async fn override_in(
+        &self,
+        tx: &mut S::Tx,
+        golden: ResourceId,
+        field: health_client_registry::Field,
+        claim: health_client_registry::Claim,
+        reviewer: &str,
+    ) -> Result<(), RegistryError> {
+        let (head, json) = self.read(tx, golden).await?;
+        let mut record = golden_record(&json)?;
+        if !record.sources.contains(&claim.source) {
+            return Err(RegistryError::Link(LinkRefused::NotLinked));
+        }
+        record.claims.insert(field, claim);
+        self.write(
+            tx,
+            reviewer,
+            "review",
+            golden,
+            &golden_json(&golden.to_string(), &record, &self.config),
+            Precondition::IfMatch(head.version.version_id),
+        )
+        .await
+    }
+
+    /// The store, for use cases that compose registry steps in one transaction.
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
+    /// The registry's configuration.
+    pub fn config(&self) -> &RegistryConfig {
+        &self.config
+    }
+
+    /// The audit trail, for use cases that record decisions in the same transaction.
+    pub fn audit(&self) -> &A {
+        &self.audit
     }
 
     /// The plan for merging `source` into `target`, for a person to preview and approve.

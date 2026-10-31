@@ -19,6 +19,7 @@ mod history;
 mod inbound;
 mod migrations;
 pub mod ownership;
+mod review;
 pub mod search;
 mod store;
 

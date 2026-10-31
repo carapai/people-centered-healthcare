@@ -14,6 +14,22 @@ Layer: **application** (Registries). The client registry's use cases over any `h
   - The plan is checked again inside the merge's transaction.
 - **Every use case** is one transaction with `If-Match` version checks. Each version it writes passes through the `AuditTrail` port in that transaction; the runtime implements it over `health-audit` (#197).
 
+## Review queue (`review.rs`)
+
+- **`RegistryReview::register(source, actor)`** matches a newly registered source with `Matcher`, then acts on the best result:
+  - an auto-link grade (certain or probable) links it, and survivorship disagreements are queued;
+  - possible matches are queued, and the source stays unlinked and usable for care;
+  - no match creates a new identity.
+- **Separated pairs:** golden records that carry an adjudication marker for the source are skipped entirely, so a pair a reviewer separated is never re-linked automatically.
+- **`decide(id, decision, reviewer)`** carries out the decision and records it in one transaction, then audits it (`AuditTrail::recorded`, `urn:health:registry-review:{id}`).
+  - **Same person:** links the source.
+  - **Different people:** leaves the marker (`ClientRegistry::separate_in`). Once nothing else is pending for the source, it becomes a new identity.
+  - **Take incoming:** sets the golden value (`override_in`).
+  - A second decision on the same item is refused.
+- **`pending(limit)` / `overdue(limit)`:** the queue, and its 7-day ageing alert.
+- **`ClientRegistry` in a caller's transaction:** `link_in`, `unlink_in`, `separate_in` and `override_in` let these use cases compose registry steps in one transaction. `link` and `unlink` wrap them.
+- **The review screen** is [#203](https://github.com/carapai/people-centered-healthcare/issues/203).
+
 ## Matching adapters (`matching.rs`)
 
 - **`DoubleMetaphone`** implements the domain's `Phonetic` port with `rphonetic`, a port of Apache commons-codec. Its `enum-iterator` dependency is 0BSD, which `deny.toml` allows as part of ADR 0045's BSD family.
@@ -74,3 +90,11 @@ On 2026-10-31 it measured:
 HTTP operations (`Patient/$merge`, link and unlink) are [#197](https://github.com/carapai/people-centered-healthcare/issues/197). The blocking tables and `Patient/$match` are [#199](https://github.com/carapai/people-centered-healthcare/issues/199), and the 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
 
 `tests/match_operation.rs` runs `$match` over SurrealDB with 2,000 synthetic patients. For 50 queries (a family-name typo and no NIN), the candidates and their counts match the in-memory pipeline exactly. A household's shared phone and family blocks are skipped by their stored counts after a recount, while the given-name keys still find the person, and a query whose every key is skipped gets the insufficient-data outcome.
+
+`tests/review.rs` covers:
+- a certain match auto-links;
+- after an unlink, matching the same source again creates a new identity and neither links nor queues it;
+- a possible match is queued, then decided as different people (a new identity, and a second decision refused) or as the same person (linked);
+- the resulting survivorship item is decided, with its wrong decision refused;
+- every decision is audited with the reviewer;
+- the 7-day ageing alert.

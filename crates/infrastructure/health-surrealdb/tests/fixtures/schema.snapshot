@@ -1136,6 +1136,14 @@ DEFINE TABLE questionnaire_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE FIELD version_id ON questionnaire_response_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON questionnaire_response_history TYPE int PERMISSIONS FULL
   DEFINE INDEX questionnaire_response_history_last_updated ON questionnaire_response_history FIELDS last_updated, version_seq
+DEFINE TABLE registry_review TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD created_at ON registry_review TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD decided_at ON registry_review TYPE none | datetime PERMISSIONS FULL
+  DEFINE FIELD decided_by ON registry_review TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD decision ON registry_review TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD details ON registry_review TYPE string PERMISSIONS FULL
+  DEFINE FIELD kind ON registry_review TYPE string ASSERT $value INSIDE ['potential-match', 'survivorship'] PERMISSIONS FULL
+  DEFINE INDEX registry_review_pending ON registry_review FIELDS decision, created_at
 DEFINE TABLE reindex_job TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD `after` ON reindex_job TYPE none | string PERMISSIONS FULL
   DEFINE FIELD done ON reindex_job TYPE bool PERMISSIONS FULL

@@ -62,6 +62,7 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Expose the client registry's link, unlink and $merge operations over FHIR](https://github.com/carapai/people-centered-healthcare/issues/197)
 - [Store blocking keys and block counts, and serve Patient/$match](https://github.com/carapai/people-centered-healthcare/issues/199)
 - [Load-test patient matching at 45M on central-class hardware](https://github.com/carapai/people-centered-healthcare/issues/200) — needs a human
+- [Build the registry review screen](https://github.com/carapai/people-centered-healthcare/issues/203)
 
 ## [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4)
 

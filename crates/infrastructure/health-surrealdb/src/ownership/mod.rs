@@ -63,6 +63,8 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
 pub const MODULE_TABLES: &[(&str, &str)] = &[
     // The Inbound Dead Letter and quarantine queue (ADR 0051).
     ("inbound", "integration"),
+    // The client registry's review queue.
+    ("registry_review", "client-registry"),
 ];
 
 /// Every owned resource type, sorted by type.
