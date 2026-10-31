@@ -14,6 +14,7 @@
 
 mod break_glass;
 mod decision;
+mod facility;
 mod permission;
 mod purpose;
 
@@ -24,5 +25,6 @@ pub use decision::{
     Access, Decision, Deny, Label, LabelRule, NodeScope, Obligation, Pdp, PurposeOfUse,
     SearchFilter, Subject,
 };
+pub use facility::{FACILITY_SCOPE_TYPES, FACILITY_TAG_SYSTEM, is_facility_scope};
 pub use permission::{Interaction, Permissions};
 pub use purpose::{DEFAULT_PURPOSE, PURPOSES_OF_USE, UnknownPurpose, purpose_of_use};

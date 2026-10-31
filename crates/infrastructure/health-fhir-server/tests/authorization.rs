@@ -9,10 +9,11 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use health_access_policy::{
-    BTG, BreakGlassPolicy, Label, LabelRule, NodeScope, Pdp, Permissions, Subject,
+    BTG, BreakGlassPolicy, FACILITY_TAG_SYSTEM, Label, LabelRule, NodeScope, Pdp, Permissions,
+    Subject,
 };
 use health_fhir_search::{Catalog, ParamState, Registry, Unrestricted};
-use health_fhir_server::{FhirServer, RecordFacility};
+use health_fhir_server::{FacilityTag, FhirServer};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{SystemClock, Timestamp};
 use http_body_util::BodyExt;
@@ -21,33 +22,17 @@ use tower::ServiceExt;
 
 const ACT: &str = "http://terminology.hl7.org/CodeSystem/v3-ActCode";
 const BASE: &str = "http://test/fhir";
-/// Where this test's records name their facility; the real convention comes with #192's
-/// follow-up.
-const FACILITY: &str = "urn:test:facility";
-
-struct TagFacility;
-
-impl RecordFacility for TagFacility {
-    fn facility(&self, resource: &Value) -> Option<String> {
-        resource["meta"]["tag"]
-            .as_array()?
-            .iter()
-            .find(|t| t["system"] == FACILITY)
-            .and_then(|t| t["code"].as_str())
-            .map(str::to_owned)
-    }
-}
-
 fn registry() -> Registry {
     // The R5 definitions of the parameters this test uses.
     let definitions = [
         json!({ "resourceType": "SearchParameter", "url": "http://hl7.org/fhir/SearchParameter/Resource-id", "code": "_id", "base": ["Resource"], "type": "token", "expression": "Resource.id" }),
+        json!({ "resourceType": "SearchParameter", "url": "http://hl7.org/fhir/SearchParameter/Resource-tag", "code": "_tag", "base": ["Resource"], "type": "token", "expression": "Resource.meta.tag" }),
         json!({ "resourceType": "SearchParameter", "url": "http://hl7.org/fhir/SearchParameter/Resource-security", "code": "_security", "base": ["Resource"], "type": "token", "expression": "Resource.meta.security" }),
         json!({ "resourceType": "SearchParameter", "url": "http://hl7.org/fhir/SearchParameter/clinical-patient", "code": "patient", "base": ["Observation"], "type": "reference", "expression": "Observation.subject.where(resolve() is Patient)", "target": ["Patient"] }),
     ];
     let catalog = Catalog::from_definitions(definitions.iter());
     let mut registry = Registry::new(jiff::tz::Offset::UTC);
-    for code in ["_id", "_security", "patient"] {
+    for code in ["_id", "_security", "_tag", "patient"] {
         registry
             .support(&catalog, "Observation", code, ParamState::Active)
             .expect(code);
@@ -199,9 +184,9 @@ async fn fixture_at(scope: NodeScope) -> Fixture {
         if labels.as_array().is_some_and(|l| !l.is_empty()) {
             observation["meta"] = json!({ "security": labels });
         }
-        if let Some(facility) = facility {
-            observation["meta"]["tag"] = json!([{ "system": FACILITY, "code": facility }]);
-        }
+        // Observations are facility-scope (ADR 0057): F1's unless the row says otherwise.
+        observation["meta"]["tag"] =
+            json!([{ "system": FACILITY_TAG_SYSTEM, "code": facility.unwrap_or("F1") }]);
         let (status, body) = send(
             &admin,
             None,
@@ -214,7 +199,7 @@ async fn fixture_at(scope: NodeScope) -> Fixture {
         ids.insert(name.to_owned(), body["id"].as_str().expect("id").to_owned());
     }
     let router = FhirServer::new(store, BASE, Arc::new(Unrestricted))
-        .with_access_control(pdp().with_scope(scope), Arc::new(TagFacility))
+        .with_access_control(pdp().with_scope(scope), Arc::new(FacilityTag))
         .router();
     Fixture { router, p1, ids }
 }
@@ -275,7 +260,8 @@ async fn no_route_serves_fhir_data_without_a_subject() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn labels_and_purpose_of_use_restrict_searches_and_reads() {
     let f = fixture().await;
-    let everything = set(&["plain", "normal-conf", "at-f1", "at-f2"]);
+    // F2's record stays out of F1's searches (ADR 0057).
+    let everything = set(&["plain", "normal-conf", "at-f1"]);
 
     // A clinician without program assignments sees no labelled record, in any search.
     let clinician = subject(Permissions::from(["*.rs"]), &[]);

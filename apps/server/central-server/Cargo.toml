@@ -26,6 +26,7 @@ health-observability = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
+jiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

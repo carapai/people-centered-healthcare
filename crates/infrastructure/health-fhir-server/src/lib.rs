@@ -80,7 +80,7 @@ use health_persistence::{ResourceType, RetryPolicy};
 use health_surrealdb::{SurrealStore, ownership};
 use health_time::Timestamp;
 
-pub use access::{NoFacilityScope, RecordFacility};
+pub use access::{FacilityTag, NoFacilityScope, RecordFacility};
 pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_statement};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use outcome::{FhirError, operation_outcome};

@@ -18,7 +18,8 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - Searches run under a per-request `SubjectSearchPolicy`, confined to a patient for `patient=` or a `subject=` naming a Patient; 403 when the type may not be searched.
   - Reads, vreads and instance history are 404 when denied. Type and system history are decided as searches, so central's patient-confined shared reads (ADR 0056) never list another facility's records.
   - Creates, updates and deletes are 403 when denied, decided on both the new resource and the version replaced.
-  - `RecordFacility` finds a facility-scope record's facility. The default, `NoFacilityScope`, treats no record as facility-scope until records name their facility ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
+  - `RecordFacility` finds a facility-scope record's facility. `FacilityTag` (ADR 0057) reads the `urn:health:facility` tag on the facility-scope types; `NoFacilityScope` treats no record as facility-scope (tests).
+  - **Stamping (ADR 0057):** on create, a facility-scope record gets the session's facility tag. A tag naming another facility is 403, and an update keeps the facility of the version it replaces.
 
 - **Client registry (#197, #216):** `with_client_registry(RegistryConfig, MatchingRules)` serves `POST /Patient/$match` to anyone who may search Patients. Candidates they may not see are left out, and so is their count. It also serves the reviewer operations `POST /Patient/$merge` (preview, then the reviewer's approval), `POST /Patient/{id}/$link` and `POST /Patient/{id}/$unlink` (patient-identity.md).
   - The reviewer is the request's `Subject`: without one the answer is 401, and without `registry.review` and `Patient` update it is 403.
@@ -37,6 +38,8 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
 `tests/registry.rs` covers the registry operations: `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+
+`tests/facility.rs` covers the facility tag: stamped on create, refused for another facility, kept through updates, and facility-isolated searches at an edge and at central.
 
 `tests/authorization.rs` runs the authorization matrix through HTTP: no route without a subject, labels and purpose of use, permissions on every interaction (including a transaction Bundle), facility isolation in reads, writes and history, and break-glass confined to one patient.
 

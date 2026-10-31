@@ -450,3 +450,25 @@ fn central_opens_patient_confined_reads_of_other_facilities_only() {
         Ok(())
     );
 }
+
+#[test]
+fn searches_of_facility_scope_types_stay_in_the_subjects_facility() {
+    // ADR 0057: facility-scope types are searched within the facility; at central a search
+    // confined to one patient reads the shared record (ADR 0056).
+    let filter = |pdp: &Pdp, resource_type: &str, patient: Option<&str>| {
+        pdp.search_filter(&subject("clinician"), resource_type, patient, now())
+            .expect("filter")
+            .facility
+    };
+    let edge = pdp();
+    let central = pdp().with_scope(NodeScope::Central);
+    assert_eq!(filter(&edge, "Observation", None).as_deref(), Some("F1"));
+    assert_eq!(
+        filter(&edge, "Observation", Some("Patient/p1")).as_deref(),
+        Some("F1")
+    );
+    assert_eq!(filter(&central, "Observation", None).as_deref(), Some("F1"));
+    assert_eq!(filter(&central, "Observation", Some("Patient/p1")), None);
+    // Global types are never facility-isolated.
+    assert_eq!(filter(&edge, "Patient", None), None);
+}

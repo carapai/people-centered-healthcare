@@ -29,7 +29,7 @@ Each facility has exactly one Facility Authority Node, recorded in the facility 
 | C: Facility Edge Node, with optional LAN and Tauri clients | The edge |
 | B: a single standalone Tauri desktop, no edge, syncing to central | That desktop |
 
-A facility-scope record stays authoritative at **the facility that created it, permanently**. Authority follows the record's facility, not the patient. Other facilities read it through central (the shared record) and add their own records. They never edit it.
+A facility-scope record names its facility in a `urn:health:facility` `meta.tag`, which the server stamps on create (ADR 0057). It stays authoritative at **the facility that created it, permanently**. Authority follows the record's facility, not the patient. Other facilities read it through central (the shared record) and add their own records. They never edit it.
 
 ## Data authority matrix (v1)
 

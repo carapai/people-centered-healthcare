@@ -243,13 +243,23 @@ pub(crate) async fn write(
     } else {
         Interaction::Update
     };
-    if interaction == Interaction::Update
-        && let Some(head) = tx.read(resource_type, id).await?
-        && !head.version.deleted
-    {
+    let replaced = match interaction {
+        Interaction::Update => tx
+            .read(resource_type, id)
+            .await?
+            .filter(|head| !head.version.deleted),
+        _ => None,
+    };
+    if let Some(head) = &replaced {
         // The version replaced must be updatable too: another facility's record stays theirs.
         access::permitted(Decide::Update, &head.json)?;
     }
+    // A facility-scope record names its facility, which never changes (ADR 0057).
+    let json = &access::stamp(
+        resource_type.as_str(),
+        json,
+        replaced.as_ref().map(|head| &head.json),
+    )?;
     access::permitted(
         if interaction == Interaction::Create {
             Decide::Create

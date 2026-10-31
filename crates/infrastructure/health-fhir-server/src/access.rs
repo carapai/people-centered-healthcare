@@ -23,7 +23,9 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use health_access_policy::{Access, Decision, Interaction, Label, Pdp, Subject};
+use health_access_policy::{
+    Access, Decision, FACILITY_TAG_SYSTEM, Interaction, Label, Pdp, Subject, is_facility_scope,
+};
 use health_fhir_search::SearchPolicy;
 use health_identity_app::SubjectSearchPolicy;
 use health_persistence::RawJson;
@@ -38,6 +40,67 @@ use crate::outcome::FhirError;
 pub trait RecordFacility: Send + Sync {
     /// The facility of `resource`, if it is facility-scope.
     fn facility(&self, resource: &Value) -> Option<String>;
+}
+
+/// The facility tag (ADR 0057): a record of a facility-scope type names its facility in
+/// `meta.tag` with system `urn:health:facility`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FacilityTag;
+
+/// The facility code `json` is tagged with.
+fn tagged(json: &Value) -> Option<String> {
+    json["meta"]["tag"]
+        .as_array()?
+        .iter()
+        .find(|t| t["system"] == FACILITY_TAG_SYSTEM)
+        .and_then(|t| t["code"].as_str())
+        .map(str::to_owned)
+}
+
+impl RecordFacility for FacilityTag {
+    fn facility(&self, resource: &Value) -> Option<String> {
+        resource["resourceType"]
+            .as_str()
+            .filter(|t| is_facility_scope(t))
+            .and_then(|_| tagged(resource))
+    }
+}
+
+/// `json` with its facility tag (ADR 0057), for a facility-scope type under access control: the
+/// facility of the version it replaces, or else the subject's. A tag naming another facility is
+/// 403: authority stays with the record's facility. Other writes pass unchanged.
+pub(crate) fn stamp(
+    resource_type: &str,
+    json: &RawJson,
+    replaced: Option<&RawJson>,
+) -> Result<RawJson, FhirError> {
+    let Some(guard) = current() else {
+        return Ok(json.clone());
+    };
+    if !is_facility_scope(resource_type) {
+        return Ok(json.clone());
+    }
+    let facility = replaced
+        .and_then(|r| tagged(&parse(r)))
+        .unwrap_or_else(|| guard.subject.facility.clone());
+    let mut value = parse(json);
+    match tagged(&value) {
+        Some(named) if named == facility => return Ok(json.clone()),
+        Some(named) => {
+            return Err(FhirError::new(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                format!("the record belongs to facility {facility}, not {named}"),
+            ));
+        }
+        None => {}
+    }
+    let tag = serde_json::json!({ "system": FACILITY_TAG_SYSTEM, "code": facility });
+    match value["meta"]["tag"].as_array_mut() {
+        Some(tags) => tags.push(tag),
+        None => value["meta"]["tag"] = serde_json::json!([tag]),
+    }
+    Ok(RawJson::from_validated(value.to_string()))
 }
 
 /// No record is facility-scope: the default until records carry their facility (#192).
