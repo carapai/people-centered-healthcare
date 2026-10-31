@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
 
+use health_identity::snapshot::ClockFloor;
 use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
 use health_time::Timestamp;
 use uuid::Uuid;
@@ -111,6 +112,28 @@ pub trait AuthStore: Send + Sync {
         until: Timestamp,
         now: Timestamp,
     ) -> impl Future<Output = Result<bool, StoreError>> + Send;
+    /// The signed permission snapshot (a compact JWS) for `account` at `facility`, as central
+    /// provisioned it. Only edges keep snapshots; the default has none.
+    fn snapshot(
+        &self,
+        account: AccountId,
+        facility: &str,
+    ) -> impl Future<Output = Result<Option<String>, StoreError>> + Send {
+        let _ = (account, facility);
+        async { Ok(None) }
+    }
+    /// The persisted clock floor.
+    fn clock_floor(&self) -> impl Future<Output = Result<ClockFloor, StoreError>> + Send {
+        async { Ok(ClockFloor::default()) }
+    }
+    /// Persists the clock floor; it never moves back.
+    fn set_clock_floor(
+        &self,
+        floor: ClockFloor,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = floor;
+        async { Ok(()) }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -121,6 +144,8 @@ struct State {
     /// Retired refresh-token hashes, to detect replay.
     retired: HashMap<String, Uuid>,
     jtis: HashMap<String, Timestamp>,
+    snapshots: HashMap<(AccountId, String), String>,
+    floor: ClockFloor,
 }
 
 /// An in-memory store.
@@ -131,6 +156,13 @@ impl MemoryStore {
     /// Adds or replaces an account (provisioning from central does this in production).
     pub fn put_account(&self, account: LoginAccount) {
         self.lock().accounts.insert(account.id, account);
+    }
+
+    /// Stores a signed snapshot, as provisioning from central does.
+    pub fn put_snapshot(&self, account: AccountId, facility: &str, jws: String) {
+        self.lock()
+            .snapshots
+            .insert((account, facility.to_owned()), jws);
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
@@ -235,5 +267,29 @@ impl AuthStore for MemoryStore {
         let mut state = self.lock();
         state.jtis.retain(|_, expiry| *expiry > now);
         Ok(state.jtis.insert(jti.to_owned(), until).is_none())
+    }
+
+    async fn snapshot(
+        &self,
+        account: AccountId,
+        facility: &str,
+    ) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .lock()
+            .snapshots
+            .get(&(account, facility.to_owned()))
+            .cloned())
+    }
+
+    async fn clock_floor(&self) -> Result<ClockFloor, StoreError> {
+        Ok(self.lock().floor)
+    }
+
+    async fn set_clock_floor(&self, floor: ClockFloor) -> Result<(), StoreError> {
+        let mut state = self.lock();
+        if let Some(at) = floor.get() {
+            state.floor = state.floor.observe(at);
+        }
+        Ok(())
     }
 }

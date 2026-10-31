@@ -1,11 +1,13 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::lockout::Lockout;
 
 /// A Login Account's id: a UUIDv7 minted by central.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct AccountId(pub Uuid);
 
 impl fmt::Display for AccountId {

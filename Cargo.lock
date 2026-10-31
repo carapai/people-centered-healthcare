@@ -2006,6 +2006,7 @@ name = "health-identity"
 version = "0.1.0"
 dependencies = [
  "health-time",
+ "serde",
  "thiserror",
  "uuid",
 ]

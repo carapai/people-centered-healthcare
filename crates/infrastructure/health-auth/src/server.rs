@@ -18,7 +18,9 @@ use uuid::Uuid;
 
 use crate::credentials::Credentials;
 use crate::jose::{TokenSigner, b64, sha256_b64, verify_dpop};
+use crate::snapshot::{SnapshotGate, token_claims};
 use crate::store::{AuthStore, AuthorizationCode, Session};
+use health_identity::snapshot::PermissionSnapshot;
 
 /// A registered public client (authorization code with PKCE; no client secret).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +50,8 @@ pub struct AuthConfig {
     pub code_lifetime: SignedDuration,
     /// How old a DPoP proof's `iat` may be, and how far ahead of our clock.
     pub dpop_window: SignedDuration,
+    /// On an edge: logins and refreshes need a valid permission snapshot (ADR 0011).
+    pub snapshots: Option<SnapshotGate>,
 }
 
 impl AuthConfig {
@@ -62,6 +66,7 @@ impl AuthConfig {
             session: SessionPolicy::default(),
             code_lifetime: SignedDuration::from_secs(60),
             dpop_window: SignedDuration::from_secs(300),
+            snapshots: None,
         }
     }
 
@@ -409,6 +414,11 @@ async fn authorize_login<S: AuthStore>(
             Err(_) => error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
         };
     }
+    // On an edge the password alone is not enough: the user needs a live snapshot here. The
+    // refusal looks like any other.
+    if inner.current_snapshot(account.id, now).await.is_err() {
+        return refused();
+    }
     let code = random_token();
     let stored = AuthorizationCode {
         client_id: request.client_id,
@@ -485,9 +495,14 @@ impl<S: AuthStore> Inner<S> {
         auth_time: Timestamp,
         refresh: &str,
         nonce: Option<&str>,
+        snapshot: Option<&PermissionSnapshot>,
         now: Timestamp,
     ) -> Value {
-        let expires = self.config.session.access_expiry(auth_time, now);
+        // No token outlives the session's cap or the user's permission snapshot.
+        let mut expires = self.config.session.access_expiry(auth_time, now);
+        if let Some(snapshot) = snapshot {
+            expires = expires.min(snapshot.not_after);
+        }
         let mut claims = json!({
             "iss": self.config.issuer,
             "sub": session.account.to_string(),
@@ -504,6 +519,11 @@ impl<S: AuthStore> Inner<S> {
         if let Some(jkt) = &session.jkt {
             claims["cnf"] = json!({ "jkt": jkt });
         }
+        if let (Some(snapshot), Some(object)) = (snapshot, claims.as_object_mut())
+            && let Value::Object(extra) = token_claims(snapshot)
+        {
+            object.extend(extra);
+        }
         let mut response = json!({
             "access_token": self.signer.sign(&claims),
             "token_type": if session.jkt.is_some() { "DPoP" } else { "Bearer" },
@@ -511,6 +531,10 @@ impl<S: AuthStore> Inner<S> {
             "scope": session.scopes.to_string(),
             "refresh_token": refresh,
         });
+        if let Some(snapshot) = snapshot {
+            // The client warns from three days before this (offline-auth.md).
+            response["snapshot_not_after"] = json!(seconds(snapshot.not_after));
+        }
         if session.scopes.contains(&Scope::OpenId) {
             let mut id = json!({
                 "iss": self.config.issuer,
@@ -528,6 +552,38 @@ impl<S: AuthStore> Inner<S> {
             response["id_token"] = json!(self.signer.sign_id_token(&id));
         }
         response
+    }
+
+    /// The account's snapshot for this node's facility, when the node requires one: present,
+    /// signed by central, for this account and facility, and unexpired at a clock that has not
+    /// gone back past the floor. Each check advances the floor to the snapshot's issue time.
+    /// `Ok(None)` when the node needs no snapshot (central).
+    async fn current_snapshot(
+        &self,
+        account: AccountId,
+        now: Timestamp,
+    ) -> Result<Option<PermissionSnapshot>, ()> {
+        let Some(gate) = &self.config.snapshots else {
+            return Ok(None);
+        };
+        let floor = self.store.clock_floor().await.map_err(|_| ())?;
+        let at = floor.check(now).map_err(|_| ())?;
+        let jws = self
+            .store
+            .snapshot(account, &gate.facility)
+            .await
+            .map_err(|_| ())?
+            .ok_or(())?;
+        let snapshot = gate.verifier.verify(&jws).map_err(|_| ())?;
+        if snapshot.account != account || snapshot.facility != gate.facility {
+            return Err(());
+        }
+        gate.policy.check(&snapshot, at).map_err(|_| ())?;
+        self.store
+            .set_clock_floor(floor.observe(snapshot.issued_at))
+            .await
+            .map_err(|_| ())?;
+        Ok(Some(snapshot))
     }
 
     async fn account_active(&self, id: AccountId) -> bool {
@@ -590,6 +646,9 @@ async fn authorization_code<S: AuthStore>(
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
+    let Ok(snapshot) = inner.current_snapshot(stored.account, now).await else {
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
+    };
     let refresh = random_token();
     let session = Session {
         id: Uuid::now_v7(),
@@ -610,6 +669,7 @@ async fn authorization_code<S: AuthStore>(
         stored.auth_time,
         &refresh,
         stored.nonce.as_deref(),
+        snapshot.as_ref(),
         now,
     );
     (no_store(), Json(body)).into_response()
@@ -643,6 +703,11 @@ async fn refresh<S: AuthStore>(
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
+    // Permissions are never cached past their snapshot: an expired one ends the session.
+    let Ok(snapshot) = inner.current_snapshot(session.account, now).await else {
+        let _ = inner.store.end_session(session.id).await;
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
+    };
     let next = random_token();
     match inner
         .store
@@ -652,7 +717,7 @@ async fn refresh<S: AuthStore>(
         Ok(true) => {}
         _ => return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"),
     }
-    let mut body = inner.tokens(&session, auth_time, &next, None, now);
+    let mut body = inner.tokens(&session, auth_time, &next, None, snapshot.as_ref(), now);
     // A refresh does not re-authenticate, so it issues no new ID token.
     if let Some(object) = body.as_object_mut() {
         object.remove("id_token");
