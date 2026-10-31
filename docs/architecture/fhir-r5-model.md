@@ -126,7 +126,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 - **Follow-ups:**
   - tier 2 invariants and the decimal-exact FHIRPath engine ([#165](https://github.com/carapai/people-centered-healthcare/issues/165));
   - the HL7 Java validator cross-check (#166; § The HL7 Java validator differential);
-  - the Inbound Dead Letter and quarantine ([#167](https://github.com/carapai/people-centered-healthcare/issues/167)).
+  - the Inbound Dead Letter and quarantine: done in #167, as `health-integration` (see § Inbound validation in code below).
 
 ### Tier 3 in code
 
@@ -226,3 +226,12 @@ These are fixed here for [How are FHIR resources, versions and history persisted
 - transactions that are all-or-nothing.
 
 Version-id format and client-supplied ids versus R5's "server SHALL ignore client id on create" are also resolved there. Our sync protocol relies on client-generated ids (ADR 0013).
+
+### Inbound validation in code
+
+`health-integration`'s `Inbound::receive` applies the external-source row of the table above:
+- **Tier 1 failures** are refused with an OperationOutcome and kept verbatim in the Inbound Dead Letter.
+- **Tier 2–3 failures, and writes the store refuses,** go to quarantine.
+- **Review:** reviewers list entries, replay them (validated again from tier 1, then written) or discard them.
+
+Every access is audited. Each integration sets its retention (90 days by default), and `purge` enforces it. The entries live in the `inbound` table (migration `0005_inbound`). The sync-ingest `rejected` status is part of sync ingest ([#81](https://github.com/carapai/people-centered-healthcare/issues/81)). Details: [crates/infrastructure/health-integration/README.md](../../crates/infrastructure/health-integration/README.md).

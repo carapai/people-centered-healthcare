@@ -3,7 +3,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use health_surrealdb::ownership::{self, INFRASTRUCTURE_TABLES, UNIT_OF_WORK, owner_of};
+use health_surrealdb::ownership::{
+    self, INFRASTRUCTURE_TABLES, MODULE_TABLES, UNIT_OF_WORK, owner_of,
+};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 
 /// Every table to its Owner. History tables belong to their head table's Owner.
@@ -24,6 +26,9 @@ fn declared() -> BTreeMap<String, Vec<&'static str>> {
             .entry((*table).to_owned())
             .or_default()
             .push(UNIT_OF_WORK);
+    }
+    for (table, owner) in MODULE_TABLES {
+        owners.entry((*table).to_owned()).or_default().push(owner);
     }
     owners
 }

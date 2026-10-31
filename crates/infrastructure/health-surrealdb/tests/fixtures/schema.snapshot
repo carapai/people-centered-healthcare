@@ -693,6 +693,19 @@ DEFINE TABLE implementation_guide_history TYPE NORMAL SCHEMAFULL PERMISSIONS NON
   DEFINE FIELD version_id ON implementation_guide_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON implementation_guide_history TYPE int PERMISSIONS FULL
   DEFINE INDEX implementation_guide_history_last_updated ON implementation_guide_history FIELDS last_updated, version_seq
+DEFINE TABLE inbound TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD integration ON inbound TYPE string PERMISSIONS FULL
+  DEFINE FIELD issues ON inbound TYPE array<string> PERMISSIONS FULL
+  DEFINE FIELD issues.* ON inbound TYPE string PERMISSIONS FULL
+  DEFINE FIELD kind ON inbound TYPE string ASSERT $value INSIDE ['dead_letter', 'quarantine'] PERMISSIONS FULL
+  DEFINE FIELD note ON inbound TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD payload ON inbound TYPE string PERMISSIONS FULL
+  DEFINE FIELD received_at ON inbound TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD resolved_at ON inbound TYPE none | datetime PERMISSIONS FULL
+  DEFINE FIELD retain_until ON inbound TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD status ON inbound TYPE string ASSERT $value INSIDE ['pending', 'replayed', 'discarded'] PERMISSIONS FULL
+  DEFINE INDEX inbound_retention ON inbound FIELDS retain_until
+  DEFINE INDEX inbound_review ON inbound FIELDS kind, status, received_at
 DEFINE TABLE insurance_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON insurance_plan TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON insurance_plan TYPE array<record> DEFAULT [] PERMISSIONS FULL
