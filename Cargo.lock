@@ -1879,6 +1879,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-access-policy"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "thiserror",
+]
+
+[[package]]
 name = "health-auth"
 version = "0.1.0"
 dependencies = [
@@ -2009,6 +2017,24 @@ dependencies = [
  "serde",
  "thiserror",
  "uuid",
+]
+
+[[package]]
+name = "health-identity-app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-access-policy",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-surrealdb",
+ "health-time",
+ "http-body-util",
+ "jiff",
+ "serde_json",
+ "surrealdb",
+ "tokio",
+ "tower",
 ]
 
 [[package]]

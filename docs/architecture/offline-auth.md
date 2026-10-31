@@ -60,6 +60,10 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
   - `health_identity::snapshot` holds the snapshot model and policy, the clock floor and the role → permission mappings.
   - In `health-auth`, `SnapshotSigner` signs at central, `SnapshotVerifier` verifies, and `SnapshotGate` lets an edge refuse logins and refreshes without a valid snapshot. Tokens carry `facility` and `snapshot_version` and never outlive the snapshot.
   - Extensions, local grants and provisional accounts are part of the edge's local authorization server ([#75](https://github.com/carapai/people-centered-healthcare/issues/75)).
+- **Policy decision point** (#65):
+  - `health-access-policy` (domain) decides from permissions (`{Type|*}.{cruds}`), facility isolation, sensitivity labels mapped to programs, purpose of use, and break-glass (one patient, 1 h, `BTG`, no extension, an event for audit and alert).
+  - `health-identity-app`'s `SubjectSearchPolicy` turns its search filter into `_security:not=…` inside the database query.
+  - Wiring it into every FHIR request, per subject, is [#192](https://github.com/carapai/people-centered-healthcare/issues/192).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence ([#187](https://github.com/carapai/people-centered-healthcare/issues/187));

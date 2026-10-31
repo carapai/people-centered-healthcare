@@ -57,6 +57,7 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Persist the authorization server's state in SurrealDB](https://github.com/carapai/people-centered-healthcare/issues/187)
 - [Mount the authorization server in central-server, with its signing key and the client sign-in flow](https://github.com/carapai/people-centered-healthcare/issues/188)
 - [Check new passwords against a breached-password list](https://github.com/carapai/people-centered-healthcare/issues/189)
+- [Apply the policy decision point to every FHIR interaction](https://github.com/carapai/people-centered-healthcare/issues/192)
 
 ## [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4)
 
