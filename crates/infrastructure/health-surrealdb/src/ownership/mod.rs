@@ -65,6 +65,14 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("inbound", "integration"),
     // The client registry's review queue.
     ("registry_review", "client-registry"),
+    // The authorization server's state (health-auth).
+    ("auth_account", "identity"),
+    ("auth_code", "identity"),
+    ("auth_session", "identity"),
+    ("auth_retired_refresh", "identity"),
+    ("auth_jti", "identity"),
+    ("auth_snapshot", "identity"),
+    ("auth_clock_floor", "identity"),
 ];
 
 /// Every owned resource type, sorted by type.

@@ -66,7 +66,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
   - Wiring it into every FHIR request, per subject, is [#192](https://github.com/carapai/people-centered-healthcare/issues/192).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
-  - persistence ([#187](https://github.com/carapai/people-centered-healthcare/issues/187));
+  - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);
   - mounting it, with key storage and the web client's sign-in ([#188](https://github.com/carapai/people-centered-healthcare/issues/188));
   - the breached-password list ([#189](https://github.com/carapai/people-centered-healthcare/issues/189)).
 

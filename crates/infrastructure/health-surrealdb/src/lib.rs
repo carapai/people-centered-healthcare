@@ -13,6 +13,7 @@
 //! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
+mod auth;
 mod blocking;
 mod connection;
 mod history;
@@ -23,6 +24,7 @@ mod review;
 pub mod search;
 mod store;
 
+pub use auth::AuthSessionRow;
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
 pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};

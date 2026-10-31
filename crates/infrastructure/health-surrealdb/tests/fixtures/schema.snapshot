@@ -92,6 +92,31 @@ DEFINE TABLE audit_event_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON audit_event_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON audit_event_history TYPE int PERMISSIONS FULL
   DEFINE INDEX audit_event_history_last_updated ON audit_event_history FIELDS last_updated, version_seq
+DEFINE TABLE auth_account TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD credential ON auth_account TYPE string PERMISSIONS FULL
+  DEFINE FIELD failures ON auth_account TYPE int PERMISSIONS FULL
+  DEFINE FIELD locked_until ON auth_account TYPE none | datetime PERMISSIONS FULL
+  DEFINE FIELD status ON auth_account TYPE string ASSERT $value INSIDE ['active', 'disabled'] PERMISSIONS FULL
+  DEFINE FIELD username ON auth_account TYPE string PERMISSIONS FULL
+  DEFINE INDEX auth_account_username ON auth_account FIELDS username UNIQUE
+DEFINE TABLE auth_clock_floor TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD at ON auth_clock_floor TYPE datetime PERMISSIONS FULL
+DEFINE TABLE auth_code TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON auth_code TYPE string PERMISSIONS FULL
+  DEFINE FIELD expires_at ON auth_code TYPE datetime PERMISSIONS FULL
+DEFINE TABLE auth_jti TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD until ON auth_jti TYPE datetime PERMISSIONS FULL
+DEFINE TABLE auth_retired_refresh TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD ends_at ON auth_retired_refresh TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD session ON auth_retired_refresh TYPE string PERMISSIONS FULL
+DEFINE TABLE auth_session TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD `live` ON auth_session TYPE bool PERMISSIONS FULL
+  DEFINE FIELD data ON auth_session TYPE string PERMISSIONS FULL
+  DEFINE FIELD ends_at ON auth_session TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD refresh_hash ON auth_session TYPE string PERMISSIONS FULL
+  DEFINE INDEX auth_session_refresh ON auth_session FIELDS refresh_hash UNIQUE
+DEFINE TABLE auth_snapshot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD jws ON auth_snapshot TYPE string PERMISSIONS FULL
 DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD count ON block_count TYPE int PERMISSIONS FULL
   DEFINE FIELD counted_at ON block_count TYPE datetime PERMISSIONS FULL

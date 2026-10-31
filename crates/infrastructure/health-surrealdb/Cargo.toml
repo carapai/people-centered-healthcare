@@ -23,6 +23,7 @@ memory = ["surrealdb/kv-mem"]
 futures-util = { workspace = true }
 health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
+health-identity = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }

@@ -31,7 +31,14 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - On resource requests it must also carry `ath`, and its key must match the token's `jkt`.
 - **Resource side:** `AccessVerifier::verify` checks the token, its binding, and that its session is still live, so logout takes effect at once. It returns a `Principal`. Authorization decisions are the policy decision point's ([#65](https://github.com/carapai/people-centered-healthcare/issues/65)).
 - **Credentials:** Argon2id with m = 19456 KiB, t = 2, p = 1, plus an optional pepper (`Credentials`).
-- **State:** `AuthStore` holds accounts, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development, and the SurrealDB adapter is [#187](https://github.com/carapai/people-centered-healthcare/issues/187).
+- **State:** `AuthStore` holds accounts, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development.
+- **`SurrealAuthStore`** persists that state in SurrealDB (migration `0008_auth`, owned by identity), one transaction per operation:
+  - **Codes:** a code is taken with a single `DELETE … RETURN`, so two concurrent redemptions cannot both get it; the loser's commit conflicts.
+  - **Refresh tokens:** rotation is a compare-and-set on the current hash, and the old hash is kept as retired, so a replay is recognised.
+  - **Other state:** lockout counters, snapshots and the clock floor survive restarts.
+  - **Provisioning:** `put_account` and `put_snapshot`.
+  - **Purging:** `purge(now)` deletes expired codes and jtis, and sessions past their 12-hour cap, as a background job.
+  - Only hashes of codes and refresh tokens are stored.
 
 ## Permission snapshots (ADR 0011)
 
@@ -71,6 +78,13 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - lockout after 10 failures, with a locked account indistinguishable from an unknown one;
   - the 12-hour cap;
   - unregistered redirects never followed.
+- **`tests/surreal_store.rs`**, over SurrealDB:
+  - the flow continues across a server restart mid-session: the access token still verifies, refresh rotates, and a replay ends the session;
+  - logout;
+  - lockout counters persist;
+  - purge;
+  - of four concurrent redemptions of one code, exactly one gets tokens (five rounds);
+  - concurrent refreshes rotate at most once.
 - **`tests/snapshots.rs`**, an edge with a `SnapshotGate`:
   - no snapshot, no login;
   - the snapshot's claims reach the token;
