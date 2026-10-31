@@ -2,15 +2,16 @@
 //! operation, so a code is redeemed at most once and a refresh token rotates at most once even
 //! when requests race.
 
+use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
 use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
 use health_persistence::{Store, Transaction};
-use health_surrealdb::{AuthSessionRow, SurrealStore, SurrealTx};
+use health_surrealdb::{AuthSessionRow, BreakGlassRow, SurrealStore, SurrealTx};
 use health_time::Timestamp;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::store::{AuthStore, AuthorizationCode, Session, StoreError};
+use crate::store::{AuthStore, AuthorizationCode, BreakGlassRecord, Session, StoreError};
 
 /// The SurrealDB [`AuthStore`].
 #[derive(Clone)]
@@ -86,6 +87,24 @@ fn session_of(id: &str, row: &AuthSessionRow) -> Option<Session> {
         facility: v["facility"].as_str().map(str::to_owned),
         jkt: v["jkt"].as_str().map(str::to_owned),
         refresh_hash: row.refresh_hash.clone(),
+    })
+}
+
+fn break_glass_of(row: BreakGlassRow) -> Option<BreakGlassRecord> {
+    Some(BreakGlassRecord {
+        id: row.id,
+        session: row.session.parse().ok()?,
+        event: BreakGlassEvent {
+            account: row.account,
+            facility: row.facility,
+            patient: row.patient,
+            reason: row.reason,
+            justification: row.justification,
+            at: row.at,
+            expires_at: row.expires_at,
+        },
+        review_due: row.review_due,
+        acknowledged: row.acknowledged,
     })
 }
 
@@ -284,6 +303,66 @@ impl AuthStore for SurrealAuthStore {
     ) -> Result<Option<String>, StoreError> {
         let mut tx = self.begin().await?;
         tx.auth_snapshot(account, facility).await.map_err(failed)
+    }
+
+    async fn grant_break_glass(
+        &self,
+        record: &BreakGlassRecord,
+        audit: Option<&Value>,
+    ) -> Result<(), StoreError> {
+        let event = &record.event;
+        let row = BreakGlassRow {
+            id: record.id.clone(),
+            session: record.session.to_string(),
+            account: event.account.clone(),
+            facility: event.facility.clone(),
+            patient: event.patient.clone(),
+            reason: event.reason.clone(),
+            justification: event.justification.clone(),
+            at: event.at,
+            expires_at: event.expires_at,
+            review_due: record.review_due,
+            acknowledged: record.acknowledged,
+        };
+        let mut tx = self.begin().await?;
+        tx.put_break_glass(&row).await.map_err(failed)?;
+        // The grant and its AuditEvent commit together, or neither does.
+        if let Some(audit) = audit {
+            health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        }
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn active_break_glass(
+        &self,
+        session: Uuid,
+        now: Timestamp,
+    ) -> Result<Option<BreakGlassRecord>, StoreError> {
+        let mut tx = self.begin().await?;
+        let row = tx
+            .active_break_glass(&session.to_string(), now)
+            .await
+            .map_err(failed)?;
+        Ok(row.and_then(break_glass_of))
+    }
+
+    async fn break_glass_alerts(
+        &self,
+        facility: &str,
+    ) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        let mut tx = self.begin().await?;
+        let rows = tx.break_glass_alerts(facility).await.map_err(failed)?;
+        Ok(rows.into_iter().filter_map(break_glass_of).collect())
+    }
+
+    async fn acknowledge_break_glass(&self, id: &str, facility: &str) -> Result<bool, StoreError> {
+        let mut tx = self.begin().await?;
+        let done = tx
+            .acknowledge_break_glass(id, facility)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok(done)
     }
 
     async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {

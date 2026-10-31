@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 13 | 23 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 14 | 24 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 44 of 124 implementation tasks done. Validation spikes open: 3.
+Total: 45 of 125 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -75,3 +75,4 @@ Total: 44 of 124 implementation tasks done. Validation spikes open: 3.
 - 2026-10-31: #209 part 1 merged (#213; ADR 0056 merged with the maintainer's explicit approval over the two-review ADR gate). Part 2: the facility is chosen at sign-in. Central's `SnapshotGate` has `facility: None`, and the user names one of their snapshots' facilities, or none if they have only one; several with none named comes back as `error=facility`. The code, session and token carry it, and `Principal` exposes `facility` and `snapshot_version`. The client's sign-in page has an optional facility code field.
 - 2026-10-31: #209 done in three PRs (#213, #214, and this one). `health_auth::Subjects` and `subject_layer` build each request's subject and audit agent. Central-server reads `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE` and, with both, mounts `/fhir` (central scope, audited). A request without a token is 401, except `/fhir/metadata`. The OpenAPI document gains `GET /api/session`, and `@health/api-client` is regenerated.
 - 2026-10-31: #209 merged (#215). #197: `FhirServer::with_client_registry` serves `Patient/$merge` (preview, then the reviewer's approval; the reviewer's own facility only; different facilities are 422), `$link` (with survivorship review queued in the same transaction) and `$unlink`. They are for subjects whose roles map to `registry.review`. Each version is audited naming the reviewer. Central serves them when `HEALTH_REGISTRY_NIN_SYSTEM` is set. Split out: #216 (`Patient/$match` over HTTP).
+- 2026-10-31: #197 merged (#217). #210: break-glass over the API. `POST /api/break-glass` grants one patient for one hour (403 without the permission, 400 without a reason or justification, 409 while one is active). It is stored for the session in `break_glass` (migration `0009`) with its `BTG` AuditEvent, in one transaction. The session's subject carries the grant, and its agent is flagged, so every access is audited with `BTG`. The in-charge (`break-glass.alerts`) lists and acknowledges alerts, and the review is due in 72 h. Split out: #218 (pushing alerts, and the privacy officer's review).

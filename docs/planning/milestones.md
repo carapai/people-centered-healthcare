@@ -60,6 +60,7 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Apply the policy decision point to every FHIR interaction](https://github.com/carapai/people-centered-healthcare/issues/192)
 - [Resolve each request's subject at central and mount the FHIR API behind it](https://github.com/carapai/people-centered-healthcare/issues/209)
 - [Break-glass over the API: the request endpoint, stored grants, audit obligations and the in-charge alert](https://github.com/carapai/people-centered-healthcare/issues/210)
+- [Deliver break-glass alerts and run the privacy officer's review](https://github.com/carapai/people-centered-healthcare/issues/218)
 - [Name a record's facility and isolate facility-scope records in searches](https://github.com/carapai/people-centered-healthcare/issues/211)
 - [Store Provenance with its target's Owner](https://github.com/carapai/people-centered-healthcare/issues/196)
 - [Expose the client registry's link, unlink and $merge operations over FHIR](https://github.com/carapai/people-centered-healthcare/issues/197)

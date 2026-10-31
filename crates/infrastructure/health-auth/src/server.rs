@@ -1039,6 +1039,16 @@ impl<S: AuthStore> AccessVerifier<S> {
 }
 
 impl<S> AccessVerifier<S> {
+    /// The server's store.
+    pub(crate) fn store(&self) -> &S {
+        &self.inner.store
+    }
+
+    /// The server's clock.
+    pub(crate) fn now(&self) -> Timestamp {
+        self.inner.clock.now()
+    }
+
     /// The issuer's origin (`scheme://host[:port]`), where resource routes are served.
     pub(crate) fn origin(&self) -> String {
         self.inner

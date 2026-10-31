@@ -120,6 +120,19 @@ DEFINE TABLE auth_snapshot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD count ON block_count TYPE int PERMISSIONS FULL
   DEFINE FIELD counted_at ON block_count TYPE datetime PERMISSIONS FULL
+DEFINE TABLE break_glass TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD account ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD acknowledged ON break_glass TYPE bool PERMISSIONS FULL
+  DEFINE FIELD at ON break_glass TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD expires_at ON break_glass TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD facility ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD justification ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD patient ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD reason ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE FIELD review_due ON break_glass TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD session ON break_glass TYPE string PERMISSIONS FULL
+  DEFINE INDEX break_glass_alerts ON break_glass FIELDS facility, acknowledged, at
+  DEFINE INDEX break_glass_session ON break_glass FIELDS session, expires_at
 DEFINE TABLE capability_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON capability_statement TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON capability_statement TYPE array<record> DEFAULT [] PERMISSIONS FULL

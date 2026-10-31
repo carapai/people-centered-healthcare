@@ -250,12 +250,53 @@ impl Auditor {
         event
     }
 
+    /// The AuditEvent of a break-glass grant (offline-auth.md § Break-glass): a security alert
+    /// coded `BTG`, labelled, naming the patient, with the user's justification.
+    pub fn break_glass(
+        &self,
+        agent: &Agent,
+        patient: &str,
+        justification: &str,
+        recorded: Timestamp,
+    ) -> Value {
+        let agent = Agent {
+            break_glass: true,
+            ..agent.clone()
+        };
+        let entity = Entity {
+            what: patient.to_owned(),
+            labels: Vec::new(),
+        };
+        let mut event = self.event(
+            &agent,
+            Interaction::Read,
+            std::slice::from_ref(&entity),
+            Some(patient),
+            recorded,
+            None,
+        );
+        event["category"] = json!([{ "coding": [{ "system": "http://dicom.nema.org/resources/ontology/DCM", "code": "110113", "display": "Security Alert" }] }]);
+        event["code"] = json!({ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/v3-ActReason", "code": "BTG", "display": "break the glass" }] });
+        event["action"] = json!("E");
+        event["entity"][0]["detail"] =
+            json!([{ "type": { "text": "justification" }, "valueString": justification }]);
+        event
+    }
+
     /// Appends `event` in `tx`: a new AuditEvent that can never be overwritten.
     pub async fn append<T: Transaction>(
         &self,
         tx: &mut T,
         event: &Value,
     ) -> Result<ResourceId, WriteError> {
+        append(tx, event).await
+    }
+}
+
+/// Appends `event` in `tx`: a new AuditEvent that can never be overwritten. For writers that
+/// built the event with an [`Auditor`] elsewhere, such as the authorization server's store.
+pub async fn append<T: Transaction>(tx: &mut T, event: &Value) -> Result<ResourceId, WriteError> {
+    {
         let id = ResourceId::new();
         let resource_type = AUDIT_EVENT.parse().map_err(|_| {
             WriteError::Store(StoreError::Unavailable(
