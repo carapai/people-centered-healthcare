@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
+import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +30,69 @@ const SignInRoute = SignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BreakGlassAlertsRoute = BreakGlassAlertsRouteImport.update({
+  id: '/break-glass/alerts',
+  path: '/break-glass/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
+  id: '/break-glass/reviews',
+  path: '/break-glass/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/sign-in': typeof SignInRoute
+  '/break-glass/alerts': typeof BreakGlassAlertsRoute
+  '/break-glass/reviews': typeof BreakGlassReviewsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/sign-in': typeof SignInRoute
+  '/break-glass/alerts': typeof BreakGlassAlertsRoute
+  '/break-glass/reviews': typeof BreakGlassReviewsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/sign-in': typeof SignInRoute
+  '/break-glass/alerts': typeof BreakGlassAlertsRoute
+  '/break-glass/reviews': typeof BreakGlassReviewsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/callback' | '/sign-in'
+  fullPaths:
+    | '/'
+    | '/callback'
+    | '/sign-in'
+    | '/break-glass/alerts'
+    | '/break-glass/reviews'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/callback' | '/sign-in'
-  id: '__root__' | '/' | '/callback' | '/sign-in'
+  to:
+    | '/'
+    | '/callback'
+    | '/sign-in'
+    | '/break-glass/alerts'
+    | '/break-glass/reviews'
+  id:
+    | '__root__'
+    | '/'
+    | '/callback'
+    | '/sign-in'
+    | '/break-glass/alerts'
+    | '/break-glass/reviews'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CallbackRoute: typeof CallbackRoute
   SignInRoute: typeof SignInRoute
+  BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
+  BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +118,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/break-glass/alerts': {
+      id: '/break-glass/alerts'
+      path: '/break-glass/alerts'
+      fullPath: '/break-glass/alerts'
+      preLoaderRoute: typeof BreakGlassAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/break-glass/reviews': {
+      id: '/break-glass/reviews'
+      path: '/break-glass/reviews'
+      fullPath: '/break-glass/reviews'
+      preLoaderRoute: typeof BreakGlassReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +139,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CallbackRoute: CallbackRoute,
   SignInRoute: SignInRoute,
+  BreakGlassAlertsRoute: BreakGlassAlertsRoute,
+  BreakGlassReviewsRoute: BreakGlassReviewsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

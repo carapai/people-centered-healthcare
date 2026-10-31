@@ -88,6 +88,7 @@ Change log, outbox, sync protocol, scopes, conflicts, seeding (§129).
 - [Implement the change log, commit counter and outbox in the write transaction](https://github.com/carapai/people-centered-healthcare/issues/79)
 - [Implement health-sync-protocol](https://github.com/carapai/people-centered-healthcare/issues/80)
 - [Run sync between central and edges with Sync Scopes](https://github.com/carapai/people-centered-healthcare/issues/81)
+- [Sync break-glass grants to central, with the review clock from arrival](https://github.com/carapai/people-centered-healthcare/issues/224)
 - [Implement conflict detection, Conflict Records and review queues](https://github.com/carapai/people-centered-healthcare/issues/82)
 - [Implement seeding, re-seeding and the tombstone horizon](https://github.com/carapai/people-centered-healthcare/issues/83)
 - [Sync attachments as resumable chunks](https://github.com/carapai/people-centered-healthcare/issues/84)
