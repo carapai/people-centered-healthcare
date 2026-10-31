@@ -74,6 +74,9 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_snapshot", "identity"),
     ("auth_clock_floor", "identity"),
     ("break_glass", "identity"),
+    // Stock (health-inventory).
+    ("stock_balance", "inventory"),
+    ("stock_movement", "inventory"),
 ];
 
 /// Every owned resource type, sorted by type.

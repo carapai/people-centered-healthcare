@@ -100,7 +100,7 @@ pub struct BreakGlassReviewRow {
 }
 
 impl SurrealTx {
-    async fn rows(
+    pub(crate) async fn rows(
         &mut self,
         sql: &str,
         binds: Vec<(&'static str, String)>,
@@ -117,7 +117,7 @@ impl SurrealTx {
             .map_err(unavailable)
     }
 
-    async fn run(
+    pub(crate) async fn run(
         &mut self,
         sql: &str,
         binds: Vec<(&'static str, String)>,

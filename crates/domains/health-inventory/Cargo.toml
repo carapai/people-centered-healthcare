@@ -1,0 +1,23 @@
+[package]
+name = "health-inventory"
+description = "Stock Units, the append-only movement ledger, balance records as guards and the negative-stock policy (inventory-and-procurement.md; ADR 0034)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "inventory"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]

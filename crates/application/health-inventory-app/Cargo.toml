@@ -1,0 +1,25 @@
+[package]
+name = "health-inventory-app"
+description = "Inventory use cases: recording stock movements against their balance records, status changes and the nightly drift check (inventory-and-procurement.md; ADR 0034)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "inventory"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-inventory = { workspace = true }
+health-persistence = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

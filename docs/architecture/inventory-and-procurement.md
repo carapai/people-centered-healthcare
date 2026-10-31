@@ -75,6 +75,7 @@ sequenceDiagram
 - **Derived values.** `available = on-hand − reserved − on-hold`.
 - **Stock card.** A running balance per Stock Unit, ordered by `occurred_at`, then `recorded_at`, then movement id. A backdated movement recomputes it from that date. Reports use `occurred_at`.
 - **Nightly check.** A job rebuilds balances from the ledger, compares them with the balance records, and alerts on any drift.
+- **Code.** `health-inventory` (the Stock Unit, movements, the policy and the stock card), `health-inventory-app` (`Inventory::record`, rerun on a write conflict) and SurrealDB migration `0011_stock`.
 
 ## Negative stock
 

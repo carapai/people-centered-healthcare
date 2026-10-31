@@ -1315,6 +1315,17 @@ DEFINE TABLE specimen_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON specimen_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON specimen_history TYPE int PERMISSIONS FULL
   DEFINE INDEX specimen_history_last_updated ON specimen_history FIELDS last_updated, version_seq
+DEFINE TABLE stock_balance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD flagged ON stock_balance TYPE bool PERMISSIONS FULL
+  DEFINE FIELD on_hand ON stock_balance TYPE int PERMISSIONS FULL
+  DEFINE FIELD on_hold ON stock_balance TYPE int PERMISSIONS FULL
+  DEFINE FIELD reserved ON stock_balance TYPE int PERMISSIONS FULL
+  DEFINE FIELD unit ON stock_balance TYPE string PERMISSIONS FULL
+DEFINE TABLE stock_movement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON stock_movement TYPE string PERMISSIONS FULL
+  DEFINE FIELD recorded_at ON stock_movement TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD unit_key ON stock_movement TYPE string PERMISSIONS FULL
+  DEFINE INDEX stock_movement_unit ON stock_movement FIELDS unit_key, recorded_at
 DEFINE TABLE structure_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON structure_definition TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON structure_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
