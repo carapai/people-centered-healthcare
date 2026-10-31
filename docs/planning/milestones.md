@@ -64,6 +64,7 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Store Provenance with its target's Owner](https://github.com/carapai/people-centered-healthcare/issues/196)
 - [Expose the client registry's link, unlink and $merge operations over FHIR](https://github.com/carapai/people-centered-healthcare/issues/197)
 - [Store blocking keys and block counts, and serve Patient/$match](https://github.com/carapai/people-centered-healthcare/issues/199)
+- [Serve Patient/$match over HTTP](https://github.com/carapai/people-centered-healthcare/issues/216)
 - [Load-test patient matching at 45M on central-class hardware](https://github.com/carapai/people-centered-healthcare/issues/200) — needs a human
 - [Build the registry review screen](https://github.com/carapai/people-centered-healthcare/issues/203)
 

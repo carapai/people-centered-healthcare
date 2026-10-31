@@ -20,6 +20,12 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - Creates, updates and deletes are 403 when denied, decided on both the new resource and the version replaced.
   - `RecordFacility` finds a facility-scope record's facility. The default, `NoFacilityScope`, treats no record as facility-scope until records name their facility ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
 
+- **Client registry (#197):** `with_client_registry(RegistryConfig)` serves the reviewer operations `POST /Patient/$merge` (preview, then the reviewer's approval), `POST /Patient/{id}/$link` and `POST /Patient/{id}/$unlink` (patient-identity.md).
+  - The reviewer is the request's `Subject`: without one the answer is 401, and without `registry.review` and `Patient` update it is 403.
+  - A merge is for records of the reviewer's facility only.
+  - Each version written is audited in its transaction, through `AuditTrail` over the server's `Auditor`, naming the reviewer.
+  - The operations are not yet declared in the CapabilityStatement.
+
 ## Tests
 
 `tests/rest.rs` runs every fixture in `tests/fixtures/rest/` and checks that the CapabilityStatement matches behaviour:
@@ -29,6 +35,8 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 All of it runs on the SurrealDB memory engine through `oneshot`.
 
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
+
+`tests/registry.rs` covers the registry operations: a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
 
 `tests/authorization.rs` runs the authorization matrix through HTTP: no route without a subject, labels and purpose of use, permissions on every interaction (including a transaction Bundle), facility isolation in reads, writes and history, and break-glass confined to one patient.
 

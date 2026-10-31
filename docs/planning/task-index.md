@@ -51,6 +51,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#210](https://github.com/carapai/people-centered-healthcare/issues/210) | Break-glass over the API: the request endpoint, stored grants, audit obligations and the in-charge alert | 3 | #192, #209 |  |
 | [#211](https://github.com/carapai/people-centered-healthcare/issues/211) | Name a record's facility and isolate facility-scope records in searches | 3 | #192 |  |
 | [#197](https://github.com/carapai/people-centered-healthcare/issues/197) | Expose the client registry's link, unlink and $merge operations over FHIR | 3 | #68, #192, #209 |  |
+| [#216](https://github.com/carapai/people-centered-healthcare/issues/216) | Serve Patient/$match over HTTP | 3 | #197 |  |
 | [#199](https://github.com/carapai/people-centered-healthcare/issues/199) | Store blocking keys and block counts, and serve Patient/$match | 3 | #69 |  |
 | [#200](https://github.com/carapai/people-centered-healthcare/issues/200) | Load-test patient matching at 45M on central-class hardware | 3 | #199 | yes |
 | [#203](https://github.com/carapai/people-centered-healthcare/issues/203) | Build the registry review screen | 3 | #70, #197 |  |

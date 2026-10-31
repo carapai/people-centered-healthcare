@@ -16,6 +16,8 @@
 //!
 //! | transaction, batch | `POST /` with a `transaction` or `batch` Bundle |
 //!
+//! | client registry (with [`FhirServer::with_client_registry`]) | `POST /Patient/$merge`, `POST /Patient/{id}/$link`, `POST /Patient/{id}/$unlink` |
+//!
 //! Every write is validated (tier 1 structure, tier 2 core invariants) and checks reference
 //! integrity, and a delete is refused while live records
 //! reference the resource ([`ReferenceScope`]).
@@ -60,6 +62,7 @@ mod interactions;
 mod ops;
 mod outcome;
 mod references;
+mod registry;
 mod search;
 mod transaction;
 
@@ -82,6 +85,7 @@ pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_sta
 pub use http::{FHIR_JSON, etag, http_date};
 pub use outcome::{FhirError, operation_outcome};
 pub use references::{AllMustResolve, ReferenceScope};
+pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
 
 /// The FHIR REST server for one node.
@@ -96,6 +100,7 @@ pub struct FhirServer {
     started: Timestamp,
     audit: Option<Arc<Auditor>>,
     access: Option<access::Control>,
+    registry: Option<Arc<health_registries_app::fhir::RegistryConfig>>,
 }
 
 impl FhirServer {
@@ -116,6 +121,7 @@ impl FhirServer {
             started: Timestamp::now(),
             audit: None,
             access: None,
+            registry: None,
         }
     }
 
@@ -163,6 +169,17 @@ impl FhirServer {
         self
     }
 
+    /// This server, serving the client registry's reviewer operations (`Patient/$merge`,
+    /// `Patient/{id}/$link`, `Patient/{id}/$unlink`) with `config` (#197).
+    #[must_use]
+    pub fn with_client_registry(
+        mut self,
+        config: health_registries_app::fhir::RegistryConfig,
+    ) -> Self {
+        self.registry = Some(Arc::new(config));
+        self
+    }
+
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
     pub fn router(self) -> Router {
         let audited = axum::middleware::from_fn_with_state(self.clone(), audit::scope);
@@ -178,6 +195,9 @@ impl FhirServer {
                     .put(conditional::update)
                     .delete(conditional::delete),
             )
+            .route("/Patient/$merge", post(registry::merge))
+            .route("/Patient/{id}/$link", post(registry::link))
+            .route("/Patient/{id}/$unlink", post(registry::unlink))
             .route("/{type}/_search", post(search::post))
             .route("/{type}/_history", get(history::of_type))
             .route(

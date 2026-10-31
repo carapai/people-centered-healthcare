@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 12 | 22 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 13 | 23 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 7 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 43 of 123 implementation tasks done. Validation spikes open: 3.
+Total: 44 of 124 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -74,3 +74,4 @@ Total: 43 of 123 implementation tasks done. Validation spikes open: 3.
 - 2026-10-31: #192 merged (#212). #209 part 1: ADR 0056. A central session acts for one facility, chosen at sign-in. Another facility's records open at central only to patient-confined reads, never to searches across patients or to writes. Purpose of use is an `X-Purpose-Of-Use` header that defaults to `TREAT`. Code: `NodeScope::Central` in the PDP, `purpose_of_use`, and `health_identity_app::subject_of`. Still to come: the facility at sign-in, the request layer and mounting `/fhir`.
 - 2026-10-31: #209 part 1 merged (#213; ADR 0056 merged with the maintainer's explicit approval over the two-review ADR gate). Part 2: the facility is chosen at sign-in. Central's `SnapshotGate` has `facility: None`, and the user names one of their snapshots' facilities, or none if they have only one; several with none named comes back as `error=facility`. The code, session and token carry it, and `Principal` exposes `facility` and `snapshot_version`. The client's sign-in page has an optional facility code field.
 - 2026-10-31: #209 done in three PRs (#213, #214, and this one). `health_auth::Subjects` and `subject_layer` build each request's subject and audit agent. Central-server reads `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE` and, with both, mounts `/fhir` (central scope, audited). A request without a token is 401, except `/fhir/metadata`. The OpenAPI document gains `GET /api/session`, and `@health/api-client` is regenerated.
+- 2026-10-31: #209 merged (#215). #197: `FhirServer::with_client_registry` serves `Patient/$merge` (preview, then the reviewer's approval; the reviewer's own facility only; different facilities are 422), `$link` (with survivorship review queued in the same transaction) and `$unlink`. They are for subjects whose roles map to `registry.review`. Each version is audited naming the reviewer. Central serves them when `HEALTH_REGISTRY_NIN_SYSTEM` is set. Split out: #216 (`Patient/$match` over HTTP).

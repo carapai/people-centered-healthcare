@@ -44,6 +44,8 @@ pub(crate) struct AuthSettings {
     pub(crate) snapshot_keys: Vec<[u8; 32]>,
     /// The role mappings and label rules: with them and snapshot keys, `/fhir` is mounted.
     pub(crate) policy: Option<AccessPolicy>,
+    /// The NIN identifier system: with it, `/fhir` serves the client registry's operations.
+    pub(crate) registry_nin_system: Option<String>,
 }
 
 /// The access policy file (`HEALTH_ACCESS_POLICY_FILE`): role → permission mappings and the
@@ -179,17 +181,21 @@ fn fhir(
         .collect::<Vec<_>>()
         .join("/");
     let subjects = Subjects::new(server.verifier(), policy.roles.clone());
-    FhirServer::new(store, format!("{origin}/fhir"), Arc::new(Unrestricted))
+    let mut fhir = FhirServer::new(store, format!("{origin}/fhir"), Arc::new(Unrestricted))
         .with_access_control(
             Pdp::new(rules).with_scope(NodeScope::Central),
             Arc::new(NoFacilityScope),
         )
-        .with_audit(Auditor::new("central", sensitive))
-        .router()
-        .layer(axum::middleware::from_fn_with_state(
-            subjects,
-            subject_layer,
-        ))
+        .with_audit(Auditor::new("central", sensitive));
+    if let Some(nin_system) = &settings.registry_nin_system {
+        fhir = fhir.with_client_registry(health_registries_app::fhir::RegistryConfig {
+            nin_system: nin_system.clone(),
+        });
+    }
+    fhir.router().layer(axum::middleware::from_fn_with_state(
+        subjects,
+        subject_layer,
+    ))
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -241,6 +247,7 @@ mod tests {
             login_page: Some("/sign-in".into()),
             snapshot_keys: Vec::new(),
             policy: None,
+            registry_nin_system: None,
         }
     }
 
@@ -416,6 +423,7 @@ mod tests {
         let mut settings = settings();
         settings.login_page = None;
         settings.snapshot_keys = vec![snapshot_key];
+        settings.registry_nin_system = Some("urn:health:nin".into());
         settings.policy = Some(policy);
         let ready = Arc::new(OnceCell::new());
         let app = gate(Arc::clone(&ready));
@@ -553,6 +561,19 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+        // The registry's operations are served, to reviewers only.
+        let (status, body, _) = send(
+            &app,
+            fhir(
+                "POST",
+                &format!("/fhir/Patient/{id}/$link"),
+                None,
+                None,
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         // An unknown purpose of use is refused.
         let (status, body, _) = send(
             &app,
