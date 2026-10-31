@@ -3,6 +3,7 @@
 
 import type { FhirClient } from './fhir'
 import type { OperationClient } from './operations'
+import type { SignIn } from './sign-in'
 
 /** Query or form parameters; a list repeats the parameter (`date=ge2026&date=le2027`). */
 export type QueryParams = Readonly<Record<string, string | readonly string[]>>
@@ -73,6 +74,8 @@ export interface Platform {
   /** The runtime's documented HTTP operations, validated at the boundary; command ports build on it. */
   operations: OperationClient
   session: SessionPort
+  /** Sign-in against the node's authorization server, when runtime.json configures one. */
+  signIn?: SignIn
   events: EventSourcePort
   capabilities: Capabilities
 }

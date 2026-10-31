@@ -52,6 +52,11 @@ pub struct AuthConfig {
     pub dpop_window: SignedDuration,
     /// On an edge: logins and refreshes need a valid permission snapshot (ADR 0011).
     pub snapshots: Option<SnapshotGate>,
+    /// The client application's sign-in page (e.g. `/sign-in`). When set, `GET /authorize`
+    /// sends the user there with the request's parameters, and a refused sign-in returns there
+    /// with `error=refused`; the page posts the credentials back to `/authorize`. Without it,
+    /// this server's minimal form is shown.
+    pub login_page: Option<String>,
 }
 
 impl AuthConfig {
@@ -67,6 +72,7 @@ impl AuthConfig {
             code_lifetime: SignedDuration::from_secs(60),
             dpop_window: SignedDuration::from_secs(300),
             snapshots: None,
+            login_page: None,
         }
     }
 
@@ -138,6 +144,14 @@ impl<S: AuthStore + 'static> AuthServer<S> {
             .route("/token", post(token::<S>))
             .route("/revoke", post(revoke::<S>))
             .with_state(Arc::clone(&self.inner))
+    }
+
+    /// `GET /session`: who the request's access token belongs to (account, client, scopes),
+    /// or 401. Mount it with the API; the web client reads it after signing in.
+    pub fn session_route(&self) -> Router {
+        Router::new()
+            .route("/session", get(session_info::<S>))
+            .with_state(self.verifier())
     }
 
     /// The resource side's check of access tokens issued here.
@@ -364,9 +378,36 @@ async fn authorize_form<S: AuthStore>(
     Query(params): Query<AuthorizeParams>,
 ) -> Response {
     match validate(&inner, &params) {
-        Ok(_) => (no_store(), Html(login_page(&params, None))).into_response(),
+        Ok(_) => match &inner.config.login_page {
+            Some(page) => Redirect::to(&with_query(page, &params, None)).into_response(),
+            None => (no_store(), Html(login_page(&params, None))).into_response(),
+        },
         Err(response) => *response,
     }
+}
+
+/// `page` with the authorization request's parameters (and an error code) as its query.
+fn with_query(page: &str, p: &AuthorizeParams, error: Option<&str>) -> String {
+    let mut query = form_urlencoded::Serializer::new(String::new());
+    for (name, value) in [
+        ("response_type", &p.response_type),
+        ("client_id", &p.client_id),
+        ("redirect_uri", &p.redirect_uri),
+        ("scope", &p.scope),
+        ("state", &p.state),
+        ("nonce", &p.nonce),
+        ("code_challenge", &p.code_challenge),
+        ("code_challenge_method", &p.code_challenge_method),
+    ] {
+        if let Some(value) = value {
+            query.append_pair(name, value);
+        }
+    }
+    if let Some(error) = error {
+        query.append_pair("error", error);
+    }
+    let separator = if page.contains('?') { '&' } else { '?' };
+    format!("{page}{separator}{}", query.finish())
 }
 
 /// One message for every refusal, so a response does not reveal whether an account exists or
@@ -381,13 +422,16 @@ async fn authorize_login<S: AuthStore>(
         Ok(request) => request,
         Err(response) => return *response,
     };
-    let refused = || {
-        (
+    let refused = || match &inner.config.login_page {
+        Some(page) => {
+            Redirect::to(&with_query(page, &form.request, Some("refused"))).into_response()
+        }
+        None => (
             StatusCode::UNAUTHORIZED,
             no_store(),
             Html(login_page(&form.request, Some(LOGIN_REFUSED))),
         )
-            .into_response()
+            .into_response(),
     };
     let now = inner.clock.now();
     let account = match inner.store.account_by_username(&form.username).await {
@@ -886,4 +930,23 @@ impl<S: AuthStore> AccessVerifier<S> {
             _ => Err(AccessError::InvalidToken),
         }
     }
+}
+
+async fn session_info<S: AuthStore>(
+    State(verifier): State<AccessVerifier<S>>,
+    headers: HeaderMap,
+    axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
+) -> Result<Json<Value>, AccessError> {
+    let issuer = &verifier.inner.config.issuer;
+    // The proof's `htu` is the absolute URL; this route sits on the issuer's origin.
+    let origin = issuer.split('/').take(3).collect::<Vec<_>>().join("/");
+    let principal = verifier
+        .verify(&headers, "GET", &format!("{origin}{}", uri.path()))
+        .await?;
+    Ok(Json(json!({
+        "account": principal.account.to_string(),
+        "client_id": principal.client_id,
+        "scope": principal.scopes.to_string(),
+        "session": principal.session.to_string(),
+    })))
 }

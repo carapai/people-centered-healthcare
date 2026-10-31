@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CallbackRouteImport } from './routes/callback'
+import { Route as SignInRouteImport } from './routes/sign-in'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CallbackRoute = CallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
+  '/sign-in': typeof SignInRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
+  '/sign-in': typeof SignInRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
+  '/sign-in': typeof SignInRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/callback' | '/sign-in'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/callback' | '/sign-in'
+  id: '__root__' | '/' | '/callback' | '/sign-in'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CallbackRoute: typeof CallbackRoute
+  SignInRoute: typeof SignInRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/callback': {
+      id: '/callback'
+      path: '/callback'
+      fullPath: '/callback'
+      preLoaderRoute: typeof CallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CallbackRoute: CallbackRoute,
+  SignInRoute: SignInRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
