@@ -1,0 +1,18 @@
+[package]
+name = "health-access-policy"
+description = "The policy decision point's rules: permissions, facility isolation, sensitivity labels, purpose of use and break-glass (offline-auth.md § Authorization model, security.md §95–97)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "identity-access"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+thiserror = { workspace = true }

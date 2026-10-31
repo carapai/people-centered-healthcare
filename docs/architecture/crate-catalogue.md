@@ -39,7 +39,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Programs & Public Health | `health-programs`, `health-surveillance`, `health-population` | — |
 | Finance | `health-pricing`, `health-coverage`, `health-billing`, `health-payments`, `health-financial-ledger` | — |
 | Supply Chain | `health-inventory`, `health-procurement` | — |
-| Identity & Access | `health-identity`, `health-consent`, `health-audit-domain` | — |
+| Identity & Access | `health-identity`, `health-access-policy` (the PDP's rules), `health-consent`, `health-audit-domain` | — |
 | Workflow | `health-workflow`, `health-decision-support` | `health-worklists` (Read Model) → `health-workflow` |
 | Patient Engagement | `health-patient-requests`, `health-patient-engagement` | `health-patient-access` → `health-patient-engagement`; `health-care-journeys` (Read Model) → `health-patient-engagement` |
 | Analytics | `health-analytics`, `health-reporting` | — |
@@ -52,6 +52,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Crate | Notes |
 |---|---|
 | `health-<context>-app` | One per Bounded Context, e.g. `health-clinical-records-app`, `health-finance-app`; created with the context's first use case |
+| `health-identity-app` | Identity & Access: the PDP applied to searches (`SubjectSearchPolicy`) |
 
 ## 5 · infrastructure
 

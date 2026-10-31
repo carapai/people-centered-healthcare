@@ -8,8 +8,10 @@ members = [
     "crates/contracts/health-fhir-search",
     "crates/contracts/health-fhir-validation",
     "crates/contracts/health-persistence",
+    "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
     "crates/domains/health-identity",
+    "crates/application/health-identity-app",
     "crates/application/health-registries-app",
     "crates/infrastructure/health-auth",
     "crates/infrastructure/health-fhir-server",
@@ -34,6 +36,7 @@ publish = false
 
 # Every crate, workspace or external, is declared here once; members use `{ workspace = true }`.
 [workspace.dependencies]
+health-access-policy = { path = "crates/domains/health-access-policy" }
 health-auth = { path = "crates/infrastructure/health-auth" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
@@ -43,6 +46,7 @@ health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-identity = { path = "crates/domains/health-identity" }
+health-identity-app = { path = "crates/application/health-identity-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
