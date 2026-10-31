@@ -192,6 +192,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     None => Vec::new(),
                 },
                 registry_nin_system: files.registry_nin_system.clone(),
+                node_code: files
+                    .node_code
+                    .parse()
+                    .map_err(|_| "HEALTH_NODE_CODE is not a short code")?,
                 policy: files
                     .access_policy_file
                     .as_deref()

@@ -97,6 +97,16 @@ where
         serde_json::from_str(stored.json.as_str()).map_err(|e| RegistryError::Store(e.to_string()))
     }
 
+    /// The registry the use cases act through.
+    pub(crate) fn registry(&self) -> &ClientRegistry<S, A> {
+        &self.registry
+    }
+
+    /// The matcher registration uses.
+    pub(crate) fn matcher(&self) -> &Matcher<S> {
+        &self.matcher
+    }
+
     /// Matches a newly registered or changed source and acts on the result: an auto-link grade
     /// links it, possible matches are queued, and no match creates a new identity. Golden
     /// records a reviewer separated from this source are skipped entirely.

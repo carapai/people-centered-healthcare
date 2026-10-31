@@ -46,6 +46,8 @@ pub(crate) struct AuthSettings {
     pub(crate) policy: Option<AccessPolicy>,
     /// The NIN identifier system: with it, `/fhir` serves the client registry's operations.
     pub(crate) registry_nin_system: Option<String>,
+    /// This node's short code, in the MRNs it mints.
+    pub(crate) node_code: health_identifiers::ShortCode,
 }
 
 /// The access policy file (`HEALTH_ACCESS_POLICY_FILE`): role → permission mappings and the
@@ -298,7 +300,16 @@ fn fhir(
         )
         .with_audit(Auditor::new("central", sensitive(policy)));
     if let Some(rules) = registry_rules(settings) {
-        fhir = fhir.with_client_registry(rules.0, rules.1);
+        fhir = fhir
+            .with_client_registry(rules.0, rules.1)
+            .with_registration(health_registries_app::register::MrnSettings {
+                node: settings.node_code.clone(),
+                format: health_identifiers::NumberFormat {
+                    padding: 6,
+                    ..health_identifiers::NumberFormat::default()
+                },
+                system: "urn:health:mrn".into(),
+            });
     }
     fhir.router().layer(axum::middleware::from_fn_with_state(
         subjects,
@@ -359,6 +370,7 @@ mod tests {
             snapshot_keys: Vec::new(),
             policy: None,
             registry_nin_system: None,
+            node_code: "C1".parse().expect("node code"),
         }
     }
 
@@ -687,6 +699,23 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{body}");
+        // Reception registers a new patient, with this node's MRN.
+        let (status, body, _) = send(
+            &app,
+            fhir(
+                "POST",
+                "/fhir/Patient/$register",
+                Some(serde_json::json!({ "resourceType": "Parameters", "parameter": [
+                    { "name": "resource", "resource": { "resourceType": "Patient", "name": [{ "family": "Achen", "given": ["Ruth"] }], "birthDate": "1985-01-20", "gender": "female" } },
+                    { "name": "confirmedNew", "valueBoolean": true },
+                ] })),
+                None,
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        assert!(body.contains("KAM013-C1-000001"), "{body}");
         // The registry's operations are served, to reviewers only.
         let (status, body, _) = send(
             &app,

@@ -3,6 +3,7 @@
 //! | Operation | Route | Parameters |
 //! |---|---|---|
 //! | `$match` (R5) | `POST /Patient/$match` | `resource` (Patient), `onlyCertainMatches` (boolean), `count` (integer) |
+//! | `$register` | `POST /Patient/$register` | `resource` (Patient), `confirmedNew` (boolean) |
 //! | `$merge` (R5) | `POST /Patient/$merge` | `source-patient`, `target-patient` (References), `preview` (boolean) |
 //! | `$link` | `POST /Patient/{id}/$link` | `golden` (Reference, optional: a new golden record when absent) |
 //! | `$unlink` | `POST /Patient/{id}/$unlink` | none |
@@ -10,6 +11,10 @@
 //! - **`$match`** is for anyone who may search Patients (403 otherwise). It returns the ranked
 //!   candidates the subject may see, as a searchset Bundle with `match-grade`. Candidates the
 //!   subject may not see are left out, and so is their count.
+//! - **`$register`** (with [`FhirServer::with_registration`]) is reception's registration, for
+//!   anyone who may create Patients. Until `confirmedNew`, it answers with the candidates the
+//!   subject may see and writes nothing (patient-identity.md). Then it creates the provisional
+//!   source Patient with a facility MRN and runs registration matching.
 //! - **Who:** for the other operations, the reviewer is the request's `Subject` (from the verified token). Without one the
 //!   answer is 401. The subject needs the [`REVIEW_PERMISSION`] use-case permission and
 //!   `Patient` update.
@@ -112,6 +117,133 @@ type Registry = ClientRegistry<health_surrealdb::SurrealStore, RegistryAudit>;
 pub(crate) struct RegistrySettings {
     pub(crate) config: health_registries_app::fhir::RegistryConfig,
     pub(crate) rules: health_client_registry::matching::MatchingRules,
+    pub(crate) mrn: Option<health_registries_app::register::MrnSettings>,
+}
+
+/// `POST /Patient/$register`.
+pub(crate) async fn register(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    agent: Option<Extension<Agent>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, FhirError> {
+    use health_registries_app::register::Registration;
+    use health_registries_app::review::{Registered, RegistryReview};
+    let Some(settings) = server.registry.clone() else {
+        return Err(FhirError::not_found("the client registry is not enabled"));
+    };
+    let Some(mrn) = settings.mrn.clone() else {
+        return Err(FhirError::not_found(
+            "registration is not enabled on this node",
+        ));
+    };
+    let Some(Extension(subject)) = subject else {
+        return Err(FhirError::new(
+            StatusCode::UNAUTHORIZED,
+            "login",
+            "registration needs a signed-in user",
+        ));
+    };
+    if !subject.permissions.allows("Patient", Decide::Create) {
+        return Err(FhirError::new(
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            "registration needs Patient create",
+        ));
+    }
+    let facility: health_identifiers::ShortCode = subject.facility.parse().map_err(|_| {
+        FhirError::bad_request("the session's facility code cannot be part of an MRN")
+    })?;
+    let parameters = parameters(&headers, &body)?;
+    let mut patient = None;
+    let mut confirmed_new = false;
+    for parameter in &parameters {
+        match parameter["name"].as_str().unwrap_or_default() {
+            "resource" => patient = Some(parameter["resource"].clone()),
+            "confirmedNew" => {
+                confirmed_new = parameter["valueBoolean"]
+                    .as_bool()
+                    .ok_or_else(|| FhirError::bad_request("confirmedNew must be a boolean"))?;
+            }
+            other => {
+                return Err(FhirError::not_supported(format!(
+                    "$register does not support {other}"
+                )));
+            }
+        }
+    }
+    let patient = patient
+        .filter(|p| p["resourceType"] == "Patient")
+        .ok_or_else(|| FhirError::bad_request("$register needs a Patient resource"))?;
+    // Tiers 1 and 2, as for any write.
+    let found = health_fhir_validation::validate_value(&patient);
+    if !found.is_empty() {
+        return Err(FhirError::invalid_resource(&found));
+    }
+    server.check_invariants(&patient).await?;
+    let agent = agent.map_or_else(
+        || Agent {
+            display: format!("account {}", subject.account),
+            ..Agent::unauthenticated()
+        },
+        |Extension(agent)| agent,
+    );
+    let audit = RegistryAudit {
+        auditor: server.audit.clone(),
+        agent,
+    };
+    let registry = ClientRegistry::new(server.store.clone(), audit, settings.config.clone());
+    let review = RegistryReview::new(
+        registry,
+        settings.rules.clone(),
+        Arc::new(health_time::SystemClock),
+    );
+    let year: i32 = Timestamp::now()
+        .strftime("%Y")
+        .to_string()
+        .parse()
+        .unwrap_or(1970);
+    let registered = review
+        .register_new(
+            &patient,
+            confirmed_new,
+            &facility,
+            &mrn,
+            &subject.account,
+            year,
+        )
+        .await?;
+    let (status, output) = match registered {
+        Registration::Candidates(mut matched) => {
+            matched.candidates.retain(|c| {
+                crate::access::may_list(&RawJson::from_validated(c.resource.to_string()))
+            });
+            let candidates = health_registries_app::matching::bundle(&matched);
+            (
+                StatusCode::OK,
+                vec![json!({ "name": "candidates", "resource": candidates })],
+            )
+        }
+        Registration::Registered { id, mrn, outcome } => {
+            let (code, golden) = match outcome {
+                Registered::AutoLinked { golden } => ("auto-linked", Some(golden)),
+                Registered::NewIdentity { golden } => ("new-identity", Some(golden)),
+                Registered::Queued { .. } => ("queued", None),
+            };
+            let mut output = vec![
+                json!({ "name": "patient", "valueReference": reference(id) }),
+                json!({ "name": "mrn", "valueString": mrn }),
+                json!({ "name": "outcome", "valueCode": code }),
+            ];
+            if let Some(golden) = golden {
+                output.push(json!({ "name": "golden", "valueReference": reference(golden) }));
+            }
+            (StatusCode::CREATED, output)
+        }
+    };
+    let body = json!({ "resourceType": "Parameters", "parameter": output });
+    Ok(fhir_json(status, body.to_string()))
 }
 
 /// The most candidates `$match` returns; the default is 10.

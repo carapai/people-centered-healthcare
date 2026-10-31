@@ -12,6 +12,9 @@ Layer: **application** (Registries). The client registry's use cases over any `h
   - The duplicate becomes `active: false` and `replaced-by` the other, which `replaces` it.
   - Nothing that references the duplicate is rewritten.
   - The plan is checked again inside the merge's transaction.
+- **Registration** (`register`, #226): `RegistryReview::register_new` answers with the `$match` candidates, writing nothing, until the clerk confirms a new patient.
+  - Then it mints the facility MRN (`next_sequence` and a guard key, in the write's transaction; ADR 0014) and creates the provisional source Patient.
+  - Registration matching follows: auto-link, queue for review, or a new identity.
 - **Every use case** is one transaction with `If-Match` version checks. Each version it writes passes through the `AuditTrail` port in that transaction; `health-fhir-server` implements it over `health-audit` for the HTTP operations (#197). `link_reviewed` is a reviewer's link that queues its survivorship disagreements for review in the same transaction.
 
 ## Review queue (`review.rs`)

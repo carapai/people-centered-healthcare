@@ -55,6 +55,9 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_REGISTRY_NIN_SYSTEM`: the national ID identifier system. Optional: with it, the
     /// client registry's reviewer operations are served under `/fhir` (#197).
     pub(crate) registry_nin_system: Option<String>,
+    /// `HEALTH_NODE_CODE`, default `C1`: this node's short code in the numbers it mints, such as
+    /// MRNs (ADR 0014).
+    pub(crate) node_code: String,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -105,6 +108,7 @@ impl Config {
                     snapshot_keys_file: get("HEALTH_AUTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
                     access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
                     registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM"),
+                    node_code: get("HEALTH_NODE_CODE").unwrap_or_else(|| "C1".to_owned()),
                 }),
             },
         })
