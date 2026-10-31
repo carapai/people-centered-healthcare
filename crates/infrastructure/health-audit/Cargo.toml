@@ -1,0 +1,22 @@
+[package]
+name = "health-audit"
+description = "The audit module: the only writer of AuditEvent, appended in the audited write's transaction, plus the Provenance builder Owners use (resource-ownership.md rule 7, security.md)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }

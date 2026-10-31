@@ -13,6 +13,7 @@ members = [
     "crates/domains/health-identity",
     "crates/application/health-identity-app",
     "crates/application/health-registries-app",
+    "crates/infrastructure/health-audit",
     "crates/infrastructure/health-auth",
     "crates/infrastructure/health-fhir-server",
     "crates/infrastructure/health-files",
@@ -37,6 +38,7 @@ publish = false
 # Every crate, workspace or external, is declared here once; members use `{ workspace = true }`.
 [workspace.dependencies]
 health-access-policy = { path = "crates/domains/health-access-policy" }
+health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }

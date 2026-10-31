@@ -64,7 +64,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-http` | crate (Axum/Tower routers, middleware) |
 | `health-fhir-server` | crate (FHIR REST handlers, per §16) |
 | `health-auth` | crate |
-| `health-audit` | crate |
+| `health-audit` | crate (the only AuditEvent writer, and the Provenance builder) |
 | `health-observability` | crate |
 | `health-files` | crate |
 | `health-crypto` | crate |
