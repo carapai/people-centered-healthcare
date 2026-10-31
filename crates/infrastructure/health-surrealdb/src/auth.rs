@@ -471,7 +471,9 @@ impl SurrealTx {
         limit: usize,
     ) -> Result<Vec<BreakGlassRow>, StoreError> {
         self.break_glass_rows(
-            &format!("WHERE reviewed_by = NONE AND $key = $key ORDER BY review_due ASC LIMIT {limit}"),
+            &format!(
+                "WHERE reviewed_by = NONE AND $key = $key ORDER BY review_due ASC LIMIT {limit}"
+            ),
             "",
             None,
         )
@@ -592,7 +594,10 @@ impl SurrealTx {
                     acknowledged: text(10) == "true",
                     review: (!text(11).is_empty()).then(|| BreakGlassReviewRow {
                         reviewer: text(11),
-                        at: r.get(12).and_then(|t| t.parse().ok()).unwrap_or(at_or_now()),
+                        at: r
+                            .get(12)
+                            .and_then(|t| t.parse().ok())
+                            .unwrap_or(at_or_now()),
                         decision: text(13),
                         note: text(14),
                     }),
