@@ -6,9 +6,11 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
 
+use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
 use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
 use health_time::Timestamp;
+use serde_json::Value;
 use uuid::Uuid;
 
 /// A store failure.
@@ -58,6 +60,22 @@ pub struct Session {
     pub jkt: Option<String>,
     /// The SHA-256 of the current refresh token; the previous one is refused.
     pub refresh_hash: String,
+}
+
+/// A break-glass grant as stored: what it reports, the session it opens records for, the
+/// in-charge's alert and the privacy officer's review (offline-auth.md § Break-glass).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreakGlassRecord {
+    /// The grant's id.
+    pub id: String,
+    /// The session it was granted to.
+    pub session: Uuid,
+    /// Who, where, for whom, why and until when.
+    pub event: BreakGlassEvent,
+    /// When the privacy officer's review is due.
+    pub review_due: Timestamp,
+    /// Whether the in-charge acknowledged the alert.
+    pub acknowledged: bool,
 }
 
 /// The authorization server's persistence port.
@@ -134,6 +152,46 @@ pub trait AuthStore: Send + Sync {
         let _ = account;
         async { Ok(Vec::new()) }
     }
+    /// Records a break-glass grant and its AuditEvent (`audit`, when the node audits) in one
+    /// transaction. The default does not support break-glass.
+    fn grant_break_glass(
+        &self,
+        record: &BreakGlassRecord,
+        audit: Option<&Value>,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = (record, audit);
+        async {
+            Err(StoreError(
+                "break-glass is not supported by this store".into(),
+            ))
+        }
+    }
+    /// The latest grant of `session` still active at `now`.
+    fn active_break_glass(
+        &self,
+        session: Uuid,
+        now: Timestamp,
+    ) -> impl Future<Output = Result<Option<BreakGlassRecord>, StoreError>> + Send {
+        let _ = (session, now);
+        async { Ok(None) }
+    }
+    /// The alerts of `facility` its in-charge has not acknowledged, oldest first.
+    fn break_glass_alerts(
+        &self,
+        facility: &str,
+    ) -> impl Future<Output = Result<Vec<BreakGlassRecord>, StoreError>> + Send {
+        let _ = facility;
+        async { Ok(Vec::new()) }
+    }
+    /// Acknowledges alert `id` of `facility`; false when there is none.
+    fn acknowledge_break_glass(
+        &self,
+        id: &str,
+        facility: &str,
+    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
+        let _ = (id, facility);
+        async { Ok(false) }
+    }
     /// The persisted clock floor.
     fn clock_floor(&self) -> impl Future<Output = Result<ClockFloor, StoreError>> + Send {
         async { Ok(ClockFloor::default()) }
@@ -158,6 +216,7 @@ struct State {
     jtis: HashMap<String, Timestamp>,
     snapshots: HashMap<(AccountId, String), String>,
     floor: ClockFloor,
+    break_glass: Vec<BreakGlassRecord>,
 }
 
 /// An in-memory store.
@@ -291,6 +350,51 @@ impl AuthStore for MemoryStore {
             .snapshots
             .get(&(account, facility.to_owned()))
             .cloned())
+    }
+
+    async fn grant_break_glass(
+        &self,
+        record: &BreakGlassRecord,
+        _audit: Option<&Value>,
+    ) -> Result<(), StoreError> {
+        self.lock().break_glass.push(record.clone());
+        Ok(())
+    }
+
+    async fn active_break_glass(
+        &self,
+        session: Uuid,
+        now: Timestamp,
+    ) -> Result<Option<BreakGlassRecord>, StoreError> {
+        Ok(self
+            .lock()
+            .break_glass
+            .iter()
+            .rev()
+            .find(|r| r.session == session && now < r.event.expires_at)
+            .cloned())
+    }
+
+    async fn break_glass_alerts(
+        &self,
+        facility: &str,
+    ) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        Ok(self
+            .lock()
+            .break_glass
+            .iter()
+            .filter(|r| r.event.facility == facility && !r.acknowledged)
+            .cloned()
+            .collect())
+    }
+
+    async fn acknowledge_break_glass(&self, id: &str, facility: &str) -> Result<bool, StoreError> {
+        let mut state = self.lock();
+        let found = state
+            .break_glass
+            .iter_mut()
+            .find(|r| r.id == id && r.event.facility == facility);
+        Ok(found.map(|r| r.acknowledged = true).is_some())
     }
 
     async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {

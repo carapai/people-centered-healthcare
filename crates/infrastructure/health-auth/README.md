@@ -53,6 +53,16 @@ Refusals:
 - an unknown purpose of use is 400;
 - a request with no credentials at all passes without a subject, so the routes decide (the FHIR server serves only `/metadata` without one).
 
+## Break-glass (offline-auth.md § Break-glass)
+
+`Subjects::routes()` serves, under `/api` at central:
+- **Requesting a grant:** `POST /break-glass` with `{"patient": "Patient/…", "reason": "BTG", "justification": "…"}` grants one patient for one hour (`BreakGlassPolicy`).
+  - Refusals: 403 without the `break-glass` permission, 400 without the reason or a justification, and 409 while a grant is active.
+  - The grant is stored for the session, with its AuditEvent (`Auditor::break_glass`) in the same transaction, and a privacy-officer review due in 72 h (`REVIEW_WITHIN`).
+- **While a grant is active:** the session's `Subject` carries it and its audit `Agent` is flagged. Every access is then audited with `BTG`, and the PDP opens that patient's records.
+- **Alerts:** `GET /break-glass/alerts` and `POST /break-glass/alerts/{id}/acknowledge` are for the facility in-charge, whose roles map to `ALERTS_PERMISSION` (`break-glass.alerts`).
+- **Still to come:** pushing alerts to the in-charge, and the privacy officer's review ([#218](https://github.com/carapai/people-centered-healthcare/issues/218)).
+
 ## Permission snapshots (ADR 0011)
 
 - **Signing:** `SnapshotSigner` is central's key. It signs a `PermissionSnapshot` as a compact ES256 JWS (`typ` `snapshot+jwt`), after checking its roles against the configured `RolePermissions`.

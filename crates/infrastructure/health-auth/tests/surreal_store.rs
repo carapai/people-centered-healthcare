@@ -383,3 +383,91 @@ async fn an_accounts_facilities_are_its_snapshots() {
             .is_empty()
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn break_glass_grants_end_after_their_hour_and_alert_their_facility() {
+    use health_access_policy::BreakGlassEvent;
+    use health_auth::{AuthStore, BreakGlassRecord};
+    let node = node().await;
+    let at = Timestamp::from_second(1_800_000_000).expect("time");
+    let session = Uuid::now_v7();
+    let record = BreakGlassRecord {
+        id: Uuid::now_v7().to_string(),
+        session,
+        event: BreakGlassEvent {
+            account: "a1".into(),
+            facility: "KAM013".into(),
+            patient: "Patient/p1".into(),
+            reason: "BTG".into(),
+            justification: "unconscious".into(),
+            at,
+            expires_at: at.checked_add(SignedDuration::from_hours(1)).expect("time"),
+        },
+        review_due: at
+            .checked_add(SignedDuration::from_hours(72))
+            .expect("time"),
+        acknowledged: false,
+    };
+    node.store
+        .grant_break_glass(&record, None)
+        .await
+        .expect("grant");
+    let during = at.checked_add(SignedDuration::from_mins(59)).expect("time");
+    let after = at.checked_add(SignedDuration::from_mins(60)).expect("time");
+    assert_eq!(
+        node.store
+            .active_break_glass(session, during)
+            .await
+            .expect("active"),
+        Some(record.clone())
+    );
+    assert_eq!(
+        node.store
+            .active_break_glass(session, after)
+            .await
+            .expect("active"),
+        None
+    );
+    assert_eq!(
+        node.store
+            .active_break_glass(Uuid::now_v7(), during)
+            .await
+            .expect("active"),
+        None
+    );
+    assert_eq!(
+        node.store
+            .break_glass_alerts("KAM013")
+            .await
+            .expect("alerts"),
+        vec![record.clone()]
+    );
+    assert!(
+        node.store
+            .break_glass_alerts("WAK002")
+            .await
+            .expect("alerts")
+            .is_empty()
+    );
+    // Only the facility's own in-charge acknowledges it.
+    assert!(
+        !node
+            .store
+            .acknowledge_break_glass(&record.id, "WAK002")
+            .await
+            .expect("ack")
+    );
+    assert!(
+        node.store
+            .acknowledge_break_glass(&record.id, "KAM013")
+            .await
+            .expect("ack")
+    );
+    assert!(
+        node.store
+            .break_glass_alerts("KAM013")
+            .await
+            .expect("alerts")
+            .is_empty()
+    );
+}

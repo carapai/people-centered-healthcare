@@ -43,6 +43,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
   - A request without a token is 401, except `/fhir/metadata`.
   - Search parameters come with the configuration package. Until then the store's registry is empty, so `/fhir` serves reads, writes and history.
   - Records do not name their facility yet ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)), and break-glass over the API is [#210](https://github.com/carapai/people-centered-healthcare/issues/210).
+- **Break-glass:** `/api/break-glass` grants one patient for one hour to roles with `break-glass`, audited with `BTG`. The facility in-charge (`break-glass.alerts`) lists and acknowledges the alerts at `/api/break-glass/alerts`.
 - **Snapshots** are provisioned with `SurrealAuthStore::put_snapshot` until the workforce registry issues them.
 
 SIGTERM or Ctrl-C shuts the server down gracefully.

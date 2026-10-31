@@ -144,22 +144,33 @@ pub(crate) fn routes(
         });
     }
     let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
-    let mut router = Router::new()
-        .nest("/auth", server.router())
-        .nest("/api", server.session_route());
+    let mut api = server.session_route();
+    let mut router = Router::new().nest("/auth", server.router());
     if let (Some(policy), false) = (&settings.policy, settings.snapshot_keys.is_empty()) {
-        router = router.nest("/fhir", fhir(fhir_store, settings, policy, &server));
+        let subjects = Subjects::new(server.verifier(), policy.roles.clone())
+            .with_auditor(Auditor::new("central", sensitive(policy)));
+        api = api.merge(subjects.routes());
+        router = router.nest("/fhir", fhir(fhir_store, settings, policy, subjects));
     }
-    Ok(router)
+    Ok(router.nest("/api", api))
 }
 
 /// The FHIR API: every interaction decided for the request's subject at central's scope, and
 /// audited (ADR 0056).
+/// The policy's sensitive labels, as the auditor takes them.
+fn sensitive(policy: &AccessPolicy) -> Vec<(String, String)> {
+    policy
+        .labels
+        .iter()
+        .map(|l| (l.system.clone(), l.code.clone()))
+        .collect()
+}
+
 fn fhir(
     store: SurrealStore,
     settings: &AuthSettings,
     policy: &AccessPolicy,
-    server: &AuthServer<SurrealAuthStore>,
+    subjects: Subjects<SurrealAuthStore>,
 ) -> Router {
     let rules: Vec<LabelRule> = policy
         .labels
@@ -169,24 +180,18 @@ fn fhir(
             program: l.program.clone(),
         })
         .collect();
-    let sensitive = policy
-        .labels
-        .iter()
-        .map(|l| (l.system.clone(), l.code.clone()))
-        .collect();
     let origin = settings
         .issuer
         .split('/')
         .take(3)
         .collect::<Vec<_>>()
         .join("/");
-    let subjects = Subjects::new(server.verifier(), policy.roles.clone());
     let mut fhir = FhirServer::new(store, format!("{origin}/fhir"), Arc::new(Unrestricted))
         .with_access_control(
             Pdp::new(rules).with_scope(NodeScope::Central),
             Arc::new(NoFacilityScope),
         )
-        .with_audit(Auditor::new("central", sensitive));
+        .with_audit(Auditor::new("central", sensitive(policy)));
     if let Some(nin_system) = &settings.registry_nin_system {
         fhir = fhir.with_client_registry(health_registries_app::fhir::RegistryConfig {
             nin_system: nin_system.clone(),
@@ -224,6 +229,8 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
     Router::new()
         .route_service("/auth/{*rest}", service.clone())
         .route_service("/api/session", service.clone())
+        .route_service("/api/break-glass", service.clone())
+        .route_service("/api/break-glass/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)
 }
@@ -587,6 +594,310 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    }
+
+    /// Provisions `username` at KAM013 with `roles`, as the workforce registry will.
+    async fn provision(
+        connection: &Connection,
+        key: &[u8; 32],
+        policy: &AccessPolicy,
+        username: &str,
+        roles: &[&str],
+    ) {
+        use health_auth::SnapshotSigner;
+        use health_identity::snapshot::{PermissionSnapshot, RoleAssignment};
+        use health_identity::{AccountId, AccountStatus, Lockout, LoginAccount};
+        let store = SurrealAuthStore::new(
+            SurrealStore::new(connection.clone(), Arc::new(SystemClock)),
+            SessionPolicy::default().hard_cap,
+        );
+        let credentials = Credentials::new(Vec::new()).expect("credentials");
+        let account = AccountId(uuid::Uuid::now_v7());
+        store
+            .put_account(&LoginAccount {
+                id: account,
+                username: username.into(),
+                credential: credentials.hash("correct horse battery").expect("hash"),
+                status: AccountStatus::Active,
+                lockout: Lockout::default(),
+            })
+            .await
+            .expect("account");
+        let issued = health_time::Timestamp::now();
+        let snapshot = PermissionSnapshot {
+            account,
+            facility: "KAM013".into(),
+            roles: roles
+                .iter()
+                .map(|r| RoleAssignment {
+                    role: (*r).into(),
+                    locations: vec![],
+                })
+                .collect(),
+            programs: vec![],
+            issued_at: issued,
+            not_after: SnapshotPolicy::default().not_after(issued),
+            snapshot_version: 1,
+        };
+        let jws = SnapshotSigner::from_secret(key)
+            .expect("key")
+            .sign(&snapshot, &policy.roles)
+            .expect("sign");
+        store
+            .put_snapshot(account, "KAM013", &jws)
+            .await
+            .expect("snapshot");
+    }
+
+    /// Signs `username` in: the `Authorization` header value.
+    async fn sign_in(app: &Router, username: &str) -> String {
+        let (_, _, location) = send(
+            app,
+            form(
+                "/auth/authorize",
+                &[
+                    ("response_type", "code"),
+                    ("client_id", "health-client"),
+                    ("redirect_uri", "https://central.test/callback"),
+                    ("scope", "openid"),
+                    ("state", "s"),
+                    (
+                        "code_challenge",
+                        "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    ),
+                    ("code_challenge_method", "S256"),
+                    ("username", username),
+                    ("password", "correct horse battery"),
+                ],
+            ),
+        )
+        .await;
+        let location = location.expect("redirect");
+        let code = form_urlencoded::parse(location.split_once('?').expect("query").1.as_bytes())
+            .find(|(k, _)| k == "code")
+            .expect("code")
+            .1
+            .into_owned();
+        let (status, body, _) = send(
+            app,
+            form(
+                "/auth/token",
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("code", &code),
+                    ("redirect_uri", "https://central.test/callback"),
+                    ("client_id", "health-client"),
+                    (
+                        "code_verifier",
+                        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    ),
+                ],
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let tokens: serde_json::Value = serde_json::from_str(&body).expect("json");
+        format!("Bearer {}", tokens["access_token"].as_str().expect("token"))
+    }
+
+    fn authorized(
+        method: &str,
+        path: &str,
+        bearer: &str,
+        body: Option<serde_json::Value>,
+    ) -> Request<Body> {
+        let mut request = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("authorization", bearer);
+        if body.is_some() {
+            request = request.header("content-type", "application/json");
+        }
+        request
+            .body(body.map_or(Body::empty(), |b| Body::from(b.to_string())))
+            .expect("request")
+    }
+
+    #[tokio::test]
+    async fn break_glass_opens_one_patient_audits_and_alerts_the_in_charge() {
+        const ACT: &str = "http://terminology.hl7.org/CodeSystem/v3-ActCode";
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "central".into(),
+            database: "glass".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let key = [5u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": {
+                "clinician": ["Patient.crs", "Observation.crs", "break-glass"],
+                "in-charge": ["break-glass.alerts"],
+            },
+            "labels": [{ "system": ACT, "code": "HIV", "program": "hiv" }],
+        }))
+        .expect("policy");
+        provision(&connection, &key, &policy, "nakato", &["clinician"]).await;
+        provision(&connection, &key, &policy, "okello", &["in-charge"]).await;
+        // A patient with an HIV-labelled Observation, written as the system would.
+        let admin = FhirServer::new(
+            SurrealStore::new(connection.clone(), Arc::new(SystemClock)),
+            "https://central.test/fhir",
+            Arc::new(Unrestricted),
+        )
+        .router();
+        let created = |body: serde_json::Value| {
+            let admin = admin.clone();
+            async move {
+                let request =
+                    Request::post(format!("/{}", body["resourceType"].as_str().expect("type")))
+                        .header("content-type", "application/fhir+json")
+                        .body(Body::from(body.to_string()))
+                        .expect("request");
+                let (status, body, _) = send(&admin, request).await;
+                assert_eq!(status, StatusCode::CREATED, "{body}");
+                serde_json::from_str::<serde_json::Value>(&body).expect("json")["id"]
+                    .as_str()
+                    .expect("id")
+                    .to_owned()
+            }
+        };
+        let patient = created(serde_json::json!({ "resourceType": "Patient" })).await;
+        let observation = created(serde_json::json!({
+            "resourceType": "Observation",
+            "status": "final",
+            "code": { "text": "viral load" },
+            "subject": { "reference": format!("Patient/{patient}") },
+            "meta": { "security": [{ "system": ACT, "code": "HIV" }] },
+        }))
+        .await;
+
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+        let clinician = sign_in(&app, "nakato").await;
+        let in_charge = sign_in(&app, "okello").await;
+        let read = format!("/fhir/Observation/{observation}");
+
+        // Without break-glass the HIV record does not exist for this clinician.
+        assert_eq!(
+            send(&app, authorized("GET", &read, &clinician, None))
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        // A reason and a justification are required.
+        let glass = |justification: &str| serde_json::json!({ "patient": format!("Patient/{patient}"), "reason": "BTG", "justification": justification });
+        let (status, _, _) = send(
+            &app,
+            authorized("POST", "/api/break-glass", &clinician, Some(glass(" "))),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        // The in-charge's role may not break glass.
+        let (status, _, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/break-glass",
+                &in_charge,
+                Some(glass("unconscious")),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/break-glass",
+                &clinician,
+                Some(glass("unconscious on arrival")),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let granted: serde_json::Value = serde_json::from_str(&body).expect("json");
+        // One grant at a time, never extended.
+        let (status, _, _) = send(
+            &app,
+            authorized("POST", "/api/break-glass", &clinician, Some(glass("again"))),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        // Now the record opens.
+        assert_eq!(
+            send(&app, authorized("GET", &read, &clinician, None))
+                .await
+                .0,
+            StatusCode::OK
+        );
+
+        // The in-charge sees the alert, and acknowledges it; the clinician may not see alerts.
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/break-glass/alerts", &in_charge, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let alerts: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(alerts.as_array().map(Vec::len), Some(1));
+        assert_eq!(alerts[0]["justification"], "unconscious on arrival");
+        assert_eq!(alerts[0]["id"], granted["id"]);
+        assert_eq!(
+            send(
+                &app,
+                authorized("GET", "/api/break-glass/alerts", &clinician, None)
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let acknowledge = format!(
+            "/api/break-glass/alerts/{}/acknowledge",
+            granted["id"].as_str().expect("id")
+        );
+        assert_eq!(
+            send(&app, authorized("POST", &acknowledge, &in_charge, None))
+                .await
+                .0,
+            StatusCode::NO_CONTENT
+        );
+        let (_, body, _) = send(
+            &app,
+            authorized("GET", "/api/break-glass/alerts", &in_charge, None),
+        )
+        .await;
+        assert_eq!(body, "[]");
+
+        // The grant and the read under it are both audited with BTG.
+        let request = Request::get("/AuditEvent?_count=100")
+            .body(Body::empty())
+            .expect("request");
+        let (_, body, _) = send(&admin, request).await;
+        let bundle: serde_json::Value = serde_json::from_str(&body).expect("json");
+        let events: Vec<&serde_json::Value> = bundle["entry"]
+            .as_array()
+            .map(|e| e.iter().map(|e| &e["resource"]).collect())
+            .unwrap_or_default();
+        assert!(
+            events
+                .iter()
+                .any(|e| e["code"]["coding"][0]["code"] == "BTG"),
+            "{body}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e["code"]["coding"][0]["code"] == "read"
+                    && e["authorization"].to_string().contains("BTG")),
+            "{body}"
+        );
     }
 
     #[test]

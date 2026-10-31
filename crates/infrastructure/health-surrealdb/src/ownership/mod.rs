@@ -73,6 +73,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_jti", "identity"),
     ("auth_snapshot", "identity"),
     ("auth_clock_floor", "identity"),
+    ("break_glass", "identity"),
 ];
 
 /// Every owned resource type, sorted by type.

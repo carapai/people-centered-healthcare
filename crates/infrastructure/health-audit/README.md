@@ -11,6 +11,7 @@ Layer: **infrastructure**. The audit module (resource-ownership.md rule 7; secur
   - the observing node as `source.observer`;
   - each entity as `Type/id/_history/version`, with its security labels copied;
   - the patient.
+- **Break-glass grants:** `Auditor::break_glass` is the AuditEvent of a grant: a DICOM `110113` security alert coded `BTG`, labelled, naming the patient, with the justification on the entity. The free function `append` lets a store write it in its own transaction (`health_auth::SurrealAuthStore`).
 - **What must be audited:** every write. A read only when a record carries a configured sensitivity label or the access relied on break-glass (`must_audit_read`).
 - **`Agent`** comes from the verified token and the request (#192), or is `Agent::unauthenticated()` / `Agent::system(job)`.
 - **`provenance(...)`** builds the Provenance for a derived write. Its target's Owner writes it in the same transaction (rule 7).

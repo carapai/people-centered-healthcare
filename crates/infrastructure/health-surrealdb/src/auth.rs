@@ -55,6 +55,33 @@ pub struct AuthSessionRow {
     pub ends_at: Timestamp,
 }
 
+/// A stored break-glass grant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreakGlassRow {
+    /// The grant's id.
+    pub id: String,
+    /// The session it was granted to.
+    pub session: String,
+    /// Who broke glass.
+    pub account: String,
+    /// At which facility.
+    pub facility: String,
+    /// For whom (`Patient/{id}`).
+    pub patient: String,
+    /// The reason code (`BTG`).
+    pub reason: String,
+    /// The user's justification.
+    pub justification: String,
+    /// When it was granted.
+    pub at: Timestamp,
+    /// When it ends.
+    pub expires_at: Timestamp,
+    /// When the privacy officer's review is due.
+    pub review_due: Timestamp,
+    /// Whether the in-charge acknowledged the alert.
+    pub acknowledged: bool,
+}
+
 impl SurrealTx {
     async fn rows(
         &mut self,
@@ -365,6 +392,121 @@ impl SurrealTx {
         )
         .await?;
         Ok(())
+    }
+
+    /// Records a break-glass grant (migration `0009_break_glass`).
+    pub async fn put_break_glass(&mut self, row: &BreakGlassRow) -> Result<(), WriteError> {
+        self.run(
+            "CREATE type::record('break_glass', $id) CONTENT { session: $grant_session, account: $account, \
+             facility: $facility, patient: $patient, reason: $reason, justification: $justification, \
+             at: <datetime>$at, expires_at: <datetime>$expires_at, review_due: <datetime>$review_due, \
+             acknowledged: false } RETURN VALUE record::id(id)",
+            vec![
+                ("id", row.id.clone()),
+                // `$session` is reserved by SurrealDB.
+                ("grant_session", row.session.clone()),
+                ("account", row.account.clone()),
+                ("facility", row.facility.clone()),
+                ("patient", row.patient.clone()),
+                ("reason", row.reason.clone()),
+                ("justification", row.justification.clone()),
+                ("at", row.at.to_string()),
+                ("expires_at", row.expires_at.to_string()),
+                ("review_due", row.review_due.to_string()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The latest break-glass grant of `session` still active at `now`.
+    pub async fn active_break_glass(
+        &mut self,
+        session: &str,
+        now: Timestamp,
+    ) -> Result<Option<BreakGlassRow>, StoreError> {
+        let rows = self
+            .break_glass_rows(
+                "WHERE session = $key AND expires_at > <datetime>$now ORDER BY at DESC LIMIT 1",
+                session,
+                Some(now),
+            )
+            .await?;
+        Ok(rows.into_iter().next())
+    }
+
+    /// The unacknowledged break-glass alerts of `facility`, oldest first.
+    pub async fn break_glass_alerts(
+        &mut self,
+        facility: &str,
+    ) -> Result<Vec<BreakGlassRow>, StoreError> {
+        self.break_glass_rows(
+            "WHERE facility = $key AND acknowledged = false ORDER BY at ASC LIMIT 1000",
+            facility,
+            None,
+        )
+        .await
+    }
+
+    /// Marks alert `id` of `facility` acknowledged; false when there is none.
+    pub async fn acknowledge_break_glass(
+        &mut self,
+        id: &str,
+        facility: &str,
+    ) -> Result<bool, WriteError> {
+        let updated = self
+            .run(
+                "UPDATE type::record('break_glass', $id) SET acknowledged = true \
+                 WHERE facility = $facility RETURN VALUE record::id(id)",
+                vec![("id", id.to_owned()), ("facility", facility.to_owned())],
+            )
+            .await?;
+        Ok(!updated.is_empty())
+    }
+
+    async fn break_glass_rows(
+        &mut self,
+        filter: &str,
+        key: &str,
+        now: Option<Timestamp>,
+    ) -> Result<Vec<BreakGlassRow>, StoreError> {
+        let mut binds = vec![("key", key.to_owned())];
+        if let Some(now) = now {
+            binds.push(("now", now.to_string()));
+        }
+        let rows = self
+            .rows(
+                &format!(
+                    "SELECT VALUE [<string>record::id(id), session, account, facility, patient, reason, \
+                     justification, <string>at, <string>expires_at, <string>review_due, <string>acknowledged] \
+                     FROM break_glass {filter}"
+                ),
+                binds,
+            )
+            .await?;
+        rows.into_iter()
+            .map(|r| {
+                let ts = |i: usize| {
+                    r.get(i)
+                        .and_then(|t| t.parse::<Timestamp>().ok())
+                        .ok_or_else(|| StoreError::Unavailable("break_glass row is invalid".into()))
+                };
+                let text = |i: usize| r.get(i).cloned().unwrap_or_default();
+                Ok(BreakGlassRow {
+                    id: text(0),
+                    session: text(1),
+                    account: text(2),
+                    facility: text(3),
+                    patient: text(4),
+                    reason: text(5),
+                    justification: text(6),
+                    at: ts(7)?,
+                    expires_at: ts(8)?,
+                    review_due: ts(9)?,
+                    acknowledged: text(10) == "true",
+                })
+            })
+            .collect()
     }
 
     /// The persisted clock floor.

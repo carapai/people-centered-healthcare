@@ -71,7 +71,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
     - A record's facility comes from the `RecordFacility` port. Records do not name their facility yet, so the default treats none as facility-scope.
     - Follow-ups:
       - resolving the subject at central and mounting `/fhir` (#209, done): one facility per session, chosen at sign-in, which the session and token carry (ADR 0056). `health_auth::subject_layer` builds each request's subject from the token, the current snapshot, the role mappings and `X-Purpose-Of-Use`; central-server mounts `/fhir` behind it;
-      - break-glass over the API, its audit and the in-charge's alert ([#210](https://github.com/carapai/people-centered-healthcare/issues/210));
+      - break-glass over the API (#210, done): `/api/break-glass` stores the grant for the session with its `BTG` AuditEvent, every access under it is audited with `BTG`, and the in-charge lists and acknowledges the alerts. Pushing alerts and the privacy officer's review are [#218](https://github.com/carapai/people-centered-healthcare/issues/218);
       - naming a record's facility, and facility isolation in searches ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
