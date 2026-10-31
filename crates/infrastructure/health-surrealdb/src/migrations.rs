@@ -63,6 +63,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0007_registry_review",
         sql: include_str!("../migrations/0007_registry_review.surql"),
     },
+    Migration {
+        version: 8,
+        name: "0008_auth",
+        sql: include_str!("../migrations/0008_auth.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.
