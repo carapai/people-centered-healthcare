@@ -92,6 +92,9 @@ DEFINE TABLE audit_event_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON audit_event_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON audit_event_history TYPE int PERMISSIONS FULL
   DEFINE INDEX audit_event_history_last_updated ON audit_event_history FIELDS last_updated, version_seq
+DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD count ON block_count TYPE int PERMISSIONS FULL
+  DEFINE FIELD counted_at ON block_count TYPE datetime PERMISSIONS FULL
 DEFINE TABLE capability_statement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON capability_statement TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON capability_statement TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -579,6 +582,7 @@ DEFINE TABLE healthcare_service_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON healthcare_service_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON healthcare_service_history TYPE int PERMISSIONS FULL
   DEFINE INDEX healthcare_service_history_last_updated ON healthcare_service_history FIELDS last_updated, version_seq
+DEFINE TABLE idx_block TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE idx_composite TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD param ON idx_composite TYPE string PERMISSIONS FULL
   DEFINE FIELD rt ON idx_composite TYPE string PERMISSIONS FULL

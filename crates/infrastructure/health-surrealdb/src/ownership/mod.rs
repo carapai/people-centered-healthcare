@@ -55,6 +55,8 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "reindex_job",
     "condition_lock",
     "idx_ref_in",
+    "idx_block",
+    "block_count",
 ];
 
 /// Tables a module owns that hold no FHIR resources: `(table, owner)`.

@@ -138,7 +138,7 @@ impl SurrealStore {
                 &job.rt,
                 &head.rid,
                 &extraction,
-                &[],
+                crate::search::write::Derived::default(),
                 Some(&job.params),
             );
             let table = sql.str(head_table);

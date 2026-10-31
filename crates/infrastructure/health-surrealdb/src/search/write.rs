@@ -97,13 +97,22 @@ pub(crate) fn references(resource: &serde_json::Value) -> Vec<ReferenceKey> {
 /// reverse `references`, and returns the expression for its new `index_keys`. With `only`,
 /// just those parameters' entries are replaced (a reindex job) and references are kept;
 /// otherwise every entry is replaced.
+/// The keys a version writes besides its search entries.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Derived<'a> {
+    /// Its literal references (`idx_ref_in`).
+    pub(crate) references: &'a [ReferenceKey],
+    /// Its blocking keys (`idx_block`).
+    pub(crate) blocks: &'a [(String, String)],
+}
+
 pub(crate) fn replace_entries(
     sql: &mut Sql,
     head_table: &str,
     resource_type: &str,
     resource_id: &str,
     extraction: &Extraction,
-    references: &[ReferenceKey],
+    derived: Derived<'_>,
     only: Option<&[String]>,
 ) -> String {
     let head = sql.str(head_table);
@@ -117,7 +126,8 @@ pub(crate) fn replace_entries(
         Some(params) => {
             let params = sql.value(Bind::Strs(params.to_vec()));
             sql.push(format!(
-                "LET {drop} = array::filter({old}, |$k| record::id($k)[1] IN {params})"
+                "LET {drop} = array::filter({old}, |$k| record::tb($k) != 'idx_block' \
+                 AND record::id($k)[1] IN {params})"
             ));
         }
         None => {
@@ -158,7 +168,7 @@ pub(crate) fn replace_entries(
     for param in &extraction.missing {
         write(sql, "idx_missing", param, Vec::new(), Vec::new());
     }
-    for target in references {
+    for target in derived.references {
         let (target_type, target_id) = (
             sql.str(target.target_type.as_str()),
             sql.str(target.target_id.as_str()),
@@ -166,6 +176,15 @@ pub(crate) fn replace_entries(
         let key = sql.variable("k");
         sql.push(format!(
             "LET {key} = type::record('idx_ref_in', [{target_type}, {target_id}, {rt}, {rid}])"
+        ));
+        sql.push(format!("UPSERT {key}"));
+        keys.push(key);
+    }
+    for (kind, value) in derived.blocks {
+        let (kind, value) = (sql.str(kind.as_str()), sql.str(value.as_str()));
+        let key = sql.variable("k");
+        sql.push(format!(
+            "LET {key} = type::record('idx_block', [{kind}, {value}, {rid}])"
         ));
         sql.push(format!("UPSERT {key}"));
         keys.push(key);
