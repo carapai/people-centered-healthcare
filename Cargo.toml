@@ -11,6 +11,7 @@ members = [
     "crates/domains/health-client-registry",
     "crates/application/health-registries-app",
     "crates/infrastructure/health-fhir-server",
+    "crates/infrastructure/health-files",
     "crates/infrastructure/health-http",
     "crates/infrastructure/health-observability",
     "crates/infrastructure/health-surrealdb",
@@ -36,6 +37,7 @@ health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
 health-http = { path = "crates/infrastructure/health-http" }
 health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
+health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
