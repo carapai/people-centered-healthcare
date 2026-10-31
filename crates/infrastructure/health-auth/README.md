@@ -33,10 +33,29 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 - **Credentials:** Argon2id with m = 19456 KiB, t = 2, p = 1, plus an optional pepper (`Credentials`).
 - **State:** `AuthStore` holds accounts, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development, and the SurrealDB adapter is [#187](https://github.com/carapai/people-centered-healthcare/issues/187).
 
+## Permission snapshots (ADR 0011)
+
+- **Signing:** `SnapshotSigner` is central's key. It signs a `PermissionSnapshot` as a compact ES256 JWS (`typ` `snapshot+jwt`), after checking its roles against the configured `RolePermissions`.
+- **Verification:** `SnapshotVerifier` trusts central's snapshot keys, several of them during a rotation. Any changed byte, another key, or a token that is not a snapshot is refused.
+- **The gate:** `AuthConfig::snapshots` takes a `SnapshotGate`, which edges set. Then every login, code redemption and refresh needs the account's snapshot for this facility. The checks, in order:
+  1. the local clock must not read before the floor;
+  2. the snapshot must verify, and must be for this account and facility;
+  3. it must be unexpired and not dated in the future;
+  4. checking it advances the clock floor to its `issued_at`.
+- **Failures:** a refused login shows the usual single message. A refused refresh ends the session.
+- **Tokens:**
+  - Access tokens carry `facility` and `snapshot_version`, and never outlive `not_after`.
+  - The token response carries `snapshot_not_after`, so the client can warn in the last 3 days.
+- **Storage:** `AuthStore::snapshot`, `clock_floor` and `set_clock_floor` default to none, as at central. `MemoryStore` keeps them.
+- **Offline administration** belongs with the edge's local authorization server ([#75](https://github.com/carapai/people-centered-healthcare/issues/75)):
+  - the in-charge's single audited 7-day emergency extension, and district or central extensions;
+  - local grants and provisional accounts, signed by the edge node key, lasting at most 7 days until central ratifies them;
+  - never granting central-only roles offline;
+  - applying central's revocations before uploading audit events and the outbox.
+
 ## Not here yet
 
 - **Wiring:** mounting the server in central-server, signing-key storage and rotation, and the web client's sign-in ([#188](https://github.com/carapai/people-centered-healthcare/issues/188)).
-- **Snapshot claims:** `facility` and `snapshot_version` ([#64](https://github.com/carapai/people-centered-healthcare/issues/64)).
 - **Edge features:** PIN resume, and SMART Backend Services between edge and central (Phase 4).
 
 ## Tests
@@ -52,3 +71,10 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - lockout after 10 failures, with a locked account indistinguishable from an unknown one;
   - the 12-hour cap;
   - unregistered redirects never followed.
+- **`tests/snapshots.rs`**, an edge with a `SnapshotGate`:
+  - no snapshot, no login;
+  - the snapshot's claims reach the token;
+  - an expired snapshot blocks login and ends refresh, and the last token stops at `not_after`;
+  - a renewed snapshot lets the user back in;
+  - a tampered or impostor-signed snapshot is refused, as is one for another facility;
+  - a clock wound back below the floor refuses logins.

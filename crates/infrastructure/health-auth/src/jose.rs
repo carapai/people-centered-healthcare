@@ -175,7 +175,7 @@ pub fn sign(key: &SigningKey, header: &Value, claims: &Value) -> String {
 }
 
 /// The header, claims, signing input and signature of a compact JWS.
-fn split(token: &str) -> Result<(Value, Value, &str, Signature), JoseError> {
+pub(crate) fn split(token: &str) -> Result<(Value, Value, &str, Signature), JoseError> {
     let mut parts = token.split('.');
     let (Some(header), Some(claims), Some(signature), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())

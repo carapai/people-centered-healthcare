@@ -19,3 +19,8 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
   - SMART v1 forms are refused.
   - `granted()` drops scopes this server does not grant yet, such as launch context.
   - `permits()` answers coarse grants without a query restriction. Query restrictions are the policy decision point's.
+- **`snapshot`**: permission snapshots (ADR 0011).
+  - **`PermissionSnapshot`:** the account, the facility, the roles (each optionally limited to some locations), the program assignments, `issued_at` (central time), `not_after` and `snapshot_version`.
+  - **`SnapshotPolicy`:** a 14-day default lifetime, configurable from 7 to 30 days. `check` refuses an expired snapshot or one dated in the future, and reports `ExpiresSoon` for the last 3 days.
+  - **`ClockFloor`:** the last known central time. It only moves forward, and `check` refuses a local clock that reads before it.
+  - **`RolePermissions`:** role → permission mappings from the configuration package. `validate` refuses unknown roles (central will not sign them), and `resolve` gives the union of a snapshot's permissions.

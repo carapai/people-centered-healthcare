@@ -59,7 +59,7 @@ cargo_metadata = "0.23.1"
 fhir-r5 = "=4.2.3"
 form_urlencoded = "1.2.2"
 http-body-util = "0.1.3"
-jiff = "0.2.38"
+jiff = { version = "0.2.38", features = ["serde"] }
 # Patched for decimal-exact evaluation (ADR 0052); see third_party/octofhir-fhirpath.
 octofhir-fhirpath = "=0.4.57"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
@@ -85,7 +85,7 @@ tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "registry", "env-filter"] }
 unicode-normalization = "0.1.26"
-uuid = { version = "1.29.0", features = ["v5", "v7"] }
+uuid = { version = "1.29.0", features = ["serde", "v5", "v7"] }
 utoipa = { version = "6.0.0", default-features = false, features = ["macros"] }
 utoipa-axum = "0.3.0"
 

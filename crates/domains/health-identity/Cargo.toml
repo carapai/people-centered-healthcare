@@ -15,5 +15,6 @@ workspace = true
 
 [dependencies]
 health-time = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
