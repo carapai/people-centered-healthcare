@@ -33,6 +33,7 @@ flowchart LR
   - till variance.
 - **Dimensions on every posting:** facility, department, service, program, **funding source**, `fund` (restricted grant), encounter or episode, and the price version references.
 - **Money.** `rust_decimal`, with the ISO 4217 scale per currency (UGX: 0) and round-half-even. Largest-remainder allocation is used for splits, with residue posted to the rounding account. There is one functional currency per ledger; foreign amounts keep their original value and rate.
+- **Implementation** (#119): `health-financial-ledger` holds the exact money, the chart template, balanced append-only postings with reversals, and the derived balances, including the projection for FHIR `Account.balance[]`. Persistence and the posting use cases come with billing.
 - **Free care** creates ChargeItems priced at a reference tariff and allocated to the government or donor funding source (§70). The patient share is zero, but consumption is still recorded.
 
 ## Charge capture
