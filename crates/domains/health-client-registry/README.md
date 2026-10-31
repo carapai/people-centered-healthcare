@@ -29,3 +29,8 @@ Layer: **domain** (Registries). Source Patients, golden records and their links 
     - Null handling: conservative counts a missing value as a disagreement, moderate as half of one, greedy as nothing.
     - Agreement only inside an estimated age's ±5 band is worth half.
     - The result is a FHIR `match-grade`: certain, probable, possible or certainly-not.
+- **`review`:** the registry review queue (ADR 0028).
+  - **`ReviewEntry`** is a potential match (source, candidate, golden record, score) or a survivorship disagreement (golden record, field, current and incoming values).
+  - **`decide`** accepts only the decisions that fit the item: same person or different people, keep current or take incoming. It needs a named reviewer, and refuses an item that is already decided.
+  - **`overdue`:** pending past `AGEING` (7 days).
+  - **`ReviewQueue`** is the storage port; `health-surrealdb` implements it (migration `0007_registry_review`).

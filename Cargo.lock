@@ -1952,6 +1952,7 @@ dependencies = [
 name = "health-client-registry"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "thiserror",
 ]
@@ -2164,6 +2165,7 @@ dependencies = [
 name = "health-surrealdb"
 version = "0.1.0"
 dependencies = [
+ "health-client-registry",
  "health-fhir-search",
  "health-identifiers",
  "health-persistence",

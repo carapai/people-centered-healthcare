@@ -40,6 +40,20 @@ impl AuditTrail<SurrealTx> for Recorded {
             .push((actor.into(), reason.into(), id));
         Ok(())
     }
+
+    async fn recorded(
+        &self,
+        _tx: &mut SurrealTx,
+        actor: &str,
+        reason: &str,
+        what: &str,
+    ) -> Result<(), WriteError> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push((actor.into(), reason.into(), what.into()));
+        Ok(())
+    }
 }
 
 async fn store() -> SurrealStore {

@@ -15,9 +15,11 @@ mod ecid;
 mod golden;
 pub mod matching;
 mod merge;
+mod review;
 mod survivorship;
 
 pub use ecid::{Ecid, InvalidEcid};
 pub use golden::{GoldenRecord, LinkRefused, SourceRecord};
 pub use merge::{MergePlan, MergeRefused, plan_merge};
+pub use review::{AGEING, Decided, Decision, ReviewEntry, ReviewKind, ReviewQueue, ReviewRefused};
 pub use survivorship::{Claim, Field, ReviewItem, Survival, Trust, survive};
