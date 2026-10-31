@@ -183,7 +183,7 @@ Checked in application code on write, not with SurrealDB `REFERENCE` constraints
 | Global replicas (Practitioner, Location, products, Published Definitions) | Must resolve against the local replica |
 | Records outside this node's scope, e.g. another facility's Encounter in a referral | Allowed; flagged `unresolved` and checked at central |
 
-- **Deletion.** A resource that live records still reference cannot be deleted (409). Clinical corrections use `entered-in-error`, not delete.
+- **Deletion.** A resource that live records still reference cannot be deleted (409). Clinical corrections use `entered-in-error`, not delete. AuditEvents do not count: they record an access to a resource and do not depend on it.
 - **Physical purge** happens only when a node's scope shrinks or a retention period expires. It runs as an audited background job.
 
 ### In code
@@ -197,7 +197,7 @@ Checked in application code on write, not with SurrealDB `REFERENCE` constraints
 | `urn:…` outside a Bundle | 422 (inside a transaction it is rewritten first) |
 | `Type/id`, or an absolute URL on this server | must name a live resource (422 otherwise), unless `ReferenceScope::must_resolve` says the target is out of scope |
 
-- **Reverse references.** Each live version writes `idx_ref_in` entries `[target_type, target_id, source_type, source_id]` for its literal references (migration `0004_reference_index`). They are listed in `index_keys` like search entries and replaced on every write; tombstones write none. `SurrealTx::referrers` reads them with a record-id range, and a delete that leaves a referrer is 409.
+- **Reverse references.** Each live version writes `idx_ref_in` entries `[target_type, target_id, source_type, source_id]` for its literal references (migration `0004_reference_index`). They are listed in `index_keys` like search entries and replaced on every write; tombstones write none. `SurrealTx::referrers` reads them with a record-id range, skipping AuditEvent sources, and a delete that leaves a referrer is 409.
 - **Scope.** The default `ReferenceScope` is `AllMustResolve`, until node scope exists.
 - **Not done yet:** flagging out-of-scope references `unresolved` for checking at central. It needs node scope and the sync tasks to decide where the flag lives.
 

@@ -24,12 +24,14 @@ use health_persistence::{Precondition, RawJson, ResourceType, Store, Transaction
 use health_surrealdb::SurrealTx;
 use serde_json::{Map, Value, json};
 
+use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{Return, fhir_json, prefer, require_json_body};
 use crate::ops::{self, Attempt, Condition, CreateTarget, UpdatePlan};
 use crate::outcome::{FhirError, operation_outcome};
 use crate::references;
 use crate::{FhirServer, etag, resource_type};
+use health_audit::Interaction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Method {
@@ -199,6 +201,9 @@ fn parse_request(server: &FhirServer, index: usize, entry: &Value) -> Result<Req
         .map_or((url, None), |(p, q)| (p, Some(q)));
     let segments: Vec<&str> = path.split('/').collect();
     let resource_type = resource_type(segments[0])?;
+    if method != Method::Get {
+        audit::writable(resource_type.as_str())?;
+    }
     let not_found = || FhirError::not_found(format!("{path} is not known"));
     let target = match (method, segments.as_slice(), query) {
         (Method::Get, _, Some(_)) => {
@@ -316,6 +321,10 @@ fn raw(value: &Value) -> RawJson {
     RawJson::from_validated(value.to_string())
 }
 
+fn request_is_version(request: &Request) -> bool {
+    matches!(request.target, Target::Version(..))
+}
+
 async fn read(tx: &mut SurrealTx, request: &Request) -> Result<Outcome, Attempt> {
     let (id, version) = match request.target {
         Target::Instance(id) => (id, None),
@@ -342,6 +351,12 @@ async fn read(tx: &mut SurrealTx, request: &Request) -> Result<Outcome, Attempt>
     if version.deleted {
         return Err(FhirError::gone().into());
     }
+    let interaction = if request_is_version(request) {
+        Interaction::Vread
+    } else {
+        Interaction::Read
+    };
+    audit::read(tx, interaction, [&json]).await?;
     Ok(Outcome {
         status: 200,
         resource_type: Some(request.resource_type.clone()),

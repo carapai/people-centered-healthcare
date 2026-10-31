@@ -12,7 +12,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use health_fhir_search::{Catalog, ParamState, Registry, Unrestricted};
-use health_fhir_server::{FhirServer, TYPE_INTERACTIONS};
+use health_fhir_server::{AUDIT_EVENT_INTERACTIONS, FhirServer, TYPE_INTERACTIONS};
 use health_identifiers::ResourceId;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::SystemClock;
@@ -64,6 +64,63 @@ fn registry() -> Registry {
 
 async fn router() -> Router {
     router_with(None).await
+}
+
+/// A server that audits, as every runtime's does.
+async fn audited_router() -> Router {
+    let settings = Settings {
+        target: Target::Memory,
+        namespace: "test".into(),
+        database: "main".into(),
+    };
+    let connection = Connection::open(&settings).await.expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let store = SurrealStore::new(connection, Arc::new(SystemClock)).with_registry(registry());
+    FhirServer::new(store, BASE, Arc::new(Unrestricted))
+        .with_audit(health_audit::Auditor::new("test node", Vec::new()))
+        .router()
+}
+
+/// AuditEvent is read-only over REST: its declared reads work on the events the earlier writes
+/// produced, and every write is refused.
+async fn audit_event_is_read_only(router: &Router) {
+    let json = vec![(
+        "content-type".to_owned(),
+        "application/fhir+json".to_owned(),
+    )];
+    let search = send(router, "GET", "/AuditEvent?_count=1", &[], String::new()).await;
+    assert_eq!(search.status, StatusCode::OK, "{}", search.body);
+    let bundle: Value = serde_json::from_str(&search.body).expect("json");
+    let event = &bundle["entry"][0]["resource"];
+    let id = event["id"]
+        .as_str()
+        .expect("an AuditEvent from an earlier write");
+    let vid = event["meta"]["versionId"].as_str().expect("versionId");
+    for path in [
+        format!("/AuditEvent/{id}"),
+        format!("/AuditEvent/{id}/_history/{vid}"),
+        format!("/AuditEvent/{id}/_history"),
+        "/AuditEvent/_history?_count=1".to_owned(),
+    ] {
+        let reply = send(router, "GET", &path, &[], String::new()).await;
+        assert_eq!(reply.status, StatusCode::OK, "{path}: {}", reply.body);
+    }
+    let mut changed = event.clone();
+    changed["action"] = Value::String("D".into());
+    let attempts = [
+        ("PUT", format!("/AuditEvent/{id}"), changed.to_string()),
+        ("POST", "/AuditEvent".to_owned(), changed.to_string()),
+        ("DELETE", format!("/AuditEvent/{id}"), String::new()),
+    ];
+    for (method, path, body) in attempts {
+        let reply = send(router, method, &path, &json, body).await;
+        assert_eq!(
+            reply.status,
+            StatusCode::METHOD_NOT_ALLOWED,
+            "{method} {path}: {}",
+            reply.body
+        );
+    }
 }
 
 async fn router_with(scope: Option<Arc<dyn health_fhir_server::ReferenceScope>>) -> Router {
@@ -298,7 +355,7 @@ type Check<'a> = (
 /// every declared search parameter, so a declaration without behaviour fails here.
 #[tokio::test]
 async fn the_capability_statement_matches_behaviour() {
-    let router = router().await;
+    let router = audited_router().await;
     let metadata = send(&router, "GET", "/metadata", &[], String::new()).await;
     assert_eq!(metadata.status, StatusCode::OK);
     let statement: Value = serde_json::from_str(&metadata.body).expect("json");
@@ -317,6 +374,12 @@ async fn the_capability_statement_matches_behaviour() {
             .iter()
             .map(|i| i["code"].as_str().expect("code"))
             .collect();
+        if t == "AuditEvent" {
+            assert_eq!(codes, AUDIT_EVENT_INTERACTIONS);
+            assert_eq!(resource["conditionalDelete"], "not-supported");
+            audit_event_is_read_only(&router).await;
+            continue;
+        }
         assert_eq!(codes, TYPE_INTERACTIONS, "{t}");
         assert_eq!(resource["conditionalCreate"], true);
         assert_eq!(resource["conditionalUpdate"], true);

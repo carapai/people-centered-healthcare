@@ -14,8 +14,10 @@ use health_persistence::{
 };
 use health_surrealdb::SurrealTx;
 
+use crate::audit;
 use crate::outcome::FhirError;
 use crate::{FhirServer, pairs};
+use health_audit::Interaction;
 
 /// One attempt of a use case: a write-write conflict reruns it, anything else ends it.
 pub(crate) enum Attempt {
@@ -229,6 +231,7 @@ pub(crate) async fn write(
     json: &RawJson,
     precondition: Precondition,
 ) -> Result<(VersionMeta, RawJson), Attempt> {
+    audit::writable(resource_type.as_str())?;
     let version = tx
         .write(WriteRequest {
             resource_type: resource_type.clone(),
@@ -241,6 +244,12 @@ pub(crate) async fn write(
     let stored = tx.read(resource_type, id).await?.ok_or_else(|| {
         Attempt::Fail(StoreError::Unavailable("written head is missing".into()).into())
     })?;
+    let interaction = if precondition == Precondition::MustNotExist {
+        Interaction::Create
+    } else {
+        Interaction::Update
+    };
+    audit::written(tx, interaction, &stored.json).await?;
     Ok((version, stored.json))
 }
 
@@ -251,6 +260,7 @@ pub(crate) async fn delete(
     id: ResourceId,
     expected: Option<OpId>,
 ) -> Result<Option<VersionMeta>, Attempt> {
+    audit::writable(resource_type.as_str())?;
     let head = tx
         .read(resource_type, id)
         .await?
@@ -258,9 +268,9 @@ pub(crate) async fn delete(
     if head.version.deleted {
         return Ok(None);
     }
-    Ok(Some(
-        tx.delete(resource_type, id, OpId::new(), expected).await?,
-    ))
+    let version = tx.delete(resource_type, id, OpId::new(), expected).await?;
+    audit::written(tx, Interaction::Delete, &head.json).await?;
+    Ok(Some(version))
 }
 
 /// `DELETE [type]?…`: deletes the one match; `None` when nothing matches.
@@ -271,12 +281,15 @@ pub(crate) async fn conditional_delete(
     condition: &Condition,
     expected: Option<OpId>,
 ) -> Result<Option<(ResourceId, VersionMeta)>, Attempt> {
+    audit::writable(resource_type.as_str())?;
     match matches(server, tx, condition).await? {
-        Some(matched) => Ok(Some((
-            matched.id,
-            tx.delete(resource_type, matched.id, OpId::new(), expected)
-                .await?,
-        ))),
+        Some(matched) => {
+            let version = tx
+                .delete(resource_type, matched.id, OpId::new(), expected)
+                .await?;
+            audit::written(tx, Interaction::Delete, &matched.json).await?;
+            Ok(Some((matched.id, version)))
+        }
         None => Ok(None),
     }
 }

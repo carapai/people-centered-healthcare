@@ -49,6 +49,7 @@ macro_rules! retrying {
     }};
 }
 
+mod audit;
 mod bundle;
 mod capability;
 mod conditional;
@@ -66,6 +67,7 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::routing::{get, post};
+use health_audit::Auditor;
 use health_fhir_search::SearchPolicy;
 use health_fhir_validation::{FhirPathEngine, OctofhirEngine, validate_invariants};
 use health_identifiers::ResourceId;
@@ -73,7 +75,7 @@ use health_persistence::{ResourceType, RetryPolicy};
 use health_surrealdb::{SurrealStore, ownership};
 use health_time::Timestamp;
 
-pub use capability::{TYPE_INTERACTIONS, capability_statement};
+pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_statement};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use outcome::{FhirError, operation_outcome};
 pub use references::{AllMustResolve, ReferenceScope};
@@ -89,6 +91,7 @@ pub struct FhirServer {
     fhirpath: Arc<dyn FhirPathEngine>,
     retry: RetryPolicy,
     started: Timestamp,
+    audit: Option<Arc<Auditor>>,
 }
 
 impl FhirServer {
@@ -107,6 +110,7 @@ impl FhirServer {
             fhirpath: Arc::new(OctofhirEngine::new()),
             retry: RetryPolicy::default(),
             started: Timestamp::now(),
+            audit: None,
         }
     }
 
@@ -135,8 +139,18 @@ impl FhirServer {
         }
     }
 
+    /// This server, recording an AuditEvent for every write and every sensitive read (#66). The
+    /// agent of each request is the `health_audit::Agent` request extension, which the
+    /// authentication layer inserts; without one it is recorded as unauthenticated.
+    #[must_use]
+    pub fn with_audit(mut self, auditor: Auditor) -> Self {
+        self.audit = Some(Arc::new(auditor));
+        self
+    }
+
     /// The routes, relative to the FHIR base; nest them under it (e.g. `/fhir`).
     pub fn router(self) -> Router {
+        let scope = axum::middleware::from_fn_with_state(self.clone(), audit::scope);
         Router::new()
             .route("/", post(transaction::post))
             .route("/metadata", get(interactions::metadata))
@@ -158,6 +172,7 @@ impl FhirServer {
             )
             .route("/{type}/{id}/_history", get(history::instance))
             .route("/{type}/{id}/_history/{vid}", get(interactions::vread))
+            .layer(scope)
             .with_state(self)
     }
 

@@ -10,10 +10,13 @@ use health_identifiers::ResourceId;
 use health_persistence::Store;
 use serde_json::{Map, json};
 
+use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{fhir_json, prefer, require_json_format};
 use crate::outcome::FhirError;
 use crate::{FhirServer, pairs, resource_type};
+use health_audit::Interaction;
+use health_persistence::Transaction as _;
 
 /// The keyset cursor parameter of `next` links: the last resource id of the previous page.
 pub const CURSOR: &str = "_cursor";
@@ -68,6 +71,16 @@ async fn run(
     }
     let mut tx = server.store.begin().await?;
     let page = tx.search(&query, server.policy.as_ref(), after).await?;
+    if audit::read(
+        &mut tx,
+        Interaction::Search,
+        page.resources.iter().map(|r| &r.json),
+    )
+    .await
+    .map_err(audit::failed)?
+    {
+        tx.commit().await?;
+    }
 
     let used: Vec<(String, String)> = search_params
         .into_iter()

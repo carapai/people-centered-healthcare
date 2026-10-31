@@ -262,8 +262,8 @@ impl SurrealTx {
 
 impl SurrealTx {
     /// Up to `limit` live resources whose current version references `resource_type/id`, not
-    /// counting the resource itself (persistence.md § Reference integrity). A record-id range
-    /// over `idx_ref_in`.
+    /// counting the resource itself or AuditEvents (persistence.md § Reference integrity). A
+    /// record-id range over `idx_ref_in`.
     pub async fn referrers(
         &mut self,
         resource_type: &ResourceType,
@@ -274,7 +274,8 @@ impl SurrealTx {
             .tx()?
             .query(format!(
                 "SELECT VALUE array::slice(record::id(id), 2) FROM idx_ref_in:[$t, $i]..[$t, $i, {{}}] \
-                 WHERE !(record::id(id)[2] = $t AND record::id(id)[3] = $i) LIMIT {limit}"
+                 WHERE !(record::id(id)[2] = $t AND record::id(id)[3] = $i) \
+                 AND record::id(id)[2] != 'AuditEvent' LIMIT {limit}"
             ))
             .bind(("t", resource_type.to_string()))
             .bind(("i", id.to_string()))

@@ -11,11 +11,13 @@ use health_persistence::{
 };
 use serde_json::Value;
 
+use crate::audit;
 use crate::http::{Return, fhir_json, if_match, prefer, require_json_body, version_headers};
 use crate::ops::{self, Attempt, Condition, CreateTarget};
 use crate::outcome::{FhirError, operation_outcome};
 use crate::references;
 use crate::{FhirServer, capability_statement, resource_id, resource_type};
+use health_audit::Interaction;
 
 /// `GET /metadata`.
 pub(crate) async fn metadata(State(server): State<FhirServer>) -> Response {
@@ -42,6 +44,12 @@ pub(crate) async fn read(
     let stored = tx.read(&resource_type, id).await?.ok_or_else(not_found)?;
     if stored.version.deleted {
         return Err(FhirError::gone());
+    }
+    if audit::read(&mut tx, Interaction::Read, [&stored.json])
+        .await
+        .map_err(audit::failed)?
+    {
+        tx.commit().await?;
     }
     if headers
         .get("if-none-match")
@@ -73,6 +81,12 @@ pub(crate) async fn vread(
         .ok_or_else(not_found)?;
     if entry.version.deleted {
         return Err(FhirError::gone());
+    }
+    if audit::read(&mut tx, Interaction::Vread, [&entry.json])
+        .await
+        .map_err(audit::failed)?
+    {
+        tx.commit().await?;
     }
     let mut response = fhir_json(StatusCode::OK, entry.json.as_str().to_owned());
     version_headers(&mut response, &entry.version);
@@ -190,6 +204,7 @@ pub(crate) async fn create(
     bytes: Bytes,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
+    audit::writable(resource_type.as_str())?;
     let (json, _ignored_id) = body(&server, &resource_type, &headers, &bytes).await?;
     let condition = headers
         .get("if-none-exist")
@@ -237,6 +252,7 @@ pub(crate) async fn update(
     bytes: Bytes,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
+    audit::writable(resource_type.as_str())?;
     let id_value: ResourceId = id.parse().map_err(|_| {
         FhirError::bad_request("resource ids are client-generated UUIDs (ADR 0013)")
     })?;
@@ -272,6 +288,7 @@ pub(crate) async fn delete(
     headers: HeaderMap,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
+    audit::writable(resource_type.as_str())?;
     let id = resource_id(&id)
         .ok_or_else(|| FhirError::not_found(format!("{type_name}/{id} is not known")))?;
     let expected = if_match(&headers)?;

@@ -35,6 +35,7 @@ pub(crate) async fn update(
     bytes: Bytes,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
+    crate::audit::writable(resource_type.as_str())?;
     let condition = Condition::parse(
         &server,
         &resource_type,
@@ -82,6 +83,7 @@ pub(crate) async fn delete(
     headers: HeaderMap,
 ) -> Result<Response, FhirError> {
     let resource_type = resource_type(&type_name)?;
+    crate::audit::writable(resource_type.as_str())?;
     let condition = Condition::parse(
         &server,
         &resource_type,

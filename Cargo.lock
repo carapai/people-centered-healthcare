@@ -1887,6 +1887,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-audit"
+version = "0.1.0"
+dependencies = [
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+]
+
+[[package]]
 name = "health-auth"
 version = "0.1.0"
 dependencies = [
@@ -1942,6 +1953,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "form_urlencoded",
+ "health-audit",
  "health-fhir-search",
  "health-fhir-validation",
  "health-identifiers",

@@ -18,6 +18,15 @@ pub const TYPE_INTERACTIONS: &[&str] = &[
     "search-type",
 ];
 
+/// AuditEvent is append-only and written only by the audit module (#66): reads only.
+pub const AUDIT_EVENT_INTERACTIONS: &[&str] = &[
+    "read",
+    "vread",
+    "history-instance",
+    "history-type",
+    "search-type",
+];
+
 fn type_code(param_type: ParamType) -> &'static str {
     match param_type {
         ParamType::Number => "number",
@@ -47,16 +56,18 @@ pub fn capability_statement(registry: &Registry, base: &str, date: Timestamp) ->
                     })
                 })
                 .collect();
+            let read_only = r.resource_type == health_audit::AUDIT_EVENT;
+            let interactions = if read_only { AUDIT_EVENT_INTERACTIONS } else { TYPE_INTERACTIONS };
             json!({
                 "type": r.resource_type,
-                "interaction": TYPE_INTERACTIONS.iter().map(|c| json!({ "code": c })).collect::<Vec<_>>(),
+                "interaction": interactions.iter().map(|c| json!({ "code": c })).collect::<Vec<_>>(),
                 "versioning": "versioned-update",
                 "readHistory": true,
-                "updateCreate": true,
-                "conditionalCreate": true,
+                "updateCreate": !read_only,
+                "conditionalCreate": !read_only,
                 "conditionalRead": "not-supported",
-                "conditionalUpdate": true,
-                "conditionalDelete": "single",
+                "conditionalUpdate": !read_only,
+                "conditionalDelete": if read_only { "not-supported" } else { "single" },
                 "searchParam": search_params,
             })
         })

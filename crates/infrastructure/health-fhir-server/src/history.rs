@@ -10,10 +10,12 @@ use health_surrealdb::{DEFAULT_COUNT, HistoryEntry, HistoryScope};
 use health_time::Timestamp;
 use serde_json::{Map, json};
 
+use crate::audit;
 use crate::bundle::{Entry, bundle};
 use crate::http::{fhir_json, require_json_format};
 use crate::outcome::FhirError;
 use crate::{FhirServer, etag, pairs, resource_id, resource_type};
+use health_audit::Interaction;
 
 struct Params {
     since: Option<Timestamp>,
@@ -96,6 +98,16 @@ async fn respond(
         )));
     }
     let entries = tx.history(&scope, params.since, params.count).await?;
+    let served = entries
+        .iter()
+        .filter(|e| !e.version.deleted)
+        .map(|e| &e.json);
+    if audit::read(&mut tx, Interaction::History, served)
+        .await
+        .map_err(audit::failed)?
+    {
+        tx.commit().await?;
+    }
     let self_link = match query.filter(|q| !q.is_empty()) {
         Some(q) => server.url(&format!("{path}?{q}")),
         None => server.url(path),

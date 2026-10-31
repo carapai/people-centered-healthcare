@@ -13,7 +13,7 @@ This page consolidates how MASTER_PROMPT §95–97 is met. Each mechanism is dec
 | Patient-level access | Caregiver access via RelatedPerson + Consent + verification; portal access at `level3` | patient-identity.md |
 | Purpose of use | Declared for patient-sensitive access | offline-auth.md |
 | Consent | Consent records (owner: consent); scoped, expiring caregiver grants | patient-identity.md |
-| AuditEvent | Append-only at the origin node and synced up; only the audit module writes them | resource-ownership.md, write-authority.md |
+| AuditEvent | Append-only at the origin node and synced up; only the audit module writes them. In code: `health-audit`, applied by `FhirServer::with_audit` to every write and every sensitive or break-glass read, in the same transaction; REST writes to AuditEvent are refused | resource-ownership.md, write-authority.md |
 | Provenance | Written with every derived write (extraction, identity survivorship, pricing versions) | questionnaire-extraction.md, patient-identity.md |
 | Break-glass | One patient, 1 hour, reason code, immediate alert, privacy-officer review within 72 h | offline-auth.md |
 | Session management | 15-minute DPoP access tokens with a 12-hour cap; PIN resume and switch; idle lock after 15 min; tokens in memory only | offline-auth.md, client-application.md |
