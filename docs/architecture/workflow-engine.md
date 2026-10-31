@@ -35,6 +35,9 @@ Status: **accepted** (ADRs 0002, 0042, 0043, 0044). Produced while resolving the
 
 - **Semantics.** SCXML-style: run-to-completion, one event queue per instance, transitions chosen by document order, deterministic.
 - **Implementation.** Our own pure interpreter in `health-workflow` (domain layer), whose behaviour is pinned by a curated subset of the W3C SCXML conformance tests.
+  - It is built (#95), following SCXML Appendix D without history states.
+  - It returns effects for the application to carry out: typed actions keyed for idempotency, timers and invocations. Guards are evaluated through a port.
+  - `tests/scxml.rs` covers the subset, one test per assertion id.
 - **Importing PlanDefinitions.** A PlanDefinition and its ActivityDefinitions are converted into a **draft** definition. `action.condition` becomes guards, `relatedAction` becomes sequencing, and `selectionBehavior` and `groupingBehavior` become parallel or choice structures. ActivityDefinitions are used by the typed action `create-request-from-activity-definition`, which produces requests with `intent=proposal` or `order`, by role.
 
 ## Contexts and instances
