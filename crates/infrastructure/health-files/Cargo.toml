@@ -1,0 +1,20 @@
+[package]
+name = "health-files"
+description = "The content-addressed blob store for attachments: sha-256 keyed files on the node filesystem, outside SurrealDB (ADR 0021)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

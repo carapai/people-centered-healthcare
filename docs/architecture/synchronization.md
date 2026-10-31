@@ -210,6 +210,7 @@ stateDiagram-v2
 - **Download** is on demand, unless the type's metadata flags it for pre-fetch.
 - **Size cap:** 50 MiB per attachment.
 - **Garbage collection** removes only blobs that nothing references, after the retention horizon.
+- **In code:** `health-files`' `FsBlobStore` ([README](../../crates/infrastructure/health-files/README.md)). It provides SHA-256 addressing, atomic writes, deduplication, the 50 MiB cap, chunked resumable uploads verified on completion, a hash check on every read (a mismatch is quarantined), and garbage collection behind a `BlobReferences` port. The sync upload endpoint and the `Attachment` reference index arrive with sync and persistence.
 
 ## Desktop reconnect (§90)
 
