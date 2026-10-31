@@ -3,11 +3,25 @@
 
 use argon2::password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString};
 use argon2::{Algorithm, Argon2, Params, Version};
+use health_identity::{PasswordPolicy, PasswordRejected};
+
+use crate::breached::BreachedPasswords;
 
 /// Hashing failed (bad parameters or pepper); never reports the password.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("password hashing failed")]
 pub struct HashError;
+
+/// Why a new password was not set.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SetPasswordError {
+    /// The policy refuses it: too short, or breached.
+    #[error(transparent)]
+    Rejected(#[from] PasswordRejected),
+    /// Hashing failed.
+    #[error(transparent)]
+    Hash(#[from] HashError),
+}
 
 /// Hashes and verifies passwords.
 #[derive(Clone)]
@@ -43,6 +57,20 @@ impl Credentials {
         };
         credentials.decoy = credentials.hash("decoy password, never matched")?;
         Ok(credentials)
+    }
+
+    /// A new password's hash, once it passes `policy` and is not on `breached` (offline-auth.md
+    /// § Credentials): the check for every password a user sets or changes, at central and on an
+    /// edge alike. `device_factor` is whether the user signs in on an enrolled device.
+    pub fn set_password(
+        &self,
+        policy: &PasswordPolicy,
+        breached: &BreachedPasswords,
+        password: &str,
+        device_factor: bool,
+    ) -> Result<String, SetPasswordError> {
+        policy.check(password, device_factor, breached.contains(password))?;
+        Ok(self.hash(password)?)
     }
 
     /// The PHC string for `password`, with a fresh salt.

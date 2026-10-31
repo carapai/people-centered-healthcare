@@ -82,7 +82,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
     - central-server mounts it at `/auth`, with rotating keys from a secret file;
     - `/api/session` is an authorized route;
     - the web client signs in with PKCE through its own sign-in page;
-  - the breached-password list ([#189](https://github.com/carapai/people-centered-healthcare/issues/189)).
+  - the breached-password list (#189, done): SecLists' top 1,000,000 (MIT), built into `health-auth` as a Bloom filter (0.1% false positives), checked by `Credentials::set_password` offline and online alike.
 
 ## Authorization model
 

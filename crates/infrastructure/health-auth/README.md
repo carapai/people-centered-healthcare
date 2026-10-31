@@ -31,6 +31,9 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - On resource requests it must also carry `ath`, and its key must match the token's `jkt`.
 - **Resource side:** `AccessVerifier::verify` checks the token, its binding, and that its session is still live, so logout takes effect at once. It returns a `Principal`. Authorization decisions are the policy decision point's ([#65](https://github.com/carapai/people-centered-healthcare/issues/65)).
 - **Credentials:** Argon2id with m = 19456 KiB, t = 2, p = 1, plus an optional pepper (`Credentials`).
+- **Breached passwords (#189):** `Credentials::set_password` is the check for every new password. It applies `PasswordPolicy` (8 characters with a device factor, 15 without) and refuses anything on `BreachedPasswords::platform()`.
+  - The list is SecLists' top 1,000,000 (MIT), built into the binary as a 1.8 MB Bloom filter with 0.1% false positives, so central and edges check offline the same way.
+  - Provenance and rebuilding are in `data/README.md`.
 - **State:** `AuthStore` holds accounts, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development.
 - **`SurrealAuthStore`** persists that state in SurrealDB (migration `0008_auth`, owned by identity), one transaction per operation:
   - **Codes:** a code is taken with a single `DELETE … RETURN`, so two concurrent redemptions cannot both get it; the loser's commit conflicts.
