@@ -1,6 +1,7 @@
 import { bearerAuth, dpopAuth } from './auth'
 import { sseEventSource } from './events'
 import { fhirClient } from './fhir'
+import { registriesCommands } from './registries'
 import { httpTransport } from './http'
 import { operationClient } from './operations'
 import { memorySession } from './session'
@@ -12,6 +13,10 @@ interface RuntimeConfig {
   apiBase: string
   /** The node's authorization server, for sign-in. */
   auth?: SignInConfig
+  /** The FHIR base on this origin (central serves `/fhir`); without it, `{apiBase}/fhir`. */
+  fhirBase?: string
+  /** The national ID identifier system the registry matches on. */
+  ninSystem?: string
 }
 
 function isSignInConfig(value: unknown): value is SignInConfig {
@@ -22,8 +27,14 @@ function isSignInConfig(value: unknown): value is SignInConfig {
 
 function isRuntimeConfig(value: unknown): value is RuntimeConfig {
   if (typeof value !== 'object' || value === null) return false
-  const { mode, apiBase, auth } = value as Record<string, unknown>
-  return (mode === 'central' || mode === 'edge') && typeof apiBase === 'string' && (auth === undefined || isSignInConfig(auth))
+  const { mode, apiBase, auth, fhirBase, ninSystem } = value as Record<string, unknown>
+  return (
+    (mode === 'central' || mode === 'edge') &&
+    typeof apiBase === 'string' &&
+    (auth === undefined || isSignInConfig(auth)) &&
+    (fhirBase === undefined || typeof fhirBase === 'string') &&
+    (ninSystem === undefined || typeof ninSystem === 'string')
+  )
 }
 
 /**
@@ -41,22 +52,33 @@ export async function composePlatform(): Promise<Platform> {
   if (!isRuntimeConfig(config)) {
     throw new Error('runtime.json must contain a mode (central or edge) and an apiBase')
   }
-  return httpPlatform(config.mode, config.apiBase, fetch, config.auth)
+  return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem)
 }
 
 /**
  * Central: a bearer token from the OIDC session. Edge: tokens DPoP-bound to the enrolled device
  * key, which enrollment (#74) provides; until then requests carry no credentials.
  */
-export function httpPlatform(mode: RuntimeConfig['mode'], apiBase: string, fetchImpl: typeof fetch = fetch, signInConfig?: SignInConfig): Platform {
+export function httpPlatform(
+  mode: RuntimeConfig['mode'],
+  apiBase: string,
+  fetchImpl: typeof fetch = fetch,
+  signInConfig?: SignInConfig,
+  fhirBase?: string,
+  ninSystem?: string,
+): Platform {
   const session = memorySession()
   const auth = mode === 'central' ? bearerAuth(session) : dpopAuth(session, () => undefined)
   const transport = httpTransport(apiBase, auth, fetchImpl)
+  // FHIR is served beside the API (central: `/fhir`), or under it when runtime.json names no base.
+  const fhirTransport = fhirBase === undefined ? transport : httpTransport('', auth, fetchImpl)
+  const fhirPath = fhirBase?.replace(/\/$/, '') ?? '/fhir'
   return {
     mode,
     transport,
-    fhir: fhirClient(transport),
+    fhir: fhirClient(fhirTransport, fhirPath),
     operations: operationClient(transport),
+    registries: registriesCommands(fhirTransport, fhirPath, ninSystem),
     session,
     // Edges sign in with DPoP-bound tokens once devices are enrolled (#74, #75).
     ...(signInConfig === undefined || mode !== 'central' ? {} : { signIn: signIn(signInConfig, session, { fetch: fetchImpl }) }),

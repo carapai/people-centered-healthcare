@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 20 | 25 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 21 | 26 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 51 of 127 implementation tasks done. Validation spikes open: 3.
+Total: 52 of 128 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -86,3 +86,8 @@ Total: 51 of 127 implementation tasks done. Validation spikes open: 3.
   - Still to do: the screens.
 - 2026-10-31: #218 part 1 merged (#223). Part 2: the break-glass screens. `/break-glass/alerts` is the in-charge's list with Acknowledge, and `/break-glass/reviews` is the privacy officer's queue with the decision form. They are DataTables keyed by the worklists `/api/events` hints, so they refresh without reloading. The edge review clock needs sync and is #224.
 - 2026-10-31: #218 merged (#223, #225). #226: reception's `POST /Patient/$register`. Until the clerk confirms a new patient (`confirmedNew`), it answers with the candidates the subject may see and writes nothing. Then it mints the facility MRN `{facility}-{node}-{sequence}` with `next_sequence` and a guard key in the write's transaction (ADR 0014), creates the provisional source Patient, and runs registration matching. Central enables it with the registry; the node code is `HEALTH_NODE_CODE`.
+- 2026-10-31: #226 merged (#227). #71: the reception registration screen (`/registration`).
+  - **Flow:** the form is checked through `Patient/$register`, and candidates are chosen by keyboard in a DataTable. A new patient is registered only after "none of these". When there is too little to match on, the clerk searches by hand. Registration shows the MRN.
+  - **Port:** the `registries` command port.
+  - **Fix:** `runtime.json` `fhirBase`. Central serves FHIR at `/fhir`, but the client was calling `/api/fhir`.
+  - **Follow-up:** the e2e harness and scenario are #228.

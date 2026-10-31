@@ -1,6 +1,6 @@
 import { css } from '@health/design-system/css'
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
 import { messages } from '../i18n/messages'
@@ -38,6 +38,19 @@ function Home() {
       {platform.signIn === undefined ? null : signedIn ? (
         <>
           <p role="status">{intl.formatMessage(messages.signedIn)}</p>
+          <nav aria-label={intl.formatMessage(messages.appName)}>
+            <ul className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+              <li>
+                <Link to="/registration">{intl.formatMessage(messages.regTitle)}</Link>
+              </li>
+              <li>
+                <Link to="/break-glass/alerts">{intl.formatMessage(messages.bgAlertsTitle)}</Link>
+              </li>
+              <li>
+                <Link to="/break-glass/reviews">{intl.formatMessage(messages.bgReviewsTitle)}</Link>
+              </li>
+            </ul>
+          </nav>
           <button type="button" className={button} onClick={() => void platform.signIn?.signOut().then(() => session.refetch())}>
             {intl.formatMessage(messages.signOut)}
           </button>
