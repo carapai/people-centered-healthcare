@@ -55,6 +55,13 @@ impl SnapshotSigner {
         Self::new(SigningKey::random(&mut rand_core::OsRng))
     }
 
+    /// A signer over a 32-byte P-256 secret, as read from a key file.
+    pub fn from_secret(secret: &[u8; 32]) -> Result<Self, crate::InvalidKey> {
+        SigningKey::from_slice(secret)
+            .map(Self::new)
+            .map_err(|_| crate::InvalidKey)
+    }
+
     /// The public key edges are provisioned with.
     pub fn public(&self) -> EcJwk {
         EcJwk::of(self.key.verifying_key())

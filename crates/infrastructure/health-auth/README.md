@@ -40,6 +40,19 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - **Purging:** `purge(now)` deletes expired codes and jtis, and sessions past their 12-hour cap, as a background job.
   - Only hashes of codes and refresh tokens are stored.
 
+## Request subjects (ADR 0056)
+
+`Subjects` and the `subject_layer` middleware turn each resource request into the `health_access_policy::Subject` and `health_audit::Agent` request extensions that `health-fhir-server` decides and audits with. The subject is built from:
+- the verified access token;
+- the current snapshot for the token's facility, re-read on every request, so a new or revoked snapshot applies at once;
+- the `RolePermissions` mappings, through `health_identity_app::subject_of`;
+- the `X-Purpose-Of-Use` header (`PURPOSE_HEADER`).
+
+Refusals:
+- an invalid token, or no current snapshot, is 401;
+- an unknown purpose of use is 400;
+- a request with no credentials at all passes without a subject, so the routes decide (the FHIR server serves only `/metadata` without one).
+
 ## Permission snapshots (ADR 0011)
 
 - **Signing:** `SnapshotSigner` is central's key. It signs a `PermissionSnapshot` as a compact ES256 JWS (`typ` `snapshot+jwt`), after checking its roles against the configured `RolePermissions`.

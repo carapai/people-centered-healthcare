@@ -1018,14 +1018,46 @@ impl<S: AuthStore> AccessVerifier<S> {
     }
 }
 
+impl<S: AuthStore> AccessVerifier<S> {
+    /// The verified, current permission snapshot of `account` at `facility`, when the node
+    /// keeps snapshots: what each request's permissions come from (ADR 0056).
+    pub(crate) async fn current_snapshot(
+        &self,
+        account: AccountId,
+        facility: &str,
+    ) -> Result<PermissionSnapshot, AccessError> {
+        let now = self.inner.clock.now();
+        match self
+            .inner
+            .current_snapshot(account, Some(facility), now)
+            .await
+        {
+            Ok(Some(snapshot)) => Ok(snapshot),
+            _ => Err(AccessError::InvalidToken),
+        }
+    }
+}
+
+impl<S> AccessVerifier<S> {
+    /// The issuer's origin (`scheme://host[:port]`), where resource routes are served.
+    pub(crate) fn origin(&self) -> String {
+        self.inner
+            .config
+            .issuer
+            .split('/')
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+}
+
 async fn session_info<S: AuthStore>(
     State(verifier): State<AccessVerifier<S>>,
     headers: HeaderMap,
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
 ) -> Result<Json<Value>, AccessError> {
-    let issuer = &verifier.inner.config.issuer;
     // The proof's `htu` is the absolute URL; this route sits on the issuer's origin.
-    let origin = issuer.split('/').take(3).collect::<Vec<_>>().join("/");
+    let origin = verifier.origin();
     let principal = verifier
         .verify(&headers, "GET", &format!("{origin}{}", uri.path()))
         .await?;

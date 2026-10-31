@@ -31,8 +31,31 @@ export const ReadinessReport = z.object({
 })
 export type ReadinessReport = z.infer<typeof ReadinessReport>
 
+/** The signed-in session, as `GET /api/session` answers (served by `health-auth`). */
+export const SessionInfo = z.object({
+  /** The account id. */
+  "account": z.string(),
+  /** The client the session was issued to. */
+  "client_id": z.string(),
+  /** The facility the session acts for (ADR 0056). */
+  "facility": z.string().nullable().optional(),
+  /** The scopes granted, space-separated. */
+  "scope": z.string(),
+  /** The session id. */
+  "session": z.string(),
+})
+export type SessionInfo = z.infer<typeof SessionInfo>
+
 /** Each operation: its method, path and response schemas by status (`null`: no body). */
 export const operations = {
+  getSession: {
+    method: 'GET',
+    path: '/api/session',
+    responses: {
+      200: SessionInfo,
+      401: null,
+    },
+  },
   getHealth: {
     method: 'GET',
     path: '/health',
