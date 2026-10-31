@@ -113,8 +113,9 @@ impl SnapshotVerifier {
 /// snapshot for this facility, signed by central, unexpired at a clock that has not gone back.
 #[derive(Debug, Clone)]
 pub struct SnapshotGate {
-    /// The facility this node serves.
-    pub facility: String,
+    /// The facility this node serves (an edge), or `None` where the user chooses it at sign-in
+    /// among the facilities they hold snapshots for (central, ADR 0056).
+    pub facility: Option<String>,
     /// Central's snapshot keys.
     pub verifier: SnapshotVerifier,
     /// The country's lifetimes.

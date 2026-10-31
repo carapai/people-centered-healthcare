@@ -44,16 +44,19 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 
 - **Signing:** `SnapshotSigner` is central's key. It signs a `PermissionSnapshot` as a compact ES256 JWS (`typ` `snapshot+jwt`), after checking its roles against the configured `RolePermissions`.
 - **Verification:** `SnapshotVerifier` trusts central's snapshot keys, several of them during a rotation. Any changed byte, another key, or a token that is not a snapshot is refused.
-- **The gate:** `AuthConfig::snapshots` takes a `SnapshotGate`, which edges set. Then every login, code redemption and refresh needs the account's snapshot for this facility. The checks, in order:
-  1. the local clock must not read before the floor;
-  2. the snapshot must verify, and must be for this account and facility;
-  3. it must be unexpired and not dated in the future;
-  4. checking it advances the clock floor to its `issued_at`.
+- **The gate:** `AuthConfig::snapshots` takes a `SnapshotGate`. Then every login, code redemption and refresh needs the account's snapshot for the session's facility.
+  - **The facility:** an edge's gate names its own facility. At central, `facility: None` means the user chooses at sign-in (ADR 0056). The form's `facility` field must name one of the account's snapshots (`AuthStore::facilities`). An account with one snapshot needs no `facility`. One with several and none named goes back to the sign-in page with `error=facility`. A facility the user holds no snapshot for is refused like a wrong password.
+  - **Carried through:** the facility is kept on the code and the session (refreshes re-check that facility's snapshot) and in the token. `Principal` exposes `facility` and `snapshot_version`, and `/session` reports the facility.
+  - **The checks, in order:**
+    1. the local clock must not read before the floor;
+    2. the snapshot must verify, and must be for this account and facility;
+    3. it must be unexpired and not dated in the future;
+    4. checking it advances the clock floor to its `issued_at`.
 - **Failures:** a refused login shows the usual single message. A refused refresh ends the session.
 - **Tokens:**
   - Access tokens carry `facility` and `snapshot_version`, and never outlive `not_after`.
   - The token response carries `snapshot_not_after`, so the client can warn in the last 3 days.
-- **Storage:** `AuthStore::snapshot`, `clock_floor` and `set_clock_floor` default to none, as at central. `MemoryStore` keeps them.
+- **Storage:** `AuthStore::snapshot`, `facilities`, `clock_floor` and `set_clock_floor` default to none. `MemoryStore` and `SurrealAuthStore` keep them; `facilities` is a range scan over the `[account, facility]` record ids.
 - **Offline administration** belongs with the edge's local authorization server ([#75](https://github.com/carapai/people-centered-healthcare/issues/75)):
   - the in-charge's single audited 7-day emergency extension, and district or central extensions;
   - local grants and provisional accounts, signed by the edge node key, lasting at most 7 days until central ratifies them;

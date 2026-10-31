@@ -18,7 +18,8 @@ export const Route = createFileRoute('/sign-in')({
 /**
  * The sign-in page the authorization server sends the browser to (offline-auth.md). It posts
  * the credentials straight to `/authorize` as an ordinary form, so the password never passes
- * through application code, and comes back here with `error=refused` on any refusal.
+ * through application code, and comes back here with `error=refused` on any refusal, or with
+ * `error=facility` when the user works at several facilities and named none (ADR 0056).
  */
 function SignInPage() {
   const intl = useIntl()
@@ -33,6 +34,11 @@ function SignInPage() {
           {intl.formatMessage(messages.signInRefused)}
         </p>
       ) : null}
+      {search['error'] === 'facility' ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(messages.signInChooseFacility)}
+        </p>
+      ) : null}
       <form method="post" action={action} className={css({ display: 'flex', flexDirection: 'column', gap: '4' })}>
         {PASSED.map((name) => (search[name] === undefined ? null : <input key={name} type="hidden" name={name} value={search[name]} />))}
         <Field.Root required>
@@ -42,6 +48,11 @@ function SignInPage() {
         <Field.Root required>
           <Field.Label>{intl.formatMessage(messages.signInPassword)}</Field.Label>
           <Field.Input name="password" type="password" autoComplete="current-password" />
+        </Field.Root>
+        <Field.Root required={search['error'] === 'facility'}>
+          <Field.Label>{intl.formatMessage(messages.signInFacility)}</Field.Label>
+          <Field.Input name="facility" autoComplete="off" />
+          <Field.HelperText>{intl.formatMessage(messages.signInFacilityHelp)}</Field.HelperText>
         </Field.Root>
         <button
           type="submit"
