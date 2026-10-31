@@ -13,6 +13,9 @@
 //!   carries the system routes' OpenAPI paths, and [`document`] builds a runtime's OpenAPI document,
 //!   from which `@health/api-client` generates TypeScript types and Zod schemas.
 
+mod events;
+
+pub use events::{Audience, Events, Hint};
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;

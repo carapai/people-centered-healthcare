@@ -73,7 +73,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
       - Searches add a `_tag` clause for the session's facility. The exceptions are central's patient-confined searches and break-glass for that patient.
     - Follow-ups:
       - resolving the subject at central and mounting `/fhir` (#209, done): one facility per session, chosen at sign-in, which the session and token carry (ADR 0056). `health_auth::subject_layer` builds each request's subject from the token, the current snapshot, the role mappings and `X-Purpose-Of-Use`; central-server mounts `/fhir` behind it;
-      - break-glass over the API (#210, done): `/api/break-glass` stores the grant for the session with its `BTG` AuditEvent, every access under it is audited with `BTG`, and the in-charge lists and acknowledges the alerts. Pushing alerts and the privacy officer's review are [#218](https://github.com/carapai/people-centered-healthcare/issues/218);
+      - break-glass over the API (#210, done): `/api/break-glass` stores the grant for the session with its `BTG` AuditEvent, every access under it is audited with `BTG`, and the in-charge lists and acknowledges the alerts. Grants push an invalidation hint to the in-charge over `/api/events`, and the privacy officer reviews each grant (audited, made once, escalated when overdue). The screens and the edge review clock are [#218](https://github.com/carapai/people-centered-healthcare/issues/218);
       - naming a record's facility, and facility isolation in searches (#211, done).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**

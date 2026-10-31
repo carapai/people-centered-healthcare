@@ -11,7 +11,14 @@
 //!   every access is audited with `BTG`.
 //! - The in-charge lists the facility's alerts (`GET /break-glass/alerts`) and acknowledges
 //!   them (`POST /break-glass/alerts/{id}/acknowledge`); their roles map to
-//!   [`ALERTS_PERMISSION`].
+//!   [`ALERTS_PERMISSION`]. A grant also sends them an invalidation hint, so an open alert list
+//!   refreshes at once.
+//! - The privacy officer ([`REVIEW_PERMISSION`]) lists pending reviews
+//!   (`GET /break-glass/reviews`) and decides each one (`POST /break-glass/reviews/{id}`), audited
+//!   in the same transaction. [`Subjects::escalate_overdue`] escalates reviews past due.
+//!
+//! **Events:** `GET /events` streams the invalidation hints meant for the caller: their facility,
+//! and their permissions.
 
 use std::sync::Arc;
 
@@ -26,6 +33,7 @@ use health_access_policy::{
     BreakGlass, BreakGlassPolicy, BreakGlassRefused, Subject, UnknownPurpose, purpose_of_use,
 };
 use health_audit::{Agent, Auditor};
+use health_http::{Audience, Events, Hint};
 use health_identity::snapshot::RolePermissions;
 use health_identity_app::subject_of;
 use health_time::SignedDuration;
@@ -36,6 +44,15 @@ use crate::store::{AuthStore, BreakGlassRecord};
 
 /// The use-case permission a facility in-charge's roles map to, to see break-glass alerts.
 pub const ALERTS_PERMISSION: &str = "break-glass.alerts";
+
+/// The use-case permission a privacy officer's roles map to, to review break-glass grants.
+pub const REVIEW_PERMISSION: &str = "break-glass.review";
+
+/// The worklist key of a facility's break-glass alerts, in invalidation hints.
+pub const ALERTS_WORKLIST: &str = "break-glass-alerts";
+
+/// The worklist key of the privacy officer's review queue, in invalidation hints.
+pub const REVIEWS_WORKLIST: &str = "break-glass-reviews";
 
 /// How long after a grant the privacy officer's review is due (offline-auth.md: 72 h of the
 /// event reaching central; an edge's grants are due from when they arrive, with sync).
@@ -79,6 +96,7 @@ pub struct Subjects<S> {
     roles: Arc<RolePermissions>,
     auditor: Option<Arc<Auditor>>,
     policy: BreakGlassPolicy,
+    events: Events,
 }
 
 impl<S> Clone for Subjects<S> {
@@ -88,6 +106,7 @@ impl<S> Clone for Subjects<S> {
             roles: Arc::clone(&self.roles),
             auditor: self.auditor.clone(),
             policy: self.policy,
+            events: self.events.clone(),
         }
     }
 }
@@ -100,7 +119,35 @@ impl<S: AuthStore> Subjects<S> {
             roles: Arc::new(roles),
             auditor: None,
             policy: BreakGlassPolicy::default(),
+            events: Events::default(),
         }
+    }
+
+    /// These subjects, publishing to and streaming from `events`.
+    #[must_use]
+    pub fn with_events(mut self, events: Events) -> Self {
+        self.events = events;
+        self
+    }
+
+    /// Escalates the reviews overdue now (offline-auth.md: within 72 hours): each is marked
+    /// escalated once, and the privacy officers' queue is told. Returns how many escalated.
+    pub async fn escalate_overdue(&self) -> Result<usize, crate::store::StoreError> {
+        let escalated = self
+            .verifier
+            .store()
+            .escalate_break_glass(self.verifier.now())
+            .await?;
+        if !escalated.is_empty() {
+            self.events.publish(Hint::worklist(
+                REVIEWS_WORKLIST,
+                Audience {
+                    facility: None,
+                    permission: Some(REVIEW_PERMISSION.into()),
+                },
+            ));
+        }
+        Ok(escalated.len())
     }
 
     /// These subjects, auditing break-glass grants with `auditor`.
@@ -229,6 +276,9 @@ impl<S: AuthStore + 'static> Subjects<S> {
                 "/break-glass/alerts/{id}/acknowledge",
                 post(acknowledge::<S>),
             )
+            .route("/break-glass/reviews", get(reviews::<S>))
+            .route("/break-glass/reviews/{id}", post(review::<S>))
+            .route("/events", get(events::<S>))
             .with_state(self.clone())
     }
 
@@ -274,6 +324,13 @@ fn record_json(record: &BreakGlassRecord) -> serde_json::Value {
         "expires_at": record.event.expires_at.to_string(),
         "review_due": record.review_due.to_string(),
         "acknowledged": record.acknowledged,
+        "escalated_at": record.escalated_at.map(|t| t.to_string()),
+        "review": record.review.as_ref().map(|r| json!({
+            "reviewer": r.reviewer,
+            "at": r.at.to_string(),
+            "decision": if r.appropriate { "appropriate" } else { "inappropriate" },
+            "note": r.note,
+        })),
     })
 }
 
@@ -322,6 +379,8 @@ async fn grant<S: AuthStore + 'static>(
         review_due: event.at.checked_add(REVIEW_WITHIN).unwrap_or(event.at),
         event,
         acknowledged: false,
+        review: None,
+        escalated_at: None,
     };
     let audit = subjects.auditor.as_ref().map(|auditor| {
         auditor.break_glass(
@@ -337,7 +396,24 @@ async fn grant<S: AuthStore + 'static>(
         .grant_break_glass(&record, audit.as_ref())
         .await
     {
-        Ok(()) => (StatusCode::CREATED, Json(record_json(&record))).into_response(),
+        Ok(()) => {
+            // The facility's in-charge and the privacy officers see it at once.
+            subjects.events.publish(Hint::worklist(
+                ALERTS_WORKLIST,
+                Audience {
+                    facility: Some(record.event.facility.clone()),
+                    permission: Some(ALERTS_PERMISSION.into()),
+                },
+            ));
+            subjects.events.publish(Hint::worklist(
+                REVIEWS_WORKLIST,
+                Audience {
+                    facility: None,
+                    permission: Some(REVIEW_PERMISSION.into()),
+                },
+            ));
+            (StatusCode::CREATED, Json(record_json(&record))).into_response()
+        }
         Err(_) => problem(
             StatusCode::SERVICE_UNAVAILABLE,
             "transient",
@@ -424,4 +500,172 @@ async fn acknowledge<S: AuthStore + 'static>(
             "break-glass is unavailable",
         ),
     }
+}
+
+/// The caller, when they hold `permission`.
+async fn holding<S: AuthStore + 'static>(
+    subjects: &Subjects<S>,
+    parts: &RequestParts,
+    permission: &str,
+) -> Result<(Subject, Agent), Box<Response>> {
+    let (subject, agent, _) = subjects
+        .caller(parts)
+        .await
+        .map_err(|refused| Box::new(refused.into_response()))?;
+    if subject.permissions.has(permission) {
+        Ok((subject, agent))
+    } else {
+        Err(Box::new(problem(
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            &format!("this needs the {permission} permission"),
+        )))
+    }
+}
+
+/// `GET /break-glass/reviews`: pending reviews, the earliest due first.
+async fn reviews<S: AuthStore + 'static>(
+    State(subjects): State<Subjects<S>>,
+    method: axum::http::Method,
+    uri: OriginalUri,
+    headers: HeaderMap,
+) -> Response {
+    let parts = RequestParts::of(headers, method, &uri);
+    if let Err(response) = holding(&subjects, &parts, REVIEW_PERMISSION).await {
+        return *response;
+    }
+    let now = subjects.verifier.now();
+    match subjects.verifier.store().break_glass_reviews(1000).await {
+        Ok(records) => Json(
+            records
+                .iter()
+                .map(|r| {
+                    let mut json = record_json(r);
+                    json["overdue"] = json!(r.review_due < now);
+                    json
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
+        Err(_) => problem(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "transient",
+            "break-glass is unavailable",
+        ),
+    }
+}
+
+/// A privacy officer's decision.
+#[derive(Debug, serde::Deserialize)]
+struct ReviewRequest {
+    /// `appropriate` or `inappropriate`.
+    decision: String,
+    /// Why.
+    #[serde(default)]
+    note: String,
+}
+
+/// `POST /break-glass/reviews/{id}`: the decision, audited in the same transaction.
+async fn review<S: AuthStore + 'static>(
+    State(subjects): State<Subjects<S>>,
+    Path(id): Path<String>,
+    method: axum::http::Method,
+    uri: OriginalUri,
+    headers: HeaderMap,
+    Json(body): Json<ReviewRequest>,
+) -> Response {
+    let parts = RequestParts::of(headers, method, &uri);
+    let (subject, agent) = match holding(&subjects, &parts, REVIEW_PERMISSION).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let appropriate = match body.decision.as_str() {
+        "appropriate" => true,
+        "inappropriate" => false,
+        _ => {
+            return problem(
+                StatusCode::BAD_REQUEST,
+                "value",
+                "decision must be appropriate or inappropriate",
+            );
+        }
+    };
+    if !appropriate && body.note.trim().is_empty() {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "required",
+            "an inappropriate access needs a note",
+        );
+    }
+    let now = subjects.verifier.now();
+    let decision = crate::store::BreakGlassReview {
+        reviewer: subject.account.clone(),
+        at: now,
+        appropriate,
+        note: body.note.trim().to_owned(),
+    };
+    let audit = subjects.auditor.as_ref().map(|auditor| {
+        auditor.event(
+            &agent,
+            health_audit::Interaction::Update,
+            &[health_audit::Entity {
+                what: format!("break-glass/{id}"),
+                labels: Vec::new(),
+            }],
+            None,
+            now,
+            None,
+        )
+    });
+    match subjects
+        .verifier
+        .store()
+        .review_break_glass(&id, &decision, audit.as_ref())
+        .await
+    {
+        Ok(true) => {
+            subjects.events.publish(Hint::worklist(
+                REVIEWS_WORKLIST,
+                Audience {
+                    facility: None,
+                    permission: Some(REVIEW_PERMISSION.into()),
+                },
+            ));
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Ok(false) => problem(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            "no such grant awaiting review",
+        ),
+        Err(_) => problem(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "transient",
+            "break-glass is unavailable",
+        ),
+    }
+}
+
+/// `GET /events`: the invalidation hints for the caller's facility and permissions.
+async fn events<S: AuthStore + 'static>(
+    State(subjects): State<Subjects<S>>,
+    method: axum::http::Method,
+    uri: OriginalUri,
+    headers: HeaderMap,
+) -> Response {
+    let parts = RequestParts::of(headers, method, &uri);
+    let (subject, _, _) = match subjects.caller(&parts).await {
+        Ok(caller) => caller,
+        Err(refused) => return refused.into_response(),
+    };
+    subjects.events.stream(move |audience| {
+        audience
+            .facility
+            .as_ref()
+            .is_none_or(|f| *f == subject.facility)
+            && audience
+                .permission
+                .as_ref()
+                .is_none_or(|p| subject.permissions.has(p))
+    })
 }

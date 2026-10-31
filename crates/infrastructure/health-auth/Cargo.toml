@@ -19,6 +19,7 @@ base64 = { workspace = true }
 form_urlencoded = { workspace = true }
 health-access-policy = { workspace = true }
 health-audit = { workspace = true }
+health-http = { workspace = true }
 health-identity = { workspace = true }
 health-identity-app = { workspace = true }
 health-persistence = { workspace = true }

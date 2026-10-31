@@ -76,6 +76,23 @@ pub struct BreakGlassRecord {
     pub review_due: Timestamp,
     /// Whether the in-charge acknowledged the alert.
     pub acknowledged: bool,
+    /// The privacy officer's review, once made.
+    pub review: Option<BreakGlassReview>,
+    /// When the review, overdue, escalated.
+    pub escalated_at: Option<Timestamp>,
+}
+
+/// A privacy officer's review of a grant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreakGlassReview {
+    /// Who reviewed it.
+    pub reviewer: String,
+    /// When.
+    pub at: Timestamp,
+    /// Whether the access was appropriate.
+    pub appropriate: bool,
+    /// Their note.
+    pub note: String,
 }
 
 /// The authorization server's persistence port.
@@ -181,6 +198,33 @@ pub trait AuthStore: Send + Sync {
         facility: &str,
     ) -> impl Future<Output = Result<Vec<BreakGlassRecord>, StoreError>> + Send {
         let _ = facility;
+        async { Ok(Vec::new()) }
+    }
+    /// Pending reviews, the earliest due first.
+    fn break_glass_reviews(
+        &self,
+        limit: usize,
+    ) -> impl Future<Output = Result<Vec<BreakGlassRecord>, StoreError>> + Send {
+        let _ = limit;
+        async { Ok(Vec::new()) }
+    }
+    /// Records the review of grant `id` and its AuditEvent (`audit`) in one transaction; false
+    /// when there is no such grant or it is already reviewed.
+    fn review_break_glass(
+        &self,
+        id: &str,
+        review: &BreakGlassReview,
+        audit: Option<&Value>,
+    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
+        let _ = (id, review, audit);
+        async { Ok(false) }
+    }
+    /// Escalates the reviews overdue at `now` not yet escalated, and returns them.
+    fn escalate_break_glass(
+        &self,
+        now: Timestamp,
+    ) -> impl Future<Output = Result<Vec<BreakGlassRecord>, StoreError>> + Send {
+        let _ = now;
         async { Ok(Vec::new()) }
     }
     /// Acknowledges alert `id` of `facility`; false when there is none.
@@ -386,6 +430,50 @@ impl AuthStore for MemoryStore {
             .filter(|r| r.event.facility == facility && !r.acknowledged)
             .cloned()
             .collect())
+    }
+
+    async fn break_glass_reviews(&self, limit: usize) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        let mut pending: Vec<BreakGlassRecord> = self
+            .lock()
+            .break_glass
+            .iter()
+            .filter(|r| r.review.is_none())
+            .cloned()
+            .collect();
+        pending.sort_by_key(|r| r.review_due);
+        pending.truncate(limit);
+        Ok(pending)
+    }
+
+    async fn review_break_glass(
+        &self,
+        id: &str,
+        review: &BreakGlassReview,
+        _audit: Option<&Value>,
+    ) -> Result<bool, StoreError> {
+        let mut state = self.lock();
+        let found = state
+            .break_glass
+            .iter_mut()
+            .find(|r| r.id == id && r.review.is_none());
+        Ok(found.map(|r| r.review = Some(review.clone())).is_some())
+    }
+
+    async fn escalate_break_glass(
+        &self,
+        now: Timestamp,
+    ) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        let mut state = self.lock();
+        let mut escalated = Vec::new();
+        for record in state
+            .break_glass
+            .iter_mut()
+            .filter(|r| r.review.is_none() && r.escalated_at.is_none() && r.review_due < now)
+        {
+            record.escalated_at = Some(now);
+            escalated.push(record.clone());
+        }
+        Ok(escalated)
     }
 
     async fn acknowledge_break_glass(&self, id: &str, facility: &str) -> Result<bool, StoreError> {

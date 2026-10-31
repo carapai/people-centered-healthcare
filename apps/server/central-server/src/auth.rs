@@ -150,6 +150,7 @@ pub(crate) fn routes(
         let subjects = Subjects::new(server.verifier(), policy.roles.clone())
             .with_auditor(Auditor::new("central", sensitive(policy)));
         api = api.merge(subjects.routes());
+        escalate_hourly(subjects.clone());
         router = router.nest("/fhir", fhir(fhir_store, settings, policy, subjects));
     }
     Ok(router.nest("/api", api))
@@ -175,6 +176,28 @@ fn registry_rules(
             &[nin, health_registries_app::fhir::ECID_SYSTEM],
         ),
     ))
+}
+
+/// Escalates overdue break-glass reviews every hour (offline-auth.md § Break-glass).
+fn escalate_hourly(subjects: Subjects<SurrealAuthStore>) {
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            every.tick().await;
+            match subjects.escalate_overdue().await {
+                Ok(0) => {}
+                Ok(escalated) => tracing::warn!(
+                    escalated,
+                    outcome = "break-glass-reviews-overdue",
+                    "break-glass reviews are overdue"
+                ),
+                Err(_) => tracing::warn!(
+                    error.kind = "escalation-failed",
+                    "break-glass reviews not checked"
+                ),
+            }
+        }
+    });
 }
 
 /// Recomputes block counts every hour (ADR 0055), starting now.
@@ -310,6 +333,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/auth/{*rest}", service.clone())
         .route_service("/api/session", service.clone())
         .route_service("/api/break-glass", service.clone())
+        .route_service("/api/events", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)
@@ -829,12 +853,14 @@ mod tests {
             "roles": {
                 "clinician": ["Patient.crs", "Observation.crs", "break-glass"],
                 "in-charge": ["break-glass.alerts"],
+                "privacy-officer": ["break-glass.review"],
             },
             "labels": [{ "system": ACT, "code": "HIV", "program": "hiv" }],
         }))
         .expect("policy");
         provision(&connection, &key, &policy, "nakato", &["clinician"]).await;
         provision(&connection, &key, &policy, "okello", &["in-charge"]).await;
+        provision(&connection, &key, &policy, "achen", &["privacy-officer"]).await;
         // A patient with an HIV-labelled Observation, written as the system would.
         let admin = FhirServer::new(
             SurrealStore::new(connection.clone(), Arc::new(SystemClock)),
@@ -877,6 +903,15 @@ mod tests {
         let _ = ready.set(routes(connection, &settings).expect("routes"));
         let clinician = sign_in(&app, "nakato").await;
         let in_charge = sign_in(&app, "okello").await;
+        let privacy = sign_in(&app, "achen").await;
+        // The in-charge's event stream, open before the grant.
+        let stream = app
+            .clone()
+            .oneshot(authorized("GET", "/api/events", &in_charge, None))
+            .await
+            .expect("response");
+        assert_eq!(stream.headers()["content-type"], "text/event-stream");
+        let mut stream = stream.into_body();
         let read = format!("/fhir/Observation/{observation}");
 
         // Without break-glass the HIV record does not exist for this clinician.
@@ -970,7 +1005,77 @@ mod tests {
         .await;
         assert_eq!(body, "[]");
 
-        // The grant and the read under it are both audited with BTG.
+        // The grant reached the in-charge's open stream as an invalidation hint.
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(5), stream.frame())
+            .await
+            .expect("a hint in time")
+            .expect("frame")
+            .expect("ok");
+        let text = String::from_utf8(frame.into_data().expect("data").to_vec()).expect("utf8");
+        assert!(
+            text.contains("\"worklist\":\"break-glass-alerts\""),
+            "{text}"
+        );
+
+        // The privacy officer reviews it; other roles may not.
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/break-glass/reviews", &privacy, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let pending: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(pending.as_array().map(Vec::len), Some(1));
+        assert_eq!(pending[0]["overdue"], false);
+        assert_eq!(
+            send(
+                &app,
+                authorized("GET", "/api/break-glass/reviews", &in_charge, None)
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let decide = format!(
+            "/api/break-glass/reviews/{}",
+            granted["id"].as_str().expect("id")
+        );
+        let (status, _, _) = send(
+            &app,
+            authorized(
+                "POST",
+                &decide,
+                &privacy,
+                Some(serde_json::json!({ "decision": "inappropriate" })),
+            ),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "an inappropriate access needs a note"
+        );
+        let (status, _, _) = send(&app, authorized("POST", &decide, &privacy, Some(serde_json::json!({ "decision": "appropriate", "note": "confirmed with the ward" })))).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        let (status, _, _) = send(
+            &app,
+            authorized(
+                "POST",
+                &decide,
+                &privacy,
+                Some(serde_json::json!({ "decision": "appropriate" })),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "a review is made once");
+        let (_, body, _) = send(
+            &app,
+            authorized("GET", "/api/break-glass/reviews", &privacy, None),
+        )
+        .await;
+        assert_eq!(body, "[]");
+
+        // The grant and the read under it are both audited with BTG, and the review is audited.
         let request = Request::get("/AuditEvent?_count=100")
             .body(Body::empty())
             .expect("request");
@@ -991,6 +1096,12 @@ mod tests {
                 .iter()
                 .any(|e| e["code"]["coding"][0]["code"] == "read"
                     && e["authorization"].to_string().contains("BTG")),
+            "{body}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e["entity"].to_string().contains("break-glass/")),
             "{body}"
         );
     }

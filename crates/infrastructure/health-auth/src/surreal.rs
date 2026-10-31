@@ -6,12 +6,16 @@ use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
 use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
 use health_persistence::{Store, Transaction};
-use health_surrealdb::{AuthSessionRow, BreakGlassRow, SurrealStore, SurrealTx};
+use health_surrealdb::{
+    AuthSessionRow, BreakGlassReviewRow, BreakGlassRow, SurrealStore, SurrealTx,
+};
 use health_time::Timestamp;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::store::{AuthStore, AuthorizationCode, BreakGlassRecord, Session, StoreError};
+use crate::store::{
+    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, Session, StoreError,
+};
 
 /// The SurrealDB [`AuthStore`].
 #[derive(Clone)]
@@ -105,6 +109,13 @@ fn break_glass_of(row: BreakGlassRow) -> Option<BreakGlassRecord> {
         },
         review_due: row.review_due,
         acknowledged: row.acknowledged,
+        review: row.review.map(|r| BreakGlassReview {
+            reviewer: r.reviewer,
+            at: r.at,
+            appropriate: r.decision == "appropriate",
+            note: r.note,
+        }),
+        escalated_at: row.escalated_at,
     })
 }
 
@@ -323,6 +334,8 @@ impl AuthStore for SurrealAuthStore {
             expires_at: event.expires_at,
             review_due: record.review_due,
             acknowledged: record.acknowledged,
+            review: None,
+            escalated_at: None,
         };
         let mut tx = self.begin().await?;
         tx.put_break_glass(&row).await.map_err(failed)?;
@@ -352,6 +365,51 @@ impl AuthStore for SurrealAuthStore {
     ) -> Result<Vec<BreakGlassRecord>, StoreError> {
         let mut tx = self.begin().await?;
         let rows = tx.break_glass_alerts(facility).await.map_err(failed)?;
+        Ok(rows.into_iter().filter_map(break_glass_of).collect())
+    }
+
+    async fn break_glass_reviews(&self, limit: usize) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        let mut tx = self.begin().await?;
+        let rows = tx.break_glass_reviews(limit).await.map_err(failed)?;
+        Ok(rows.into_iter().filter_map(break_glass_of).collect())
+    }
+
+    async fn review_break_glass(
+        &self,
+        id: &str,
+        review: &BreakGlassReview,
+        audit: Option<&Value>,
+    ) -> Result<bool, StoreError> {
+        let row = BreakGlassReviewRow {
+            reviewer: review.reviewer.clone(),
+            at: review.at,
+            decision: if review.appropriate {
+                "appropriate"
+            } else {
+                "inappropriate"
+            }
+            .into(),
+            note: review.note.clone(),
+        };
+        let mut tx = self.begin().await?;
+        if !tx.review_break_glass(id, &row).await.map_err(failed)? {
+            return Ok(false);
+        }
+        // The decision and its AuditEvent commit together, or neither does.
+        if let Some(audit) = audit {
+            health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        }
+        tx.commit().await.map_err(failed)?;
+        Ok(true)
+    }
+
+    async fn escalate_break_glass(
+        &self,
+        now: Timestamp,
+    ) -> Result<Vec<BreakGlassRecord>, StoreError> {
+        let mut tx = self.begin().await?;
+        let rows = tx.escalate_break_glass(now).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
         Ok(rows.into_iter().filter_map(break_glass_of).collect())
     }
 

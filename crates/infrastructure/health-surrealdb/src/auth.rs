@@ -80,6 +80,23 @@ pub struct BreakGlassRow {
     pub review_due: Timestamp,
     /// Whether the in-charge acknowledged the alert.
     pub acknowledged: bool,
+    /// The privacy officer's review, once made.
+    pub review: Option<BreakGlassReviewRow>,
+    /// When the review, overdue, escalated.
+    pub escalated_at: Option<Timestamp>,
+}
+
+/// A privacy officer's review of a grant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreakGlassReviewRow {
+    /// Who reviewed it.
+    pub reviewer: String,
+    /// When.
+    pub at: Timestamp,
+    /// `appropriate` or `inappropriate`.
+    pub decision: String,
+    /// Their note.
+    pub note: String,
 }
 
 impl SurrealTx {
@@ -448,6 +465,72 @@ impl SurrealTx {
         .await
     }
 
+    /// Pending reviews, the earliest due first.
+    pub async fn break_glass_reviews(
+        &mut self,
+        limit: usize,
+    ) -> Result<Vec<BreakGlassRow>, StoreError> {
+        self.break_glass_rows(
+            &format!("WHERE reviewed_by = NONE AND $key = $key ORDER BY review_due ASC LIMIT {limit}"),
+            "",
+            None,
+        )
+        .await
+    }
+
+    /// Records the review of grant `id`; false when there is none or it is already reviewed.
+    pub async fn review_break_glass(
+        &mut self,
+        id: &str,
+        review: &BreakGlassReviewRow,
+    ) -> Result<bool, WriteError> {
+        let updated = self
+            .run(
+                "UPDATE type::record('break_glass', $id) SET reviewed_by = $reviewer, \
+                 reviewed_at = <datetime>$at, decision = $decision, note = $note \
+                 WHERE reviewed_by = NONE RETURN VALUE record::id(id)",
+                vec![
+                    ("id", id.to_owned()),
+                    ("reviewer", review.reviewer.clone()),
+                    ("at", review.at.to_string()),
+                    ("decision", review.decision.clone()),
+                    ("note", review.note.clone()),
+                ],
+            )
+            .await?;
+        Ok(!updated.is_empty())
+    }
+
+    /// Escalates the reviews due before `now` that are neither made nor already escalated, and
+    /// returns them.
+    pub async fn escalate_break_glass(
+        &mut self,
+        now: Timestamp,
+    ) -> Result<Vec<BreakGlassRow>, StoreError> {
+        let due = self
+            .break_glass_rows(
+                "WHERE reviewed_by = NONE AND escalated_at = NONE AND review_due < <datetime>$now AND $key = $key",
+                "",
+                Some(now),
+            )
+            .await?;
+        for row in &due {
+            self.run(
+                "UPDATE type::record('break_glass', $id) SET escalated_at = <datetime>$now RETURN VALUE record::id(id)",
+                vec![("id", row.id.clone()), ("now", now.to_string())],
+            )
+            .await
+            .map_err(|e| StoreError::Unavailable(e.to_string()))?;
+        }
+        Ok(due
+            .into_iter()
+            .map(|row| BreakGlassRow {
+                escalated_at: Some(now),
+                ..row
+            })
+            .collect())
+    }
+
     /// Marks alert `id` of `facility` acknowledged; false when there is none.
     pub async fn acknowledge_break_glass(
         &mut self,
@@ -478,12 +561,15 @@ impl SurrealTx {
             .rows(
                 &format!(
                     "SELECT VALUE [<string>record::id(id), session, account, facility, patient, reason, \
-                     justification, <string>at, <string>expires_at, <string>review_due, <string>acknowledged] \
+                     justification, <string>at, <string>expires_at, <string>review_due, <string>acknowledged, \
+                     reviewed_by ?? '', <string>(reviewed_at ?? ''), decision ?? '', note ?? '', \
+                     <string>(escalated_at ?? '')] \
                      FROM break_glass {filter}"
                 ),
                 binds,
             )
             .await?;
+        let at_or_now = Timestamp::now;
         rows.into_iter()
             .map(|r| {
                 let ts = |i: usize| {
@@ -504,6 +590,13 @@ impl SurrealTx {
                     expires_at: ts(8)?,
                     review_due: ts(9)?,
                     acknowledged: text(10) == "true",
+                    review: (!text(11).is_empty()).then(|| BreakGlassReviewRow {
+                        reviewer: text(11),
+                        at: r.get(12).and_then(|t| t.parse().ok()).unwrap_or(at_or_now()),
+                        decision: text(13),
+                        note: text(14),
+                    }),
+                    escalated_at: r.get(15).and_then(|t| t.parse().ok()),
                 })
             })
             .collect()
