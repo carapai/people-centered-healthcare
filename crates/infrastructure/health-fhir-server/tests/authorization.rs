@@ -8,7 +8,9 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use health_access_policy::{BTG, BreakGlassPolicy, Label, LabelRule, Pdp, Permissions, Subject};
+use health_access_policy::{
+    BTG, BreakGlassPolicy, Label, LabelRule, NodeScope, Pdp, Permissions, Subject,
+};
 use health_fhir_search::{Catalog, ParamState, Registry, Unrestricted};
 use health_fhir_server::{FhirServer, RecordFacility};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
@@ -148,6 +150,10 @@ struct Fixture {
 }
 
 async fn fixture() -> Fixture {
+    fixture_at(NodeScope::Edge).await
+}
+
+async fn fixture_at(scope: NodeScope) -> Fixture {
     let store = store().await;
     let admin = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted)).router();
     let mut patients = Vec::new();
@@ -208,7 +214,7 @@ async fn fixture() -> Fixture {
         ids.insert(name.to_owned(), body["id"].as_str().expect("id").to_owned());
     }
     let router = FhirServer::new(store, BASE, Arc::new(Unrestricted))
-        .with_access_control(pdp(), Arc::new(TagFacility))
+        .with_access_control(pdp().with_scope(scope), Arc::new(TagFacility))
         .router();
     Fixture { router, p1, ids }
 }
@@ -467,4 +473,43 @@ async fn break_glass_opens_one_patient_only() {
     );
     let (_, across) = f.search(&glass, "").await;
     assert!(!across.contains("hiv"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn central_shares_patient_confined_reads_across_facilities() {
+    // ADR 0056: at central, another facility's record about a patient may be read, but it is
+    // never listed across patients or written.
+    let f = fixture_at(NodeScope::Central).await;
+    let clinician = subject(Permissions::from(["Observation.cruds"]), &[]);
+    assert_eq!(f.read(&clinician, "at-f2").await, StatusCode::OK);
+    let (status, _) = send(
+        &f.router,
+        Some(&clinician),
+        Method::GET,
+        &format!("/Observation/{}/_history", f.ids["at-f2"]),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = send(
+        &f.router,
+        Some(&clinician),
+        Method::DELETE,
+        &format!("/Observation/{}", f.ids["at-f2"]),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (_, history) = send(
+        &f.router,
+        Some(&clinician),
+        Method::GET,
+        "/Observation/_history",
+        None,
+    )
+    .await;
+    let seen = names(&history);
+    assert!(seen.contains("at-f1") && !seen.contains("at-f2"));
+    // Labels still apply to shared reads.
+    assert_eq!(f.read(&clinician, "hiv").await, StatusCode::NOT_FOUND);
 }

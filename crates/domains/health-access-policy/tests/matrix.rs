@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use health_access_policy::{
     Access, BTG, BreakGlassPolicy, BreakGlassRefused, Decision, Deny, Interaction, Label,
-    LabelRule, Obligation, Pdp, Permissions, Subject,
+    LabelRule, NodeScope, Obligation, Pdp, Permissions, Subject,
 };
 use health_time::{SignedDuration, Timestamp};
 
@@ -354,5 +354,99 @@ fn searches_exclude_what_the_subject_may_not_see() {
         pdp.search_filter(&clinician, "Observation", None, now())
             .map(names),
         Ok(vec!["HIV".into(), "PSY".into(), "R".into()])
+    );
+}
+
+#[test]
+fn central_opens_patient_confined_reads_of_other_facilities_only() {
+    // ADR 0056: central is the shared record. Another facility's record may be read when the
+    // access is about one patient; never searched across patients, never written.
+    let edge = pdp();
+    let central = pdp().with_scope(NodeScope::Central);
+    assert_eq!(edge.scope(), NodeScope::Edge);
+    let decide = |pdp: &Pdp, who: &str, interaction, patient, labels: &[Label]| match pdp.decide(
+        &subject(who),
+        &Access {
+            resource_type: "Observation",
+            interaction,
+            facility: Some("F2"),
+            labels,
+            patient,
+        },
+        now(),
+    ) {
+        Decision::Permit(obligations) => {
+            assert!(obligations.is_empty(), "no break-glass");
+            Ok(())
+        }
+        Decision::Deny(deny) => Err(deny),
+    };
+    let hiv = [Label::new(ACT, "HIV")];
+    assert_eq!(
+        decide(
+            &edge,
+            "clinician",
+            Interaction::Read,
+            Some("Patient/p1"),
+            &[]
+        ),
+        Err(Deny::OtherFacility)
+    );
+    assert_eq!(
+        decide(
+            &central,
+            "clinician",
+            Interaction::Read,
+            Some("Patient/p1"),
+            &[]
+        ),
+        Ok(())
+    );
+    // A record about no patient is not a patient-confined read.
+    assert_eq!(
+        decide(&central, "clinician", Interaction::Read, None, &[]),
+        Err(Deny::OtherFacility)
+    );
+    // Searches across patients and writes stay with the facility.
+    assert_eq!(
+        decide(
+            &central,
+            "clinician",
+            Interaction::Search,
+            Some("Patient/p1"),
+            &[]
+        ),
+        Err(Deny::OtherFacility)
+    );
+    assert_eq!(
+        decide(
+            &central,
+            "clinician",
+            Interaction::Update,
+            Some("Patient/p1"),
+            &[]
+        ),
+        Err(Deny::OtherFacility)
+    );
+    // Labels still apply to shared reads.
+    assert_eq!(
+        decide(
+            &central,
+            "clinician",
+            Interaction::Read,
+            Some("Patient/p1"),
+            &hiv
+        ),
+        Err(Deny::SensitiveLabel(Label::new(ACT, "HIV")))
+    );
+    assert_eq!(
+        decide(
+            &central,
+            "hiv-counsellor",
+            Interaction::Read,
+            Some("Patient/p1"),
+            &hiv
+        ),
+        Ok(())
     );
 }

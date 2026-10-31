@@ -67,9 +67,10 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
     - Searches run under `SubjectSearchPolicy`, confined to a patient for `patient=` or a `subject=` that names a Patient. A type the subject may not search gets 403.
     - Reads, vreads and history go through `Pdp::decide` with the record's facility, labels and patient. A denied read is a 404, so the record's existence is not disclosed; type and system history leave out the versions the subject may not read.
     - Creates, updates and deletes are decided on the resource written and on the version replaced. A denial is 403, and a transaction with one denied entry writes nothing.
+    - At central (`NodeScope::Central`, ADR 0056), another facility's record about a patient may be read, because central is the shared record. Type and system history and searches across patients stay with the session's facility, and writes always do.
     - A record's facility comes from the `RecordFacility` port. Records do not name their facility yet, so the default treats none as facility-scope.
     - Follow-ups:
-      - resolving the subject at central and mounting `/fhir` ([#209](https://github.com/carapai/people-centered-healthcare/issues/209));
+      - resolving the subject at central and mounting `/fhir` (ADR 0056: one facility per session, chosen at sign-in; `X-Purpose-Of-Use` defaulting to `TREAT`; `subject_of` builds the subject from the snapshot) ([#209](https://github.com/carapai/people-centered-healthcare/issues/209));
       - break-glass over the API, its audit and the in-charge's alert ([#210](https://github.com/carapai/people-centered-healthcare/issues/210));
       - naming a record's facility, and facility isolation in searches ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).

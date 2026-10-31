@@ -9,8 +9,8 @@
 //!   (`patient=`, or `subject=` naming a Patient); 403 when the subject may not search the type.
 //! - **Reads and vreads** go through [`Pdp::decide`] with the record's facility, labels and
 //!   patient. A denied read answers 404, so the record's existence is not disclosed.
-//! - **History** answers 404 for a record the subject may not read, and leaves out of type and
-//!   system history the versions it may not read.
+//! - **History** answers 404 for a record the subject may not read. Type and system history
+//!   leave out the versions the subject may not see in a search.
 //! - **Creates, updates and deletes** are decided on the resource written and, for an update or
 //!   a delete, on the version it replaces: 403 when denied.
 //!
@@ -195,9 +195,16 @@ pub(crate) fn readable(
     }
 }
 
-/// Whether the subject may read the stored version `json`, for filtering history.
-pub(crate) fn may_read(json: &RawJson) -> bool {
-    readable(json, || FhirError::not_found(String::new())).is_ok()
+/// Whether the subject may see the stored version `json` in a listing that spans patients
+/// (type and system history): decided as a search, so central's patient-confined shared reads
+/// (ADR 0056) do not apply.
+pub(crate) fn may_list(json: &RawJson) -> bool {
+    current().is_none_or(|guard| {
+        matches!(
+            decide(&guard, Interaction::Search, &parse(json)),
+            Decision::Permit(_)
+        )
+    })
 }
 
 /// Whether the subject may do `interaction` (create, update or delete) to `json`: 403
