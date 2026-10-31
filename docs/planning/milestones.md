@@ -58,6 +58,8 @@ Authorization server, permission snapshots, PDP, audit, client registry and matc
 - [Mount the authorization server in central-server, with its signing key and the client sign-in flow](https://github.com/carapai/people-centered-healthcare/issues/188)
 - [Check new passwords against a breached-password list](https://github.com/carapai/people-centered-healthcare/issues/189)
 - [Apply the policy decision point to every FHIR interaction](https://github.com/carapai/people-centered-healthcare/issues/192)
+- [Store Provenance with its target's Owner](https://github.com/carapai/people-centered-healthcare/issues/196)
+- [Expose the client registry's link, unlink and $merge operations over FHIR](https://github.com/carapai/people-centered-healthcare/issues/197)
 
 ## [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4)
 

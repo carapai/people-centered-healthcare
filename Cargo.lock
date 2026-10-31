@@ -1922,6 +1922,10 @@ dependencies = [
 [[package]]
 name = "health-client-registry"
 version = "0.1.0"
+dependencies = [
+ "health-time",
+ "thiserror",
+]
 
 [[package]]
 name = "health-errors"
@@ -2109,6 +2113,21 @@ dependencies = [
 [[package]]
 name = "health-registries-app"
 version = "0.1.0"
+dependencies = [
+ "health-client-registry",
+ "health-fhir-search",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "jiff",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "health-surrealdb"

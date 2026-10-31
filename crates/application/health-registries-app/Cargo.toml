@@ -14,3 +14,18 @@ context = "registries"
 workspace = true
 
 [dependencies]
+health-client-registry = { workspace = true }
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+health-fhir-search = { workspace = true }
+health-fhir-validation = { workspace = true }
+health-surrealdb = { workspace = true }
+jiff = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

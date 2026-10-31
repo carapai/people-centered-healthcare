@@ -41,6 +41,7 @@ publish = false
 health-access-policy = { path = "crates/domains/health-access-policy" }
 health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
+health-client-registry = { path = "crates/domains/health-client-registry" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }

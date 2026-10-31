@@ -65,6 +65,15 @@ flowchart LR
   | Unlink | Reviewer decision (audited) | Splits the golden record; an adjudication marker stops later automatic runs from re-linking the pair |
   | Merge (`$merge`) | Two source records **from the same facility** are the same person; human approval after preview | Source `replaced-by` → target, `active=false`; references are never rewritten |
 
+### In code
+
+- **`health-client-registry`** (domain): survivorship, the golden record with link, unlink and adjudication markers, merge planning, and the ECID.
+- **`health-registries-app`** (application): the link, unlink and `$merge` use cases over the store, with the FHIR mapping. Each use case runs in one transaction and audits every version it writes.
+- **Not yet:**
+  - Provenance per surviving value is [#196](https://github.com/carapai/people-centered-healthcare/issues/196). For now each value's origin is an extension on the golden Patient.
+  - The HTTP operations are [#197](https://github.com/carapai/people-centered-healthcare/issues/197).
+- **ECID:** 11 random characters plus the check character.
+
 ## Matching (ADR 0028)
 
 ```mermaid
