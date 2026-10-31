@@ -1,0 +1,33 @@
+[package]
+name = "health-auth"
+description = "The OIDC / SMART App Launch v2 authorization server: authorization code with PKCE, DPoP-bound ES256 tokens, refresh, revocation and Argon2id credentials (offline-auth.md, ADR 0010)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+argon2 = { workspace = true }
+axum = { workspace = true, features = ["form", "query"] }
+base64 = { workspace = true }
+form_urlencoded = { workspace = true }
+health-identity = { workspace = true }
+health-time = { workspace = true }
+p256 = { workspace = true }
+rand_core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+http-body-util = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }

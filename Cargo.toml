@@ -9,7 +9,9 @@ members = [
     "crates/contracts/health-fhir-validation",
     "crates/contracts/health-persistence",
     "crates/domains/health-client-registry",
+    "crates/domains/health-identity",
     "crates/application/health-registries-app",
+    "crates/infrastructure/health-auth",
     "crates/infrastructure/health-fhir-server",
     "crates/infrastructure/health-files",
     "crates/infrastructure/health-http",
@@ -32,6 +34,7 @@ publish = false
 
 # Every crate, workspace or external, is declared here once; members use `{ workspace = true }`.
 [workspace.dependencies]
+health-auth = { path = "crates/infrastructure/health-auth" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
@@ -39,6 +42,7 @@ health-http = { path = "crates/infrastructure/health-http" }
 health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
+health-identity = { path = "crates/domains/health-identity" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
@@ -46,8 +50,10 @@ health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
 health-time = { path = "crates/foundation/health-time" }
 
 anyhow = "1.0.104"
+argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.92"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
+base64 = "0.22.1"
 cargo_metadata = "0.23.1"
 # The adopted R5 model crate, exactly pinned (ADR 0050); only health-fhir-models may use it.
 fhir-r5 = "=4.2.3"
@@ -59,7 +65,9 @@ octofhir-fhirpath = "=0.4.57"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
+p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
 pollster = "1.0.1"
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 regex = "1.13.1"
 rust_decimal = "1.43.0"
 reqwest = { version = "0.13.5", default-features = false }

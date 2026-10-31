@@ -47,6 +47,21 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 | Idle lock | After **15 min**; a PIN unlocks it. |
 | Shared workstation | One session per user per device. Switching users by PIN hides the previous user's view completely before the next user's view loads. |
 
+### In code
+
+- **`health-identity`** (domain): the lockout, password-length, session-lifetime and SMART v2 scope rules above.
+- **`health-auth`** (infrastructure): the authorization server.
+  - authorization code with PKCE S256;
+  - ES256 access tokens, DPoP-bound when the client sends a proof (always on an edge);
+  - rotating refresh tokens up to the 12 h cap; a replayed one ends the session;
+  - logout through `/revoke`;
+  - `AccessVerifier` for resource routes, which checks that the session is live on every request.
+- **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
+- **Follow-ups:**
+  - persistence ([#187](https://github.com/carapai/people-centered-healthcare/issues/187));
+  - mounting it, with key storage and the web client's sign-in ([#188](https://github.com/carapai/people-centered-healthcare/issues/188));
+  - the breached-password list ([#189](https://github.com/carapai/people-centered-healthcare/issues/189)).
+
 ## Authorization model
 
 - **RBAC.**

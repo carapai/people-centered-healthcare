@@ -1,0 +1,19 @@
+[package]
+name = "health-identity"
+description = "Identity & Access rules: Login Accounts, credential and lockout policy, sessions and SMART v2 scopes (offline-auth.md, ADR 0010)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "identity-access"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }

@@ -29,7 +29,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#59](https://github.com/carapai/people-centered-healthcare/issues/59) | Implement validation tiers 1–2 on the write path | 2 | #53 |  |
 | [#165](https://github.com/carapai/people-centered-healthcare/issues/165) | Enforce the core invariants (tier 2) with the decimal-exact FHIRPath engine | 2 | #59 |  |
 | [#166](https://github.com/carapai/people-centered-healthcare/issues/166) | Cross-check tiers 1 and 3 against the HL7 Java validator | 2 | #59, #145 |  |
-| [#167](https://github.com/carapai/people-centered-healthcare/issues/167) | Implement the Inbound Dead Letter and the quarantine queue | 2 | #59 |  |
+| [#167](https://github.com/carapai/people-centered-healthcare/issues/167) | Implement the Inbound Dead Letter and the quarantine queue | 2 | #59, #66 |  |
 | [#60](https://github.com/carapai/people-centered-healthcare/issues/60) | Implement the content-addressed blob store | 2 | #55 |  |
 | [#61](https://github.com/carapai/people-centered-healthcare/issues/61) | Implement encrypted logical backup and the round-trip fixture | 2 | #55, #60 |  |
 | [#62](https://github.com/carapai/people-centered-healthcare/issues/62) | Implement FhirClient, command ports and HttpTransport in the client | 2 | #44, #50, #58 |  |
@@ -42,6 +42,9 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#69](https://github.com/carapai/people-centered-healthcare/issues/69) | Implement the matching engine and Patient/$match | 3 | #68, #51, #37 |  |
 | [#70](https://github.com/carapai/people-centered-healthcare/issues/70) | Build the registry review queue | 3 | #69 |  |
 | [#71](https://github.com/carapai/people-centered-healthcare/issues/71) | Build the reception registration screen | 3 | #62, #69, #45 |  |
+| [#187](https://github.com/carapai/people-centered-healthcare/issues/187) | Persist the authorization server's state in SurrealDB | 3 | #63 |  |
+| [#188](https://github.com/carapai/people-centered-healthcare/issues/188) | Mount the authorization server in central-server, with its signing key and the client sign-in flow | 3 | #63 |  |
+| [#189](https://github.com/carapai/people-centered-healthcare/issues/189) | Check new passwords against a breached-password list | 3 | #63 |  |
 | [#72](https://github.com/carapai/people-centered-healthcare/issues/72) | Create the facility-edge executable as an OS service | 4 | #55, #49, #34 |  |
 | [#73](https://github.com/carapai/people-centered-healthcare/issues/73) | Implement edge provisioning, node identity and the FDE check | 4 | #72, #67 |  |
 | [#74](https://github.com/carapai/people-centered-healthcare/issues/74) | Implement LAN TLS, pairing and device enrollment with DPoP | 4 | #73 |  |
