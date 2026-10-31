@@ -50,6 +50,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#209](https://github.com/carapai/people-centered-healthcare/issues/209) | Resolve each request's subject at central and mount the FHIR API behind it | 3 | #192 |  |
 | [#210](https://github.com/carapai/people-centered-healthcare/issues/210) | Break-glass over the API: the request endpoint, stored grants, audit obligations and the in-charge alert | 3 | #192, #209 |  |
 | [#218](https://github.com/carapai/people-centered-healthcare/issues/218) | Deliver break-glass alerts and run the privacy officer's review | 3 | #210 |  |
+| [#224](https://github.com/carapai/people-centered-healthcare/issues/224) | Sync break-glass grants to central, with the review clock from arrival | 5 | #81, #218 |  |
 | [#211](https://github.com/carapai/people-centered-healthcare/issues/211) | Name a record's facility and isolate facility-scope records in searches | 3 | #192 |  |
 | [#197](https://github.com/carapai/people-centered-healthcare/issues/197) | Expose the client registry's link, unlink and $merge operations over FHIR | 3 | #68, #192, #209 |  |
 | [#216](https://github.com/carapai/people-centered-healthcare/issues/216) | Serve Patient/$match over HTTP | 3 | #197 |  |
