@@ -26,6 +26,9 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    # Zero-clause BSD: ADR 0045's BSD family, as permissive as MIT-0. Added for enum-iterator,
+    # a dependency of rphonetic's Double Metaphone (ADR 0055).
+    "0BSD",
     "ISC",
     "Unicode-3.0",
     "Zlib",

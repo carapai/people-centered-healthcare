@@ -18,6 +18,7 @@ health-client-registry = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }
+rphonetic = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
@@ -28,4 +29,5 @@ health-fhir-validation = { workspace = true }
 health-surrealdb = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
+synthetic-data = { workspace = true }
 tokio = { workspace = true }
