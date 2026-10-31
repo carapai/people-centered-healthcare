@@ -57,6 +57,7 @@ health-identity-app = { path = "crates/application/health-identity-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
+health-registries-app = { path = "crates/application/health-registries-app" }
 health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
 health-time = { path = "crates/foundation/health-time" }
 synthetic-data = { path = "tools/synthetic-data" }

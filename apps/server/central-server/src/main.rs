@@ -191,6 +191,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE is not a valid key file")?,
                     None => Vec::new(),
                 },
+                registry_nin_system: files.registry_nin_system.clone(),
                 policy: files
                     .access_policy_file
                     .as_deref()

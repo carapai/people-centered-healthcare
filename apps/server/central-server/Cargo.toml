@@ -22,6 +22,7 @@ health-fhir-server = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
 serde = { workspace = true }

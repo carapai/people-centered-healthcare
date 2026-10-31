@@ -52,6 +52,9 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_ACCESS_POLICY_FILE`: role → permission mappings and label rules (JSON).
     /// Optional: with it and the snapshot keys, `/fhir` is mounted.
     pub(crate) access_policy_file: Option<PathBuf>,
+    /// `HEALTH_REGISTRY_NIN_SYSTEM`: the national ID identifier system. Optional: with it, the
+    /// client registry's reviewer operations are served under `/fhir` (#197).
+    pub(crate) registry_nin_system: Option<String>,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -101,6 +104,7 @@ impl Config {
                     login_page: get("HEALTH_AUTH_LOGIN_PAGE"),
                     snapshot_keys_file: get("HEALTH_AUTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
                     access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
+                    registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM"),
                 }),
             },
         })

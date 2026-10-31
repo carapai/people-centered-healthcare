@@ -279,3 +279,28 @@ where
         Ok(())
     }
 }
+
+impl<S, A> ClientRegistry<S, A>
+where
+    S: Store,
+    S::Tx: ReviewQueue,
+    A: AuditTrail<S::Tx>,
+{
+    /// A reviewer's link (`$link`): [`link_in`](Self::link_in) in its own transaction, with the
+    /// survivorship disagreements queued for review in the same transaction.
+    pub async fn link_reviewed(
+        &self,
+        source: ResourceId,
+        golden: Option<ResourceId>,
+        reviewer: &str,
+        now: Timestamp,
+    ) -> Result<crate::Linked, RegistryError> {
+        let mut tx = self.store().begin().await?;
+        let linked = self.link_in(&mut tx, source, golden, reviewer).await?;
+        for entry in survivorship(linked.golden, linked.review.clone(), now) {
+            tx.put_review(&entry).await?;
+        }
+        tx.commit().await?;
+        Ok(linked)
+    }
+}
