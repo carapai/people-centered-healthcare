@@ -114,6 +114,25 @@ impl Connection {
         &self.db
     }
 
+    /// A snapshot-consistent logical export of this database as SurrealQL (backup-and-recovery.md).
+    /// Supported by the embedded engines (edges, desktops, tests), not over WebSocket.
+    pub async fn export_sql(&self) -> Result<Vec<u8>, surrealdb::Error> {
+        use futures_util::StreamExt;
+        let mut stream = self.db.export(()).await?;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            bytes.extend_from_slice(&chunk?);
+        }
+        Ok(bytes)
+    }
+
+    /// Restores an [`export_sql`](Self::export_sql) into this (empty) database. The text is run
+    /// in memory, so a decrypted backup never touches the disk.
+    pub async fn import_sql(&self, sql: &str) -> Result<(), surrealdb::Error> {
+        self.db.query(sql).await?.check()?;
+        Ok(())
+    }
+
     /// Runs SurrealQL and returns the raw response, for tests and tooling such as
     /// `INFO FOR DB` comparisons.
     pub async fn query(&self, sql: &str) -> Result<surrealdb::IndexedResults, surrealdb::Error> {

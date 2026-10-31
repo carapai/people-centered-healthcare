@@ -67,6 +67,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-audit` | crate (the only AuditEvent writer, and the Provenance builder) |
 | `health-observability` | crate |
 | `health-files` | crate |
+| `health-backup` | crate (encrypted logical backups, verify and restore) |
 | `health-crypto` | crate |
 | `health-sync-server` | crate |
 | `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |
