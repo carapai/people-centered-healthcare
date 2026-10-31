@@ -46,6 +46,12 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_AUTH_LOGIN_PAGE`: the web client's sign-in page (e.g. `/sign-in`). Optional:
     /// without it the authorization server shows its own minimal form.
     pub(crate) login_page: Option<String>,
+    /// `HEALTH_AUTH_SNAPSHOT_KEYS_FILE`: central's snapshot-signing keys, one hex line each,
+    /// the active key first. Optional: with it, sessions act for one facility (ADR 0056).
+    pub(crate) snapshot_keys_file: Option<PathBuf>,
+    /// `HEALTH_ACCESS_POLICY_FILE`: role → permission mappings and label rules (JSON).
+    /// Optional: with it and the snapshot keys, `/fhir` is mounted.
+    pub(crate) access_policy_file: Option<PathBuf>,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -93,6 +99,8 @@ impl Config {
                         .map(str::to_owned)
                         .collect(),
                     login_page: get("HEALTH_AUTH_LOGIN_PAGE"),
+                    snapshot_keys_file: get("HEALTH_AUTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
+                    access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
                 }),
             },
         })

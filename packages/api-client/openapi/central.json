@@ -5,6 +5,31 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/session": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Documents `GET /api/session`; the route itself is `health_auth::AuthServer::session_route`.",
+        "description": "The signed-in session. Needs the access token (`Authorization: Bearer` or `DPoP`).",
+        "operationId": "getSession",
+        "responses": {
+          "200": {
+            "description": "The session is live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token, or the session has ended"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -119,6 +144,41 @@
           "ready",
           "not-ready"
         ]
+      },
+      "SessionInfo": {
+        "type": "object",
+        "description": "The signed-in session, as `GET /api/session` answers (served by `health-auth`).",
+        "required": [
+          "account",
+          "client_id",
+          "scope",
+          "session"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "description": "The account id."
+          },
+          "client_id": {
+            "type": "string",
+            "description": "The client the session was issued to."
+          },
+          "facility": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The facility the session acts for (ADR 0056)."
+          },
+          "scope": {
+            "type": "string",
+            "description": "The scopes granted, space-separated."
+          },
+          "session": {
+            "type": "string",
+            "description": "The session id."
+          }
+        }
       }
     }
   }

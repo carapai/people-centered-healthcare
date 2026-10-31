@@ -113,9 +113,40 @@ async fn shutdown_signal() {
     }
 }
 
-/// Central's OpenAPI document: its API routes (none are mounted yet) and the system routes.
+/// The signed-in session, as `GET /api/session` answers (served by `health-auth`).
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct SessionInfo {
+    /// The account id.
+    account: String,
+    /// The client the session was issued to.
+    client_id: String,
+    /// The scopes granted, space-separated.
+    scope: String,
+    /// The session id.
+    session: String,
+    /// The facility the session acts for (ADR 0056).
+    facility: Option<String>,
+}
+
+/// Documents `GET /api/session`; the route itself is `health_auth::AuthServer::session_route`.
+#[utoipa::path(get, path = "/api/session", tag = "identity", operation_id = "getSession",
+    description = "The signed-in session. Needs the access token (`Authorization: Bearer` or `DPoP`).",
+    responses(
+        (status = 200, description = "The session is live", body = SessionInfo),
+        (status = 401, description = "No valid access token, or the session has ended"),
+    ))]
+#[allow(dead_code)]
+async fn session() {}
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(session), components(schemas(SessionInfo)))]
+struct CentralApi;
+
+/// Central's OpenAPI document: its API routes and the system routes. The FHIR API at `/fhir`
+/// is described by its CapabilityStatement (`/fhir/metadata`), not here.
 fn openapi() -> utoipa::openapi::OpenApi {
-    document("central-server", utoipa::openapi::OpenApi::default())
+    document("central-server", <CentralApi as utoipa::OpenApi>::openapi())
 }
 
 #[tokio::main]
@@ -155,6 +186,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     redirect_uris: files.redirect_uris.clone(),
                 }],
                 login_page: files.login_page.clone(),
+                snapshot_keys: match &files.snapshot_keys_file {
+                    Some(path) => auth::read_keys(path)
+                        .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE is not a valid key file")?,
+                    None => Vec::new(),
+                },
+                policy: files
+                    .access_policy_file
+                    .as_deref()
+                    .map(auth::read_policy)
+                    .transpose()?,
             };
             Some((settings, Arc::new(OnceCell::new())))
         }

@@ -1,6 +1,6 @@
-//! The authorization server, mounted at `/auth` (offline-auth.md; ADR 0010). Central is the
-//! identity provider of record; its routes come up once the database is migrated, and answer
-//! 503 until then.
+//! The authorization server, mounted at `/auth` (offline-auth.md; ADR 0010), and the FHIR API
+//! behind it at `/fhir` (ADR 0056). Central is the identity provider of record; its routes come
+//! up once the database is migrated, and answer 503 until then.
 
 use std::convert::Infallible;
 use std::path::Path;
@@ -10,10 +10,19 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::{IntoResponse, Response};
-use health_auth::{AuthConfig, AuthServer, Client, Credentials, SurrealAuthStore, TokenSigner};
+use health_access_policy::{Label, LabelRule, NodeScope, Pdp};
+use health_audit::Auditor;
+use health_auth::{
+    AuthConfig, AuthServer, Client, Credentials, SnapshotGate, SnapshotSigner, SnapshotVerifier,
+    Subjects, SurrealAuthStore, TokenSigner, subject_layer,
+};
+use health_fhir_search::Unrestricted;
+use health_fhir_server::{FhirServer, NoFacilityScope};
 use health_identity::SessionPolicy;
+use health_identity::snapshot::{RolePermissions, SnapshotPolicy};
 use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
+use serde::Deserialize;
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
@@ -30,6 +39,37 @@ pub(crate) struct AuthSettings {
     pub(crate) clients: Vec<Client>,
     /// The web client's sign-in page, if it fronts `/authorize`.
     pub(crate) login_page: Option<String>,
+    /// Central's snapshot-signing keys (the active one first): with them, a session acts for
+    /// one facility, chosen at sign-in (ADR 0056).
+    pub(crate) snapshot_keys: Vec<[u8; 32]>,
+    /// The role mappings and label rules: with them and snapshot keys, `/fhir` is mounted.
+    pub(crate) policy: Option<AccessPolicy>,
+}
+
+/// The access policy file (`HEALTH_ACCESS_POLICY_FILE`): role → permission mappings and the
+/// sensitivity label rules, from the country configuration package.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub(crate) struct AccessPolicy {
+    /// Role → permission codes (`{Type|*}.{cruds}`, `break-glass`, …).
+    pub(crate) roles: RolePermissions,
+    /// The labels that restrict records, and the program that opens each.
+    #[serde(default)]
+    pub(crate) labels: Vec<LabelFile>,
+}
+
+/// One label rule in the policy file.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct LabelFile {
+    system: String,
+    code: String,
+    program: String,
+}
+
+/// Reads the access policy file.
+pub(crate) fn read_policy(path: &Path) -> Result<AccessPolicy, &'static str> {
+    let text =
+        std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_ACCESS_POLICY_FILE")?;
+    serde_json::from_str(&text).map_err(|_| "HEALTH_ACCESS_POLICY_FILE is not a valid policy")
 }
 
 impl std::fmt::Debug for AuthSettings {
@@ -38,6 +78,8 @@ impl std::fmt::Debug for AuthSettings {
             .field("issuer", &self.issuer)
             .field("keys", &self.keys.len())
             .field("clients", &self.clients)
+            .field("snapshot_keys", &self.snapshot_keys.len())
+            .field("policy", &self.policy.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -80,27 +122,94 @@ pub(crate) fn routes(
     let credentials =
         Credentials::new(settings.pepper.clone()).map_err(|_| "the pepper cannot be used")?;
     let policy = SessionPolicy::default();
-    let store = SurrealAuthStore::new(
-        SurrealStore::new(connection, Arc::new(SystemClock)),
-        policy.hard_cap,
-    );
+    let fhir_store = SurrealStore::new(connection, Arc::new(SystemClock));
+    let store = SurrealAuthStore::new(fhir_store.clone(), policy.hard_cap);
     let mut config = AuthConfig::new(settings.issuer.as_str(), "central", false);
     config.clients.clone_from(&settings.clients);
     config.login_page.clone_from(&settings.login_page);
+    if !settings.snapshot_keys.is_empty() {
+        let keys = settings
+            .snapshot_keys
+            .iter()
+            .map(|k| SnapshotSigner::from_secret(k).map(|s| s.public()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?;
+        config.snapshots = Some(SnapshotGate {
+            facility: None,
+            verifier: SnapshotVerifier::new(&keys)
+                .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?,
+            policy: SnapshotPolicy::default(),
+        });
+    }
     let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
-    Ok(Router::new()
+    let mut router = Router::new()
         .nest("/auth", server.router())
-        .nest("/api", server.session_route()))
+        .nest("/api", server.session_route());
+    if let (Some(policy), false) = (&settings.policy, settings.snapshot_keys.is_empty()) {
+        router = router.nest("/fhir", fhir(fhir_store, settings, policy, &server));
+    }
+    Ok(router)
 }
 
-/// `/auth` and `/api/session`, forwarded (paths intact) to the routes once they are built, and
-/// 503 until then.
+/// The FHIR API: every interaction decided for the request's subject at central's scope, and
+/// audited (ADR 0056).
+fn fhir(
+    store: SurrealStore,
+    settings: &AuthSettings,
+    policy: &AccessPolicy,
+    server: &AuthServer<SurrealAuthStore>,
+) -> Router {
+    let rules: Vec<LabelRule> = policy
+        .labels
+        .iter()
+        .map(|l| LabelRule {
+            label: Label::new(&l.system, &l.code),
+            program: l.program.clone(),
+        })
+        .collect();
+    let sensitive = policy
+        .labels
+        .iter()
+        .map(|l| (l.system.clone(), l.code.clone()))
+        .collect();
+    let origin = settings
+        .issuer
+        .split('/')
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("/");
+    let subjects = Subjects::new(server.verifier(), policy.roles.clone());
+    FhirServer::new(store, format!("{origin}/fhir"), Arc::new(Unrestricted))
+        .with_access_control(
+            Pdp::new(rules).with_scope(NodeScope::Central),
+            Arc::new(NoFacilityScope),
+        )
+        .with_audit(Auditor::new("central", sensitive))
+        .router()
+        .layer(axum::middleware::from_fn_with_state(
+            subjects,
+            subject_layer,
+        ))
+}
+
+/// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
+/// built, and 503 until then.
 pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
     let service = tower::service_fn(move |request: Request<Body>| {
         let ready = Arc::clone(&ready);
         async move {
             let response = match ready.get() {
-                Some(router) => router.clone().oneshot(request).await.into_response(),
+                Some(router) => {
+                    // A fresh request: the gate's own route parameters must not reach the
+                    // routes' extractors.
+                    let (parts, body) = request.into_parts();
+                    let mut fresh = Request::new(body);
+                    *fresh.method_mut() = parts.method;
+                    *fresh.uri_mut() = parts.uri;
+                    *fresh.version_mut() = parts.version;
+                    *fresh.headers_mut() = parts.headers;
+                    router.clone().oneshot(fresh).await.into_response()
+                }
                 None => (StatusCode::SERVICE_UNAVAILABLE, "sign-in is starting").into_response(),
             };
             Ok::<Response, Infallible>(response)
@@ -108,7 +217,9 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
     });
     Router::new()
         .route_service("/auth/{*rest}", service.clone())
-        .route_service("/api/session", service)
+        .route_service("/api/session", service.clone())
+        .route_service("/fhir", service.clone())
+        .route_service("/fhir/{*rest}", service)
 }
 
 #[cfg(test)]
@@ -128,6 +239,8 @@ mod tests {
                 redirect_uris: vec!["https://central.test/callback".into()],
             }],
             login_page: Some("/sign-in".into()),
+            snapshot_keys: Vec::new(),
+            policy: None,
         }
     }
 
@@ -208,6 +321,251 @@ mod tests {
                 .expect("location")
                 .starts_with("/sign-in?")
         );
+    }
+
+    async fn send(app: &Router, request: Request<Body>) -> (StatusCode, String, Option<String>) {
+        let response = app.clone().oneshot(request).await.expect("response");
+        let location = response
+            .headers()
+            .get(axum::http::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let status = response.status();
+        let body = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body")
+            .to_bytes();
+        (
+            status,
+            String::from_utf8_lossy(&body).into_owned(),
+            location,
+        )
+    }
+
+    fn form(path: &str, fields: &[(&str, &str)]) -> Request<Body> {
+        let body = form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(fields)
+            .finish();
+        Request::post(path)
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .expect("request")
+    }
+
+    #[tokio::test]
+    async fn fhir_is_served_to_signed_in_users_with_their_roles_permissions() {
+        use health_auth::SnapshotSigner;
+        use health_identity::snapshot::{PermissionSnapshot, RoleAssignment};
+        use health_identity::{AccountId, AccountStatus, Lockout, LoginAccount};
+
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "central".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let snapshot_key = [7u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": { "clinician": ["Patient.crs"], "cashier": ["Invoice.crus"] },
+            "labels": [{ "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "HIV", "program": "hiv" }],
+        }))
+        .expect("policy");
+        // Provision a clinician at KAM013, as central's workforce registry will.
+        let provisioning = SurrealAuthStore::new(
+            SurrealStore::new(connection.clone(), Arc::new(SystemClock)),
+            SessionPolicy::default().hard_cap,
+        );
+        let credentials = Credentials::new(Vec::new()).expect("credentials");
+        let account = AccountId(uuid::Uuid::now_v7());
+        provisioning
+            .put_account(&LoginAccount {
+                id: account,
+                username: "nakato".into(),
+                credential: credentials.hash("correct horse battery").expect("hash"),
+                status: AccountStatus::Active,
+                lockout: Lockout::default(),
+            })
+            .await
+            .expect("account");
+        let issued = health_time::Timestamp::now();
+        let snapshot = PermissionSnapshot {
+            account,
+            facility: "KAM013".into(),
+            roles: vec![RoleAssignment {
+                role: "clinician".into(),
+                locations: vec![],
+            }],
+            programs: vec![],
+            issued_at: issued,
+            not_after: SnapshotPolicy::default().not_after(issued),
+            snapshot_version: 1,
+        };
+        let jws = SnapshotSigner::from_secret(&snapshot_key)
+            .expect("key")
+            .sign(&snapshot, &policy.roles)
+            .expect("sign");
+        provisioning
+            .put_snapshot(account, "KAM013", &jws)
+            .await
+            .expect("snapshot");
+
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![snapshot_key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+
+        // Sign in: one facility, so none need be named.
+        let (_, _, location) = send(
+            &app,
+            form(
+                "/auth/authorize",
+                &[
+                    ("response_type", "code"),
+                    ("client_id", "health-client"),
+                    ("redirect_uri", "https://central.test/callback"),
+                    ("scope", "openid"),
+                    ("state", "s"),
+                    (
+                        "code_challenge",
+                        "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    ),
+                    ("code_challenge_method", "S256"),
+                    ("username", "nakato"),
+                    ("password", "correct horse battery"),
+                ],
+            ),
+        )
+        .await;
+        let location = location.expect("redirect");
+        let code = form_urlencoded::parse(location.split_once('?').expect("query").1.as_bytes())
+            .find(|(k, _)| k == "code")
+            .expect("code")
+            .1
+            .into_owned();
+        let (status, body, _) = send(
+            &app,
+            form(
+                "/auth/token",
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("code", &code),
+                    ("redirect_uri", "https://central.test/callback"),
+                    ("client_id", "health-client"),
+                    (
+                        "code_verifier",
+                        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    ),
+                ],
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let tokens: serde_json::Value = serde_json::from_str(&body).expect("json");
+        let bearer = format!("Bearer {}", tokens["access_token"].as_str().expect("token"));
+        let fhir = |method: &str,
+                    path: &str,
+                    body: Option<serde_json::Value>,
+                    purpose: Option<&str>,
+                    auth: bool| {
+            let mut request = Request::builder().method(method).uri(path);
+            if auth {
+                request = request.header("authorization", bearer.as_str());
+            }
+            if let Some(purpose) = purpose {
+                request = request.header("x-purpose-of-use", purpose);
+            }
+            if body.is_some() {
+                request = request.header("content-type", "application/fhir+json");
+            }
+            request
+                .body(body.map_or(Body::empty(), |b| Body::from(b.to_string())))
+                .expect("request")
+        };
+
+        // No route serves FHIR data without a signed-in user; the CapabilityStatement is open.
+        assert_eq!(
+            send(
+                &app,
+                fhir(
+                    "GET",
+                    "/fhir/Patient/018f0000-0000-7000-8000-000000000000",
+                    None,
+                    None,
+                    false
+                )
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            send(&app, fhir("GET", "/fhir/metadata", None, None, false))
+                .await
+                .0,
+            StatusCode::OK
+        );
+        // The clinician's role creates and reads Patients.
+        let (status, body, _) = send(
+            &app,
+            fhir(
+                "POST",
+                "/fhir/Patient",
+                Some(serde_json::json!({ "resourceType": "Patient" })),
+                None,
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let id = serde_json::from_str::<serde_json::Value>(&body).expect("json")["id"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        let (status, _, _) = send(
+            &app,
+            fhir(
+                "GET",
+                &format!("/fhir/Patient/{id}"),
+                None,
+                Some("TREAT"),
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        // But not Invoices, which another role holds.
+        let (status, _, _) = send(
+            &app,
+            fhir(
+                "POST",
+                "/fhir/Invoice",
+                Some(serde_json::json!({ "resourceType": "Invoice", "status": "draft" })),
+                None,
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        // An unknown purpose of use is refused.
+        let (status, body, _) = send(
+            &app,
+            fhir(
+                "GET",
+                &format!("/fhir/Patient/{id}"),
+                None,
+                Some("SNOOPING"),
+                true,
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     }
 
     #[test]

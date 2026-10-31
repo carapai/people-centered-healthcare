@@ -624,13 +624,19 @@ name = "central-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "form_urlencoded",
+ "health-access-policy",
+ "health-audit",
  "health-auth",
+ "health-fhir-search",
+ "health-fhir-server",
  "health-http",
  "health-identity",
  "health-observability",
  "health-surrealdb",
  "health-time",
  "http-body-util",
+ "serde",
  "serde_json",
  "surrealdb",
  "tempfile",
@@ -639,6 +645,7 @@ dependencies = [
  "tower",
  "tracing",
  "utoipa",
+ "uuid",
 ]
 
 [[package]]
@@ -1978,8 +1985,11 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "form_urlencoded",
+ "health-access-policy",
+ "health-audit",
  "health-fhir-search",
  "health-identity",
+ "health-identity-app",
  "health-persistence",
  "health-surrealdb",
  "health-time",

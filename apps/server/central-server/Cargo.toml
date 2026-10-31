@@ -14,12 +14,18 @@ workspace = true
 
 [dependencies]
 axum = { workspace = true }
+health-access-policy = { workspace = true }
+health-audit = { workspace = true }
 health-auth = { workspace = true }
+health-fhir-search = { workspace = true }
+health-fhir-server = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tower = { workspace = true }
 tokio = { workspace = true, features = ["net", "signal", "sync"] }
@@ -27,8 +33,10 @@ tracing = { workspace = true }
 utoipa = { workspace = true }
 
 [dev-dependencies]
+form_urlencoded = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 http-body-util = { workspace = true }
 serde_json = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tempfile = { workspace = true }
+uuid = { workspace = true }
