@@ -574,3 +574,109 @@ async fn reception_registers_only_after_the_clerk_rules_out_the_candidates() {
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+fn review_app(store: &SurrealStore, subject: &Subject) -> Router {
+    FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted))
+        .with_access_control(Pdp::default(), Arc::new(NoFacilityScope))
+        .with_audit(Auditor::new("test central", Vec::new()))
+        .with_client_registry(config(), rules())
+        .registry_review_router()
+        .layer(Extension(Agent {
+            display: format!("account {}", subject.account),
+            ..Agent::unauthenticated()
+        }))
+        .layer(Extension(subject.clone()))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn reviewers_work_the_queue_over_http() {
+    use health_client_registry::{ReviewEntry, ReviewKind};
+    use health_persistence::Transaction;
+    let store = store().await;
+    let reviewer = reviewer("KAM013");
+    let fhir = app(&store, Some(&reviewer));
+    // A survivorship item: B's self-reported phone loses to A's.
+    let a = source(&store, "KAM013", "Nakato", "0772000001").await;
+    let b = sourced(&store, "KAM013", "Nakato", "0772999999", "self-reported").await;
+    let (_, linked) = send(&fhir, "POST", &format!("/Patient/{a}/$link"), None).await;
+    let golden = linked["parameter"][0]["valueReference"]["reference"]
+        .as_str()
+        .expect("golden")
+        .to_owned();
+    let (status, _) = send(
+        &fhir,
+        "POST",
+        &format!("/Patient/{b}/$link"),
+        Some(json!({ "resourceType": "Parameters", "parameter": [
+            { "name": "golden", "valueReference": { "reference": golden } },
+        ] })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // A potential match: C resembles A.
+    let c = source(&store, "KAM013", "Nakato", "0772000001").await;
+    let mut tx = store.begin().await.expect("tx");
+    tx.put_review(&ReviewEntry {
+        id: health_identifiers::ResourceId::new().to_string(),
+        kind: ReviewKind::PotentialMatch {
+            source: c.clone(),
+            candidate: a.clone(),
+            golden: golden.trim_start_matches("Patient/").to_owned(),
+            score: 9.5,
+        },
+        created_at: health_time::Timestamp::now(),
+        decided: None,
+    })
+    .await
+    .expect("review");
+    tx.commit().await.expect("commit");
+
+    let queue = review_app(&store, &reviewer);
+    let (status, items) = send(&queue, "GET", "/", None).await;
+    assert_eq!(status, StatusCode::OK, "{items}");
+    let items = items.as_array().expect("items").clone();
+    let survivorship = items
+        .iter()
+        .find(|i| i["kind"] == "survivorship")
+        .expect("survivorship");
+    assert_eq!(survivorship["field"], "phone");
+    assert_eq!(survivorship["current"]["value"], "0772000001");
+    assert_eq!(survivorship["incoming"]["trust"], "self-reported");
+    let potential = items
+        .iter()
+        .find(|i| i["kind"] == "potential-match")
+        .expect("potential match");
+    assert_eq!(potential["source"]["id"], c);
+    assert_eq!(potential["candidate"]["id"], a);
+    assert_eq!(potential["overdue"], false);
+
+    // Decisions are carried out; a decided item cannot be decided again.
+    let decide = |id: &Value, decision: &str| {
+        (
+            format!("/{}", id.as_str().expect("id")),
+            json!({ "decision": decision }),
+        )
+    };
+    let (path, body) = decide(&potential["id"], "different-people");
+    let (status, outcome) = send(&queue, "POST", &path, Some(body.clone())).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{outcome}");
+    let (status, _) = send(&queue, "POST", &path, Some(body)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (path, body) = decide(&survivorship["id"], "same-person");
+    let (status, _) = send(&queue, "POST", &path, Some(body)).await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "a survivorship item takes keep-current or take-incoming"
+    );
+    let (path, body) = decide(&survivorship["id"], "keep-current");
+    let (status, _) = send(&queue, "POST", &path, Some(body)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, rest) = send(&queue, "GET", "/", None).await;
+    assert_eq!(rest.as_array().map(Vec::len), Some(0), "{rest}");
+
+    // Reviewers only.
+    let clerk = subject("clerk-1", "KAM013", &["Patient.crus"]);
+    let (status, _) = send(&review_app(&store, &clerk), "GET", "/", None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

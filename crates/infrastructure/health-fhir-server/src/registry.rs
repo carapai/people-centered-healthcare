@@ -563,3 +563,154 @@ pub(crate) async fn unlink(
     ] });
     Ok(fhir_json(StatusCode::OK, body.to_string()))
 }
+
+/// The JSON shape of a trust level.
+fn trust_code(trust: health_client_registry::Trust) -> &'static str {
+    use health_client_registry::Trust;
+    match trust {
+        Trust::NiraVerified => "nira-verified",
+        Trust::StaffVerified => "staff-verified",
+        Trust::StaffEntered => "staff-entered",
+        Trust::SelfReported => "self-reported",
+    }
+}
+
+fn claim_json(claim: &health_client_registry::Claim) -> Value {
+    json!({
+        "value": claim.value,
+        "trust": trust_code(claim.trust),
+        "recorded": claim.recorded.to_string(),
+        "source": format!("Patient/{}", claim.source),
+    })
+}
+
+/// The registry review queue, for the review screen (#203). Nest it under the API (e.g.
+/// `/api/registry/reviews`) behind the subject layer:
+///
+/// - `GET /`: pending items, the oldest first, with `overdue` past 7 days. A potential match carries
+///   both Patients side by side; a survivorship item, the current and incoming values.
+/// - `POST /{id}` with `{"decision": "same-person" | "different-people" | "keep-current" |
+///   "take-incoming"}`: carried out, recorded and audited in one transaction.
+///
+/// Both need a reviewer: the `registry.review` permission and Patient update.
+impl FhirServer {
+    /// The review queue's routes (see above); empty answers 404 without the client registry.
+    pub fn registry_review_router(&self) -> axum::Router {
+        axum::Router::new()
+            .route("/", axum::routing::get(review_queue))
+            .route("/{id}", axum::routing::post(review_decision))
+            .with_state(self.clone())
+    }
+}
+
+type Review =
+    health_registries_app::review::RegistryReview<health_surrealdb::SurrealStore, RegistryAudit>;
+
+fn review_use_case(
+    server: &FhirServer,
+    subject: Option<Extension<Subject>>,
+    agent: Option<Extension<Agent>>,
+) -> Result<(Subject, Review), FhirError> {
+    let Some(settings) = server.registry.clone() else {
+        return Err(FhirError::not_found("the client registry is not enabled"));
+    };
+    let (subject, registry) = reviewer(server, subject, agent)?;
+    Ok((
+        subject,
+        health_registries_app::review::RegistryReview::new(
+            registry,
+            settings.rules.clone(),
+            Arc::new(health_time::SystemClock),
+        ),
+    ))
+}
+
+/// `GET /` of the review queue.
+async fn review_queue(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    agent: Option<Extension<Agent>>,
+) -> Result<Response, FhirError> {
+    use health_client_registry::ReviewKind;
+    let (_, review) = review_use_case(&server, subject, agent)?;
+    let now = Timestamp::now();
+    let pending = review.pending(500).await?;
+    let mut tx = server.store.begin().await?;
+    let patient_type = "Patient"
+        .parse()
+        .map_err(|_| FhirError::bad_request("Patient"))?;
+    let mut items = Vec::with_capacity(pending.len());
+    for entry in pending {
+        let mut item = json!({
+            "id": entry.id,
+            "kind": entry.kind.code(),
+            "created_at": entry.created_at.to_string(),
+            "overdue": entry.overdue(now),
+        });
+        match &entry.kind {
+            ReviewKind::PotentialMatch {
+                source,
+                candidate,
+                golden,
+                score,
+            } => {
+                let mut sides = Vec::with_capacity(2);
+                for id in [source, candidate] {
+                    let stored = match id.parse::<ResourceId>() {
+                        Ok(id) => tx.read(&patient_type, id).await?,
+                        Err(_) => None,
+                    };
+                    sides.push(
+                        stored
+                            .and_then(|s| serde_json::from_str::<Value>(s.json.as_str()).ok())
+                            .unwrap_or(Value::Null),
+                    );
+                }
+                let candidate_json = sides.pop().unwrap_or(Value::Null);
+                let source_json = sides.pop().unwrap_or(Value::Null);
+                item["golden"] = json!(format!("Patient/{golden}"));
+                item["score"] = json!(score);
+                item["source"] = source_json;
+                item["candidate"] = candidate_json;
+            }
+            ReviewKind::Survivorship {
+                golden,
+                field,
+                current,
+                incoming,
+            } => {
+                item["golden"] = json!(format!("Patient/{golden}"));
+                item["field"] = json!(field.code());
+                item["current"] = claim_json(current);
+                item["incoming"] = claim_json(incoming);
+            }
+        }
+        items.push(item);
+    }
+    Ok(fhir_json(StatusCode::OK, Value::Array(items).to_string()))
+}
+
+/// `POST /{id}` of the review queue.
+async fn review_decision(
+    State(server): State<FhirServer>,
+    Path(id): Path<String>,
+    subject: Option<Extension<Subject>>,
+    agent: Option<Extension<Agent>>,
+    body: Bytes,
+) -> Result<Response, FhirError> {
+    let (subject, review) = review_use_case(&server, subject, agent)?;
+    let body: Value = serde_json::from_slice(&body)
+        .map_err(|_| FhirError::bad_request("the body is not JSON"))?;
+    let decision = body["decision"]
+        .as_str()
+        .and_then(health_client_registry::Decision::from_code)
+        .ok_or_else(|| {
+            FhirError::bad_request(
+                "decision must be same-person, different-people, keep-current or take-incoming",
+            )
+        })?;
+    review.decide(&id, decision, &subject.account).await?;
+    let mut response = Response::new(axum::body::Body::empty());
+    *response.status_mut() = StatusCode::NO_CONTENT;
+    Ok(response)
+}

@@ -44,6 +44,9 @@ function Home() {
                 <Link to="/registration">{intl.formatMessage(messages.regTitle)}</Link>
               </li>
               <li>
+                <Link to="/registry/reviews">{intl.formatMessage(messages.rrTitle)}</Link>
+              </li>
+              <li>
                 <Link to="/break-glass/alerts">{intl.formatMessage(messages.bgAlertsTitle)}</Link>
               </li>
               <li>

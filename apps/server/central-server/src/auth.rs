@@ -153,7 +153,11 @@ pub(crate) fn routes(
             .with_auditor(Auditor::new("central", sensitive(policy)));
         api = api.merge(subjects.routes());
         escalate_hourly(subjects.clone());
-        router = router.nest("/fhir", fhir(fhir_store, settings, policy, subjects));
+        let (fhir, reviews) = fhir(fhir_store, settings, policy, subjects);
+        router = router.nest("/fhir", fhir);
+        if let Some(reviews) = reviews {
+            api = api.nest("/registry/reviews", reviews);
+        }
     }
     Ok(router.nest("/api", api))
 }
@@ -265,7 +269,7 @@ fn fhir(
     settings: &AuthSettings,
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
-) -> Router {
+) -> (Router, Option<Router>) {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
@@ -311,10 +315,11 @@ fn fhir(
                 system: "urn:health:mrn".into(),
             });
     }
-    fhir.router().layer(axum::middleware::from_fn_with_state(
-        subjects,
-        subject_layer,
-    ))
+    let layer = axum::middleware::from_fn_with_state(subjects, subject_layer);
+    // The registry review queue (#203), with the registry.
+    let reviews =
+        registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
+    (fhir.router().layer(layer), reviews)
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -345,6 +350,8 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/session", service.clone())
         .route_service("/api/break-glass", service.clone())
         .route_service("/api/events", service.clone())
+        .route_service("/api/registry/reviews", service.clone())
+        .route_service("/api/registry/reviews/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)
@@ -716,6 +723,10 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         assert!(body.contains("KAM013-C1-000001"), "{body}");
+        // The registry review queue is served, to reviewers only.
+        let (status, body, _) =
+            send(&app, fhir("GET", "/api/registry/reviews", None, None, true)).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         // The registry's operations are served, to reviewers only.
         let (status, body, _) = send(
             &app,
