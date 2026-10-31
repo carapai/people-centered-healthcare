@@ -14,6 +14,7 @@
 //! goes through the [`AuditTrail`] port in that transaction.
 
 pub mod fhir;
+pub mod matching;
 
 use std::future::Future;
 

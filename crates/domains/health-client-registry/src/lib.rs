@@ -1,5 +1,6 @@
 //! Client registry Module: source Patients, golden records and their links (ADR 0027;
-//! patient-identity.md § Golden record model). Matching rules arrive with #69.
+//! patient-identity.md § Golden record model), and patient matching ([`matching`]; ADRs 0028,
+//! 0055).
 //!
 //! - **Source Patients** keep their own ids; clinical records reference them, never the golden
 //!   record.
@@ -12,6 +13,7 @@
 
 mod ecid;
 mod golden;
+pub mod matching;
 mod merge;
 mod survivorship;
 

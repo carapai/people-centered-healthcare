@@ -73,6 +73,9 @@ flowchart LR
   - Provenance per surviving value is [#196](https://github.com/carapai/people-centered-healthcare/issues/196). For now each value's origin is an extension on the golden Patient.
   - The HTTP operations are [#197](https://github.com/carapai/people-centered-healthcare/issues/197).
 - **ECID:** 11 random characters plus the check character.
+- **Matching** (#69): `health_client_registry::matching` holds the rules, the deterministic layer, the five blocking keys with the stop-list plan, and Fellegi–Sunter scoring with grades. Double Metaphone comes from `rphonetic`, through a port.
+  - The CI corruption benchmark gives blocking recall 99.85%, candidate sets at most 97, and auto-link precision 100% on 60,000 synthetic people.
+  - The storage and `$match` are [#199](https://github.com/carapai/people-centered-healthcare/issues/199), and the 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
 
 ## Matching (ADR 0028)
 

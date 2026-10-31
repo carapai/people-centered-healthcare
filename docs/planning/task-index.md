@@ -48,6 +48,8 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#192](https://github.com/carapai/people-centered-healthcare/issues/192) | Apply the policy decision point to every FHIR interaction | 3 | #65, #188 |  |
 | [#196](https://github.com/carapai/people-centered-healthcare/issues/196) | Store Provenance with its target's Owner | 3 | #68 |  |
 | [#197](https://github.com/carapai/people-centered-healthcare/issues/197) | Expose the client registry's link, unlink and $merge operations over FHIR | 3 | #68, #192 |  |
+| [#199](https://github.com/carapai/people-centered-healthcare/issues/199) | Store blocking keys and block counts, and serve Patient/$match | 3 | #69 |  |
+| [#200](https://github.com/carapai/people-centered-healthcare/issues/200) | Load-test patient matching at 45M on central-class hardware | 3 | #199 | yes |
 | [#72](https://github.com/carapai/people-centered-healthcare/issues/72) | Create the facility-edge executable as an OS service | 4 | #55, #49, #34 |  |
 | [#73](https://github.com/carapai/people-centered-healthcare/issues/73) | Implement edge provisioning, node identity and the FDE check | 4 | #72, #67 |  |
 | [#74](https://github.com/carapai/people-centered-healthcare/issues/74) | Implement LAN TLS, pairing and device enrollment with DPoP | 4 | #73 |  |
