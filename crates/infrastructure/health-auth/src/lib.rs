@@ -21,7 +21,7 @@ mod store;
 mod surreal;
 
 pub use credentials::{Credentials, HashError};
-pub use jose::TokenSigner;
+pub use jose::{InvalidKey, TokenSigner};
 pub use server::{AccessError, AccessVerifier, AuthConfig, AuthServer, Client, Principal};
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
 pub use store::{AuthStore, AuthorizationCode, MemoryStore, Session, StoreError};

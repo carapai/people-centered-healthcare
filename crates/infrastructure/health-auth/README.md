@@ -9,7 +9,7 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 | Route | What it does |
 |---|---|
 | `GET /.well-known/openid-configuration`, `/.well-known/smart-configuration` | Server metadata: S256 PKCE only, public clients, ES256 for DPoP and ID tokens, SMART capabilities |
-| `GET /jwks` | The ES256 public key; its `kid` is the RFC 7638 thumbprint |
+| `GET /jwks` | The ES256 public keys: the active one and any rotated-out keys whose tokens may still be live. Each `kid` is the RFC 7638 thumbprint |
 | `GET /authorize` | Validates the request and shows the sign-in form |
 | `POST /authorize` | Checks the credentials and redirects with a one-time code, `state` and `iss` (RFC 9207) |
 | `POST /token` | `authorization_code` (PKCE S256) and `refresh_token` grants |
@@ -62,7 +62,7 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 
 ## Not here yet
 
-- **Wiring:** mounting the server in central-server, signing-key storage and rotation, and the web client's sign-in ([#188](https://github.com/carapai/people-centered-healthcare/issues/188)).
+- **Wiring:** central-server mounts it at `/auth` (#188). `TokenSigner::from_secrets` takes the active key first and rotated-out keys after it, which still verify. The web client's sign-in is the rest of [#188](https://github.com/carapai/people-centered-healthcare/issues/188).
 - **Edge features:** PIN resume, and SMART Backend Services between edge and central (Phase 4).
 
 ## Tests

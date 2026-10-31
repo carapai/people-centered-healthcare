@@ -104,7 +104,15 @@ impl EcJwk {
 pub struct TokenSigner {
     key: SigningKey,
     kid: String,
+    /// Keys rotated out: they still verify the tokens they signed until those expire, and stay
+    /// in `/jwks` meanwhile.
+    previous: Vec<(String, VerifyingKey)>,
 }
+
+/// A signing key that is not a valid P-256 scalar.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid signing key")]
+pub struct InvalidKey;
 
 impl std::fmt::Debug for TokenSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -123,7 +131,37 @@ impl TokenSigner {
     /// A signer over `key`; its `kid` is the key's thumbprint.
     pub fn new(key: SigningKey) -> Self {
         let kid = EcJwk::of(key.verifying_key()).thumbprint();
-        Self { key, kid }
+        Self {
+            key,
+            kid,
+            previous: Vec::new(),
+        }
+    }
+
+    /// The signer for a key set read from the node's secret store: `secrets[0]` signs, and the
+    /// rest (rotated out) only verify. Each secret is a 32-byte P-256 scalar.
+    pub fn from_secrets(secrets: &[[u8; 32]]) -> Result<Self, InvalidKey> {
+        let keys: Vec<SigningKey> = secrets
+            .iter()
+            .map(|s| SigningKey::from_slice(s).map_err(|_| InvalidKey))
+            .collect::<Result<_, _>>()?;
+        let mut keys = keys.into_iter();
+        let active = keys.next().ok_or(InvalidKey)?;
+        Ok(Self::new(active).with_previous(keys))
+    }
+
+    /// This signer, still verifying tokens signed by `previous` keys.
+    #[must_use]
+    pub fn with_previous(mut self, previous: impl IntoIterator<Item = SigningKey>) -> Self {
+        self.previous = previous
+            .into_iter()
+            .map(|k| {
+                let verifying = *k.verifying_key();
+                (EcJwk::of(&verifying).thumbprint(), verifying)
+            })
+            .filter(|(kid, _)| *kid != self.kid)
+            .collect();
+        self
     }
 
     /// The key id.
@@ -133,8 +171,13 @@ impl TokenSigner {
 
     /// The public key set, for `/jwks`.
     pub fn jwks(&self) -> Value {
-        let jwk = EcJwk::of(self.key.verifying_key());
-        json!({ "keys": [{ "kty": jwk.kty, "crv": jwk.crv, "x": jwk.x, "y": jwk.y, "kid": self.kid, "use": "sig", "alg": "ES256" }] })
+        let entry = |kid: &str, key: &VerifyingKey| {
+            let jwk = EcJwk::of(key);
+            json!({ "kty": jwk.kty, "crv": jwk.crv, "x": jwk.x, "y": jwk.y, "kid": kid, "use": "sig", "alg": "ES256" })
+        };
+        let mut keys = vec![entry(&self.kid, self.key.verifying_key())];
+        keys.extend(self.previous.iter().map(|(kid, key)| entry(kid, key)));
+        json!({ "keys": keys })
     }
 
     /// Signs `claims` as a JWT.
@@ -152,12 +195,19 @@ impl TokenSigner {
     /// Verifies a token this signer issued and returns its claims.
     pub fn verify(&self, token: &str) -> Result<Value, JoseError> {
         let (header, claims, input, signature) = split(token)?;
-        if header["alg"] != "ES256" || header["kid"] != self.kid.as_str() {
+        if header["alg"] != "ES256" {
             return Err(JoseError::Header);
         }
-        self.key
-            .verifying_key()
-            .verify(input.as_bytes(), &signature)
+        let key = if header["kid"] == self.kid.as_str() {
+            self.key.verifying_key()
+        } else {
+            self.previous
+                .iter()
+                .find(|(kid, _)| header["kid"] == kid.as_str())
+                .map(|(_, key)| key)
+                .ok_or(JoseError::Header)?
+        };
+        key.verify(input.as_bytes(), &signature)
             .map_err(|_| JoseError::Signature)?;
         Ok(claims)
     }
@@ -275,6 +325,27 @@ pub(crate) mod tests {
         parts[1] = &forged;
         assert_eq!(signer.verify(&parts.join(".")), Err(JoseError::Signature));
         assert!(TokenSigner::generate().verify(&token).is_err());
+    }
+
+    #[test]
+    fn rotated_keys_still_verify_their_tokens() {
+        let old = TokenSigner::from_secrets(&[[7u8; 32]]).expect("old");
+        let token = old.sign(&json!({ "sub": "a" }));
+        let rotated = TokenSigner::from_secrets(&[[8u8; 32], [7u8; 32]]).expect("rotated");
+        assert_ne!(rotated.kid(), old.kid());
+        assert_eq!(
+            rotated.verify(&token).map(|c| c["sub"].clone()),
+            Ok(json!("a"))
+        );
+        assert_eq!(rotated.jwks()["keys"].as_array().map(Vec::len), Some(2));
+        // Once the old key is dropped, its tokens no longer verify.
+        let dropped = TokenSigner::from_secrets(&[[8u8; 32]]).expect("dropped");
+        assert_eq!(dropped.verify(&token), Err(JoseError::Header));
+        assert_eq!(TokenSigner::from_secrets(&[]).err(), Some(InvalidKey));
+        assert_eq!(
+            TokenSigner::from_secrets(&[[0u8; 32]]).err(),
+            Some(InvalidKey)
+        );
     }
 
     #[test]

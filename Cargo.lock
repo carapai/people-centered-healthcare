@@ -624,11 +624,19 @@ name = "central-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "health-auth",
  "health-http",
+ "health-identity",
  "health-observability",
  "health-surrealdb",
+ "health-time",
+ "http-body-util",
+ "serde_json",
+ "surrealdb",
+ "tempfile",
  "thiserror",
  "tokio",
+ "tower",
  "tracing",
  "utoipa",
 ]
