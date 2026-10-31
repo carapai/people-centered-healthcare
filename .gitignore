@@ -12,3 +12,7 @@ styled-system/
 # Build output of vendored crates tested on their own
 third_party/*/target/
 third_party/*/Cargo.lock
+
+# Playwright (apps/client e2e)
+apps/client/test-results/
+apps/client/playwright-report/

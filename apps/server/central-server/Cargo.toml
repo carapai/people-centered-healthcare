@@ -35,6 +35,7 @@ tower = { workspace = true }
 tokio = { workspace = true, features = ["net", "signal", "sync"] }
 tracing = { workspace = true }
 utoipa = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 form_urlencoded = { workspace = true }
@@ -43,4 +44,3 @@ http-body-util = { workspace = true }
 serde_json = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tempfile = { workspace = true }
-uuid = { workspace = true }

@@ -43,6 +43,7 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 | `desktop-build.yml` | PR (unsigned), release (signed) | Tauri on Windows x64 and Ubuntu 22.04 x64 |
 | `edge-build.yml` | PR (unsigned), release (signed) | `facility-edge` on Windows x64 and Ubuntu x64, built separately from Tauri |
 | `release.yml` | Release tag | Build matrix, signing, SBOMs, provenance, publishing (below) |
+| `e2e.yml` | Nightly, manual | Playwright in Chromium: the built client in `vite preview` against a real central-server over SurrealDB, with provisioned users; axe on each screen tested |
 | `documentation.yml` | PR touching `docs/` or `*.surql` | markdownlint; `lychee` link check; Mermaid render; `surreal validate` plus `surql-fmt --check`; ADR numbering and index check |
 
 ### Workflows in code
@@ -57,6 +58,9 @@ Five workflows are in `.github/workflows/` (#47); every action is pinned to a fu
   - **Generated types:** regenerates central's OpenAPI document, `@health/api-client` and `@health/fhir-types` with `tools/codegen`, and fails on any difference from the committed files. It also typechecks and tests the generators and both packages ([client-application.md](client-application.md) § Types).
 - **`security.yml`** and **`dependency-review.yml`** run as specified. CodeQL, dependency review and push protection need the repository to be public on this account (or GitHub Advanced Security). zizmor reports in the log instead of uploading SARIF.
 - **`documentation.yml`** runs on every PR, since its jobs are required checks: markdownlint (`.markdownlint-cli2.jsonc`), lychee (`lychee.toml`; this private repository's own URLs are excluded, and relative links are checked), Mermaid rendering (`tools/docs/render-mermaid.sh`), `surreal validate` with the pinned 3.3.5 binary, `surql-fmt --check`, and `tools/docs/check-adr-index.sh`. An applied migration is immutable (the runner records its SHA-256 and refuses a changed file), so `surql-fmt` checks a migration only in the PR that adds it, and never asks for an applied one to be reformatted.
+- **`e2e.yml`** (#228) runs nightly and on demand, and is not a required check. It installs the pinned SurrealDB, builds central-server, installs Chromium with Playwright, and runs `bun run test:e2e` in `apps/client`.
+  - **The backend:** `e2e/backend.ts` starts SurrealDB in memory and central-server, with fresh keys and an access policy, and provisions a clerk and a reviewer with `central-server provision`.
+  - **The client:** `vite preview` proxies `/auth`, `/api` and `/fhir` to it (`HEALTH_DEV_BACKEND`).
 - **Not yet:** `integration-tests.yml`, `desktop-build.yml`, `edge-build.yml` and `release.yml` come with their tasks; branch protection and CODEOWNERS are below (§ Git and merge rules in code).
 
 ### Architecture enforcement (§109)

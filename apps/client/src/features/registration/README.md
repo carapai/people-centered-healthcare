@@ -12,4 +12,4 @@ Reception registration (patient-identity.md § "Did you mean" at registration; #
 - **`patient.ts`** builds the staff-entered Patient. An age gives an estimated birth year, which matching widens by ±5 years.
 - **`candidates.ts`** reads a match or search Bundle into rows.
 - **Port:** writes go through the `registries` command port (`platform/registries.ts`), never `FhirClient`.
-- **Tests:** `test/registration.test.ts` covers the builder, the port and the candidate rows. The keyboard scenario end to end is #228.
+- **Tests:** `test/registration.test.ts` covers the builder, the port and the candidate rows. `e2e/registration.spec.ts` runs the keyboard scenario end to end, with axe (#228).

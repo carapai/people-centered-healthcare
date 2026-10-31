@@ -49,6 +49,14 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 
 SIGTERM or Ctrl-C shuts the server down gracefully.
 
+## Provisioning
+
+`central-server provision <username> <facility> <role>[,<role>…]` creates or updates a Login Account and signs its permission snapshot at `facility`. It is the stopgap until the workforce registry provisions staff.
+
+- It reads the same configuration as the server, and needs the auth settings, `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE`.
+- The password comes from `HEALTH_PROVISION_PASSWORD_FILE`. It must pass the password policy and the breached-password list (15 characters, since central sign-in has no device factor).
+- The roles must be defined in the access policy.
+
 ## OpenAPI
 
 `central-server openapi` prints central's OpenAPI document (the system routes and `GET /api/session`) and exits, without reading any configuration. The FHIR API is described by its CapabilityStatement. `tools/codegen` generates `@health/api-client` from it (`bun run generate`).

@@ -1,0 +1,62 @@
+# End-to-end suite (testing.md: Playwright on the web, nightly; #228): the built client against a
+# real central-server over SurrealDB, with provisioned users. Not a required check.
+name: e2e
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+# Cargo caches use actions/cache (MIT), keyed per job on the toolchain and Cargo.lock;
+# Swatinem/rust-cache is LGPL-3.0, which ADR 0045's licence allowlist excludes.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Playwright against central-server
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Install SurrealDB 3.3.5 (the pinned server version)
+        run: |
+          curl --fail --silent --show-error --location --output surreal.tgz \
+            https://download.surrealdb.com/v3.3.5/surreal-v3.3.5.linux-amd64.tgz
+          echo "8f3bc163405085343fc6db9746a8e0cd55503c939802ad2b35a466675a9c09cf  surreal.tgz" | sha256sum --check
+          tar -xzf surreal.tgz
+          ./surreal version
+      - run: cargo build --locked -p central-server
+      - run: bun install --frozen-lockfile
+      - run: bunx --bun playwright install --with-deps chromium
+        working-directory: apps/client
+      - run: bun run codegen
+        working-directory: apps/client
+      - run: bun run test:e2e
+        working-directory: apps/client
+        env:
+          SURREAL_BIN: ${{ github.workspace }}/surreal
+          CI: "true"
