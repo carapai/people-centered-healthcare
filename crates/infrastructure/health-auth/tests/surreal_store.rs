@@ -358,3 +358,28 @@ async fn concurrent_refresh_rotates_once() {
         "{statuses:?}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_accounts_facilities_are_its_snapshots() {
+    use health_auth::AuthStore;
+    let node = node().await;
+    let account = AccountId(Uuid::now_v7());
+    let other = AccountId(Uuid::now_v7());
+    for (who, facility) in [(account, "WAK002"), (account, "KAM013"), (other, "GUL001")] {
+        node.store
+            .put_snapshot(who, facility, "jws")
+            .await
+            .expect("snapshot");
+    }
+    assert_eq!(
+        node.store.facilities(account).await.expect("facilities"),
+        vec!["KAM013".to_owned(), "WAK002".to_owned()]
+    );
+    assert!(
+        node.store
+            .facilities(AccountId(Uuid::now_v7()))
+            .await
+            .expect("facilities")
+            .is_empty()
+    );
+}

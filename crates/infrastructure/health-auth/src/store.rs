@@ -31,6 +31,8 @@ pub struct AuthorizationCode {
     pub nonce: Option<String>,
     /// Who logged in.
     pub account: AccountId,
+    /// The facility the session acts for, when the node keeps snapshots.
+    pub facility: Option<String>,
     /// When the password was checked.
     pub auth_time: Timestamp,
     /// The code is refused after this.
@@ -50,6 +52,8 @@ pub struct Session {
     pub scopes: Scopes,
     /// Live or ended.
     pub state: SessionState,
+    /// The facility the session acts for, when the node keeps snapshots (ADR 0056).
+    pub facility: Option<String>,
     /// The DPoP key thumbprint the session's tokens are bound to, if any.
     pub jkt: Option<String>,
     /// The SHA-256 of the current refresh token; the previous one is refused.
@@ -121,6 +125,14 @@ pub trait AuthStore: Send + Sync {
     ) -> impl Future<Output = Result<Option<String>, StoreError>> + Send {
         let _ = (account, facility);
         async { Ok(None) }
+    }
+    /// The facilities `account` holds snapshots for, sorted. The default has none.
+    fn facilities(
+        &self,
+        account: AccountId,
+    ) -> impl Future<Output = Result<Vec<String>, StoreError>> + Send {
+        let _ = account;
+        async { Ok(Vec::new()) }
     }
     /// The persisted clock floor.
     fn clock_floor(&self) -> impl Future<Output = Result<ClockFloor, StoreError>> + Send {
@@ -279,6 +291,18 @@ impl AuthStore for MemoryStore {
             .snapshots
             .get(&(account, facility.to_owned()))
             .cloned())
+    }
+
+    async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {
+        let mut facilities: Vec<String> = self
+            .lock()
+            .snapshots
+            .keys()
+            .filter(|(a, _)| *a == account)
+            .map(|(_, f)| f.clone())
+            .collect();
+        facilities.sort();
+        Ok(facilities)
     }
 
     async fn clock_floor(&self) -> Result<ClockFloor, StoreError> {

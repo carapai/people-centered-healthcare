@@ -31,6 +31,7 @@ fn code_json(code: &AuthorizationCode) -> Value {
         "scopes": code.scopes.to_string(),
         "nonce": code.nonce,
         "account": code.account.to_string(),
+        "facility": code.facility,
         "auth_time": code.auth_time.to_string(),
         "expires_at": code.expires_at.to_string(),
     })
@@ -45,6 +46,7 @@ fn code_of(v: &Value) -> Option<AuthorizationCode> {
         scopes: Scopes::parse(v["scopes"].as_str()?).ok()?,
         nonce: v["nonce"].as_str().map(str::to_owned),
         account: AccountId(v["account"].as_str()?.parse().ok()?),
+        facility: v["facility"].as_str().map(str::to_owned),
         auth_time: ts("auth_time")?,
         expires_at: ts("expires_at")?,
     })
@@ -60,6 +62,7 @@ fn session_json(session: &Session) -> Value {
         "client_id": session.client_id,
         "scopes": session.scopes.to_string(),
         "auth_time": auth_time,
+        "facility": session.facility,
         "jkt": session.jkt,
         "refresh_hash": session.refresh_hash,
     })
@@ -80,6 +83,7 @@ fn session_of(id: &str, row: &AuthSessionRow) -> Option<Session> {
         client_id: v["client_id"].as_str()?.to_owned(),
         scopes: Scopes::parse(v["scopes"].as_str()?).ok()?,
         state,
+        facility: v["facility"].as_str().map(str::to_owned),
         jkt: v["jkt"].as_str().map(str::to_owned),
         refresh_hash: row.refresh_hash.clone(),
     })
@@ -280,6 +284,11 @@ impl AuthStore for SurrealAuthStore {
     ) -> Result<Option<String>, StoreError> {
         let mut tx = self.begin().await?;
         tx.auth_snapshot(account, facility).await.map_err(failed)
+    }
+
+    async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.auth_snapshot_facilities(account).await.map_err(failed)
     }
 
     async fn clock_floor(&self) -> Result<ClockFloor, StoreError> {

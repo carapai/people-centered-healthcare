@@ -334,6 +334,24 @@ impl SurrealTx {
         Ok(rows.into_iter().next().and_then(|r| r.into_iter().next()))
     }
 
+    /// The facilities `account` holds snapshots for, in id order: a range scan over the
+    /// `[account, facility]` record ids.
+    pub async fn auth_snapshot_facilities(
+        &mut self,
+        account: AccountId,
+    ) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [record::id(id)[1]] FROM auth_snapshot:[$account, NONE]..=[$account, {}]",
+                vec![("account", account.to_string())],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .collect())
+    }
+
     /// Stores a permission snapshot, replacing the previous one.
     pub async fn put_auth_snapshot(
         &mut self,

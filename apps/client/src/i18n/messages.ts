@@ -17,6 +17,17 @@ export const messages = defineMessages({
     defaultMessage: 'The username or password is incorrect, or the account is locked.',
     description: 'Sign-in page: one message for every refusal, so it does not reveal whether an account exists',
   },
+  signInFacility: { id: 'app.signIn.facility', defaultMessage: 'Facility code', description: 'Sign-in page: facility field label' },
+  signInFacilityHelp: {
+    id: 'app.signIn.facilityHelp',
+    defaultMessage: 'Needed only if you work at more than one facility.',
+    description: 'Sign-in page: helper text under the facility field',
+  },
+  signInChooseFacility: {
+    id: 'app.signIn.chooseFacility',
+    defaultMessage: 'You work at more than one facility. Enter the code of the facility you are signing in for, then sign in again.',
+    description: 'Sign-in page: shown when the user holds roles at several facilities and named none',
+  },
   signInStart: { id: 'app.signIn.start', defaultMessage: 'Sign in', description: 'Home: button that starts sign-in' },
   signOut: { id: 'app.signIn.signOut', defaultMessage: 'Sign out', description: 'Home: button that signs the user out' },
   signedIn: { id: 'app.signIn.signedIn', defaultMessage: 'Signed in', description: 'Home: shown once the session is confirmed by the server' },

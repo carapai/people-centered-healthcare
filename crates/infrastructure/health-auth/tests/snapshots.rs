@@ -68,7 +68,7 @@ fn edge() -> Edge {
         redirect_uris: vec![REDIRECT.into()],
     });
     config.snapshots = Some(SnapshotGate {
-        facility: FACILITY.into(),
+        facility: Some(FACILITY.into()),
         verifier: SnapshotVerifier::new(&[central.public()]).expect("verifier"),
         policy: SnapshotPolicy::default(),
     });

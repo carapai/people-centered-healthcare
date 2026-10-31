@@ -237,6 +237,9 @@ pub(crate) struct LoginForm {
     username: String,
     #[serde(default)]
     password: String,
+    /// The facility to act for, where the user chooses it (central, ADR 0056).
+    #[serde(default)]
+    facility: String,
 }
 
 /// A validated authorization request.
@@ -369,6 +372,7 @@ fn login_page(p: &AuthorizeParams, error: Option<&str>) -> String {
          <form method=\"post\" action=\"authorize\">{hidden}\
          <label for=\"username\">Username</label><input id=\"username\" name=\"username\" autocomplete=\"username\" required>\
          <label for=\"password\">Password</label><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required>\
+         <label for=\"facility\">Facility (if you work at more than one)</label><input id=\"facility\" name=\"facility\">\
          <button type=\"submit\">Sign in</button></form></main></html>"
     )
 }
@@ -414,6 +418,20 @@ fn with_query(page: &str, p: &AuthorizeParams, error: Option<&str>) -> String {
 /// is locked.
 const LOGIN_REFUSED: &str = "The username or password is incorrect, or the account is locked.";
 
+/// Shown when the user works at several facilities and named none of them.
+const CHOOSE_FACILITY: &str =
+    "You work at more than one facility: enter the one you are signing in for.";
+
+/// Where a sign-in's facility comes from.
+enum FacilityChoice {
+    /// This one (or none, where the node keeps no snapshots).
+    Chosen(Option<String>),
+    /// The user must name one of several.
+    Ask,
+    /// None the user may act for.
+    Refused,
+}
+
 async fn authorize_login<S: AuthStore>(
     State(inner): State<Arc<Inner<S>>>,
     Form(form): Form<LoginForm>,
@@ -458,9 +476,30 @@ async fn authorize_login<S: AuthStore>(
             Err(_) => error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
         };
     }
-    // On an edge the password alone is not enough: the user needs a live snapshot here. The
+    let facility = match inner.sign_in_facility(account.id, &form.facility).await {
+        FacilityChoice::Chosen(facility) => facility,
+        FacilityChoice::Refused => return refused(),
+        FacilityChoice::Ask => {
+            return match &inner.config.login_page {
+                Some(page) => {
+                    Redirect::to(&with_query(page, &form.request, Some("facility"))).into_response()
+                }
+                None => (
+                    StatusCode::BAD_REQUEST,
+                    no_store(),
+                    Html(login_page(&form.request, Some(CHOOSE_FACILITY))),
+                )
+                    .into_response(),
+            };
+        }
+    };
+    // The password alone is not enough: the user needs a live snapshot for the facility. The
     // refusal looks like any other.
-    if inner.current_snapshot(account.id, now).await.is_err() {
+    if inner
+        .current_snapshot(account.id, facility.as_deref(), now)
+        .await
+        .is_err()
+    {
         return refused();
     }
     let code = random_token();
@@ -471,6 +510,7 @@ async fn authorize_login<S: AuthStore>(
         scopes: request.scopes,
         nonce: request.nonce,
         account: account.id,
+        facility,
         auth_time: now,
         expires_at: now.checked_add(inner.config.code_lifetime).unwrap_or(now),
     };
@@ -598,28 +638,61 @@ impl<S: AuthStore> Inner<S> {
         response
     }
 
-    /// The account's snapshot for this node's facility, when the node requires one: present,
-    /// signed by central, for this account and facility, and unexpired at a clock that has not
-    /// gone back past the floor. Each check advances the floor to the snapshot's issue time.
-    /// `Ok(None)` when the node needs no snapshot (central).
+    /// The facility a sign-in acts for: the edge's own; at central the one the user named, or
+    /// their only one (ADR 0056); none where the node keeps no snapshots.
+    async fn sign_in_facility(&self, account: AccountId, named: &str) -> FacilityChoice {
+        let Some(gate) = &self.config.snapshots else {
+            return FacilityChoice::Chosen(None);
+        };
+        if let Some(facility) = &gate.facility {
+            return FacilityChoice::Chosen(Some(facility.clone()));
+        }
+        let Ok(facilities) = self.store.facilities(account).await else {
+            return FacilityChoice::Refused;
+        };
+        let named = named.trim();
+        match facilities.as_slice() {
+            _ if !named.is_empty() => {
+                if facilities.iter().any(|f| f == named) {
+                    FacilityChoice::Chosen(Some(named.to_owned()))
+                } else {
+                    FacilityChoice::Refused
+                }
+            }
+            [] => FacilityChoice::Refused,
+            [only] => FacilityChoice::Chosen(Some(only.clone())),
+            _ => FacilityChoice::Ask,
+        }
+    }
+
+    /// The account's snapshot for `facility`, when the node requires one: present, signed by
+    /// central, for this account and facility, and unexpired at a clock that has not gone back
+    /// past the floor. Each check advances the floor to the snapshot's issue time. `Ok(None)`
+    /// when the node needs no snapshot.
     async fn current_snapshot(
         &self,
         account: AccountId,
+        facility: Option<&str>,
         now: Timestamp,
     ) -> Result<Option<PermissionSnapshot>, ()> {
         let Some(gate) = &self.config.snapshots else {
             return Ok(None);
         };
+        // An edge's sessions are for its own facility only.
+        let facility = facility.ok_or(())?;
+        if gate.facility.as_deref().is_some_and(|f| f != facility) {
+            return Err(());
+        }
         let floor = self.store.clock_floor().await.map_err(|_| ())?;
         let at = floor.check(now).map_err(|_| ())?;
         let jws = self
             .store
-            .snapshot(account, &gate.facility)
+            .snapshot(account, facility)
             .await
             .map_err(|_| ())?
             .ok_or(())?;
         let snapshot = gate.verifier.verify(&jws).map_err(|_| ())?;
-        if snapshot.account != account || snapshot.facility != gate.facility {
+        if snapshot.account != account || snapshot.facility != facility {
             return Err(());
         }
         gate.policy.check(&snapshot, at).map_err(|_| ())?;
@@ -690,7 +763,10 @@ async fn authorization_code<S: AuthStore>(
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
-    let Ok(snapshot) = inner.current_snapshot(stored.account, now).await else {
+    let Ok(snapshot) = inner
+        .current_snapshot(stored.account, stored.facility.as_deref(), now)
+        .await
+    else {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     };
     let refresh = random_token();
@@ -702,6 +778,7 @@ async fn authorization_code<S: AuthStore>(
         state: SessionState::Live {
             auth_time: stored.auth_time,
         },
+        facility: stored.facility,
         jkt,
         refresh_hash: sha256_b64(&refresh),
     };
@@ -748,7 +825,10 @@ async fn refresh<S: AuthStore>(
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
     // Permissions are never cached past their snapshot: an expired one ends the session.
-    let Ok(snapshot) = inner.current_snapshot(session.account, now).await else {
+    let Ok(snapshot) = inner
+        .current_snapshot(session.account, session.facility.as_deref(), now)
+        .await
+    else {
         let _ = inner.store.end_session(session.id).await;
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     };
@@ -811,6 +891,10 @@ pub struct Principal {
     pub scopes: Scopes,
     /// The session.
     pub session: Uuid,
+    /// The facility the session acts for, when the node keeps snapshots (ADR 0056).
+    pub facility: Option<String>,
+    /// The version of the permission snapshot the token was issued under.
+    pub snapshot_version: Option<u64>,
 }
 
 /// Why access was refused; maps to 401 with a `WWW-Authenticate` challenge.
@@ -926,6 +1010,8 @@ impl<S: AuthStore> AccessVerifier<S> {
                 client_id: claims["client_id"].as_str().unwrap_or_default().to_owned(),
                 scopes,
                 session,
+                facility: claims["facility"].as_str().map(str::to_owned),
+                snapshot_version: claims["snapshot_version"].as_u64(),
             }),
             _ => Err(AccessError::InvalidToken),
         }
@@ -948,5 +1034,6 @@ async fn session_info<S: AuthStore>(
         "client_id": principal.client_id,
         "scope": principal.scopes.to_string(),
         "session": principal.session.to_string(),
+        "facility": principal.facility,
     })))
 }
