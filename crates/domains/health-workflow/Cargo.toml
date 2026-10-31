@@ -1,0 +1,22 @@
+[package]
+name = "health-workflow"
+description = "The workflow engine's pure statechart interpreter: SCXML-style semantics, deterministic (workflow-engine.md; ADR 0042)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "workflow"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

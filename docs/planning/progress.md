@@ -10,7 +10,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
-| [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 0 | 7 |
+| [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 0 | 5 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 54 of 128 implementation tasks done. Validation spikes open: 3.
+Total: 55 of 128 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -100,3 +100,12 @@ Total: 54 of 128 implementation tasks done. Validation spikes open: 3.
   - **Client:** `vite preview` proxies to it (`HEALTH_DEV_BACKEND`).
   - **Scenarios:** the clerk's keyboard registration (candidates chosen with arrows and Enter, a duplicate only after "none of these"), and axe on the registration and registry review screens.
   - **Fix:** axe found the status area's `header` carrying `role=status`, which a `header` may not take.
+- 2026-10-31: #228 merged (#231). #95: `health-workflow`, the pure statechart interpreter. It follows SCXML Appendix D without history:
+  - selection by document order, with conflict removal;
+  - exit, transition content, then entry order;
+  - eventless transitions before internal events;
+  - `done.state` for compound and parallel states;
+  - invocations after the macrostep;
+  - timers and typed actions returned as effects, with idempotency keys.
+
+  `tests/scxml.rs` covers 30 W3C SCXML §3 assertions. Writing them found that initial targets inside a parallel must have their descendants added before any ancestors.

@@ -11,6 +11,7 @@ members = [
     "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
     "crates/domains/health-identity",
+    "crates/domains/health-workflow",
     "crates/application/health-identity-app",
     "crates/application/health-registries-app",
     "crates/infrastructure/health-audit",
@@ -53,6 +54,7 @@ health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-identity = { path = "crates/domains/health-identity" }
+health-workflow = { path = "crates/domains/health-workflow" }
 health-identity-app = { path = "crates/application/health-identity-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
