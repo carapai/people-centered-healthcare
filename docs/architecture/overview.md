@@ -147,6 +147,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0053](../adr/0053-own-snapshot-driven-profile-validator.md) | Tier 3 profile validation is our own snapshot-driven validator, sharing the raw-JSON walker with tier 1 |
 | [0054](../adr/0054-frontend-toolchain-and-precise-fhirpath-js.md) | The frontend runs on Bun with TypeScript 7, and fhirpath.js runs in lossless precise mode over a gated expression subset |
 | [0055](../adr/0055-default-blocking-keys-and-stop-list.md) | Default blocking uses five narrow keys with an hourly stop-list, and blocking recall is proven before launch |
+| [0056](../adr/0056-central-sessions-act-for-one-facility-with-patient-confined-shared-reads.md) | Central sessions act for one facility, other facilities' records open only to patient-confined reads, and purpose of use is a header defaulting to TREAT |
 
 ## Still open
 

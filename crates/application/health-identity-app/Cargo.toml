@@ -16,5 +16,8 @@ workspace = true
 [dependencies]
 health-access-policy = { workspace = true }
 health-fhir-search = { workspace = true }
+health-identity = { workspace = true }
 health-time = { workspace = true }
 
+[dev-dependencies]
+uuid = { workspace = true }

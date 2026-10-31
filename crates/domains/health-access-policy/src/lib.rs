@@ -15,11 +15,14 @@
 mod break_glass;
 mod decision;
 mod permission;
+mod purpose;
 
 pub use break_glass::{
     BREAK_GLASS_PERMISSION, BTG, BreakGlass, BreakGlassEvent, BreakGlassPolicy, BreakGlassRefused,
 };
 pub use decision::{
-    Access, Decision, Deny, Label, LabelRule, Obligation, Pdp, PurposeOfUse, SearchFilter, Subject,
+    Access, Decision, Deny, Label, LabelRule, NodeScope, Obligation, Pdp, PurposeOfUse,
+    SearchFilter, Subject,
 };
 pub use permission::{Interaction, Permissions};
+pub use purpose::{DEFAULT_PURPOSE, PURPOSES_OF_USE, UnknownPurpose, purpose_of_use};

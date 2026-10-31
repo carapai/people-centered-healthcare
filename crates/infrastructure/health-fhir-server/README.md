@@ -16,7 +16,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Access control (#192):** `with_access_control(Pdp, RecordFacility)` decides every interaction for the request's `health_access_policy::Subject` request extension, which authentication inserts ([#209](https://github.com/carapai/people-centered-healthcare/issues/209)).
   - Without a subject the answer is 401; `/metadata` stays open.
   - Searches run under a per-request `SubjectSearchPolicy`, confined to a patient for `patient=` or a `subject=` naming a Patient; 403 when the type may not be searched.
-  - Reads, vreads and instance history are 404 when denied. Type and system history leave out the versions that are denied.
+  - Reads, vreads and instance history are 404 when denied. Type and system history are decided as searches, so central's patient-confined shared reads (ADR 0056) never list another facility's records.
   - Creates, updates and deletes are 403 when denied, decided on both the new resource and the version replaced.
   - `RecordFacility` finds a facility-scope record's facility. The default, `NoFacilityScope`, treats no record as facility-scope until records name their facility ([#211](https://github.com/carapai/people-centered-healthcare/issues/211)).
 

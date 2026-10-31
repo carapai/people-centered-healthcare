@@ -102,8 +102,11 @@ async fn respond(
         HistoryScope::System => {}
     }
     let mut entries = tx.history(&scope, params.since, params.count).await?;
-    // Versions the subject may not read are left out (a page may come back short).
-    entries.retain(|e| access::may_read(&e.json));
+    // Versions the subject may not see are left out (a page may come back short). Instance
+    // history passed the read check above.
+    if !matches!(scope, HistoryScope::Instance(..)) {
+        entries.retain(|e| access::may_list(&e.json));
+    }
     let served = entries
         .iter()
         .filter(|e| !e.version.deleted)

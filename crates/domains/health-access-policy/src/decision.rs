@@ -115,16 +115,45 @@ pub struct SearchFilter {
     pub excluded_labels: Vec<Label>,
 }
 
+/// Where the PDP decides (ADR 0056).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum NodeScope {
+    /// A facility edge: it holds only its own facility's scope, and facility isolation is
+    /// strict.
+    #[default]
+    Edge,
+    /// Central, the shared record: another facility's record may be read when the access is
+    /// confined to its patient (a read of a record about a patient), never searched across
+    /// patients or written.
+    Central,
+}
+
 /// The policy decision point, configured with the country's label rules.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Pdp {
     rules: Vec<LabelRule>,
+    scope: NodeScope,
 }
 
 impl Pdp {
-    /// A PDP over `rules`.
+    /// A PDP over `rules`, deciding as an edge.
     pub fn new(rules: Vec<LabelRule>) -> Self {
-        Self { rules }
+        Self {
+            rules,
+            scope: NodeScope::Edge,
+        }
+    }
+
+    /// This PDP, deciding at `scope`.
+    #[must_use]
+    pub fn with_scope(mut self, scope: NodeScope) -> Self {
+        self.scope = scope;
+        self
+    }
+
+    /// Where this PDP decides.
+    pub fn scope(&self) -> NodeScope {
+        self.scope
     }
 
     fn sensitive<'a>(&'a self, labels: &'a [Label]) -> impl Iterator<Item = &'a Label> + 'a {
@@ -153,7 +182,11 @@ impl Pdp {
             .filter(|(patient, grant)| grant.covers(patient, now))
             .map(|(patient, _)| patient);
         let mut used_glass = false;
-        if access.facility.is_some_and(|f| f != subject.facility) {
+        // At central, the shared record: a patient-confined read of another facility's record.
+        let shared_read = self.scope == NodeScope::Central
+            && access.interaction == Interaction::Read
+            && access.patient.is_some();
+        if access.facility.is_some_and(|f| f != subject.facility) && !shared_read {
             if glass.is_none() {
                 return Decision::Deny(Deny::OtherFacility);
             }

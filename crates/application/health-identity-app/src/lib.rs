@@ -1,10 +1,30 @@
-//! Identity & Access use cases. For now: the policy decision point applied to searches, so
-//! restricted records are excluded inside the database query (offline-auth.md § Authorization
-//! model: "repository searches receive its decision as a query filter").
+//! Identity & Access use cases: the request's [`Subject`] built from the user's permission
+//! snapshot ([`subject_of`]), and the policy decision point applied to searches, so restricted
+//! records are excluded inside the database query (offline-auth.md § Authorization model:
+//! "repository searches receive its decision as a query filter").
 
-use health_access_policy::{Deny, Label, Pdp, Subject};
+use health_access_policy::{Deny, Label, Pdp, Permissions, PurposeOfUse, Subject};
 use health_fhir_search::{Clause, ParamType, SearchPolicy, SearchValue, Test};
+use health_identity::snapshot::{PermissionSnapshot, RolePermissions};
 use health_time::Timestamp;
+
+/// The subject of a request by the snapshot's user at its facility (ADR 0056): the permissions
+/// of their roles there, their program assignments and the declared purpose of use. The
+/// snapshot must already be verified and current; break-glass grants are added by the caller.
+pub fn subject_of(
+    snapshot: &PermissionSnapshot,
+    roles: &RolePermissions,
+    purpose: PurposeOfUse,
+) -> Subject {
+    Subject {
+        account: snapshot.account.to_string(),
+        facility: snapshot.facility.clone(),
+        permissions: Permissions(roles.resolve(snapshot)),
+        programs: snapshot.programs.iter().cloned().collect(),
+        purpose: Some(purpose),
+        break_glass: None,
+    }
+}
 
 /// The `meta.security` search parameter (`Resource-security`).
 pub const SECURITY_PARAM: &str = "_security";
