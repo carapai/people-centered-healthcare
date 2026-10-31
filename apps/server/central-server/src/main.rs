@@ -13,6 +13,7 @@
 
 mod auth;
 mod config;
+mod provision;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -149,6 +150,41 @@ fn openapi() -> utoipa::openapi::OpenApi {
     document("central-server", <CentralApi as utoipa::OpenApi>::openapi())
 }
 
+/// The authorization server's settings, read from `files` and the secret files they name.
+fn auth_settings(
+    files: &config::AuthFiles,
+) -> Result<auth::AuthSettings, Box<dyn std::error::Error>> {
+    let pepper = match &files.pepper_file {
+        Some(path) => std::fs::read(path).map_err(|_| "cannot read HEALTH_AUTH_PEPPER_FILE")?,
+        None => Vec::new(),
+    };
+    Ok(auth::AuthSettings {
+        issuer: files.issuer.clone(),
+        keys: auth::read_keys(&files.keys_file)?,
+        pepper,
+        clients: vec![health_auth::Client {
+            id: files.client_id.clone(),
+            redirect_uris: files.redirect_uris.clone(),
+        }],
+        login_page: files.login_page.clone(),
+        snapshot_keys: match &files.snapshot_keys_file {
+            Some(path) => auth::read_keys(path)
+                .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE is not a valid key file")?,
+            None => Vec::new(),
+        },
+        registry_nin_system: files.registry_nin_system.clone(),
+        node_code: files
+            .node_code
+            .parse()
+            .map_err(|_| "HEALTH_NODE_CODE is not a short code")?,
+        policy: files
+            .access_policy_file
+            .as_deref()
+            .map(auth::read_policy)
+            .transpose()?,
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("openapi") {
@@ -158,6 +194,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
+    if std::env::args().nth(1).as_deref() == Some("provision") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return provision::run(&config, &args).await;
+    }
     let _telemetry = health_observability::init(&TelemetryConfig {
         service: "central-server",
         otlp_endpoint: config.otlp_endpoint.clone(),
@@ -171,37 +211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth = match &config.auth {
         None => None,
         Some(files) => {
-            let pepper = match &files.pepper_file {
-                Some(path) => {
-                    std::fs::read(path).map_err(|_| "cannot read HEALTH_AUTH_PEPPER_FILE")?
-                }
-                None => Vec::new(),
-            };
-            let settings = auth::AuthSettings {
-                issuer: files.issuer.clone(),
-                keys: auth::read_keys(&files.keys_file)?,
-                pepper,
-                clients: vec![health_auth::Client {
-                    id: files.client_id.clone(),
-                    redirect_uris: files.redirect_uris.clone(),
-                }],
-                login_page: files.login_page.clone(),
-                snapshot_keys: match &files.snapshot_keys_file {
-                    Some(path) => auth::read_keys(path)
-                        .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE is not a valid key file")?,
-                    None => Vec::new(),
-                },
-                registry_nin_system: files.registry_nin_system.clone(),
-                node_code: files
-                    .node_code
-                    .parse()
-                    .map_err(|_| "HEALTH_NODE_CODE is not a short code")?,
-                policy: files
-                    .access_policy_file
-                    .as_deref()
-                    .map(auth::read_policy)
-                    .transpose()?,
-            };
+            let settings = auth_settings(files)?;
             Some((settings, Arc::new(OnceCell::new())))
         }
     };

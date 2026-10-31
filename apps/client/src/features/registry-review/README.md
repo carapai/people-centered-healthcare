@@ -8,4 +8,4 @@ The registry review queue (patient-identity.md § Review queue; #203), at `/regi
 - **On the server:** every decision is checked, carried out and audited at `/api/registry/reviews` (`health-fhir-server`'s `registry_review_router`). The screen enforces nothing on its own.
 - **Not yet:**
   - unlinking from a golden record's own view, which comes with the patient record screens (`Patient/{id}/$unlink` is served);
-  - the axe and end-to-end checks, which come with the Playwright harness (#228).
+  - an end-to-end decision scenario. `e2e/registration.spec.ts` checks the screen with axe (#228).

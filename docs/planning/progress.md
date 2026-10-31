@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 22 | 26 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 23 | 26 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 53 of 128 implementation tasks done. Validation spikes open: 3.
+Total: 54 of 128 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -95,3 +95,8 @@ Total: 53 of 128 implementation tasks done. Validation spikes open: 3.
   - **Server:** `/api/registry/reviews` (`registry_review_router`, for `registry.review`) lists pending items with both Patients or both claims, and takes audited decisions.
   - **Client:** `/registry/reviews`, a keyboard DataTable of the queue. Possible duplicates are compared side by side, field by field; disagreeing values are shown with trust and source.
   - **Deferred:** unlinking from the golden record view comes with the patient record screens, and axe and e2e come with #228.
+- 2026-10-31: #203 merged (#230). #228: the Playwright e2e harness (`@playwright/test` 1.64.1, Apache-2.0; `@axe-core/playwright` 4.14.0, MPL-2.0) and nightly `e2e.yml`.
+  - **Backend:** `e2e/backend.ts` runs SurrealDB in memory and central-server, with users from the new `central-server provision`.
+  - **Client:** `vite preview` proxies to it (`HEALTH_DEV_BACKEND`).
+  - **Scenarios:** the clerk's keyboard registration (candidates chosen with arrows and Enter, a duplicate only after "none of these"), and axe on the registration and registry review screens.
+  - **Fix:** axe found the status area's `header` carrying `role=status`, which a `header` may not take.

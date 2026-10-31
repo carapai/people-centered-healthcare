@@ -6,13 +6,14 @@
     "dev": "bunx --bun vite",
     "codegen": "bun run --cwd ../../packages/design-system lib && panda codegen",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "lint": "oxlint --deny-warnings src scripts test && bun scripts/check-boundaries.ts",
+    "lint": "oxlint --deny-warnings src scripts test e2e && bun scripts/check-boundaries.ts",
     "build": "bunx --bun vite build",
     "build:tauri": "bunx --bun vite build --mode tauri",
     "scan": "bun scripts/scan-bundle.ts dist",
     "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan",
     "test": "bunx --bun vitest run",
-    "test:contract": "bunx --bun vitest run --config vitest.contract.config.ts"
+    "test:contract": "bunx --bun vitest run --config vitest.contract.config.ts",
+    "test:e2e": "bunx --bun playwright test"
   },
   "dependencies": {
     "@health/api-client": "workspace:*",
@@ -27,11 +28,13 @@
     "react-intl": "12.1.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@babel/core": "8.0.9",
     "@pandacss/dev": "2.4.0",
     "@pandacss/preset-base": "2.4.0",
     "@pandacss/preset-panda": "2.4.0",
     "@pandacss/vite": "2.4.0",
+    "@playwright/test": "1.64.1",
     "@rolldown/plugin-babel": "0.2.4",
     "@tanstack/router-plugin": "1.168.48",
     "@types/bun": "1.4.2",

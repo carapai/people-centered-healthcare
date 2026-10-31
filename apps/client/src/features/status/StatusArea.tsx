@@ -15,12 +15,12 @@ export function StatusArea() {
   const platform = usePlatform()
   const intl = useIntl()
   return (
-    <header
-      role="status"
-      className={css({ display: 'flex', gap: '4', px: '6', py: '2', bg: 'bg.subtle', color: 'fg.default', fontSize: 'sm' })}
-    >
-      <span>{intl.formatMessage(labels[platform.mode])}</span>
-      {platform.capabilities.syncStatus ? <span>{intl.formatMessage(messages.syncPending)}</span> : null}
+    // A banner landmark holding a live status region: `header` may not take the status role.
+    <header className={css({ bg: 'bg.subtle', color: 'fg.default', fontSize: 'sm' })}>
+      <div role="status" className={css({ display: 'flex', gap: '4', px: '6', py: '2' })}>
+        <span>{intl.formatMessage(labels[platform.mode])}</span>
+        {platform.capabilities.syncStatus ? <span>{intl.formatMessage(messages.syncPending)}</span> : null}
+      </div>
     </header>
   )
 }
