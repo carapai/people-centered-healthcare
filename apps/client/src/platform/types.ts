@@ -3,6 +3,7 @@
 
 import type { FhirClient } from './fhir'
 import type { OperationClient } from './operations'
+import type { RegistriesCommands } from './registries'
 import type { SignIn } from './sign-in'
 
 /** Query or form parameters; a list repeats the parameter (`date=ge2026&date=le2027`). */
@@ -73,6 +74,8 @@ export interface Platform {
   fhir: FhirClient
   /** The runtime's documented HTTP operations, validated at the boundary; command ports build on it. */
   operations: OperationClient
+  /** The Registries Bounded Context's commands (registration). */
+  registries: RegistriesCommands
   session: SessionPort
   /** Sign-in against the node's authorization server, when runtime.json configures one. */
   signIn?: SignIn

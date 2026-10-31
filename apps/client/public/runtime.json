@@ -1,5 +1,10 @@
 {
   "mode": "central",
   "apiBase": "/api",
-  "auth": { "issuer": "/auth", "clientId": "health-client", "redirectPath": "/callback" }
+  "auth": {
+    "issuer": "/auth",
+    "clientId": "health-client",
+    "redirectPath": "/callback"
+  },
+  "fhirBase": "/fhir"
 }

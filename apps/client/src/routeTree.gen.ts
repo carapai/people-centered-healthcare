@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CallbackRouteImport } from './routes/callback'
+import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const CallbackRoute = CallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistrationRoute = RegistrationRouteImport.update({
+  id: '/registration',
+  path: '/registration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -44,6 +50,7 @@ const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
+  '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
+  '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
+  '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -68,6 +77,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/callback'
+    | '/registration'
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -75,6 +85,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/callback'
+    | '/registration'
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -82,6 +93,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/callback'
+    | '/registration'
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CallbackRoute: typeof CallbackRoute
+  RegistrationRoute: typeof RegistrationRoute
   SignInRoute: typeof SignInRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
@@ -109,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/callback'
       fullPath: '/callback'
       preLoaderRoute: typeof CallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registration': {
+      id: '/registration'
+      path: '/registration'
+      fullPath: '/registration'
+      preLoaderRoute: typeof RegistrationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -138,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CallbackRoute: CallbackRoute,
+  RegistrationRoute: RegistrationRoute,
   SignInRoute: SignInRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
