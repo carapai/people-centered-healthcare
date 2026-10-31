@@ -628,6 +628,7 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-auth",
+ "health-client-registry",
  "health-fhir-search",
  "health-fhir-server",
  "health-http",

@@ -16,7 +16,7 @@
 //!
 //! | transaction, batch | `POST /` with a `transaction` or `batch` Bundle |
 //!
-//! | client registry (with [`FhirServer::with_client_registry`]) | `POST /Patient/$merge`, `POST /Patient/{id}/$link`, `POST /Patient/{id}/$unlink` |
+//! | client registry (with [`FhirServer::with_client_registry`]) | `POST /Patient/$match`, `POST /Patient/$merge`, `POST /Patient/{id}/$link`, `POST /Patient/{id}/$unlink` |
 //!
 //! Every write is validated (tier 1 structure, tier 2 core invariants) and checks reference
 //! integrity, and a delete is refused while live records
@@ -100,7 +100,7 @@ pub struct FhirServer {
     started: Timestamp,
     audit: Option<Arc<Auditor>>,
     access: Option<access::Control>,
-    registry: Option<Arc<health_registries_app::fhir::RegistryConfig>>,
+    registry: Option<Arc<registry::RegistrySettings>>,
 }
 
 impl FhirServer {
@@ -169,14 +169,18 @@ impl FhirServer {
         self
     }
 
-    /// This server, serving the client registry's reviewer operations (`Patient/$merge`,
-    /// `Patient/{id}/$link`, `Patient/{id}/$unlink`) with `config` (#197).
+    /// This server, serving the client registry's operations with `config`: `Patient/$match`
+    /// under `rules` (#216), and the reviewer operations `Patient/$merge`,
+    /// `Patient/{id}/$link` and `Patient/{id}/$unlink` (#197). The store should write the same
+    /// rules' blocking keys (`SurrealStore::with_blocking` with
+    /// `health_registries_app::matching::RegistryBlocking`).
     #[must_use]
     pub fn with_client_registry(
         mut self,
         config: health_registries_app::fhir::RegistryConfig,
+        rules: health_client_registry::matching::MatchingRules,
     ) -> Self {
-        self.registry = Some(Arc::new(config));
+        self.registry = Some(Arc::new(registry::RegistrySettings { config, rules }));
         self
     }
 
@@ -195,6 +199,7 @@ impl FhirServer {
                     .put(conditional::update)
                     .delete(conditional::delete),
             )
+            .route("/Patient/$match", post(registry::matches))
             .route("/Patient/$merge", post(registry::merge))
             .route("/Patient/{id}/$link", post(registry::link))
             .route("/Patient/{id}/$unlink", post(registry::unlink))

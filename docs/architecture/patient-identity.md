@@ -81,7 +81,8 @@ flowchart LR
 - **Matching** (#69): `health_client_registry::matching` holds the rules, the deterministic layer, the five blocking keys with the stop-list plan, and Fellegi–Sunter scoring with grades. Double Metaphone comes from `rphonetic`, through a port.
   - The CI corruption benchmark gives blocking recall 99.85%, candidate sets at most 97, and auto-link precision 100% on 60,000 synthetic people.
   - **Storage and `$match`** (#199): `idx_block` rows are written in each source Patient's write transaction (`SurrealStore::with_blocking` with `RegistryBlocking`). `block_count` is recomputed in the background. `Matcher::find` and `bundle` answer `$match` with scores, `match-grade`, and the insufficient-data outcome.
-  - **Still to come:** serving `Patient/$match` over HTTP ([#216](https://github.com/carapai/people-centered-healthcare/issues/216)), and loading the rules from the configuration package. The 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
+  - **Over HTTP** (#216): `POST /Patient/$match` (`resource`, `onlyCertainMatches`, `count` up to 100) is for anyone who may search Patients. Candidates the subject may not see are left out, and so is their count. Central's store writes the blocking keys and recounts blocks hourly.
+  - **Still to come:** loading the rules from the configuration package. The 45M load test is [#200](https://github.com/carapai/people-centered-healthcare/issues/200).
 - **Review queue** (#70): `RegistryReview` matches each registration.
   - It auto-links certain and probable matches, queues possible ones, and creates new identities. It skips every golden record that carries an adjudication marker for the source, so a separated pair is never re-linked automatically.
   - Reviewers' decisions run in one transaction and are audited. Items pending more than 7 days are listed as overdue.
