@@ -11,6 +11,7 @@
 //! `central-server openapi` prints central's OpenAPI document and exits, without configuration;
 //! `tools/codegen` generates `@health/api-client` from it (client-application.md § Types).
 
+mod auth;
 mod config;
 
 use std::future::Future;
@@ -45,7 +46,12 @@ impl ReadinessCheck for Database {
 }
 
 /// Connects and migrates, retrying with capped exponential backoff until it succeeds.
-async fn open_database(config: Config, password: String, database: Database) {
+async fn open_database(
+    config: Config,
+    password: String,
+    database: Database,
+    auth: Option<(auth::AuthSettings, Arc<OnceCell<axum::Router>>)>,
+) {
     let settings = Settings {
         target: Target::Remote {
             endpoint: config.surrealdb_endpoint,
@@ -66,6 +72,14 @@ async fn open_database(config: Config, password: String, database: Database) {
         };
         match opened {
             Ok(connection) => {
+                if let Some((settings, ready)) = &auth {
+                    match auth::routes(connection.clone(), settings) {
+                        Ok(router) => {
+                            let _ = ready.set(router);
+                        }
+                        Err(reason) => tracing::error!(error.kind = reason, "sign-in disabled"),
+                    }
+                }
                 let _ = database.0.set(connection);
                 tracing::info!(attempt, outcome = "database-ready", "database ready");
                 return;
@@ -123,13 +137,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .trim()
         .to_owned();
 
-    let database = Database::default();
-    tokio::spawn(open_database(config.clone(), password, database.clone()));
+    let auth = match &config.auth {
+        None => None,
+        Some(files) => {
+            let pepper = match &files.pepper_file {
+                Some(path) => {
+                    std::fs::read(path).map_err(|_| "cannot read HEALTH_AUTH_PEPPER_FILE")?
+                }
+                None => Vec::new(),
+            };
+            let settings = auth::AuthSettings {
+                issuer: files.issuer.clone(),
+                keys: auth::read_keys(&files.keys_file)?,
+                pepper,
+                clients: vec![health_auth::Client {
+                    id: files.client_id.clone(),
+                    redirect_uris: files.redirect_uris.clone(),
+                }],
+            };
+            Some((settings, Arc::new(OnceCell::new())))
+        }
+    };
+    let api = match &auth {
+        Some((_, ready)) => auth::gate(Arc::clone(ready)),
+        None => axum::Router::new(),
+    };
 
-    let router = app(
-        axum::Router::new(),
-        Readiness::new(vec![Arc::new(database)]),
-    );
+    let database = Database::default();
+    tokio::spawn(open_database(
+        config.clone(),
+        password,
+        database.clone(),
+        auth,
+    ));
+
+    let router = app(api, Readiness::new(vec![Arc::new(database)]));
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(outcome = "listening", "central-server listening");
     axum::serve(listener, router)

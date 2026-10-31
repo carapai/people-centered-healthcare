@@ -14,12 +14,25 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_DATABASE` | `main` | |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | none | The in-country collector; without it only logs are written |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
+| `HEALTH_AUTH_ISSUER` | none | The authorization server's issuer URL, e.g. `https://central.ug/auth`; without it nothing is mounted at `/auth` |
+| `HEALTH_AUTH_KEYS_FILE` | required with an issuer | Signing keys, one hex-encoded 32-byte P-256 secret per line, the active key first. Keep a rotated-out key on a later line until its tokens have expired |
+| `HEALTH_AUTH_PEPPER_FILE` | none | The Argon2id pepper |
+| `HEALTH_AUTH_CLIENT_ID` | `health-client` | The web client |
+| `HEALTH_AUTH_REDIRECT_URIS` | required with an issuer | The web client's redirect URIs, comma-separated |
 
 ## Startup
 
 1. Telemetry starts through the allowlist.
 2. The listener starts at once: `/health` answers, and `/ready` is 503 until the database is ready.
 3. The database is connected and migrated in the background, with capped exponential backoff (0.5 s to 30 s). Only an error kind is logged, never the message.
+4. With an issuer configured, the authorization server (`health-auth` over `SurrealAuthStore`) is built once the database is ready. `/auth` answers 503 until then.
+
+## Sign-in
+
+- **Routes:** `/auth` serves discovery, `/jwks`, `/authorize`, `/token` and `/revoke` (offline-auth.md).
+- **Key rotation:** add a new key as the first line of the keys file and keep the old one below it until its tokens have expired. Both keys are published in `/jwks`, and tokens signed with the old key still verify.
+- **Key storage:** keys and the pepper are read from secret files. Holding them in central KMS is part of central's key custody ([#138](https://github.com/carapai/people-centered-healthcare/issues/138)).
+- **The FHIR routes** mount behind `AccessVerifier` once the policy decision point is wired per request ([#192](https://github.com/carapai/people-centered-healthcare/issues/192)).
 
 SIGTERM or Ctrl-C shuts the server down gracefully.
 

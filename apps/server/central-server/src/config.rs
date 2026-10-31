@@ -24,6 +24,25 @@ pub(crate) struct Config {
     pub(crate) otlp_endpoint: Option<String>,
     /// `HEALTH_LOG`, an `EnvFilter` directive, default `info`.
     pub(crate) log: String,
+    /// The authorization server, when `HEALTH_AUTH_ISSUER` is set.
+    pub(crate) auth: Option<AuthFiles>,
+}
+
+/// Where the authorization server's settings and secrets are.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AuthFiles {
+    /// `HEALTH_AUTH_ISSUER`, e.g. `https://central.example/auth`.
+    pub(crate) issuer: String,
+    /// `HEALTH_AUTH_KEYS_FILE`: the signing keys, one hex line each, the active key first.
+    /// Required with an issuer.
+    pub(crate) keys_file: PathBuf,
+    /// `HEALTH_AUTH_PEPPER_FILE`: the Argon2id pepper. Optional.
+    pub(crate) pepper_file: Option<PathBuf>,
+    /// `HEALTH_AUTH_CLIENT_ID`, default `health-client` (the web client).
+    pub(crate) client_id: String,
+    /// `HEALTH_AUTH_REDIRECT_URIS`: the web client's redirect URIs, comma-separated. Required
+    /// with an issuer.
+    pub(crate) redirect_uris: Vec<String>,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -56,6 +75,22 @@ impl Config {
             database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".to_owned()),
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
             log: get("HEALTH_LOG").unwrap_or_else(|| "info".to_owned()),
+            auth: match get("HEALTH_AUTH_ISSUER") {
+                None => None,
+                Some(issuer) => Some(AuthFiles {
+                    issuer,
+                    keys_file: required("HEALTH_AUTH_KEYS_FILE")?.into(),
+                    pepper_file: get("HEALTH_AUTH_PEPPER_FILE").map(PathBuf::from),
+                    client_id: get("HEALTH_AUTH_CLIENT_ID")
+                        .unwrap_or_else(|| "health-client".to_owned()),
+                    redirect_uris: required("HEALTH_AUTH_REDIRECT_URIS")?
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|u| !u.is_empty())
+                        .map(str::to_owned)
+                        .collect(),
+                }),
+            },
         })
     }
 }
@@ -90,6 +125,30 @@ mod tests {
             ("ug", "main")
         );
         assert_eq!(config.otlp_endpoint, None);
+        assert_eq!(config.auth, None);
+        let with_auth = Config::from_lookup(lookup(&[
+            ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
+            ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),
+            ("HEALTH_AUTH_ISSUER", "https://central.ug/auth"),
+            ("HEALTH_AUTH_KEYS_FILE", "/run/secrets/auth-keys"),
+            (
+                "HEALTH_AUTH_REDIRECT_URIS",
+                "https://central.ug/callback, https://central.ug/silent",
+            ),
+        ]))
+        .expect("config")
+        .auth
+        .expect("auth");
+        assert_eq!(with_auth.client_id, "health-client");
+        assert_eq!(with_auth.redirect_uris.len(), 2);
+        assert_eq!(
+            Config::from_lookup(lookup(&[
+                ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
+                ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),
+                ("HEALTH_AUTH_ISSUER", "https://central.ug/auth"),
+            ])),
+            Err(ConfigError::Missing("HEALTH_AUTH_KEYS_FILE"))
+        );
         assert_eq!(
             Config::from_lookup(lookup(&[("HEALTH_SURREALDB_ENDPOINT", "ws://x")])),
             Err(ConfigError::Missing("HEALTH_SURREALDB_PASSWORD_FILE"))
