@@ -35,6 +35,8 @@ fn install(root: &Path) -> Edge {
     fs::create_dir_all(&bin).expect("bin");
     let binary = bin.join("facility-edge");
     fs::copy(BINARY, &binary).expect("install");
+    // A debug binary carries its debug info (hundreds of MB on Linux); a release one does not.
+    let _ = Command::new("strip").arg("-S").arg(&binary).status();
     let key = SigningKey::from_slice(&[9_u8; 32]).expect("key");
     let key_file = root.join("release.pub");
     fs::write(
@@ -114,7 +116,7 @@ fn a_signed_update_is_staged_applied_and_committed_once_ready() {
     let dir = tempfile::tempdir().expect("dir");
     let edge = install(dir.path());
     edge.run_until_ready();
-    let new = fs::read(BINARY).expect("binary");
+    let new = fs::read(&edge.binary).expect("binary");
 
     // A package signed by any other key is refused (exit 7), and nothing is staged.
     let stranger = SigningKey::from_slice(&[3_u8; 32]).expect("key");
@@ -160,7 +162,7 @@ async fn a_failed_migration_is_rolled_back_by_the_next_start() {
         });
         migrate(&connection, &newer).await.expect("migrate");
     }
-    edge.stage_and_apply(&fs::read(BINARY).expect("binary"), "9.9.9");
+    edge.stage_and_apply(&fs::read(&edge.binary).expect("binary"), "9.9.9");
 
     // Wait out the embedded store's background close (a locked store exits 3).
     let started = Instant::now();

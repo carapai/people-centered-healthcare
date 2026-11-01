@@ -245,24 +245,32 @@ pub async fn run(
     outcome
 }
 
-/// A stop request: Ctrl-C, or SIGTERM on Unix (systemd's stop).
-pub async fn shutdown_signal() {
-    let interrupt = async {
-        let _ = tokio::signal::ctrl_c().await;
-    };
+/// A stop request: Ctrl-C, or SIGTERM on Unix (systemd's stop). The handlers are installed
+/// when this is called, not when the future is first polled, so a stop that arrives while the
+/// node starts is never lost to the signal's default action.
+pub fn shutdown_signal() -> impl Future<Output = ()> + Send + 'static {
     #[cfg(unix)]
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let interrupt = signal(SignalKind::interrupt()).ok();
+        let terminate = signal(SignalKind::terminate()).ok();
+        async move {
+            let wait = |s: Option<tokio::signal::unix::Signal>| async move {
+                match s {
+                    Some(mut s) => {
+                        s.recv().await;
+                    }
+                    None => std::future::pending::<()>().await,
+                }
+            };
+            tokio::select! {
+                () = wait(interrupt) => {}
+                () = wait(terminate) => {}
             }
-            Err(_) => std::future::pending::<()>().await,
         }
-    };
+    }
     #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-    tokio::select! {
-        () = interrupt => {}
-        () = terminate => {}
+    async {
+        let _ = tokio::signal::ctrl_c().await;
     }
 }

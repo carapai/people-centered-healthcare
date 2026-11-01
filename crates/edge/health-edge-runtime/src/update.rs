@@ -38,7 +38,7 @@ use sha2::{Digest, Sha256};
 
 /// How many starts of a new binary may fail to reach ready before [`before_open`] rolls back.
 pub const MAX_ATTEMPTS: u32 = 3;
-/// The largest package accepted.
+/// The largest package, and the largest file in one, accepted.
 const MAX_PACKAGE: u64 = 512 * 1024 * 1024;
 
 /// What a package contains.
@@ -245,9 +245,12 @@ pub fn stage(
         let mut bytes = Vec::new();
         entry
             .by_ref()
-            .take(MAX_PACKAGE)
+            .take(MAX_PACKAGE + 1)
             .read_to_end(&mut bytes)
             .map_err(|_| UpdateError::Malformed("not a gzipped tar"))?;
+        if bytes.len() as u64 > MAX_PACKAGE {
+            return Err(UpdateError::Malformed("too large"));
+        }
         if name == "manifest.json" {
             manifest = Some(
                 serde_json::from_slice(&bytes)
