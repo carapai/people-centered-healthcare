@@ -165,6 +165,7 @@ fn auth_settings(
         clients: vec![health_auth::Client {
             id: files.client_id.clone(),
             redirect_uris: files.redirect_uris.clone(),
+            patient: false,
         }],
         login_page: files.login_page.clone(),
         snapshot_keys: match &files.snapshot_keys_file {

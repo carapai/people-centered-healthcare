@@ -73,6 +73,8 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_jti", "identity"),
     ("auth_snapshot", "identity"),
     ("auth_clock_floor", "identity"),
+    ("auth_phone_account", "identity"),
+    ("auth_otp", "identity"),
     ("break_glass", "identity"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),

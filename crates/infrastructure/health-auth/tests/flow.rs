@@ -60,6 +60,7 @@ fn harness(require_dpop: bool) -> Harness {
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
+        patient: false,
     });
     let server = AuthServer::new(
         config,

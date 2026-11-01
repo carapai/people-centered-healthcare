@@ -4,7 +4,9 @@
 
 use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
-use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
+use health_identity::{
+    AccountId, Lockout, LoginAccount, PhoneAccount, PhoneNumber, Scopes, SessionState,
+};
 use health_persistence::{Store, Transaction};
 use health_surrealdb::{
     AuthSessionRow, BreakGlassReviewRow, BreakGlassRow, SurrealStore, SurrealTx,
@@ -13,6 +15,7 @@ use health_time::Timestamp;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::otp::PhoneOtp;
 use crate::store::{
     AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, Session, StoreError,
 };
@@ -168,6 +171,66 @@ impl SurrealAuthStore {
 }
 
 impl AuthStore for SurrealAuthStore {
+    async fn phone_account(&self, phone: &PhoneNumber) -> Result<Option<PhoneAccount>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.phone_account_by_phone(phone).await.map_err(failed)
+    }
+
+    async fn phone_account_by_id(&self, id: AccountId) -> Result<Option<PhoneAccount>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.phone_account(id).await.map_err(failed)
+    }
+
+    async fn create_phone_account(
+        &self,
+        account: PhoneAccount,
+    ) -> Result<PhoneAccount, StoreError> {
+        let created = async {
+            let mut tx = self.begin().await?;
+            tx.create_phone_account(&account).await.map_err(failed)?;
+            tx.commit().await.map_err(failed)
+        };
+        // A concurrent sign-in that created it first wins on the unique index.
+        let first = created.await;
+        match self.phone_account(&account.phone).await? {
+            Some(existing) => Ok(existing),
+            None => first.map(|()| account),
+        }
+    }
+
+    async fn phone_otp(&self, phone: &PhoneNumber) -> Result<Option<PhoneOtp>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.phone_otp(phone)
+            .await
+            .map_err(failed)?
+            .map(|data| serde_json::from_str(&data).map_err(failed))
+            .transpose()
+    }
+
+    async fn put_phone_otp(&self, otp: &PhoneOtp) -> Result<(), StoreError> {
+        let data = serde_json::to_string(otp).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        tx.put_phone_otp(&otp.challenge.phone, &data, otp.challenge.issued_at)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn attempt_phone_otp(&self, before: u32, otp: &PhoneOtp) -> Result<bool, StoreError> {
+        let data = serde_json::to_string(otp).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        let updated = tx
+            .attempt_phone_otp(&otp.challenge.phone, otp.challenge.issued_at, before, &data)
+            .await
+            .map_err(failed)?;
+        // Two tries that both read `before` both match the WHERE; only one commit succeeds.
+        match tx.commit().await {
+            Ok(()) => Ok(updated),
+            Err(health_persistence::WriteError::Conflict) => Ok(false),
+            Err(other) => Err(failed(other)),
+        }
+    }
+
     async fn account_by_username(
         &self,
         username: &str,

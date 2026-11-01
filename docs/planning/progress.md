@@ -122,3 +122,7 @@ Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
   - **`health-identity`:** `PhoneAccount`, E.164 `PhoneNumber`, and `OtpPolicy`/`OtpChallenge` (6 digits, 5 minutes, 5 tries, 1 a minute and 5 an hour per phone).
   - **`health-client-registry::person`:** `Person` links at `level1` or `level3`. Linking an existing Patient needs `level3`; below it, only self-submitted data is visible.
   - **`health-patient-engagement`** (new): the §59 Registration Request. A certain match below `level3` goes to review, never to a link.
+- 2026-11-01: #111 part 1 merged (#236). Part 2a: patients sign in by phone in `health-auth`.
+  - **Endpoints:** `POST /otp`, plus phone and code on `/authorize`, for patient clients. The first accepted code creates the phone's account. Sessions need no snapshot, and tokens carry `amr: ["otp"]`.
+  - **Rules:** one account per phone, even under races. Each try is a compare-and-set, so 8 concurrent tries count once. Codes are sent through `OtpSender`, to `DevOutbox` until #235 picks a provider.
+  - **SurrealDB:** migration `0012_phone_sign_in`.

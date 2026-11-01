@@ -12,6 +12,7 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 | `GET /jwks` | The ES256 public keys: the active one and any rotated-out keys whose tokens may still be live. Each `kid` is the RFC 7638 thumbprint |
 | `GET /authorize` | Validates the request and shows the sign-in form |
 | `POST /authorize` | Checks the credentials and redirects with a one-time code, `state` and `iss` (RFC 9207) |
+| `POST /otp` | Patient clients: sends a one-time code to the phone (#111) |
 | `POST /token` | `authorization_code` (PKCE S256) and `refresh_token` grants |
 | `POST /revoke` | Logout (RFC 7009): either token ends the session |
 
@@ -21,6 +22,13 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 - **Sign-in:**
   - Every refusal shows one message, and an unknown username still spends one Argon2id verification, so responses reveal neither whether an account exists nor whether it is locked.
   - Lockout follows `health_identity::LockoutPolicy`.
+- **Patients sign in by phone** (#111; ADR 0029), on clients registered with `Client::patient`, when `AuthConfig::phone_sign_in` is set:
+  - `POST /otp` sends a code; `POST /authorize` takes the `phone` and `code`. Patients have no password, and a patient client never takes one, nor a staff client a phone.
+  - Signing up and signing in are the same step, so no answer reveals whether a phone has an account. The first accepted code creates the phone's Login Account (`PhoneAccount`, `level1`); one account per phone, even when two first sign-ins race.
+  - Codes follow `health_identity::OtpPolicy`: 6 digits, valid 5 minutes, 5 tries, at most one a minute and 5 an hour per phone. A code is stored only salted and hashed, compared in constant time, and accepted once.
+  - Every try is a compare-and-set on the challenge's try count (`attempt_phone_otp`), so parallel guesses cannot share a try.
+  - Codes leave through the `OtpSender` port. Until the SMS provider is chosen (#235), the only adapter is `DevOutbox`, which keeps them for a developer or an e2e test.
+  - Patient sessions need no permission snapshot. Their tokens carry `amr: ["otp"]`, and `Principal::patient` is true. A phone account's id is refused by staff clients, and a staff account's by patient clients.
 - **Tokens:**
   - Access tokens are ES256 JWTs (`typ` `at+jwt`). Claims: `iss`, `sub`, `client_id`, `scope`, `sid`, `auth_time`, `amr`, `acr` (`central` or `offline-local`), and `cnf.jkt` when the token request carried a DPoP proof.
   - They expire after 15 minutes or at the session's 12-hour cap, whichever is first.
@@ -34,10 +42,11 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 - **Breached passwords (#189):** `Credentials::set_password` is the check for every new password. It applies `PasswordPolicy` (8 characters with a device factor, 15 without) and refuses anything on `BreachedPasswords::platform()`.
   - The list is SecLists' top 1,000,000 (MIT), built into the binary as a 1.8 MB Bloom filter with 0.1% false positives, so central and edges check offline the same way.
   - Provenance and rebuilding are in `data/README.md`.
-- **State:** `AuthStore` holds accounts, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development.
+- **State:** `AuthStore` holds accounts, phone accounts and their code challenges, hashed codes, sessions with hashed refresh tokens, and the jti cache. `MemoryStore` serves tests and development.
 - **`SurrealAuthStore`** persists that state in SurrealDB (migration `0008_auth`, owned by identity), one transaction per operation:
   - **Codes:** a code is taken with a single `DELETE … RETURN`, so two concurrent redemptions cannot both get it; the loser's commit conflicts.
   - **Refresh tokens:** rotation is a compare-and-set on the current hash, and the old hash is kept as retired, so a replay is recognised.
+  - **Phone accounts and codes** (migration `0012_phone_sign_in`): a unique index on the phone, and a try counted only `WHERE attempts = $before`; of two concurrent tries, one commit conflicts and is refused.
   - **Other state:** lockout counters, snapshots and the clock floor survive restarts.
   - **Provisioning:** `put_account` and `put_snapshot`.
   - **Purging:** `purge(now)` deletes expired codes and jtis, and sessions past their 12-hour cap, as a background job.

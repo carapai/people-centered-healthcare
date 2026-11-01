@@ -372,6 +372,7 @@ mod tests {
             clients: vec![Client {
                 id: "health-client".into(),
                 redirect_uris: vec!["https://central.test/callback".into()],
+                patient: false,
             }],
             login_page: Some("/sign-in".into()),
             snapshot_keys: Vec::new(),
