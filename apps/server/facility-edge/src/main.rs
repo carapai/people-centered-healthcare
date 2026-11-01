@@ -2,8 +2,9 @@
 //! process, embedding SurrealDB. `health-edge-runtime` runs the node.
 //!
 //! - `facility-edge`: foreground, for development in a terminal.
-//! - `facility-edge --service`: under the service manager. On Linux that is systemd,
-//!   `Type=notify` (`packaging/facility-edge.service`).
+//! - `facility-edge --service`: under the service manager ([`service`]). On Linux that is
+//!   systemd, `Type=notify` (`packaging/facility-edge.service`); on Windows, the Service Control
+//!   Manager (`packaging/install-service.ps1`).
 //! - `facility-edge update …`: signed updates ([`update`]).
 //!
 //! Exit codes, for the service manager and the update rollback:
@@ -20,23 +21,17 @@
 //! | 8 | a failed update's store is restored; the service manager restores the previous binary |
 //! | 1 | anything else (the listener, telemetry, serving) |
 
+mod service;
 mod update;
 
+use std::future::Future;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use health_edge_runtime::{EdgeConfig, EdgeError, Foreground, ServiceManager, Systemd, run};
+use health_edge_runtime::{EdgeConfig, EdgeError, Foreground, ServiceManager, run};
 use health_observability::TelemetryConfig;
 
-/// The service manager for `--service`.
-fn service_manager() -> Result<Arc<dyn ServiceManager>, &'static str> {
-    Systemd::from_env(|name| std::env::var(name).ok())
-        .map(|systemd| Arc::new(systemd) as Arc<dyn ServiceManager>)
-        .ok_or("--service needs a service manager: NOTIFY_SOCKET is unset")
-}
-
-#[tokio::main]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let config = match EdgeConfig::from_lookup(|name| std::env::var(name).ok()) {
         Ok(config) => config,
@@ -45,34 +40,52 @@ async fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let service = match args.first().map(String::as_str) {
-        None => false,
-        Some("--service") if args.len() == 1 => true,
-        Some("update") => {
-            return match update::run(&config, &args[1..]) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(error) => {
-                    eprintln!("facility-edge: {error}");
-                    ExitCode::from(7)
-                }
-            };
-        }
-        Some(_) => {
-            eprintln!("usage: facility-edge [--service | update …]");
-            return ExitCode::from(2);
-        }
-    };
-    let manager: Arc<dyn ServiceManager> = if service {
-        match service_manager() {
-            Ok(manager) => manager,
+    match args.first().map(String::as_str) {
+        None => ExitCode::from(block_on(&config, Arc::new(Foreground), None)),
+        Some("--service") if args.len() == 1 => service::run(config),
+        Some("update") => match update::run(&config, &args[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("facility-edge: {error}");
-                return ExitCode::from(2);
+                ExitCode::from(7)
             }
+        },
+        Some(_) => {
+            eprintln!("usage: facility-edge [--service | update …]");
+            ExitCode::from(2)
         }
-    } else {
-        Arc::new(Foreground)
+    }
+}
+
+/// Runs the node on a new runtime until `stop` resolves, or the stop signals when `stop` is
+/// `None`; returns the exit code.
+fn block_on(
+    config: &EdgeConfig,
+    manager: Arc<dyn ServiceManager>,
+    stop: Option<std::pin::Pin<Box<dyn Future<Output = ()> + Send>>>,
+) -> u8 {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(_) => {
+            eprintln!("facility-edge: cannot start the async runtime");
+            return 1;
+        }
     };
+    runtime.block_on(async {
+        let stop = stop.unwrap_or_else(|| Box::pin(health_edge_runtime::shutdown_signal()));
+        serve(config, manager, stop).await
+    })
+}
+
+/// Telemetry, then the node; the exit code (see the table above).
+async fn serve(
+    config: &EdgeConfig,
+    manager: Arc<dyn ServiceManager>,
+    stop: impl Future<Output = ()>,
+) -> u8 {
     let _telemetry = match health_observability::init(&TelemetryConfig {
         service: "facility-edge",
         otlp_endpoint: config.otlp_endpoint.clone(),
@@ -81,17 +94,17 @@ async fn main() -> ExitCode {
         Ok(telemetry) => telemetry,
         Err(error) => {
             eprintln!("facility-edge: {error}");
-            return ExitCode::from(2);
+            return 2;
         }
     };
-    match run(&config, manager, health_edge_runtime::shutdown_signal()).await {
+    match run(config, manager, stop).await {
         Ok(stop) => {
             tracing::info!(reason = ?stop, "facility edge exited");
-            ExitCode::SUCCESS
+            0
         }
         Err(error) => {
             tracing::error!(error.kind = %error, "facility edge failed");
-            ExitCode::from(match error {
+            match error {
                 EdgeError::Store => 3,
                 EdgeError::Migration => 4,
                 EdgeError::Task(_) => 5,
@@ -99,7 +112,7 @@ async fn main() -> ExitCode {
                 EdgeError::Update(_) => 7,
                 EdgeError::RollbackPending => 8,
                 EdgeError::Listen(_) | EdgeError::Serve(_) => 1,
-            })
+            }
         }
     }
 }

@@ -26,5 +26,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "signal", "sync"] }
 tracing = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-service = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }

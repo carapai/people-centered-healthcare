@@ -1,0 +1,109 @@
+# The Facility Edge Node on its two platforms (deployment.md § Workflows): a release build, the
+# edge crates' checks, and the binary run under the real service manager (facility-edge.md § OS
+# service). PR builds are unsigned; release signing comes with release.yml.
+name: edge-build
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  windows:
+    name: Windows service
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    env:
+      # RocksDB's bindings are generated with the image's LLVM.
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - run: cargo clippy --locked -p health-edge-runtime -p facility-edge --all-targets -- -D warnings
+      - run: cargo test --locked -p health-edge-runtime
+      - run: cargo build --locked --release -p facility-edge
+      - name: Run it as a Windows service
+        shell: pwsh
+        run: |
+          $store = Join-Path $env:RUNNER_TEMP 'edge\store'
+          ./apps/server/facility-edge/packaging/install-service.ps1 `
+            -Binary (Resolve-Path target/release/facility-edge.exe) `
+            -Environment "HEALTH_DATA_DIR=$store", 'HEALTH_BIND=127.0.0.1:8080'
+          Start-Service facility-edge
+          $deadline = (Get-Date).AddMinutes(2)
+          while ($true) {
+            try {
+              if ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/ready).StatusCode -eq 200) { break }
+            } catch {}
+            if ((Get-Date) -gt $deadline) { throw 'not ready in time' }
+            Start-Sleep -Seconds 1
+          }
+          Stop-Service facility-edge
+          $service = Get-CimInstance Win32_Service -Filter "Name='facility-edge'"
+          "state=$($service.State) exit=$($service.ExitCode) specific=$($service.ServiceSpecificExitCode)"
+          if ($service.State -ne 'Stopped' -or $service.ExitCode -ne 0 -or $service.ServiceSpecificExitCode -ne 0) {
+            throw 'the service did not stop cleanly'
+          }
+
+  linux:
+    name: systemd service
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - run: cargo build --locked --release -p facility-edge
+      - name: Run it under systemd
+        run: |
+          sudo useradd --system --no-create-home health
+          sudo install -D -m 0755 target/release/facility-edge /opt/health/bin/facility-edge
+          sudo install -d /etc/health
+          printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8080\n' \
+            | sudo tee /etc/health/facility-edge.env
+          sudo install -m 0644 apps/server/facility-edge/packaging/facility-edge.service \
+            apps/server/facility-edge/packaging/facility-edge-rollback.service /etc/systemd/system/
+          sudo systemd-analyze verify /etc/systemd/system/facility-edge.service
+          sudo systemctl daemon-reload
+          # Type=notify: start returns once the edge has migrated and sent READY=1.
+          sudo systemctl start facility-edge
+          curl --fail --silent http://127.0.0.1:8080/ready
+          sudo systemctl stop facility-edge
+          systemctl show facility-edge -p Result -p ExecMainStatus
+          test "$(systemctl show facility-edge -p Result --value)" = success
+          test "$(systemctl show facility-edge -p ExecMainStatus --value)" = 0
+      - if: failure()
+        run: sudo journalctl -u facility-edge --no-pager

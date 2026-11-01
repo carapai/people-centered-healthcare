@@ -7,7 +7,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 ## Modes
 
 - `facility-edge`: foreground, for development in a terminal. Ctrl-C stops it.
-- `facility-edge --service`: under the service manager. On Linux this is systemd, `Type=notify`, with [`packaging/facility-edge.service`](packaging/facility-edge.service). The Windows service is the last part of [#72](https://github.com/carapai/people-centered-healthcare/issues/72).
+- `facility-edge --service`: under the service manager. On Linux this is systemd, `Type=notify`, with [`packaging/facility-edge.service`](packaging/facility-edge.service). On Windows it is the Service Control Manager: [`packaging/install-service.ps1`](packaging/install-service.ps1) registers the service, its environment and the failure actions (restart three times, then stay stopped; the count resets after 24 hours).
 - `facility-edge update …`: signed updates (below).
 
 ## Configuration
@@ -42,6 +42,8 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | 8 | A failed update's store is restored, and the binary is left for the service manager | not restarted; `OnFailure=` runs `packaging/facility-edge-rollback.service` |
 
 The first start and three restarts are allowed within 24 hours. After that the unit stays stopped.
+
+On Windows a non-zero code is reported to the SCM as a service-specific error, and the failure actions restart it whatever the code. Exits 2, 7 and 8 therefore retry three times before the service stays stopped. The service runs as LocalSystem and can replace its own binary, so a rollback finishes in the process (exit 6), and the rollback unit's step is not needed. Long migrations and drains advance the SCM checkpoint with a wait hint, so the SCM keeps waiting.
 
 ## Updates
 

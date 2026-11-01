@@ -61,7 +61,8 @@ Five workflows are in `.github/workflows/` (#47); every action is pinned to a fu
 - **`e2e.yml`** (#228) runs nightly and on demand, and is not a required check. It installs the pinned SurrealDB, builds central-server, installs Chromium with Playwright, and runs `bun run test:e2e` in `apps/client`.
   - **The backend:** `e2e/backend.ts` starts SurrealDB in memory and central-server, with fresh keys and an access policy, and provisions a clerk and a reviewer with `central-server provision`.
   - **The client:** `vite preview` proxies `/auth`, `/api` and `/fhir` to it (`HEALTH_DEV_BACKEND`).
-- **Not yet:** `integration-tests.yml`, `desktop-build.yml`, `edge-build.yml` and `release.yml` come with their tasks; branch protection and CODEOWNERS are below (§ Git and merge rules in code).
+- **`edge-build.yml`** (#72) builds `facility-edge` in release mode on Windows and Ubuntu and runs it under the real service manager. On Windows that is `install-service.ps1`, `Start-Service`, `/ready`, `Stop-Service` and a clean exit code. On Ubuntu it is both units installed, `systemd-analyze verify`, a `Type=notify` start and a clean stop. The Windows job also runs the edge crates' clippy and unit tests. It is not a required check yet, and its artefacts are not uploaded until `release.yml` signs them.
+- **Not yet:** `integration-tests.yml`, `desktop-build.yml` and `release.yml` come with their tasks; branch protection and CODEOWNERS are below (§ Git and merge rules in code).
 
 ### Architecture enforcement (§109)
 

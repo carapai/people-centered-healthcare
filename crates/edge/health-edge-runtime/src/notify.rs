@@ -79,6 +79,127 @@ impl ServiceManager for Systemd {
     }
 }
 
+/// The Windows Service Control Manager: each report carries a wait hint, and a long migration or
+/// drain advances the checkpoint so the SCM keeps waiting (facility-edge.md § OS service).
+#[cfg(windows)]
+pub struct WindowsScm {
+    status: std::sync::Mutex<ScmStatus>,
+}
+
+#[cfg(windows)]
+struct ScmStatus {
+    handle: windows_service::service_control_handler::ServiceStatusHandle,
+    state: windows_service::service::ServiceState,
+    checkpoint: u32,
+}
+
+#[cfg(windows)]
+impl WindowsScm {
+    /// Reports through `handle`, starting in `StartPending`.
+    pub fn new(handle: windows_service::service_control_handler::ServiceStatusHandle) -> Self {
+        let scm = Self {
+            status: std::sync::Mutex::new(ScmStatus {
+                handle,
+                state: windows_service::service::ServiceState::StartPending,
+                checkpoint: 0,
+            }),
+        };
+        scm.report(
+            windows_service::service::ServiceState::StartPending,
+            Duration::from_secs(30),
+            0,
+        );
+        scm
+    }
+
+    fn report(&self, state: windows_service::service::ServiceState, wait: Duration, exit: u32) {
+        use windows_service::service::{
+            ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
+        };
+        let mut status = self
+            .status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let pending = matches!(
+            state,
+            ServiceState::StartPending | ServiceState::StopPending
+        );
+        status.checkpoint = if pending && status.state == state {
+            status.checkpoint + 1
+        } else {
+            0
+        };
+        status.state = state;
+        let report = ServiceStatus {
+            service_type: ServiceType::OWN_PROCESS,
+            current_state: state,
+            controls_accepted: if state == ServiceState::Running {
+                ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN
+            } else {
+                ServiceControlAccept::empty()
+            },
+            exit_code: if exit == 0 {
+                ServiceExitCode::Win32(0)
+            } else {
+                ServiceExitCode::ServiceSpecific(exit)
+            },
+            checkpoint: if pending { status.checkpoint } else { 0 },
+            wait_hint: if pending { wait } else { Duration::ZERO },
+            process_id: None,
+        };
+        if status.handle.set_service_status(report).is_err() {
+            tracing::warn!(error.kind = "scm-report", "service status report failed");
+        }
+    }
+
+    /// The node has stopped with `exit` (its `facility-edge` exit code; 0 for a clean stop). A
+    /// non-zero code is a service-specific error, which the SCM's failure actions act on.
+    pub fn stopped(&self, exit: u32) {
+        self.report(
+            windows_service::service::ServiceState::Stopped,
+            Duration::ZERO,
+            exit,
+        );
+    }
+}
+
+#[cfg(windows)]
+impl ServiceManager for WindowsScm {
+    fn ready(&self) {
+        self.report(
+            windows_service::service::ServiceState::Running,
+            Duration::ZERO,
+            0,
+        );
+        tracing::info!(outcome = "ready", "facility edge ready");
+    }
+    fn stopping(&self) {
+        self.report(
+            windows_service::service::ServiceState::StopPending,
+            Duration::from_secs(30),
+            0,
+        );
+    }
+    fn extend(&self, by: Duration) {
+        let state = self
+            .status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .state;
+        if matches!(
+            state,
+            windows_service::service::ServiceState::StartPending
+                | windows_service::service::ServiceState::StopPending
+        ) {
+            self.report(state, by, 0);
+        }
+    }
+    fn watchdog(&self) {}
+    fn watchdog_interval(&self) -> Option<Duration> {
+        None
+    }
+}
+
 #[cfg(unix)]
 fn send(socket: &str, message: &str) -> std::io::Result<()> {
     let datagram = std::os::unix::net::UnixDatagram::unbound()?;
