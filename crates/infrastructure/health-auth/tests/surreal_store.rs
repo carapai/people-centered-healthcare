@@ -49,6 +49,7 @@ fn serve(node: &Node) -> Router {
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
+        patient: false,
     });
     let server = AuthServer::new(
         config,

@@ -8,7 +8,8 @@ use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use health_identity::{
-    AccountId, AccountStatus, LockoutPolicy, Scope, Scopes, SessionPolicy, SessionState,
+    AccountId, AccountStatus, LockoutPolicy, OtpPurpose, OtpRefused, PhoneAccount, PhoneNumber,
+    Scope, Scopes, SessionPolicy, SessionState,
 };
 use health_time::{Clock, SignedDuration, Timestamp};
 use rand_core::RngCore;
@@ -18,6 +19,7 @@ use uuid::Uuid;
 
 use crate::credentials::Credentials;
 use crate::jose::{TokenSigner, b64, sha256_b64, verify_dpop};
+use crate::otp::{PhoneOtp, PhoneSignIn, code_matches, hash_code, new_code};
 use crate::snapshot::{SnapshotGate, token_claims};
 use crate::store::{AuthStore, AuthorizationCode, Session};
 use health_identity::snapshot::PermissionSnapshot;
@@ -29,6 +31,9 @@ pub struct Client {
     pub id: String,
     /// Redirect URIs, compared exactly.
     pub redirect_uris: Vec<String>,
+    /// A patient client (the portal): its users sign in with a one-time code to their phone
+    /// ([`AuthConfig::phone_sign_in`]), never a password, and need no permission snapshot.
+    pub patient: bool,
 }
 
 /// How this node runs its authorization server.
@@ -57,6 +62,8 @@ pub struct AuthConfig {
     /// with `error=refused`; the page posts the credentials back to `/authorize`. Without it,
     /// this server's minimal form is shown.
     pub login_page: Option<String>,
+    /// Sign-in by one-time code for patient clients (#111). Without it they cannot sign in.
+    pub phone_sign_in: Option<PhoneSignIn>,
 }
 
 impl AuthConfig {
@@ -73,11 +80,17 @@ impl AuthConfig {
             dpop_window: SignedDuration::from_secs(300),
             snapshots: None,
             login_page: None,
+            phone_sign_in: None,
         }
     }
 
     fn endpoint(&self, path: &str) -> String {
         format!("{}{path}", self.issuer)
+    }
+
+    /// Whether `client_id` is a patient client.
+    fn patient(&self, client_id: &str) -> bool {
+        self.clients.iter().any(|c| c.id == client_id && c.patient)
     }
 }
 
@@ -141,6 +154,7 @@ impl<S: AuthStore + 'static> AuthServer<S> {
                 "/authorize",
                 get(authorize_form::<S>).post(authorize_login::<S>),
             )
+            .route("/otp", post(send_otp::<S>))
             .route("/token", post(token::<S>))
             .route("/revoke", post(revoke::<S>))
             .with_state(Arc::clone(&self.inner))
@@ -240,6 +254,21 @@ pub(crate) struct LoginForm {
     /// The facility to act for, where the user chooses it (central, ADR 0056).
     #[serde(default)]
     facility: String,
+    /// A patient's phone number (patient clients).
+    #[serde(default)]
+    phone: String,
+    /// The one-time code sent to it.
+    #[serde(default)]
+    code: String,
+}
+
+/// A request for a one-time code: the authorization request's parameters plus the phone.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct OtpForm {
+    #[serde(flatten)]
+    request: AuthorizeParams,
+    #[serde(default)]
+    phone: String,
 }
 
 /// A validated authorization request.
@@ -344,7 +373,53 @@ fn no_store() -> [(header::HeaderName, HeaderValue); 2] {
 /// The login form. The client application's sign-in screen replaces it in the UI; this one keeps
 /// the protocol complete and testable.
 fn login_page(p: &AuthorizeParams, error: Option<&str>) -> String {
-    let hidden: String = [
+    let hidden = hidden_fields(p);
+    let alert = error
+        .map(|e| format!("<p role=\"alert\">{}</p>", escape(e)))
+        .unwrap_or_default();
+    format!(
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Sign in</title><main><h1>Sign in</h1>{alert}\
+         <form method=\"post\" action=\"authorize\">{hidden}\
+         <label for=\"username\">Username</label><input id=\"username\" name=\"username\" autocomplete=\"username\" required>\
+         <label for=\"password\">Password</label><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required>\
+         <label for=\"facility\">Facility (if you work at more than one)</label><input id=\"facility\" name=\"facility\">\
+         <button type=\"submit\">Sign in</button></form></main></html>"
+    )
+}
+
+/// A patient's first step: their phone number, posted to `/otp`.
+fn phone_page(p: &AuthorizeParams, error: Option<&str>) -> String {
+    let hidden = hidden_fields(p);
+    let alert = error
+        .map(|e| format!("<p role=\"alert\">{}</p>", escape(e)))
+        .unwrap_or_default();
+    format!(
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Sign in</title><main><h1>Sign in</h1>{alert}\
+         <form method=\"post\" action=\"otp\">{hidden}\
+         <label for=\"phone\">Phone number</label><input id=\"phone\" name=\"phone\" type=\"tel\" autocomplete=\"tel\" required>\
+         <button type=\"submit\">Send me a code</button></form></main></html>"
+    )
+}
+
+/// A patient's second step: the code sent to their phone, posted to `/authorize`.
+fn code_page(p: &AuthorizeParams, phone: &str, error: Option<&str>) -> String {
+    let hidden = hidden_fields(p);
+    let alert = error
+        .map(|e| format!("<p role=\"alert\">{}</p>", escape(e)))
+        .unwrap_or_default();
+    let phone = escape(phone);
+    format!(
+        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Enter your code</title><main><h1>Enter your code</h1>{alert}\
+         <p>We sent a code to {phone}.</p>\
+         <form method=\"post\" action=\"authorize\">{hidden}<input type=\"hidden\" name=\"phone\" value=\"{phone}\">\
+         <label for=\"code\">Code</label><input id=\"code\" name=\"code\" inputmode=\"numeric\" autocomplete=\"one-time-code\" required>\
+         <button type=\"submit\">Sign in</button></form></main></html>"
+    )
+}
+
+/// The authorization request's parameters as hidden inputs.
+fn hidden_fields(p: &AuthorizeParams) -> String {
+    [
         ("response_type", &p.response_type),
         ("client_id", &p.client_id),
         ("redirect_uri", &p.redirect_uri),
@@ -363,18 +438,7 @@ fn login_page(p: &AuthorizeParams, error: Option<&str>) -> String {
             )
         })
     })
-    .collect();
-    let alert = error
-        .map(|e| format!("<p role=\"alert\">{}</p>", escape(e)))
-        .unwrap_or_default();
-    format!(
-        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Sign in</title><main><h1>Sign in</h1>{alert}\
-         <form method=\"post\" action=\"authorize\">{hidden}\
-         <label for=\"username\">Username</label><input id=\"username\" name=\"username\" autocomplete=\"username\" required>\
-         <label for=\"password\">Password</label><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required>\
-         <label for=\"facility\">Facility (if you work at more than one)</label><input id=\"facility\" name=\"facility\">\
-         <button type=\"submit\">Sign in</button></form></main></html>"
-    )
+    .collect()
 }
 
 async fn authorize_form<S: AuthStore>(
@@ -382,8 +446,11 @@ async fn authorize_form<S: AuthStore>(
     Query(params): Query<AuthorizeParams>,
 ) -> Response {
     match validate(&inner, &params) {
-        Ok(_) => match &inner.config.login_page {
+        Ok(request) => match &inner.config.login_page {
             Some(page) => Redirect::to(&with_query(page, &params, None)).into_response(),
+            None if inner.config.patient(&request.client_id) => {
+                (no_store(), Html(phone_page(&params, None))).into_response()
+            }
             None => (no_store(), Html(login_page(&params, None))).into_response(),
         },
         Err(response) => *response,
@@ -392,6 +459,11 @@ async fn authorize_form<S: AuthStore>(
 
 /// `page` with the authorization request's parameters (and an error code) as its query.
 fn with_query(page: &str, p: &AuthorizeParams, error: Option<&str>) -> String {
+    with_pairs(page, p, &error.map(|e| [("error", e)]).unwrap_or_default())
+}
+
+/// `page` with the authorization request's parameters and `extra` as its query.
+fn with_pairs(page: &str, p: &AuthorizeParams, extra: &[(&str, &str)]) -> String {
     let mut query = form_urlencoded::Serializer::new(String::new());
     for (name, value) in [
         ("response_type", &p.response_type),
@@ -407,8 +479,8 @@ fn with_query(page: &str, p: &AuthorizeParams, error: Option<&str>) -> String {
             query.append_pair(name, value);
         }
     }
-    if let Some(error) = error {
-        query.append_pair("error", error);
+    for (name, value) in extra {
+        query.append_pair(name, value);
     }
     let separator = if page.contains('?') { '&' } else { '?' };
     format!("{page}{separator}{}", query.finish())
@@ -440,6 +512,9 @@ async fn authorize_login<S: AuthStore>(
         Ok(request) => request,
         Err(response) => return *response,
     };
+    if inner.config.patient(&request.client_id) {
+        return phone_login(&inner, &form, request).await;
+    }
     let refused = || match &inner.config.login_page {
         Some(page) => {
             Redirect::to(&with_query(page, &form.request, Some("refused"))).into_response()
@@ -502,6 +577,25 @@ async fn authorize_login<S: AuthStore>(
     {
         return refused();
     }
+    if inner
+        .store
+        .set_lockout(account.id, account.lockout.reset())
+        .await
+        .is_err()
+    {
+        return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable.");
+    }
+    issue_code(&inner, request, account.id, facility, now).await
+}
+
+/// Redirects back with a new authorization code for `account`.
+async fn issue_code<S: AuthStore>(
+    inner: &Inner<S>,
+    request: Request,
+    account: AccountId,
+    facility: Option<String>,
+    now: Timestamp,
+) -> Response {
     let code = random_token();
     let stored = AuthorizationCode {
         client_id: request.client_id,
@@ -509,25 +603,190 @@ async fn authorize_login<S: AuthStore>(
         code_challenge: request.code_challenge,
         scopes: request.scopes,
         nonce: request.nonce,
-        account: account.id,
+        account,
         facility,
         auth_time: now,
         expires_at: now.checked_add(inner.config.code_lifetime).unwrap_or(now),
     };
-    let saved = async {
-        inner
-            .store
-            .set_lockout(account.id, account.lockout.reset())
-            .await?;
-        inner.store.put_code(sha256_b64(&code), stored).await
-    };
-    match saved.await {
+    match inner.store.put_code(sha256_b64(&code), stored).await {
         Ok(()) => redirect_with(
             &inner.config,
             &request.redirect_uri,
             &[("code", &code)],
             request.state.as_deref(),
         ),
+        Err(_) => error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
+    }
+}
+
+/// Shown when a patient's phone number cannot be read.
+const PHONE_INVALID: &str = "Enter your phone number, for example 0772 123456.";
+/// Shown when codes are asked for too often.
+const OTP_WAIT: &str = "A code was sent recently. Wait a minute, then ask for a new one.";
+/// One message for a wrong code, whatever the reason, apart from asking for a new one.
+const OTP_REFUSED: &str = "That code is not right. Check it, or ask for a new one.";
+/// Shown when the code can no longer be used.
+const OTP_EXPIRED: &str = "That code can no longer be used. Ask for a new one.";
+
+/// `POST /otp`: sends a patient a one-time code. Signing up and signing in are the same step,
+/// so the answer never reveals whether the phone has an account.
+async fn send_otp<S: AuthStore>(
+    State(inner): State<Arc<Inner<S>>>,
+    Form(form): Form<OtpForm>,
+) -> Response {
+    let request = match validate(&inner, &form.request) {
+        Ok(request) => request,
+        Err(response) => return *response,
+    };
+    let (true, Some(phone_sign_in)) = (
+        inner.config.patient(&request.client_id),
+        &inner.config.phone_sign_in,
+    ) else {
+        return error_page(
+            StatusCode::BAD_REQUEST,
+            "This client does not sign in by phone.",
+        );
+    };
+    let back = |status: StatusCode, error: &str, message: &str| match &inner.config.login_page {
+        Some(page) => {
+            Redirect::to(&with_pairs(page, &form.request, &[("error", error)])).into_response()
+        }
+        None => (
+            status,
+            no_store(),
+            Html(phone_page(&form.request, Some(message))),
+        )
+            .into_response(),
+    };
+    let Ok(phone) = PhoneNumber::parse(&form.phone, &phone_sign_in.country_code) else {
+        return back(StatusCode::BAD_REQUEST, "phone", PHONE_INVALID);
+    };
+    let now = inner.clock.now();
+    let Ok(current) = inner.store.phone_otp(&phone).await else {
+        return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable.");
+    };
+    let sent = current.map(|otp| otp.sent).unwrap_or_default();
+    if phone_sign_in.policy.may_send(&sent, now).is_err() {
+        return back(StatusCode::TOO_MANY_REQUESTS, "wait", OTP_WAIT);
+    }
+    let purpose = match inner.store.phone_account(&phone).await {
+        Ok(Some(_)) => OtpPurpose::SignIn,
+        Ok(None) => OtpPurpose::SignUp,
+        Err(_) => return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
+    };
+    let code = new_code(phone_sign_in.policy.digits);
+    let hour = SignedDuration::from_hours(1);
+    let mut sent: Vec<Timestamp> = sent.into_iter().filter(|at| now < *at + hour).collect();
+    sent.push(now);
+    let otp = PhoneOtp {
+        challenge: phone_sign_in
+            .policy
+            .issue(phone.clone(), purpose, hash_code(&code), now),
+        sent,
+    };
+    if inner.store.put_phone_otp(&otp).await.is_err()
+        || phone_sign_in.sender.send(&phone, &code).await.is_err()
+    {
+        return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable.");
+    }
+    match &inner.config.login_page {
+        Some(page) => Redirect::to(&with_pairs(
+            page,
+            &form.request,
+            &[("otp", "sent"), ("phone", phone.as_str())],
+        ))
+        .into_response(),
+        None => (
+            no_store(),
+            Html(code_page(&form.request, phone.as_str(), None)),
+        )
+            .into_response(),
+    }
+}
+
+/// `POST /authorize` for a patient client: the phone and the code sent to it. The first
+/// accepted code creates the phone's Login Account (`level1`), which reaches no patient record
+/// until the client registry links its Person.
+async fn phone_login<S: AuthStore>(
+    inner: &Inner<S>,
+    form: &LoginForm,
+    request: Request,
+) -> Response {
+    let Some(phone_sign_in) = &inner.config.phone_sign_in else {
+        return error_page(
+            StatusCode::BAD_REQUEST,
+            "This client does not sign in by phone.",
+        );
+    };
+    let refused = |error: &str, message: &str| match &inner.config.login_page {
+        Some(page) => Redirect::to(&with_pairs(
+            page,
+            &form.request,
+            &[
+                ("error", error),
+                ("otp", "sent"),
+                ("phone", form.phone.as_str()),
+            ],
+        ))
+        .into_response(),
+        None => (
+            StatusCode::UNAUTHORIZED,
+            no_store(),
+            Html(code_page(&form.request, &form.phone, Some(message))),
+        )
+            .into_response(),
+    };
+    let Ok(phone) = PhoneNumber::parse(&form.phone, &phone_sign_in.country_code) else {
+        return refused("refused", OTP_REFUSED);
+    };
+    let now = inner.clock.now();
+    let otp = match inner.store.phone_otp(&phone).await {
+        Ok(Some(otp)) => otp,
+        Ok(None) => return refused("refused", OTP_REFUSED),
+        Err(_) => return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
+    };
+    let before = otp.challenge.attempts;
+    let matches = code_matches(form.code.trim(), &otp.challenge.code_hash);
+    let mut tried = otp.clone();
+    let outcome = tried.challenge.attempt(&phone_sign_in.policy, matches, now);
+    match outcome {
+        Err(OtpRefused::Expired | OtpRefused::Used | OtpRefused::Spent) => {
+            return refused("expired", OTP_EXPIRED);
+        }
+        Err(OtpRefused::TooSoon { .. } | OtpRefused::TooMany { .. }) => {
+            return refused("refused", OTP_REFUSED);
+        }
+        Ok(()) | Err(OtpRefused::Wrong { .. }) => {}
+    }
+    // Every try counts once: a concurrent try of the same challenge loses and is refused.
+    match inner.store.attempt_phone_otp(before, &tried).await {
+        Ok(true) => {}
+        Ok(false) => return refused("refused", OTP_REFUSED),
+        Err(_) => return error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
+    }
+    if outcome.is_err() {
+        return refused("refused", OTP_REFUSED);
+    }
+    let account = match inner.store.phone_account(&phone).await {
+        Ok(Some(account)) => Ok(account),
+        Ok(None) => {
+            inner
+                .store
+                .create_phone_account(PhoneAccount {
+                    id: AccountId(Uuid::now_v7()),
+                    phone,
+                    status: AccountStatus::Active,
+                    verified_at: now,
+                })
+                .await
+        }
+        Err(error) => Err(error),
+    };
+    match account {
+        Ok(account) if account.status == AccountStatus::Active => {
+            issue_code(inner, request, account.id, None, now).await
+        }
+        Ok(_) => refused("refused", OTP_REFUSED),
         Err(_) => error_page(StatusCode::SERVICE_UNAVAILABLE, "Sign-in is unavailable."),
     }
 }
@@ -597,7 +856,7 @@ impl<S: AuthStore> Inner<S> {
             "jti": Uuid::now_v7().to_string(),
             "sid": session.id.to_string(),
             "auth_time": seconds(auth_time),
-            "amr": ["pwd"],
+            "amr": [if self.config.patient(&session.client_id) { "otp" } else { "pwd" }],
             "acr": self.config.acr,
         });
         if let Some(jkt) = &session.jkt {
@@ -703,8 +962,29 @@ impl<S: AuthStore> Inner<S> {
         Ok(Some(snapshot))
     }
 
-    async fn account_active(&self, id: AccountId) -> bool {
-        matches!(self.store.account(id).await, Ok(Some(a)) if a.status == AccountStatus::Active)
+    /// Whether the account is active: a phone account for a patient client, a staff account
+    /// otherwise, so neither kind's id works with the other's clients.
+    async fn account_active(&self, id: AccountId, client_id: &str) -> bool {
+        if self.config.patient(client_id) {
+            matches!(self.store.phone_account_by_id(id).await, Ok(Some(a)) if a.status == AccountStatus::Active)
+        } else {
+            matches!(self.store.account(id).await, Ok(Some(a)) if a.status == AccountStatus::Active)
+        }
+    }
+
+    /// The snapshot a session's tokens are issued under: none for a patient client, whose
+    /// patients have no roles; otherwise [`current_snapshot`](Self::current_snapshot).
+    async fn session_snapshot(
+        &self,
+        client_id: &str,
+        account: AccountId,
+        facility: Option<&str>,
+        now: Timestamp,
+    ) -> Result<Option<PermissionSnapshot>, ()> {
+        if self.config.patient(client_id) {
+            return Ok(None);
+        }
+        self.current_snapshot(account, facility, now).await
     }
 }
 
@@ -759,12 +1039,19 @@ async fn authorization_code<S: AuthStore>(
         || params.client_id.as_deref() != Some(stored.client_id.as_str())
         || params.redirect_uri.as_deref() != Some(stored.redirect_uri.as_str())
         || !verifier_ok
-        || !inner.account_active(stored.account).await
+        || !inner
+            .account_active(stored.account, &stored.client_id)
+            .await
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
     let Ok(snapshot) = inner
-        .current_snapshot(stored.account, stored.facility.as_deref(), now)
+        .session_snapshot(
+            &stored.client_id,
+            stored.account,
+            stored.facility.as_deref(),
+            now,
+        )
         .await
     else {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
@@ -820,13 +1107,20 @@ async fn refresh<S: AuthStore>(
     if params.client_id.as_deref() != Some(session.client_id.as_str())
         || !inner.config.session.may_refresh(session.state, now)
         || session.jkt != jkt && session.jkt.is_some()
-        || !inner.account_active(session.account).await
+        || !inner
+            .account_active(session.account, &session.client_id)
+            .await
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
     // Permissions are never cached past their snapshot: an expired one ends the session.
     let Ok(snapshot) = inner
-        .current_snapshot(session.account, session.facility.as_deref(), now)
+        .session_snapshot(
+            &session.client_id,
+            session.account,
+            session.facility.as_deref(),
+            now,
+        )
         .await
     else {
         let _ = inner.store.end_session(session.id).await;
@@ -895,6 +1189,8 @@ pub struct Principal {
     pub facility: Option<String>,
     /// The version of the permission snapshot the token was issued under.
     pub snapshot_version: Option<u64>,
+    /// Whether it is a patient's (a patient client's phone account), not staff.
+    pub patient: bool,
 }
 
 /// Why access was refused; maps to 401 with a `WWW-Authenticate` challenge.
@@ -1007,6 +1303,9 @@ impl<S: AuthStore> AccessVerifier<S> {
         match (live, account) {
             (true, Some(account)) => Ok(Principal {
                 account,
+                patient: inner
+                    .config
+                    .patient(claims["client_id"].as_str().unwrap_or_default()),
                 client_id: claims["client_id"].as_str().unwrap_or_default().to_owned(),
                 scopes,
                 session,

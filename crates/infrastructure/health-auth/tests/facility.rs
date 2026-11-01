@@ -85,6 +85,7 @@ fn central(facilities: &[&str]) -> Central {
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
+        patient: false,
     });
     config.login_page = Some("/sign-in".into());
     config.snapshots = Some(SnapshotGate {

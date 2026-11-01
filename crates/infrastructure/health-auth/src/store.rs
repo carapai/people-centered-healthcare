@@ -8,10 +8,14 @@ use std::sync::Mutex;
 
 use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
-use health_identity::{AccountId, Lockout, LoginAccount, Scopes, SessionState};
+use health_identity::{
+    AccountId, Lockout, LoginAccount, PhoneAccount, PhoneNumber, Scopes, SessionState,
+};
 use health_time::Timestamp;
 use serde_json::Value;
 use uuid::Uuid;
+
+use crate::otp::PhoneOtp;
 
 /// A store failure.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -236,6 +240,63 @@ pub trait AuthStore: Send + Sync {
         let _ = (id, facility);
         async { Ok(false) }
     }
+    /// The patient phone account of `phone`. The default has none.
+    fn phone_account(
+        &self,
+        phone: &PhoneNumber,
+    ) -> impl Future<Output = Result<Option<PhoneAccount>, StoreError>> + Send {
+        let _ = phone;
+        async { Ok(None) }
+    }
+    /// The patient phone account with `id`.
+    fn phone_account_by_id(
+        &self,
+        id: AccountId,
+    ) -> impl Future<Output = Result<Option<PhoneAccount>, StoreError>> + Send {
+        let _ = id;
+        async { Ok(None) }
+    }
+    /// Creates the account of `account.phone`, or returns the one a concurrent sign-in created
+    /// first: one account per phone.
+    fn create_phone_account(
+        &self,
+        account: PhoneAccount,
+    ) -> impl Future<Output = Result<PhoneAccount, StoreError>> + Send {
+        let _ = account;
+        async {
+            Err(StoreError(
+                "phone sign-in is not supported by this store".into(),
+            ))
+        }
+    }
+    /// The phone's current code challenge.
+    fn phone_otp(
+        &self,
+        phone: &PhoneNumber,
+    ) -> impl Future<Output = Result<Option<PhoneOtp>, StoreError>> + Send {
+        let _ = phone;
+        async { Ok(None) }
+    }
+    /// Replaces the phone's challenge with a newly sent one.
+    fn put_phone_otp(&self, otp: &PhoneOtp) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = otp;
+        async {
+            Err(StoreError(
+                "phone sign-in is not supported by this store".into(),
+            ))
+        }
+    }
+    /// Stores `otp` after one more try, if the stored challenge is still the same one with
+    /// `before` tries (compare-and-set). False when a concurrent try or a new code came first,
+    /// so parallel guesses cannot share one try.
+    fn attempt_phone_otp(
+        &self,
+        before: u32,
+        otp: &PhoneOtp,
+    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
+        let _ = (before, otp);
+        async { Ok(false) }
+    }
     /// The persisted clock floor.
     fn clock_floor(&self) -> impl Future<Output = Result<ClockFloor, StoreError>> + Send {
         async { Ok(ClockFloor::default()) }
@@ -261,6 +322,8 @@ struct State {
     snapshots: HashMap<(AccountId, String), String>,
     floor: ClockFloor,
     break_glass: Vec<BreakGlassRecord>,
+    phone_accounts: HashMap<AccountId, PhoneAccount>,
+    otps: HashMap<PhoneNumber, PhoneOtp>,
 }
 
 /// An in-memory store.
@@ -288,6 +351,60 @@ impl MemoryStore {
 }
 
 impl AuthStore for MemoryStore {
+    async fn phone_account(&self, phone: &PhoneNumber) -> Result<Option<PhoneAccount>, StoreError> {
+        Ok(self
+            .lock()
+            .phone_accounts
+            .values()
+            .find(|a| &a.phone == phone)
+            .cloned())
+    }
+
+    async fn phone_account_by_id(&self, id: AccountId) -> Result<Option<PhoneAccount>, StoreError> {
+        Ok(self.lock().phone_accounts.get(&id).cloned())
+    }
+
+    async fn create_phone_account(
+        &self,
+        account: PhoneAccount,
+    ) -> Result<PhoneAccount, StoreError> {
+        let mut state = self.lock();
+        if let Some(existing) = state
+            .phone_accounts
+            .values()
+            .find(|a| a.phone == account.phone)
+        {
+            return Ok(existing.clone());
+        }
+        state.phone_accounts.insert(account.id, account.clone());
+        Ok(account)
+    }
+
+    async fn phone_otp(&self, phone: &PhoneNumber) -> Result<Option<PhoneOtp>, StoreError> {
+        Ok(self.lock().otps.get(phone).cloned())
+    }
+
+    async fn put_phone_otp(&self, otp: &PhoneOtp) -> Result<(), StoreError> {
+        self.lock()
+            .otps
+            .insert(otp.challenge.phone.clone(), otp.clone());
+        Ok(())
+    }
+
+    async fn attempt_phone_otp(&self, before: u32, otp: &PhoneOtp) -> Result<bool, StoreError> {
+        let mut state = self.lock();
+        match state.otps.get_mut(&otp.challenge.phone) {
+            Some(stored)
+                if stored.challenge.issued_at == otp.challenge.issued_at
+                    && stored.challenge.attempts == before =>
+            {
+                *stored = otp.clone();
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
     async fn account_by_username(
         &self,
         username: &str,

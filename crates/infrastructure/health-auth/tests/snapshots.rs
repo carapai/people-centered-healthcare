@@ -66,6 +66,7 @@ fn edge() -> Edge {
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
+        patient: false,
     });
     config.snapshots = Some(SnapshotGate {
         facility: Some(FACILITY.into()),

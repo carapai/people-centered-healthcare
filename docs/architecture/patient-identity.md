@@ -207,7 +207,8 @@ stateDiagram-v2
   - `health-identity`: `PhoneAccount`, `PhoneNumber` (E.164), `OtpPolicy` and `OtpChallenge`.
   - `health-client-registry::person`: `Person`, its links and assurance, and `PortalAccess`.
   - `health-patient-engagement::registration`: the Registration Request and its route.
-  - The use cases, storage and HTTP come in #111's later parts.
+  - `health-auth`: `POST /otp`, and the phone and code on `POST /authorize`, for patient clients, with `OtpSender` and `DevOutbox`; SurrealDB migration `0012_phone_sign_in`.
+  - The self-registration use cases and their HTTP API, and the portal screens, come in #111's later parts.
 
 ## Caregiver delegation
 

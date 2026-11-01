@@ -29,6 +29,7 @@ fn app() -> Router {
     config.clients.push(Client {
         id: "health-client".into(),
         redirect_uris: vec!["http://central.test/callback".into()],
+        patient: false,
     });
     config.login_page = Some("/sign-in".into());
     let clock = Arc::new(FixedClock::new(
