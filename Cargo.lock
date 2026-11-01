@@ -2044,6 +2044,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-consent"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "thiserror",
+]
+
+[[package]]
 name = "health-errors"
 version = "0.1.0"
 

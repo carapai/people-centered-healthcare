@@ -1,0 +1,18 @@
+[package]
+name = "health-consent"
+description = "Caregiver delegation: scoped, expiring, verified grants over a dependent's record, with the age of majority and adolescent confidentiality (patient-identity.md § Caregiver delegation; ADR 0029)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "identity-access"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+thiserror = { workspace = true }
