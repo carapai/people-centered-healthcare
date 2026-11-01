@@ -36,7 +36,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `GET /on-hand?store=`: Stock Units, balances and last unit costs.
   - `GET /reorder?store=&days=`.
   - `POST /gs1`: reads a scanned or printed DataMatrix.
-  - `POST /requisitions` and `/requisitions/{id}/decision`.
+  - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
   - Over `health-inventory-app`.
 
 ## Tests

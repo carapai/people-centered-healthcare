@@ -158,3 +158,74 @@ async fn gs1_requisitions_and_permissions() {
         StatusCode::FORBIDDEN
     );
 }
+
+#[tokio::test]
+async fn a_ward_requisition_is_approved_and_fulfilled_from_the_pharmacy() {
+    let app = app(&[STOCK_PERMISSION]).await;
+    assert_eq!(
+        send(&app, "POST", "/goods-received", Some(note())).await.0,
+        StatusCode::CREATED
+    );
+    let (_, created) = send(
+        &app,
+        "POST",
+        "/requisitions",
+        Some(json!({ "requesting_store": "Location/ward", "supplying_store": "Location/pharmacy", "lines": [{ "product": "amoxicillin-500", "quantity": 200 }] })),
+    )
+    .await;
+    let id = created["id"].as_str().expect("id").to_owned();
+    for store in ["Location%2Fward", "Location%2Fpharmacy"] {
+        let (status, list) = send(&app, "GET", &format!("/requisitions?store={store}"), None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(list[0]["id"], id.as_str());
+        assert_eq!(list[0]["status"], "requested");
+    }
+    let (_, other) = send(&app, "GET", "/requisitions?store=Location%2Flab", None).await;
+    assert_eq!(other, json!([]));
+
+    let picked = json!({ "lines": [{ "product": "amoxicillin-500", "batch": "B42", "expiry": "2027-06-30", "quantity": 200 }] });
+    let (status, _) = send(
+        &app,
+        "POST",
+        &format!("/requisitions/{id}/fulfil"),
+        Some(picked.clone()),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "not before approval"
+    );
+    let (_, approved) = send(
+        &app,
+        "POST",
+        &format!("/requisitions/{id}/decision"),
+        Some(json!({ "approve": true })),
+    )
+    .await;
+    assert_eq!(approved["status"], "approved");
+    let (status, fulfilled) = send(
+        &app,
+        "POST",
+        &format!("/requisitions/{id}/fulfil"),
+        Some(picked.clone()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{fulfilled}");
+    assert_eq!(fulfilled["status"], "fulfilled");
+    assert_eq!(fulfilled["transfer"], format!("transfer-{id}"));
+    let (_, on_hand) = send(&app, "GET", "/on-hand?store=Location%2Fpharmacy", None).await;
+    assert_eq!(on_hand[0]["on_hand"], 800);
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            &format!("/requisitions/{id}/fulfil"),
+            Some(picked)
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "fulfilled once"
+    );
+}

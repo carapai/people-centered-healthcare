@@ -151,6 +151,19 @@ where
         Ok((requisition, transfer))
     }
 
+    /// The requisitions `store` asked for or was asked, newest first.
+    pub async fn requisitions(&self, store: &str) -> Result<Vec<Requisition>, InventoryError> {
+        let mut tx = self.store.begin().await?;
+        let mut list: Vec<Requisition> = tx
+            .requisitions()
+            .await?
+            .into_iter()
+            .filter(|r| r.requesting_store == store || r.supplying_store == store)
+            .collect();
+        list.reverse();
+        Ok(list)
+    }
+
     /// Requisition `id`.
     pub async fn requisition(&self, id: &str) -> Result<Requisition, InventoryError> {
         self.load_requisition(id).await

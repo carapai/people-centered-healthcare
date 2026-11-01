@@ -116,3 +116,63 @@ export function lineComplete(line: ReceivedLine): boolean {
     /^\d+(\.\d+)?$/.test(line.unit_cost.trim())
   )
 }
+
+/** A ward's requisition (SupplyRequest), as `/api/stock/requisitions` reports it. */
+export interface Requisition {
+  id: string
+  requesting_store: string
+  supplying_store: string
+  lines: { product: string; quantity: number }[]
+  status: 'requested' | 'approved' | 'fulfilled' | 'rejected'
+  requested_by: string
+  decided_by: string | null
+  transfer: string | null
+}
+
+/** One batch picked to fulfil a requisition. */
+export interface Picked {
+  product: string
+  batch: string
+  expiry: string
+  funding_source: string
+  quantity: number
+}
+
+export const requisitionsKey = (store: string) => ['stock', 'requisitions', store] as const
+
+/** The requisitions a store asked for or was asked, newest first. */
+export function requisitionsQuery(transport: Transport, store: string) {
+  return {
+    queryKey: requisitionsKey(store),
+    queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<Requisition[]> => {
+      const response = await transport.request({ method: 'GET', path: `/stock/requisitions?store=${encodeURIComponent(store)}`, ...(signal === undefined ? {} : { signal }) })
+      if (response.status !== 200 || !Array.isArray(response.body)) throw new StockError(response.status, reason(response.body))
+      return response.body as Requisition[]
+    },
+  }
+}
+
+/** A ward asks another store for products. */
+export async function requestStock(transport: Transport, requesting: string, supplying: string, lines: { product: string; quantity: number }[]): Promise<string> {
+  const response = await transport.request({
+    method: 'POST',
+    path: '/stock/requisitions',
+    body: { requesting_store: requesting, supplying_store: supplying, lines },
+  })
+  if (response.status !== 201) throw new StockError(response.status, reason(response.body))
+  return (response.body as { id: string }).id
+}
+
+/** The supplying store approves or refuses requisition `id`. */
+export async function decideRequisition(transport: Transport, id: string, approve: boolean): Promise<Requisition> {
+  const response = await transport.request({ method: 'POST', path: `/stock/requisitions/${encodeURIComponent(id)}/decision`, body: { approve } })
+  if (response.status !== 200) throw new StockError(response.status, reason(response.body))
+  return response.body as Requisition
+}
+
+/** Fulfils requisition `id` with the batches picked: they leave as a transfer to the ward. */
+export async function fulfilRequisition(transport: Transport, id: string, lines: Picked[]): Promise<Requisition> {
+  const response = await transport.request({ method: 'POST', path: `/stock/requisitions/${encodeURIComponent(id)}/fulfil`, body: { lines } })
+  if (response.status !== 200) throw new StockError(response.status, reason(response.body))
+  return response.body as Requisition
+}

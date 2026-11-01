@@ -6,8 +6,10 @@
 //! - `GET /reorder?store=&days=`: min/max reorder suggestions from recent consumption;
 //! - `POST /gs1`: a scanned or printed GS1 DataMatrix, read into its GTIN, expiry, batch and
 //!   serial;
+//! - `GET /requisitions?store=`: the requisitions a store asked for or was asked, newest first;
 //! - `POST /requisitions`, `POST /requisitions/{id}/decision`: a ward's requisition, and the
-//!   pharmacy's approval or refusal.
+//!   pharmacy's approval or refusal;
+//! - `POST /requisitions/{id}/fulfil`: the batches picked, dispatched as a transfer to the ward.
 
 use std::str::FromStr;
 
@@ -20,6 +22,7 @@ use health_access_policy::Subject;
 use health_inventory::receiving::{
     GoodsReceived, ReceivedLine, ReorderPolicy, RequestedLine, Requisition, parse_gs1,
 };
+use health_inventory::transfers::TransferLine;
 use health_inventory::{Ownership, Policy, Status};
 use health_inventory_app::{Inventory, InventoryError, Sender, supply_requests};
 use health_time::Timestamp;
@@ -290,6 +293,91 @@ async fn requisition(
     }
 }
 
+fn requisition_json(r: &Requisition) -> Value {
+    json!({
+        "id": r.id,
+        "requesting_store": r.requesting_store,
+        "supplying_store": r.supplying_store,
+        "lines": r.lines.iter().map(|l| json!({ "product": l.product, "quantity": l.quantity })).collect::<Vec<_>>(),
+        "status": match r.status {
+            health_inventory::receiving::RequisitionStatus::Requested => "requested",
+            health_inventory::receiving::RequisitionStatus::Approved => "approved",
+            health_inventory::receiving::RequisitionStatus::Fulfilled => "fulfilled",
+            health_inventory::receiving::RequisitionStatus::Rejected => "rejected",
+        },
+        "requested_by": r.requested_by,
+        "decided_by": r.decided_by,
+        "transfer": r.transfer,
+    })
+}
+
+async fn requisitions(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Query(query): Query<StoreQuery>,
+) -> Response {
+    if let Err(response) = staff(subject) {
+        return *response;
+    }
+    match inventory(&server).requisitions(&query.store).await {
+        Ok(list) => Json(Value::Array(list.iter().map(requisition_json).collect())).into_response(),
+        Err(error) => failed(&error),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct PickedLine {
+    product: String,
+    batch: String,
+    expiry: String,
+    #[serde(default = "government")]
+    funding_source: String,
+    #[serde(default)]
+    consignment: bool,
+    quantity: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct FulfilBody {
+    lines: Vec<PickedLine>,
+}
+
+async fn fulfil(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(body): Json<FulfilBody>,
+) -> Response {
+    let subject = match staff(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let lines = body
+        .lines
+        .into_iter()
+        .map(|l| TransferLine {
+            product: l.product,
+            batch: l.batch,
+            expiry: l.expiry,
+            funding_source: l.funding_source,
+            ownership: if l.consignment {
+                Ownership::Consignment
+            } else {
+                Ownership::Owned
+            },
+            quantity: l.quantity,
+        })
+        .collect();
+    let transfer = format!("transfer-{id}");
+    match inventory(&server)
+        .fulfil_requisition(&id, &transfer, lines, &sender(&subject), Timestamp::now())
+        .await
+    {
+        Ok((requisition, _)) => Json(requisition_json(&requisition)).into_response(),
+        Err(error) => failed(&error),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct DecisionBody {
     approve: bool,
@@ -310,7 +398,9 @@ async fn decide(
         .await
     {
         Ok(requisition) => {
-            Json(json!({ "supplyRequests": supply_requests(&requisition) })).into_response()
+            let mut body = requisition_json(&requisition);
+            body["supplyRequests"] = json!(supply_requests(&requisition));
+            Json(body).into_response()
         }
         Err(error) => failed(&error),
     }
@@ -324,8 +414,9 @@ impl FhirServer {
             .route("/on-hand", get(on_hand))
             .route("/reorder", get(reorder))
             .route("/gs1", post(gs1))
-            .route("/requisitions", post(requisition))
+            .route("/requisitions", get(requisitions).post(requisition))
             .route("/requisitions/{id}/decision", post(decide))
+            .route("/requisitions/{id}/fulfil", post(fulfil))
             .with_state(self.clone())
     }
 }

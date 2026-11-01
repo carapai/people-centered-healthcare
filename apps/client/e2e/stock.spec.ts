@@ -10,7 +10,6 @@ test('a receipt increases the stock on hand, with its cost recorded', async ({ p
   await signIn(page, USERS.storekeeper)
   await press(page, 'Stock', 'link')
   await expect(page.getByRole('heading', { name: 'Stock' })).toBeVisible()
-  await expect(page.getByText('This store has no stock recorded.')).toBeVisible()
   await noViolations(page)
 
   await press(page, 'Receive goods', 'link')

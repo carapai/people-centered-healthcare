@@ -16,13 +16,13 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
-| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 4 | 7 |
+| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 5 | 7 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 62 of 133 implementation tasks done. Validation spikes open: 3.
+Total: 63 of 133 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -176,3 +176,8 @@ Total: 62 of 133 implementation tasks done. Validation spikes open: 3.
 - 2026-11-01: #130 merged (#251). #131: stock valuation and inventory-accounting postings.
   - **Valuation:** weighted average or FIFO, rebuilt from the movement ledger; consignment carries no value, and donor stock is valued at its declared price.
   - **Postings:** one balanced posting per costed movement when inventory accounting is enabled; the inventory account equals the valuation. The financial ledger has no storage yet, so the postings are not persisted.
+- 2026-11-01: #131 merged (#252). #250: the ward requisition screens.
+  - **API:** listing a store's requisitions, and fulfilment.
+  - **Screen:** Requisitions (`/stock/requisitions`): ask, approve or refuse, pick a batch, and send.
+  - **e2e:** the stock leaves the pharmacy as a transfer to the ward.
+  - **Fix:** the lossless JSON numbers crashed a React render; they are now shown as strings.

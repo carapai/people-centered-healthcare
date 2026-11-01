@@ -48,6 +48,7 @@ export function StockPage() {
         <Field.Input value={store} onChange={(event) => setStore(event.target.value)} autoComplete="off" />
       </Field.Root>
       <Link to="/stock/receive">{intl.formatMessage(messages.stReceive)}</Link>
+      <Link to="/stock/requisitions">{intl.formatMessage(messages.rqTitle)}</Link>
       {onHand.isError ? (
         <p role="alert" className={css({ color: 'danger.text' })}>
           {intl.formatMessage(messages.stFailed)}

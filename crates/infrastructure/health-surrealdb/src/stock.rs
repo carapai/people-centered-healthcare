@@ -271,4 +271,17 @@ impl StockStore for SurrealTx {
             .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
             .transpose()
     }
+
+    async fn requisitions(&mut self) -> Result<Vec<Requisition>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM stock_requisition ORDER BY id",
+                vec![],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .collect()
+    }
 }

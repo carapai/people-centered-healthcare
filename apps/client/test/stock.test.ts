@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { StockError, lineComplete, onHandQuery, readGs1, receiveGoods, reorderQuery } from '../src/features/stock/api'
+import { StockError, decideRequisition, fulfilRequisition, lineComplete, onHandQuery, readGs1, receiveGoods, reorderQuery, requestStock, requisitionsQuery } from '../src/features/stock/api'
 import { fakeTransport } from './fake'
 
 const line = { product: 'amox', batch: 'B42', expiry: '2027-06-30', quantity: 1000, pack_size: 100, unit_cost: '1.50' }
@@ -31,5 +31,22 @@ describe('stock', () => {
     expect(transport.sent.map((r) => r.path)).toEqual(['/stock/on-hand?store=Location%2Fpharmacy', '/stock/reorder?store=Location%2Fpharmacy&days=30'])
     const scanned = fakeTransport(() => ({ body: { gtin: '09501101530003', expiry: '2027-06-30', batch: 'B42', serial: null } }))
     await expect(readGs1(scanned, '(01)09501101530003(17)270630(10)B42')).resolves.toMatchObject({ batch: 'B42' })
+  })
+
+  test('requisitions are listed, sent, decided and fulfilled', async () => {
+    const transport = fakeTransport((request) =>
+      request.method === 'GET' ? { body: [] } : request.path === '/stock/requisitions' ? { status: 201, body: { id: 'req-1' } } : { body: { id: 'req-1', status: 'approved' } },
+    )
+    await requisitionsQuery(transport, 'Location/ward').queryFn({})
+    await expect(requestStock(transport, 'Location/ward', 'Location/pharmacy', [{ product: 'ors', quantity: 50 }])).resolves.toBe('req-1')
+    await decideRequisition(transport, 'req-1', true)
+    await fulfilRequisition(transport, 'req-1', [{ product: 'ors', batch: 'R1', expiry: '2028-01-31', funding_source: 'government', quantity: 50 }])
+    expect(transport.sent.map((r) => [r.method, r.path])).toEqual([
+      ['GET', '/stock/requisitions?store=Location%2Fward'],
+      ['POST', '/stock/requisitions'],
+      ['POST', '/stock/requisitions/req-1/decision'],
+      ['POST', '/stock/requisitions/req-1/fulfil'],
+    ])
+    expect(transport.sent[1]?.body).toEqual({ requesting_store: 'Location/ward', supplying_store: 'Location/pharmacy', lines: [{ product: 'ors', quantity: 50 }] })
   })
 })
