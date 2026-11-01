@@ -1181,6 +1181,24 @@ DEFINE TABLE procedure_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON procedure_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON procedure_history TYPE int PERMISSIONS FULL
   DEFINE INDEX procedure_history_last_updated ON procedure_history FIELDS last_updated, version_seq
+DEFINE TABLE provenance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON provenance TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON provenance TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON provenance TYPE record PERMISSIONS FULL
+  DEFINE FIELD json ON provenance TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON provenance TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD owner ON provenance TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_id ON provenance TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON provenance TYPE int PERMISSIONS FULL
+  DEFINE INDEX provenance_owner ON provenance FIELDS owner
+DEFINE TABLE provenance_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON provenance_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON provenance_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON provenance_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD owner ON provenance_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_id ON provenance_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON provenance_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX provenance_history_last_updated ON provenance_history FIELDS last_updated, version_seq
 DEFINE TABLE questionnaire TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON questionnaire TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON questionnaire TYPE array<record> DEFAULT [] PERMISSIONS FULL

@@ -148,6 +148,9 @@ impl From<WriteError> for FhirError {
                 "a number sequence is exhausted",
             ),
             WriteError::Json(e) => Self::bad_request(e.to_string()),
+            WriteError::Invalid(why) => {
+                Self::new(StatusCode::UNPROCESSABLE_ENTITY, "processing", why)
+            }
             WriteError::Store(e) => e.into(),
         }
     }

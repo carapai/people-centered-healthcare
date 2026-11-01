@@ -32,6 +32,10 @@ pub struct ResourceOwnership {
     pub partitions: &'static [Partition],
 }
 
+/// The Owner of a Provenance: its target's (resource-ownership.md rule 7). Each Provenance row
+/// carries the actual Owner in its `owner` column ([`provenance_owner`]).
+pub const TARGET_OWNER: &str = "target";
+
 /// The Owner of the unit of work's own tables.
 pub const UNIT_OF_WORK: &str = "unit-of-work";
 
@@ -100,6 +104,22 @@ pub fn resource(resource_type: &str) -> Option<&'static ResourceOwnership> {
     generated::RESOURCES
         .iter()
         .find(|r| r.resource_type == resource_type)
+}
+
+/// The target of a Provenance: the type and id of its first `target` reference
+/// (`Type/id` or `Type/id/_history/version`).
+pub fn provenance_target(record: &Value) -> Option<(&str, &str)> {
+    let reference = record["target"].as_array()?.first()?["reference"].as_str()?;
+    let mut parts = reference.split('/');
+    Some((parts.next()?, parts.next()?))
+}
+
+/// The Owner of a Provenance whose target is `target` (`target_type` stored as `target_record`).
+pub fn provenance_owner(target_type: &str, target_record: &Value) -> Option<&'static str> {
+    if target_type == "Provenance" {
+        return None;
+    }
+    owner_of(target_type, target_record)
 }
 
 /// The Owner of one record: the first partition whose category coding it carries, otherwise

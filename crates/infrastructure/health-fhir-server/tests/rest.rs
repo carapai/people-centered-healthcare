@@ -365,7 +365,7 @@ async fn the_capability_statement_matches_behaviour() {
         "application/fhir+json".to_owned(),
     )];
     let resources = rest["resource"].as_array().expect("resources");
-    assert_eq!(resources.len(), 84);
+    assert_eq!(resources.len(), 85);
     for resource in resources {
         let t = resource["type"].as_str().expect("type");
         let codes: Vec<&str> = resource["interaction"]
@@ -388,6 +388,22 @@ async fn the_capability_statement_matches_behaviour() {
         let id = ResourceId::new();
         // A minimal valid instance: every required element, placeholder values (tier 1).
         let mut skeleton = health_fhir_validation::skeleton(t).expect("skeleton");
+        if t == "Provenance" {
+            // The store gives a Provenance its target's Owner, so the target must be stored.
+            let patient = ResourceId::new();
+            let mut target = health_fhir_validation::skeleton("Patient").expect("skeleton");
+            target["id"] = Value::String(patient.to_string());
+            let put = send(
+                &router,
+                "PUT",
+                &format!("/Patient/{patient}"),
+                &json,
+                target.to_string(),
+            )
+            .await;
+            assert_eq!(put.status, StatusCode::CREATED, "{}", put.body);
+            skeleton["target"] = serde_json::json!([{ "reference": format!("Patient/{patient}") }]);
+        }
         let body_without_id = skeleton.to_string();
         skeleton["id"] = Value::String(id.to_string());
         let body = skeleton.to_string();

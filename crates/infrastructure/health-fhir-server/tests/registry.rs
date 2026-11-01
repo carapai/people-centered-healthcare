@@ -311,8 +311,18 @@ async fn link_and_unlink_are_audited_and_queue_survivorship_review() {
         unlinked["parameter"][0]["valueReference"]["reference"],
         golden
     );
-    // Each link writes two versions (golden and source), as does the unlink.
-    assert_eq!(audited_by(&store, "reviewer-1").await.len(), 6);
+    // Each link writes two versions (golden and source), as does the unlink; the rest are the
+    // Provenance of the golden record's changed values (#196).
+    let audited = audited_by(&store, "reviewer-1").await;
+    let of = |kind: &str| {
+        audited
+            .iter()
+            .filter(|e| e["entity"].to_string().contains(&format!("\"{kind}/")))
+            .count()
+    };
+    assert_eq!(of("Patient"), 6);
+    assert!(of("Provenance") > 0);
+    assert_eq!(of("Patient") + of("Provenance"), audited.len());
     // A source already linked cannot be linked again.
     let (status, _) = send(&app, "POST", &format!("/Patient/{a}/$link"), None).await;
     assert_eq!(status, StatusCode::CONFLICT);

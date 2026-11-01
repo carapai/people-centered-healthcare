@@ -117,6 +117,8 @@ fn every_owner_is_a_module_in_the_ownership_doc() {
     let owners: BTreeSet<&str> = ownership::resources()
         .iter()
         .flat_map(|r| std::iter::once(r.owner).chain(r.partitions.iter().map(|p| p.owner)))
+        // A Provenance is its target's Owner's, not a module of its own (rule 7).
+        .filter(|owner| *owner != ownership::TARGET_OWNER)
         .collect();
     for owner in owners {
         assert!(

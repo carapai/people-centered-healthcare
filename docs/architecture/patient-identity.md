@@ -70,7 +70,7 @@ flowchart LR
 - **`health-client-registry`** (domain): survivorship, the golden record with link, unlink and adjudication markers, merge planning, and the ECID.
 - **`health-registries-app`** (application): the link, unlink and `$merge` use cases over the store, with the FHIR mapping. Each use case runs in one transaction and audits every version it writes.
 - **Not yet:**
-  - Provenance per surviving value is [#196](https://github.com/carapai/people-centered-healthcare/issues/196). For now each value's origin is an extension on the golden Patient.
+  - Nothing for origin: each golden write stores one Provenance per surviving value that changed, in its transaction (#196). The origin extensions on the golden Patient stay, for survivorship.
 - **HTTP operations** (#197): `FhirServer::with_client_registry` serves, for reviewers:
   - **The operations:** `POST /Patient/$merge` (`source-patient`, `target-patient`, `preview`), `POST /Patient/{id}/$link` (`golden`, optional) and `POST /Patient/{id}/$unlink`.
   - **Who may use them:** the reviewer is the request's subject, from the verified token. Their roles must map to `registry.review` and `Patient` update.

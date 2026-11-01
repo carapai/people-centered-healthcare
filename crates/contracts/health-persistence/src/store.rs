@@ -42,6 +42,10 @@ pub enum WriteError {
     /// The request JSON could not be stamped.
     #[error("invalid resource JSON: {0}")]
     Json(#[from] crate::RawJsonError),
+    /// The store refuses the resource's content (HTTP 422): a Provenance whose target is not
+    /// stored, for example.
+    #[error("refused: {0}")]
+    Invalid(String),
     /// The store failed.
     #[error(transparent)]
     Store(#[from] StoreError),

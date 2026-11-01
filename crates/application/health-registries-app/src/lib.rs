@@ -236,6 +236,20 @@ where
         json: &Value,
         precondition: Precondition,
     ) -> Result<(), RegistryError> {
+        // A golden record's surviving values, before this write, for their Provenance.
+        let before = if is_golden(json) {
+            match tx.read(&patient_type(), id).await? {
+                Some(previous) if !previous.version.deleted => {
+                    serde_json::from_str::<Value>(previous.json.as_str())
+                        .ok()
+                        .and_then(|v| golden_record(&v).ok())
+                        .map(|g| g.claims)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         let raw = RawJson::from_validated(json.to_string());
         tx.write(WriteRequest {
             resource_type: patient_type(),
@@ -250,6 +264,40 @@ where
             .await?
             .ok_or_else(|| RegistryError::Store("written Patient is missing".into()))?;
         self.audit.written(tx, actor, reason, &stored.json).await?;
+        if is_golden(json) {
+            // One Provenance per surviving value that changed, in this transaction (#196).
+            let after = golden_record(json)?.claims;
+            let recorded = stored.version.last_updated.to_string();
+            let version = stored.version.version_id.to_string();
+            for (field, claim) in &after {
+                if before.as_ref().and_then(|b| b.get(field)) == Some(claim) {
+                    continue;
+                }
+                let provenance = fhir::survivorship_provenance(
+                    &id.to_string(),
+                    &version,
+                    *field,
+                    claim,
+                    actor,
+                    &recorded,
+                );
+                let provenance_type: ResourceType = "Provenance"
+                    .parse()
+                    .map_err(|_| RegistryError::Store("Provenance".into()))?;
+                let provenance_id = ResourceId::new();
+                tx.write(WriteRequest {
+                    resource_type: provenance_type.clone(),
+                    id: provenance_id,
+                    json: RawJson::from_validated(provenance.to_string()),
+                    op_id: OpId::new(),
+                    precondition: Precondition::MustNotExist,
+                })
+                .await?;
+                if let Some(written) = tx.read(&provenance_type, provenance_id).await? {
+                    self.audit.written(tx, actor, reason, &written.json).await?;
+                }
+            }
+        }
         Ok(())
     }
 
