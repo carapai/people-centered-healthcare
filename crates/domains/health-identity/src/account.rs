@@ -3,6 +3,9 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use health_time::Timestamp;
+
+use crate::PhoneNumber;
 use crate::lockout::Lockout;
 
 /// A Login Account's id: a UUIDv7 minted by central.
@@ -38,6 +41,21 @@ pub struct LoginAccount {
     pub status: AccountStatus,
     /// Failed-login state, per user (per edge on an edge).
     pub lockout: Lockout,
+}
+
+/// A patient's Login Account: one per verified phone number (ADR 0029). It has no password; each
+/// sign-in is a one-time code to [`phone`](Self::phone). It reaches patient data only through a
+/// Person in the client registry, never by the phone number matching a Patient's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhoneAccount {
+    /// The account id.
+    pub id: AccountId,
+    /// The verified phone number, unique among phone accounts.
+    pub phone: PhoneNumber,
+    /// Active or disabled.
+    pub status: AccountStatus,
+    /// When the phone was verified (`level1`).
+    pub verified_at: Timestamp,
 }
 
 #[cfg(test)]

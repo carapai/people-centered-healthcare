@@ -149,6 +149,7 @@ Documentation, medications, laboratory, care plans, clinical inbox (§133).
 Accounts, self-registration, verification, caregivers, requests, care journeys (§134).
 
 - [Implement Login Accounts, Person links and self-registration](https://github.com/carapai/people-centered-healthcare/issues/111)
+- [Choose the SMS provider for patient one-time codes](https://github.com/carapai/people-centered-healthcare/issues/235) — needs a human
 - [Integrate NIRA verification](https://github.com/carapai/people-centered-healthcare/issues/112) — needs a human
 - [Implement caregiver delegation](https://github.com/carapai/people-centered-healthcare/issues/113)
 - [Implement patient requests and appointment proposals](https://github.com/carapai/people-centered-healthcare/issues/114)

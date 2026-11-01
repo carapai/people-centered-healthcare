@@ -10,11 +10,14 @@
 //!   re-links the pair. Nothing is merged automatically.
 //! - **`$merge`** is only for two source records of the same facility, after a preview and a
 //!   human approval ([`plan_merge`]); references are never rewritten.
+//! - **A Login Account's [`person::Person`]** links to source Patients at an assurance level.
+//!   Linking to an existing Patient needs `level3`; a phone account is never linked automatically.
 
 mod ecid;
 mod golden;
 pub mod matching;
 mod merge;
+pub mod person;
 mod review;
 mod survivorship;
 

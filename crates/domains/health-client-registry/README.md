@@ -34,3 +34,7 @@ Layer: **domain** (Registries). Source Patients, golden records and their links 
   - **`decide`** accepts only the decisions that fit the item: same person or different people, keep current or take incoming. It needs a named reviewer, and refuses an item that is already decided.
   - **`overdue`:** pending past `AGEING` (7 days).
   - **`ReviewQueue`** is the storage port; `health-surrealdb` implements it (migration `0007_registry_review`).
+- **`person`:** a Login Account's `Person` (#111; ADR 0029).
+  - **`Person.link`** names a source Patient the account may act as, at an `Assurance`: `level1` from a phone code, `level3` from a NIRA NIN check or an in-person check of an ID document (`Evidence`, `Verification`).
+  - **`link_existing`** links an existing Patient only on a `level3` verification: a phone account is never linked automatically. `link_self_registered` links the Patient the account's own registration created, at the account's level. `verify` raises a link's assurance and never lowers it.
+  - **`access`:** no link sees nothing; below `level3`, only what the patient submitted (`PortalAccess::SelfSubmitted`); `level3` sees released records too, subject to the PDP and sensitivity labels.

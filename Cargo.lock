@@ -2238,6 +2238,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-patient-engagement"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "health-persistence"
 version = "0.1.0"
 dependencies = [

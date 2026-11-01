@@ -13,7 +13,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
-| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 0 | 5 |
+| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 0 | 6 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 1 | 5 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 57 of 128 implementation tasks done. Validation spikes open: 3.
+Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -118,3 +118,7 @@ Total: 57 of 128 implementation tasks done. Validation spikes open: 3.
   - **Domain (`health-inventory`):** Stock Units, movements, reversals, the negative-stock policy (blocked at the authority, emergency dispense with permission and reason, late operations flagged, store tightening and relaxing) and the stock card ordered by occurrence.
   - **Use cases (`health-inventory-app`):** each movement reads and writes its unit's balance record in one transaction; a write conflict reruns it. Six concurrent issues of the last pack: exactly one succeeds. Status changes move stock between units in one transaction; the nightly check rebuilds balances and reports drift.
   - **SurrealDB:** migration `0011_stock`.
+- 2026-11-01: #127 merged (#234). #111 part 1, the domain of patients' phone accounts and self-registration. Patients sign in with a one-time code every time, with no password; the SMS provider is #235, which needs a person.
+  - **`health-identity`:** `PhoneAccount`, E.164 `PhoneNumber`, and `OtpPolicy`/`OtpChallenge` (6 digits, 5 minutes, 5 tries, 1 a minute and 5 an hour per phone).
+  - **`health-client-registry::person`:** `Person` links at `level1` or `level3`. Linking an existing Patient needs `level3`; below it, only self-submitted data is visible.
+  - **`health-patient-engagement`** (new): the §59 Registration Request. A certain match below `level3` goes to review, never to a link.
