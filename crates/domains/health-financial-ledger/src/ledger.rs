@@ -463,3 +463,33 @@ impl Ledger {
         balances
     }
 }
+
+/// The postings' storage, inside a transaction (the ledger's driven port). Postings are
+/// appended once and never changed.
+pub trait PostingStore {
+    /// Appends a posting; a second posting with the same id fails.
+    fn append_posting(
+        &mut self,
+        posting: &Posting,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// Every posting, oldest first.
+    fn postings(
+        &mut self,
+    ) -> impl std::future::Future<Output = Result<Vec<Posting>, health_persistence::StoreError>> + Send;
+}
+
+impl Ledger {
+    /// The ledger rebuilt from stored `postings` (each checked again as it is appended).
+    pub fn from_postings(
+        facility: &str,
+        currency: Currency,
+        chart: ChartOfAccounts,
+        postings: Vec<Posting>,
+    ) -> Result<Self, PostingRefused> {
+        let mut ledger = Self::new(facility, currency, chart);
+        for posting in postings {
+            ledger.post(posting)?;
+        }
+        Ok(ledger)
+    }
+}

@@ -21,6 +21,7 @@ mod history;
 mod inbound;
 mod migrations;
 pub mod ownership;
+mod payments;
 mod phone;
 mod review;
 pub mod search;

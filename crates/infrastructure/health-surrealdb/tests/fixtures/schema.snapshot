@@ -199,6 +199,11 @@ DEFINE TABLE caregiver_grant TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD patient ON caregiver_grant TYPE string PERMISSIONS FULL
   DEFINE INDEX caregiver_grant_caregiver ON caregiver_grant FIELDS caregiver
   DEFINE INDEX caregiver_grant_patient ON caregiver_grant FIELDS patient
+DEFINE TABLE cash_shift TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON cash_shift TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON cash_shift TYPE string PERMISSIONS FULL
+  DEFINE FIELD till ON cash_shift TYPE string PERMISSIONS FULL
+  DEFINE INDEX cash_shift_till ON cash_shift FIELDS till, status
 DEFINE TABLE charge_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON charge_item TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON charge_item TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -829,6 +834,10 @@ DEFINE TABLE invoice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON invoice_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON invoice_history TYPE int PERMISSIONS FULL
   DEFINE INDEX invoice_history_last_updated ON invoice_history FIELDS last_updated, version_seq
+DEFINE TABLE ledger_posting TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD at ON ledger_posting TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD data ON ledger_posting TYPE string PERMISSIONS FULL
+  DEFINE INDEX ledger_posting_at ON ledger_posting FIELDS at
 DEFINE TABLE library TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON library TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON library TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -1060,6 +1069,13 @@ DEFINE TABLE patient_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON patient_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON patient_history TYPE int PERMISSIONS FULL
   DEFINE INDEX patient_history_last_updated ON patient_history FIELDS last_updated, version_seq
+DEFINE TABLE payment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON payment TYPE string PERMISSIONS FULL
+  DEFINE FIELD recorded_at ON payment TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD shift ON payment TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD status ON payment TYPE string PERMISSIONS FULL
+  DEFINE INDEX payment_shift ON payment FIELDS shift, recorded_at
+  DEFINE INDEX payment_status ON payment FIELDS status, recorded_at
 DEFINE TABLE payment_notice TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON payment_notice TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON payment_notice TYPE array<record> DEFAULT [] PERMISSIONS FULL

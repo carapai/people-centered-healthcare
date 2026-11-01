@@ -20,8 +20,12 @@ use health_financial_ledger::{
     Currency, DEPOSITS, Dimensions, IN_TRANSIT, Line, Money, Posting, Side, TILL_VARIANCE,
 };
 use health_payments::{Method, Payment, Purpose, Shift, Status};
+
+mod service;
+
 use health_time::Timestamp;
 use rust_decimal::Decimal;
+pub use service::{Payments, PaymentsError, Settings};
 
 /// Where payments land in the chart of accounts.
 #[derive(Debug, Clone, PartialEq, Eq)]
