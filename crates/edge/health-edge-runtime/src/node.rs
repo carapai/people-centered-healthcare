@@ -10,6 +10,7 @@ use health_http::{Readiness, ReadinessCheck, app};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
 
+use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
@@ -216,6 +217,23 @@ pub async fn run(
                 }
             }
         });
+    }
+    match (&config.backup_dir, &config.backup_key_file, store.0.get()) {
+        (Some(root), Some(key_file), Some(connection)) => {
+            let schedule = Schedule {
+                backups: Backups::new(root, &config.node_id),
+                key_file: key_file.clone(),
+                every: config.backup_interval,
+                test_every: config.backup_test_interval,
+                data_dir: config.data_dir.clone(),
+            };
+            let connection = connection.clone();
+            supervisor.spawn("backup", move || schedule.clone().run(connection.clone()));
+        }
+        _ => tracing::warn!(
+            alert = "backups-off",
+            "no HEALTH_BACKUP_DIR: this node takes no backups"
+        ),
     }
     if let Some(ups) = &config.ups {
         let (ups, poll, low) = (ups.clone(), config.ups_poll, Arc::clone(&low_battery));

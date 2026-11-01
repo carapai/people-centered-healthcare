@@ -13,7 +13,10 @@
 //!    migration rolls it back.
 //! 5. A stop (a signal, a UPS low-battery signal, or a task that keeps failing): `/ready`
 //!    reports `not-ready`, in-flight requests drain, and the store closes.
+//!
+//! Once ready, the node also takes its scheduled backups ([`backup`]).
 
+pub mod backup;
 mod config;
 mod node;
 mod notify;

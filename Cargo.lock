@@ -1487,9 +1487,11 @@ dependencies = [
 name = "facility-edge"
 version = "0.1.0"
 dependencies = [
+ "health-backup",
  "health-edge-runtime",
  "health-observability",
  "health-surrealdb",
+ "health-time",
  "p256",
  "serde_json",
  "tempfile",
@@ -2114,8 +2116,11 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "flate2",
+ "health-backup",
+ "health-files",
  "health-http",
  "health-surrealdb",
+ "health-time",
  "p256",
  "serde",
  "serde_json",

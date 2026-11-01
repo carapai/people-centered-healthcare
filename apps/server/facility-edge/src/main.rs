@@ -6,6 +6,7 @@
 //!   systemd, `Type=notify` (`packaging/facility-edge.service`); on Windows, the Service Control
 //!   Manager (`packaging/install-service.ps1`).
 //! - `facility-edge update …`: signed updates ([`update`]).
+//! - `facility-edge backup …`: backups on demand, to USB, verify and restore ([`backup`]).
 //!
 //! Exit codes, for the service manager and the update rollback:
 //!
@@ -19,8 +20,10 @@
 //! | 6 | a failed update was rolled back; the next start runs the previous binary |
 //! | 7 | an update step failed, or an `update` command was refused: needs a person |
 //! | 8 | a failed update's store is restored; the service manager restores the previous binary |
+//! | 9 | a `backup` command failed |
 //! | 1 | anything else (the listener, telemetry, serving) |
 
+mod backup;
 mod service;
 mod update;
 
@@ -50,8 +53,15 @@ fn main() -> ExitCode {
                 ExitCode::from(7)
             }
         },
+        Some("backup") => match backup::run(&config, &args[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("facility-edge: {error}");
+                ExitCode::from(9)
+            }
+        },
         Some(_) => {
-            eprintln!("usage: facility-edge [--service | update …]");
+            eprintln!("usage: facility-edge [--service | update … | backup …]");
             ExitCode::from(2)
         }
     }

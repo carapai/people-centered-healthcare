@@ -34,6 +34,19 @@ pub struct EdgeConfig {
     pub update_dir: PathBuf,
     /// `HEALTH_UPDATE_KEY_FILE`: the pinned release key (hex SEC1), for staging packages.
     pub update_key_file: Option<PathBuf>,
+    /// `HEALTH_NODE_ID`: the name backups are taken under, default `facility-edge`.
+    pub node_id: String,
+    /// `HEALTH_BACKUP_DIR`: where backups go, on the second volume. Optional: without it the
+    /// node takes none, and says so at every start.
+    pub backup_dir: Option<PathBuf>,
+    /// `HEALTH_BACKUP_KEY_FILE`: the node's backup key, 64 hex characters. Required with
+    /// `HEALTH_BACKUP_DIR`.
+    pub backup_key_file: Option<PathBuf>,
+    /// `HEALTH_BACKUP_INTERVAL_SECS`, default 3600 (hourly).
+    pub backup_interval: Duration,
+    /// `HEALTH_BACKUP_TEST_SECS`: how often the newest backup is test-restored, default 604800
+    /// (weekly).
+    pub backup_test_interval: Duration,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -57,6 +70,10 @@ impl EdgeConfig {
                 .transpose()
                 .map(|s| Duration::from_secs(s.unwrap_or(default)))
         };
+        let positive = |name: &'static str, default: u64| match seconds(name, default)? {
+            d if d.is_zero() => Err(ConfigError::Malformed(name)),
+            d => Ok(d),
+        };
         let data_dir: PathBuf = get("HEALTH_DATA_DIR")
             .map(PathBuf::from)
             .ok_or(ConfigError::Missing("HEALTH_DATA_DIR"))?;
@@ -79,6 +96,14 @@ impl EdgeConfig {
                 .transpose()?,
             ups_poll: seconds("HEALTH_UPS_POLL_SECS", 5)?,
             drain: seconds("HEALTH_DRAIN_SECS", 20)?,
+            node_id: get("HEALTH_NODE_ID").unwrap_or_else(|| "facility-edge".into()),
+            backup_key_file: match (get("HEALTH_BACKUP_DIR"), get("HEALTH_BACKUP_KEY_FILE")) {
+                (Some(_), None) => return Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE")),
+                (_, key) => key.map(PathBuf::from),
+            },
+            backup_dir: get("HEALTH_BACKUP_DIR").map(PathBuf::from),
+            backup_interval: positive("HEALTH_BACKUP_INTERVAL_SECS", 3600)?,
+            backup_test_interval: positive("HEALTH_BACKUP_TEST_SECS", 604_800)?,
         })
     }
 }
@@ -104,6 +129,26 @@ mod tests {
         assert_eq!(c.ups, None);
         assert_eq!(c.drain, Duration::from_secs(20));
         assert_eq!(c.update_dir, PathBuf::from("/var/lib/updates"));
+        assert_eq!((c.backup_dir, c.backup_key_file), (None, None));
+        assert_eq!(c.backup_interval, Duration::from_secs(3600));
+        assert_eq!(c.backup_test_interval, Duration::from_secs(604_800));
+    }
+
+    #[test]
+    fn backups_need_their_key() {
+        let dir = ("HEALTH_DATA_DIR", "/d");
+        let backups = ("HEALTH_BACKUP_DIR", "/backup");
+        assert_eq!(
+            config(&[dir, backups]),
+            Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE"))
+        );
+        assert_eq!(
+            config(&[dir, ("HEALTH_BACKUP_INTERVAL_SECS", "0")]),
+            Err(ConfigError::Malformed("HEALTH_BACKUP_INTERVAL_SECS"))
+        );
+        let c = config(&[dir, backups, ("HEALTH_BACKUP_KEY_FILE", "/k")]).expect("config");
+        assert_eq!(c.backup_dir, Some(PathBuf::from("/backup")));
+        assert_eq!(c.backup_key_file, Some(PathBuf::from("/k")));
     }
 
     #[test]
