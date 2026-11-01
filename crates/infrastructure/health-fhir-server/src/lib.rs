@@ -61,6 +61,7 @@ mod http;
 mod interactions;
 mod ops;
 mod outcome;
+mod portal;
 mod references;
 mod registry;
 mod search;

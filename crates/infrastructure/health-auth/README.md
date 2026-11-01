@@ -65,6 +65,10 @@ Refusals:
 - an unknown purpose of use is 400;
 - a request with no credentials at all passes without a subject, so the routes decide (the FHIR server serves only `/metadata` without one).
 
+## Patient subjects (#111)
+
+Patients have no permission snapshot, so the portal's routes sit behind `patient_layer` rather than `subject_layer`. It inserts a `health_access_policy::PatientSubject` (the phone account and its phone) for a patient's live token of an active phone account. A staff token is 403, an invalid one 401, and a request with no credentials passes without a subject.
+
 ## Break-glass (offline-auth.md § Break-glass)
 
 `Subjects::routes()` serves, under `/api` at central:

@@ -26,6 +26,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - A merge is for records of the reviewer's facility only.
   - Each version written is audited in its transaction, through `AuditTrail` over the server's `Auditor`, naming the reviewer.
   - The operations are not yet declared in the CapabilityStatement.
+- **Self-registration (#111):** `portal_router()` serves patients signed in with their phone, behind `health_auth::patient_layer` (a `PatientSubject`; without one, 401).
+  - `GET /registration` is the account's Registration Request: `status`, `patient`, and `access` (`none`, `self-submitted` or `records`).
+  - `POST /registration` submits the self-registration QuestionnaireResponse (422 when invalid, 409 when already submitted).
+  - It implements `health_patient_engagement_app::PatientRegistry` over the client registry: `$match` for the answers, and `create_self_registered` for a new Patient. Each version written is audited, naming the patient account.
 
 ## Tests
 

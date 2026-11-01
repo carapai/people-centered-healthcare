@@ -183,6 +183,50 @@ where
         Ok((stored, json))
     }
 
+    /// Creates a self-registered source Patient (#111; patient-identity.md § Self-registration)
+    /// as `id`: tagged `provisional` and `patient-reported`, with no facility and no MRN. It is
+    /// never matched to a golden record automatically; it joins one only by a reviewer's decision.
+    /// Creating it again is a no-op, so a retried registration does not duplicate it.
+    pub async fn create_self_registered(
+        &self,
+        id: ResourceId,
+        patient: &Value,
+        actor: &str,
+    ) -> Result<(), RegistryError> {
+        if patient["resourceType"] != "Patient" {
+            return Err(RegistryError::WrongKind(
+                "a registration is a Patient".into(),
+            ));
+        }
+        let mut tx = self.store.begin().await?;
+        if tx.read(&patient_type(), id).await?.is_some() {
+            return Ok(());
+        }
+        let mut json = patient.clone();
+        json["id"] = json!(id.to_string());
+        json.as_object_mut()
+            .map(|o| o.remove("managingOrganization"));
+        let tags = [
+            json!({ "system": fhir::REGISTRY_TAG, "code": "provisional" }),
+            json!({ "system": fhir::ORIGIN_TAG, "code": "patient-reported" }),
+        ];
+        match json["meta"]["tag"].as_array_mut() {
+            Some(list) => list.extend(tags),
+            None => json["meta"]["tag"] = json!(tags),
+        }
+        self.write(
+            &mut tx,
+            actor,
+            "self-register",
+            id,
+            &json,
+            Precondition::MustNotExist,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub(crate) async fn write(
         &self,
         tx: &mut S::Tx,

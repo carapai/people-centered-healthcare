@@ -2080,6 +2080,8 @@ dependencies = [
  "health-fhir-validation",
  "health-identifiers",
  "health-identity-app",
+ "health-patient-engagement",
+ "health-patient-engagement-app",
  "health-persistence",
  "health-registries-app",
  "health-surrealdb",
@@ -2242,6 +2244,22 @@ name = "health-patient-engagement"
 version = "0.1.0"
 dependencies = [
  "thiserror",
+]
+
+[[package]]
+name = "health-patient-engagement-app"
+version = "0.1.0"
+dependencies = [
+ "health-client-registry",
+ "health-identifiers",
+ "health-patient-engagement",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

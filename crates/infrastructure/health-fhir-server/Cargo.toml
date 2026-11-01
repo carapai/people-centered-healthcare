@@ -22,6 +22,8 @@ health-fhir-search = { workspace = true }
 health-fhir-validation = { workspace = true }
 health-identifiers = { workspace = true }
 health-identity-app = { workspace = true }
+health-patient-engagement = { workspace = true }
+health-patient-engagement-app = { workspace = true }
 health-persistence = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }

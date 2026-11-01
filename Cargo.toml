@@ -17,6 +17,7 @@ members = [
     "crates/domains/health-workflow",
     "crates/application/health-identity-app",
     "crates/application/health-inventory-app",
+    "crates/application/health-patient-engagement-app",
     "crates/application/health-registries-app",
     "crates/infrastructure/health-audit",
     "crates/infrastructure/health-auth",
@@ -64,6 +65,7 @@ health-patient-engagement = { path = "crates/domains/health-patient-engagement" 
 health-workflow = { path = "crates/domains/health-workflow" }
 health-identity-app = { path = "crates/application/health-identity-app" }
 health-inventory-app = { path = "crates/application/health-inventory-app" }
+health-patient-engagement-app = { path = "crates/application/health-patient-engagement-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }

@@ -1,0 +1,28 @@
+[package]
+name = "health-patient-engagement-app"
+description = "Patient engagement use cases: self-registration from a patient's QuestionnaireResponse to a linked or new source Patient (patient-identity.md § Self-registration; ADR 0029)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "patient-engagement"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-client-registry = { workspace = true }
+health-identifiers = { workspace = true }
+health-patient-engagement = { workspace = true }
+health-persistence = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

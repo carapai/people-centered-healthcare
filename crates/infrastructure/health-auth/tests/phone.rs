@@ -43,6 +43,12 @@ async fn whoami(
         .map(|p| format!("{} {}", p.account, p.patient))
 }
 
+async fn portal_subject(
+    subject: Option<axum::Extension<health_access_policy::PatientSubject>>,
+) -> String {
+    subject.map_or_else(|| "none".to_owned(), |s| s.0.phone.clone())
+}
+
 fn harness() -> Harness {
     let clock = Arc::new(FixedClock::new(
         Timestamp::from_second(1_800_000_000).expect("time"),
@@ -64,9 +70,16 @@ fn harness() -> Harness {
         MemoryStore::default(),
         clock.clone(),
     );
+    let portal = Router::new().route("/portal", get(portal_subject)).layer(
+        axum::middleware::from_fn_with_state(
+            server.verifier(),
+            health_auth::patient_layer::<MemoryStore>,
+        ),
+    );
     let app = Router::new()
         .nest("/auth", server.router())
-        .route("/whoami", get(whoami).with_state(server.verifier()));
+        .route("/whoami", get(whoami).with_state(server.verifier()))
+        .merge(portal);
     Harness {
         app,
         clock,
@@ -333,4 +346,24 @@ async fn phone_sign_in_is_only_for_patient_clients_and_passwords_only_for_staff(
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("name=\"phone\"") && !body.contains("password"));
+}
+
+#[tokio::test]
+async fn the_patient_layer_gives_portal_routes_the_signed_in_patient() {
+    let h = harness();
+    let (_, tokens) = sign_in(&h).await;
+    let token = tokens["access_token"].as_str().expect("token");
+    let get = |auth: Option<String>| {
+        let mut request = Request::get("/portal");
+        if let Some(auth) = auth {
+            request = request.header(header::AUTHORIZATION, auth);
+        }
+        request.body(Body::empty()).expect("request")
+    };
+    let (status, _, body) = send(&h.app, get(Some(format!("Bearer {token}")))).await;
+    assert_eq!((status, body.as_str()), (StatusCode::OK, "+256772123456"));
+    let (status, _, body) = send(&h.app, get(None)).await;
+    assert_eq!((status, body.as_str()), (StatusCode::OK, "none"));
+    let (status, _, _) = send(&h.app, get(Some("Bearer not-a-token".into()))).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
