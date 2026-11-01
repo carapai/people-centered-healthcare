@@ -2292,6 +2292,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-payments"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "rust_decimal",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-payments-app"
+version = "0.1.0"
+dependencies = [
+ "health-financial-ledger",
+ "health-payments",
+ "health-time",
+ "rust_decimal",
+ "thiserror",
+]
+
+[[package]]
 name = "health-persistence"
 version = "0.1.0"
 dependencies = [

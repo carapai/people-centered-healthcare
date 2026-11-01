@@ -117,6 +117,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#121](https://github.com/carapai/people-centered-healthcare/issues/121) | Implement charge capture triggers | 12 | #120, #97 |  |
 | [#122](https://github.com/carapai/people-centered-healthcare/issues/122) | Implement Financial Gates | 12 | #121, #96 |  |
 | [#123](https://github.com/carapai/people-centered-healthcare/issues/123) | Implement tills and two-phase payments | 12 | #119 |  |
+| [#254](https://github.com/carapai/people-centered-healthcare/issues/254) | Persist payments and cashier shifts, and build the till screens | 12 | #123 |  |
 | [#124](https://github.com/carapai/people-centered-healthcare/issues/124) | Integrate mobile money at central | 12 | #123 | yes |
 | [#125](https://github.com/carapai/people-centered-healthcare/issues/125) | Implement coverage, benefit plans, eligibility and accumulators | 12 | #120 |  |
 | [#126](https://github.com/carapai/people-centered-healthcare/issues/126) | Implement claims and payer adapters | 12 | #125, #119 |  |
