@@ -15,6 +15,7 @@ Layer: **application** (Registries). The client registry's use cases over any `h
 - **Registration** (`register`, #226): `RegistryReview::register_new` answers with the `$match` candidates, writing nothing, until the clerk confirms a new patient.
   - Then it mints the facility MRN (`next_sequence` and a guard key, in the write's transaction; ADR 0014) and creates the provisional source Patient.
   - Registration matching follows: auto-link, queue for review, or a new identity.
+- **Self-registration** (`create_self_registered`, #111): a portal patient's new source Patient, tagged `provisional` and `patient-reported` (`ORIGIN_TAG`), with no facility and no MRN. It runs no registration matching, so it is never auto-linked to a golden record; it joins one only by a reviewer's decision. Creating it again is a no-op.
 - **Every use case** is one transaction with `If-Match` version checks. Each version it writes passes through the `AuditTrail` port in that transaction; `health-fhir-server` implements it over `health-audit` for the HTTP operations (#197). `link_reviewed` is a reviewer's link that queues its survivorship disagreements for review in the same transaction.
 
 ## Review queue (`review.rs`)

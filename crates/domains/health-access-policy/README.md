@@ -3,6 +3,7 @@
 Layer: **domain** (Identity & Access). The policy decision point's rules (offline-auth.md § Authorization model, § Break-glass; security.md §95–97). They are pure and the same at central and on edges.
 
 - **`Subject`:** the account, the facility, the `Permissions` resolved from its roles, the program assignments, a declared purpose of use, and an active `BreakGlass` grant, if any.
+- **`PatientSubject`** (#111): a patient's portal request, their phone account and its verified phone. It carries no permissions; what the patient sees follows from their Person's links (ADR 0029).
 - **`Permissions`:** codes of the form `{Type|*}.{cruds}`, such as `Observation.rs` or `*.r`.
   - A code with any other letters (`payment.record`) is a use-case permission, not a resource grant.
   - `has` answers literal codes, such as `break-glass`.

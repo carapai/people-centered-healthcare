@@ -17,6 +17,7 @@ mod breached;
 mod credentials;
 pub mod jose;
 mod otp;
+mod patient;
 mod server;
 mod snapshot;
 mod store;
@@ -27,6 +28,7 @@ pub use breached::{BreachedPasswords, InvalidFilter};
 pub use credentials::{Credentials, HashError, SetPasswordError};
 pub use jose::{InvalidKey, TokenSigner};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};
+pub use patient::patient_layer;
 pub use server::{AccessError, AccessVerifier, AuthConfig, AuthServer, Client, Principal};
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
 pub use store::{

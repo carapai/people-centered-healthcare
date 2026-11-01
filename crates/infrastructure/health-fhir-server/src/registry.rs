@@ -53,9 +53,10 @@ use crate::outcome::{FhirError, operation_outcome};
 pub const REVIEW_PERMISSION: &str = "registry.review";
 
 /// The audit trail of one reviewer's request, over the server's auditor.
+#[derive(Clone)]
 pub(crate) struct RegistryAudit {
-    auditor: Option<Arc<Auditor>>,
-    agent: Agent,
+    pub(crate) auditor: Option<Arc<Auditor>>,
+    pub(crate) agent: Agent,
 }
 
 impl RegistryAudit {

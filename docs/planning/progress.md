@@ -126,3 +126,7 @@ Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
   - **Endpoints:** `POST /otp`, plus phone and code on `/authorize`, for patient clients. The first accepted code creates the phone's account. Sessions need no snapshot, and tokens carry `amr: ["otp"]`.
   - **Rules:** one account per phone, even under races. Each try is a compare-and-set, so 8 concurrent tries count once. Codes are sent through `OtpSender`, to `DevOutbox` until #235 picks a provider.
   - **SurrealDB:** migration `0012_phone_sign_in`.
+- 2026-11-01: #111 part 2a merged (#237). Part 2b: self-registration.
+  - **Use case:** `health-patient-engagement-app` routes a patient's QuestionnaireResponse after `$match`. No candidate gives a new self-registered Patient (provisional, patient-reported, no MRN, never auto-linked), with the Person linked at `level1`. Any candidate goes to review with nothing linked.
+  - **Storage:** the Task, QuestionnaireResponse and Person, with ids derived from the account.
+  - **Server:** `ClientRegistry::create_self_registered`. `health-fhir-server::portal_router` serves `/registration` behind the new `health_auth::patient_layer` (`PatientSubject`).

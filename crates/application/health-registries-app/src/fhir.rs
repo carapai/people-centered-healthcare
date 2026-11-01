@@ -11,6 +11,10 @@ pub const ECID_SYSTEM: &str = "urn:health:ecid";
 /// The registry's tag system: `golden` on golden Patients, `provisional` on sources not yet
 /// reconciled (identifiers.md).
 pub const REGISTRY_TAG: &str = "urn:health:registry";
+
+/// The tag system for where a record came from: `patient-reported` marks what a patient
+/// submitted through the portal (ADR 0029).
+pub const ORIGIN_TAG: &str = "urn:health:origin";
 /// The tag system stating how far a source's values are trusted.
 pub const TRUST_TAG: &str = "urn:health:registry:trust";
 /// An Identifier extension: `nira-verified` once central verified the NIN with NIRA.
