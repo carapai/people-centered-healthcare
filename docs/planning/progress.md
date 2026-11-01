@@ -138,3 +138,8 @@ Total: 58 of 129 implementation tasks done. Validation spikes open: 3.
   - **Central:** the portal's patient client, phone sign-in through `HEALTH_DEV_OTP_OUTBOX` (development only, until #235), and `/api/portal` behind `patient_layer`.
   - **Client:** the portal's own sign-in, session and transport. `/sign-in` takes the phone and code steps, and `/portal` has the registration form and status.
   - **e2e:** a new patient registers; a lookalike is linked by a reviewer after an in-person ID check.
+- 2026-11-01: #111 merged (#240). #113 part 1: `health-consent`, the caregiver delegation rules.
+  - **Grants:** scoped, expiring, verified grants; mother–newborn grants at delivery.
+  - **Ages:** guardian access ends at the age of majority, and a guardian never sees an adolescent's sensitive records without their consent. Uncertain ages are reckoned protectively.
+  - **Revocation:** who may revoke a grant.
+  - **Tests:** an authorization matrix.

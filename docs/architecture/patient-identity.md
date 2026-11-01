@@ -226,6 +226,11 @@ stateDiagram-v2
 - **Adolescent confidentiality.** From a configurable age (default 12), records with sensitive labels (HIV, SRH, mental health) are excluded from guardian access unless the adolescent consents.
 - **Revocation.** Access can be revoked by the patient once of age, by a guardian with authority, or by staff. Revocation takes effect at the next sync.
 - **Enforcement.** The policy decision point evaluates Person links, Consent scope, assurance level and confidentiality labels together (ADR 0011).
+- **Uncertain ages** (decided on #113):
+  - With a partial birth date, ages are reckoned from the earliest date it allows, so guardianship ends and adolescent confidentiality starts as early as the record allows.
+  - A dependent with no known birth date gives a guardian nothing.
+  - A patient revokes a guardian's grant only once of age by the latest date the record allows.
+- **In code:** `health-consent` (`CaregiverGrant::decide`, `revoke`, `at_delivery`). Storage as RelatedPerson and Consent, staff verification, and enforcement in the PDP and portal come in #113's next parts.
 
 ## Patient-initiated workflows and patient-reported data (§60, §62)
 

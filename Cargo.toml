@@ -10,6 +10,7 @@ members = [
     "crates/contracts/health-persistence",
     "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
+    "crates/domains/health-consent",
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
     "crates/domains/health-inventory",
@@ -50,6 +51,7 @@ health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
 health-backup = { path = "crates/infrastructure/health-backup" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
+health-consent = { path = "crates/domains/health-consent" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
