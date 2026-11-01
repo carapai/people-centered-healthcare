@@ -59,7 +59,7 @@ The edge serves the client from its own origin (lan-security.md § App delivery 
 
 ## Backup and recovery
 
-Local backups, restore, failover and recovery targets are in [backup-and-recovery.md](backup-and-recovery.md).
+Local backups, restore, failover and recovery targets are in [backup-and-recovery.md](backup-and-recovery.md). In code (#78): `health_edge_runtime::backup` takes the hourly backups and the weekly test restore, and `facility-edge backup` covers backups on demand, USB copies and restore.
 
 ## Updates and migrations
 

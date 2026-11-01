@@ -19,7 +19,13 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
   - `verify` checks every checksum, decryption and blob hash.
   - `restore` verifies first, imports the export in memory into an empty database, and returns the blobs to the store.
 - **CI** runs the round-trip fixture and the `set<record>` check.
-- **Not here:** the schedule, retention and the weekly test restore are [#78](https://github.com/carapai/people-centered-healthcare/issues/78). Central's export over HTTP and key escrow are [#138](https://github.com/carapai/people-centered-healthcare/issues/138).
+- **`health_edge_runtime::backup`** schedules them on the edge ([#78](https://github.com/carapai/people-centered-healthcare/issues/78), [README](../../crates/edge/health-edge-runtime/README.md)):
+  - hourly backups into `HEALTH_BACKUP_DIR`, with retention of 48 hourly and 14 daily copies, then pruning of blobs no kept backup refers to;
+  - a weekly test restore of the newest backup into a scratch store;
+  - `status.json` for the status page, and an alert in the log when a backup or test restore fails. Neither stops the node;
+  - a warning when the backup directory shares the data volume.
+- **`facility-edge backup now | copy | verify | test | restore | status`** covers on-demand backups, USB copies, verification and restore ([README](../../apps/server/facility-edge/README.md)). The pre-update backup is the store copy an update takes ([facility-edge.md](facility-edge.md) § Updates and migrations).
+- **Not here:** central's export over HTTP and key escrow are [#138](https://github.com/carapai/people-centered-healthcare/issues/138). A backup on demand while the node runs comes with the admin page (#77).
 
 ## Restore and failover
 

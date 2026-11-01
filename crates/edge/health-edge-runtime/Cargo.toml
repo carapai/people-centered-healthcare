@@ -1,6 +1,6 @@
 [package]
 name = "health-edge-runtime"
-description = "The Facility Edge Node's runtime: the embedded store, the startup and stop sequence, the embedded web app, service-manager notifications, supervised tasks and the UPS watch (facility-edge.md, ADR 0007)."
+description = "The Facility Edge Node's runtime: the embedded store, the startup and stop sequence, the embedded web app, scheduled backups, service-manager notifications, supervised tasks and the UPS watch (facility-edge.md, ADR 0007)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,13 +15,17 @@ workspace = true
 [dependencies]
 axum = { workspace = true }
 flate2 = { workspace = true }
+health-backup = { workspace = true }
+health-files = { workspace = true }
 health-http = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
+health-time = { workspace = true }
 p256 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tar = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "signal", "sync"] }
 tracing = { workspace = true }
@@ -30,5 +34,4 @@ tracing = { workspace = true }
 windows-service = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 tower = { workspace = true }

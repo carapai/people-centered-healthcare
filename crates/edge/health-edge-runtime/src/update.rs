@@ -169,7 +169,7 @@ pub fn release_key(hex_text: &str) -> Option<VerifyingKey> {
     VerifyingKey::from_sec1_bytes(&hex(hex_text.trim())?).ok()
 }
 
-fn hex(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn hex(text: &str) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) {
         return None;
     }
