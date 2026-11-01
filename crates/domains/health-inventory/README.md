@@ -29,9 +29,16 @@ Layer: **domain** (inventory). The stock ledger: Stock Units, movements and the 
   - **`parse_gs1`:** reads GS1 DataMatrix element strings, as scanned (with the group separator) or as printed (`(01)…`): GTIN 01, expiry 17 (day `00` is the month's last), batch 10 and serial 21. It is never required.
   - **`Requisition`:** a ward's SupplyRequest to the pharmacy, from Requested to Approved (or Rejected), then Fulfilled by a transfer.
   - **`suggest`:** min/max reorder levels from the average monthly consumption (`ReorderPolicy`, default 1 and 3 months). At or below the minimum it orders up to the maximum, rounded up; with no consumption it suggests nothing.
+- **Valuation** (`valuation`, #131): `value(unit, movements, method)` is a projection rebuilt from the ledger in stock-card order, the same whatever order the movements come in.
+  - **Methods:** weighted average (the default) or FIFO receipt layers.
+  - **Costs:** the cost comes from each receipt, and donor-funded stock is received at the donor-declared price. An increase without a cost (a transfer-in, a return, a positive count) comes in at the current cost.
+  - **Consignment** stock carries no value.
+  - **What it returns:** the quantity, value, unit cost, layers, and every movement with its cost (`Costed`).
 - **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, goods received notes, requisitions, the units of a store, and Reconciliation Records, inside a store transaction.
 
 ## Tests
+
+`tests/valuation.rs` covers weighted average and FIFO, rebuilding in any order, consignment, costless increases, and stock issued below nothing.
 
 `tests/receiving.rs` covers note validation, GS1 as scanned and printed, requisitions, and reorder suggestions.
 

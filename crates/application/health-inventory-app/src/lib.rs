@@ -21,10 +21,12 @@ use health_persistence::{Store, StoreError, Transaction, WriteError};
 mod counts;
 mod receiving;
 mod transfers;
+mod valuation;
 
 pub use counts::{Cause, inventory_report};
 pub use receiving::{OnHand, supply_requests};
 pub use transfers::Sender;
+pub use valuation::{StoreValuation, inventory_postings};
 
 /// Why a movement was not recorded.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

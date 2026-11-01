@@ -16,13 +16,13 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
-| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 3 | 7 |
+| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 4 | 7 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 61 of 133 implementation tasks done. Validation spikes open: 3.
+Total: 62 of 133 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -173,3 +173,6 @@ Total: 61 of 133 implementation tasks done. Validation spikes open: 3.
   - **e2e:** a receipt on hand at its cost.
   - **Fix:** the full e2e run exposed a race. Concurrent requests rewrote the shared clock floor, and the loser of the write conflict was refused with a spurious 401. Now the floor is written only when it advances, and a lost raise refuses nothing.
   - **Follow-up:** #250, the ward requisition screens.
+- 2026-11-01: #130 merged (#251). #131: stock valuation and inventory-accounting postings.
+  - **Valuation:** weighted average or FIFO, rebuilt from the movement ledger; consignment carries no value, and donor stock is valued at its declared price.
+  - **Postings:** one balanced posting per costed movement when inventory accounting is enabled; the inventory account equals the valuation. The financial ledger has no storage yet, so the postings are not persisted.

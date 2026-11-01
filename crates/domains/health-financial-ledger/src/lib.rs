@@ -16,7 +16,8 @@ mod ledger;
 mod money;
 
 pub use ledger::{
-    Account, AccountKind, ChartOfAccounts, ChartTemplate, DEPOSITS, Dimensions, DuplicateAccount,
-    IN_TRANSIT, Ledger, Line, Original, Posting, PostingRefused, ROUNDING, Side, TILL_VARIANCE,
+    Account, AccountKind, COST_OF_GOODS, ChartOfAccounts, ChartTemplate, DEPOSITS, Dimensions,
+    DuplicateAccount, IN_TRANSIT, INVENTORY, Ledger, Line, Original, PAYABLE, Posting,
+    PostingRefused, ROUNDING, STOCK_ADJUSTMENT, Side, TILL_VARIANCE,
 };
 pub use money::{Currency, Money, MoneyError, UnknownCurrency};

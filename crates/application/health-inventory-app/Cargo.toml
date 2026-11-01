@@ -14,6 +14,7 @@ context = "inventory"
 workspace = true
 
 [dependencies]
+health-financial-ledger = { workspace = true }
 health-inventory = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }
