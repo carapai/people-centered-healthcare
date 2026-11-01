@@ -16,13 +16,13 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
-| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 1 | 5 |
+| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 2 | 6 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 59 of 131 implementation tasks done. Validation spikes open: 3.
+Total: 60 of 132 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -156,3 +156,8 @@ Total: 59 of 131 implementation tasks done. Validation spikes open: 3.
   - **Transfers:** dispatch, receipt with counted good and damaged stock (damaged into quarantine), and the direct transfer within a facility. Each step is one transaction, and a dispatch beyond what is available moves nothing.
   - **Reconciliation Records:** short, damaged, excess and negative balances each open one, which closes only with a root cause (GSDP §13.2). A transfer closes when its last record is resolved.
   - **SurrealDB:** migration `0015_stock_transfers`.
+- 2026-11-01: #129 part 1 merged (#246). Part 2 completes #129.
+  - **Counts:** full, cycle and blind, without freeze; variances are counted minus (the balance at the start plus the movements since).
+  - **Approval:** a reason for every variance, and a supervisor above the threshold. Each posted variance raises a Reconciliation Record, and a settled negative balance needs its root cause.
+  - **Export:** the InventoryReport.
+  - **Follow-up:** #247, central matching of inter-facility transfers, which needs sync.

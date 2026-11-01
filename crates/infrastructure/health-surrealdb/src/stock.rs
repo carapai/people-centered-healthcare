@@ -1,5 +1,6 @@
 //! Stock (migration `0011_stock`): `health_inventory::StockStore` over the transaction.
 
+use health_inventory::counts::StockCount;
 use health_inventory::reconciliation::ReconciliationRecord;
 use health_inventory::transfers::Transfer;
 use health_inventory::{Balance, Movement, StockStore, StockUnit};
@@ -178,5 +179,45 @@ impl StockStore for SurrealTx {
             .filter_map(|r| r.into_iter().next())
             .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
             .collect()
+    }
+
+    async fn units_of_store(&mut self, store: &str) -> Result<Vec<StockUnit>, StoreError> {
+        // A unit's key starts with its store.
+        let rows = self
+            .rows(
+                "SELECT VALUE [unit] FROM stock_balance \
+                 WHERE string::starts_with(<string>record::id(id), $prefix) ORDER BY id",
+                vec![("prefix", format!("{store}|"))],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|unit| serde_json::from_str(&unit).map_err(|_| invalid()))
+            .collect()
+    }
+
+    async fn put_count(&mut self, count: &StockCount) -> Result<(), WriteError> {
+        let data = serde_json::to_string(count)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        self.run(
+            "UPSERT type::record('stock_count', $id) CONTENT { data: $data } RETURN VALUE record::id(id)",
+            vec![("id", count.id.clone()), ("data", data)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn count(&mut self, id: &str) -> Result<Option<StockCount>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('stock_count', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .next()
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .transpose()
     }
 }
