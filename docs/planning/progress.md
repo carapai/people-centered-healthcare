@@ -13,7 +13,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
-| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 1 | 6 |
+| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 1 | 5 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 58 of 129 implementation tasks done. Validation spikes open: 3.
+Total: 59 of 131 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -147,3 +147,8 @@ Total: 58 of 129 implementation tasks done. Validation spikes open: 3.
   - **Staff:** they record a caregiver by their portal phone, verified against the document checked, and can revoke a grant or record an adolescent's consent (`/api/caregivers`, `caregiver.manage`).
   - **Storage:** the grant and its RelatedPerson and Consent are written in one transaction and audited (migration `0014_caregiver_grant`).
   - **Portal:** caregivers see their dependents at `/api/portal/dependents`.
+- 2026-11-01: #113 part 2 merged (#242). Part 3 completes #113.
+  - **Staff:** a minimal patient view (`/patients/{id}`) with its Caregivers panel, linked from reception: record by phone, revoke, and the young person's consent.
+  - **Portal:** caregivers see the people they care for.
+  - **e2e:** a guardian's view of an adolescent, with and without her consent, and revoked.
+  - **Follow-ups:** #243 (the mother–newborn link at delivery) and #244 (`decide` on portal record reads).

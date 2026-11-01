@@ -6,6 +6,7 @@ import { useIntl } from 'react-intl'
 
 import { messages } from '../../i18n/messages'
 import type { Portal } from '../../platform/types'
+import { dependentsQuery, type Dependent } from '../caregivers/api'
 import { REGISTRATION, canSubmit, registrationQuery, submitRegistration, type Answers, type Registration } from './api'
 
 const button = css({
@@ -41,6 +42,7 @@ export function PortalPage({ portal }: { portal: Portal }) {
   const queryClient = useQueryClient()
   const signedIn = portal.session.accessToken() !== undefined
   const registration = useQuery({ ...registrationQuery(portal.transport), enabled: signedIn })
+  const dependents = useQuery({ ...dependentsQuery(portal.transport), enabled: signedIn })
   const [answers, setAnswers] = useState<Answers>(empty)
   const submit = useMutation({
     mutationFn: () => submitRegistration(portal.transport, answers),
@@ -114,6 +116,33 @@ export function PortalPage({ portal }: { portal: Portal }) {
           ) : null}
         </form>
       )}
+      {signedIn && dependents.data !== undefined && dependents.data.length > 0 ? <Dependents list={dependents.data} /> : null}
+      {signedIn ? (
+        <button type="button" className={button} disabled={dependents.isFetching} onClick={() => void dependents.refetch()}>
+          {intl.formatMessage(messages.portalRefreshDependents)}
+        </button>
+      ) : null}
+    </section>
+  )
+}
+
+/** The people the caregiver cares for (#113), with what they may do and what is withheld. */
+function Dependents({ list }: { list: Dependent[] }) {
+  const intl = useIntl()
+  return (
+    <section aria-labelledby="dependents" className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+      <h2 id="dependents" className={css({ fontSize: 'lg', fontWeight: 'semibold' })}>
+        {intl.formatMessage(messages.portalDependents)}
+      </h2>
+      <ul className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+        {list.map((dependent) => (
+          <li key={dependent.id}>
+            <strong>{dependent.name ?? intl.formatMessage(messages.portalDependentUnnamed)}</strong> · {intl.formatMessage(messages.cgUntil)}{' '}
+            {intl.formatDate(new Date(dependent.expires), { dateStyle: 'medium' })}
+            {dependent.confidential_withheld ? <p>{intl.formatMessage(messages.portalConfidential)}</p> : null}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

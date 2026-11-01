@@ -41,7 +41,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs'], reviewer: ['Patient.crus', 'registry.review'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'] },
       labels: [],
     }),
   ),

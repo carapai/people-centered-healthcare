@@ -1,5 +1,7 @@
 # Registration
 
+A registered or chosen patient links to the patient view (`/patients/{id}`, `features/patient`), where staff manage their caregivers.
+
 Reception registration (patient-identity.md § "Did you mean" at registration; #71).
 
 - **`RegistrationPage`** (`/registration`):

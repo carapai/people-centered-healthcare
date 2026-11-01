@@ -105,6 +105,8 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#235](https://github.com/carapai/people-centered-healthcare/issues/235) | Choose the SMS provider for patient one-time codes | 10 | #111 | yes |
 | [#112](https://github.com/carapai/people-centered-healthcare/issues/112) | Integrate NIRA verification | 10 | #111 | yes |
 | [#113](https://github.com/carapai/people-centered-healthcare/issues/113) | Implement caregiver delegation | 10 | #111, #65 |  |
+| [#243](https://github.com/carapai/people-centered-healthcare/issues/243) | Record the mother–newborn caregiver link at a facility delivery | 10 | #113 |  |
+| [#244](https://github.com/carapai/people-centered-healthcare/issues/244) | Enforce caregiver grants and adolescent confidentiality on portal record reads | 10 | #113 |  |
 | [#114](https://github.com/carapai/people-centered-healthcare/issues/114) | Implement patient requests and appointment proposals | 10 | #111, #99 |  |
 | [#115](https://github.com/carapai/people-centered-healthcare/issues/115) | Build the care journey and patient timeline read models | 10 | #68, #104 |  |
 | [#116](https://github.com/carapai/people-centered-healthcare/issues/116) | Implement program definitions and enrolment | 11 | #96, #102 |  |

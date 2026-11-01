@@ -237,7 +237,8 @@ stateDiagram-v2
   - `health-consent`: `CaregiverGrant::decide`, `revoke`, `at_delivery` and the `GrantStore` port.
   - `health-identity-app::caregivers`: the grant with its RelatedPerson and Consent, in one transaction.
   - `health-auth::CaregiverRoutes`: `/api/caregivers` for staff, and `/api/portal/dependents`.
-  - The screens come in #113's last part.
+  - The screens: a minimal staff patient view at `/patients/{id}` with its Caregivers panel, and the portal's **People you care for**.
+  - **Not yet:** the mother–newborn link at delivery ([#243](https://github.com/carapai/people-centered-healthcare/issues/243)), and `decide` on portal record reads ([#244](https://github.com/carapai/people-centered-healthcare/issues/244)).
 
 ## Patient-initiated workflows and patient-reported data (§60, §62)
 
