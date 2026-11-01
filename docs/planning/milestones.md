@@ -185,6 +185,7 @@ Stock ledger, reservations, FEFO, dispensing, transfers, counts, receiving (§13
 - [Implement the stock ledger and balance guards](https://github.com/carapai/people-centered-healthcare/issues/127)
 - [Implement reservations, FEFO and dispensing](https://github.com/carapai/people-centered-healthcare/issues/128)
 - [Implement transfers, counts and stock reconciliation](https://github.com/carapai/people-centered-healthcare/issues/129)
+- [Match inter-facility transfer dispatches with receipts at central](https://github.com/carapai/people-centered-healthcare/issues/247)
 - [Implement receiving, requisitions and reorder suggestions](https://github.com/carapai/people-centered-healthcare/issues/130)
 - [Implement stock valuation and optional financial postings](https://github.com/carapai/people-centered-healthcare/issues/131)
 

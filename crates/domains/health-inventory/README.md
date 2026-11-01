@@ -21,9 +21,14 @@ Layer: **domain** (inventory). The stock ledger: Stock Units, movements and the 
   - `close` needs its records resolved.
   - `discrepancies` is the comparison central's matching of a dispatch with a receipt will use.
 - **Reconciliation Records** (`reconciliation`): `ReconciliationRecord` is a discrepancy (short, damaged, excess, negative, count variance) with its signed quantity and source. It is open until `resolve` records its `RootCause` (GSDP §13.2): recording error, unrecorded issue, transit loss, damage, expiry, supplier discrepancy, theft, or other with a note. A record is resolved once.
-- **The `StockStore` port:** a unit's balance record and its movements, transfers, and Reconciliation Records, inside a store transaction.
+- **Stock counts** (`counts`, #129): `StockCount` goes from Draft to Submitted to Approved, in full, cycle or blind mode (`sheet` hides what the ledger expects).
+  - **No freeze:** `variances` are counted minus (the balance at the start plus the movements recorded since).
+  - **Approval:** `approve` needs a reason for every variance, and a supervisor for any variance above the store's threshold.
+- **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, the units of a store, and Reconciliation Records, inside a store transaction.
 
 ## Tests
+
+`tests/counts.rs` covers blind sheets, counting and submitting, movements during a count, and approval rules.
 
 `tests/transfers.rs` covers transfer validation, dispatch and receipt, short, damaged and excess stock, direct transfers, closing, and resolving records.
 

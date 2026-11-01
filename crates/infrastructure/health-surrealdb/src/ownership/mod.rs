@@ -78,6 +78,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("caregiver_grant", "consent"),
     ("stock_transfer", "inventory"),
     ("stock_reconciliation", "inventory"),
+    ("stock_count", "inventory"),
     ("break_glass", "identity"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),

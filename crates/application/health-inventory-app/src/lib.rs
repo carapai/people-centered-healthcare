@@ -8,6 +8,7 @@
 //!   transaction: out of one Stock Unit and into the other.
 //! - **[`Inventory::nightly_check`]** rebuilds each balance from the ledger and reports drift.
 
+use health_inventory::counts::CountRefused;
 use health_inventory::reconciliation::{Discrepancy, ReconciliationRecord, ResolveRefused};
 use health_inventory::transfers::TransferRefused;
 use health_inventory::{
@@ -16,8 +17,10 @@ use health_inventory::{
 };
 use health_persistence::{Store, StoreError, Transaction, WriteError};
 
+mod counts;
 mod transfers;
 
+pub use counts::{Cause, inventory_report};
 pub use transfers::Sender;
 
 /// Why a movement was not recorded.
@@ -35,6 +38,12 @@ pub enum InventoryError {
     /// A Reconciliation Record could not be resolved.
     #[error(transparent)]
     Resolve(#[from] ResolveRefused),
+    /// A count step was refused.
+    #[error(transparent)]
+    Count(#[from] CountRefused),
+    /// A count that resolves a flagged negative balance needs its root cause (GSDP §13.2).
+    #[error("reconciliation record {0} needs its root cause")]
+    CauseRequired(String),
     /// No such transfer or Reconciliation Record.
     #[error("{0} is not known")]
     NotFound(String),
@@ -72,6 +81,12 @@ impl From<StoreError> for Attempt {
 
 impl From<Refused> for Attempt {
     fn from(refused: Refused) -> Self {
+        Self::Fail(refused.into())
+    }
+}
+
+impl From<CountRefused> for Attempt {
+    fn from(refused: CountRefused) -> Self {
         Self::Fail(refused.into())
     }
 }

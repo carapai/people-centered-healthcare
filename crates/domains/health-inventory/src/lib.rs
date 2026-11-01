@@ -13,6 +13,7 @@
 //! - **[`stock_card`]** and **[`rebuild`]**: the running balance by `occurred_at`, and the
 //!   nightly drift check.
 
+pub mod counts;
 pub mod reconciliation;
 pub mod transfers;
 
@@ -420,6 +421,21 @@ pub trait StockStore {
         &mut self,
         id: &str,
     ) -> impl Future<Output = Result<Option<reconciliation::ReconciliationRecord>, StoreError>> + Send;
+    /// The Stock Units of `store` that have a balance record.
+    fn units_of_store(
+        &mut self,
+        store: &str,
+    ) -> impl Future<Output = Result<Vec<StockUnit>, StoreError>> + Send;
+    /// Adds or replaces a stock count.
+    fn put_count(
+        &mut self,
+        count: &counts::StockCount,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One stock count.
+    fn count(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<counts::StockCount>, StoreError>> + Send;
     /// The records still open, oldest first.
     fn open_reconciliations(
         &mut self,

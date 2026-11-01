@@ -155,6 +155,7 @@ stateDiagram-v2
 - **Approval.** Variance movements are posted on approval, with reason codes. A supervisor must approve any variance above a configurable threshold.
 - **Root cause.** A count that resolves a flagged negative balance closes its Reconciliation Record with a recorded cause (WHO GSDP §13.2).
 - **Export:** FHIR `InventoryReport` (`snapshot`).
+- **Code** (#129): `health-inventory::counts`, and `Inventory::start_count`, `record_count`, `submit_count`, `approve_count` and `inventory_report`. Approval posts each variance with a Reconciliation Record. A count that settles a flagged negative balance needs its root cause.
 
 ## Valuation
 
