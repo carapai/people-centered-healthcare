@@ -14,6 +14,7 @@
 //!   tokens carry `facility` and `snapshot_version` and never outlive the snapshot.
 
 mod breached;
+mod caregivers;
 mod credentials;
 pub mod jose;
 mod otp;
@@ -25,6 +26,7 @@ mod subject;
 mod surreal;
 
 pub use breached::{BreachedPasswords, InvalidFilter};
+pub use caregivers::{CAREGIVER_PERMISSION, CaregiverRoutes};
 pub use credentials::{Credentials, HashError, SetPasswordError};
 pub use jose::{InvalidKey, TokenSigner};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};

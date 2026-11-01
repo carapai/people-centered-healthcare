@@ -41,6 +41,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 - **Routes:** `/auth` serves discovery, `/jwks`, `/authorize`, `/token` and `/revoke` (offline-auth.md). `/api/session` is the first authorized route: it answers 401 without a valid access token, and the signed-in principal with one.
 - **Key rotation:** add a new key as the first line of the keys file and keep the old one below it until its tokens have expired. Both keys are published in `/jwks`, and tokens signed with the old key still verify.
 - **Key storage:** keys and the pepper are read from secret files. Holding them in central KMS is part of central's key custody ([#138](https://github.com/carapai/people-centered-healthcare/issues/138)).
+- **Caregivers** (#113): with the access policy, `/api/caregivers` serves staff with `caregiver.manage`, and `/api/portal/dependents` serves caregivers. The policy's labels are the sensitive ones an adolescent's guardian does not see.
 - **Patients** (#111): with the portal configured, the portal's client signs patients in by phone (`/auth/otp`, then the code on `/authorize`; ADR 0029). `/api/portal/registration` sits behind `health_auth::patient_layer`, so only a patient's token reaches it.
 - **The facility:** with snapshot keys, the user picks the facility at sign-in when they hold snapshots for several (ADR 0056). The token carries it.
 - **`/fhir`** (ADR 0056):

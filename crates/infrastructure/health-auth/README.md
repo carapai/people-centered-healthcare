@@ -69,6 +69,15 @@ Refusals:
 
 Patients have no permission snapshot, so the portal's routes sit behind `patient_layer` rather than `subject_layer`. It inserts a `health_access_policy::PatientSubject` (the phone account and its phone) for a patient's live token of an active phone account. A staff token is 403, an invalid one 401, and a request with no credentials passes without a subject.
 
+## Caregivers (#113)
+
+`CaregiverRoutes` serves caregiver delegation over `health_identity_app::caregivers`, auditing every version written.
+- **Staff** (`caregiver_router`, behind `subject_layer`, needing `caregiver.manage`):
+  - `GET /?patient=` lists a patient's caregivers.
+  - `POST /` records one: the caregiver by the phone of their portal account (422 if the phone has none), the relationship, `guardian` or `delegated`, the scopes, the last day of access, and the document checked.
+  - `POST /{id}/revoke` revokes a grant, and `POST /{id}/adolescent-consent` records the adolescent's consent, given or withdrawn.
+- **Patients** (`dependents_router`, behind `patient_layer`): `GET /dependents` lists the people the signed-in caregiver cares for, with their names, scopes, expiry, and whether an adolescent's sensitive records are withheld.
+
 ## Break-glass (offline-auth.md § Break-glass)
 
 `Subjects::routes()` serves, under `/api` at central:

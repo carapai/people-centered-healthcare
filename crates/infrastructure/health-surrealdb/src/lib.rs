@@ -16,6 +16,7 @@
 mod auth;
 mod blocking;
 mod connection;
+mod consent;
 mod history;
 mod inbound;
 mod migrations;

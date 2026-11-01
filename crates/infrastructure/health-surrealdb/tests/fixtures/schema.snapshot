@@ -193,6 +193,12 @@ DEFINE TABLE care_team_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON care_team_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON care_team_history TYPE int PERMISSIONS FULL
   DEFINE INDEX care_team_history_last_updated ON care_team_history FIELDS last_updated, version_seq
+DEFINE TABLE caregiver_grant TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD caregiver ON caregiver_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON caregiver_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD patient ON caregiver_grant TYPE string PERMISSIONS FULL
+  DEFINE INDEX caregiver_grant_caregiver ON caregiver_grant FIELDS caregiver
+  DEFINE INDEX caregiver_grant_patient ON caregiver_grant FIELDS patient
 DEFINE TABLE charge_item TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON charge_item TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON charge_item TYPE array<record> DEFAULT [] PERMISSIONS FULL
