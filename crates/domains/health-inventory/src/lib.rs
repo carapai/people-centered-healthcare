@@ -458,6 +458,10 @@ pub trait StockStore {
         &mut self,
         id: &str,
     ) -> impl Future<Output = Result<Option<receiving::Requisition>, StoreError>> + Send;
+    /// Every requisition (a facility has few; callers filter by store).
+    fn requisitions(
+        &mut self,
+    ) -> impl Future<Output = Result<Vec<receiving::Requisition>, StoreError>> + Send;
     /// The records still open, oldest first.
     fn open_reconciliations(
         &mut self,

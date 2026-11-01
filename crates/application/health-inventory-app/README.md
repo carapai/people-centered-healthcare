@@ -11,7 +11,7 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
   - **`approve_count`** is one transaction. It posts a count-variance movement and a Reconciliation Record for each variance. It also resolves the open negative-balance records of the counted units, each with its root cause (`Cause`; `CauseRequired` without one, GSDP §13.2), and unflags their balances.
   - **`inventory_report`** is the count as a FHIR `InventoryReport` snapshot.
 - **Receiving** (#130): `receive_goods` is one transaction. It writes a receipt of each line at its unit cost and pack size, and the note; a note is received once.
-- **Requisitions:** `request`, `decide_requisition`, and `fulfil_requisition`, which dispatches the picked batches as a transfer from the pharmacy to the ward and marks the requisition fulfilled in the same transaction. `supply_requests` is a requisition as FHIR SupplyRequests.
+- **Requisitions:** `request`, `decide_requisition`, and `fulfil_requisition`, which dispatches the picked batches as a transfer from the pharmacy to the ward and marks the requisition fulfilled in the same transaction. `requisitions(store)` lists those a store asked for or was asked, newest first. `supply_requests` is a requisition as FHIR SupplyRequests.
 - **Stock on hand:** `stock_on_hand(store)` gives each Stock Unit with its balance and the unit cost of its last costed movement.
 - **Reorder:** `reorder(store, policy, days, now)` gives per-product suggestions from usable stock and the issues and dispensing over the last `days` days.
 - **Valuation** (#131): `valuation(store, method)` rebuilds the value of each Stock Unit of a store from its movements, and the total.
@@ -52,7 +52,7 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 
 **Not here yet:**
 - persisting the postings, with the financial ledger's storage (billing);
-- the ward requisition screens (#250);
+- receiving a requisition's transfer at the ward on screen;
 - upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
 - the change log and outbox for sync (#135);
