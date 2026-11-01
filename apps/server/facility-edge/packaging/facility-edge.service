@@ -8,6 +8,8 @@ After=network-online.target
 # SCM policy too).
 StartLimitIntervalSec=86400
 StartLimitBurst=4
+# When the unit fails, the previous binary finishes any failed update's rollback, as root.
+OnFailure=facility-edge-rollback.service
 
 [Service]
 Type=notify
@@ -25,8 +27,10 @@ TimeoutStopSec=120
 WatchdogSec=30
 Restart=on-failure
 RestartSec=5
-# A configuration error (exit 2) needs a person, so it is not restarted.
-RestartPreventExitStatus=2
+# Not restarted: a configuration error (2) or a refused update step (7) needs a person, and a
+# half-finished rollback (8) fails the unit so the rollback unit restores the previous binary.
+# A finished rollback (6) is restarted, which runs the previous binary.
+RestartPreventExitStatus=2 7 8
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

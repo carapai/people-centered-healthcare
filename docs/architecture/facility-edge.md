@@ -59,6 +59,10 @@ Local backups, restore, failover and recovery targets are in [backup-and-recover
   4. Start, and run migrations before reporting ready.
 - **Migrations are forward-only and versioned.** They run at startup inside the edge process, extending the service-manager timeout while they run.
 - **On a failed migration or failed readiness:** reinstall the previous binary automatically and restore the pre-update backup. Old binaries are never run against a migrated store.
+- **In code (#72):** `health_edge_runtime::update` and `facility-edge update stage | apply | rollback | status`.
+  - **Package:** a gzipped tar of `manifest.json` (version, binary name, SHA-256) and the binary, with a detached ECDSA P-256 signature. The installer pins the release key.
+  - **Pre-update backup:** a cold copy of the store, taken by the new binary before its first open.
+  - **Rollback:** after a failed migration, or three starts that never reach ready. The store is restored first, then the binary. Under systemd, the sandboxed service restores the store, and `facility-edge-rollback.service` (`OnFailure=`) restores the binary as root.
 - **Compatibility:** central supports edge versions N and N-1 on the sync protocol, so a facility may lag one release.
 - Release signing and the CI pipeline are in [deployment.md](deployment.md).
 

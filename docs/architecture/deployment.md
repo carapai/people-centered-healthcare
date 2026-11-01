@@ -123,7 +123,7 @@ flowchart LR
   | Windows edge and desktop installers | Authenticode via Azure Artifact Signing |
   | Tauri updater artifacts | Updater key in KMS |
   | AppImage, apt repository | GPG |
-  | Edge update packages | Release-signing key, separate from the metadata publication key (ADR 0024) |
+  | Edge update packages | Release-signing key (ECDSA P-256, a detached signature over the gzipped tar), separate from the metadata publication key (ADR 0024) |
   | Central OCI image | `cosign` keyless (Sigstore) |
 
 - **Attestations:** SLSA provenance (`actions/attest-build-provenance`), plus CycloneDX SBOMs for Rust (`cargo-cyclonedx`) and Bun, attached to every release.

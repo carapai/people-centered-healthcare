@@ -198,3 +198,8 @@ Total: 66 of 134 implementation tasks done. Validation spikes open: 3.
   - **Runtime:** `health-edge-runtime`. The listener starts first. The embedded store opens once, and migrations run before ready, extending the service manager's timeout. A store a newer binary migrated is refused. Supervised tasks restart with backoff, and a crash loop stops the node. A NUT UPS low battery stops it gracefully.
   - **Binary:** `facility-edge`, in foreground and `--service` (systemd `Type=notify`, with a unit file). Distinct exit codes tell the service manager and the update rollback what failed.
   - **Tests:** the built binary: ready and SIGTERM, recovery after SIGKILL, the store's single owner, the systemd notifications, the UPS stop, and an old binary refusing a newer store.
+- 2026-11-01: #72 part 1 merged (#259). Part 2a, signed updates with rollback.
+  - **Packages:** a gzipped tar of a manifest and the binary, with a detached ECDSA P-256 signature checked against the pinned release key before anything is unpacked.
+  - **Sequence:** stage, then apply with the service stopped. The new binary's first start copies the store, and ready commits the update.
+  - **Rollback:** after a failed migration, or three starts that never reach ready, the store is restored first, then the binary. Under systemd a root `OnFailure=` unit restores the binary, since the sandboxed service cannot.
+  - **Tests:** the installed binary updated, rolled back after a failed migration, and rolled back by the previous binary after a crashing release.

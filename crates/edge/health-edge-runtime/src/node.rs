@@ -13,6 +13,7 @@ use tokio::sync::{Notify, OnceCell};
 use crate::config::EdgeConfig;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
+use crate::update::{self, Startup, Updates};
 
 /// How often a long migration or drain asks the service manager for more time, and how much.
 const EXTEND_EVERY: Duration = Duration::from_secs(10);
@@ -40,6 +41,17 @@ pub enum EdgeError {
     /// A migration failed, or the store was migrated by a newer binary.
     #[error("the store cannot be migrated")]
     Migration,
+    /// The pending update kept failing and was rolled back; the next start runs the previous
+    /// binary.
+    #[error("the update was rolled back")]
+    RolledBack,
+    /// The pending update's store is restored, but this process may not replace its own
+    /// binary: the service manager's privileged rollback must.
+    #[error("the update rollback needs the service manager")]
+    RollbackPending,
+    /// An update step failed: the node needs a person.
+    #[error("the update cannot proceed")]
+    Update(#[source] crate::update::UpdateError),
     /// A supervised task kept failing.
     #[error("the {0} task keeps failing")]
     Task(&'static str),
@@ -149,8 +161,43 @@ pub async fn run(
             .await
     });
 
-    let connection = extending(manager.as_ref(), open(config)).await?;
+    let updates = Updates::new(&config.update_dir);
+    let binary = std::env::current_exe().map_err(|e| EdgeError::Update(e.into()))?;
+    let startup = extending(manager.as_ref(), async {
+        update::before_open(&updates, &config.data_dir, &binary)
+    })
+    .await
+    .map_err(EdgeError::Update)?;
+    match startup {
+        Startup::RolledBack => {
+            tracing::error!(
+                outcome = "rolled-back",
+                "the update failed and was rolled back"
+            );
+            return Err(EdgeError::RolledBack);
+        }
+        Startup::RollbackPending => {
+            tracing::error!(
+                outcome = "rollback-pending",
+                "the update failed; the service manager restores the previous binary"
+            );
+            return Err(EdgeError::RollbackPending);
+        }
+        Startup::Normal | Startup::Updating => {}
+    }
+    let connection = match extending(manager.as_ref(), open(config)).await {
+        Ok(connection) => connection,
+        Err(EdgeError::Migration) if startup == Startup::Updating => {
+            update::fail(&updates).map_err(EdgeError::Update)?;
+            return Err(EdgeError::Migration);
+        }
+        Err(error) => return Err(error),
+    };
     let _ = store.0.set(connection);
+    if startup == Startup::Updating {
+        update::commit(&updates).map_err(EdgeError::Update)?;
+        tracing::info!(outcome = "updated", "update committed");
+    }
     manager.ready();
 
     let low_battery = Arc::new(Notify::new());
@@ -198,24 +245,32 @@ pub async fn run(
     outcome
 }
 
-/// A stop request: Ctrl-C, or SIGTERM on Unix (systemd's stop).
-pub async fn shutdown_signal() {
-    let interrupt = async {
-        let _ = tokio::signal::ctrl_c().await;
-    };
+/// A stop request: Ctrl-C, or SIGTERM on Unix (systemd's stop). The handlers are installed
+/// when this is called, not when the future is first polled, so a stop that arrives while the
+/// node starts is never lost to the signal's default action.
+pub fn shutdown_signal() -> impl Future<Output = ()> + Send + 'static {
     #[cfg(unix)]
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let interrupt = signal(SignalKind::interrupt()).ok();
+        let terminate = signal(SignalKind::terminate()).ok();
+        async move {
+            let wait = |s: Option<tokio::signal::unix::Signal>| async move {
+                match s {
+                    Some(mut s) => {
+                        s.recv().await;
+                    }
+                    None => std::future::pending::<()>().await,
+                }
+            };
+            tokio::select! {
+                () = wait(interrupt) => {}
+                () = wait(terminate) => {}
             }
-            Err(_) => std::future::pending::<()>().await,
         }
-    };
+    }
     #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-    tokio::select! {
-        () = interrupt => {}
-        () = terminate => {}
+    async {
+        let _ = tokio::signal::ctrl_c().await;
     }
 }

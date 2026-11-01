@@ -1,0 +1,14 @@
+# Finishes a failed update's rollback (facility-edge.md § Updates and migrations). Runs when
+# facility-edge.service fails. The edge restores its store itself; only this unit, as root,
+# may put the previous binary back in /opt/health/bin. With no update to roll back it does
+# nothing, and the edge stays stopped for a person.
+[Unit]
+Description=Roll back a failed Health Facility Edge update
+ConditionPathExists=/var/lib/health/updates/previous/facility-edge
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/health/facility-edge.env
+ExecStart=/var/lib/health/updates/previous/facility-edge update rollback /opt/health/bin/facility-edge
+ExecStartPost=/usr/bin/systemctl reset-failed facility-edge.service
+ExecStartPost=/usr/bin/systemctl start facility-edge.service
