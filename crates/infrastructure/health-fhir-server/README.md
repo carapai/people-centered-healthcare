@@ -38,6 +38,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `POST /gs1`: reads a scanned or printed DataMatrix.
   - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
   - Over `health-inventory-app`.
+- **Payments (#254):** `with_payments(PaymentConfig)` and `payments_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/payments`.
+  - **Permissions:** `payments.cash` (cashiers), `payments.supervise` (variance approval, statements, voids) and `payments.refund`.
+  - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.
+  - **Payments:** cash with its receipt; pending with its provider reference (a reused one is 409), with a provisional receipt until the provider confirms it; void and refund.
+  - **Statements and balances:** provider statements confirm what they match. `GET /balances` covers the till, in-transit, variance and merchant accounts.
 
 ## Tests
 

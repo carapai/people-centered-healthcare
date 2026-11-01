@@ -15,14 +15,14 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
-| [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 2 | 9 |
+| [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 3 | 9 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 5 | 7 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 64 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 65 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -189,3 +189,7 @@ Total: 64 of 134 implementation tasks done. Validation spikes open: 3.
   - **One transaction per step:** the payment, its posting checked against the chart, and its shift.
   - **Integrity:** a provider reference is claimed once, a till has one open shift, and receipts are numbered.
   - **SurrealDB:** migration `0018_payments`.
+- 2026-11-01: #254 part 1 merged (#256). Part 2 completes #254.
+  - **API:** `/api/payments`, with cashier, supervisor and refund permissions.
+  - **Screens:** the Till (`/till`), where a non-cash receipt is provisional until confirmed, and the supervisor's page (`/till/supervise`), which takes statement lines and approves variances.
+  - **e2e:** the provisional receipt is confirmed only by the statement.

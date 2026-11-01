@@ -27,6 +27,8 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_PORTAL_CLIENT_ID` | `health-portal` | The patient portal's client |
 | `HEALTH_PORTAL_COUNTRY_CODE` | `256` | The country code of national phone numbers (`0772…`) |
 | `HEALTH_DEV_OTP_OUTBOX` | required with the portal | **Development and e2e only.** A file each one-time code is appended to (`{phone} {code}`); nothing reaches a phone. It is the only sender until an SMS provider is chosen ([#235](https://github.com/carapai/people-centered-healthcare/issues/235)), and central logs a warning while it is in use |
+| `HEALTH_PAYMENT_TILLS` | none | The tills, comma-separated (#254). With them and the access policy, `/api/payments` takes payments and runs cashier shifts |
+| `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217) |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup

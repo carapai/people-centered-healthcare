@@ -173,6 +173,17 @@ fn auth_settings(
             patient: true,
         }))
         .collect(),
+        payments: if files.payment_tills.is_empty() {
+            None
+        } else {
+            Some(health_fhir_server::PaymentConfig {
+                currency: health_financial_ledger::Currency::from_code(&files.currency)
+                    .map_err(|_| "HEALTH_CURRENCY is not an ISO 4217 code")?,
+                tills: files.payment_tills.clone(),
+                node: files.node_code.clone(),
+                pending_for: health_time::SignedDuration::from_hours(24),
+            })
+        },
         portal: files.portal.as_ref().map(|portal| auth::PortalSettings {
             country_code: portal.country_code.clone(),
             otp_outbox: portal.otp_outbox.clone(),

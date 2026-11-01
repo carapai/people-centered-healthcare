@@ -27,7 +27,7 @@ The pending money sits in transit, never counted as received; the trial balance 
 
 - **`Payments`** (#254) are the use cases over any `Store` whose transaction is a `PaymentStore` and a `PostingStore`. Each step is one transaction: the payment, its posting (checked against the chart first), and any change to its shift.
   - **Shifts:** `open_shift` allows one open shift per till (a guard, released at close); `close_shift`; `approve_shift`, which posts the variance.
-  - **Cash and pending payments:** `take_cash`; `record_pending`, which claims the provider reference once, so a reused one is `DuplicateReference`.
+  - **Cash and pending payments:** `take_cash`; `record_pending`, which claims the provider reference once, so a reused one is `DuplicateReference`. It also records the shift it was taken in, for the shift's list, which adds nothing to the cash expected.
   - **Later steps:** `confirm`, `void`, `expire_due`, `reverse` and `refund`. A cash refund is paid out of the till's open shift, and needs the permission.
   - **Statements:** `reconcile_statement` confirms the pending payments a statement matches, and returns the exceptions.
   - **Views:** `payment`, `shift` and `balances` (from the stored postings).
@@ -38,4 +38,4 @@ The pending money sits in transit, never counted as received; the trial balance 
 - pending payments voided, expired, or confirmed by the statement, with a mismatch confirming nothing;
 - cash refunds with the permission and an open shift.
 
-**Not here yet:** the API and the till screens (#254 part 2).
+The API and the till screens are in `health-fhir-server` and the web client (#254).

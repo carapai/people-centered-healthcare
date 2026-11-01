@@ -87,7 +87,7 @@ stateDiagram-v2
 - **Code** (#123):
   - `health-payments`: `Payment`, `Shift` and `reconcile`.
   - `health-payments-app`: `Ledgering`, the postings. A pending payment sits in payments in transit, and only provider evidence moves it to the merchant account. A void or expiry returns it to the patient's account.
-  - Storage (#254): payments, shifts and the ledger's postings in migration `0018_payments`, each step one transaction (`health-payments-app::Payments`). The API and the till screens are #254's second part.
+  - Storage (#254): payments, shifts and the ledger's postings in migration `0018_payments`, each step one transaction (`health-payments-app::Payments`). The API (`/api/payments`) and the till screens (`/till`, `/till/supervise`) complete #254.
 
 ## Other flows
 

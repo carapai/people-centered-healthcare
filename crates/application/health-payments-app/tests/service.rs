@@ -91,6 +91,7 @@ async fn a_shift_with_cash_and_a_confirmed_mobile_money_payment() {
         .record_pending(
             &new("momo-1", Method::MtnMomo, 20_000),
             "x-ref-1",
+            Some("shift-1"),
             at(3),
             at(603),
         )
@@ -110,6 +111,7 @@ async fn a_shift_with_cash_and_a_confirmed_mobile_money_payment() {
             .record_pending(
                 &new("momo-2", Method::MtnMomo, 20_000),
                 "x-ref-1",
+                None,
                 at(4),
                 at(604)
             )
@@ -167,7 +169,11 @@ async fn a_shift_with_cash_and_a_confirmed_mobile_money_payment() {
         .expect("reopened");
     let (shift, taken) = payments.shift("shift-1").await.expect("shift");
     assert_eq!(shift.status, ShiftStatus::Settled);
-    assert_eq!(taken.len(), 1);
+    assert_eq!(
+        taken.len(),
+        2,
+        "the cash and the MTN payment taken in the shift"
+    );
 }
 
 #[tokio::test]
@@ -177,6 +183,7 @@ async fn pending_payments_void_expire_or_are_confirmed_by_the_statement() {
         .record_pending(
             &new("p-void", Method::MtnMomo, 1_000),
             "r-void",
+            None,
             at(0),
             at(600),
         )
@@ -190,6 +197,7 @@ async fn pending_payments_void_expire_or_are_confirmed_by_the_statement() {
         .record_pending(
             &new("p-late", Method::MtnMomo, 2_000),
             "r-late",
+            None,
             at(0),
             at(60),
         )
@@ -212,6 +220,7 @@ async fn pending_payments_void_expire_or_are_confirmed_by_the_statement() {
         .record_pending(
             &new("p-sms", Method::CustomerReported, 5_000),
             "SMS-77",
+            None,
             at(0),
             at(86_400),
         )
@@ -221,6 +230,7 @@ async fn pending_payments_void_expire_or_are_confirmed_by_the_statement() {
         .record_pending(
             &new("p-diff", Method::MtnMomo, 4_000),
             "r-diff",
+            None,
             at(0),
             at(86_400),
         )

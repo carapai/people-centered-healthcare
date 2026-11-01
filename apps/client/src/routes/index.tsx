@@ -55,6 +55,9 @@ function Home() {
               <li>
                 <Link to="/stock">{intl.formatMessage(messages.stTitle)}</Link>
               </li>
+              <li>
+                <Link to="/till">{intl.formatMessage(messages.tlTitle)}</Link>
+              </li>
             </ul>
           </nav>
           <button type="button" className={button} onClick={() => void platform.signIn?.signOut().then(() => session.refetch())}>
