@@ -16,10 +16,10 @@ workspace = true
 [dependencies]
 health-inventory = { workspace = true }
 health-persistence = { workspace = true }
+health-time = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 health-surrealdb = { workspace = true }
-health-time = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tokio = { workspace = true }

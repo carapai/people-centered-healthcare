@@ -8,11 +8,17 @@
 //!   transaction: out of one Stock Unit and into the other.
 //! - **[`Inventory::nightly_check`]** rebuilds each balance from the ledger and reports drift.
 
+use health_inventory::reconciliation::{Discrepancy, ReconciliationRecord, ResolveRefused};
+use health_inventory::transfers::TransferRefused;
 use health_inventory::{
     Balance, Decision, Drift, Movement, MovementKind, Origin, Policy, Refused, Status, StockStore,
     rebuild,
 };
 use health_persistence::{Store, StoreError, Transaction, WriteError};
+
+mod transfers;
+
+pub use transfers::Sender;
 
 /// Why a movement was not recorded.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -23,6 +29,15 @@ pub enum InventoryError {
     /// Concurrent writers kept winning; the caller may try again.
     #[error("the stock unit is busy; try again")]
     Busy,
+    /// A transfer step was refused.
+    #[error(transparent)]
+    Transfer(#[from] TransferRefused),
+    /// A Reconciliation Record could not be resolved.
+    #[error(transparent)]
+    Resolve(#[from] ResolveRefused),
+    /// No such transfer or Reconciliation Record.
+    #[error("{0} is not known")]
+    NotFound(String),
     /// The store failed.
     #[error("{0}")]
     Store(String),
@@ -35,7 +50,7 @@ impl From<StoreError> for InventoryError {
 }
 
 /// One attempt's failure: a conflict reruns the use case.
-enum Attempt {
+pub(crate) enum Attempt {
     Conflict,
     Fail(InventoryError),
 }
@@ -57,6 +72,12 @@ impl From<StoreError> for Attempt {
 
 impl From<Refused> for Attempt {
     fn from(refused: Refused) -> Self {
+        Self::Fail(refused.into())
+    }
+}
+
+impl From<TransferRefused> for Attempt {
+    fn from(refused: TransferRefused) -> Self {
         Self::Fail(refused.into())
     }
 }
@@ -96,6 +117,18 @@ where
         tx.append_movement(&recorded).await?;
         tx.put_stock_balance(&movement.unit, &decision.balance)
             .await?;
+        // A late operation that drove the balance negative is reconciled by a count.
+        if decision.reconcile {
+            tx.put_reconciliation(&ReconciliationRecord::open(
+                &format!("{}-negative", movement.id),
+                &key,
+                Discrepancy::Negative,
+                decision.balance.on_hand,
+                &format!("Movement/{}", movement.id),
+                movement.recorded_at,
+            ))
+            .await?;
+        }
         Ok(decision)
     }
 

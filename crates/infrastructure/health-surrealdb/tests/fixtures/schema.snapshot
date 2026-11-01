@@ -1341,6 +1341,14 @@ DEFINE TABLE stock_movement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD recorded_at ON stock_movement TYPE datetime PERMISSIONS FULL
   DEFINE FIELD unit_key ON stock_movement TYPE string PERMISSIONS FULL
   DEFINE INDEX stock_movement_unit ON stock_movement FIELDS unit_key, recorded_at
+DEFINE TABLE stock_reconciliation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON stock_reconciliation TYPE string PERMISSIONS FULL
+  DEFINE FIELD opened_at ON stock_reconciliation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD resolved ON stock_reconciliation TYPE bool PERMISSIONS FULL
+  DEFINE FIELD unit_key ON stock_reconciliation TYPE string PERMISSIONS FULL
+  DEFINE INDEX stock_reconciliation_open ON stock_reconciliation FIELDS resolved, opened_at
+DEFINE TABLE stock_transfer TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON stock_transfer TYPE string PERMISSIONS FULL
 DEFINE TABLE structure_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON structure_definition TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON structure_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL

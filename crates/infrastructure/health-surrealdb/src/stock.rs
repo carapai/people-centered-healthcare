@@ -1,5 +1,7 @@
 //! Stock (migration `0011_stock`): `health_inventory::StockStore` over the transaction.
 
+use health_inventory::reconciliation::ReconciliationRecord;
+use health_inventory::transfers::Transfer;
 use health_inventory::{Balance, Movement, StockStore, StockUnit};
 use health_persistence::{StoreError, WriteError};
 
@@ -99,5 +101,82 @@ impl StockStore for SurrealTx {
             .into_iter()
             .filter_map(|r| r.into_iter().next())
             .collect())
+    }
+
+    async fn put_transfer(&mut self, transfer: &Transfer) -> Result<(), WriteError> {
+        let data = serde_json::to_string(transfer)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        self.run(
+            "UPSERT type::record('stock_transfer', $id) CONTENT { data: $data } RETURN VALUE record::id(id)",
+            vec![("id", transfer.id.clone()), ("data", data)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn transfer(&mut self, id: &str) -> Result<Option<Transfer>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('stock_transfer', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .next()
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .transpose()
+    }
+
+    async fn put_reconciliation(
+        &mut self,
+        record: &ReconciliationRecord,
+    ) -> Result<(), WriteError> {
+        let data = serde_json::to_string(record)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        self.run(
+            "UPSERT type::record('stock_reconciliation', $id) CONTENT { unit_key: $unit, \
+             resolved: <bool>$resolved, opened_at: <datetime>$opened_at, data: $data } \
+             RETURN VALUE record::id(id)",
+            vec![
+                ("id", record.id.clone()),
+                ("unit", record.unit.clone()),
+                ("resolved", record.resolution.is_some().to_string()),
+                ("opened_at", record.opened_at.to_string()),
+                ("data", data),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn reconciliation(
+        &mut self,
+        id: &str,
+    ) -> Result<Option<ReconciliationRecord>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('stock_reconciliation', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .next()
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .transpose()
+    }
+
+    async fn open_reconciliations(&mut self) -> Result<Vec<ReconciliationRecord>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM stock_reconciliation WHERE resolved = false ORDER BY opened_at",
+                vec![],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .collect()
     }
 }
