@@ -15,6 +15,8 @@ import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
+import { Route as PortalIndexRouteImport } from './routes/portal.index'
+import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +49,16 @@ const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
   path: '/break-glass/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/portal/',
+  path: '/portal/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalCallbackRoute = PortalCallbackRouteImport.update({
+  id: '/portal/callback',
+  path: '/portal/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegistryReviewsRoute = RegistryReviewsRouteImport.update({
   id: '/registry/reviews',
   path: '/registry/reviews',
@@ -60,7 +72,9 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/portal/': typeof PortalIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,7 +83,9 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/portal': typeof PortalIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,7 +95,9 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/portal/': typeof PortalIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,7 +108,9 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/portal/callback'
     | '/registry/reviews'
+    | '/portal/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -99,7 +119,9 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/portal/callback'
     | '/registry/reviews'
+    | '/portal'
   id:
     | '__root__'
     | '/'
@@ -108,7 +130,9 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/portal/callback'
     | '/registry/reviews'
+    | '/portal/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -118,7 +142,9 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
+  PortalCallbackRoute: typeof PortalCallbackRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
+  PortalIndexRoute: typeof PortalIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +191,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BreakGlassReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal/': {
+      id: '/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/callback': {
+      id: '/portal/callback'
+      path: '/portal/callback'
+      fullPath: '/portal/callback'
+      preLoaderRoute: typeof PortalCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/registry/reviews': {
       id: '/registry/reviews'
       path: '/registry/reviews'
@@ -182,7 +222,9 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
+  PortalCallbackRoute: PortalCallbackRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
+  PortalIndexRoute: PortalIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
