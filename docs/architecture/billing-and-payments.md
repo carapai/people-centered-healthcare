@@ -84,6 +84,10 @@ stateDiagram-v2
 - **Provider integrations run only at central** (`health-integration`). An edge asks central to initiate, and the outcome syncs back. An edge that is offline cannot initiate mobile money.
 - **Idempotency.** The provider reference (e.g. MTN `X-Reference-Id` UUIDv4) is persisted in the same transaction as the pending entry, before initiation. Recovery queries by that reference and never re-initiates. The reference is also the reconciliation key.
 - **Merchant accounts.** Each facility uses its own merchant account, or a licensed aggregator. The platform never holds funds (Bank of Uganda licensing is in the map's legal fog).
+- **Code** (#123):
+  - `health-payments`: `Payment`, `Shift` and `reconcile`.
+  - `health-payments-app`: `Ledgering`, the postings. A pending payment sits in payments in transit, and only provider evidence moves it to the merchant account. A void or expiry returns it to the patient's account.
+  - Storage, the API and the till screens are #254.
 
 ## Other flows
 

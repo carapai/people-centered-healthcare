@@ -1,0 +1,20 @@
+[package]
+name = "health-payments"
+description = "Payments: cash tills and shifts with supervised settlement, and two-phase non-cash payments confirmed only by provider evidence (billing-and-payments.md § Payments; ADR 0032)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "payments"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

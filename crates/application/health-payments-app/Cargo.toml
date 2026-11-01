@@ -1,0 +1,21 @@
+[package]
+name = "health-payments-app"
+description = "Payment postings: cash at the till, two-phase payments through payments in transit, refunds, reversals and till variances, as financial-ledger postings (billing-and-payments.md § Payments; ADR 0032)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "payments"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-financial-ledger = { workspace = true }
+health-payments = { workspace = true }
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+thiserror = { workspace = true }

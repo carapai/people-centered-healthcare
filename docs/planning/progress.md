@@ -15,14 +15,14 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
-| [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
+| [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 2 | 9 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 5 | 7 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 63 of 133 implementation tasks done. Validation spikes open: 3.
+Total: 64 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -181,3 +181,7 @@ Total: 63 of 133 implementation tasks done. Validation spikes open: 3.
   - **Screen:** Requisitions (`/stock/requisitions`): ask, approve or refuse, pick a batch, and send.
   - **e2e:** the stock leaves the pharmacy as a transfer to the ward.
   - **Fix:** the lossless JSON numbers crashed a React render; they are now shown as strings.
+- 2026-11-01: #250 merged (#253). #123: tills and two-phase payments.
+  - **Rules (`health-payments`):** cash within a shift with supervised settlement; non-cash payments pending until provider evidence (receipts provisional, never confirmed before it); customer-reported payments confirmed only by a statement line; refunds behind the permission; statement reconciliation with an exceptions queue.
+  - **Postings (`health-payments-app`):** the ledger postings, with pending money in payments in transit.
+  - **Follow-up:** #254, storage, the API and the till screens.

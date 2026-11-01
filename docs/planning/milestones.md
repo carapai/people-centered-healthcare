@@ -174,6 +174,7 @@ Ledger, pricing, charges, gates, payments, coverage and claims (§136).
 - [Implement charge capture triggers](https://github.com/carapai/people-centered-healthcare/issues/121)
 - [Implement Financial Gates](https://github.com/carapai/people-centered-healthcare/issues/122)
 - [Implement tills and two-phase payments](https://github.com/carapai/people-centered-healthcare/issues/123)
+- [Persist payments and cashier shifts, and build the till screens](https://github.com/carapai/people-centered-healthcare/issues/254)
 - [Integrate mobile money at central](https://github.com/carapai/people-centered-healthcare/issues/124) — needs a human
 - [Implement coverage, benefit plans, eligibility and accumulators](https://github.com/carapai/people-centered-healthcare/issues/125)
 - [Implement claims and payer adapters](https://github.com/carapai/people-centered-healthcare/issues/126)
