@@ -15,6 +15,7 @@ This page consolidates the decided parts of the patient workspace (MASTER_PROMPT
 | Account creation | Login Account per verified phone number (identity) | Decided |
 | Self-registration | §59 flow: Draft → … → Completed | Decided |
 | Identity verification | Assurance levels: OTP `level1`; NIRA or in-person `level3` | Decided |
+| Sign-in | A one-time code to the verified phone, every time; no patient password | Decided (#111) |
 | Appointment booking | `Appointment.status=proposed`; staff confirm | Decided |
 | Pre-visit questionnaires, patient-reported outcomes, symptom reporting | Patient-reported QuestionnaireResponses (patient-engagement); `seed`-only extraction, unconfirmed | Decided |
 | Refill and care requests | `MedicationRequest` / `ServiceRequest` with `intent=proposal`, or a `Task` | Decided |
@@ -36,5 +37,5 @@ This page consolidates the decided parts of the patient workspace (MASTER_PROMPT
 
 - Portal UX.
 - Result-release policy (which results, after what clinician action or delay).
-- Messaging and notification channels.
+- Messaging and notification channels, including the SMS provider for one-time codes.
 - Portal payments and feedback.

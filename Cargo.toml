@@ -13,6 +13,7 @@ members = [
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
     "crates/domains/health-inventory",
+    "crates/domains/health-patient-engagement",
     "crates/domains/health-workflow",
     "crates/application/health-identity-app",
     "crates/application/health-inventory-app",
@@ -59,6 +60,7 @@ health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
+health-patient-engagement = { path = "crates/domains/health-patient-engagement" }
 health-workflow = { path = "crates/domains/health-workflow" }
 health-identity-app = { path = "crates/application/health-identity-app" }
 health-inventory-app = { path = "crates/application/health-inventory-app" }

@@ -1,0 +1,17 @@
+[package]
+name = "health-patient-engagement"
+description = "Patient engagement: the self-registration Registration Request and its route after matching (patient-identity.md § Self-registration; ADR 0029)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "patient-engagement"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }

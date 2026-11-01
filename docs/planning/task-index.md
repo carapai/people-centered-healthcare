@@ -102,6 +102,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#109](https://github.com/carapai/people-centered-healthcare/issues/109) | Implement the laboratory workflow | 9 | #99, #104 |  |
 | [#110](https://github.com/carapai/people-centered-healthcare/issues/110) | Build care plans and the clinical inbox | 9 | #99 |  |
 | [#111](https://github.com/carapai/people-centered-healthcare/issues/111) | Implement Login Accounts, Person links and self-registration | 10 | #68, #63 |  |
+| [#235](https://github.com/carapai/people-centered-healthcare/issues/235) | Choose the SMS provider for patient one-time codes | 10 | #111 | yes |
 | [#112](https://github.com/carapai/people-centered-healthcare/issues/112) | Integrate NIRA verification | 10 | #111 | yes |
 | [#113](https://github.com/carapai/people-centered-healthcare/issues/113) | Implement caregiver delegation | 10 | #111, #65 |  |
 | [#114](https://github.com/carapai/people-centered-healthcare/issues/114) | Implement patient requests and appointment proposals | 10 | #111, #99 |  |
