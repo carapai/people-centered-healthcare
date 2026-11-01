@@ -146,6 +146,7 @@ stateDiagram-v2
 
 - **Within a facility:** the same two steps apply between stores. A one-step "direct transfer" is allowed only when one user both sends and receives, and is audited.
 - **Between facilities:** each side records its own movement at its own Authority Node, and central matches dispatch with receipt (write-authority.md).
+- **Code** (#129): `health-inventory::transfers` and `reconciliation`, and `Inventory::dispatch`, `receive`, `direct_transfer` and `resolve`. Damaged stock is received into quarantine. Central's matching uses `transfers::discrepancies` once sync exists.
 
 ## Stock counts
 

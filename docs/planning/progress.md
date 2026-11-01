@@ -152,3 +152,7 @@ Total: 59 of 131 implementation tasks done. Validation spikes open: 3.
   - **Portal:** caregivers see the people they care for.
   - **e2e:** a guardian's view of an adolescent, with and without her consent, and revoked.
   - **Follow-ups:** #243 (the mother–newborn link at delivery) and #244 (`decide` on portal record reads).
+- 2026-11-01: #113 merged (#245). #129 part 1: two-step transfers and Reconciliation Records.
+  - **Transfers:** dispatch, receipt with counted good and damaged stock (damaged into quarantine), and the direct transfer within a facility. Each step is one transaction, and a dispatch beyond what is available moves nothing.
+  - **Reconciliation Records:** short, damaged, excess and negative balances each open one, which closes only with a root cause (GSDP §13.2). A transfer closes when its last record is resolved.
+  - **SurrealDB:** migration `0015_stock_transfers`.

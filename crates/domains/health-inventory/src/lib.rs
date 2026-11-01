@@ -13,6 +13,9 @@
 //! - **[`stock_card`]** and **[`rebuild`]**: the running balance by `occurred_at`, and the
 //!   nightly drift check.
 
+pub mod reconciliation;
+pub mod transfers;
+
 use std::future::Future;
 
 use health_persistence::{StoreError, WriteError};
@@ -397,4 +400,28 @@ pub trait StockStore {
     ) -> impl Future<Output = Result<Vec<Movement>, StoreError>> + Send;
     /// The unit keys that have a balance record.
     fn stock_units(&mut self) -> impl Future<Output = Result<Vec<String>, StoreError>> + Send;
+    /// Adds or replaces a transfer.
+    fn put_transfer(
+        &mut self,
+        transfer: &transfers::Transfer,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One transfer.
+    fn transfer(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<transfers::Transfer>, StoreError>> + Send;
+    /// Adds or replaces a Reconciliation Record.
+    fn put_reconciliation(
+        &mut self,
+        record: &reconciliation::ReconciliationRecord,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One Reconciliation Record.
+    fn reconciliation(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<reconciliation::ReconciliationRecord>, StoreError>> + Send;
+    /// The records still open, oldest first.
+    fn open_reconciliations(
+        &mut self,
+    ) -> impl Future<Output = Result<Vec<reconciliation::ReconciliationRecord>, StoreError>> + Send;
 }

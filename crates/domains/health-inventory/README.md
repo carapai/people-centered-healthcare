@@ -14,8 +14,17 @@ Layer: **domain** (inventory). The stock ledger: Stock Units, movements and the 
   - a late operation (an offline candidate) is appended, flags the unit and asks for reconciliation;
   - a store may tighten the policy (`block_emergency_dispense`) or relax it (`allow_negative_issues`, which allows and flags).
 - **The stock card** (`stock_card`) orders movements by `occurred_at`, then `recorded_at`, then id, with a running balance, so a backdated movement lands in place. `rebuild` sums a unit's movements for the nightly check (`Drift`).
-- **The `StockStore` port:** a unit's balance record and its movements, inside a store transaction.
+- **Transfers** (`transfers`, #129): two steps, from Picked to InTransit, then Received or Reconciling, then Closed.
+  - `Transfer::dispatch` is a transfer-out of each line at the source.
+  - `receive` takes the counted good and damaged quantities. It gives the transfer-ins (damaged stock into quarantine) and what was found: short, damaged or excess.
+  - `direct` is the one-step transfer within one facility by one user, and is marked. A transfer between facilities is never direct.
+  - `close` needs its records resolved.
+  - `discrepancies` is the comparison central's matching of a dispatch with a receipt will use.
+- **Reconciliation Records** (`reconciliation`): `ReconciliationRecord` is a discrepancy (short, damaged, excess, negative, count variance) with its signed quantity and source. It is open until `resolve` records its `RootCause` (GSDP §13.2): recording error, unrecorded issue, transit loss, damage, expiry, supplier discrepancy, theft, or other with a note. A record is resolved once.
+- **The `StockStore` port:** a unit's balance record and its movements, transfers, and Reconciliation Records, inside a store transaction.
 
 ## Tests
+
+`tests/transfers.rs` covers transfer validation, dispatch and receipt, short, damaged and excess stock, direct transfers, closing, and resolving records.
 
 `tests/policy.rs` covers the quantity and reason rules, blocking at the authority (including reserved and held stock), emergency dispense, store tightening and relaxing, late operations, the stock card with a backdated movement, and reversals.
