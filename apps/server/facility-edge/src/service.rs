@@ -1,9 +1,11 @@
 //! `facility-edge --service`: the node under the platform's service manager.
 
+#[cfg(unix)]
 use std::process::ExitCode;
 #[cfg(unix)]
 use std::sync::Arc;
 
+#[cfg(unix)]
 use health_edge_runtime::EdgeConfig;
 
 /// systemd, `Type=notify`: notifications go to `$NOTIFY_SOCKET`.
