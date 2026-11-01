@@ -53,6 +53,8 @@ pub(crate) struct AuthSettings {
     pub(crate) node_code: health_identifiers::ShortCode,
     /// The patient portal's phone sign-in (#111), with a portal client among `clients`.
     pub(crate) portal: Option<PortalSettings>,
+    /// Payments and cashier shifts (#254), with the access policy.
+    pub(crate) payments: Option<health_fhir_server::PaymentConfig>,
 }
 
 /// The patient portal's phone sign-in.
@@ -222,7 +224,10 @@ pub(crate) fn routes(
                     subject_layer,
                 )),
         );
-        let (fhir, reviews, portal, stock) = fhir(fhir_store, settings, policy, subjects);
+        let (fhir, reviews, portal, stock, payments) = fhir(fhir_store, settings, policy, subjects);
+        if let Some(payments) = payments {
+            api = api.nest("/payments", payments);
+        }
         router = router.nest("/fhir", fhir);
         // Stock (#130): receiving, stock on hand, reorder and requisitions, for staff.
         api = api.nest("/stock", stock);
@@ -352,7 +357,13 @@ fn fhir(
     settings: &AuthSettings,
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
-) -> (Router, Option<Router>, Option<Router>, Router) {
+) -> (
+    Router,
+    Option<Router>,
+    Option<Router>,
+    Router,
+    Option<Router>,
+) {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
@@ -404,8 +415,16 @@ fn fhir(
         registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
     // The portal, with the registry; its patients pass `patient_layer`, not the subject layer.
     let portal = registry_rules(settings).map(|_| fhir.portal_router());
+    if let Some(payments) = settings.payments.clone() {
+        fhir = fhir.with_payments(payments);
+    }
     let stock = fhir.inventory_router().layer(layer.clone());
-    (fhir.router().layer(layer), reviews, portal, stock)
+    // Payments and cashier shifts (#254), for the session's facility.
+    let payments = settings
+        .payments
+        .as_ref()
+        .map(|_| fhir.payments_router().layer(layer.clone()));
+    (fhir.router().layer(layer), reviews, portal, stock, payments)
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -440,6 +459,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/registry/reviews/{*rest}", service.clone())
         .route_service("/api/portal/{*rest}", service.clone())
         .route_service("/api/stock/{*rest}", service.clone())
+        .route_service("/api/payments/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
@@ -469,6 +489,7 @@ mod tests {
             policy: None,
             registry_nin_system: None,
             portal: None,
+            payments: None,
             node_code: "C1".parse().expect("node code"),
         }
     }

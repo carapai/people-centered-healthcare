@@ -60,6 +60,11 @@ pub(crate) struct AuthFiles {
     pub(crate) node_code: String,
     /// The patient portal's sign-in (#111), when `HEALTH_PORTAL_REDIRECT_URIS` is set.
     pub(crate) portal: Option<PortalFiles>,
+    /// `HEALTH_PAYMENT_TILLS`: the tills, comma-separated (#254). With them, `/api/payments`
+    /// takes payments.
+    pub(crate) payment_tills: Vec<String>,
+    /// `HEALTH_CURRENCY`, default `UGX`: the ledger's functional currency.
+    pub(crate) currency: String,
 }
 
 /// The patient portal's client and its one-time codes (#111; ADR 0029).
@@ -125,6 +130,17 @@ impl Config {
                     access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
                     registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM"),
                     node_code: get("HEALTH_NODE_CODE").unwrap_or_else(|| "C1".to_owned()),
+                    payment_tills: get("HEALTH_PAYMENT_TILLS")
+                        .map(|tills| {
+                            tills
+                                .split(',')
+                                .map(str::trim)
+                                .filter(|t| !t.is_empty())
+                                .map(str::to_owned)
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    currency: get("HEALTH_CURRENCY").unwrap_or_else(|| "UGX".to_owned()),
                     portal: match get("HEALTH_PORTAL_REDIRECT_URIS") {
                         None => None,
                         Some(uris) => Some(PortalFiles {

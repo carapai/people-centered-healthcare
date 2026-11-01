@@ -22,6 +22,8 @@ import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
 import { Route as StockIndexRouteImport } from './routes/stock.index'
 import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
+import { Route as TillIndexRouteImport } from './routes/till.index'
+import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +90,16 @@ const StockRequisitionsRoute = StockRequisitionsRouteImport.update({
   path: '/stock/requisitions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TillIndexRoute = TillIndexRouteImport.update({
+  id: '/till/',
+  path: '/till/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TillSuperviseRoute = TillSuperviseRouteImport.update({
+  id: '/till/supervise',
+  path: '/till/supervise',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -101,8 +113,10 @@ export interface FileRoutesByFullPath {
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/stock/': typeof StockIndexRoute
+  '/till/': typeof TillIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -116,8 +130,10 @@ export interface FileRoutesByTo {
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/till/supervise': typeof TillSuperviseRoute
   '/portal': typeof PortalIndexRoute
   '/stock': typeof StockIndexRoute
+  '/till': typeof TillIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -132,8 +148,10 @@ export interface FileRoutesById {
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/stock/': typeof StockIndexRoute
+  '/till/': typeof TillIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -149,8 +167,10 @@ export interface FileRouteTypes {
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/till/supervise'
     | '/portal/'
     | '/stock/'
+    | '/till/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -164,8 +184,10 @@ export interface FileRouteTypes {
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/till/supervise'
     | '/portal'
     | '/stock'
+    | '/till'
   id:
     | '__root__'
     | '/'
@@ -179,8 +201,10 @@ export interface FileRouteTypes {
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/till/supervise'
     | '/portal/'
     | '/stock/'
+    | '/till/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -195,8 +219,10 @@ export interface RootRouteChildren {
   RegistryReviewsRoute: typeof RegistryReviewsRoute
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
+  TillSuperviseRoute: typeof TillSuperviseRoute
   PortalIndexRoute: typeof PortalIndexRoute
   StockIndexRoute: typeof StockIndexRoute
+  TillIndexRoute: typeof TillIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +318,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StockRequisitionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/till/': {
+      id: '/till/'
+      path: '/till'
+      fullPath: '/till/'
+      preLoaderRoute: typeof TillIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/till/supervise': {
+      id: '/till/supervise'
+      path: '/till/supervise'
+      fullPath: '/till/supervise'
+      preLoaderRoute: typeof TillSuperviseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -307,8 +347,10 @@ const rootRouteChildren: RootRouteChildren = {
   RegistryReviewsRoute: RegistryReviewsRoute,
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
+  TillSuperviseRoute: TillSuperviseRoute,
   PortalIndexRoute: PortalIndexRoute,
   StockIndexRoute: StockIndexRoute,
+  TillIndexRoute: TillIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

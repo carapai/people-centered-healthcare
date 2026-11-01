@@ -38,10 +38,12 @@ const env = {
   // The patient portal (#111), sending one-time codes to the development outbox.
   HEALTH_PORTAL_REDIRECT_URIS: `${ORIGIN}/portal/callback`,
   HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
+  // Payments at one till (#254).
+  HEALTH_PAYMENT_TILLS: 'till-1',
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'] },
       labels: [],
     }),
   ),

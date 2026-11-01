@@ -27,4 +27,4 @@ Layer: **domain** (Finance, payments). Tills and two-phase payments (#123; billi
 
 - **`PaymentStore`** is the storage port for payments and shifts; `health-surrealdb` implements it (migration `0018_payments`). A payment carries its `receipt` number once issued.
 
-**Not here yet:** the API and the till screens (#254 part 2).
+The API and the till screens are in `health-fhir-server` and the web client (#254). Provider callbacks and polls come from mobile money at central (#124).

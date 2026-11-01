@@ -62,6 +62,7 @@ mod interactions;
 mod inventory;
 mod ops;
 mod outcome;
+mod payments;
 mod portal;
 mod references;
 mod registry;
@@ -87,6 +88,7 @@ pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_sta
 pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
 pub use outcome::{FhirError, operation_outcome};
+pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_PERMISSION};
 pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
@@ -104,6 +106,7 @@ pub struct FhirServer {
     audit: Option<Arc<Auditor>>,
     access: Option<access::Control>,
     registry: Option<Arc<registry::RegistrySettings>>,
+    payments: Option<Arc<payments::PaymentConfig>>,
 }
 
 impl FhirServer {
@@ -125,6 +128,7 @@ impl FhirServer {
             audit: None,
             access: None,
             registry: None,
+            payments: None,
         }
     }
 

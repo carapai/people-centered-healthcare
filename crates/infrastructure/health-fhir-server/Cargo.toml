@@ -20,12 +20,15 @@ health-audit = { workspace = true }
 health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-validation = { workspace = true }
+health-financial-ledger = { workspace = true }
 health-identifiers = { workspace = true }
 health-identity-app = { workspace = true }
 health-inventory = { workspace = true }
 health-inventory-app = { workspace = true }
 health-patient-engagement = { workspace = true }
 health-patient-engagement-app = { workspace = true }
+health-payments = { workspace = true }
+health-payments-app = { workspace = true }
 health-persistence = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }

@@ -204,15 +204,18 @@ where
     }
 
     /// Records a two-phase payment, pending until `expires_at`, with its provider `reference`
-    /// claimed once (the idempotency and reconciliation key) and a provisional receipt.
+    /// claimed once (the idempotency and reconciliation key) and a provisional receipt. `shift`
+    /// is the cashier's shift it was taken in, for its list; it adds nothing to the cash expected.
     pub async fn record_pending(
         &self,
         new: &NewPayment<'_>,
         reference: &str,
+        shift: Option<&str>,
         at: Timestamp,
         expires_at: Timestamp,
     ) -> Result<Payment, PaymentsError> {
         let mut payment = Payment::pending(new, reference, at, expires_at)?;
+        payment.shift = shift.map(str::to_owned);
         let mut tx = self.store.begin().await?;
         let guard = GuardKey(format!("payment-reference|{}", reference.trim()));
         tx.claim_guard(guard).await.map_err(|e| match e {
@@ -391,6 +394,12 @@ where
             self.confirm(id, Evidence::Statement, at).await?;
         }
         Ok(result)
+    }
+
+    /// The open shift of `till`, if any.
+    pub async fn open_shift_of(&self, till: &str) -> Result<Option<Shift>, PaymentsError> {
+        let mut tx = self.store.begin().await?;
+        Ok(tx.open_shift(till).await?)
     }
 
     /// Payment `id`.

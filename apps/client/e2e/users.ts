@@ -10,4 +10,6 @@ export const USERS = {
   clerk: { username: 'e2e-clerk', password: 'tumbling otter quarry seven', roles: 'clerk' },
   reviewer: { username: 'e2e-reviewer', password: 'patient heron basket ninety', roles: 'reviewer' },
   storekeeper: { username: 'e2e-storekeeper', password: 'copper lantern meadow forty', roles: 'storekeeper' },
+  cashier: { username: 'e2e-cashier', password: 'saffron kettle harbour nine', roles: 'cashier' },
+  supervisor: { username: 'e2e-supervisor', password: 'granite willow pocket eleven', roles: 'supervisor' },
 } as const
