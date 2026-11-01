@@ -1,6 +1,7 @@
 //! Stock (migration `0011_stock`): `health_inventory::StockStore` over the transaction.
 
 use health_inventory::counts::StockCount;
+use health_inventory::receiving::{GoodsReceived, Requisition};
 use health_inventory::reconciliation::ReconciliationRecord;
 use health_inventory::transfers::Transfer;
 use health_inventory::{Balance, Movement, StockStore, StockUnit};
@@ -211,6 +212,56 @@ impl StockStore for SurrealTx {
         let rows = self
             .rows(
                 "SELECT VALUE [data] FROM type::record('stock_count', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .next()
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .transpose()
+    }
+
+    async fn put_goods_received(&mut self, note: &GoodsReceived) -> Result<(), WriteError> {
+        let data = serde_json::to_string(note)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        self.run(
+            "UPSERT type::record('stock_goods_received', $id) CONTENT { data: $data } RETURN VALUE record::id(id)",
+            vec![("id", note.id.clone()), ("data", data)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn goods_received(&mut self, id: &str) -> Result<Option<GoodsReceived>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('stock_goods_received', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .next()
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .transpose()
+    }
+
+    async fn put_requisition(&mut self, requisition: &Requisition) -> Result<(), WriteError> {
+        let data = serde_json::to_string(requisition)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        self.run(
+            "UPSERT type::record('stock_requisition', $id) CONTENT { data: $data } RETURN VALUE record::id(id)",
+            vec![("id", requisition.id.clone()), ("data", data)],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn requisition(&mut self, id: &str) -> Result<Option<Requisition>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('stock_requisition', $id)",
                 vec![("id", id.to_owned())],
             )
             .await?;

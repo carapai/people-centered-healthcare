@@ -10,6 +10,9 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - **Stock counts** (#129): `start_count` (every unit of the store, or the given units for a cycle count; nothing is frozen), `record_count` and `submit_count`.
   - **`approve_count`** is one transaction. It posts a count-variance movement and a Reconciliation Record for each variance. It also resolves the open negative-balance records of the counted units, each with its root cause (`Cause`; `CauseRequired` without one, GSDP §13.2), and unflags their balances.
   - **`inventory_report`** is the count as a FHIR `InventoryReport` snapshot.
+- **Receiving** (#130): `receive_goods` is one transaction. It writes a receipt of each line at its unit cost and pack size, and the note; a note is received once.
+- **Requisitions:** `request`, `decide_requisition`, and `fulfil_requisition`, which dispatches the picked batches as a transfer from the pharmacy to the ward and marks the requisition fulfilled in the same transaction. `supply_requests` is a requisition as FHIR SupplyRequests.
+- **Reorder:** `reorder(store, policy, days, now)` gives per-product suggestions from usable stock and the issues and dispensing over the last `days` days.
 - **`balance(key)`** and **`nightly_check()`:** the check rebuilds each balance from its movements and reports any drift.
 
 ## Tests
@@ -30,7 +33,14 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - a large variance waits for a supervisor;
 - a count settles a flagged negative balance only with its root cause.
 
+`tests/receiving.rs`, over SurrealDB:
+- a receipt increases the balance with its cost recorded, once;
+- a ward requisition is approved, then fulfilled by a transfer;
+- reorder suggestions follow the last month's consumption.
+
 **Not here yet:**
+- the receiving, requisition and reorder screens and e2e (#130 part 2);
+- upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
 - the change log and outbox for sync (#135);
 - reservations and FEFO (#128);

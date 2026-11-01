@@ -14,6 +14,7 @@
 //!   nightly drift check.
 
 pub mod counts;
+pub mod receiving;
 pub mod reconciliation;
 pub mod transfers;
 
@@ -436,6 +437,26 @@ pub trait StockStore {
         &mut self,
         id: &str,
     ) -> impl Future<Output = Result<Option<counts::StockCount>, StoreError>> + Send;
+    /// Records a goods received note.
+    fn put_goods_received(
+        &mut self,
+        note: &receiving::GoodsReceived,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One goods received note.
+    fn goods_received(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<receiving::GoodsReceived>, StoreError>> + Send;
+    /// Adds or replaces a requisition.
+    fn put_requisition(
+        &mut self,
+        requisition: &receiving::Requisition,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One requisition.
+    fn requisition(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<receiving::Requisition>, StoreError>> + Send;
     /// The records still open, oldest first.
     fn open_reconciliations(
         &mut self,

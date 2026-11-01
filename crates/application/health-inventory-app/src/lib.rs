@@ -9,6 +9,7 @@
 //! - **[`Inventory::nightly_check`]** rebuilds each balance from the ledger and reports drift.
 
 use health_inventory::counts::CountRefused;
+use health_inventory::receiving::ReceivingRefused;
 use health_inventory::reconciliation::{Discrepancy, ReconciliationRecord, ResolveRefused};
 use health_inventory::transfers::TransferRefused;
 use health_inventory::{
@@ -18,9 +19,11 @@ use health_inventory::{
 use health_persistence::{Store, StoreError, Transaction, WriteError};
 
 mod counts;
+mod receiving;
 mod transfers;
 
 pub use counts::{Cause, inventory_report};
+pub use receiving::supply_requests;
 pub use transfers::Sender;
 
 /// Why a movement was not recorded.
@@ -38,6 +41,9 @@ pub enum InventoryError {
     /// A Reconciliation Record could not be resolved.
     #[error(transparent)]
     Resolve(#[from] ResolveRefused),
+    /// A goods received note or requisition was refused.
+    #[error(transparent)]
+    Receiving(#[from] ReceivingRefused),
     /// A count step was refused.
     #[error(transparent)]
     Count(#[from] CountRefused),
@@ -81,6 +87,12 @@ impl From<StoreError> for Attempt {
 
 impl From<Refused> for Attempt {
     fn from(refused: Refused) -> Self {
+        Self::Fail(refused.into())
+    }
+}
+
+impl From<ReceivingRefused> for Attempt {
+    fn from(refused: ReceivingRefused) -> Self {
         Self::Fail(refused.into())
     }
 }

@@ -161,3 +161,9 @@ Total: 60 of 132 implementation tasks done. Validation spikes open: 3.
   - **Approval:** a reason for every variance, and a supervisor above the threshold. Each posted variance raises a Reconciliation Record, and a settled negative balance needs its root cause.
   - **Export:** the InventoryReport.
   - **Follow-up:** #247, central matching of inter-facility transfers, which needs sync.
+- 2026-11-01: #129 merged (#248). #130 part 1: receiving, requisitions and reorder.
+  - **Receiving:** a goods received note writes a receipt of each line with its unit cost, in one transaction, once.
+  - **GS1:** DataMatrix parsing.
+  - **Requisitions:** ward requisitions (SupplyRequest) are approved, then fulfilled by a dispatched transfer.
+  - **Reorder:** min/max suggestions from average monthly consumption.
+  - **SurrealDB:** migration `0017_receiving`.

@@ -24,9 +24,16 @@ Layer: **domain** (inventory). The stock ledger: Stock Units, movements and the 
 - **Stock counts** (`counts`, #129): `StockCount` goes from Draft to Submitted to Approved, in full, cycle or blind mode (`sheet` hides what the ledger expects).
   - **No freeze:** `variances` are counted minus (the balance at the start plus the movements recorded since).
   - **Approval:** `approve` needs a reason for every variance, and a supervisor for any variance above the store's threshold.
-- **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, the units of a store, and Reconciliation Records, inside a store transaction.
+- **Receiving** (`receiving`, #130):
+  - **`GoodsReceived`:** a goods received note against a supplier delivery. `validate` needs the supplier, delivery and complete lines (product, batch, expiry, positive quantity and pack size, cost of zero or more).
+  - **`parse_gs1`:** reads GS1 DataMatrix element strings, as scanned (with the group separator) or as printed (`(01)…`): GTIN 01, expiry 17 (day `00` is the month's last), batch 10 and serial 21. It is never required.
+  - **`Requisition`:** a ward's SupplyRequest to the pharmacy, from Requested to Approved (or Rejected), then Fulfilled by a transfer.
+  - **`suggest`:** min/max reorder levels from the average monthly consumption (`ReorderPolicy`, default 1 and 3 months). At or below the minimum it orders up to the maximum, rounded up; with no consumption it suggests nothing.
+- **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, goods received notes, requisitions, the units of a store, and Reconciliation Records, inside a store transaction.
 
 ## Tests
+
+`tests/receiving.rs` covers note validation, GS1 as scanned and printed, requisitions, and reorder suggestions.
 
 `tests/counts.rs` covers blind sheets, counting and submitting, movements during a count, and approval rules.
 

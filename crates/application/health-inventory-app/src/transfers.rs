@@ -5,6 +5,7 @@
 //! refused as a whole), and the Reconciliation Records for what was found short, damaged or in
 //! excess on receipt.
 
+use health_inventory::receiving::Requisition;
 use health_inventory::reconciliation::{ReconciliationRecord, RootCause};
 use health_inventory::transfers::{Counted, Leg, Transfer, TransferStatus};
 use health_inventory::{Movement, MovementKind, Origin, StockStore};
@@ -54,20 +55,36 @@ fn movement(
     }
 }
 
+/// What one transfer step writes beside the transfer.
+pub(crate) struct Step<'a> {
+    /// The step's name, in its movements' ids.
+    pub(crate) name: &'a str,
+    /// The movements.
+    pub(crate) legs: &'a [Leg],
+    /// The Reconciliation Records found.
+    pub(crate) records: &'a [ReconciliationRecord],
+    /// The requisition it fulfils.
+    pub(crate) requisition: Option<&'a Requisition>,
+}
+
 impl<S> Inventory<S>
 where
     S: Store,
     S::Tx: StockStore,
 {
-    async fn step(
+    pub(crate) async fn step(
         &self,
         transfer: &Transfer,
-        step: &str,
-        legs: &[Leg],
-        records: &[ReconciliationRecord],
+        step: Step<'_>,
         sender: &Sender,
         now: Timestamp,
     ) -> Result<(), InventoryError> {
+        let Step {
+            name: step,
+            legs,
+            records,
+            requisition,
+        } = step;
         for _ in 0..ATTEMPTS {
             let mut tx = self.store.begin().await?;
             let attempt = async {
@@ -86,6 +103,9 @@ where
                     tx.put_reconciliation(record).await?;
                 }
                 tx.put_transfer(transfer).await?;
+                if let Some(requisition) = requisition {
+                    tx.put_requisition(requisition).await?;
+                }
                 Ok::<(), Attempt>(())
             }
             .await;
@@ -111,7 +131,18 @@ where
         now: Timestamp,
     ) -> Result<Transfer, InventoryError> {
         let legs = transfer.dispatch(&sender.actor)?;
-        self.step(&transfer, "out", &legs, &[], sender, now).await?;
+        self.step(
+            &transfer,
+            Step {
+                name: "out",
+                legs: &legs,
+                records: &[],
+                requisition: None,
+            },
+            sender,
+            now,
+        )
+        .await?;
         Ok(transfer)
     }
 
@@ -140,8 +171,18 @@ where
                 )
             })
             .collect();
-        self.step(&transfer, "in", &legs, &records, sender, now)
-            .await?;
+        self.step(
+            &transfer,
+            Step {
+                name: "in",
+                legs: &legs,
+                records: &records,
+                requisition: None,
+            },
+            sender,
+            now,
+        )
+        .await?;
         Ok((transfer, records))
     }
 
@@ -153,8 +194,18 @@ where
         now: Timestamp,
     ) -> Result<Transfer, InventoryError> {
         let legs = transfer.direct(&sender.actor)?;
-        self.step(&transfer, "direct", &legs, &[], sender, now)
-            .await?;
+        self.step(
+            &transfer,
+            Step {
+                name: "direct",
+                legs: &legs,
+                records: &[],
+                requisition: None,
+            },
+            sender,
+            now,
+        )
+        .await?;
         Ok(transfer)
     }
 
