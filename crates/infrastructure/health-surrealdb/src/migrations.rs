@@ -88,6 +88,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0012_phone_sign_in",
         sql: include_str!("../migrations/0012_phone_sign_in.surql"),
     },
+    Migration {
+        version: 13,
+        name: "0013_registration_review",
+        sql: include_str!("../migrations/0013_registration_review.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.

@@ -7,11 +7,13 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::{Extension, Router};
-use health_access_policy::PatientSubject;
-use health_audit::Auditor;
+use std::collections::BTreeSet;
+
+use health_access_policy::{PatientSubject, Permissions, Subject};
+use health_audit::{Agent, Auditor};
 use health_client_registry::matching::MatchingRules;
 use health_fhir_search::{Registry, Unrestricted};
-use health_fhir_server::FhirServer;
+use health_fhir_server::{FhirServer, REVIEW_PERMISSION};
 use health_registries_app::fhir::{ECID_SYSTEM, RegistryConfig};
 use health_registries_app::matching::RegistryBlocking;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
@@ -63,6 +65,48 @@ fn portal(store: &SurrealStore, account: Option<&str>) -> Router {
         })),
         None => router,
     }
+}
+
+/// The review queue as a registry reviewer's request reaches it.
+fn reviews(store: &SurrealStore) -> Router {
+    server(store)
+        .registry_review_router()
+        .layer(Extension(Agent {
+            display: "account clerk-1".into(),
+            ..Agent::unauthenticated()
+        }))
+        .layer(Extension(Subject {
+            account: "clerk-1".into(),
+            facility: "KLA01".into(),
+            permissions: Permissions(
+                ["Patient.crus", REVIEW_PERMISSION]
+                    .iter()
+                    .map(|p| (*p).to_owned())
+                    .collect(),
+            ),
+            programs: BTreeSet::new(),
+            purpose: Some("TREAT".into()),
+            break_glass: None,
+        }))
+}
+
+/// An existing Patient like the one the tests register, and its id.
+async fn existing(store: &SurrealStore) -> String {
+    let (status, existing) = send(
+        &server(store).router(),
+        "POST",
+        "/Patient",
+        Some(json!({
+            "resourceType": "Patient",
+            "name": [{ "family": "Nakato", "given": ["Grace"] }],
+            "birthDate": "1990-04-12",
+            "gender": "female",
+            "telecom": [{ "system": "phone", "value": PHONE }],
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{existing}");
+    existing["id"].as_str().expect("id").to_owned()
 }
 
 async fn send(app: &Router, method: &str, path: &str, body: Option<Value>) -> (StatusCode, Value) {
@@ -158,20 +202,7 @@ async fn a_new_patient_is_self_registered_and_sees_only_what_they_submitted() {
 async fn a_phone_account_resembling_an_existing_patient_goes_to_review() {
     let store = store().await;
     let admin = server(&store).router();
-    let (status, existing) = send(
-        &admin,
-        "POST",
-        "/Patient",
-        Some(json!({
-            "resourceType": "Patient",
-            "name": [{ "family": "Nakato", "given": ["Grace"] }],
-            "birthDate": "1990-04-12",
-            "gender": "female",
-            "telecom": [{ "system": "phone", "value": PHONE }],
-        })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "{existing}");
+    existing(&store).await;
 
     let app = portal(&store, Some("acct-2"));
     let (status, body) = send(
@@ -216,4 +247,112 @@ async fn the_portal_needs_a_patient_and_a_valid_response() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(outcome["resourceType"], "OperationOutcome");
+}
+
+/// Submits a lookalike registration and returns its queue item.
+async fn queued(store: &SurrealStore, account: &str) -> (String, Value) {
+    let id = existing(store).await;
+    let (_, body) = send(
+        &portal(store, Some(account)),
+        "POST",
+        "/registration",
+        Some(response("Grace", "Nakato")),
+    )
+    .await;
+    assert_eq!(body["status"], "review");
+    let (status, queue) = send(&reviews(store), "GET", "/", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let item = queue
+        .as_array()
+        .expect("items")
+        .iter()
+        .find(|i| i["kind"] == "registration-request")
+        .cloned()
+        .expect("queued");
+    (id, item)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_reviewer_links_the_account_after_checking_its_holder_in_person() {
+    let store = store().await;
+    let (existing_id, item) = queued(&store, "acct-4").await;
+    assert_eq!(item["candidates"][0]["id"], existing_id.as_str());
+    assert_eq!(item["response"]["resourceType"], "QuestionnaireResponse");
+    let path = format!("/{}", item["id"].as_str().expect("id"));
+
+    let (status, _) = send(
+        &reviews(&store),
+        "POST",
+        &path,
+        Some(json!({ "decision": "link-patient", "patient": existing_id })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "no in-person check"
+    );
+    let (status, _) = send(
+        &reviews(&store),
+        "POST",
+        &path,
+        Some(json!({ "decision": "same-person" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    let (status, body) = send(
+        &reviews(&store),
+        "POST",
+        &path,
+        Some(json!({ "decision": "link-patient", "patient": format!("Patient/{existing_id}"), "document": "national-id" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let (_, mine) = send(
+        &portal(&store, Some("acct-4")),
+        "GET",
+        "/registration",
+        None,
+    )
+    .await;
+    assert_eq!(mine["status"], "completed");
+    assert_eq!(mine["patient"], existing_id.as_str());
+    assert_eq!(mine["access"], "records");
+
+    let (_, queue) = send(&reviews(&store), "GET", "/", None).await;
+    assert_eq!(queue, json!([]), "decided");
+    let (status, _) = send(
+        &reviews(&store),
+        "POST",
+        &path,
+        Some(json!({ "decision": "create-patient" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_reviewer_may_create_a_new_patient_for_the_account() {
+    let store = store().await;
+    let (existing_id, item) = queued(&store, "acct-5").await;
+    let path = format!("/{}", item["id"].as_str().expect("id"));
+    let (status, _) = send(
+        &reviews(&store),
+        "POST",
+        &path,
+        Some(json!({ "decision": "create-patient" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, mine) = send(
+        &portal(&store, Some("acct-5")),
+        "GET",
+        "/registration",
+        None,
+    )
+    .await;
+    assert_eq!(mine["status"], "completed");
+    assert_eq!(mine["access"], "self-submitted");
+    assert_ne!(mine["patient"], existing_id.as_str());
 }

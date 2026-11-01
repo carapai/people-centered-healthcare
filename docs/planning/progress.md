@@ -130,3 +130,7 @@ Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
   - **Use case:** `health-patient-engagement-app` routes a patient's QuestionnaireResponse after `$match`. No candidate gives a new self-registered Patient (provisional, patient-reported, no MRN, never auto-linked), with the Person linked at `level1`. Any candidate goes to review with nothing linked.
   - **Storage:** the Task, QuestionnaireResponse and Person, with ids derived from the account.
   - **Server:** `ClientRegistry::create_self_registered`. `health-fhir-server::portal_router` serves `/registration` behind the new `health_auth::patient_layer` (`PatientSubject`).
+- 2026-11-01: #111 part 2b merged (#238). Part 2c: staff review of portal registrations.
+  - **Queue:** a request that resembles existing Patients is a `registration-request` item in the registry review queue (migration `0013_registration_review`). It is opened and closed in the self-registration use case's own transaction.
+  - **Decisions:** a reviewer links the account to a candidate only with the ID document checked in person, which gives `level3`; otherwise they create a new Patient. The review screen shows the patient's answers against each candidate.
+  - **Fix:** a single certain candidate no longer hides the other candidates from review.

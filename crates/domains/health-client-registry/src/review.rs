@@ -37,6 +37,17 @@ pub enum ReviewKind {
         /// The value that did not survive.
         incoming: Claim,
     },
+    /// A portal self-registration that matched existing Patients (#111; ADR 0029): a reviewer
+    /// links the account to one, after checking the holder's ID in person, or creates a new
+    /// Patient. A phone account is never linked without this.
+    Registration {
+        /// The Registration Request (its Task id).
+        request: String,
+        /// The phone Login Account that made it.
+        account: String,
+        /// The candidate source Patients.
+        candidates: Vec<String>,
+    },
 }
 
 impl ReviewKind {
@@ -45,6 +56,7 @@ impl ReviewKind {
         match self {
             Self::PotentialMatch { .. } => "potential-match",
             Self::Survivorship { .. } => "survivorship",
+            Self::Registration { .. } => "registration-request",
         }
     }
 }
@@ -60,6 +72,10 @@ pub enum Decision {
     KeepCurrent,
     /// Survivorship: take the incoming value.
     TakeIncoming,
+    /// Registration: the account holder, checked in person, is an existing Patient; link them.
+    LinkPatient,
+    /// Registration: none of the candidates; create a new Patient.
+    CreatePatient,
 }
 
 impl Decision {
@@ -70,6 +86,8 @@ impl Decision {
             Self::DifferentPeople => "different-people",
             Self::KeepCurrent => "keep-current",
             Self::TakeIncoming => "take-incoming",
+            Self::LinkPatient => "link-patient",
+            Self::CreatePatient => "create-patient",
         }
     }
 
@@ -80,6 +98,8 @@ impl Decision {
             Self::DifferentPeople,
             Self::KeepCurrent,
             Self::TakeIncoming,
+            Self::LinkPatient,
+            Self::CreatePatient,
         ]
         .into_iter()
         .find(|d| d.code() == code)
@@ -156,6 +176,9 @@ impl ReviewEntry {
             ) | (
                 ReviewKind::Survivorship { .. },
                 Decision::KeepCurrent | Decision::TakeIncoming
+            ) | (
+                ReviewKind::Registration { .. },
+                Decision::LinkPatient | Decision::CreatePatient
             )
         );
         if !fits {

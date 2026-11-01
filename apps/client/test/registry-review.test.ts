@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { ReviewError, compare, decide, reviewQueue } from '../src/features/registry-review/api'
+import { ReviewError, compare, decide, decideRegistration, reviewQueue, submitted } from '../src/features/registry-review/api'
 import { worklistKey } from '../src/platform'
 import { fakeTransport } from './fake'
 
@@ -51,5 +51,41 @@ describe('registry review', () => {
     expect(byField['nin']?.agrees).toBe(true)
     expect(byField['phone']).toEqual({ field: 'phone', source: '0772000001', candidate: '', agrees: false })
     expect(byField['mrn']?.candidate).toBe('KAM013-C1-000001')
+  })
+
+  test('a portal registration is decided with the candidate and the document checked', async () => {
+    const transport = fakeTransport(() => ({ status: 204 }))
+    await decideRegistration(transport, 'task-1', { decision: 'link-patient', patient: 'p1', document: 'national-id' })
+    expect(transport.sent[0]).toMatchObject({
+      method: 'POST',
+      path: '/registry/reviews/task-1',
+      body: { decision: 'link-patient', patient: 'p1', document: 'national-id' },
+    })
+    await decideRegistration(transport, 'task-1', { decision: 'create-patient' })
+    expect(transport.sent[1]).toMatchObject({ body: { decision: 'create-patient' } })
+    await expect(decideRegistration(fakeTransport(() => ({ status: 409 })), 'task-1', { decision: 'create-patient' })).rejects.toEqual(
+      new ReviewError(409),
+    )
+  })
+
+  test("a portal registration's answers become the patient compared with the candidates", () => {
+    expect(submitted(null)).toBeNull()
+    const patient = submitted({
+      resourceType: 'QuestionnaireResponse',
+      questionnaire: 'urn:health:questionnaire/self-registration',
+      status: 'completed',
+      item: [
+        { linkId: 'given', answer: [{ valueString: 'Grace' }] },
+        { linkId: 'family', answer: [{ valueString: 'Nakato' }] },
+        { linkId: 'birthDate', answer: [{ valueDate: '1990-04-12' }] },
+        { linkId: 'gender', answer: [{ valueCoding: { code: 'female' } }] },
+      ],
+    })
+    expect(patient).toEqual({
+      resourceType: 'Patient',
+      name: [{ family: 'Nakato', given: ['Grace'] }],
+      birthDate: '1990-04-12',
+      gender: 'female',
+    })
   })
 })

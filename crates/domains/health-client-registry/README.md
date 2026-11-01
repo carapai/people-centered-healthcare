@@ -30,8 +30,8 @@ Layer: **domain** (Registries). Source Patients, golden records and their links 
     - Agreement only inside an estimated age's ±5 band is worth half.
     - The result is a FHIR `match-grade`: certain, probable, possible or certainly-not.
 - **`review`:** the registry review queue (ADR 0028).
-  - **`ReviewEntry`** is a potential match (source, candidate, golden record, score) or a survivorship disagreement (golden record, field, current and incoming values).
-  - **`decide`** accepts only the decisions that fit the item: same person or different people, keep current or take incoming. It needs a named reviewer, and refuses an item that is already decided.
+  - **`ReviewEntry`** is a potential match (source, candidate, golden record, score) or a survivorship disagreement (golden record, field, current and incoming values), or a portal registration that resembles existing Patients (`Registration`: the request, the account and the candidates; #111).
+  - **`decide`** accepts only the decisions that fit the item: same person or different people, keep current or take incoming, link the patient or create a patient. It needs a named reviewer, and refuses an item that is already decided.
   - **`overdue`:** pending past `AGEING` (7 days).
   - **`ReviewQueue`** is the storage port; `health-surrealdb` implements it (migration `0007_registry_review`).
 - **`person`:** a Login Account's `Person` (#111; ADR 0029).

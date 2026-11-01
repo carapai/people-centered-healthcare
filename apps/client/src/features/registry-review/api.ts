@@ -1,4 +1,4 @@
-import type { Patient } from '@health/fhir-types'
+import type { Patient, QuestionnaireResponse } from '@health/fhir-types'
 
 import { worklistKey } from '../../platform'
 import type { Transport } from '../../platform/types'
@@ -33,6 +33,17 @@ export type ReviewItem =
       current: Claim
       incoming: Claim
     }
+  | {
+      id: string
+      kind: 'registration-request'
+      created_at: string
+      overdue: boolean
+      /** `Task/{id}`: the patient's Registration Request. */
+      request: string
+      /** What the patient submitted through the portal. */
+      response: QuestionnaireResponse | null
+      candidates: (Patient | null)[]
+    }
 
 export type Decision = 'same-person' | 'different-people' | 'keep-current' | 'take-incoming'
 
@@ -62,6 +73,39 @@ export function reviewQueue(transport: Transport) {
 export async function decide(transport: Transport, id: string, decision: Decision): Promise<void> {
   const response = await transport.request({ method: 'POST', path: `/registry/reviews/${encodeURIComponent(id)}`, body: { decision } })
   if (response.status !== 204) throw new ReviewError(response.status)
+}
+
+/** A reviewer's decision on a portal registration (#111): link the account to a candidate after
+ * checking the holder's ID `document` in person, or create a new patient. */
+export type RegistrationDecision = { decision: 'link-patient'; patient: string; document: string } | { decision: 'create-patient' }
+
+/** The ID documents a reviewer may check in person. */
+export const DOCUMENTS = ['national-id', 'passport', 'driving-licence', 'refugee-id'] as const
+
+/** The reviewer's decision on registration `id`. */
+export async function decideRegistration(transport: Transport, id: string, decision: RegistrationDecision): Promise<void> {
+  const response = await transport.request({ method: 'POST', path: `/registry/reviews/${encodeURIComponent(id)}`, body: decision })
+  if (response.status !== 204) throw new ReviewError(response.status)
+}
+
+/** The patient a portal registration describes, from its answers (`given`, `family`,
+ * `birthDate`, `gender`), for comparing with the candidates. */
+export function submitted(response: QuestionnaireResponse | null): Patient | null {
+  if (response === null) return null
+  const answer = (linkId: string) => {
+    const value = response.item?.find((i) => i.linkId === linkId)?.answer?.[0]
+    return value?.valueString ?? value?.valueDate ?? value?.valueCoding?.code
+  }
+  const given = answer('given')
+  const family = answer('family')
+  const birthDate = answer('birthDate')
+  const gender = answer('gender')
+  return {
+    resourceType: 'Patient',
+    name: [{ ...(family === undefined ? {} : { family }), ...(given === undefined ? {} : { given: [given] }) }],
+    ...(birthDate === undefined ? {} : { birthDate }),
+    ...(gender === 'male' || gender === 'female' || gender === 'other' || gender === 'unknown' ? { gender } : {}),
+  }
 }
 
 /** One row of a side-by-side comparison. */

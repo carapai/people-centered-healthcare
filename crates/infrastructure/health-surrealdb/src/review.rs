@@ -40,6 +40,11 @@ fn details(kind: &ReviewKind) -> Value {
         } => {
             json!({ "golden": golden, "field": field.code(), "current": claim_json(current), "incoming": claim_json(incoming) })
         }
+        ReviewKind::Registration {
+            request,
+            account,
+            candidates,
+        } => json!({ "request": request, "account": account, "candidates": candidates }),
     }
 }
 
@@ -57,6 +62,15 @@ fn kind(code: &str, d: &Value) -> Option<ReviewKind> {
             field: Field::from_code(d["field"].as_str()?)?,
             current: claim(&d["current"])?,
             incoming: claim(&d["incoming"])?,
+        }),
+        "registration-request" => Some(ReviewKind::Registration {
+            request: text("request")?,
+            account: text("account")?,
+            candidates: d["candidates"]
+                .as_array()?
+                .iter()
+                .map(|c| c.as_str().map(str::to_owned))
+                .collect::<Option<_>>()?,
         }),
         _ => None,
     }
