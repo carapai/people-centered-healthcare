@@ -27,6 +27,12 @@ This page consolidates the decided parts of the patient workspace (MASTER_PROMPT
 | Payments | Mobile money via central provider integration (ADR 0032) | Mechanism decided; **portal payment UX is open** |
 | Feedback | — | **Open** |
 
+## In code (#111)
+
+- **Sign-in:** a one-time code to the phone, every time (`health-auth`; codes go to a development outbox until #235).
+- **Self-registration:** `health-patient-engagement-app`, at `/api/portal/registration`. A registration that resembles existing patients waits in the registry review queue. A reviewer links it only after checking the patient's ID in person.
+- **Screens:** `/portal` in the web client: sign-in, the registration form and its status. These are minimal working screens; the portal's UX is still open.
+
 ## Rules
 
 - **No automatic linking (§58).** A phone account is never linked to a Patient automatically.

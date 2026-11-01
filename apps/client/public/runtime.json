@@ -6,5 +6,9 @@
     "clientId": "health-client",
     "redirectPath": "/callback"
   },
-  "fhirBase": "/fhir"
+  "fhirBase": "/fhir",
+  "portal": {
+    "clientId": "health-portal",
+    "redirectPath": "/portal/callback"
+  }
 }

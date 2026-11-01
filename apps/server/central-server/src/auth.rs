@@ -13,11 +13,13 @@ use axum::response::{IntoResponse, Response};
 use health_access_policy::{Label, LabelRule, NodeScope, Pdp};
 use health_audit::Auditor;
 use health_auth::{
-    AuthConfig, AuthServer, Client, Credentials, SnapshotGate, SnapshotSigner, SnapshotVerifier,
-    Subjects, SurrealAuthStore, TokenSigner, subject_layer,
+    AuthConfig, AuthServer, Client, Credentials, OtpSendError, OtpSender, PhoneSignIn, SendFuture,
+    SnapshotGate, SnapshotSigner, SnapshotVerifier, Subjects, SurrealAuthStore, TokenSigner,
+    patient_layer, subject_layer,
 };
 use health_fhir_search::Unrestricted;
 use health_fhir_server::{FacilityTag, FhirServer};
+use health_identity::PhoneNumber;
 use health_identity::SessionPolicy;
 use health_identity::snapshot::{RolePermissions, SnapshotPolicy};
 use health_surrealdb::{Connection, SurrealStore};
@@ -48,6 +50,36 @@ pub(crate) struct AuthSettings {
     pub(crate) registry_nin_system: Option<String>,
     /// This node's short code, in the MRNs it mints.
     pub(crate) node_code: health_identifiers::ShortCode,
+    /// The patient portal's phone sign-in (#111), with a portal client among `clients`.
+    pub(crate) portal: Option<PortalSettings>,
+}
+
+/// The patient portal's phone sign-in.
+#[derive(Debug, Clone)]
+pub(crate) struct PortalSettings {
+    /// The country code of national phone numbers.
+    pub(crate) country_code: String,
+    /// The development outbox file one-time codes are appended to (#235).
+    pub(crate) otp_outbox: std::path::PathBuf,
+}
+
+/// One-time codes appended to a file, one `{phone} {code}` line each: the development and e2e
+/// sender until an SMS provider is chosen (#235). Nothing reaches a phone.
+struct FileOutbox(std::path::PathBuf);
+
+impl OtpSender for FileOutbox {
+    fn send<'a>(&'a self, phone: &'a PhoneNumber, code: &'a str) -> SendFuture<'a> {
+        Box::pin(async move {
+            use std::io::Write;
+            let line = format!("{phone} {code}\n");
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.0)
+                .and_then(|mut file| file.write_all(line.as_bytes()))
+                .map_err(|e| OtpSendError(e.to_string()))
+        })
+    }
 }
 
 /// The access policy file (`HEALTH_ACCESS_POLICY_FILE`): role → permission mappings and the
@@ -131,6 +163,13 @@ pub(crate) fn routes(
     let mut config = AuthConfig::new(settings.issuer.as_str(), "central", false);
     config.clients.clone_from(&settings.clients);
     config.login_page.clone_from(&settings.login_page);
+    if let Some(portal) = &settings.portal {
+        tracing::warn!("the patient portal sends one-time codes to a development outbox file");
+        config.phone_sign_in = Some(PhoneSignIn::new(
+            portal.country_code.as_str(),
+            Arc::new(FileOutbox(portal.otp_outbox.clone())),
+        ));
+    }
     if !settings.snapshot_keys.is_empty() {
         let keys = settings
             .snapshot_keys
@@ -153,10 +192,20 @@ pub(crate) fn routes(
             .with_auditor(Auditor::new("central", sensitive(policy)));
         api = api.merge(subjects.routes());
         escalate_hourly(subjects.clone());
-        let (fhir, reviews) = fhir(fhir_store, settings, policy, subjects);
+        let (fhir, reviews, portal) = fhir(fhir_store, settings, policy, subjects);
         router = router.nest("/fhir", fhir);
         if let Some(reviews) = reviews {
             api = api.nest("/registry/reviews", reviews);
+        }
+        // The portal's self-registration (#111), for patients signed in by phone.
+        if let (Some(portal), Some(_)) = (portal, &settings.portal) {
+            api = api.nest(
+                "/portal",
+                portal.layer(axum::middleware::from_fn_with_state(
+                    server.verifier(),
+                    patient_layer::<SurrealAuthStore>,
+                )),
+            );
         }
     }
     Ok(router.nest("/api", api))
@@ -269,7 +318,7 @@ fn fhir(
     settings: &AuthSettings,
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
-) -> (Router, Option<Router>) {
+) -> (Router, Option<Router>, Option<Router>) {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
@@ -319,7 +368,9 @@ fn fhir(
     // The registry review queue (#203), with the registry.
     let reviews =
         registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
-    (fhir.router().layer(layer), reviews)
+    // The portal, with the registry; its patients pass `patient_layer`, not the subject layer.
+    let portal = registry_rules(settings).map(|_| fhir.portal_router());
+    (fhir.router().layer(layer), reviews, portal)
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -352,6 +403,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/events", service.clone())
         .route_service("/api/registry/reviews", service.clone())
         .route_service("/api/registry/reviews/{*rest}", service.clone())
+        .route_service("/api/portal/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)
@@ -378,6 +430,7 @@ mod tests {
             snapshot_keys: Vec::new(),
             policy: None,
             registry_nin_system: None,
+            portal: None,
             node_code: "C1".parse().expect("node code"),
         }
     }
@@ -459,6 +512,145 @@ mod tests {
                 .expect("location")
                 .starts_with("/sign-in?")
         );
+    }
+
+    #[tokio::test]
+    async fn the_portal_signs_patients_in_by_phone_and_registers_them() {
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "central".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let dir = tempfile::tempdir().expect("dir");
+        let outbox = dir.path().join("otp");
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![[7u8; 32]];
+        settings.registry_nin_system = Some("urn:health:nin".into());
+        settings.policy = Some(AccessPolicy::default());
+        settings.clients.push(Client {
+            id: "health-portal".into(),
+            redirect_uris: vec!["https://central.test/portal/callback".into()],
+            patient: true,
+        });
+        settings.portal = Some(PortalSettings {
+            country_code: "256".into(),
+            otp_outbox: outbox.clone(),
+        });
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+
+        let request = [
+            ("response_type", "code"),
+            ("client_id", "health-portal"),
+            ("redirect_uri", "https://central.test/portal/callback"),
+            ("scope", "openid"),
+            ("state", "s"),
+            (
+                "code_challenge",
+                "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            ),
+            ("code_challenge_method", "S256"),
+        ];
+        let with = |extra: &[(&'static str, String)]| {
+            let mut fields: Vec<(&str, String)> =
+                request.iter().map(|(k, v)| (*k, (*v).to_owned())).collect();
+            fields.extend(extra.iter().cloned());
+            fields
+        };
+        let post = |path: &str, fields: Vec<(&str, String)>| {
+            let pairs: Vec<(&str, &str)> = fields.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            form(path, &pairs)
+        };
+        let (status, _, _) = send(
+            &app,
+            post("/auth/otp", with(&[("phone", "0772 123456".into())])),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let line = std::fs::read_to_string(&outbox).expect("outbox");
+        let code = line
+            .strip_prefix("+256772123456 ")
+            .expect("the code went to the outbox")
+            .trim()
+            .to_owned();
+        let (_, _, location) = send(
+            &app,
+            post(
+                "/auth/authorize",
+                with(&[("phone", "0772123456".into()), ("code", code)]),
+            ),
+        )
+        .await;
+        let location = location.expect("redirect");
+        let code = form_urlencoded::parse(location.split_once('?').expect("query").1.as_bytes())
+            .find(|(k, _)| k == "code")
+            .expect("code")
+            .1
+            .into_owned();
+        let (status, body, _) = send(
+            &app,
+            form(
+                "/auth/token",
+                &[
+                    ("grant_type", "authorization_code"),
+                    ("code", &code),
+                    ("redirect_uri", "https://central.test/portal/callback"),
+                    ("client_id", "health-portal"),
+                    (
+                        "code_verifier",
+                        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    ),
+                ],
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let tokens: serde_json::Value = serde_json::from_str(&body).expect("json");
+        let bearer = format!("Bearer {}", tokens["access_token"].as_str().expect("token"));
+        let portal = |method: &str, body: Option<serde_json::Value>, auth: bool| {
+            let mut request = Request::builder()
+                .method(method)
+                .uri("/api/portal/registration");
+            if auth {
+                request = request.header("authorization", bearer.as_str());
+            }
+            if body.is_some() {
+                request = request.header("content-type", "application/json");
+            }
+            request
+                .body(body.map_or(Body::empty(), |b| Body::from(b.to_string())))
+                .expect("request")
+        };
+        assert_eq!(
+            send(&app, portal("GET", None, false)).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            send(&app, portal("GET", None, true)).await.0,
+            StatusCode::NOT_FOUND
+        );
+        let text = |link: &str, value: &str| serde_json::json!({ "linkId": link, "answer": [{ "valueString": value }] });
+        let response = serde_json::json!({
+            "resourceType": "QuestionnaireResponse",
+            "questionnaire": "urn:health:questionnaire/self-registration",
+            "status": "completed",
+            "item": [
+                text("given", "Grace"),
+                text("family", "Nakato"),
+                { "linkId": "birthDate", "answer": [{ "valueDate": "1990-04-12" }] },
+                { "linkId": "gender", "answer": [{ "valueCoding": { "code": "female" } }] },
+            ],
+        });
+        let (status, body, _) = send(&app, portal("POST", Some(response), true)).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let registered: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(registered["status"], "completed");
+        assert_eq!(registered["access"], "self-submitted");
     }
 
     async fn send(app: &Router, request: Request<Body>) -> (StatusCode, String, Option<String>) {

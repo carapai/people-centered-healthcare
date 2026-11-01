@@ -23,6 +23,10 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` | none | Central's permission-snapshot signing keys, in the same format as the keys file. With it, each session acts for one facility, chosen at sign-in (ADR 0056) |
 | `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID identifier system. With it, `/fhir` serves `Patient/$match` and the client registry's reviewer operations (`Patient/$merge`, `$link`, `$unlink`), source Patients carry their blocking keys, and block counts are recomputed hourly. `/api/registry/reviews` serves the review queue to reviewers |
 | `HEALTH_NODE_CODE` | `C1` | This node's short code in the numbers it mints. With the registry on, `/fhir/Patient/$register` mints MRNs as `{facility}-{node}-{sequence}` (ADR 0014) |
+| `HEALTH_PORTAL_REDIRECT_URIS` | none | The patient portal's redirect URIs, comma-separated (#111). With it, a patient client signs patients in with a one-time code to their phone, and, with the registry and access policy, `/api/portal` serves self-registration |
+| `HEALTH_PORTAL_CLIENT_ID` | `health-portal` | The patient portal's client |
+| `HEALTH_PORTAL_COUNTRY_CODE` | `256` | The country code of national phone numbers (`0772…`) |
+| `HEALTH_DEV_OTP_OUTBOX` | required with the portal | **Development and e2e only.** A file each one-time code is appended to (`{phone} {code}`); nothing reaches a phone. It is the only sender until an SMS provider is chosen ([#235](https://github.com/carapai/people-centered-healthcare/issues/235)), and central logs a warning while it is in use |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup
@@ -37,6 +41,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 - **Routes:** `/auth` serves discovery, `/jwks`, `/authorize`, `/token` and `/revoke` (offline-auth.md). `/api/session` is the first authorized route: it answers 401 without a valid access token, and the signed-in principal with one.
 - **Key rotation:** add a new key as the first line of the keys file and keep the old one below it until its tokens have expired. Both keys are published in `/jwks`, and tokens signed with the old key still verify.
 - **Key storage:** keys and the pepper are read from secret files. Holding them in central KMS is part of central's key custody ([#138](https://github.com/carapai/people-centered-healthcare/issues/138)).
+- **Patients** (#111): with the portal configured, the portal's client signs patients in by phone (`/auth/otp`, then the code on `/authorize`; ADR 0029). `/api/portal/registration` sits behind `health_auth::patient_layer`, so only a patient's token reaches it.
 - **The facility:** with snapshot keys, the user picks the facility at sign-in when they hold snapshots for several (ADR 0056). The token carries it.
 - **`/fhir`** (ADR 0056):
   - Each request's subject is built from the access token, the current snapshot for the session's facility, the policy file's roles, and the `X-Purpose-Of-Use` header (default `TREAT`; an unknown code is 400).

@@ -1,5 +1,5 @@
-// The e2e backend (#228): SurrealDB in memory, central-server with sign-in, the access policy and
-// the client registry, and two provisioned users. Playwright starts it (playwright.config.ts) and
+// The e2e backend (#228): SurrealDB in memory, central-server with sign-in, the access policy,
+// the client registry and the patient portal, and two provisioned users. Playwright starts it (playwright.config.ts) and
 // stops it with the run. Binaries come from SURREAL_BIN (default `surreal`) and
 // CENTRAL_SERVER_BIN (default the workspace's debug build).
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { USERS } from './users'
+import { OTP_OUTBOX, USERS } from './users'
 
 const ORIGIN = 'http://localhost:4173'
 const CENTRAL = 'http://127.0.0.1:18080'
@@ -21,6 +21,7 @@ const file = (name: string, content: string) => {
   writeFileSync(path, content, { mode: 0o600 })
   return path
 }
+writeFileSync(OTP_OUTBOX, '', { mode: 0o600 })
 const dbPassword = randomBytes(16).toString('hex')
 const env = {
   ...process.env,
@@ -34,6 +35,9 @@ const env = {
   HEALTH_AUTH_REDIRECT_URIS: `${ORIGIN}/callback`,
   HEALTH_AUTH_LOGIN_PAGE: '/sign-in',
   HEALTH_REGISTRY_NIN_SYSTEM: 'urn:health:nin',
+  // The patient portal (#111), sending one-time codes to the development outbox.
+  HEALTH_PORTAL_REDIRECT_URIS: `${ORIGIN}/portal/callback`,
+  HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({

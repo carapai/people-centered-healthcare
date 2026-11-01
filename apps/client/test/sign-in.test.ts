@@ -45,7 +45,7 @@ describe('signIn', () => {
     expect(authorize.origin + authorize.pathname).toBe(`${ISSUER}/authorize`)
     expect(authorize.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/callback`)
     expect(authorize.searchParams.get('code_challenge_method')).toBe('S256')
-    const saved = JSON.parse(h.store.get('health.sign-in') ?? '{}') as { verifier: string }
+    const saved = JSON.parse(h.store.get('health.sign-in.health-client') ?? '{}') as { verifier: string }
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(saved.verifier)))
     const expected = btoa(String.fromCharCode(...digest)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
     expect(authorize.searchParams.get('code_challenge')).toBe(expected)

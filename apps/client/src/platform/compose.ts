@@ -17,6 +17,8 @@ interface RuntimeConfig {
   fhirBase?: string
   /** The national ID identifier system the registry matches on. */
   ninSystem?: string
+  /** The patient portal's client (#111), signing in at `auth.issuer`. */
+  portal?: { clientId: string; redirectPath: string }
 }
 
 function isSignInConfig(value: unknown): value is SignInConfig {
@@ -27,8 +29,15 @@ function isSignInConfig(value: unknown): value is SignInConfig {
 
 function isRuntimeConfig(value: unknown): value is RuntimeConfig {
   if (typeof value !== 'object' || value === null) return false
-  const { mode, apiBase, auth, fhirBase, ninSystem } = value as Record<string, unknown>
+  const { mode, apiBase, auth, fhirBase, ninSystem, portal } = value as Record<string, unknown>
+  const portalOk =
+    portal === undefined ||
+    (typeof portal === 'object' &&
+      portal !== null &&
+      typeof (portal as Record<string, unknown>)['clientId'] === 'string' &&
+      typeof (portal as Record<string, unknown>)['redirectPath'] === 'string')
   return (
+    portalOk &&
     (mode === 'central' || mode === 'edge') &&
     typeof apiBase === 'string' &&
     (auth === undefined || isSignInConfig(auth)) &&
@@ -52,7 +61,7 @@ export async function composePlatform(): Promise<Platform> {
   if (!isRuntimeConfig(config)) {
     throw new Error('runtime.json must contain a mode (central or edge) and an apiBase')
   }
-  return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem)
+  return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem, config.portal)
 }
 
 /**
@@ -66,6 +75,7 @@ export function httpPlatform(
   signInConfig?: SignInConfig,
   fhirBase?: string,
   ninSystem?: string,
+  portalConfig?: RuntimeConfig['portal'],
 ): Platform {
   const session = memorySession()
   const auth = mode === 'central' ? bearerAuth(session) : dpopAuth(session, () => undefined)
@@ -73,6 +83,18 @@ export function httpPlatform(
   // FHIR is served beside the API (central: `/fhir`), or under it when runtime.json names no base.
   const fhirTransport = fhirBase === undefined ? transport : httpTransport('', auth, fetchImpl)
   const fhirPath = fhirBase?.replace(/\/$/, '') ?? '/fhir'
+  // The portal is central's only; its patients have a session apart from staff sessions.
+  const portal = (() => {
+    if (portalConfig === undefined || signInConfig === undefined || mode !== 'central') return undefined
+    const portalSession = memorySession()
+    const config = { issuer: signInConfig.issuer, clientId: portalConfig.clientId, redirectPath: portalConfig.redirectPath }
+    return {
+      clientId: portalConfig.clientId,
+      session: portalSession,
+      signIn: signIn(config, portalSession, { fetch: fetchImpl }),
+      transport: httpTransport(apiBase, bearerAuth(portalSession), fetchImpl),
+    }
+  })()
   return {
     mode,
     transport,
@@ -82,6 +104,7 @@ export function httpPlatform(
     session,
     // Edges sign in with DPoP-bound tokens once devices are enrolled (#74, #75).
     ...(signInConfig === undefined || mode !== 'central' ? {} : { signIn: signIn(signInConfig, session, { fetch: fetchImpl }) }),
+    ...(portal === undefined ? {} : { portal }),
     events: sseEventSource(`${apiBase.replace(/\/$/, '')}/events`, auth, { fetch: fetchImpl }),
     capabilities: {
       offlineCapable: mode === 'edge',

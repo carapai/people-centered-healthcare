@@ -58,6 +58,22 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_NODE_CODE`, default `C1`: this node's short code in the numbers it mints, such as
     /// MRNs (ADR 0014).
     pub(crate) node_code: String,
+    /// The patient portal's sign-in (#111), when `HEALTH_PORTAL_REDIRECT_URIS` is set.
+    pub(crate) portal: Option<PortalFiles>,
+}
+
+/// The patient portal's client and its one-time codes (#111; ADR 0029).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PortalFiles {
+    /// `HEALTH_PORTAL_CLIENT_ID`, default `health-portal`.
+    pub(crate) client_id: String,
+    /// `HEALTH_PORTAL_REDIRECT_URIS`: the portal's redirect URIs, comma-separated.
+    pub(crate) redirect_uris: Vec<String>,
+    /// `HEALTH_PORTAL_COUNTRY_CODE`, default `256`: the country code of national phone numbers.
+    pub(crate) country_code: String,
+    /// `HEALTH_DEV_OTP_OUTBOX`: a file that one-time codes are appended to, for development and
+    /// e2e only. Required with the portal until an SMS provider is chosen (#235).
+    pub(crate) otp_outbox: PathBuf,
 }
 
 /// A missing or invalid setting. It names the variable, never its value.
@@ -109,6 +125,22 @@ impl Config {
                     access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
                     registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM"),
                     node_code: get("HEALTH_NODE_CODE").unwrap_or_else(|| "C1".to_owned()),
+                    portal: match get("HEALTH_PORTAL_REDIRECT_URIS") {
+                        None => None,
+                        Some(uris) => Some(PortalFiles {
+                            client_id: get("HEALTH_PORTAL_CLIENT_ID")
+                                .unwrap_or_else(|| "health-portal".to_owned()),
+                            redirect_uris: uris
+                                .split(',')
+                                .map(str::trim)
+                                .filter(|u| !u.is_empty())
+                                .map(str::to_owned)
+                                .collect(),
+                            country_code: get("HEALTH_PORTAL_COUNTRY_CODE")
+                                .unwrap_or_else(|| "256".to_owned()),
+                            otp_outbox: required("HEALTH_DEV_OTP_OUTBOX")?.into(),
+                        }),
+                    },
                 }),
             },
         })
@@ -161,6 +193,33 @@ mod tests {
         .expect("auth");
         assert_eq!(with_auth.client_id, "health-client");
         assert_eq!(with_auth.redirect_uris.len(), 2);
+        assert_eq!(with_auth.portal, None);
+        let auth = [
+            ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
+            ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),
+            ("HEALTH_AUTH_ISSUER", "https://central.ug/auth"),
+            ("HEALTH_AUTH_KEYS_FILE", "/k"),
+            ("HEALTH_AUTH_REDIRECT_URIS", "https://central.ug/callback"),
+            (
+                "HEALTH_PORTAL_REDIRECT_URIS",
+                "https://central.ug/portal/callback",
+            ),
+        ];
+        assert_eq!(
+            Config::from_lookup(lookup(&auth)),
+            Err(ConfigError::Missing("HEALTH_DEV_OTP_OUTBOX"))
+        );
+        let mut with_outbox = auth.to_vec();
+        with_outbox.push(("HEALTH_DEV_OTP_OUTBOX", "/tmp/otp"));
+        let portal = Config::from_lookup(lookup(&with_outbox))
+            .expect("config")
+            .auth
+            .and_then(|a| a.portal)
+            .expect("portal");
+        assert_eq!(
+            (portal.client_id.as_str(), portal.country_code.as_str()),
+            ("health-portal", "256")
+        );
         assert_eq!(
             Config::from_lookup(lookup(&[
                 ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),

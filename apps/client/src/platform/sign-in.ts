@@ -114,7 +114,7 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
       const verifier = random(32)
       const state = random(16)
       const transaction: Transaction = { verifier, state, returnTo }
-      storage.setItem(KEY, JSON.stringify(transaction))
+      storage.setItem(`${KEY}.${config.clientId}`, JSON.stringify(transaction))
       const query = new URLSearchParams({
         response_type: 'code',
         client_id: config.clientId,
@@ -129,8 +129,8 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
 
     async complete(callbackUrl) {
       const params = new URL(callbackUrl, origin).searchParams
-      const saved = storage.getItem(KEY)
-      storage.removeItem(KEY)
+      const saved = storage.getItem(`${KEY}.${config.clientId}`)
+      storage.removeItem(`${KEY}.${config.clientId}`)
       if (saved === null) throw new SignInError('no-transaction')
       const transaction = JSON.parse(saved) as Transaction
       if (params.get('state') !== transaction.state) throw new SignInError('state')

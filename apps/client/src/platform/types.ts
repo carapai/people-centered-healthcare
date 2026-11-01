@@ -67,6 +67,16 @@ export interface Capabilities {
 /** Which runtime this bundle is serving; read only by the status area, never to branch features. */
 export type RuntimeMode = 'central' | 'edge' | 'tauri'
 
+/** The patient portal's own client, session and API transport. */
+export interface Portal {
+  /** The portal's OAuth client id; the sign-in page asks for a phone for it. */
+  clientId: string
+  signIn: SignIn
+  session: SessionPort
+  /** The API (`/api`) with the patient's token. */
+  transport: Transport
+}
+
 export interface Platform {
   mode: RuntimeMode
   transport: Transport
@@ -79,6 +89,9 @@ export interface Platform {
   session: SessionPort
   /** Sign-in against the node's authorization server, when runtime.json configures one. */
   signIn?: SignIn
+  /** The patient portal (#111), at central when runtime.json configures it: patients sign in
+   * with their phone, with a session of their own, never a staff session. */
+  portal?: Portal
   events: EventSourcePort
   capabilities: Capabilities
 }

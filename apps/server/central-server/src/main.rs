@@ -162,11 +162,21 @@ fn auth_settings(
         issuer: files.issuer.clone(),
         keys: auth::read_keys(&files.keys_file)?,
         pepper,
-        clients: vec![health_auth::Client {
+        clients: std::iter::once(health_auth::Client {
             id: files.client_id.clone(),
             redirect_uris: files.redirect_uris.clone(),
             patient: false,
-        }],
+        })
+        .chain(files.portal.iter().map(|portal| health_auth::Client {
+            id: portal.client_id.clone(),
+            redirect_uris: portal.redirect_uris.clone(),
+            patient: true,
+        }))
+        .collect(),
+        portal: files.portal.as_ref().map(|portal| auth::PortalSettings {
+            country_code: portal.country_code.clone(),
+            otp_outbox: portal.otp_outbox.clone(),
+        }),
         login_page: files.login_page.clone(),
         snapshot_keys: match &files.snapshot_keys_file {
             Some(path) => auth::read_keys(path)

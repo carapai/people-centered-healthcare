@@ -13,7 +13,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
-| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 0 | 6 |
+| [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 1 | 6 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 1 | 5 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
+Total: 58 of 129 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -134,3 +134,7 @@ Total: 57 of 129 implementation tasks done. Validation spikes open: 3.
   - **Queue:** a request that resembles existing Patients is a `registration-request` item in the registry review queue (migration `0013_registration_review`). It is opened and closed in the self-registration use case's own transaction.
   - **Decisions:** a reviewer links the account to a candidate only with the ID document checked in person, which gives `level3`; otherwise they create a new Patient. The review screen shows the patient's answers against each candidate.
   - **Fix:** a single certain candidate no longer hides the other candidates from review.
+- 2026-11-01: #111 part 2c merged (#239). Part 3 completes #111.
+  - **Central:** the portal's patient client, phone sign-in through `HEALTH_DEV_OTP_OUTBOX` (development only, until #235), and `/api/portal` behind `patient_layer`.
+  - **Client:** the portal's own sign-in, session and transport. `/sign-in` takes the phone and code steps, and `/portal` has the registration form and status.
+  - **e2e:** a new patient registers; a lookalike is linked by a reviewer after an in-person ID check.
