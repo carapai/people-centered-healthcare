@@ -18,11 +18,11 @@ health-client-registry = { workspace = true }
 health-identifiers = { workspace = true }
 health-patient-engagement = { workspace = true }
 health-persistence = { workspace = true }
+health-time = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 health-surrealdb = { workspace = true }
-health-time = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tokio = { workspace = true }

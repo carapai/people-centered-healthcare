@@ -209,7 +209,8 @@ stateDiagram-v2
   - `health-patient-engagement::registration`: the Registration Request and its route.
   - `health-auth`: `POST /otp`, and the phone and code on `POST /authorize`, for patient clients, with `OtpSender` and `DevOutbox`; SurrealDB migration `0012_phone_sign_in`.
   - `health-patient-engagement-app`: `SelfRegistration` (`submit`, `status`); `health-fhir-server::portal_router` serves `GET`/`POST /registration` behind `health_auth::patient_layer`.
-  - Staff review of registration requests and the portal screens come in #111's later parts.
+  - **Staff review:** a request that resembles existing Patients is a `registration-request` item in the registry review queue (migration `0013_registration_review`), shown at `/registry/reviews`. The reviewer links the account to a candidate only after checking the holder's ID document in person, which verifies it at `level3`; otherwise they create a new Patient (`SelfRegistration::review`).
+  - The portal screens and e2e come in #111's last part.
 - **Decided on #111:**
   - **A new self-registered Patient** has no facility and no MRN. It is tagged `provisional` and `patient-reported`, and every field is self-reported (trust 4). A facility mints its MRN when the patient first presents.
   - **It never auto-links.** Self-reported demographics never auto-link to a golden record. A self-registered Patient joins one only by a reviewer's decision, or after `level3`.

@@ -685,6 +685,38 @@ async fn review_queue(
                 item["current"] = claim_json(current);
                 item["incoming"] = claim_json(incoming);
             }
+            ReviewKind::Registration {
+                request,
+                account,
+                candidates,
+            } => {
+                let mut patients = Vec::with_capacity(candidates.len());
+                for id in candidates {
+                    let stored = match id.parse::<ResourceId>() {
+                        Ok(id) => tx.read(&patient_type, id).await?,
+                        Err(_) => None,
+                    };
+                    patients.push(
+                        stored
+                            .and_then(|s| serde_json::from_str::<Value>(s.json.as_str()).ok())
+                            .unwrap_or(Value::Null),
+                    );
+                }
+                let response_type = "QuestionnaireResponse"
+                    .parse()
+                    .map_err(|_| FhirError::bad_request("QuestionnaireResponse"))?;
+                let response = tx
+                    .read(
+                        &response_type,
+                        crate::portal::Registration::response_id(account),
+                    )
+                    .await?
+                    .and_then(|s| serde_json::from_str::<Value>(s.json.as_str()).ok())
+                    .unwrap_or(Value::Null);
+                item["request"] = json!(format!("Task/{request}"));
+                item["response"] = response;
+                item["candidates"] = Value::Array(patients);
+            }
         }
         items.push(item);
     }
@@ -699,15 +731,52 @@ async fn review_decision(
     agent: Option<Extension<Agent>>,
     body: Bytes,
 ) -> Result<Response, FhirError> {
+    let Some(settings) = server.registry.clone() else {
+        return Err(FhirError::not_found("the client registry is not enabled"));
+    };
+    let reviewer_agent = agent.clone();
     let (subject, review) = review_use_case(&server, subject, agent)?;
     let body: Value = serde_json::from_slice(&body)
         .map_err(|_| FhirError::bad_request("the body is not JSON"))?;
+    let entry = {
+        let mut tx = server.store.begin().await?;
+        health_client_registry::ReviewQueue::review(&mut tx, &id).await?
+    };
+    if let Some(health_client_registry::ReviewEntry {
+        kind: health_client_registry::ReviewKind::Registration { account, .. },
+        ..
+    }) = entry
+    {
+        // A registration is the self-registration use case's to carry out.
+        let audit = RegistryAudit {
+            auditor: server.audit.clone(),
+            agent: reviewer_agent.map_or_else(
+                || Agent {
+                    display: format!("account {}", subject.account),
+                    ..Agent::unauthenticated()
+                },
+                |Extension(agent)| agent,
+            ),
+        };
+        crate::portal::decide_registration(
+            &server,
+            settings,
+            audit,
+            &account,
+            &body,
+            &subject.account,
+        )
+        .await?;
+        let mut response = Response::new(axum::body::Body::empty());
+        *response.status_mut() = StatusCode::NO_CONTENT;
+        return Ok(response);
+    }
     let decision = body["decision"]
         .as_str()
         .and_then(health_client_registry::Decision::from_code)
         .ok_or_else(|| {
             FhirError::bad_request(
-                "decision must be same-person, different-people, keep-current or take-incoming",
+                "decision must be same-person, different-people, keep-current, take-incoming, link-patient or create-patient",
             )
         })?;
     review.decide(&id, decision, &subject.account).await?;

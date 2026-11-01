@@ -29,6 +29,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Self-registration (#111):** `portal_router()` serves patients signed in with their phone, behind `health_auth::patient_layer` (a `PatientSubject`; without one, 401).
   - `GET /registration` is the account's Registration Request: `status`, `patient`, and `access` (`none`, `self-submitted` or `records`).
   - `POST /registration` submits the self-registration QuestionnaireResponse (422 when invalid, 409 when already submitted).
+  - **Registration requests in the review queue** (#111 part 2c): a request that resembles existing Patients is a `registration-request` item. The queue lists it with the patient's QuestionnaireResponse and the candidate Patients. `POST /{id}` takes `{"decision": "link-patient", "patient", "document"}` (the holder's ID checked in person; 422 without one) or `{"decision": "create-patient"}`, and carries it out through `SelfRegistration::review`.
   - It implements `health_patient_engagement_app::PatientRegistry` over the client registry: `$match` for the answers, and `create_self_registered` for a new Patient. Each version written is audited, naming the patient account.
 
 ## Tests

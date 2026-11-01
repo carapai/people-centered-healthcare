@@ -222,6 +222,11 @@ where
             .review(id)
             .await?
             .ok_or_else(|| RegistryError::NoSuchReview(id.to_owned()))?;
+        if matches!(entry.kind, ReviewKind::Registration { .. }) {
+            return Err(RegistryError::WrongKind(
+                "a registration request is decided by self-registration".into(),
+            ));
+        }
         entry.decide(decision, reviewer, now)?;
         let parse = |id: &str| {
             id.parse::<ResourceId>()
