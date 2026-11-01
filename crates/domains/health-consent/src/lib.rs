@@ -15,12 +15,16 @@
 
 mod day;
 
+use std::future::Future;
+
+use health_persistence::{StoreError, WriteError};
 use health_time::Timestamp;
+use serde::{Deserialize, Serialize};
 
 pub use day::{Day, InvalidDay};
 
 /// What a grant lets the caregiver do (the Consent's scope).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Scope {
     /// See the dependent's released records.
     ViewRecords,
@@ -58,7 +62,7 @@ impl Scope {
 }
 
 /// Where the caregiver's authority comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Authority {
     /// A parent or guardian of a minor: it ends at the age of majority, and adolescent
     /// confidentiality applies.
@@ -69,7 +73,7 @@ pub enum Authority {
 }
 
 /// How the relationship was verified.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Verification {
     /// Facility staff checked documents.
     StaffChecked {
@@ -87,7 +91,7 @@ pub enum Verification {
 }
 
 /// Who revoked a grant.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Revoker {
     /// The patient themselves.
     Patient,
@@ -104,7 +108,7 @@ pub enum Revoker {
 }
 
 /// A revocation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Revoked {
     /// Who.
     pub by: Revoker,
@@ -185,11 +189,11 @@ pub enum Refused {
 }
 
 /// A caregiver's access to one dependent: the RelatedPerson, its Consent and the verification.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaregiverGrant {
     /// The grant's id (its Consent).
     pub id: String,
-    /// The caregiver's Person (their Login Account's).
+    /// The caregiver's phone Login Account.
     pub caregiver: String,
     /// The RelatedPerson for the dependent.
     pub related_person: String,
@@ -330,4 +334,30 @@ impl CaregiverGrant {
         self.revoked = Some(Revoked { by, at: now });
         Ok(())
     }
+}
+
+/// The grants' storage, inside a transaction (the consent Module's driven port). A grant is one
+/// record, found by its id, its patient or its caregiver; the FHIR RelatedPerson and Consent are
+/// written beside it.
+pub trait GrantStore {
+    /// Adds or replaces a grant.
+    fn put_grant(
+        &mut self,
+        grant: &CaregiverGrant,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// One grant.
+    fn grant(
+        &mut self,
+        id: &str,
+    ) -> impl Future<Output = Result<Option<CaregiverGrant>, StoreError>> + Send;
+    /// The grants over a patient, revoked ones included.
+    fn grants_of_patient(
+        &mut self,
+        patient: &str,
+    ) -> impl Future<Output = Result<Vec<CaregiverGrant>, StoreError>> + Send;
+    /// The grants a caregiver holds, revoked ones included.
+    fn grants_of_caregiver(
+        &mut self,
+        caregiver: &str,
+    ) -> impl Future<Output = Result<Vec<CaregiverGrant>, StoreError>> + Send;
 }

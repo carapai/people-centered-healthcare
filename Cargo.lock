@@ -629,6 +629,7 @@ dependencies = [
  "health-audit",
  "health-auth",
  "health-client-registry",
+ "health-consent",
  "health-fhir-search",
  "health-fhir-server",
  "health-http",
@@ -1991,8 +1992,10 @@ dependencies = [
  "form_urlencoded",
  "health-access-policy",
  "health-audit",
+ "health-consent",
  "health-fhir-search",
  "health-http",
+ "health-identifiers",
  "health-identity",
  "health-identity-app",
  "health-persistence",
@@ -2047,7 +2050,9 @@ dependencies = [
 name = "health-consent"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
+ "serde",
  "thiserror",
 ]
 
@@ -2181,9 +2186,17 @@ name = "health-identity-app"
 version = "0.1.0"
 dependencies = [
  "health-access-policy",
+ "health-consent",
  "health-fhir-search",
+ "health-identifiers",
  "health-identity",
+ "health-persistence",
+ "health-surrealdb",
  "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -2318,6 +2331,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "health-client-registry",
+ "health-consent",
  "health-fhir-search",
  "health-identifiers",
  "health-identity",

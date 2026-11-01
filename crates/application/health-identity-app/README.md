@@ -9,3 +9,8 @@ Layer: **application** (Identity & Access). The policy decision point applied wh
   - Without search permission it adds a clause that nothing satisfies. `check` lets the caller answer 403 first.
 
 `health-fhir-server` builds one per request under access control (#192). Its `tests/authorization.rs` runs the authorization matrix through the HTTP API.
+- **`caregivers`** (#113): caregiver delegation over any `Store` whose transaction is a `health_consent::GrantStore`.
+  - `Caregivers::record` is staff recording a caregiver against a dependent at the facility, verified against the document they checked (one grant per caregiver and patient; `AlreadyGranted` while one is in force). `revoke` and `adolescent_consent` change it.
+  - Each change writes the grant and its FHIR projections, the RelatedPerson and the Consent, in one transaction, each audited through `CaregiverAudit`.
+  - The Consent is `active` or `inactive`. It carries the scopes on `provision.action` (`urn:health:caregiver-scope`), the expiry on `period.end`, the verification, and the authority and adolescent's consent as extensions.
+  - `of_patient` and `of_caregiver` list grants.

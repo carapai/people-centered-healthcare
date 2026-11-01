@@ -13,10 +13,11 @@ use axum::response::{IntoResponse, Response};
 use health_access_policy::{Label, LabelRule, NodeScope, Pdp};
 use health_audit::Auditor;
 use health_auth::{
-    AuthConfig, AuthServer, Client, Credentials, OtpSendError, OtpSender, PhoneSignIn, SendFuture,
-    SnapshotGate, SnapshotSigner, SnapshotVerifier, Subjects, SurrealAuthStore, TokenSigner,
-    patient_layer, subject_layer,
+    AuthConfig, AuthServer, CaregiverRoutes, Client, Credentials, OtpSendError, OtpSender,
+    PhoneSignIn, SendFuture, SnapshotGate, SnapshotSigner, SnapshotVerifier, Subjects,
+    SurrealAuthStore, TokenSigner, patient_layer, subject_layer,
 };
+use health_consent::Confidentiality;
 use health_fhir_search::Unrestricted;
 use health_fhir_server::{FacilityTag, FhirServer};
 use health_identity::PhoneNumber;
@@ -184,6 +185,7 @@ pub(crate) fn routes(
             policy: SnapshotPolicy::default(),
         });
     }
+    let accounts = store.clone();
     let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
     let mut api = server.session_route();
     let mut router = Router::new().nest("/auth", server.router());
@@ -192,6 +194,34 @@ pub(crate) fn routes(
             .with_auditor(Auditor::new("central", sensitive(policy)));
         api = api.merge(subjects.routes());
         escalate_hourly(subjects.clone());
+        // Caregiver delegation (#113): staff manage grants; patients see their dependents. The
+        // policy's labels are the sensitive ones an adolescent's guardian does not see.
+        let caregivers = CaregiverRoutes::new(
+            fhir_store.clone(),
+            accounts,
+            Some(Arc::new(Auditor::new("central", sensitive(policy)))),
+            Confidentiality {
+                sensitive: policy
+                    .labels
+                    .iter()
+                    .map(|l| (l.system.clone(), l.code.clone()))
+                    .collect(),
+                ..Confidentiality::default()
+            },
+            settings
+                .portal
+                .as_ref()
+                .map_or("256", |p| p.country_code.as_str()),
+        );
+        api = api.nest(
+            "/caregivers",
+            caregivers
+                .caregiver_router()
+                .layer(axum::middleware::from_fn_with_state(
+                    subjects.clone(),
+                    subject_layer,
+                )),
+        );
         let (fhir, reviews, portal) = fhir(fhir_store, settings, policy, subjects);
         router = router.nest("/fhir", fhir);
         if let Some(reviews) = reviews {
@@ -201,10 +231,12 @@ pub(crate) fn routes(
         if let (Some(portal), Some(_)) = (portal, &settings.portal) {
             api = api.nest(
                 "/portal",
-                portal.layer(axum::middleware::from_fn_with_state(
-                    server.verifier(),
-                    patient_layer::<SurrealAuthStore>,
-                )),
+                portal.merge(caregivers.dependents_router()).layer(
+                    axum::middleware::from_fn_with_state(
+                        server.verifier(),
+                        patient_layer::<SurrealAuthStore>,
+                    ),
+                ),
             );
         }
     }
@@ -404,6 +436,8 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/registry/reviews", service.clone())
         .route_service("/api/registry/reviews/{*rest}", service.clone())
         .route_service("/api/portal/{*rest}", service.clone())
+        .route_service("/api/caregivers", service.clone())
+        .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)

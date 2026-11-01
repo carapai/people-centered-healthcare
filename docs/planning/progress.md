@@ -143,3 +143,7 @@ Total: 58 of 129 implementation tasks done. Validation spikes open: 3.
   - **Ages:** guardian access ends at the age of majority, and a guardian never sees an adolescent's sensitive records without their consent. Uncertain ages are reckoned protectively.
   - **Revocation:** who may revoke a grant.
   - **Tests:** an authorization matrix.
+- 2026-11-01: #113 part 1 merged (#241). Part 2: storing and managing caregiver grants.
+  - **Staff:** they record a caregiver by their portal phone, verified against the document checked, and can revoke a grant or record an adolescent's consent (`/api/caregivers`, `caregiver.manage`).
+  - **Storage:** the grant and its RelatedPerson and Consent are written in one transaction and audited (migration `0014_caregiver_grant`).
+  - **Portal:** caregivers see their dependents at `/api/portal/dependents`.

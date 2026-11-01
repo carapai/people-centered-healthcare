@@ -22,6 +22,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 - **Stock** (migration `0011_stock`, `health_inventory::StockStore`): `stock_balance`, one record per Stock Unit keyed by `StockUnit::key`, is the guard every movement writes; `stock_movement` holds the movements, indexed by unit; the adapter only ever creates them.
 - **Phone sign-in** (migration `0012_phone_sign_in`): `auth_phone_account`, unique by phone, and `auth_otp`, each phone's current code challenge; `attempt_phone_otp` counts a try by compare-and-set. Used by `health_auth::SurrealAuthStore`.
 - **Registration review** (migration `0013_registration_review`): the review queue also takes `registration-request` items (#111).
+- **Caregiver grants** (migration `0014_caregiver_grant`): `health_consent::GrantStore`, one record per grant, indexed by patient and by caregiver.
 - **`ownership`** is the ownership registry: one default Owner per head table, plus category partitions (resource-ownership.md § In code).
 - **`migrate(&Connection, MIGRATIONS)`** creates the `_migration` ledger, refuses modified, unknown or out-of-order migrations before changing anything, and then applies each pending migration in its own transaction with its ledger row.
 - **Closing:** SDK 3.3.5 has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.

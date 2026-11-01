@@ -1,7 +1,10 @@
 //! Identity & Access use cases: the request's [`Subject`] built from the user's permission
 //! snapshot ([`subject_of`]), and the policy decision point applied to searches, so restricted
 //! records are excluded inside the database query (offline-auth.md § Authorization model:
-//! "repository searches receive its decision as a query filter").
+//! "repository searches receive its decision as a query filter"), and caregiver delegation
+//! ([`caregivers`], #113).
+
+pub mod caregivers;
 
 use health_access_policy::{
     Deny, FACILITY_TAG_SYSTEM, Label, Pdp, Permissions, PurposeOfUse, Subject,

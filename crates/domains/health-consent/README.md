@@ -15,6 +15,7 @@ Layer: **domain** (Identity & Access, consent). Caregiver delegation (#113; pati
   - **Staff:** at any time.
   - **A guardian:** only one with a verified, live guardian grant over the same patient.
   - **The patient:** a delegation at any time. A guardian's grant only once of age by the *latest* birth date the record allows, so a minor of uncertain age cannot end it. Revocation takes effect at the next sync.
+- **`GrantStore`** is the storage port: a grant is one record, found by id, patient or caregiver. `health-surrealdb` implements it (migration `0014_caregiver_grant`).
 - **`Day`:** a calendar day; ages in whole years, with 29 February birthdays on 1 March.
 
 ## Tests
@@ -27,4 +28,4 @@ Layer: **domain** (Identity & Access, consent). Caregiver delegation (#113; pati
 - mother–newborn grants for twins;
 - days and ages.
 
-**Not here yet** (#113's next parts): storing grants as RelatedPerson and Consent, staff verification and the delivery link, and applying `decide` in the policy decision point and the portal.
+**Not here yet:** the staff and portal screens and e2e (#113 part 3), recording the delivery link at a facility delivery, and applying `decide` to record reads (the portal has no records view yet).

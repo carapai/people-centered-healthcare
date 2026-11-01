@@ -19,12 +19,14 @@ base64 = { workspace = true }
 form_urlencoded = { workspace = true }
 health-access-policy = { workspace = true }
 health-audit = { workspace = true }
+health-consent = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-identity-app = { workspace = true }
 health-persistence = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
+jiff = { workspace = true }
 p256 = { workspace = true }
 rand_core = { workspace = true }
 serde = { workspace = true }
@@ -34,6 +36,7 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+health-identifiers = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 health-fhir-search = { workspace = true }

@@ -75,6 +75,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_clock_floor", "identity"),
     ("auth_phone_account", "identity"),
     ("auth_otp", "identity"),
+    ("caregiver_grant", "consent"),
     ("break_glass", "identity"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),

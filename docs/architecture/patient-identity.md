@@ -230,7 +230,14 @@ stateDiagram-v2
   - With a partial birth date, ages are reckoned from the earliest date it allows, so guardianship ends and adolescent confidentiality starts as early as the record allows.
   - A dependent with no known birth date gives a guardian nothing.
   - A patient revokes a guardian's grant only once of age by the latest date the record allows.
-- **In code:** `health-consent` (`CaregiverGrant::decide`, `revoke`, `at_delivery`). Storage as RelatedPerson and Consent, staff verification, and enforcement in the PDP and portal come in #113's next parts.
+- **Decided on #113:**
+  - Staff record a caregiver from the dependent's record, verifying the documents in the same step; there is no portal request flow yet.
+  - In the portal, a caregiver sees the people they care for. Record viewing will apply `decide` when the records view arrives.
+- **In code:**
+  - `health-consent`: `CaregiverGrant::decide`, `revoke`, `at_delivery` and the `GrantStore` port.
+  - `health-identity-app::caregivers`: the grant with its RelatedPerson and Consent, in one transaction.
+  - `health-auth::CaregiverRoutes`: `/api/caregivers` for staff, and `/api/portal/dependents`.
+  - The screens come in #113's last part.
 
 ## Patient-initiated workflows and patient-reported data (§60, §62)
 

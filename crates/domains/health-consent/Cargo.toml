@@ -14,5 +14,7 @@ context = "identity-access"
 workspace = true
 
 [dependencies]
+health-persistence = { workspace = true }
 health-time = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
