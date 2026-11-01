@@ -1,0 +1,23 @@
+[package]
+name = "facility-edge"
+description = "Facility Edge Node composition root (ADR 0007): one OS service embedding SurrealDB."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "runtime"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-edge-runtime = { workspace = true }
+health-observability = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true, features = ["embedded"] }
+tempfile = { workspace = true }

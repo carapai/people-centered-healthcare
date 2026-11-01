@@ -34,13 +34,15 @@ LAN discovery and TLS trust are in [lan-security.md](lan-security.md). Staff aut
 | Linux in Docker | Allowed for centrally managed sites only | Not the reference path, because mDNS is unavailable in containers. |
 | Windows arm64, macOS | No | |
 
+In code (#72): `apps/server/facility-edge` over `health-edge-runtime`. The systemd unit is `apps/server/facility-edge/packaging/facility-edge.service`. The exit codes are in the binary's README; a configuration error is not restarted.
+
 ## Hardware and power baseline
 
 - x64, at least 8 GB RAM, SSD system storage.
 - **TPM 2.0 and UEFI Secure Boot enabled.** Full-disk encryption with TPM-only unlock (BitLocker or LUKS2 + TPM2) is mandatory before provisioning, so the edge still restarts unattended after a power cut (ADR 0048).
 - A **second storage volume or a dedicated external drive** for backups.
 - A **UPS is mandatory**. NUT is used on Linux, and NUT or the vendor agent on Windows. A low-battery signal triggers a graceful stop: drain requests, finish the in-flight transaction, take a final backup if time allows, then stop. Where no UPS signal is available, durability rests on `sync=every`.
-- A power-cut validation spike must pass on Windows NTFS and Linux ext4 before edge storage implementation starts. See the task ticket [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34).
+- A power-cut validation spike must pass on Windows NTFS and Linux ext4 before an edge is deployed to a facility. See the task ticket [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34). The edge is built on the embedded adapter ahead of it (#72); if the spike fails, only the engine settings change.
 
 ## Backup and recovery
 
@@ -62,7 +64,7 @@ Local backups, restore, failover and recovery targets are in [backup-and-recover
 
 ## Health monitoring
 
-- **Endpoints:** `/health/live` (process up) and `/health/ready` (store open, migrations done, not draining).
+- **Endpoints:** the shared system routes. `/health` means the process is up. `/ready` means the store is open, migrations are done, and the node is not draining.
 - **Admin status page** in the shared React app, showing node identity, version, store size, backup status, sync status, certificate expiry, UPS status and active sessions.
 - **Telemetry:** OpenTelemetry metrics, traces and logs go into a bounded local buffer and are shipped to central when online. The oldest data is dropped first when the buffer is full.
 - **Alerts** go to both the local status page and central:

@@ -1,0 +1,24 @@
+[package]
+name = "health-edge-runtime"
+description = "The Facility Edge Node's runtime: the embedded store, the startup and stop sequence, service-manager notifications, supervised tasks and the UPS watch (facility-edge.md, ADR 0007)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "runtime"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { workspace = true }
+health-http = { workspace = true }
+health-surrealdb = { workspace = true, features = ["embedded"] }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "net", "signal", "sync"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

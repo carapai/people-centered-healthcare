@@ -1469,6 +1469,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "facility-edge"
+version = "0.1.0"
+dependencies = [
+ "health-edge-runtime",
+ "health-observability",
+ "health-surrealdb",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "fastnum"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2055,6 +2067,19 @@ dependencies = [
  "health-time",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "health-edge-runtime"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-http",
+ "health-surrealdb",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

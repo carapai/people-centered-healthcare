@@ -194,3 +194,7 @@ Total: 66 of 134 implementation tasks done. Validation spikes open: 3.
   - **Screens:** the Till (`/till`), where a non-cash receipt is provisional until confirmed, and the supervisor's page (`/till/supervise`), which takes statement lines and approves variances.
   - **e2e:** the provisional receipt is confirmed only by the statement.
 - 2026-11-01: #196 Provenance with its target's Owner. One `provenance` table with an `owner` column, set by the store from the target's head in the same transaction (migration `0019_provenance`); a missing or unknown target is refused. The client registry writes one Provenance per changed surviving value with each golden write, naming the field, the source Patient and its trust.
+- 2026-11-01: #72 part 1, the facility-edge service (Phase 4 starts ahead of #34, which now gates deployment).
+  - **Runtime:** `health-edge-runtime`. The listener starts first. The embedded store opens once, and migrations run before ready, extending the service manager's timeout. A store a newer binary migrated is refused. Supervised tasks restart with backoff, and a crash loop stops the node. A NUT UPS low battery stops it gracefully.
+  - **Binary:** `facility-edge`, in foreground and `--service` (systemd `Type=notify`, with a unit file). Distinct exit codes tell the service manager and the update rollback what failed.
+  - **Tests:** the built binary: ready and SIGTERM, recovery after SIGKILL, the store's single owner, the systemd notifications, the UPS stop, and an old binary refusing a newer store.

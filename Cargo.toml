@@ -32,7 +32,9 @@ members = [
     "crates/infrastructure/health-observability",
     "crates/infrastructure/health-surrealdb",
     "crates/testing/health-persistence-memory",
+    "crates/edge/health-edge-runtime",
     "apps/server/central-server",
+    "apps/server/facility-edge",
     "tools/architecture-checks",
     "tools/fhir-element-table",
     "tools/synthetic-data",
@@ -54,6 +56,7 @@ health-auth = { path = "crates/infrastructure/health-auth" }
 health-backup = { path = "crates/infrastructure/health-backup" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
 health-consent = { path = "crates/domains/health-consent" }
+health-edge-runtime = { path = "crates/edge/health-edge-runtime" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }

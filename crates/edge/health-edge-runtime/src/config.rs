@@ -1,0 +1,116 @@
+//! The edge's configuration, from the service environment (deployment.md; secrets come from
+//! files, never from the environment itself).
+
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::time::Duration;
+
+use crate::ups::Ups;
+
+/// What the edge needs to start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EdgeConfig {
+    /// `HEALTH_BIND`, default `0.0.0.0:8080`.
+    pub bind: SocketAddr,
+    /// `HEALTH_DATA_DIR`: the embedded store's directory, owned by this process alone. Required.
+    pub data_dir: PathBuf,
+    /// `HEALTH_TENANT`, the SurrealDB namespace, default `ug`.
+    pub tenant: String,
+    /// `HEALTH_DATABASE`, default `main`.
+    pub database: String,
+    /// `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`. Optional: without it only logs are written.
+    pub otlp_endpoint: Option<String>,
+    /// `HEALTH_LOG`, an `EnvFilter` directive, default `info`.
+    pub log: String,
+    /// `HEALTH_UPS`, the NUT UPS to watch, as `name@host[:port]`. Optional: without it,
+    /// durability rests on `sync=every`.
+    pub ups: Option<Ups>,
+    /// `HEALTH_UPS_POLL_SECS`, default 5.
+    pub ups_poll: Duration,
+    /// `HEALTH_DRAIN_SECS`: how long in-flight requests may take to finish on a stop, default 20.
+    pub drain: Duration,
+}
+
+/// A configuration value that is missing or malformed. Names the variable, never its value.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ConfigError {
+    /// A required variable is unset.
+    #[error("{0} is required")]
+    Missing(&'static str),
+    /// A variable does not parse.
+    #[error("{0} is malformed")]
+    Malformed(&'static str),
+}
+
+impl EdgeConfig {
+    /// Reads the configuration through `lookup` (the process environment, in production).
+    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        let get = |name: &str| lookup(name).filter(|v| !v.trim().is_empty());
+        let seconds = |name: &'static str, default: u64| -> Result<Duration, ConfigError> {
+            get(name)
+                .map(|v| v.trim().parse().map_err(|_| ConfigError::Malformed(name)))
+                .transpose()
+                .map(|s| Duration::from_secs(s.unwrap_or(default)))
+        };
+        Ok(Self {
+            bind: get("HEALTH_BIND")
+                .unwrap_or_else(|| "0.0.0.0:8080".into())
+                .parse()
+                .map_err(|_| ConfigError::Malformed("HEALTH_BIND"))?,
+            data_dir: get("HEALTH_DATA_DIR")
+                .map(PathBuf::from)
+                .ok_or(ConfigError::Missing("HEALTH_DATA_DIR"))?,
+            tenant: get("HEALTH_TENANT").unwrap_or_else(|| "ug".into()),
+            database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".into()),
+            otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
+            log: get("HEALTH_LOG").unwrap_or_else(|| "info".into()),
+            ups: get("HEALTH_UPS")
+                .map(|v| v.parse().map_err(|_| ConfigError::Malformed("HEALTH_UPS")))
+                .transpose()?,
+            ups_poll: seconds("HEALTH_UPS_POLL_SECS", 5)?,
+            drain: seconds("HEALTH_DRAIN_SECS", 20)?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(vars: &[(&str, &str)]) -> Result<EdgeConfig, ConfigError> {
+        EdgeConfig::from_lookup(|name| {
+            vars.iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (*v).to_owned())
+        })
+    }
+
+    #[test]
+    fn the_data_directory_is_required_and_the_rest_defaults() {
+        assert_eq!(config(&[]), Err(ConfigError::Missing("HEALTH_DATA_DIR")));
+        let c = config(&[("HEALTH_DATA_DIR", "/var/lib/health")]).expect("config");
+        assert_eq!(c.bind.to_string(), "0.0.0.0:8080");
+        assert_eq!((c.tenant.as_str(), c.database.as_str()), ("ug", "main"));
+        assert_eq!(c.ups, None);
+        assert_eq!(c.drain, Duration::from_secs(20));
+    }
+
+    #[test]
+    fn malformed_values_name_their_variable() {
+        let dir = ("HEALTH_DATA_DIR", "/d");
+        assert_eq!(
+            config(&[dir, ("HEALTH_BIND", "nowhere")]),
+            Err(ConfigError::Malformed("HEALTH_BIND"))
+        );
+        assert_eq!(
+            config(&[dir, ("HEALTH_UPS", "@host")]),
+            Err(ConfigError::Malformed("HEALTH_UPS"))
+        );
+        assert_eq!(
+            config(&[dir, ("HEALTH_DRAIN_SECS", "soon")]),
+            Err(ConfigError::Malformed("HEALTH_DRAIN_SECS"))
+        );
+        let c = config(&[dir, ("HEALTH_UPS", "apc@127.0.0.1")]).expect("config");
+        assert_eq!(c.ups.expect("ups").to_string(), "apc@127.0.0.1:3493");
+    }
+}
