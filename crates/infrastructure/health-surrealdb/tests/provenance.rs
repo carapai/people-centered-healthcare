@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use health_identifiers::{OpId, ResourceId};
-use health_persistence::{Precondition, RawJson, Store, Transaction, WriteRequest};
+use health_persistence::{Precondition, RawJson, Store, Transaction, WriteError, WriteRequest};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::SystemClock;
 use serde_json::{Value, json};
@@ -110,9 +110,11 @@ async fn a_provenance_without_a_stored_target_is_refused_and_one_rolled_back_is_
         json!({ "resourceType": "Provenance", "recorded": "2026-11-01T00:00:00Z" }),
     ] {
         assert!(
-            tx.write(request("Provenance", ResourceId::new(), &json))
-                .await
-                .is_err(),
+            matches!(
+                tx.write(request("Provenance", ResourceId::new(), &json))
+                    .await,
+                Err(WriteError::Invalid(_))
+            ),
             "{json}"
         );
     }

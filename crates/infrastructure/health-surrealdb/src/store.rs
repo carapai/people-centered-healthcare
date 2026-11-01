@@ -208,8 +208,7 @@ impl SurrealTx {
     /// The Owner of the Provenance `json`: its target's, read in this transaction. A Provenance
     /// whose target the platform does not store, or that is missing, is refused.
     async fn provenance_owner(&self, json: &str) -> Result<String, WriteError> {
-        let refused =
-            |why: &str| WriteError::Store(StoreError::Unavailable(format!("a Provenance {why}")));
+        let refused = |why: &str| WriteError::Invalid(format!("a Provenance {why}"));
         let record: Value = serde_json::from_str(json).map_err(|_| refused("is not JSON"))?;
         let (target_type, target_id) = crate::ownership::provenance_target(&record)
             .ok_or_else(|| refused("needs a target reference"))?;
