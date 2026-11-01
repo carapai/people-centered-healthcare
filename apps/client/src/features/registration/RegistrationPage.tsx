@@ -3,6 +3,7 @@ import { css } from '@health/design-system/css'
 import type { Registration } from '../../platform'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
 import { messages } from '../../i18n/messages'
@@ -88,6 +89,9 @@ export function RegistrationPage() {
           {intl.formatMessage(messages.regRegistered)} <strong>{result.mrn}</strong>
         </p>
         <p>{intl.formatMessage(outcome)}</p>
+        <Link to="/patients/$id" params={{ id: result.id }}>
+          {intl.formatMessage(messages.ptOpen)}
+        </Link>
         <button type="button" className={button} onClick={startOver}>
           {intl.formatMessage(messages.regAnother)}
         </button>
@@ -187,7 +191,10 @@ export function RegistrationPage() {
           />
           {chosen === undefined ? null : (
             <p role="status">
-              {intl.formatMessage(messages.regChosen)} <strong>{chosen.name}</strong> {chosen.mrn}
+              {intl.formatMessage(messages.regChosen)} <strong>{chosen.name}</strong> {chosen.mrn}{' '}
+              <Link to="/patients/$id" params={{ id: chosen.id }}>
+                {intl.formatMessage(messages.ptOpen)}
+              </Link>
             </p>
           )}
         </div>

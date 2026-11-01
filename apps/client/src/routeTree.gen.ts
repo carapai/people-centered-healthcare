@@ -15,6 +15,7 @@ import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
+import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
@@ -49,6 +50,11 @@ const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
   path: '/break-glass/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientsIdRoute = PatientsIdRouteImport.update({
+  id: '/patients/$id',
+  path: '/patients/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortalIndexRoute = PortalIndexRouteImport.update({
   id: '/portal/',
   path: '/portal/',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/portal/': typeof PortalIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/portal': typeof PortalIndexRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/portal/': typeof PortalIndexRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
     | '/portal/'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
     | '/portal'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
     | '/portal/'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
+  PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
   PortalIndexRoute: typeof PortalIndexRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BreakGlassReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patients/$id': {
+      id: '/patients/$id'
+      path: '/patients/$id'
+      fullPath: '/patients/$id'
+      preLoaderRoute: typeof PatientsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portal/': {
       id: '/portal/'
       path: '/portal'
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
+  PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
   PortalIndexRoute: PortalIndexRoute,

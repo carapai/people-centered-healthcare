@@ -9,6 +9,7 @@ The patient portal (patient-portal.md; ADR 0029; #111), at `/portal`, central on
   - waiting for review, with **Check again**;
   - registered, seeing only what the patient submitted;
   - linked to their health record (`level3`, after an in-person ID check).
+- **People you care for** (#113): a caregiver's dependents, until when, and a note when a young person's sensitive records stay private to them, with a refresh button.
 - **On the server:** `/api/portal/registration` (`health-fhir-server`'s `portal_router`) decides everything. The screen enforces nothing.
 - **Not yet:** the portal's own UX (fog in patient-portal.md), requests, appointments and records.
 

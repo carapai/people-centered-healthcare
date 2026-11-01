@@ -152,6 +152,8 @@ Accounts, self-registration, verification, caregivers, requests, care journeys (
 - [Choose the SMS provider for patient one-time codes](https://github.com/carapai/people-centered-healthcare/issues/235) — needs a human
 - [Integrate NIRA verification](https://github.com/carapai/people-centered-healthcare/issues/112) — needs a human
 - [Implement caregiver delegation](https://github.com/carapai/people-centered-healthcare/issues/113)
+- [Record the mother–newborn caregiver link at a facility delivery](https://github.com/carapai/people-centered-healthcare/issues/243)
+- [Enforce caregiver grants and adolescent confidentiality on portal record reads](https://github.com/carapai/people-centered-healthcare/issues/244)
 - [Implement patient requests and appointment proposals](https://github.com/carapai/people-centered-healthcare/issues/114)
 - [Build the care journey and patient timeline read models](https://github.com/carapai/people-centered-healthcare/issues/115)
 
