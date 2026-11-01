@@ -81,6 +81,9 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("stock_count", "inventory"),
     ("stock_goods_received", "inventory"),
     ("stock_requisition", "inventory"),
+    ("ledger_posting", "financial-ledger"),
+    ("payment", "payments"),
+    ("cash_shift", "payments"),
     ("break_glass", "identity"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),

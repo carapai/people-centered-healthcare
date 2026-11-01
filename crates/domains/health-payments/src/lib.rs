@@ -146,6 +146,9 @@ pub struct Payment {
     pub reason: Option<String>,
     /// What has been refunded of it.
     pub refunded: Decimal,
+    /// Its receipt number (node-prefixed, ADR 0014), once issued.
+    #[serde(default)]
+    pub receipt: Option<String>,
 }
 
 /// What every payment has: who paid how much, how, and for what.
@@ -193,6 +196,7 @@ impl Payment {
             evidence: None,
             reason: None,
             refunded: Decimal::ZERO,
+            receipt: None,
         })
     }
 
@@ -390,4 +394,42 @@ pub fn reconcile(payments: &[Payment], lines: &[StatementLine]) -> Reconciliatio
         }
     }
     result
+}
+
+/// Payments and shifts, inside a transaction (the payments Module's driven port).
+pub trait PaymentStore {
+    /// Adds or replaces a payment.
+    fn put_payment(
+        &mut self,
+        payment: &Payment,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// One payment.
+    fn payment(
+        &mut self,
+        id: &str,
+    ) -> impl std::future::Future<Output = Result<Option<Payment>, health_persistence::StoreError>> + Send;
+    /// The payments taken in a shift, and those still pending, oldest first.
+    fn payments_of_shift(
+        &mut self,
+        shift: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Payment>, health_persistence::StoreError>> + Send;
+    /// The payments still pending (or pending unverified), oldest first.
+    fn pending_payments(
+        &mut self,
+    ) -> impl std::future::Future<Output = Result<Vec<Payment>, health_persistence::StoreError>> + Send;
+    /// Adds or replaces a shift.
+    fn put_shift(
+        &mut self,
+        shift: &Shift,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// One shift.
+    fn shift(
+        &mut self,
+        id: &str,
+    ) -> impl std::future::Future<Output = Result<Option<Shift>, health_persistence::StoreError>> + Send;
+    /// The open shift of a till, if any.
+    fn open_shift(
+        &mut self,
+        till: &str,
+    ) -> impl std::future::Future<Output = Result<Option<Shift>, health_persistence::StoreError>> + Send;
 }

@@ -25,4 +25,6 @@ Layer: **domain** (Finance, payments). Tills and two-phase payments (#123; billi
 - shift settlement with a supervised variance;
 - statement reconciliation with its exceptions.
 
-**Not here yet:** storage, the API and the till screens (#254).
+- **`PaymentStore`** is the storage port for payments and shifts; `health-surrealdb` implements it (migration `0018_payments`). A payment carries its `receipt` number once issued.
+
+**Not here yet:** the API and the till screens (#254 part 2).

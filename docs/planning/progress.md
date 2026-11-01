@@ -185,3 +185,7 @@ Total: 64 of 134 implementation tasks done. Validation spikes open: 3.
   - **Rules (`health-payments`):** cash within a shift with supervised settlement; non-cash payments pending until provider evidence (receipts provisional, never confirmed before it); customer-reported payments confirmed only by a statement line; refunds behind the permission; statement reconciliation with an exceptions queue.
   - **Postings (`health-payments-app`):** the ledger postings, with pending money in payments in transit.
   - **Follow-up:** #254, storage, the API and the till screens.
+- 2026-11-01: #123 merged (#255). #254 part 1: payments, shifts and the ledger's postings stored.
+  - **One transaction per step:** the payment, its posting checked against the chart, and its shift.
+  - **Integrity:** a provider reference is claimed once, a till has one open shift, and receipts are numbered.
+  - **SurrealDB:** migration `0018_payments`.

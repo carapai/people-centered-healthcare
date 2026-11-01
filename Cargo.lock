@@ -2139,6 +2139,7 @@ dependencies = [
 name = "health-financial-ledger"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "rust_decimal",
  "serde",
@@ -2295,6 +2296,7 @@ dependencies = [
 name = "health-payments"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "rust_decimal",
  "serde",
@@ -2306,10 +2308,16 @@ name = "health-payments-app"
 version = "0.1.0"
 dependencies = [
  "health-financial-ledger",
+ "health-identifiers",
  "health-payments",
+ "health-persistence",
+ "health-surrealdb",
  "health-time",
+ "jiff",
  "rust_decimal",
+ "surrealdb",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2362,13 +2370,16 @@ dependencies = [
  "health-client-registry",
  "health-consent",
  "health-fhir-search",
+ "health-financial-ledger",
  "health-identifiers",
  "health-identity",
  "health-inventory",
+ "health-payments",
  "health-persistence",
  "health-time",
  "jiff",
  "rust_decimal",
+ "serde",
  "serde_json",
  "sha2 0.11.1",
  "surrealdb",
