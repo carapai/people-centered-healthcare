@@ -29,6 +29,11 @@ pub struct EdgeConfig {
     pub ups_poll: Duration,
     /// `HEALTH_DRAIN_SECS`: how long in-flight requests may take to finish on a stop, default 20.
     pub drain: Duration,
+    /// `HEALTH_UPDATE_DIR`: staged packages, the previous binary and the pre-update store copy.
+    /// Default: `updates` beside the data directory, so renames stay on one volume.
+    pub update_dir: PathBuf,
+    /// `HEALTH_UPDATE_KEY_FILE`: the pinned release key (hex SEC1), for staging packages.
+    pub update_key_file: Option<PathBuf>,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -52,14 +57,19 @@ impl EdgeConfig {
                 .transpose()
                 .map(|s| Duration::from_secs(s.unwrap_or(default)))
         };
+        let data_dir: PathBuf = get("HEALTH_DATA_DIR")
+            .map(PathBuf::from)
+            .ok_or(ConfigError::Missing("HEALTH_DATA_DIR"))?;
         Ok(Self {
+            update_dir: get("HEALTH_UPDATE_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| data_dir.with_file_name("updates")),
+            update_key_file: get("HEALTH_UPDATE_KEY_FILE").map(PathBuf::from),
+            data_dir,
             bind: get("HEALTH_BIND")
                 .unwrap_or_else(|| "0.0.0.0:8080".into())
                 .parse()
                 .map_err(|_| ConfigError::Malformed("HEALTH_BIND"))?,
-            data_dir: get("HEALTH_DATA_DIR")
-                .map(PathBuf::from)
-                .ok_or(ConfigError::Missing("HEALTH_DATA_DIR"))?,
             tenant: get("HEALTH_TENANT").unwrap_or_else(|| "ug".into()),
             database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".into()),
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
@@ -93,6 +103,7 @@ mod tests {
         assert_eq!((c.tenant.as_str(), c.database.as_str()), ("ug", "main"));
         assert_eq!(c.ups, None);
         assert_eq!(c.drain, Duration::from_secs(20));
+        assert_eq!(c.update_dir, PathBuf::from("/var/lib/updates"));
     }
 
     #[test]

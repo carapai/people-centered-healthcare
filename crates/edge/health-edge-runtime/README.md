@@ -6,10 +6,11 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 
 `run(config, manager, stop)` is the node's whole life:
 1. **Listen.** The listener starts at once: `/health` answers, and `/ready` is 503 until the store is ready (the shared `health-http` system routes).
-2. **Open the store.** The embedded store (`Target::RocksDb`, `sync=every`) is opened once. If it fails, `run` returns `EdgeError::Store` and the service manager restarts the process.
-3. **Migrate.** Migrations run before ready. The service manager is asked for 30 s more every 10 s while they run. A store that a newer binary migrated is refused (`EdgeError::Migration`), so an old binary never runs against it.
-4. **Ready.** The manager is told, and the supervised tasks start: the watchdog keep-alive and the UPS watch.
-5. **Stop.** On `stop`, a UPS low battery, or a task that keeps failing:
+2. **Update check.** A pending update copies the store to `pre-update-store/` on its first start, or rolls back after three starts that never reached ready (`update::before_open`), before the store is opened.
+3. **Open the store.** The embedded store (`Target::RocksDb`, `sync=every`) is opened once. If it fails, `run` returns `EdgeError::Store` and the service manager restarts the process.
+4. **Migrate.** Migrations run before ready. The service manager is asked for 30 s more every 10 s while they run. A store that a newer binary migrated is refused (`EdgeError::Migration`), so an old binary never runs against it. During an update, a failed migration marks the update failed and the next start rolls it back.
+5. **Ready.** A pending update is committed. The manager is told, and the supervised tasks start: the watchdog keep-alive and the UPS watch.
+6. **Stop.** On `stop`, a UPS low battery, or a task that keeps failing:
    - `/ready` turns 503 (the `serving` check);
    - the manager is told;
    - in-flight requests drain within `HEALTH_DRAIN_SECS`;
@@ -22,10 +23,11 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - `Foreground` is the no-op for development.
   - `Systemd` speaks sd_notify(3) on `$NOTIFY_SOCKET`, including Linux abstract sockets. It sends `WATCHDOG=1` at half of `WATCHDOG_USEC`, when `WATCHDOG_PID` is unset or names this process.
 - **`supervisor`:** a failed or panicking task restarts with exponential backoff, from 1 s to 60 s. Five failures within 10 minutes stop the node (`EdgeError::Task`). A task that returns `Ok` is finished.
+- **`update`:** signed packages, the update journal, and rollback. A pending update copies the store before its first open; a failed migration or three starts that never reach ready roll it back, store first. See the binary's README for the commands.
 - **`ups`:** polls a NUT server for `ups.status`. `OB` is warned about, and `LB` stops the node. An unreachable NUT server is warned about and polled again; it never stops the node.
 
 ## Not yet
 
-- **Windows service, and update staging with rollback:** part 2 of [#72](https://github.com/carapai/people-centered-healthcare/issues/72).
+- **Windows service:** the last part of [#72](https://github.com/carapai/people-centered-healthcare/issues/72), with the `edge-build.yml` workflow on Windows.
 - **Final backup on a UPS stop:** with the backup scheduler (#78).
 - **Alerts for UPS and task restarts:** with the admin page (#77).

@@ -8,6 +8,8 @@
 //! 3. Migrations, before ready, extending the service manager's start timeout while they run.
 //!    An old binary refuses a store migrated by a newer one.
 //! 4. Ready: the service manager is told, the watchdog starts, and supervised tasks run.
+//!    A pending update ([`update`]) copies the store before its first open, and a failed
+//!    migration rolls it back.
 //! 5. A stop (a signal, a UPS low-battery signal, or a task that keeps failing): `/ready`
 //!    reports `not-ready`, in-flight requests drain, and the store closes.
 
@@ -15,6 +17,7 @@ mod config;
 mod node;
 mod notify;
 mod supervisor;
+pub mod update;
 mod ups;
 
 pub use config::{ConfigError, EdgeConfig};

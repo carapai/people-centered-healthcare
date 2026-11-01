@@ -4,6 +4,7 @@
 //! - `facility-edge`: foreground, for development in a terminal.
 //! - `facility-edge --service`: under the service manager. On Linux that is systemd,
 //!   `Type=notify` (`packaging/facility-edge.service`).
+//! - `facility-edge update …`: signed updates ([`update`]).
 //!
 //! Exit codes, for the service manager and the update rollback:
 //!
@@ -14,7 +15,12 @@
 //! | 3 | the store cannot be opened (another process holds it, or the disk failed) |
 //! | 4 | a migration failed, or the store was migrated by a newer binary |
 //! | 5 | a supervised task kept failing |
+//! | 6 | a failed update was rolled back; the next start runs the previous binary |
+//! | 7 | an update step failed, or an `update` command was refused: needs a person |
+//! | 8 | a failed update's store is restored; the service manager restores the previous binary |
 //! | 1 | anything else (the listener, telemetry, serving) |
+
+mod update;
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -31,18 +37,28 @@ fn service_manager() -> Result<Arc<dyn ServiceManager>, &'static str> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let service = match std::env::args().nth(1).as_deref() {
-        None => false,
-        Some("--service") => true,
-        Some(_) => {
-            eprintln!("usage: facility-edge [--service]");
-            return ExitCode::from(2);
-        }
-    };
+    let args: Vec<String> = std::env::args().skip(1).collect();
     let config = match EdgeConfig::from_lookup(|name| std::env::var(name).ok()) {
         Ok(config) => config,
         Err(error) => {
             eprintln!("facility-edge: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let service = match args.first().map(String::as_str) {
+        None => false,
+        Some("--service") if args.len() == 1 => true,
+        Some("update") => {
+            return match update::run(&config, &args[1..]) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("facility-edge: {error}");
+                    ExitCode::from(7)
+                }
+            };
+        }
+        Some(_) => {
+            eprintln!("usage: facility-edge [--service | update …]");
             return ExitCode::from(2);
         }
     };
@@ -79,6 +95,9 @@ async fn main() -> ExitCode {
                 EdgeError::Store => 3,
                 EdgeError::Migration => 4,
                 EdgeError::Task(_) => 5,
+                EdgeError::RolledBack => 6,
+                EdgeError::Update(_) => 7,
+                EdgeError::RollbackPending => 8,
                 EdgeError::Listen(_) | EdgeError::Serve(_) => 1,
             })
         }
