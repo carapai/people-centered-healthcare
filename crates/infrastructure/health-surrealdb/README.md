@@ -27,6 +27,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 - **Stock counts** (migration `0016_stock_counts`): `stock_count`, and `units_of_store` by the balance records' key prefix.
 - **Receiving** (migration `0017_receiving`): `stock_goods_received` and `stock_requisition`.
 - **Payments** (migration `0018_payments`): `ledger_posting` (`health_financial_ledger::PostingStore`, each posting created once), and `payment` and `cash_shift` (`health_payments::PaymentStore`).
+- **Provenance** (migration `0019_provenance`): `provenance`, whose `owner` the store sets to the Owner of the target's head in the same transaction, refusing a missing or unknown target; `provenance_of_owner` lists a node's Provenance for sync (#196).
 - **`ownership`** is the ownership registry: one default Owner per head table, plus category partitions (resource-ownership.md § In code).
 - **`migrate(&Connection, MIGRATIONS)`** creates the `_migration` ledger, refuses modified, unknown or out-of-order migrations before changing anything, and then applies each pending migration in its own transaction with its ledger row.
 - **Closing:** SDK 3.3.5 has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.

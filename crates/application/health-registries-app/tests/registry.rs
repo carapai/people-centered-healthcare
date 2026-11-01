@@ -228,10 +228,71 @@ async fn links_build_one_golden_record_and_lower_trust_never_overwrites() {
             golden: first.golden.to_string()
         })
     );
-    // Every version written was audited, with who and why.
+    // Every version written was audited, with who and why: six Patient versions, and the
+    // Provenance of each surviving value that changed.
+    let provenance = provenance(&store).await;
     let audited = audit.0.lock().expect("audit").clone();
-    assert_eq!(audited.len(), 6);
+    assert_eq!(audited.len(), 6 + provenance.len());
     assert!(audited.iter().all(|(_, reason, _)| reason == "link"));
+
+    // Each surviving value names its source Patient and trust, against a golden version (#196).
+    let latest = |field: &str| {
+        provenance
+            .iter()
+            .filter(|p| p["activity"]["coding"][0]["code"] == field)
+            .max_by_key(|p| p["recorded"].as_str().map(str::to_owned))
+            .cloned()
+            .expect("a Provenance for the field")
+    };
+    let family = latest("family");
+    assert_eq!(
+        family["entity"][0]["what"]["reference"],
+        format!("Patient/{b}")
+    );
+    assert_eq!(
+        family["entity"][0]["extension"][0]["valueCode"],
+        "staff-verified"
+    );
+    let nin = latest("nin");
+    assert_eq!(
+        nin["entity"][0]["what"]["reference"],
+        format!("Patient/{a}")
+    );
+    assert_eq!(
+        nin["entity"][0]["extension"][0]["valueCode"],
+        "nira-verified"
+    );
+    for p in &provenance {
+        tier1(p);
+        assert!(
+            p["target"][0]["reference"]
+                .as_str()
+                .expect("target")
+                .starts_with(&format!("Patient/{}/_history/", first.golden))
+        );
+    }
+}
+
+/// Every Provenance in the store, all owned by the client registry.
+async fn provenance(store: &SurrealStore) -> Vec<Value> {
+    let mut tx = store.begin().await.expect("tx");
+    let ids = tx
+        .provenance_of_owner("client-registry")
+        .await
+        .expect("ids");
+    let mut out = Vec::new();
+    for id in ids {
+        let stored = tx
+            .read(
+                &"Provenance".parse().expect("type"),
+                id.parse().expect("id"),
+            )
+            .await
+            .expect("read")
+            .expect("exists");
+        out.push(serde_json::from_str(stored.json.as_str()).expect("json"));
+    }
+    out
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -66,7 +66,7 @@ Layer: **application** (Registries). The client registry's use cases over any `h
   - each field's surviving value;
   - an `urn:health:registry:origin` extension per field: field, source, trust, time and value;
   - an `urn:health:registry:separated` extension per adjudication marker.
-- **Provenance:** storing a Provenance per value is [#196](https://github.com/carapai/people-centered-healthcare/issues/196). Provenance has no table until its storage discriminator is decided.
+- **Provenance** (#196): each golden write also writes, in its transaction, one Provenance per surviving value that changed. The target is the golden version (`Patient/{id}/_history/{version}`); the activity is the field (`urn:health:registry:survivorship`); the entity is the source Patient, with its trust as an `urn:health:registry:trust` extension; the agent is the actor. Each is audited with the write's reason. The store gives it the client registry's Owner.
 
 ## Tests
 

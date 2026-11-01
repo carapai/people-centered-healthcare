@@ -473,6 +473,12 @@ pub(super) const RESOURCES: &[ResourceOwnership] = &[
         partitions: &[],
     },
     ResourceOwnership {
+        resource_type: "Provenance",
+        table: "provenance",
+        owner: super::TARGET_OWNER,
+        partitions: &[],
+    },
+    ResourceOwnership {
         resource_type: "Questionnaire",
         table: "questionnaire",
         owner: "metadata",

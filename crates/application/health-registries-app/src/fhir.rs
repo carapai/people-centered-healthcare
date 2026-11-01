@@ -344,3 +344,28 @@ pub fn reconciled(json: &Value) -> Value {
     }
     patient
 }
+
+/// The Provenance of a golden record's surviving value (#196): the golden version is the target,
+/// the field the activity, and the source Patient the entity, carrying its trust.
+pub(crate) fn survivorship_provenance(
+    golden: &str,
+    version: &str,
+    field: Field,
+    claim: &Claim,
+    actor: &str,
+    recorded: &str,
+) -> Value {
+    json!({
+        "resourceType": "Provenance",
+        "target": [{ "reference": format!("Patient/{golden}/_history/{version}") }],
+        "occurredDateTime": claim.recorded.to_string(),
+        "recorded": recorded,
+        "activity": { "coding": [{ "system": "urn:health:registry:survivorship", "code": field.code() }] },
+        "agent": [{ "who": { "display": actor } }],
+        "entity": [{
+            "extension": [{ "url": TRUST_TAG, "valueCode": trust_code(claim.trust) }],
+            "role": "source",
+            "what": { "reference": format!("Patient/{}", claim.source) },
+        }],
+    })
+}

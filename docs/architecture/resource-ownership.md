@@ -26,7 +26,9 @@ This document names the single **Owner** (a Module inside a Bounded Context) of 
 `tests/ownership.rs` checks that every table has exactly one Owner, that partitions are disjoint, that the migrated schema matches the registry, and that every Owner is a module listed here.
 
 **Not yet in the registry:**
-- **Location** (administrative areas versus facility-internal), **QuestionnaireResponse** (patient-reported versus staff-captured) and **Provenance** (owned by its target's Owner). Each needs a discriminator other than category, still to be decided. Until then, Location defaults to facility-registry and QuestionnaireResponse to clinical-documentation, and Provenance has no table.
+- **Location** (administrative areas versus facility-internal) and **QuestionnaireResponse** (patient-reported versus staff-captured). Each needs a discriminator other than category, still to be decided. Until then, Location defaults to facility-registry and QuestionnaireResponse to clinical-documentation.
+
+**Provenance (rule 7, #196):** one `provenance` table, with an `owner` column. The store sets it on write to the Owner of the target's stored head, read in the same transaction. A Provenance whose target is missing, or is a type the platform does not store, is refused. The registry's `Provenance` entry has the owner `target`, so the doc-module test skips it. Sync selects a node's Provenance by `owner` (`SurrealTx::provenance_of_owner`).
 - **The DiagnosticReport default** (laboratory for non-imaging categories) is an assumption, to be confirmed.
 
 ## Bounded contexts and modules

@@ -190,6 +190,46 @@ pub(crate) fn table(resource_type: &ResourceType) -> Result<&'static str, StoreE
 }
 
 impl SurrealTx {
+    /// The ids of the Provenance owned by `owner` (its targets' Owner), for sync to carry with
+    /// their targets (#196).
+    pub async fn provenance_of_owner(&mut self, owner: &str) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [<string>record::id(id)] FROM provenance WHERE owner = $owner AND deleted = false ORDER BY id",
+                vec![("owner", owner.to_owned())],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .collect())
+    }
+
+    /// The Owner of the Provenance `json`: its target's, read in this transaction. A Provenance
+    /// whose target the platform does not store, or that is missing, is refused.
+    async fn provenance_owner(&self, json: &str) -> Result<String, WriteError> {
+        let refused =
+            |why: &str| WriteError::Store(StoreError::Unavailable(format!("a Provenance {why}")));
+        let record: Value = serde_json::from_str(json).map_err(|_| refused("is not JSON"))?;
+        let (target_type, target_id) = crate::ownership::provenance_target(&record)
+            .ok_or_else(|| refused("needs a target reference"))?;
+        let resource_type: ResourceType = target_type
+            .parse()
+            .map_err(|_| refused("targets an unknown resource type"))?;
+        let id: ResourceId = target_id
+            .parse()
+            .map_err(|_| refused("targets an invalid id"))?;
+        let target = self
+            .head(&resource_type, id)
+            .await?
+            .ok_or_else(|| refused("targets a record that is not stored"))?;
+        let target_json: Value = serde_json::from_str(target.json.as_str())
+            .map_err(|_| refused("targets a record that is not JSON"))?;
+        crate::ownership::provenance_owner(target_type, &target_json)
+            .map(str::to_owned)
+            .ok_or_else(|| refused("targets a type no Owner holds"))
+    }
+
     pub(crate) fn tx(&self) -> Result<&SurrealTransaction<Any>, StoreError> {
         self.tx
             .as_ref()
@@ -247,6 +287,13 @@ impl SurrealTx {
         let table = table(resource_type)?;
         let last_updated = self.clock.now();
         let stamped = stamp_meta(json, resource_type, id, op_id, last_updated)?;
+        // A Provenance belongs to its target's Owner (resource-ownership.md rule 7), read in
+        // this transaction so the target's category decides it.
+        let owner = if resource_type.as_str() == "Provenance" {
+            Some(self.provenance_owner(stamped.as_str()).await?)
+        } else {
+            None
+        };
         let version_seq = previous_seq + 1;
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
@@ -296,13 +343,20 @@ impl SurrealTx {
             "{last_updated:.3}"
         )));
         let deleted_text = if deleted { "true" } else { "false" };
+        let (owner_set, owner_field) = match owner {
+            Some(owner) => {
+                let owner = sql.str(owner);
+                (format!(", owner = {owner}"), format!(", owner: {owner}"))
+            }
+            None => (String::new(), String::new()),
+        };
         sql.push(format!(
             "UPSERT type::record({head}, {rid}) SET json = {json}, version_id = {version_id}, \
-             version_seq = {seq}, last_updated = {at}, deleted = {deleted_text}, index_keys = {keys}"
+             version_seq = {seq}, last_updated = {at}, deleted = {deleted_text}, index_keys = {keys}{owner_set}"
         ));
         sql.push(format!(
             "CREATE type::record({history}, [{rid}, {seq}]) CONTENT {{ json: {json}, \
-             version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text} }}"
+             version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text}{owner_field} }}"
         ));
         sql.run(self.tx()?).await.map_err(write_error)?;
         Ok(VersionMeta {
