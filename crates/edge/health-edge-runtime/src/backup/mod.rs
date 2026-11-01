@@ -256,8 +256,18 @@ impl Backups {
         let scratch = tempfile::Builder::new()
             .prefix(".restore-test-")
             .tempdir_in(&self.root)?;
-        let db = open_store(&scratch.path().join("store"), "restore", "test").await?;
-        let blobs = FsBlobStore::open(scratch.path().join("files"))?;
+        let outcome = Self::check_restore(&scratch.path().join("store"), entry, key).await;
+        remove_scratch(scratch.keep()).await;
+        outcome
+    }
+
+    async fn check_restore(
+        store: &Path,
+        entry: &Entry,
+        key: &BackupKey,
+    ) -> Result<(), BackupError> {
+        let db = open_store(store, "restore", "test").await?;
+        let blobs = FsBlobStore::open(store.with_file_name("files"))?;
         health_backup::restore(&entry.dir, key, &db, Some(&blobs)).await?;
         let migrations: Option<i64> = db
             .query("RETURN count(SELECT * FROM _migration)")
@@ -400,6 +410,19 @@ pub async fn restore_into(
     health_backup::restore(backup, key, &db, None).await
 }
 
+/// Removes a scratch store once its engine has let go of it: on Windows the store's files stay
+/// open for a moment after the connection is dropped. A store still held after that is left for
+/// the next test restore to remove.
+async fn remove_scratch(dir: PathBuf) {
+    for _ in 0..50 {
+        if fs::remove_dir_all(&dir).is_ok() || !dir.exists() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    tracing::warn!(scratch = %dir.display(), "test restore scratch store not removed");
+}
+
 fn read_manifest(dir: &Path) -> Option<Manifest> {
     serde_json::from_slice(&fs::read(dir.join("manifest.json")).ok()?).ok()
 }
@@ -412,7 +435,8 @@ fn file_name(dir: &Path) -> String {
 
 fn copy_durably(from: &Path, to: &Path) -> std::io::Result<()> {
     fs::copy(from, to)?;
-    fs::File::open(to)?.sync_all()
+    // Windows flushes a file only through a handle that may write it.
+    fs::OpenOptions::new().write(true).open(to)?.sync_all()
 }
 
 /// Whether two directories are on one volume; `None` when that cannot be told.
