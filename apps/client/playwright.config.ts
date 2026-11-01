@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test'
 // `vite preview`, proxying /auth, /api and /fhir to a real central-server over SurrealDB.
 export default defineConfig({
   testDir: 'e2e',
+  // The edge suite has its own config (playwright.edge.config.ts).
+  testIgnore: 'edge/**',
   fullyParallel: false,
   workers: 1,
   retries: process.env['CI'] === undefined ? 0 : 1,

@@ -14,6 +14,7 @@ use crate::config::EdgeConfig;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
 use crate::update::{self, Startup, Updates};
+use crate::web::{self, Bundle};
 
 /// How often a long migration or drain asks the service manager for more time, and how much.
 const EXTEND_EVERY: Duration = Duration::from_secs(10);
@@ -148,7 +149,7 @@ pub async fn run(
     let store = Store::default();
     let serving = Serving(Arc::new(AtomicBool::new(true)));
     let readiness = Readiness::new(vec![Arc::new(store.clone()), Arc::new(serving.clone())]);
-    let router = app(axum::Router::new(), readiness);
+    let router = app(web::routes(Bundle::embedded()), readiness);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(EdgeError::Listen)?;

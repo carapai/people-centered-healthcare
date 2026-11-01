@@ -1,5 +1,6 @@
 # End-to-end suite (testing.md: Playwright on the web, nightly; #228): the built client against a
-# real central-server over SurrealDB, with provisioned users. Not a required check.
+# real central-server over SurrealDB, with provisioned users; and the client as a facility-edge
+# binary embeds and serves it (#76). Not a required check.
 name: e2e
 
 on:
@@ -59,4 +60,40 @@ jobs:
         working-directory: apps/client
         env:
           SURREAL_BIN: ${{ github.workspace }}/surreal
+          CI: "true"
+
+  edge:
+    name: Playwright against facility-edge
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bunx --bun playwright install --with-deps chromium
+        working-directory: apps/client
+      # The client first: the edge's build script embeds apps/client/dist.
+      - run: bun run codegen && bun run build
+        working-directory: apps/client
+      - run: cargo build --locked -p facility-edge
+      - run: bun run test:e2e:edge
+        working-directory: apps/client
+        env:
           CI: "true"

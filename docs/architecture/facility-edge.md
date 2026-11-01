@@ -36,6 +36,19 @@ LAN discovery and TLS trust are in [lan-security.md](lan-security.md). Staff aut
 
 In code (#72): `apps/server/facility-edge` over `health-edge-runtime`. The systemd unit is `apps/server/facility-edge/packaging/facility-edge.service`. On Windows, `install-service.ps1` registers the service and its failure actions, and `WindowsScm` reports wait hints. `edge-build.yml` runs the binary under both service managers. The Event Log sink is still to come. The exit codes are in the binary's README; a configuration error is not restarted.
 
+## Web app
+
+The edge serves the client from its own origin (lan-security.md § App delivery to browsers). In code (#76):
+- `health-edge-runtime`'s build script embeds `apps/client/dist` in the binary, without its source maps, so a LAN browser needs nothing from the internet. Build the client before the binary; a binary built without it serves only its API.
+- The edge answers:
+  - `runtime.json` (the edge platform and the embedded build);
+  - `sw.js`, the app-shell service worker ([client-application.md](client-application.md) § Serving and versions);
+  - the bundle's files, with hashed `assets/` immutable and everything else revalidated;
+  - the page for any other path that is not a file.
+
+  Unknown paths under `/api`, `/fhir` and `/auth` are 404s, never the page.
+- The app is served from the listener's first moment, so browsers load the shell while the store opens.
+
 ## Hardware and power baseline
 
 - x64, at least 8 GB RAM, SSD system storage.

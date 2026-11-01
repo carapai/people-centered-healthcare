@@ -13,7 +13,8 @@
     "check": "bun run codegen && bun run typecheck && bun run lint && bun run build && bun run scan",
     "test": "bunx --bun vitest run",
     "test:contract": "bunx --bun vitest run --config vitest.contract.config.ts",
-    "test:e2e": "bunx --bun playwright test"
+    "test:e2e": "bunx --bun playwright test",
+    "test:e2e:edge": "bunx --bun playwright test --config playwright.edge.config.ts"
   },
   "dependencies": {
     "@health/api-client": "workspace:*",

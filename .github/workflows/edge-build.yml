@@ -86,6 +86,13 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      # The web app first, so the release binary embeds it (#76).
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build
+        working-directory: apps/client
       - run: cargo build --locked --release -p facility-edge
       - name: Run it under systemd
         run: |
@@ -101,6 +108,10 @@ jobs:
           # Type=notify: start returns once the edge has migrated and sent READY=1.
           sudo systemctl start facility-edge
           curl --fail --silent http://127.0.0.1:8080/ready
+          # The embedded app: the page, its runtime.json and the shell's service worker.
+          curl --fail --silent http://127.0.0.1:8080/ | grep --quiet 'id="root"'
+          curl --fail --silent http://127.0.0.1:8080/runtime.json | grep --quiet '"mode":"edge"'
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/sw.js
           sudo systemctl stop facility-edge
           systemctl show facility-edge -p Result -p ExecMainStatus
           test "$(systemctl show facility-edge -p Result --value)" = success

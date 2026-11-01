@@ -3,7 +3,8 @@
 //!
 //! [`run`] is the whole life of the node:
 //! 1. The HTTP listener, at once: `/health` answers, and `/ready` reports `not-ready` until the
-//!    store is open and migrated.
+//!    store is open and migrated. The embedded web app ([`web`]) is served from the start, so
+//!    browsers load the shell while the store opens.
 //! 2. The embedded store (RocksDB, `sync=every`), opened once; the process owns its directory.
 //! 3. Migrations, before ready, extending the service manager's start timeout while they run.
 //!    An old binary refuses a store migrated by a newer one.
@@ -19,6 +20,7 @@ mod notify;
 mod supervisor;
 pub mod update;
 mod ups;
+pub mod web;
 
 pub use config::{ConfigError, EdgeConfig};
 pub use node::{EdgeError, Stop, run, shutdown_signal};

@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "types": ["node", "bun"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "vitest.contract.config.ts", "playwright.config.ts", "panda.config.ts", "scripts", "test/contract/server.ts", "test/contract/context.ts", "e2e"]
+  "include": ["vite.config.ts", "vitest.config.ts", "vitest.contract.config.ts", "playwright.config.ts", "playwright.edge.config.ts", "panda.config.ts", "scripts", "test/contract/server.ts", "test/contract/context.ts", "e2e"]
 }
