@@ -22,6 +22,7 @@ mod migrations;
 pub mod ownership;
 mod review;
 pub mod search;
+mod stock;
 mod store;
 
 pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};

@@ -16,13 +16,13 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 0 | 5 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
-| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 0 | 5 |
+| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 1 | 5 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 56 of 128 implementation tasks done. Validation spikes open: 3.
+Total: 57 of 128 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -114,3 +114,7 @@ Total: 56 of 128 implementation tasks done. Validation spikes open: 3.
   - **Chart of accounts:** built from the country template.
   - **Postings:** balanced and append-only, in the functional currency, with dimensions on every line and foreign amounts kept with their rate. Corrections are reversals, made once.
   - **Balances:** derived from postings, including what each funding source owes per encounter (`Account.balance[]`).
+- 2026-10-31: #119 merged (#233). #127: the stock ledger and balance guards.
+  - **Domain (`health-inventory`):** Stock Units, movements, reversals, the negative-stock policy (blocked at the authority, emergency dispense with permission and reason, late operations flagged, store tightening and relaxing) and the stock card ordered by occurrence.
+  - **Use cases (`health-inventory-app`):** each movement reads and writes its unit's balance record in one transaction; a write conflict reruns it. Six concurrent issues of the last pack: exactly one succeeds. Status changes move stock between units in one transaction; the nightly check rebuilds balances and reports drift.
+  - **SurrealDB:** migration `0011_stock`.

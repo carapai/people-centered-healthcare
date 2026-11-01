@@ -2200,6 +2200,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-inventory"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "health-time",
+ "rust_decimal",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-inventory-app"
+version = "0.1.0"
+dependencies = [
+ "health-inventory",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-observability"
 version = "0.1.0"
 dependencies = [
@@ -2264,6 +2288,7 @@ dependencies = [
  "health-fhir-search",
  "health-identifiers",
  "health-identity",
+ "health-inventory",
  "health-persistence",
  "health-time",
  "jiff",
