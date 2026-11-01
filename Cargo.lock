@@ -2093,6 +2093,8 @@ dependencies = [
  "health-fhir-validation",
  "health-identifiers",
  "health-identity-app",
+ "health-inventory",
+ "health-inventory-app",
  "health-patient-engagement",
  "health-patient-engagement-app",
  "health-persistence",
@@ -2101,11 +2103,14 @@ dependencies = [
  "health-time",
  "http-body-util",
  "jiff",
+ "rust_decimal",
+ "serde",
  "serde_json",
  "surrealdb",
  "tokio",
  "tower",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

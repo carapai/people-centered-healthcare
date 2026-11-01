@@ -955,10 +955,12 @@ impl<S: AuthStore> Inner<S> {
             return Err(());
         }
         gate.policy.check(&snapshot, at).map_err(|_| ())?;
-        self.store
-            .set_clock_floor(floor.observe(snapshot.issued_at))
-            .await
-            .map_err(|_| ())?;
+        // Only an advance is written: every request writing the floor would make concurrent
+        // requests conflict.
+        let raised = floor.observe(snapshot.issued_at);
+        if raised != floor {
+            self.store.set_clock_floor(raised).await.map_err(|_| ())?;
+        }
         Ok(Some(snapshot))
     }
 

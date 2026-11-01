@@ -31,6 +31,13 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `POST /registration` submits the self-registration QuestionnaireResponse (422 when invalid, 409 when already submitted).
   - **Registration requests in the review queue** (#111 part 2c): a request that resembles existing Patients is a `registration-request` item. The queue lists it with the patient's QuestionnaireResponse and the candidate Patients. `POST /{id}` takes `{"decision": "link-patient", "patient", "document"}` (the holder's ID checked in person; 422 without one) or `{"decision": "create-patient"}`, and carries it out through `SelfRegistration::review`.
   - It implements `health_patient_engagement_app::PatientRegistry` over the client registry: `$match` for the answers, and `create_self_registered` for a new Patient. Each version written is audited, naming the patient account.
+- **Stock (#130):** `inventory_router()` is for staff with `stock.manage`, behind `subject_layer`; central nests it at `/api/stock`.
+  - `POST /goods-received`: each line is a receipt at its unit cost.
+  - `GET /on-hand?store=`: Stock Units, balances and last unit costs.
+  - `GET /reorder?store=&days=`.
+  - `POST /gs1`: reads a scanned or printed DataMatrix.
+  - `POST /requisitions` and `/requisitions/{id}/decision`.
+  - Over `health-inventory-app`.
 
 ## Tests
 

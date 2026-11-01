@@ -12,6 +12,7 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
   - **`inventory_report`** is the count as a FHIR `InventoryReport` snapshot.
 - **Receiving** (#130): `receive_goods` is one transaction. It writes a receipt of each line at its unit cost and pack size, and the note; a note is received once.
 - **Requisitions:** `request`, `decide_requisition`, and `fulfil_requisition`, which dispatches the picked batches as a transfer from the pharmacy to the ward and marks the requisition fulfilled in the same transaction. `supply_requests` is a requisition as FHIR SupplyRequests.
+- **Stock on hand:** `stock_on_hand(store)` gives each Stock Unit with its balance and the unit cost of its last costed movement.
 - **Reorder:** `reorder(store, policy, days, now)` gives per-product suggestions from usable stock and the issues and dispensing over the last `days` days.
 - **`balance(key)`** and **`nightly_check()`:** the check rebuilds each balance from its movements and reports any drift.
 
@@ -39,7 +40,7 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - reorder suggestions follow the last month's consumption.
 
 **Not here yet:**
-- the receiving, requisition and reorder screens and e2e (#130 part 2);
+- the ward requisition screens (#250);
 - upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
 - the change log and outbox for sync (#135);

@@ -16,13 +16,13 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 2 | 8 |
 | [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 0 | 3 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 1 | 8 |
-| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 2 | 6 |
+| [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 3 | 7 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
 | [Phase 15 — Public health and analytics](https://github.com/carapai/people-centered-healthcare/milestone/15) | 0 | 0 |
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 60 of 132 implementation tasks done. Validation spikes open: 3.
+Total: 61 of 133 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -167,3 +167,9 @@ Total: 60 of 132 implementation tasks done. Validation spikes open: 3.
   - **Requisitions:** ward requisitions (SupplyRequest) are approved, then fulfilled by a dispatched transfer.
   - **Reorder:** min/max suggestions from average monthly consumption.
   - **SurrealDB:** migration `0017_receiving`.
+- 2026-11-01: #130 part 1 merged (#249). Part 2 completes #130.
+  - **API:** `/api/stock` for staff with `stock.manage`: receiving, stock on hand with costs, reorder, GS1 and requisitions.
+  - **Screens:** Stock (`/stock`) and Receive goods (`/stock/receive`), with the barcode filling the batch and expiry.
+  - **e2e:** a receipt on hand at its cost.
+  - **Fix:** the full e2e run exposed a race. Concurrent requests rewrote the shared clock floor, and the loser of the write conflict was refused with a spurious 401. Now the floor is written only when it advances, and a lost raise refuses nothing.
+  - **Follow-up:** #250, the ward requisition screens.

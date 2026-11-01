@@ -19,6 +19,8 @@ import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
+import { Route as StockIndexRouteImport } from './routes/stock.index'
+import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +72,16 @@ const RegistryReviewsRoute = RegistryReviewsRouteImport.update({
   path: '/registry/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StockIndexRoute = StockIndexRouteImport.update({
+  id: '/stock/',
+  path: '/stock/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockReceiveRoute = StockReceiveRouteImport.update({
+  id: '/stock/receive',
+  path: '/stock/receive',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,7 +93,9 @@ export interface FileRoutesByFullPath {
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/receive': typeof StockReceiveRoute
   '/portal/': typeof PortalIndexRoute
+  '/stock/': typeof StockIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -93,7 +107,9 @@ export interface FileRoutesByTo {
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/receive': typeof StockReceiveRoute
   '/portal': typeof PortalIndexRoute
+  '/stock': typeof StockIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -106,7 +122,9 @@ export interface FileRoutesById {
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/receive': typeof StockReceiveRoute
   '/portal/': typeof PortalIndexRoute
+  '/stock/': typeof StockIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,7 +138,9 @@ export interface FileRouteTypes {
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
+    | '/stock/receive'
     | '/portal/'
+    | '/stock/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -132,7 +152,9 @@ export interface FileRouteTypes {
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
+    | '/stock/receive'
     | '/portal'
+    | '/stock'
   id:
     | '__root__'
     | '/'
@@ -144,7 +166,9 @@ export interface FileRouteTypes {
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
+    | '/stock/receive'
     | '/portal/'
+    | '/stock/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -157,7 +181,9 @@ export interface RootRouteChildren {
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
+  StockReceiveRoute: typeof StockReceiveRoute
   PortalIndexRoute: typeof PortalIndexRoute
+  StockIndexRoute: typeof StockIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +258,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegistryReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/stock/': {
+      id: '/stock/'
+      path: '/stock'
+      fullPath: '/stock/'
+      preLoaderRoute: typeof StockIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock/receive': {
+      id: '/stock/receive'
+      path: '/stock/receive'
+      fullPath: '/stock/receive'
+      preLoaderRoute: typeof StockReceiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -245,7 +285,9 @@ const rootRouteChildren: RootRouteChildren = {
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
+  StockReceiveRoute: StockReceiveRoute,
   PortalIndexRoute: PortalIndexRoute,
+  StockIndexRoute: StockIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

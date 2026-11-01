@@ -187,6 +187,7 @@ Stock ledger, reservations, FEFO, dispensing, transfers, counts, receiving (§13
 - [Implement transfers, counts and stock reconciliation](https://github.com/carapai/people-centered-healthcare/issues/129)
 - [Match inter-facility transfer dispatches with receipts at central](https://github.com/carapai/people-centered-healthcare/issues/247)
 - [Implement receiving, requisitions and reorder suggestions](https://github.com/carapai/people-centered-healthcare/issues/130)
+- [Build the ward requisition screens](https://github.com/carapai/people-centered-healthcare/issues/250)
 - [Implement stock valuation and optional financial postings](https://github.com/carapai/people-centered-healthcare/issues/131)
 
 ## [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14)

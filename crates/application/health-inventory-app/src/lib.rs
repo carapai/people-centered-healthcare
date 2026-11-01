@@ -23,7 +23,7 @@ mod receiving;
 mod transfers;
 
 pub use counts::{Cause, inventory_report};
-pub use receiving::supply_requests;
+pub use receiving::{OnHand, supply_requests};
 pub use transfers::Sender;
 
 /// Why a movement was not recorded.

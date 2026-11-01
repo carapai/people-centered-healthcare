@@ -502,11 +502,13 @@ impl AuthStore for SurrealAuthStore {
 
     async fn set_clock_floor(&self, floor: ClockFloor) -> Result<(), StoreError> {
         let Some(at) = floor.get() else { return Ok(()) };
-        {
-            let mut tx = self.begin().await?;
-            tx.raise_auth_clock_floor(at).await.map_err(failed)?;
-            tx.commit().await.map_err(failed)?;
-            Ok::<_, StoreError>(())
+        let mut tx = self.begin().await?;
+        tx.raise_auth_clock_floor(at).await.map_err(failed)?;
+        match tx.commit().await {
+            // A concurrent request raised the floor first. The floor only moves forward, and a
+            // later observation raises it again, so losing the race refuses nothing.
+            Ok(()) | Err(health_persistence::WriteError::Conflict) => Ok(()),
+            Err(other) => Err(failed(other)),
         }
     }
 }

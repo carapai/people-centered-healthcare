@@ -52,6 +52,9 @@ function Home() {
               <li>
                 <Link to="/break-glass/reviews">{intl.formatMessage(messages.bgReviewsTitle)}</Link>
               </li>
+              <li>
+                <Link to="/stock">{intl.formatMessage(messages.stTitle)}</Link>
+              </li>
             </ul>
           </nav>
           <button type="button" className={button} onClick={() => void platform.signIn?.signOut().then(() => session.refetch())}>

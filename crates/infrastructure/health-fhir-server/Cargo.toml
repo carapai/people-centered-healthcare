@@ -22,15 +22,20 @@ health-fhir-search = { workspace = true }
 health-fhir-validation = { workspace = true }
 health-identifiers = { workspace = true }
 health-identity-app = { workspace = true }
+health-inventory = { workspace = true }
+health-inventory-app = { workspace = true }
 health-patient-engagement = { workspace = true }
 health-patient-engagement-app = { workspace = true }
 health-persistence = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 http-body-util = { workspace = true }
