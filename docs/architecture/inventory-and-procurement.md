@@ -174,6 +174,7 @@ stateDiagram-v2
   - **within the facility** (ward → pharmacy): SupplyRequest;
   - **upward** to the district or NMS: through procurement adapters at central.
 - **Reorder.** Min/max policy per store and product. Suggested order quantities are computed at the edge from consumption.
+- **Code** (#130): `health-inventory::receiving` (`GoodsReceived`, `parse_gs1`, `Requisition`, `suggest`), and `Inventory::receive_goods`, `request`, `decide_requisition`, `fulfil_requisition` and `reorder`. Min and max default to 1 and 3 months of average monthly consumption.
 
 ## Offline and leases
 

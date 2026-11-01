@@ -25,6 +25,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 - **Caregiver grants** (migration `0014_caregiver_grant`): `health_consent::GrantStore`, one record per grant, indexed by patient and by caregiver.
 - **Transfers and Reconciliation Records** (migration `0015_stock_transfers`): `stock_transfer`, and `stock_reconciliation` indexed by whether it is resolved and when it was opened.
 - **Stock counts** (migration `0016_stock_counts`): `stock_count`, and `units_of_store` by the balance records' key prefix.
+- **Receiving** (migration `0017_receiving`): `stock_goods_received` and `stock_requisition`.
 - **`ownership`** is the ownership registry: one default Owner per head table, plus category partitions (resource-ownership.md § In code).
 - **`migrate(&Connection, MIGRATIONS)`** creates the `_migration` ledger, refuses modified, unknown or out-of-order migrations before changing anything, and then applies each pending migration in its own transaction with its ledger row.
 - **Closing:** SDK 3.3.5 has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.
