@@ -125,6 +125,7 @@ _Generated from the backlog spec when the backlog was created (2026-10-28). GitH
 | [#129](https://github.com/carapai/people-centered-healthcare/issues/129) | Implement transfers, counts and stock reconciliation | 13 | #127 |  |
 | [#247](https://github.com/carapai/people-centered-healthcare/issues/247) | Match inter-facility transfer dispatches with receipts at central | 13 | #129, sync |  |
 | [#130](https://github.com/carapai/people-centered-healthcare/issues/130) | Implement receiving, requisitions and reorder suggestions | 13 | #127 |  |
+| [#250](https://github.com/carapai/people-centered-healthcare/issues/250) | Build the ward requisition screens | 13 | #130 |  |
 | [#131](https://github.com/carapai/people-centered-healthcare/issues/131) | Implement stock valuation and optional financial postings | 13 | #127, #119 |  |
 | [#132](https://github.com/carapai/people-centered-healthcare/issues/132) | Build the Tauri desktop runtime | 16 | #62, #58, #39 |  |
 | [#133](https://github.com/carapai/people-centered-healthcare/issues/133) | Implement desktop pass-through and offline failover under an edge | 16 | #132, #81, #75 |  |

@@ -222,8 +222,10 @@ pub(crate) fn routes(
                     subject_layer,
                 )),
         );
-        let (fhir, reviews, portal) = fhir(fhir_store, settings, policy, subjects);
+        let (fhir, reviews, portal, stock) = fhir(fhir_store, settings, policy, subjects);
         router = router.nest("/fhir", fhir);
+        // Stock (#130): receiving, stock on hand, reorder and requisitions, for staff.
+        api = api.nest("/stock", stock);
         if let Some(reviews) = reviews {
             api = api.nest("/registry/reviews", reviews);
         }
@@ -350,7 +352,7 @@ fn fhir(
     settings: &AuthSettings,
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
-) -> (Router, Option<Router>, Option<Router>) {
+) -> (Router, Option<Router>, Option<Router>, Router) {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
@@ -402,7 +404,8 @@ fn fhir(
         registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
     // The portal, with the registry; its patients pass `patient_layer`, not the subject layer.
     let portal = registry_rules(settings).map(|_| fhir.portal_router());
-    (fhir.router().layer(layer), reviews, portal)
+    let stock = fhir.inventory_router().layer(layer.clone());
+    (fhir.router().layer(layer), reviews, portal, stock)
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -436,6 +439,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/registry/reviews", service.clone())
         .route_service("/api/registry/reviews/{*rest}", service.clone())
         .route_service("/api/portal/{*rest}", service.clone())
+        .route_service("/api/stock/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

@@ -225,3 +225,42 @@ pub fn supply_requests(requisition: &Requisition) -> Vec<Value> {
         })
         .collect()
 }
+
+/// One Stock Unit of a store, with its balance and the unit cost of its last costed receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnHand {
+    /// The Stock Unit.
+    pub unit: health_inventory::StockUnit,
+    /// Its balance.
+    pub balance: health_inventory::Balance,
+    /// The unit cost of its last costed movement.
+    pub unit_cost: Option<rust_decimal::Decimal>,
+}
+
+impl<S> Inventory<S>
+where
+    S: Store,
+    S::Tx: StockStore,
+{
+    /// The Stock Units of `store` with their balances and last unit costs.
+    pub async fn stock_on_hand(&self, store: &str) -> Result<Vec<OnHand>, InventoryError> {
+        let mut tx = self.store.begin().await?;
+        let mut list = Vec::new();
+        for unit in tx.units_of_store(store).await? {
+            let key = unit.key();
+            let balance = tx.stock_balance(&key).await?.unwrap_or_default();
+            let unit_cost = tx
+                .movements(&key)
+                .await?
+                .iter()
+                .rev()
+                .find_map(|m| m.unit_cost);
+            list.push(OnHand {
+                unit,
+                balance,
+                unit_cost,
+            });
+        }
+        Ok(list)
+    }
+}

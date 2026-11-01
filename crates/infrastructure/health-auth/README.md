@@ -47,7 +47,7 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - **Codes:** a code is taken with a single `DELETE … RETURN`, so two concurrent redemptions cannot both get it; the loser's commit conflicts.
   - **Refresh tokens:** rotation is a compare-and-set on the current hash, and the old hash is kept as retired, so a replay is recognised.
   - **Phone accounts and codes** (migration `0012_phone_sign_in`): a unique index on the phone, and a try counted only `WHERE attempts = $before`; of two concurrent tries, one commit conflicts and is refused.
-  - **Other state:** lockout counters, snapshots and the clock floor survive restarts.
+  - **Other state:** lockout counters, snapshots and the clock floor survive restarts. The floor is written only when a snapshot advances it. Of two concurrent raises, the one that loses the write conflict refuses nothing (the floor only moves forward). Before this fix, overlapping requests could get a spurious 401.
   - **Provisioning:** `put_account` and `put_snapshot`.
   - **Purging:** `purge(now)` deletes expired codes and jtis, and sessions past their 12-hour cap, as a background job.
   - Only hashes of codes and refresh tokens are stored.

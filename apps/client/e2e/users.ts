@@ -9,4 +9,5 @@ export const OTP_OUTBOX = join(tmpdir(), 'health-e2e-otp-outbox')
 export const USERS = {
   clerk: { username: 'e2e-clerk', password: 'tumbling otter quarry seven', roles: 'clerk' },
   reviewer: { username: 'e2e-reviewer', password: 'patient heron basket ninety', roles: 'reviewer' },
+  storekeeper: { username: 'e2e-storekeeper', password: 'copper lantern meadow forty', roles: 'storekeeper' },
 } as const
