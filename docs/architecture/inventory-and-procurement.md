@@ -165,6 +165,11 @@ stateDiagram-v2
   - donor-funded stock is valued at the donor-declared price;
   - consignment stock is not owned, so it carries no value.
 - **Financial postings.** Facilities with "inventory accounting" enabled, typically private ones, also post inventory-asset and cost-of-goods entries to the financial ledger (ADR 0030). It is off by default for public facilities.
+- **Code** (#131): `health-inventory::valuation` (`value`, by `Method`) and `Inventory::valuation`. `inventory_postings` posts each costed movement, and `ChartTemplate::inventory` adds the accounts.
+- **Decided on #131:**
+  - An increase recorded without a cost (a transfer-in, a return, a positive count) is valued at the unit's current cost.
+  - Stock issued below zero leaves no value.
+  - Transfers within a facility post nothing.
 
 ## Receiving, requisitions and reorder
 

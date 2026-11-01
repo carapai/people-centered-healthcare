@@ -66,6 +66,9 @@ pub struct ChartTemplate {
     pub service_classes: Vec<String>,
     /// Tills, each with a cash account.
     pub tills: Vec<String>,
+    /// Inventory accounting (typically private facilities; off by default for public ones):
+    /// the inventory asset, cost of goods issued, stock adjustments and supplier payables.
+    pub inventory: bool,
 }
 
 /// The rounding account, where split and conversion residue goes.
@@ -76,6 +79,14 @@ pub const DEPOSITS: &str = "deposits/patient";
 pub const IN_TRANSIT: &str = "clearing/in-transit";
 /// Till variance.
 pub const TILL_VARIANCE: &str = "variance/till";
+/// Inventory on hand (an asset), with inventory accounting.
+pub const INVENTORY: &str = "asset/inventory";
+/// The cost of goods issued and dispensed.
+pub const COST_OF_GOODS: &str = "expense/cost-of-goods";
+/// Stock written off or found (expiry, adjustments, count variances).
+pub const STOCK_ADJUSTMENT: &str = "expense/stock-adjustment";
+/// What is owed to suppliers for goods received.
+pub const PAYABLE: &str = "payable/suppliers";
 
 impl ChartOfAccounts {
     /// An empty chart.
@@ -125,6 +136,20 @@ impl ChartOfAccounts {
                 kind,
                 name: name.to_owned(),
             })?;
+        }
+        if template.inventory {
+            for (code, kind, name) in [
+                (INVENTORY, AccountKind::Asset, "Inventory"),
+                (COST_OF_GOODS, AccountKind::Expense, "Cost of goods issued"),
+                (STOCK_ADJUSTMENT, AccountKind::Expense, "Stock adjustments"),
+                (PAYABLE, AccountKind::Liability, "Supplier payables"),
+            ] {
+                chart.add(Account {
+                    code: code.to_owned(),
+                    kind,
+                    name: name.to_owned(),
+                })?;
+            }
         }
         Ok(chart)
     }

@@ -17,6 +17,7 @@ pub mod counts;
 pub mod receiving;
 pub mod reconciliation;
 pub mod transfers;
+pub mod valuation;
 
 use std::future::Future;
 

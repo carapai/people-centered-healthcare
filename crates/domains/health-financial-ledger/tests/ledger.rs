@@ -4,8 +4,9 @@
 use std::str::FromStr;
 
 use health_financial_ledger::{
-    ChartOfAccounts, ChartTemplate, Currency, Dimensions, Ledger, Line, Money, MoneyError,
-    Original, Posting, PostingRefused, ROUNDING, Side,
+    COST_OF_GOODS, ChartOfAccounts, ChartTemplate, Currency, Dimensions, INVENTORY, Ledger, Line,
+    Money, MoneyError, Original, PAYABLE, Posting, PostingRefused, ROUNDING, STOCK_ADJUSTMENT,
+    Side,
 };
 use health_time::Timestamp;
 use rust_decimal::Decimal;
@@ -35,6 +36,7 @@ fn ledger() -> Ledger {
         funding_sources: vec!["patient".into(), "nhis".into(), "government".into()],
         service_classes: vec!["consultation".into(), "laboratory".into()],
         tills: vec!["till-1".into()],
+        inventory: false,
     })
     .expect("chart");
     Ledger::new("KAM013", ugx(), chart)
@@ -167,8 +169,13 @@ fn the_template_gives_the_chart_of_accounts() {
         funding_sources: vec!["patient".into()],
         service_classes: vec!["pharmacy".into()],
         tills: vec!["main".into()],
+        inventory: false,
     })
     .expect("chart");
+    assert!(
+        chart.account(INVENTORY).is_none(),
+        "inventory accounting is off by default"
+    );
     for code in [
         "receivable/patient",
         "waiver/patient",
@@ -188,6 +195,14 @@ fn the_template_gives_the_chart_of_accounts() {
         })
         .is_err()
     );
+    let with_inventory = ChartOfAccounts::from_template(&ChartTemplate {
+        inventory: true,
+        ..ChartTemplate::default()
+    })
+    .expect("chart");
+    for code in [INVENTORY, COST_OF_GOODS, STOCK_ADJUSTMENT, PAYABLE] {
+        assert!(with_inventory.account(code).is_some(), "{code}");
+    }
 }
 
 #[test]

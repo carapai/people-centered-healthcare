@@ -2242,6 +2242,7 @@ dependencies = [
 name = "health-inventory-app"
 version = "0.1.0"
 dependencies = [
+ "health-financial-ledger",
  "health-inventory",
  "health-persistence",
  "health-surrealdb",

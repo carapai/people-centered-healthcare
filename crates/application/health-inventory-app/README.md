@@ -14,6 +14,13 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - **Requisitions:** `request`, `decide_requisition`, and `fulfil_requisition`, which dispatches the picked batches as a transfer from the pharmacy to the ward and marks the requisition fulfilled in the same transaction. `supply_requests` is a requisition as FHIR SupplyRequests.
 - **Stock on hand:** `stock_on_hand(store)` gives each Stock Unit with its balance and the unit cost of its last costed movement.
 - **Reorder:** `reorder(store, policy, days, now)` gives per-product suggestions from usable stock and the issues and dispensing over the last `days` days.
+- **Valuation** (#131): `valuation(store, method)` rebuilds the value of each Stock Unit of a store from its movements, and the total.
+- **Inventory accounting:** `inventory_postings` gives one balanced posting per costed movement for `health-financial-ledger`, with the unit's funding source as a dimension.
+  - **Receipts:** inventory against supplier payables.
+  - **Issues and dispensing:** cost of goods against inventory; a return reverses it.
+  - **Write-offs, adjustments, count variances and reversals:** against stock adjustments.
+  - **No posting:** transfers within the facility and status changes.
+  - **Off by default:** a facility enables it through `ChartTemplate::inventory`, which adds the accounts. The financial ledger has no storage yet, so the postings are produced, not persisted.
 - **`balance(key)`** and **`nightly_check()`:** the check rebuilds each balance from its movements and reports any drift.
 
 ## Tests
@@ -39,7 +46,12 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - a ward requisition is approved, then fulfilled by a transfer;
 - reorder suggestions follow the last month's consumption.
 
+`tests/valuation.rs`, over SurrealDB:
+- weighted average and FIFO totals rebuilt from the ledger;
+- the postings balance, the inventory account equals the valuation, and consignment stock posts nothing.
+
 **Not here yet:**
+- persisting the postings, with the financial ledger's storage (billing);
 - the ward requisition screens (#250);
 - upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
