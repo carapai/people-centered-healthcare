@@ -1,0 +1,36 @@
+# The Facility Edge Node under systemd (facility-edge.md § OS service). Installed by the edge
+# installer, which also writes /etc/health/facility-edge.env.
+[Unit]
+Description=Health Facility Edge Node
+Wants=network-online.target
+After=network-online.target
+# The first start and three restarts within 24 h, then stay stopped and alert (the Windows
+# SCM policy too).
+StartLimitIntervalSec=86400
+StartLimitBurst=4
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=/opt/health/bin/facility-edge --service
+EnvironmentFile=/etc/health/facility-edge.env
+User=health
+Group=health
+StateDirectory=health
+# HEALTH_DATA_DIR is under /var/lib/health, the only writable path.
+# The edge keeps systemd informed: READY after migrations, WATCHDOG while alive, and
+# EXTEND_TIMEOUT_USEC while a migration or drain runs.
+TimeoutStartSec=120
+TimeoutStopSec=120
+WatchdogSec=30
+Restart=on-failure
+RestartSec=5
+# A configuration error (exit 2) needs a person, so it is not restarted.
+RestartPreventExitStatus=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
