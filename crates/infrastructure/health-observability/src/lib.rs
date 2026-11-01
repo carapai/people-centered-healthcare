@@ -77,8 +77,17 @@ pub fn otlp_provider(
         .build())
 }
 
-/// Installs the global subscriber described by `config`.
+/// Installs the global subscriber described by `config`, logging to standard output.
 pub fn init(config: &TelemetryConfig) -> Result<Telemetry, TelemetryError> {
+    init_with(config, Arc::new(Stdout))
+}
+
+/// Installs the global subscriber described by `config`, writing log lines to `logs`: an edge's
+/// bounded buffer, shipped when online (facility-edge.md § Health monitoring).
+pub fn init_with(
+    config: &TelemetryConfig,
+    logs: Arc<dyn LogSink>,
+) -> Result<Telemetry, TelemetryError> {
     let filter =
         EnvFilter::try_new(&config.filter).map_err(|e| TelemetryError::Filter(e.to_string()))?;
     let provider = config
@@ -89,7 +98,7 @@ pub fn init(config: &TelemetryConfig) -> Result<Telemetry, TelemetryError> {
     let tracer = provider.as_ref().map(|p| p.tracer(config.service));
     let subscriber = tracing_subscriber::registry()
         .with(filter)
-        .with(ExportLayer::new(tracer, Arc::new(Stdout)));
+        .with(ExportLayer::new(tracer, logs));
     tracing::subscriber::set_global_default(subscriber)
         .map_err(|_| TelemetryError::AlreadyInstalled)?;
     Ok(Telemetry { provider })

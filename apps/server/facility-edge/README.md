@@ -30,6 +30,10 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_BACKUP_INTERVAL_SECS` | `3600` | |
 | `HEALTH_BACKUP_TEST_SECS` | `604800` | How often the newest backup is test-restored |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | none | Without it only logs are written |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | none | The in-country collector's OTLP/HTTP logs endpoint. Without it, log lines stay in the local buffer |
+| `HEALTH_TELEMETRY_DIR` | `telemetry` beside `HEALTH_DATA_DIR` | The bounded buffer (64 MiB) of log lines waiting to be shipped |
+| `HEALTH_TELEMETRY_SHIP_SECS` | `30` | How often the buffer is shipped |
+| `HEALTH_INDICATORS_SECS` | `60` | How often the indicators are logged and alerts raised |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -82,7 +86,15 @@ The running node takes a backup every hour and test-restores the newest one ever
 - `facility-edge backup restore <backup>`: with the service stopped and the old data directory moved aside, restores `backup` into a new store at `HEALTH_DATA_DIR`. It refuses a directory that holds anything.
 - `facility-edge backup status`: prints `status.json` and the backups kept.
 
-A backup on demand while the node runs comes with the admin page (#77).
+A backup on demand while the node runs is not available yet: the admin page (#77) shows the backup status only.
+
+## Health monitoring
+
+The node measures its indicators and raises alerts against the thresholds in facility-edge.md § Health monitoring (`health_edge_runtime::admin`).
+
+- **Status page:** `/edge/status` in the embedded app, from `GET /api/admin/status`. Until edge sign-in arrives (#75), the node serves the report to a browser on the node itself only (403 elsewhere).
+- **Telemetry:** every log line goes to standard output and to the buffer under `HEALTH_TELEMETRY_DIR`, including an `indicators` line every `HEALTH_INDICATORS_SECS` and each alert as it is raised and cleared. The buffer is shipped to `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` when the collector answers, so indicators recorded offline reach central once the link is back. When the buffer is full, the oldest lines are dropped first.
+- Everything shipped passes the telemetry allowlist (`health-observability`), so it carries no personal health data.
 
 ## Tests
 
@@ -103,3 +115,8 @@ A backup on demand while the node runs comes with the admin page (#77).
 - `backup now` is refused while the node runs, and works once it stops;
 - `backup verify`, `backup copy` to a USB directory, and `backup restore` into a fresh store that then starts and reports ready;
 - a corrupt backup fails `backup test`, which records the failure for the alert, and `backup verify`.
+
+`tests/health.rs` runs the built binary against a stand-in collector:
+- `/api/admin/status` returns the report with the `backups-off` alert;
+- while the collector refuses, the report says shipping is failing and the lines stay in the buffer;
+- once it accepts, the buffered alert and an `indicators` line reach it.

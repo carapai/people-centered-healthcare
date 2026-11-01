@@ -164,3 +164,34 @@ fn sensitive_values_never_reach_exported_spans_or_logs() {
         logs[3]
     );
 }
+
+/// The edge's alerts and indicators (facility-edge.md § Health monitoring) are exported, and a
+/// sensitive value under their names is not.
+#[test]
+fn edge_alerts_and_indicators_are_exported_but_not_free_text() {
+    let lines = Arc::new(Lines::default());
+    let subscriber = tracing_subscriber::registry().with(ExportLayer::new(None, lines.clone()));
+    tracing::subscriber::with_default(subscriber, || {
+        tracing::warn!(alert = "disk-full", data_free_bytes = 1024_u64, "disk");
+        tracing::info!(state = "on-battery", backup_age_seconds = 60_u64, "ups");
+        tracing::error!(alert = NAME, state = %NOTE, "free text");
+    });
+    let logs = lines.0.lock().expect("lines").clone();
+    assert!(
+        logs[0].contains(r#""alert":"disk-full""#) && logs[0].contains(r#""data_free_bytes":1024"#)
+    );
+    assert!(
+        logs[1].contains(r#""state":"on-battery""#)
+            && logs[1].contains(r#""backup_age_seconds":60"#)
+    );
+    assert!(
+        !logs[2].contains("Akello") && !logs[2].contains("chest"),
+        "{}",
+        logs[2]
+    );
+    assert!(
+        logs[2].contains(r#""telemetry.redacted_fields":2"#),
+        "{}",
+        logs[2]
+    );
+}

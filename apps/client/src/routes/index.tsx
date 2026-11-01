@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { messages } from '../i18n/messages'
+import { edgeStatusMessages, messages } from '../i18n/messages'
 import { usePlatform } from '../platform'
 
 export const Route = createFileRoute('/')({
@@ -35,6 +35,8 @@ function Home() {
   return (
     <section className={css({ display: 'flex', flexDirection: 'column', gap: '4' })}>
       <h1 className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>{intl.formatMessage(messages.appName)}</h1>
+      {/* The edge's own status needs no sign-in yet: the edge serves it to the node itself only. */}
+      {platform.capabilities.edgeStatus ? <Link to="/edge/status">{intl.formatMessage(edgeStatusMessages.esTitle)}</Link> : null}
       {platform.signIn === undefined ? null : signedIn ? (
         <>
           <p role="status">{intl.formatMessage(messages.signedIn)}</p>

@@ -14,8 +14,11 @@
 //! 5. A stop (a signal, a UPS low-battery signal, or a task that keeps failing): `/ready`
 //!    reports `not-ready`, in-flight requests drain, and the store closes.
 //!
-//! Once ready, the node also takes its scheduled backups ([`backup`]).
+//! Once ready, the node also takes its scheduled backups ([`backup`]) and logs its health
+//! indicators, which `/api/admin/status` serves to the admin page and the telemetry buffer ships to
+//! central ([`admin`]).
 
+pub mod admin;
 pub mod backup;
 mod config;
 mod node;
@@ -30,5 +33,5 @@ pub use node::{EdgeError, Stop, run, shutdown_signal};
 #[cfg(windows)]
 pub use notify::WindowsScm;
 pub use notify::{Foreground, ServiceManager, Systemd};
-pub use supervisor::{RestartPolicy, Supervisor};
-pub use ups::{Ups, UpsError};
+pub use supervisor::{RestartPolicy, Restarts, Supervisor};
+pub use ups::{Power, PowerState, Ups, UpsError};

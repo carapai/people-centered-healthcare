@@ -67,6 +67,7 @@ export function tauriPlatform(): Platform {
       printing: true,
       deviceIntegration: true,
       syncStatus: true,
+      edgeStatus: false,
     },
   }
 }

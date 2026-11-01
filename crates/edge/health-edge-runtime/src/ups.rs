@@ -3,7 +3,7 @@
 
 use std::fmt;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -33,6 +33,35 @@ pub enum UpsError {
     #[error("the NUT server refused the status request")]
     Refused,
 }
+
+/// What the last poll found, for the status page and its alerts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Power {
+    /// On line power.
+    Online,
+    /// On battery.
+    OnBattery,
+    /// Low battery: the node is stopping.
+    LowBattery,
+    /// The NUT server did not answer.
+    Unreachable,
+}
+
+impl Power {
+    /// The name the status page and telemetry use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Online => "online",
+            Self::OnBattery => "on-battery",
+            Self::LowBattery => "low-battery",
+            Self::Unreachable => "unreachable",
+        }
+    }
+}
+
+/// The last poll's [`Power`], shared with the status page; `None` before the first poll.
+pub type PowerState = Arc<Mutex<Option<Power>>>;
 
 impl FromStr for Ups {
     type Err = ();
@@ -98,18 +127,26 @@ impl Ups {
 
     /// Polls every `interval` until the UPS reports low battery, then wakes `low_battery`.
     /// An unreachable NUT server is warned about and polled again: a UPS daemon that is down
-    /// never stops the node.
-    pub async fn watch(self, interval: Duration, low_battery: Arc<Notify>) -> Result<(), String> {
+    /// never stops the node. Each poll's result is left in `power`.
+    pub async fn watch(
+        self,
+        interval: Duration,
+        low_battery: Arc<Notify>,
+        power: PowerState,
+    ) -> Result<(), String> {
         let mut on_battery = false;
+        let seen = |p: Power| *power.lock().unwrap_or_else(|e| e.into_inner()) = Some(p);
         loop {
             match self.status().await {
                 Ok(flags) if flags.iter().any(|f| f == "LB") => {
+                    seen(Power::LowBattery);
                     tracing::warn!(outcome = "low-battery", "UPS battery low; stopping");
                     low_battery.notify_one();
                     return Ok(());
                 }
                 Ok(flags) => {
                     let now = flags.iter().any(|f| f == "OB");
+                    seen(if now { Power::OnBattery } else { Power::Online });
                     if now != on_battery {
                         if now {
                             tracing::warn!(outcome = "on-battery", "UPS on battery");
@@ -119,7 +156,10 @@ impl Ups {
                     }
                     on_battery = now;
                 }
-                Err(error) => tracing::warn!(error.kind = %error, "UPS status unavailable"),
+                Err(error) => {
+                    seen(Power::Unreachable);
+                    tracing::warn!(error.kind = %error, "UPS status unavailable");
+                }
             }
             tokio::time::sleep(interval).await;
         }
@@ -177,13 +217,19 @@ mod tests {
         ])
         .await;
         let low = Arc::new(Notify::new());
+        let power = PowerState::default();
         let watched = tokio::time::timeout(
             Duration::from_secs(5),
-            ups.watch(Duration::from_millis(10), Arc::clone(&low)),
+            ups.watch(
+                Duration::from_millis(10),
+                Arc::clone(&low),
+                Arc::clone(&power),
+            ),
         )
         .await
         .expect("watch ends");
         assert_eq!(watched, Ok(()));
+        assert_eq!(*power.lock().expect("power"), Some(Power::LowBattery));
         tokio::time::timeout(Duration::from_millis(100), low.notified())
             .await
             .expect("woken");

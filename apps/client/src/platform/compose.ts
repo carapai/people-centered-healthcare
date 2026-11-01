@@ -120,6 +120,7 @@ export function httpPlatform(
       printing: true,
       deviceIntegration: false,
       syncStatus: mode === 'edge',
+      edgeStatus: mode === 'edge',
     },
   }
 }

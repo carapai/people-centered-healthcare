@@ -2,7 +2,9 @@
 //! exponential backoff; one that keeps failing stops the node, so the service manager restarts
 //! the whole process cleanly.
 
+use std::collections::BTreeMap;
 use std::future::Future;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -40,6 +42,34 @@ pub struct Supervisor {
     tasks: JoinSet<()>,
     failed: mpsc::Sender<&'static str>,
     failures: mpsc::Receiver<&'static str>,
+    restarts: Restarts,
+}
+
+/// Each supervised task's recent failures, for the status page and its alert.
+#[derive(Debug, Clone, Default)]
+pub struct Restarts {
+    window: Duration,
+    failures: Arc<Mutex<BTreeMap<&'static str, Vec<Instant>>>>,
+}
+
+impl Restarts {
+    /// Each task that has failed, with its failures within the policy's window.
+    pub fn recent(&self) -> Vec<(&'static str, usize)> {
+        let now = Instant::now();
+        let failures = self.failures.lock().unwrap_or_else(|e| e.into_inner());
+        failures
+            .iter()
+            .map(|(name, at)| {
+                let recent = at.iter().filter(|t| now.duration_since(**t) < self.window);
+                (*name, recent.count())
+            })
+            .collect()
+    }
+
+    fn record(&self, name: &'static str, recent: &[Instant]) {
+        let mut failures = self.failures.lock().unwrap_or_else(|e| e.into_inner());
+        failures.insert(name, recent.to_vec());
+    }
 }
 
 impl Supervisor {
@@ -51,7 +81,16 @@ impl Supervisor {
             tasks: JoinSet::new(),
             failed,
             failures,
+            restarts: Restarts {
+                window: policy.window,
+                failures: Arc::default(),
+            },
         }
+    }
+
+    /// The tasks' recent failures, readable while the tasks run.
+    pub fn restarts(&self) -> Restarts {
+        self.restarts.clone()
     }
 
     /// Runs the task `make` builds, rebuilding and restarting it whenever it fails or panics.
@@ -63,6 +102,7 @@ impl Supervisor {
     {
         let policy = self.policy;
         let failed = self.failed.clone();
+        let restarts = self.restarts.clone();
         self.tasks.spawn(async move {
             let mut delay = policy.initial;
             let mut recent: Vec<Instant> = Vec::new();
@@ -75,6 +115,7 @@ impl Supervisor {
                 let now = Instant::now();
                 recent.retain(|at| now.duration_since(*at) < policy.window);
                 recent.push(now);
+                restarts.record(name, &recent);
                 tracing::warn!(
                     task = name,
                     failures = recent.len(),
@@ -135,6 +176,7 @@ mod tests {
         let stopped = tokio::time::timeout(Duration::from_millis(300), supervisor.failed()).await;
         assert!(stopped.is_err(), "a recovering task never stops the node");
         assert_eq!(runs.load(Ordering::SeqCst), 3);
+        assert_eq!(supervisor.restarts().recent(), vec![("flaky", 2)]);
     }
 
     #[tokio::test]

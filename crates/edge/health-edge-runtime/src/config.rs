@@ -47,6 +47,17 @@ pub struct EdgeConfig {
     /// `HEALTH_BACKUP_TEST_SECS`: how often the newest backup is test-restored, default 604800
     /// (weekly).
     pub backup_test_interval: Duration,
+    /// `HEALTH_TELEMETRY_DIR`: the bounded buffer of log lines awaiting shipping. Default:
+    /// `telemetry` beside the data directory.
+    pub telemetry_dir: PathBuf,
+    /// `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`: the in-country collector's OTLP/HTTP logs endpoint,
+    /// e.g. `http://otel-collector:4318/v1/logs`. Optional: without it, lines stay buffered.
+    pub logs_endpoint: Option<String>,
+    /// `HEALTH_TELEMETRY_SHIP_SECS`: how often the buffer is shipped, default 30.
+    pub ship_interval: Duration,
+    /// `HEALTH_INDICATORS_SECS`: how often the indicators are logged and alerts raised,
+    /// default 60.
+    pub indicators_interval: Duration,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -82,6 +93,9 @@ impl EdgeConfig {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| data_dir.with_file_name("updates")),
             update_key_file: get("HEALTH_UPDATE_KEY_FILE").map(PathBuf::from),
+            telemetry_dir: get("HEALTH_TELEMETRY_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| data_dir.with_file_name("telemetry")),
             data_dir,
             bind: get("HEALTH_BIND")
                 .unwrap_or_else(|| "0.0.0.0:8080".into())
@@ -104,6 +118,9 @@ impl EdgeConfig {
             backup_dir: get("HEALTH_BACKUP_DIR").map(PathBuf::from),
             backup_interval: positive("HEALTH_BACKUP_INTERVAL_SECS", 3600)?,
             backup_test_interval: positive("HEALTH_BACKUP_TEST_SECS", 604_800)?,
+            logs_endpoint: get("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"),
+            ship_interval: positive("HEALTH_TELEMETRY_SHIP_SECS", 30)?,
+            indicators_interval: positive("HEALTH_INDICATORS_SECS", 60)?,
         })
     }
 }
@@ -132,6 +149,12 @@ mod tests {
         assert_eq!((c.backup_dir, c.backup_key_file), (None, None));
         assert_eq!(c.backup_interval, Duration::from_secs(3600));
         assert_eq!(c.backup_test_interval, Duration::from_secs(604_800));
+        assert_eq!(c.telemetry_dir, PathBuf::from("/var/lib/telemetry"));
+        assert_eq!(c.logs_endpoint, None);
+        assert_eq!(
+            (c.ship_interval, c.indicators_interval),
+            (Duration::from_secs(30), Duration::from_secs(60))
+        );
     }
 
     #[test]

@@ -15,6 +15,7 @@ import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
+import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
@@ -53,6 +54,11 @@ const BreakGlassAlertsRoute = BreakGlassAlertsRouteImport.update({
 const BreakGlassReviewsRoute = BreakGlassReviewsRouteImport.update({
   id: '/break-glass/reviews',
   path: '/break-glass/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EdgeStatusRoute = EdgeStatusRouteImport.update({
+  id: '/edge/status',
+  path: '/edge/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientsIdRoute = PatientsIdRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
+  '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
+    | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
     | '/registry/reviews'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
+  EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/break-glass/reviews'
       fullPath: '/break-glass/reviews'
       preLoaderRoute: typeof BreakGlassReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/edge/status': {
+      id: '/edge/status'
+      path: '/edge/status'
+      fullPath: '/edge/status'
+      preLoaderRoute: typeof EdgeStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patients/$id': {
@@ -342,6 +362,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
+  EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
