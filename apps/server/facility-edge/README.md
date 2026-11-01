@@ -27,6 +27,10 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
+## Web app
+
+The binary embeds the client and serves it, with its `runtime.json` and app-shell service worker, from its own origin (#76). Build the client first: `bun run build` in `apps/client`, then `cargo build -p facility-edge`. A binary built without `apps/client/dist` serves only its API. `bun run test:e2e:edge` in `apps/client` runs the browser suite against the built binary.
+
 ## Exit codes
 
 | Code | Meaning | systemd |

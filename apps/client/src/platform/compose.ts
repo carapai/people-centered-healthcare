@@ -5,6 +5,7 @@ import { registriesCommands } from './registries'
 import { httpTransport } from './http'
 import { operationClient } from './operations'
 import { memorySession } from './session'
+import { checkVersion, registerShellWorker } from './shell'
 import { type SignInConfig, signIn } from './sign-in'
 import type { Platform, RuntimeMode } from './types'
 
@@ -19,6 +20,8 @@ interface RuntimeConfig {
   ninSystem?: string
   /** The patient portal's client (#111), signing in at `auth.issuer`. */
   portal?: { clientId: string; redirectPath: string }
+  /** The build the node serves (an edge's embedded bundle), for the version check. */
+  build?: string
 }
 
 function isSignInConfig(value: unknown): value is SignInConfig {
@@ -29,7 +32,7 @@ function isSignInConfig(value: unknown): value is SignInConfig {
 
 function isRuntimeConfig(value: unknown): value is RuntimeConfig {
   if (typeof value !== 'object' || value === null) return false
-  const { mode, apiBase, auth, fhirBase, ninSystem, portal } = value as Record<string, unknown>
+  const { mode, apiBase, auth, fhirBase, ninSystem, portal, build } = value as Record<string, unknown>
   const portalOk =
     portal === undefined ||
     (typeof portal === 'object' &&
@@ -42,7 +45,8 @@ function isRuntimeConfig(value: unknown): value is RuntimeConfig {
     typeof apiBase === 'string' &&
     (auth === undefined || isSignInConfig(auth)) &&
     (fhirBase === undefined || typeof fhirBase === 'string') &&
-    (ninSystem === undefined || typeof ninSystem === 'string')
+    (ninSystem === undefined || typeof ninSystem === 'string') &&
+    (build === undefined || typeof build === 'string')
   )
 }
 
@@ -61,6 +65,9 @@ export async function composePlatform(): Promise<Platform> {
   if (!isRuntimeConfig(config)) {
     throw new Error('runtime.json must contain a mode (central or edge) and an apiBase')
   }
+  // A shell cached from before an edge update reloads; the page never composes meanwhile.
+  if (!checkVersion(config.build, import.meta.env.VITE_HEALTH_BUILD)) return new Promise(() => {})
+  if (config.mode === 'edge') registerShellWorker()
   return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem, config.portal)
 }
 

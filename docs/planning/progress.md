@@ -7,7 +7,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
-| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 1 | 7 |
+| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 2 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 67 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 68 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -207,3 +207,7 @@ Total: 67 of 134 implementation tasks done. Validation spikes open: 3.
   - **Runtime:** `WindowsScm` reports `StartPending` and `StopPending` with wait hints and checkpoints, then `Running`, then `Stopped` with the exit code as a service-specific error. `facility-edge --service` on Windows runs under the SCM dispatcher.
   - **Packaging:** `install-service.ps1` registers the service, its environment and the failure actions.
   - **CI:** `edge-build.yml` runs the release binary as a real Windows service and under systemd with both units, with the edge crates' clippy and tests on Windows.
+- 2026-11-01: #72 merged (#261). #76, the web app served from the edge.
+  - **Edge:** `health-edge-runtime`'s build script embeds `apps/client/dist`, without source maps. The edge serves the page for client routes, the hashed assets (immutable), `runtime.json` (edge mode and the embedded build) and `sw.js`. Unknown API paths are 404s.
+  - **Client:** a build ID in the bundle and `build.json`. A shell of another build than its edge's reloads once. In edge mode the client registers the service worker, which caches only the shell's fixed paths when it installs, and goes to the edge first for pages and `runtime.json`.
+  - **Tests:** Rust unit tests of the routes, Vitest for the version check, and a Playwright edge suite (nightly in `e2e.yml`). The app loads with every non-edge host refused, and loads from the cached shell after the edge stops, with no API response cached. `edge-build.yml`'s Ubuntu job embeds the app and checks it is served.

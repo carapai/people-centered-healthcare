@@ -191,6 +191,13 @@ flowchart TD
 
   LAN clients therefore always run their own edge's version.
 - **Version check.** On load, the client checks its version against the API's supported range. On a mismatch it reloads (browser) or prompts the user to update (Tauri).
+  - In code (#76): each build has an ID, `HEALTH_BUILD_ID` or the commit. The bundle carries it, and `dist/build.json` holds it for the edge.
+  - An edge serves exactly the build it embeds, so its `runtime.json` names that one build (`build`). A browser shell of another build reloads once (`src/platform/shell.ts`). If the mismatch survives the reload, it is an error rather than a reload loop.
+  - Central names no build yet, so it skips the check.
+- **The edge's shell** (#76; lan-security.md § App delivery to browsers):
+  - In edge mode, the client registers the edge's `/sw.js`.
+  - The worker caches a fixed list when it installs: the page, `runtime.json` and the bundle's files. It adds nothing afterwards.
+  - Navigations and `runtime.json` go to the edge first, with the cached copy used only while the edge cannot be reached. Every other request goes to the network untouched, so no API response is cached (ADR 0037).
 
 ## Design system
 

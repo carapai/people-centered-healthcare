@@ -1,6 +1,6 @@
 [package]
 name = "health-edge-runtime"
-description = "The Facility Edge Node's runtime: the embedded store, the startup and stop sequence, service-manager notifications, supervised tasks and the UPS watch (facility-edge.md, ADR 0007)."
+description = "The Facility Edge Node's runtime: the embedded store, the startup and stop sequence, the embedded web app, service-manager notifications, supervised tasks and the UPS watch (facility-edge.md, ADR 0007)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -31,3 +31,4 @@ windows-service = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tower = { workspace = true }
