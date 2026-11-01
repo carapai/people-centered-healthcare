@@ -124,6 +124,7 @@ tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "registry", "env-filter"] }
 unicode-normalization = "0.1.26"
+windows-service = "0.8.0"
 uuid = { version = "1.29.0", features = ["serde", "v5", "v7"] }
 utoipa = { version = "6.0.0", default-features = false, features = ["macros"] }
 utoipa-axum = "0.3.0"

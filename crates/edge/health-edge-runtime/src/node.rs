@@ -269,8 +269,16 @@ pub fn shutdown_signal() -> impl Future<Output = ()> + Send + 'static {
             }
         }
     }
-    #[cfg(not(unix))]
-    async {
-        let _ = tokio::signal::ctrl_c().await;
+    #[cfg(windows)]
+    {
+        let mut interrupt = tokio::signal::windows::ctrl_c().ok();
+        async move {
+            match interrupt.as_mut() {
+                Some(interrupt) => {
+                    interrupt.recv().await;
+                }
+                None => std::future::pending::<()>().await,
+            }
+        }
     }
 }

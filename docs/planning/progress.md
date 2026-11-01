@@ -7,7 +7,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
-| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 0 | 7 |
+| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 1 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 66 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 67 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -203,3 +203,7 @@ Total: 66 of 134 implementation tasks done. Validation spikes open: 3.
   - **Sequence:** stage, then apply with the service stopped. The new binary's first start copies the store, and ready commits the update.
   - **Rollback:** after a failed migration, or three starts that never reach ready, the store is restored first, then the binary. Under systemd a root `OnFailure=` unit restores the binary, since the sandboxed service cannot.
   - **Tests:** the installed binary updated, rolled back after a failed migration, and rolled back by the previous binary after a crashing release.
+- 2026-11-01: #72 part 2a merged (#260). Part 2b, the Windows service, completes #72.
+  - **Runtime:** `WindowsScm` reports `StartPending` and `StopPending` with wait hints and checkpoints, then `Running`, then `Stopped` with the exit code as a service-specific error. `facility-edge --service` on Windows runs under the SCM dispatcher.
+  - **Packaging:** `install-service.ps1` registers the service, its environment and the failure actions.
+  - **CI:** `edge-build.yml` runs the release binary as a real Windows service and under systemd with both units, with the edge crates' clippy and tests on Windows.

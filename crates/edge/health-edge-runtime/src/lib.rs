@@ -22,6 +22,8 @@ mod ups;
 
 pub use config::{ConfigError, EdgeConfig};
 pub use node::{EdgeError, Stop, run, shutdown_signal};
+#[cfg(windows)]
+pub use notify::WindowsScm;
 pub use notify::{Foreground, ServiceManager, Systemd};
 pub use supervisor::{RestartPolicy, Supervisor};
 pub use ups::{Ups, UpsError};

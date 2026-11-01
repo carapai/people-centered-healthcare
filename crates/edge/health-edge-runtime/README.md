@@ -21,6 +21,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 - **`config`:** `EdgeConfig::from_lookup` reads the service environment. Errors name the variable, never its value.
 - **`notify`:** the `ServiceManager` port.
   - `Foreground` is the no-op for development.
+  - `WindowsScm` reports to the Service Control Manager: `StartPending` and `StopPending` with wait hints and an advancing checkpoint, `Running`, then `Stopped` with the exit code as a service-specific error.
   - `Systemd` speaks sd_notify(3) on `$NOTIFY_SOCKET`, including Linux abstract sockets. It sends `WATCHDOG=1` at half of `WATCHDOG_USEC`, when `WATCHDOG_PID` is unset or names this process.
 - **`supervisor`:** a failed or panicking task restarts with exponential backoff, from 1 s to 60 s. Five failures within 10 minutes stop the node (`EdgeError::Task`). A task that returns `Ok` is finished.
 - **`update`:** signed packages, the update journal, and rollback. A pending update copies the store before its first open; a failed migration or three starts that never reach ready roll it back, store first. See the binary's README for the commands.
@@ -28,6 +29,6 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 
 ## Not yet
 
-- **Windows service:** the last part of [#72](https://github.com/carapai/people-centered-healthcare/issues/72), with the `edge-build.yml` workflow on Windows.
+- **Event Log output on Windows:** logs go to the console and telemetry; the Event Log sink comes with the MSI.
 - **Final backup on a UPS stop:** with the backup scheduler (#78).
 - **Alerts for UPS and task restarts:** with the admin page (#77).

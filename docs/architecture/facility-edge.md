@@ -34,7 +34,7 @@ LAN discovery and TLS trust are in [lan-security.md](lan-security.md). Staff aut
 | Linux in Docker | Allowed for centrally managed sites only | Not the reference path, because mDNS is unavailable in containers. |
 | Windows arm64, macOS | No | |
 
-In code (#72): `apps/server/facility-edge` over `health-edge-runtime`. The systemd unit is `apps/server/facility-edge/packaging/facility-edge.service`. The exit codes are in the binary's README; a configuration error is not restarted.
+In code (#72): `apps/server/facility-edge` over `health-edge-runtime`. The systemd unit is `apps/server/facility-edge/packaging/facility-edge.service`. On Windows, `install-service.ps1` registers the service and its failure actions, and `WindowsScm` reports wait hints. `edge-build.yml` runs the binary under both service managers. The Event Log sink is still to come. The exit codes are in the binary's README; a configuration error is not restarted.
 
 ## Hardware and power baseline
 
