@@ -96,3 +96,9 @@ Local backups, restore, failover and recovery targets are in [backup-and-recover
 | Clock skew against central | above a configured threshold (HLC ordering tolerates skew; alerts catch broken clocks) |
 | Permission snapshot expiry | approaching hard expiry |
 | Task restarts | repeated restarts of any supervised task |
+
+- **In code (#77):** `health_edge_runtime::admin`, `GET /api/admin/status`, and the client's `/edge/status` page.
+  - **Reported:** identity, version, store size, free disk, backups, UPS, task restarts (two or more within the supervisor's window) and the telemetry buffer.
+  - **Pending:** sync, clock skew, certificates, the permission snapshot, disk encryption and sessions arrive with their features (Phase 5, #73–#75). The report lists them as pending.
+  - **Access:** until the local authorization server can require an admin (#75), the report is served only to the node itself.
+  - **Telemetry:** the buffer is under `HEALTH_TELEMETRY_DIR`, shipped to `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`. Spans are not buffered yet.

@@ -30,7 +30,7 @@ pub enum Shape {
 pub fn shape(name: &str) -> Option<Shape> {
     Some(match name {
         "operation" | "outcome" | "error.kind" | "resource_type" | "http.method"
-        | "facility_id" | "tenant" | "engine" | "check" => Shape::Ident,
+        | "facility_id" | "tenant" | "engine" | "check" | "alert" | "state" => Shape::Ident,
         "http.route" => Shape::Route,
         "code" => Shape::Code,
         "http.status_code" | "count" | "attempt" => Shape::Number,

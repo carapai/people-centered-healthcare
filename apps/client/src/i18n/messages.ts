@@ -317,3 +317,115 @@ export const messages = defineMessages({
   rrLinkPatient: { id: 'app.registryReview.linkPatient', defaultMessage: 'ID checked: this is the patient', description: 'Registry review action: link the portal account to this candidate' },
   rrCreatePatient: { id: 'app.registryReview.createPatient', defaultMessage: 'None of these: create a new patient', description: 'Registry review action: a new patient for the portal account' },
 })
+
+/** The edge status page's messages' ICU arguments, so `formatMessage` checks the values passed. */
+type EdgeStatusValues = {
+  esTitle: {}
+  esLoading: {}
+  esFailed: {}
+  esForbidden: {}
+  esNotEdge: {}
+  esAlerts: {}
+  esNoAlerts: {}
+  esAlertDiskFull: { subject: string }
+  esAlertBackupsOff: {}
+  esAlertBackupFailed: {}
+  esAlertBackupStale: {}
+  esAlertBackupTestFailed: {}
+  esAlertOnBattery: {}
+  esAlertLowBattery: {}
+  esAlertUpsUnreachable: {}
+  esAlertTaskRestarts: { subject: string }
+  esNode: {}
+  esNodeId: {}
+  esVersion: {}
+  esStarted: {}
+  esChecked: {}
+  esStorage: {}
+  esStoreSize: {}
+  esDataVolume: {}
+  esDataDisk: {}
+  esBackupDisk: {}
+  esBackupVolume: {}
+  esVolumeUse: { percent: number; free: string }
+  esBackups: {}
+  esBackupsOff: {}
+  esLastBackup: {}
+  esLastFailure: {}
+  esLastTest: {}
+  esTestPassed: { at: string }
+  esTestFailed: { at: string }
+  esPower: {}
+  esUps: {}
+  esUpsOff: {}
+  esPowerOnline: {}
+  esPowerOnBattery: {}
+  esPowerLowBattery: {}
+  esPowerUnreachable: {}
+  esTelemetry: {}
+  esBuffered: {}
+  esDropped: {}
+  esLastShipped: {}
+  esShippingOff: {}
+  esShippingFailing: { at: string }
+  esTaskRestarts: { task: string }
+  esNever: {}
+  esUnknown: {}
+  esPending: { indicators: string }
+}
+
+// The edge admin status page's strings (features/edge-status).
+export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
+  esTitle: { id: 'app.edgeStatus.title', defaultMessage: 'Edge status', description: 'Edge admin status page heading' },
+  esLoading: { id: 'app.edgeStatus.loading', defaultMessage: 'Checking the edge…', description: 'Edge status: loading' },
+  esFailed: { id: 'app.edgeStatus.failed', defaultMessage: 'The edge status could not be loaded. Please try again.', description: 'Edge status: loading failed' },
+  esForbidden: { id: 'app.edgeStatus.forbidden', defaultMessage: 'Open this page on the edge server itself: the status is shown only there until edge sign-in is available.', description: 'Edge status: refused for a remote browser' },
+  esNotEdge: { id: 'app.edgeStatus.notEdge', defaultMessage: 'This page is available on a facility edge only.', description: 'Edge status: not served by central' },
+  esAlerts: { id: 'app.edgeStatus.alerts', defaultMessage: 'Alerts', description: 'Edge status: alerts section' },
+  esNoAlerts: { id: 'app.edgeStatus.noAlerts', defaultMessage: 'No alerts.', description: 'Edge status: nothing to act on' },
+  esAlertDiskFull: { id: 'app.edgeStatus.alert.diskFull', defaultMessage: 'The {subject} is more than 80% full.', description: 'Alert: a volume is nearly full; subject is the volume' },
+  esAlertBackupsOff: { id: 'app.edgeStatus.alert.backupsOff', defaultMessage: 'Backups are not configured on this node.', description: 'Alert: no backup directory' },
+  esAlertBackupFailed: { id: 'app.edgeStatus.alert.backupFailed', defaultMessage: 'The last backup failed.', description: 'Alert' },
+  esAlertBackupStale: { id: 'app.edgeStatus.alert.backupStale', defaultMessage: 'There has been no good backup for more than two backup intervals.', description: 'Alert' },
+  esAlertBackupTestFailed: { id: 'app.edgeStatus.alert.backupTestFailed', defaultMessage: 'The last test restore failed.', description: 'Alert' },
+  esAlertOnBattery: { id: 'app.edgeStatus.alert.onBattery', defaultMessage: 'The UPS is on battery.', description: 'Alert' },
+  esAlertLowBattery: { id: 'app.edgeStatus.alert.lowBattery', defaultMessage: 'The UPS battery is low: the node is stopping.', description: 'Alert' },
+  esAlertUpsUnreachable: { id: 'app.edgeStatus.alert.upsUnreachable', defaultMessage: 'The UPS cannot be reached.', description: 'Alert' },
+  esAlertTaskRestarts: { id: 'app.edgeStatus.alert.taskRestarts', defaultMessage: 'The {subject} task keeps restarting.', description: 'Alert: a background task fails repeatedly; subject is its name' },
+  esNode: { id: 'app.edgeStatus.node', defaultMessage: 'Node', description: 'Edge status: node section' },
+  esNodeId: { id: 'app.edgeStatus.nodeId', defaultMessage: 'Node ID', description: 'Edge status' },
+  esVersion: { id: 'app.edgeStatus.version', defaultMessage: 'Version', description: 'Edge status' },
+  esStarted: { id: 'app.edgeStatus.started', defaultMessage: 'Running since', description: 'Edge status' },
+  esChecked: { id: 'app.edgeStatus.checked', defaultMessage: 'Checked', description: 'Edge status: when the report was taken' },
+  esStorage: { id: 'app.edgeStatus.storage', defaultMessage: 'Storage', description: 'Edge status: storage section' },
+  esStoreSize: { id: 'app.edgeStatus.storeSize', defaultMessage: 'Database size', description: 'Edge status' },
+  esDataVolume: { id: 'app.edgeStatus.dataVolume', defaultMessage: 'data disk', description: 'Edge status: the volume holding the database' },
+  esBackupVolume: { id: 'app.edgeStatus.backupVolume', defaultMessage: 'backup disk', description: 'Edge status: the volume holding backups' },
+  esDataDisk: { id: 'app.edgeStatus.dataDisk', defaultMessage: 'Data disk', description: 'Edge status: label for the volume holding the database' },
+  esBackupDisk: { id: 'app.edgeStatus.backupDisk', defaultMessage: 'Backup disk', description: 'Edge status: label for the volume holding backups' },
+  esVolumeUse: { id: 'app.edgeStatus.volumeUse', defaultMessage: '{percent}% used, {free} free', description: 'Edge status: how full a volume is' },
+  esBackups: { id: 'app.edgeStatus.backups', defaultMessage: 'Backups', description: 'Edge status: backups section' },
+  esBackupsOff: { id: 'app.edgeStatus.backupsOff', defaultMessage: 'Not configured', description: 'Edge status: no backups' },
+  esLastBackup: { id: 'app.edgeStatus.lastBackup', defaultMessage: 'Last good backup', description: 'Edge status' },
+  esLastFailure: { id: 'app.edgeStatus.lastFailure', defaultMessage: 'Last failure', description: 'Edge status' },
+  esLastTest: { id: 'app.edgeStatus.lastTest', defaultMessage: 'Last test restore', description: 'Edge status' },
+  esTestPassed: { id: 'app.edgeStatus.testPassed', defaultMessage: 'Passed, {at}', description: 'Edge status: test restore passed at a time' },
+  esTestFailed: { id: 'app.edgeStatus.testFailed', defaultMessage: 'Failed, {at}', description: 'Edge status: test restore failed at a time' },
+  esPower: { id: 'app.edgeStatus.power', defaultMessage: 'Power', description: 'Edge status: power section' },
+  esUps: { id: 'app.edgeStatus.ups', defaultMessage: 'UPS', description: 'Edge status' },
+  esUpsOff: { id: 'app.edgeStatus.upsOff', defaultMessage: 'Not configured', description: 'Edge status: no UPS' },
+  esPowerOnline: { id: 'app.edgeStatus.power.online', defaultMessage: 'On mains power', description: 'UPS state' },
+  esPowerOnBattery: { id: 'app.edgeStatus.power.onBattery', defaultMessage: 'On battery', description: 'UPS state' },
+  esPowerLowBattery: { id: 'app.edgeStatus.power.lowBattery', defaultMessage: 'Low battery', description: 'UPS state' },
+  esPowerUnreachable: { id: 'app.edgeStatus.power.unreachable', defaultMessage: 'Not answering', description: 'UPS state' },
+  esTelemetry: { id: 'app.edgeStatus.telemetry', defaultMessage: 'Monitoring', description: 'Edge status: telemetry section' },
+  esBuffered: { id: 'app.edgeStatus.buffered', defaultMessage: 'Waiting to send to central', description: 'Edge status: telemetry buffered' },
+  esDropped: { id: 'app.edgeStatus.dropped', defaultMessage: 'Dropped when the buffer was full', description: 'Edge status' },
+  esLastShipped: { id: 'app.edgeStatus.lastShipped', defaultMessage: 'Last sent to central', description: 'Edge status' },
+  esShippingOff: { id: 'app.edgeStatus.shippingOff', defaultMessage: 'Not configured: kept on this node', description: 'Edge status: no collector' },
+  esShippingFailing: { id: 'app.edgeStatus.shippingFailing', defaultMessage: 'Central unreachable; last sent {at}', description: 'Edge status: shipping failing' },
+  esTaskRestarts: { id: 'app.edgeStatus.taskRestarts', defaultMessage: 'Recent restarts of {task}', description: 'Edge status: a background task' },
+  esNever: { id: 'app.edgeStatus.never', defaultMessage: 'Never', description: 'Edge status: no time yet' },
+  esUnknown: { id: 'app.edgeStatus.unknown', defaultMessage: 'Unknown', description: 'Edge status: not measured' },
+  esPending: { id: 'app.edgeStatus.pending', defaultMessage: 'Not reported yet: {indicators}.', description: 'Edge status: indicators that arrive with later work' },
+})

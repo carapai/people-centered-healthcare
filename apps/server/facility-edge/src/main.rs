@@ -31,8 +31,9 @@ use std::future::Future;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use health_edge_runtime::admin::{self, Buffer};
 use health_edge_runtime::{EdgeConfig, EdgeError, Foreground, ServiceManager, run};
-use health_observability::TelemetryConfig;
+use health_observability::{LogSink, Stdout, TelemetryConfig};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -96,18 +97,34 @@ async fn serve(
     manager: Arc<dyn ServiceManager>,
     stop: impl Future<Output = ()>,
 ) -> u8 {
-    let _telemetry = match health_observability::init(&TelemetryConfig {
+    // Log lines go to standard output and the bounded buffer, shipped when online. Without a
+    // usable buffer directory they go to standard output alone.
+    let buffer = Buffer::open(&config.telemetry_dir, admin::DEFAULT_CAP)
+        .map(Arc::new)
+        .ok();
+    let logs: Arc<dyn LogSink> = match &buffer {
+        Some(buffer) => buffer.clone(),
+        None => Arc::new(Stdout),
+    };
+    let telemetry = TelemetryConfig {
         service: "facility-edge",
         otlp_endpoint: config.otlp_endpoint.clone(),
         filter: config.log.clone(),
-    }) {
+    };
+    let _telemetry = match health_observability::init_with(&telemetry, logs) {
         Ok(telemetry) => telemetry,
         Err(error) => {
             eprintln!("facility-edge: {error}");
             return 2;
         }
     };
-    match run(config, manager, stop).await {
+    if buffer.is_none() {
+        tracing::warn!(
+            alert = "telemetry-unbuffered",
+            "cannot open HEALTH_TELEMETRY_DIR: telemetry is not buffered"
+        );
+    }
+    match run(config, manager, buffer, stop).await {
         Ok(stop) => {
             tracing::info!(reason = ?stop, "facility edge exited");
             0

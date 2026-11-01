@@ -25,7 +25,7 @@ Recovery draws on two sources. **Central** holds everything already synced. **Lo
   - `status.json` for the status page, and an alert in the log when a backup or test restore fails. Neither stops the node;
   - a warning when the backup directory shares the data volume.
 - **`facility-edge backup now | copy | verify | test | restore | status`** covers on-demand backups, USB copies, verification and restore ([README](../../apps/server/facility-edge/README.md)). The pre-update backup is the store copy an update takes ([facility-edge.md](facility-edge.md) § Updates and migrations).
-- **Not here:** central's export over HTTP and key escrow are [#138](https://github.com/carapai/people-centered-healthcare/issues/138). A backup on demand while the node runs comes with the admin page (#77).
+- **Not here:** central's export over HTTP and key escrow are [#138](https://github.com/carapai/people-centered-healthcare/issues/138). A backup on demand while the node runs is not built: the edge status page (#77) shows the schedule's status and alerts only.
 
 ## Restore and failover
 

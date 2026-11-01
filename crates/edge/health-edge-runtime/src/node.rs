@@ -10,11 +10,13 @@ use health_http::{Readiness, ReadinessCheck, app};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
 
+use crate::admin::{self, Buffer, Monitor, ShipState};
 use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
 use crate::update::{self, Startup, Updates};
+use crate::ups::PowerState;
 use crate::web::{self, Bundle};
 
 /// How often a long migration or drain asks the service manager for more time, and how much.
@@ -141,16 +143,33 @@ async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
 }
 
 /// Runs the node until `stop` resolves, the UPS reports low battery, or a supervised task keeps
-/// failing.
+/// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready.
 pub async fn run(
     config: &EdgeConfig,
     manager: Arc<dyn ServiceManager>,
+    telemetry: Option<Arc<Buffer>>,
     stop: impl Future<Output = ()>,
 ) -> Result<Stop, EdgeError> {
     let store = Store::default();
     let serving = Serving(Arc::new(AtomicBool::new(true)));
     let readiness = Readiness::new(vec![Arc::new(store.clone()), Arc::new(serving.clone())]);
-    let router = app(web::routes(Bundle::embedded()), readiness);
+    let mut supervisor = Supervisor::new(RestartPolicy::default());
+    let backups = config
+        .backup_dir
+        .as_ref()
+        .map(|root| Backups::new(root, &config.node_id));
+    let monitor = Monitor {
+        node_id: config.node_id.clone(),
+        started: health_time::Timestamp::now(),
+        data_dir: config.data_dir.clone(),
+        backups: backups.clone().map(|b| (b, config.backup_interval)),
+        power: config.ups.as_ref().map(|_| PowerState::default()),
+        restarts: supervisor.restarts(),
+        buffer: telemetry.clone(),
+        shipping: ShipState::default(),
+    };
+    let routes = web::routes(Bundle::embedded()).merge(admin::routes(monitor.clone()));
+    let router = app(routes, readiness);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .map_err(EdgeError::Listen)?;
@@ -158,7 +177,8 @@ pub async fn run(
     let drain = Arc::new(Notify::new());
     let draining = Arc::clone(&drain);
     let server = tokio::spawn(async move {
-        axum::serve(listener, router)
+        let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+        axum::serve(listener, service)
             .with_graceful_shutdown(async move { draining.notified().await })
             .await
     });
@@ -203,7 +223,6 @@ pub async fn run(
     manager.ready();
 
     let low_battery = Arc::new(Notify::new());
-    let mut supervisor = Supervisor::new(RestartPolicy::default());
     if let Some(interval) = manager.watchdog_interval() {
         // On the runtime, so a stalled runtime stops the keep-alives.
         let beat = interval / 2;
@@ -218,10 +237,10 @@ pub async fn run(
             }
         });
     }
-    match (&config.backup_dir, &config.backup_key_file, store.0.get()) {
-        (Some(root), Some(key_file), Some(connection)) => {
+    match (backups, &config.backup_key_file, store.0.get()) {
+        (Some(backups), Some(key_file), Some(connection)) => {
             let schedule = Schedule {
-                backups: Backups::new(root, &config.node_id),
+                backups,
                 key_file: key_file.clone(),
                 every: config.backup_interval,
                 test_every: config.backup_test_interval,
@@ -235,9 +254,40 @@ pub async fn run(
             "no HEALTH_BACKUP_DIR: this node takes no backups"
         ),
     }
-    if let Some(ups) = &config.ups {
+    if let (Some(ups), Some(power)) = (&config.ups, &monitor.power) {
         let (ups, poll, low) = (ups.clone(), config.ups_poll, Arc::clone(&low_battery));
-        supervisor.spawn("ups", move || ups.clone().watch(poll, Arc::clone(&low)));
+        let power = Arc::clone(power);
+        supervisor.spawn("ups", move || {
+            ups.clone()
+                .watch(poll, Arc::clone(&low), Arc::clone(&power))
+        });
+    }
+    let every = config.indicators_interval;
+    let watching = monitor.clone();
+    supervisor.spawn("indicators", move || watching.clone().watch(every));
+    match (telemetry, &config.logs_endpoint) {
+        (Some(buffer), Some(endpoint)) => {
+            let (endpoint, node, every) = (
+                endpoint.clone(),
+                config.node_id.clone(),
+                config.ship_interval,
+            );
+            let state = Arc::clone(&monitor.shipping);
+            state.lock().unwrap_or_else(|e| e.into_inner()).configured = true;
+            supervisor.spawn("telemetry", move || {
+                admin::ship(
+                    Arc::clone(&buffer),
+                    endpoint.clone(),
+                    node.clone(),
+                    every,
+                    Arc::clone(&state),
+                )
+            });
+        }
+        _ => tracing::info!(
+            outcome = "telemetry-local",
+            "no OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: telemetry stays in the local buffer"
+        ),
     }
 
     let outcome = tokio::select! {

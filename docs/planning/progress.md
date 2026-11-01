@@ -7,7 +7,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
-| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 3 | 7 |
+| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 4 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 69 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 70 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -215,3 +215,8 @@ Total: 69 of 134 implementation tasks done. Validation spikes open: 3.
   - **Edge:** `health_edge_runtime::backup` runs as a supervised task once the node is ready. It takes an hourly `health-backup` backup into `HEALTH_BACKUP_DIR`, verified after writing. It keeps the 48 newest and the newest of each of the last 14 days, prunes unreferenced blobs, and test-restores the newest backup weekly into a scratch store. Each outcome goes to `status.json`, and failures are logged as alerts without stopping the node. A node without backups, or with backups on its data volume, warns at start.
   - **Binary:** `facility-edge backup now | copy <dir> | verify | test | restore <backup> | status`, with exit code 9 for a failed command. The pre-update backup stays the update's cold store copy.
   - **Tests:** unit tests for retention, scheduling, a failed test restore recorded for the alert, the USB copy and restore. `tests/backup.rs` runs the binary end to end, through to a restored store that starts ready.
+- 2026-11-02: #78 merged (#263). #77, edge health monitoring and the admin page.
+  - **Edge:** `health_edge_runtime::admin` measures the node: identity, version, store size, free space on the data and backup volumes, the backup schedule, the UPS's last poll, task restarts and the telemetry buffer. It raises alerts against the facility-edge.md thresholds. `GET /api/admin/status` serves the report to the node itself until the local authorization server can require an admin (#75).
+  - **Telemetry:** the process's log lines go to a bounded on-disk buffer (64 MiB, oldest dropped first) as well as stdout. Every interval an `indicators` line and each raised or cleared alert are logged. The buffer is shipped as OTLP/HTTP log records when the collector answers. `alert` and `state` join the allowlist; the redaction test covers them.
+  - **Client:** `/edge/status`, linked from the home page on an edge (the `edgeStatus` capability), with the alerts first and the indicators not reported yet listed.
+  - **Tests:** unit tests for each threshold, the buffer's bound and restarts, the OTLP encoding, loopback-only access, and shipping after an outage. `tests/health.rs` runs the binary against a collector that is down, then up. A Playwright edge spec opens the page from the real binary with axe.
