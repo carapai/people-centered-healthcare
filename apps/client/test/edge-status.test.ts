@@ -1,7 +1,8 @@
 import { createIntl } from 'react-intl'
 import { describe, expect, test } from 'vitest'
 
-import { EdgeStatusError, REFRESH_MS, statusQuery, usedPercent } from '../src/features/edge-status/api'
+import { EdgeStatusError, PairingUnavailable, REFRESH_MS, pairingQuery, statusQuery, usedPercent } from '../src/features/edge-status/api'
+import { qrPath } from '../src/features/edge-status/qr'
 import { alertText, formatBytes } from '../src/features/edge-status/StatusPage'
 import { parseJson } from '../src/platform/json'
 import { fakeTransport } from './fake'
@@ -91,5 +92,23 @@ describe('edge status', () => {
     for (const code of ['not-provisioned', 'identity-invalid', 'certificate-renewal-failed', 'certificate-expiring', 'intermediate-expiring', 'address-changed']) {
       expect(alertText(intl, { code, subject: null })).not.toBe(code)
     }
+  })
+
+  test('the pairing payload comes from the edge, and its absence says why', async () => {
+    const pairing = { version: '1', node_id: 'ug-kla-0001', url: 'https://ug-kla-0001.local', spki: 'sha256/abc=', uri: 'health-edge://pair?v=1&node=ug-kla-0001' }
+    const transport = fakeTransport(() => ({ body: pairing }))
+    expect(await pairingQuery(transport).queryFn({})).toEqual(pairing)
+    expect(transport.sent.map((r) => `${r.method} ${r.path}`)).toEqual(['GET /admin/pairing'])
+    const refused = fakeTransport(() => ({ status: 409, body: { error: 'not-provisioned', detail: 'x' } }))
+    await expect(pairingQuery(refused).queryFn({})).rejects.toEqual(new PairingUnavailable('not-provisioned'))
+    await expect(pairingQuery(fakeTransport(() => ({ status: 403 }))).queryFn({})).rejects.toEqual(new EdgeStatusError(403))
+  })
+
+  test('the QR code is a square of dark modules inside a quiet zone', () => {
+    const { size, path } = qrPath('health-edge://pair?v=1&node=ug-kla-0001&url=https%3A%2F%2Fug-kla-0001.local')
+    // Version 3 or 4 at level M, plus 4 modules of quiet zone on each side.
+    expect(size).toBeGreaterThanOrEqual(29 + 8)
+    expect(path.startsWith('M4 4h1v1h-1z')).toBe(true)
+    expect(path).not.toMatch(/M[0-3] |M\d+ [0-3]h/)
   })
 })

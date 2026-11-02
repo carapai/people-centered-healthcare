@@ -568,4 +568,32 @@ fn a_leaf_reads_back_its_names_addresses_and_validity() {
         health_pki::LEAF_DAYS * 86_400 + health_pki::BACKDATE_SECONDS
     );
     assert!(health_pki::inspect("not a certificate").is_err());
+
+    // The pin is the key's, not the certificate's: a reissued intermediate for the same key
+    // keeps it, and another key does not.
+    let pin = health_pki::inspect(&pki.facility.certificate_pem())
+        .expect("inspect")
+        .spki_sha256;
+    assert!(
+        pin.starts_with("sha256/") && pin.len() == "sha256/".len() + 44,
+        "{pin}"
+    );
+    assert_ne!(read.spki_sha256, pin);
+    let again = pki
+        .issuing
+        .issue_facility(
+            &request(&pki.facility_key, NODE).expect("csr"),
+            &Facility {
+                node_id: NODE.into(),
+                dns_names: Vec::new(),
+            },
+            at(),
+        )
+        .expect("reissued");
+    assert_eq!(
+        health_pki::inspect(&again.pem())
+            .expect("inspect")
+            .spki_sha256,
+        pin
+    );
 }

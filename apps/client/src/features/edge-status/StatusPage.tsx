@@ -5,7 +5,8 @@ import { useIntl } from 'react-intl'
 
 import { edgeStatusMessages } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
-import { EdgeStatusError, statusQuery, usedPercent } from './api'
+import { EdgeStatusError, PairingUnavailable, pairingQuery, statusQuery, usedPercent } from './api'
+import { qrPath } from './qr'
 import type { EdgeReport } from './api'
 
 type Messages = typeof edgeStatusMessages
@@ -192,8 +193,56 @@ function Report({ report }: { report: EdgeReport }) {
           </Fact>
         ))}
       </Facts>
+      <PairDevice />
       {report.pending.length === 0 ? null : <p className={term}>{intl.formatMessage(edgeStatusMessages.esPending, { indicators: report.pending.join(', ') })}</p>}
     </>
+  )
+}
+
+const qrBox = css({ width: '64', height: '64', maxWidth: 'full' })
+const code = css({ fontFamily: 'mono', fontSize: 'sm', overflowWrap: 'anywhere' })
+
+/** The pairing QR code and its text, for a device to find and pin this edge. */
+function PairDevice() {
+  const intl = useIntl()
+  const { transport } = usePlatform()
+  const pairing = useQuery(pairingQuery(transport))
+  const title = intl.formatMessage(edgeStatusMessages.esPairing)
+  if (pairing.isPending) return null
+  if (pairing.isError) {
+    const reason = pairing.error instanceof PairingUnavailable ? pairing.error.reason : null
+    return (
+      <Facts id="edge-pairing" title={title}>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esCertState)}>
+          {reason === 'not-provisioned'
+            ? intl.formatMessage(edgeStatusMessages.esPairingNotProvisioned)
+            : intl.formatMessage(edgeStatusMessages.esPairingUnavailable, { reason: reason ?? String(pairing.error) })}
+        </Fact>
+      </Facts>
+    )
+  }
+  const { size, path } = qrPath(pairing.data.uri)
+  return (
+    <section className={section} aria-labelledby="edge-pairing">
+      <h2 id="edge-pairing" className={subheading}>
+        {title}
+      </h2>
+      <p>{intl.formatMessage(edgeStatusMessages.esPairingHint)}</p>
+      <svg className={qrBox} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={intl.formatMessage(edgeStatusMessages.esPairingQr, { node: pairing.data.node_id })} shapeRendering="crispEdges">
+        <rect width={size} height={size} fill="white" />
+        <path d={path} fill="black" />
+      </svg>
+      <dl className={facts}>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esNodeId)}>{pairing.data.node_id}</Fact>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esPairingUrl)}>{pairing.data.url}</Fact>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esPairingPin)}>
+          <span className={code}>{pairing.data.spki}</span>
+        </Fact>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esPairingCode)}>
+          <span className={code}>{pairing.data.uri}</span>
+        </Fact>
+      </dl>
+    </section>
   )
 }
 

@@ -362,6 +362,14 @@ type EdgeStatusValues = {
   esCertRenews: {}
   esIntermediateExpires: {}
   esCertProblem: {}
+  esPairing: {}
+  esPairingHint: {}
+  esPairingQr: { node: string }
+  esPairingUrl: {}
+  esPairingPin: {}
+  esPairingCode: {}
+  esPairingNotProvisioned: {}
+  esPairingUnavailable: { reason: string }
   esSystemVolume: {}
   esSystemDisk: {}
   esEncryption: {}
@@ -458,6 +466,14 @@ export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
   esCertRenews: { id: 'app.edgeStatus.certificate.renews', defaultMessage: 'Renews', description: 'Edge status: when the certificate is renewed' },
   esIntermediateExpires: { id: 'app.edgeStatus.certificate.intermediateExpires', defaultMessage: 'Facility intermediate expires', description: 'Edge status: when the facility intermediate expires' },
   esCertProblem: { id: 'app.edgeStatus.certificate.problem', defaultMessage: 'Last renewal failed', description: 'Edge status: why the last renewal failed' },
+  esPairing: { id: 'app.edgeStatus.pairing', defaultMessage: 'Pair a device', description: 'Edge status section heading: pairing a LAN device' },
+  esPairingHint: { id: 'app.edgeStatus.pairing.hint', defaultMessage: 'Scan this code with the app on the new device, or enter the pairing code. Then approve the device below when it asks to enroll.', description: 'Edge status: how to pair a device' },
+  esPairingQr: { id: 'app.edgeStatus.pairing.qr', defaultMessage: 'QR code for pairing a device with {node}', description: 'Accessible name of the pairing QR code; node is the node ID' },
+  esPairingUrl: { id: 'app.edgeStatus.pairing.url', defaultMessage: 'Address', description: 'Edge status: the URL devices reach the edge by' },
+  esPairingPin: { id: 'app.edgeStatus.pairing.pin', defaultMessage: 'Key fingerprint', description: "Edge status: the facility intermediate's SPKI fingerprint" },
+  esPairingCode: { id: 'app.edgeStatus.pairing.code', defaultMessage: 'Pairing code', description: 'Edge status: the pairing URI as text' },
+  esPairingNotProvisioned: { id: 'app.edgeStatus.pairing.notProvisioned', defaultMessage: 'Devices can pair once this edge is provisioned.', description: 'Edge status: no pairing before provisioning' },
+  esPairingUnavailable: { id: 'app.edgeStatus.pairing.unavailable', defaultMessage: 'Pairing is unavailable: {reason}.', description: 'Edge status: the pairing payload could not be made; reason is a code' },
   esSystemVolume: { id: 'app.edgeStatus.systemVolume', defaultMessage: 'system disk', description: 'Edge status: the volume holding the operating system' },
   esSystemDisk: { id: 'app.edgeStatus.systemDisk', defaultMessage: 'System disk', description: 'Edge status: label for the volume holding the operating system' },
   esEncryption: { id: 'app.edgeStatus.encryption', defaultMessage: 'Disk encryption', description: 'Edge status: disk encryption section' },

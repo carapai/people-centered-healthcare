@@ -36,8 +36,8 @@ use crate::config::EdgeConfig;
 pub(crate) use listener::TlsListener;
 
 /// The installed national root and chain, as `facility-edge provision install` writes them.
-const ROOT: &str = "root.pem";
-const CHAIN: &str = "facility-chain.pem";
+pub(crate) const ROOT: &str = "root.pem";
+pub(crate) const CHAIN: &str = "facility-chain.pem";
 /// The leaf and its key, in `HEALTH_TLS_DIR`.
 const LEAF: &str = "leaf.pem";
 const LEAF_KEY: &str = "leaf.key";

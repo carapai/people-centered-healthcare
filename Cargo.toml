@@ -110,6 +110,8 @@ opentelemetry-otlp = { version = "0.33.1", default-features = false, features = 
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
 # The edge's private LAN addresses, for its leaf certificate.
 if-addrs = "0.15.0"
+# The edge's `_health-edge._tcp` mDNS hint for LAN clients (lan-security.md § Addressing).
+mdns-sd = { version = "0.21.7", default-features = false }
 p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
 pollster = "1.0.1"
 # Certificates and CRLs for the private PKI (ADRs 0008, 0058), on ring like rustls.

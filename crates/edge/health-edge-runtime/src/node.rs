@@ -14,6 +14,7 @@ use tokio::sync::{Notify, OnceCell};
 use crate::admin::{self, Buffer, EncryptionCheck, EncryptionState, Monitor, ShipState};
 use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
+use crate::discovery::{self, Pairing};
 use crate::enrollment::Api;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
@@ -181,6 +182,7 @@ pub async fn run(
     let api = Api::default();
     let routes = web::routes(Bundle::embedded())
         .merge(admin::routes(monitor.clone()))
+        .merge(admin::local_only(discovery::routes(Pairing::new(config))))
         .merge(api.routes());
     let router = app(routes, readiness);
     let identity = Arc::new(Identity::new(config, intermediate_key));
@@ -324,6 +326,13 @@ pub async fn run(
         let (state, every) = (Arc::clone(state), config.encryption_interval);
         supervisor.spawn("encryption", move || {
             admin::watch_encryption(Arc::clone(&check), Arc::clone(&state), every)
+        });
+    }
+    if resolver.is_some() && config.mdns {
+        let (node, port) = (config.node_id.clone(), config.bind.port());
+        let (every, state) = (config.certificate_interval, Arc::clone(&certificate));
+        supervisor.spawn("mdns", move || {
+            discovery::announce(node.clone(), port, Arc::clone(&state), every)
         });
     }
     if let Some(resolver) = resolver {
