@@ -24,6 +24,18 @@ const alertLabels: Record<string, Messages['esAlertBackupsOff']> = {
   'secure-boot-off': edgeStatusMessages.esAlertSecureBootOff,
   'secure-boot-unknown': edgeStatusMessages.esAlertSecureBootUnknown,
   'encryption-exempt': edgeStatusMessages.esAlertEncryptionExempt,
+  'not-provisioned': edgeStatusMessages.esAlertNotProvisioned,
+  'identity-invalid': edgeStatusMessages.esAlertIdentityInvalid,
+  'certificate-renewal-failed': edgeStatusMessages.esAlertCertificateRenewalFailed,
+  'certificate-expiring': edgeStatusMessages.esAlertCertificateExpiring,
+  'intermediate-expiring': edgeStatusMessages.esAlertIntermediateExpiring,
+  'address-changed': edgeStatusMessages.esAlertAddressChanged,
+}
+
+const certificateStates: Record<string, Messages['esCertServing']> = {
+  serving: edgeStatusMessages.esCertServing,
+  'not-provisioned': edgeStatusMessages.esCertNotProvisioned,
+  invalid: edgeStatusMessages.esCertInvalid,
 }
 
 /** Alerts about a volume or a task. */
@@ -148,6 +160,22 @@ function Report({ report }: { report: EdgeReport }) {
         </Fact>
       </Facts>
       {report.encryption === null ? null : <Encryption encryption={report.encryption} />}
+      <Facts id="edge-certificate" title={intl.formatMessage(edgeStatusMessages.esCertificate)}>
+        <Fact label={intl.formatMessage(edgeStatusMessages.esCertState)}>
+          {intl.formatMessage(certificateStates[report.certificate.state] ?? edgeStatusMessages.esUnknown)}
+        </Fact>
+        {report.certificate.state !== 'serving' ? null : (
+          <>
+            <Fact label={intl.formatMessage(edgeStatusMessages.esCertNames)}>{[...report.certificate.names, ...report.certificate.addresses].join(', ')}</Fact>
+            <Fact label={intl.formatMessage(edgeStatusMessages.esCertExpires)}>{time(report.certificate.expires)}</Fact>
+            <Fact label={intl.formatMessage(edgeStatusMessages.esCertRenews)}>{time(report.certificate.renews)}</Fact>
+          </>
+        )}
+        {report.certificate.intermediate_expires === null ? null : (
+          <Fact label={intl.formatMessage(edgeStatusMessages.esIntermediateExpires)}>{time(report.certificate.intermediate_expires)}</Fact>
+        )}
+        {report.certificate.problem === null ? null : <Fact label={intl.formatMessage(edgeStatusMessages.esCertProblem)}>{report.certificate.problem}</Fact>}
+      </Facts>
       <Facts id="edge-telemetry" title={intl.formatMessage(edgeStatusMessages.esTelemetry)}>
         <Fact label={intl.formatMessage(edgeStatusMessages.esBuffered)}>{formatBytes(intl, report.telemetry.buffered_bytes)}</Fact>
         {report.telemetry.dropped_bytes > 0 ? <Fact label={intl.formatMessage(edgeStatusMessages.esDropped)}>{formatBytes(intl, report.telemetry.dropped_bytes)}</Fact> : null}

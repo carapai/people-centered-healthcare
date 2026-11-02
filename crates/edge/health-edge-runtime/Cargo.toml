@@ -22,10 +22,14 @@ health-files = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-pki = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
+if-addrs = { workspace = true }
 p256 = { workspace = true }
 reqwest = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -33,6 +37,7 @@ tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "signal", "sync"] }
+tokio-rustls = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
 

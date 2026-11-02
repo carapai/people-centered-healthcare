@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use super::encryption::Encryption;
 use crate::backup::Status;
+use crate::tls::Certificate;
 use crate::ups::Power;
 
 /// A volume above this share used raises an alert.
@@ -16,13 +17,7 @@ pub(crate) const DISK_ALERT_PERCENT: u64 = 80;
 pub(crate) const TASK_ALERT_FAILURES: usize = 2;
 
 /// Indicators this node does not report yet, and the work that adds each.
-pub(crate) const PENDING: &[&str] = &[
-    "sync",
-    "clock-skew",
-    "certificates",
-    "permission-snapshot",
-    "sessions",
-];
+pub(crate) const PENDING: &[&str] = &["sync", "clock-skew", "permission-snapshot", "sessions"];
 
 /// What was measured, before it is judged.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +35,8 @@ pub(crate) struct Facts {
     pub(crate) telemetry: Telemetry,
     /// The last disk-encryption check; the outer `None` when no check is wired in.
     pub(crate) encryption: Option<Option<Encryption>>,
+    /// The TLS leaf.
+    pub(crate) certificate: Certificate,
 }
 
 /// The node's status, as `GET /api/admin/status` returns it. Holds no personal health data.
@@ -63,6 +60,8 @@ pub struct Report {
     pub telemetry: Telemetry,
     /// The last disk-encryption check; `None` until one has run.
     pub encryption: Option<Encryption>,
+    /// The TLS leaf the node serves, or why it serves none.
+    pub certificate: Certificate,
     /// Indicators not reported yet.
     pub pending: Vec<&'static str>,
     /// The alerts raised now, most severe first.
@@ -246,6 +245,7 @@ pub(crate) fn assess(facts: Facts, now: Timestamp) -> Report {
         }
         Some(found) => alerts.extend(found.findings.iter().cloned()),
     }
+    alerts.extend(certificate_alerts(&facts.certificate, now));
     alerts.sort_by_key(|alert| severity(alert.code));
     Report {
         at: now,
@@ -261,9 +261,46 @@ pub(crate) fn assess(facts: Facts, now: Timestamp) -> Report {
         tasks,
         telemetry: facts.telemetry,
         encryption,
+        certificate: facts.certificate,
         pending,
         alerts,
     }
+}
+
+/// Days of leaf validity left that raise `certificate-expiring` (facility-edge.md: under 30).
+const CERTIFICATE_DAYS: i64 = 30;
+/// Days the facility intermediate has left that raise `intermediate-expiring`: a leaf (397
+/// days) cannot be issued past it, so it is re-provisioned before then.
+const INTERMEDIATE_DAYS: i64 = 400;
+/// How long `address-changed` stands after the addresses change.
+const ADDRESS_CHANGE_HOURS: i64 = 24;
+
+fn certificate_alerts(certificate: &Certificate, now: Timestamp) -> Vec<Alert> {
+    let left = |at: Option<Timestamp>, days: i64| {
+        at.is_some_and(|at| at.as_second() - now.as_second() < days * 86_400)
+    };
+    let mut alerts = Vec::new();
+    match certificate.state {
+        "not-provisioned" => alerts.push(Alert::new("not-provisioned")),
+        "invalid" => alerts.push(Alert::new("identity-invalid")),
+        _ => {}
+    }
+    if certificate.problem.is_some() {
+        alerts.push(Alert::new("certificate-renewal-failed"));
+    }
+    if left(certificate.expires, CERTIFICATE_DAYS) {
+        alerts.push(Alert::new("certificate-expiring"));
+    }
+    if left(certificate.intermediate_expires, INTERMEDIATE_DAYS) {
+        alerts.push(Alert::new("intermediate-expiring"));
+    }
+    if certificate
+        .address_changed
+        .is_some_and(|at| now.as_second() - at.as_second() < ADDRESS_CHANGE_HOURS * 3600)
+    {
+        alerts.push(Alert::new("address-changed"));
+    }
+    alerts
 }
 
 /// Lower is more severe: what stops the node or loses data comes first.
@@ -272,6 +309,7 @@ fn severity(code: &str) -> u8 {
         "ups-low-battery" => 0,
         "disk-full" => 1,
         "backup-failed" | "backup-stale" | "backup-test-failed" | "backups-off" => 2,
+        "identity-invalid" | "certificate-expiring" | "certificate-renewal-failed" => 3,
         "ups-on-battery" => 3,
         _ => 4,
     }
@@ -334,6 +372,16 @@ mod tests {
                 findings: Vec::new(),
                 exemption: None,
             })),
+            certificate: Certificate {
+                state: "serving",
+                names: vec!["facility-edge.local".into()],
+                addresses: Vec::new(),
+                expires: Some(at("2027-12-04T08:00:00Z")),
+                renews: Some(at("2027-08-01T08:00:00Z")),
+                intermediate_expires: Some(at("2031-11-02T08:00:00Z")),
+                problem: None,
+                address_changed: None,
+            },
         }
     }
 
@@ -454,5 +502,52 @@ mod tests {
             codes(&assess(facts, at("2026-11-02T10:01:00Z"))),
             vec![("backup-stale", None)]
         );
+    }
+
+    #[test]
+    fn the_certificate_raises_its_alerts() {
+        let now = at("2026-11-02T09:00:00Z");
+        let report = assess(healthy(), now);
+        assert!(report.alerts.is_empty(), "{:?}", report.alerts);
+        assert!(!report.pending.contains(&"certificates"));
+
+        let mut facts = healthy();
+        facts.certificate.expires = Some(at("2026-11-30T09:00:00Z"));
+        facts.certificate.intermediate_expires = Some(at("2027-11-30T09:00:00Z"));
+        facts.certificate.problem = Some("the keystore is locked".into());
+        facts.certificate.address_changed = Some(at("2026-11-02T08:00:00Z"));
+        let mut found: Vec<_> = assess(facts.clone(), now)
+            .alerts
+            .iter()
+            .map(|a| a.code)
+            .collect();
+        found.sort_unstable();
+        assert_eq!(
+            found,
+            vec![
+                "address-changed",
+                "certificate-expiring",
+                "certificate-renewal-failed",
+                "intermediate-expiring"
+            ]
+        );
+        let later = at("2026-11-03T09:00:00Z");
+        assert!(
+            !assess(facts, later)
+                .alerts
+                .iter()
+                .any(|a| a.code == "address-changed")
+        );
+
+        for (state, code) in [
+            ("not-provisioned", "not-provisioned"),
+            ("invalid", "identity-invalid"),
+        ] {
+            let mut facts = healthy();
+            facts.certificate = Certificate::unprovisioned();
+            facts.certificate.state = state;
+            let codes: Vec<_> = assess(facts, now).alerts.iter().map(|a| a.code).collect();
+            assert_eq!(codes, vec![code]);
+        }
     }
 }

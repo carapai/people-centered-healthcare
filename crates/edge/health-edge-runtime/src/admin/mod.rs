@@ -53,6 +53,8 @@ pub(crate) struct Monitor {
     pub(crate) shipping: ShipState,
     /// The disk-encryption check's last result, when a check is wired in.
     pub(crate) encryption: Option<EncryptionState>,
+    /// The TLS leaf's state.
+    pub(crate) certificate: crate::tls::CertificateState,
 }
 
 impl Monitor {
@@ -108,6 +110,11 @@ impl Monitor {
                 .encryption
                 .as_ref()
                 .map(|e| e.lock().unwrap_or_else(|e| e.into_inner()).clone()),
+            certificate: self
+                .certificate
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
         }
     }
 

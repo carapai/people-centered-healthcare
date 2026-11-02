@@ -31,5 +31,7 @@ windows-service = { workspace = true }
 health-auth = { workspace = true }
 p256 = { workspace = true }
 rand_core = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
 tempfile = { workspace = true }
 uuid = { workspace = true }

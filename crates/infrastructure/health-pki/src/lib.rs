@@ -23,15 +23,19 @@
 //!   issuing CAs and publication signing, the issuing CA's covers facility intermediates. CRLs
 //!   travel in the sync revocation lane.
 //! - **[`Trust`]** verifies a chain against the root and the CRLs a node holds.
+//! - **[`inspect`]** reads a certificate's validity and names back, so an edge knows when to
+//!   renew its leaf.
 //!
 //! Every key is ECDSA P-256 with SHA-256. Certificates are backdated by
 //! [`BACKDATE_SECONDS`] so a verifier whose clock runs slightly behind still accepts them.
 
 mod authority;
+mod inspect;
 mod revocation;
 mod trust;
 
 pub use authority::{Authority, Facility, Issued, IssuingCa, Serial, Tier, new_key, request};
+pub use inspect::{Inspected, inspect};
 pub use rcgen::KeyPair;
 pub use revocation::{Reason, Revocations, Revoked};
 pub use trust::Trust;

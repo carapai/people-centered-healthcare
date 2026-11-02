@@ -346,6 +346,22 @@ type EdgeStatusValues = {
   esAlertSecureBootOff: {}
   esAlertSecureBootUnknown: {}
   esAlertEncryptionExempt: {}
+  esAlertNotProvisioned: {}
+  esAlertIdentityInvalid: {}
+  esAlertCertificateRenewalFailed: {}
+  esAlertCertificateExpiring: {}
+  esAlertIntermediateExpiring: {}
+  esAlertAddressChanged: {}
+  esCertificate: {}
+  esCertServing: {}
+  esCertNotProvisioned: {}
+  esCertInvalid: {}
+  esCertState: {}
+  esCertNames: {}
+  esCertExpires: {}
+  esCertRenews: {}
+  esIntermediateExpires: {}
+  esCertProblem: {}
   esSystemVolume: {}
   esSystemDisk: {}
   esEncryption: {}
@@ -426,6 +442,22 @@ export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
   esAlertSecureBootOff: { id: 'app.edgeStatus.alert.secureBootOff', defaultMessage: 'Secure Boot is off.', description: 'Alert' },
   esAlertSecureBootUnknown: { id: 'app.edgeStatus.alert.secureBootUnknown', defaultMessage: 'Secure Boot could not be checked.', description: 'Alert' },
   esAlertEncryptionExempt: { id: 'app.edgeStatus.alert.encryptionExempt', defaultMessage: 'This facility is exempt from full-disk encryption.', description: 'Alert: a standing country-configuration exemption' },
+  esAlertNotProvisioned: { id: 'app.edgeStatus.alert.notProvisioned', defaultMessage: 'This edge is not provisioned: it serves this machine only, without TLS.', description: 'Alert: no facility intermediate installed' },
+  esAlertIdentityInvalid: { id: 'app.edgeStatus.alert.identityInvalid', defaultMessage: 'The edge cannot serve its TLS certificate: it serves this machine only.', description: 'Alert: the installed identity cannot be used' },
+  esAlertCertificateRenewalFailed: { id: 'app.edgeStatus.alert.certificateRenewalFailed', defaultMessage: 'The TLS certificate could not be renewed.', description: 'Alert: issuing the server certificate failed' },
+  esAlertCertificateExpiring: { id: 'app.edgeStatus.alert.certificateExpiring', defaultMessage: 'The TLS certificate expires in under 30 days.', description: 'Alert: the server certificate is close to expiry' },
+  esAlertIntermediateExpiring: { id: 'app.edgeStatus.alert.intermediateExpiring', defaultMessage: 'The facility intermediate is close to expiry: re-provision this edge.', description: 'Alert: the facility intermediate has under 400 days left' },
+  esAlertAddressChanged: { id: 'app.edgeStatus.alert.addressChanged', defaultMessage: "The edge's network address changed; its certificate was reissued.", description: 'Alert: the LAN address changed in the last day' },
+  esCertificate: { id: 'app.edgeStatus.certificate', defaultMessage: 'TLS certificate', description: 'Edge status section heading' },
+  esCertServing: { id: 'app.edgeStatus.certificate.serving', defaultMessage: 'Serving', description: 'TLS certificate state' },
+  esCertNotProvisioned: { id: 'app.edgeStatus.certificate.notProvisioned', defaultMessage: 'Not provisioned', description: 'TLS certificate state' },
+  esCertInvalid: { id: 'app.edgeStatus.certificate.invalid', defaultMessage: 'Cannot be served', description: 'TLS certificate state' },
+  esCertState: { id: 'app.edgeStatus.certificate.state', defaultMessage: 'State', description: 'Edge status: the TLS certificate state' },
+  esCertNames: { id: 'app.edgeStatus.certificate.names', defaultMessage: 'Names', description: "Edge status: the certificate's DNS names and addresses" },
+  esCertExpires: { id: 'app.edgeStatus.certificate.expires', defaultMessage: 'Expires', description: 'Edge status: when the certificate expires' },
+  esCertRenews: { id: 'app.edgeStatus.certificate.renews', defaultMessage: 'Renews', description: 'Edge status: when the certificate is renewed' },
+  esIntermediateExpires: { id: 'app.edgeStatus.certificate.intermediateExpires', defaultMessage: 'Facility intermediate expires', description: 'Edge status: when the facility intermediate expires' },
+  esCertProblem: { id: 'app.edgeStatus.certificate.problem', defaultMessage: 'Last renewal failed', description: 'Edge status: why the last renewal failed' },
   esSystemVolume: { id: 'app.edgeStatus.systemVolume', defaultMessage: 'system disk', description: 'Edge status: the volume holding the operating system' },
   esSystemDisk: { id: 'app.edgeStatus.systemDisk', defaultMessage: 'System disk', description: 'Edge status: label for the volume holding the operating system' },
   esEncryption: { id: 'app.edgeStatus.encryption', defaultMessage: 'Disk encryption', description: 'Edge status: disk encryption section' },

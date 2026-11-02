@@ -16,7 +16,9 @@
 //!
 //! Once ready, the node also takes its scheduled backups ([`backup`]) and logs its health
 //! indicators, which `/api/admin/status` serves to the admin page and the telemetry buffer ships to
-//! central ([`admin`]). Its API is open only to enrolled LAN devices (`enrollment`, #74).
+//! central ([`admin`]). Its API is open only to enrolled LAN devices (`enrollment`, #74), over
+//! TLS with a leaf it issues itself under its facility intermediate (`tls`, #74); before
+//! provisioning it serves plain HTTP on the loopback address only.
 
 pub mod admin;
 pub mod backup;
@@ -25,6 +27,7 @@ mod enrollment;
 mod node;
 mod notify;
 mod supervisor;
+mod tls;
 pub mod update;
 mod ups;
 pub mod web;
@@ -35,4 +38,5 @@ pub use node::{EdgeError, Stop, run, shutdown_signal};
 pub use notify::WindowsScm;
 pub use notify::{Foreground, ServiceManager, Systemd};
 pub use supervisor::{RestartPolicy, Restarts, Supervisor};
+pub use tls::{Certificate, IntermediateKey};
 pub use ups::{Power, PowerState, Ups, UpsError};

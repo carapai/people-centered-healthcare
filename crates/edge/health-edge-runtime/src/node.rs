@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use axum::serve::ListenerExt;
 use health_http::{Readiness, ReadinessCheck, app};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
@@ -16,6 +17,7 @@ use crate::config::EdgeConfig;
 use crate::enrollment::Api;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
+use crate::tls::{self, Certificate, Identity, IntermediateKey, Listen, TlsListener};
 use crate::update::{self, Startup, Updates};
 use crate::ups::PowerState;
 use crate::web::{self, Bundle};
@@ -146,12 +148,14 @@ async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
 /// Runs the node until `stop` resolves, the UPS reports low battery, or a supervised task keeps
 /// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready, and
 /// `encryption` is the composition root's disk-encryption check, run every
-/// `HEALTH_ENCRYPTION_SECS` for the status page.
+/// `HEALTH_ENCRYPTION_SECS` for the status page, and `intermediate_key` unseals the facility
+/// intermediate's key to issue the node's TLS leaf (`tls`).
 pub async fn run(
     config: &EdgeConfig,
     manager: Arc<dyn ServiceManager>,
     telemetry: Option<Arc<Buffer>>,
     encryption: Option<EncryptionCheck>,
+    intermediate_key: Option<IntermediateKey>,
     stop: impl Future<Output = ()>,
 ) -> Result<Stop, EdgeError> {
     let store = Store::default();
@@ -172,24 +176,69 @@ pub async fn run(
         buffer: telemetry.clone(),
         shipping: ShipState::default(),
         encryption: encryption.as_ref().map(|_| EncryptionState::default()),
+        certificate: Arc::new(std::sync::Mutex::new(Certificate::unprovisioned())),
     };
     let api = Api::default();
     let routes = web::routes(Bundle::embedded())
         .merge(admin::routes(monitor.clone()))
         .merge(api.routes());
     let router = app(routes, readiness);
-    let listener = tokio::net::TcpListener::bind(config.bind)
+    let identity = Arc::new(Identity::new(config, intermediate_key));
+    let certificate = Arc::clone(&monitor.certificate);
+    let serving_with = {
+        let (identity, certificate) = (Arc::clone(&identity), Arc::clone(&certificate));
+        tokio::task::spawn_blocking(move || tls::prepare(&identity, &certificate))
+            .await
+            .unwrap_or(Listen::ConsoleOnly)
+    };
+    // One stop signal for every listener: a `Notify` would wake only one of them.
+    let (drain, draining) = tokio::sync::watch::channel(false);
+    let shutdown = move || {
+        let mut draining = draining.clone();
+        async move {
+            let _ = draining.wait_for(|stop| *stop).await;
+        }
+    };
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let mut servers = Vec::new();
+    // The edge's own screen: plain HTTP on the loopback address, provisioned or not, where the
+    // admin pages answer until staff sign-in (#75). The LAN never reaches it.
+    let console = tokio::net::TcpListener::bind(config.console_bind)
         .await
         .map_err(EdgeError::Listen)?;
-    tracing::info!(outcome = "listening", "facility edge listening");
-    let drain = Arc::new(Notify::new());
-    let draining = Arc::clone(&drain);
-    let server = tokio::spawn(async move {
-        let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
-        axum::serve(listener, service)
-            .with_graceful_shutdown(async move { draining.notified().await })
-            .await
-    });
+    tracing::info!(
+        outcome = "listening",
+        tls = false,
+        "facility edge console listening"
+    );
+    servers.push(tokio::spawn(
+        axum::serve(console, service.clone())
+            .with_graceful_shutdown(shutdown())
+            .into_future(),
+    ));
+    let resolver = match serving_with {
+        Listen::Https(resolver) => {
+            let tcp = tokio::net::TcpListener::bind(config.bind)
+                .await
+                .map_err(EdgeError::Listen)?;
+            let tls = resolver
+                .server_config()
+                .map_err(|e| EdgeError::Listen(std::io::Error::other(e)))?;
+            // `tap_io` gives the connections the peer address `ConnectInfo` reads.
+            let listener = TlsListener::new(tcp, tls)
+                .map_err(EdgeError::Listen)?
+                .tap_io(|_| {});
+            tracing::info!(outcome = "listening", tls = true, "facility edge listening");
+            servers.push(tokio::spawn(
+                axum::serve(listener, service)
+                    .with_graceful_shutdown(shutdown())
+                    .into_future(),
+            ));
+            Some(resolver)
+        }
+        // Nothing to serve the LAN with: the console alone.
+        Listen::ConsoleOnly => None,
+    };
 
     let updates = Updates::new(&config.update_dir);
     let binary = std::env::current_exe().map_err(|e| EdgeError::Update(e.into()))?;
@@ -277,6 +326,17 @@ pub async fn run(
             admin::watch_encryption(Arc::clone(&check), Arc::clone(&state), every)
         });
     }
+    if let Some(resolver) = resolver {
+        let (every, state) = (config.certificate_interval, Arc::clone(&certificate));
+        supervisor.spawn("certificate", move || {
+            tls::watch(
+                Arc::clone(&identity),
+                Arc::clone(&resolver),
+                Arc::clone(&state),
+                every,
+            )
+        });
+    }
     let every = config.indicators_interval;
     let watching = monitor.clone();
     supervisor.spawn("indicators", move || watching.clone().watch(every));
@@ -314,13 +374,27 @@ pub async fn run(
     // Stop: report not-ready, then let in-flight requests finish within the drain time.
     serving.0.store(false, Ordering::SeqCst);
     manager.stopping();
-    drain.notify_one();
-    let served = extending(manager.as_ref(), tokio::time::timeout(config.drain, server)).await;
+    let _ = drain.send(true);
+    let all = async {
+        let mut results = Vec::new();
+        for server in servers {
+            results.push(server.await);
+        }
+        results
+    };
+    let served = extending(manager.as_ref(), tokio::time::timeout(config.drain, all)).await;
     drop(supervisor);
     match served {
-        Ok(Ok(Ok(()))) => tracing::info!(outcome = "stopped", "facility edge stopped"),
-        Ok(Ok(Err(error))) => return Err(EdgeError::Serve(error)),
-        Ok(Err(_)) => return Err(EdgeError::Serve(std::io::ErrorKind::Other.into())),
+        Ok(results) => {
+            for result in results {
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => return Err(EdgeError::Serve(error)),
+                    Err(_) => return Err(EdgeError::Serve(std::io::ErrorKind::Other.into())),
+                }
+            }
+            tracing::info!(outcome = "stopped", "facility edge stopped");
+        }
         Err(_) => tracing::warn!(
             outcome = "drain-timeout",
             "requests still in flight at stop"

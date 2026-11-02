@@ -27,9 +27,13 @@ Environment=HEALTH_ENCRYPTION_STATE_FILE=/run/health/encryption.json
 LoadCredentialEncrypted=health.facility-intermediate.key
 User=health
 Group=health
+# The unprivileged service may bind TCP 443 (lan-security.md), and nothing else privileged.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 StateDirectory=health
 RuntimeDirectory=health
-# HEALTH_DATA_DIR is under /var/lib/health, the only writable path.
+# HEALTH_DATA_DIR is under /var/lib/health, the only writable path; the node keeps its TLS
+# leaf beside it in /var/lib/health/tls.
 # The edge keeps systemd informed: READY after migrations, WATCHDOG while alive, and
 # EXTEND_TIMEOUT_USEC while a migration or drain runs.
 TimeoutStartSec=120

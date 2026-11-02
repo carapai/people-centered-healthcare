@@ -24,6 +24,16 @@ const report = parseJson(
       findings: [{ code: 'disk-unencrypted', subject: 'data' }],
       exemption: null,
     },
+    certificate: {
+      state: 'serving',
+      names: ['facility-edge.local'],
+      addresses: ['192.168.1.10'],
+      expires: '2027-12-04T09:00:00Z',
+      renews: '2027-08-01T09:00:00Z',
+      intermediate_expires: '2031-11-02T09:00:00Z',
+      problem: null,
+      address_changed: null,
+    },
     pending: ['sync'],
     alerts: [{ code: 'disk-full', subject: 'data' }],
   }),
@@ -39,6 +49,7 @@ describe('edge status', () => {
     expect(got.store_bytes).toBe(1048576)
     expect(got.volumes[0] === undefined ? undefined : usedPercent(got.volumes[0])).toBe(85)
     expect(got.alerts).toEqual([{ code: 'disk-full', subject: 'data' }])
+    expect(got.certificate.state).toBe('serving')
   })
 
   test('a refusal carries its status, so the page tells a remote browser from a failure', async () => {
@@ -72,6 +83,13 @@ describe('edge status', () => {
       const text = alertText(intl, { code, subject })
       expect(text).not.toBe(code)
       if (subject !== null) expect(text).toContain(`${subject} disk`)
+    }
+  })
+
+  test('every certificate alert the edge raises has its sentence', () => {
+    const intl = createIntl({ locale: 'en', defaultLocale: 'en' })
+    for (const code of ['not-provisioned', 'identity-invalid', 'certificate-renewal-failed', 'certificate-expiring', 'intermediate-expiring', 'address-changed']) {
+      expect(alertText(intl, { code, subject: null })).not.toBe(code)
     }
   })
 })
