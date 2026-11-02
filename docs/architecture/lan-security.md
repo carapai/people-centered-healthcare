@@ -1,6 +1,6 @@
 # LAN connectivity: discovery, TLS trust and device enrollment
 
-Status: **accepted** (ADRs 0008, 0009). Produced while resolving the Wayfinder ticket [How do LAN clients find and trust the Facility Edge Node?](https://github.com/carapai/people-centered-healthcare/issues/19). Background: [docs/research/facility-edge.md](../research/facility-edge.md). The process model is in [facility-edge.md](facility-edge.md). Staff login on top of device enrollment is decided in [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20).
+Status: **accepted** (ADRs 0008, 0009, 0058). Produced while resolving the Wayfinder ticket [How do LAN clients find and trust the Facility Edge Node?](https://github.com/carapai/people-centered-healthcare/issues/19). Background: [docs/research/facility-edge.md](../research/facility-edge.md). The process model is in [facility-edge.md](facility-edge.md). Staff login on top of device enrollment is decided in [How do staff authenticate and get authorized offline?](https://github.com/carapai/people-centered-healthcare/issues/20).
 
 ## Supported LAN clients (v1)
 
@@ -15,12 +15,15 @@ Status: **accepted** (ADRs 0008, 0009). Produced while resolving the Wayfinder t
 
 ```mermaid
 flowchart TD
-  R[National root<br/>offline, country configuration] --> I[Facility intermediate<br/>5 y, name-constrained]
+  R[National root<br/>offline, country configuration, 25 y] --> C[Facility issuing CA<br/>central HSM/KMS, 10 y, name-constrained]
+  R --> P[Publication signing<br/>code signing only, yearly]
+  C --> I[Facility intermediate<br/>5 y, name-constrained]
   I --> L[Edge server leaf<br/>397 d, self-renewed]
 ```
 
 - **Root.** The root is offline and held as country configuration. For Uganda the platform operator holds it until MoH governance is decided (see the map's Not yet specified). It is installed on browser client PCs at enrollment.
-- **Facility intermediate.** Central issues one per facility at edge provisioning, valid 5 years. Its name constraints permit only that facility's DNS names (`<node-id>.local` and the configured facility name) and the RFC 1918 / ULA IP ranges, so a compromised edge cannot mint certificates for other names. Its private key sits in the edge's OS keystore.
+- **Facility issuing CA (ADR 0058).** The root issues it at a ceremony, and central holds its key non-exportable in its HSM or KMS. It is valid 10 years and issues only in its first 5, after which a successor takes over. Its name constraints permit only `.local`, the country's configured facility DNS suffixes and the private IP ranges, so even its key cannot mint a certificate for a public name.
+- **Facility intermediate.** Central's issuing CA issues one per facility at edge provisioning, valid 5 years. The edge generates the key in its keystore and sends a certificate signing request; central keeps only the public key and sets everything else from the facility registry. Its name constraints permit only that facility's DNS names (`<node-id>.local` and the configured facility name) and the RFC 1918 / ULA IP ranges, so a compromised edge cannot mint certificates for other names. Its private key sits in the edge's OS keystore.
 - **Leaf.** The edge issues its own server certificate with `rcgen` and serves it with rustls.
   - ECDSA P-256, serverAuth EKU.
   - SANs: the node's static IP(s), `<node-id>.local`, and the optional configured DNS name. Names go in SANs, never in the CN alone.
@@ -57,7 +60,7 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
 ## Revocation
 
 - **Devices.** A device is revoked on the edge admin page, or at central with the change synced down. The edge removes the key from its registry, rejects that key's next token request, and ends its open sessions immediately. Because tokens are short-lived DPoP tokens, nothing outlives one token lifetime. The revocation is audited.
-- **Facility intermediates.** Central revokes a compromised intermediate and issues a new one. Tauri clients receive revocations and new pins through sync. Browsers cannot check private-CA revocation offline, so they rely on the leaf lifetime and re-provisioning. This is a known, accepted limitation.
+- **Facility intermediates.** Central revokes a compromised intermediate on the issuing CA's CRL and issues a new one. The root's CRL, reissued at each ceremony and at least every 13 months, covers issuing CAs and publication-signing certificates (ADR 0058). Tauri clients receive revocations and new pins through sync. Browsers cannot check private-CA revocation offline, so they rely on the leaf lifetime and re-provisioning. This is a known, accepted limitation.
 
 ## Denying unauthorized LAN devices
 

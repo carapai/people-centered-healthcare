@@ -5,7 +5,7 @@ Every Published Definition is distributed in a FHIR NPM package:
 - a CRMI-style manifest Library that pins every dependency `url|version`, including ValueSet expansions;
 - a `configuration/` folder of JSON-Schema-validated, non-FHIR configuration;
 - a `tests/` folder of fixtures;
-- a detached signature from a publication-signing intermediate under the platform root.
+- a detached signature from a publication-signing intermediate under the platform root (amended by ADR 0058: a code-signing certificate issued by the root, not a CA).
 
 **Kinds.** There are five package kinds: national core, terminology, program, country configuration, and district or facility override.
 
