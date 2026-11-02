@@ -68,6 +68,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-observability` | crate |
 | `health-files` | crate |
 | `health-backup` | crate (encrypted logical backups, verify and restore) |
+| `health-pki` | crate (the private PKI: each tier's issuance from requests, CRLs and chain verification; ADRs 0008, 0058) |
 | `health-crypto` | crate |
 | `health-sync-server` | crate |
 | `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |
@@ -98,6 +99,7 @@ The edge and desktop runtimes reuse the same domain and application crates as ce
 | Tool | Purpose | Source |
 |---|---|---|
 | `tools/architecture-checks` | Layer and dependency rules from `cargo metadata` | dependency-rules.md |
+| `tools/pki` | The PKI's ceremonies and issuance, with the root ceremony runbook | lan-security.md, ADR 0058 |
 | `tools/synthetic-data` | Synthetic patients, facilities, stock, prices and payer contracts with Ugandan distributions | testing.md |
 | `health-cli` | Development CLI (§108); only justified commands, starting with `check architecture` | MASTER_PROMPT §108 |
 

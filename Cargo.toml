@@ -30,6 +30,7 @@ members = [
     "crates/infrastructure/health-http",
     "crates/infrastructure/health-integration",
     "crates/infrastructure/health-observability",
+    "crates/infrastructure/health-pki",
     "crates/infrastructure/health-surrealdb",
     "crates/testing/health-persistence-memory",
     "crates/edge/health-edge-runtime",
@@ -37,6 +38,7 @@ members = [
     "apps/server/facility-edge",
     "tools/architecture-checks",
     "tools/fhir-element-table",
+    "tools/pki",
     "tools/synthetic-data",
 ]
 # Vendored upstream crates are path dependencies through [patch.crates-io], not members.
@@ -77,6 +79,7 @@ health-patient-engagement-app = { path = "crates/application/health-patient-enga
 health-payments-app = { path = "crates/application/health-payments-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
+health-pki = { path = "crates/infrastructure/health-pki" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
 health-registries-app = { path = "crates/application/health-registries-app" }
 health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
@@ -105,8 +108,12 @@ opentelemetry-otlp = { version = "0.33.1", default-features = false, features = 
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
 p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
 pollster = "1.0.1"
+# Certificates and CRLs for the private PKI (ADRs 0008, 0058), on ring like rustls.
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "ring", "pem", "x509-parser"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 regex = "1.13.1"
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
+rustls-webpki = { version = "0.103.16", default-features = false, features = ["std", "ring"] }
 rust_decimal = "1.43.0"
 reqwest = { version = "0.13.5", default-features = false }
 rphonetic = { version = "4.0.0", default-features = false }
@@ -116,6 +123,7 @@ sha2 = "0.11.1"
 serde_json = { version = "1.0.154", features = ["arbitrary_precision", "preserve_order"] }
 # The exact 3.3.x pin shared by every runtime (persistence.md § Engine, version and process).
 surrealdb = { version = "=3.3.5", default-features = false }
+time = { version = "0.3.55", default-features = false, features = ["std"] }
 tempfile = "3.27.0"
 tar = { version = "0.4.44", default-features = false }
 thiserror = "2.0.21"
@@ -126,6 +134,8 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "registry", "env-filter"] }
 unicode-normalization = "0.1.26"
 windows-service = "0.8.0"
+# Reads the PKI's own certificates back: path length, names and validity (health-pki).
+x509-parser = "0.18.1"
 uuid = { version = "1.29.0", features = ["serde", "v5", "v7"] }
 utoipa = { version = "6.0.0", default-features = false, features = ["macros"] }
 utoipa-axum = "0.3.0"
