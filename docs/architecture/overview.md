@@ -149,6 +149,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0055](../adr/0055-default-blocking-keys-and-stop-list.md) | Default blocking uses five narrow keys with an hourly stop-list, and blocking recall is proven before launch |
 | [0056](../adr/0056-central-sessions-act-for-one-facility-with-patient-confined-shared-reads.md) | Central sessions act for one facility, other facilities' records open only to patient-confined reads, and purpose of use is a header defaulting to TREAT |
 | [0057](../adr/0057-facility-scope-records-carry-a-facility-tag.md) | Facility-scope records carry a facility tag that the server stamps, and searches filter by it |
+| [0058](../adr/0058-online-issuing-ca-under-the-offline-root.md) | Facility intermediates come from an online, name-constrained issuing CA under the offline national root |
 
 ## Still open
 

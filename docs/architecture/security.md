@@ -54,11 +54,12 @@ Permissions are enforced in the Rust services on every node, never only in the U
 | Key | Holder | Purpose | Rotation and custody | Source |
 |---|---|---|---|---|
 | National root | Offline; the platform operator until MoH governance is decided | Anchors the private PKI | Ceremony; custody in fog | ADR 0008 |
-| Facility intermediate | Edge OS keystore | LAN TLS for the facility's names | 5 years; revoked centrally | ADR 0008 |
+| Facility issuing CA | Central HSM/KMS, non-exportable | Issues facility intermediates at provisioning | 10 years, issuing for the first 5; issued at a root ceremony | ADR 0058 |
+| Facility intermediate | Edge OS keystore | LAN TLS for the facility's names | 5 years; revoked on the issuing CA's CRL | ADRs 0008, 0058 |
 | Node and device keys | OS keystore (edge, desktop); non-extractable WebCrypto key (browser) | mTLS and DPoP | Re-enrollment; never recycled | ADRs 0009, 0013, 0040 |
 | Edge pepper | Edge OS keystore (CNG machine key, or TPM where present) | Wraps the credential hashes | — | offline-auth.md |
 | Permission-snapshot signing | Central | Signs per-user snapshots | — | ADR 0011 |
-| Publication signing | Central HSM/KMS | Signs definition packages | Yearly | ADR 0024 |
+| Publication signing | Central HSM/KMS | Signs definition packages; a code-signing certificate under the root, never a CA | Yearly, at a root ceremony | ADRs 0024, 0058 |
 | Release signing | Azure Artifact Signing, KMS, GPG, cosign | Installers, updater artifacts, edge packages, images | Per ADR 0045 | ADRs 0041, 0045 |
 | Disk recovery keys (edge) | Wrapped and escrowed in central KMS; read out by phone to a verified facility admin; no on-site copy | Unlocks the edge's full-disk encryption when the TPM cannot | Rotated after every use | ADR 0048 |
 | Backup keys | Per node, wrapped and escrowed in central KMS; central master key under 3-of-5 Shamir | Backup encryption | Runbook custodians | ADR 0046 |

@@ -1,5 +1,7 @@
 # LAN TLS uses a private PKI with a name-constrained intermediate per facility
 
+> Amended by ADR 0058: facility intermediates are issued by an online facility issuing CA under this offline root, so the PKI has four tiers.
+
 LAN clients reach the Facility Edge Node over HTTPS backed by a private PKI with three tiers:
 - **Root:** an offline national root, held as country configuration.
 - **Intermediate:** one per facility, issued to its edge at provisioning, valid 5 years, and name-constrained to that facility's DNS names and the private IP ranges.
