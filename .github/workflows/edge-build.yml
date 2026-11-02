@@ -1,8 +1,9 @@
 # The Facility Edge Node on its two platforms (deployment.md § Workflows): the edge crates'
 # checks, and the binary run under the real service manager (facility-edge.md § OS service).
-# Pull requests run the debug binary, which `cargo test` has already mostly built; the release
-# build, three times as slow from cold, runs on main and in the merge queue. PR builds are
-# unsigned; release signing comes with release.yml.
+# On Ubuntu, pull requests run the debug binary; the release build, three times as slow from
+# cold, runs on main and in the merge queue. Windows always runs the release binary: the debug
+# one does not start under the SCM (its large debug futures likely overflow the service thread's
+# 1 MB stack). PR builds are unsigned; release signing comes with release.yml.
 name: edge-build
 
 on:
@@ -49,15 +50,13 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
       - run: cargo clippy --locked -p health-edge-runtime -p health-node-identity -p facility-edge --all-targets -- -D warnings
       - run: cargo test --locked -p health-edge-runtime -p health-node-identity
-      - run: cargo build --locked -p facility-edge
-      - if: github.event_name != 'pull_request'
-        run: cargo build --locked --release -p facility-edge
+      - run: cargo build --locked --release -p facility-edge
       - name: Run it as a Windows service
         shell: pwsh
         run: |
           $store = Join-Path $env:RUNNER_TEMP 'edge\store'
           ./apps/server/facility-edge/packaging/install-service.ps1 `
-            -Binary (Resolve-Path target/debug/facility-edge.exe) `
+            -Binary (Resolve-Path target/release/facility-edge.exe) `
             -Environment "HEALTH_DATA_DIR=$store", 'HEALTH_CONSOLE_BIND=127.0.0.1:8080'
           Start-Service facility-edge
           $deadline = (Get-Date).AddMinutes(2)
