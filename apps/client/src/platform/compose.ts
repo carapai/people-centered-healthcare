@@ -1,4 +1,5 @@
 import { bearerAuth, dpopAuth } from './auth'
+import { type DeviceKeys, deviceKeys, indexedDbKeyStorage } from './device'
 import { sseEventSource } from './events'
 import { fhirClient } from './fhir'
 import { registriesCommands } from './registries'
@@ -68,12 +69,14 @@ export async function composePlatform(): Promise<Platform> {
   // A shell cached from before an edge update reloads; the page never composes meanwhile.
   if (!checkVersion(config.build, import.meta.env.VITE_HEALTH_BUILD)) return new Promise(() => {})
   if (config.mode === 'edge') registerShellWorker()
-  return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem, config.portal)
+  // On an edge, the device's key proves it in every request (ADR 0009).
+  const device = config.mode === 'edge' ? await deviceKeys(indexedDbKeyStorage()) : undefined
+  return httpPlatform(config.mode, config.apiBase, fetch, config.auth, config.fhirBase, config.ninSystem, config.portal, device)
 }
 
 /**
- * Central: a bearer token from the OIDC session. Edge: tokens DPoP-bound to the enrolled device
- * key, which enrollment (#74) provides; until then requests carry no credentials.
+ * Central: a bearer token from the OIDC session. Edge: DPoP proofs by the device's key (`device`),
+ * binding its tokens once staff sign in (#75); before the device has a key, requests carry none.
  */
 export function httpPlatform(
   mode: RuntimeConfig['mode'],
@@ -83,9 +86,10 @@ export function httpPlatform(
   fhirBase?: string,
   ninSystem?: string,
   portalConfig?: RuntimeConfig['portal'],
+  device?: DeviceKeys,
 ): Platform {
   const session = memorySession()
-  const auth = mode === 'central' ? bearerAuth(session) : dpopAuth(session, () => undefined)
+  const auth = mode === 'central' ? bearerAuth(session) : dpopAuth(session, () => device?.current())
   const transport = httpTransport(apiBase, auth, fetchImpl)
   // FHIR is served beside the API (central: `/fhir`), or under it when runtime.json names no base.
   const fhirTransport = fhirBase === undefined ? transport : httpTransport('', auth, fetchImpl)
@@ -112,6 +116,7 @@ export function httpPlatform(
     // Edges sign in with DPoP-bound tokens once devices are enrolled (#74, #75).
     ...(signInConfig === undefined || mode !== 'central' ? {} : { signIn: signIn(signInConfig, session, { fetch: fetchImpl }) }),
     ...(portal === undefined ? {} : { portal }),
+    ...(device === undefined ? {} : { device }),
     events: sseEventSource(`${apiBase.replace(/\/$/, '')}/events`, auth, { fetch: fetchImpl }),
     capabilities: {
       offlineCapable: mode === 'edge',

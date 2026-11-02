@@ -17,10 +17,15 @@ describe('dpopAuth', async () => {
   const session = memorySession()
   const auth = dpopAuth(session, () => keys)
 
-  test('sends nothing without a token or a device key', async () => {
-    expect(await auth.headers('GET', new URL('https://edge.example/a'))).toEqual({})
+  test('sends nothing without a device key, and the proof alone before sign-in', async () => {
     session.setAccessToken('t')
     expect(await dpopAuth(session, () => undefined).headers('GET', new URL('https://edge.example/a'))).toEqual({})
+    const signedOut = memorySession()
+    const headers = await dpopAuth(signedOut, () => keys).headers('POST', new URL('https://edge.example/api/enrollment'))
+    expect(headers['authorization']).toBeUndefined()
+    const claims = decode(headers['dpop']?.split('.')[1] ?? '') as Record<string, unknown>
+    expect(claims['htu']).toBe('https://edge.example/api/enrollment')
+    expect(claims['ath']).toBeUndefined()
   })
 
   test('signs an RFC 9449 proof bound to the token, method and URI', async () => {

@@ -24,11 +24,12 @@ const storageApis: [RegExp, string][] = [
 ]
 
 /**
- * Files allowed to use browser storage: user-keyed UI preferences, and the OAuth transaction
- * (PKCE verifier and state) kept across the sign-in redirect, which is removed at the callback.
- * Neither is clinical data.
+ * Files allowed to use browser storage: user-keyed UI preferences, the OAuth transaction (PKCE
+ * verifier and state) kept across the sign-in redirect, which is removed at the callback, and the
+ * device's enrollment key pair, whose private key the browser will not export (ADR 0009). None is
+ * clinical data.
  */
-const storageAllowlist = new Set(['platform/preferences.ts', 'platform/sign-in.ts'])
+const storageAllowlist = new Set(['platform/preferences.ts', 'platform/sign-in.ts', 'platform/device.ts'])
 
 /** Code allowed to know the runtime: the composition boundary and the status area. */
 function mayCheckRuntime(file: string): boolean {

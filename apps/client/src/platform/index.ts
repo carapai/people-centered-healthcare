@@ -1,4 +1,5 @@
 export { type AuthStrategy, bearerAuth, dpopAuth } from './auth'
+export { type DeviceKeys, type KeyStorage, deviceKeys, memoryKeyStorage } from './device'
 export { composePlatform } from './compose'
 export { PlatformProvider, usePlatform } from './context'
 export { type FhirClient, FhirError, type ResourceType } from './fhir'

@@ -25,8 +25,9 @@ export function bearerAuth(session: SessionPort): AuthStrategy {
 }
 
 /**
- * RFC 9449 DPoP. `deviceKey` returns the enrolled device's ES256 key pair (a non-extractable
- * private key; enrollment stores it, #74), or nothing before enrollment.
+ * RFC 9449 DPoP. `deviceKey` returns the device's ES256 key pair (a non-extractable private key,
+ * `DeviceKeys`), or nothing before the device has one. Every request then carries a proof, which
+ * the edge's device gate requires (ADR 0009); with a token it is also bound to it (`ath`).
  */
 export function dpopAuth(session: SessionPort, deviceKey: () => CryptoKeyPair | undefined): AuthStrategy {
   let nonce: string | undefined
@@ -43,9 +44,10 @@ export function dpopAuth(session: SessionPort, deviceKey: () => CryptoKeyPair | 
 
   return {
     async headers(method, url) {
-      const token = session.accessToken()
       const keys = deviceKey()
-      if (token === undefined || keys === undefined) return {}
+      if (keys === undefined) return {}
+      // Before sign-in the proof alone, which the edge's device gate requires of every API call.
+      const token = session.accessToken()
       const header = { typ: 'dpop+jwt', alg: 'ES256', jwk: await publicJwk(keys.publicKey) }
       const claims = {
         jti: crypto.randomUUID(),
@@ -53,12 +55,13 @@ export function dpopAuth(session: SessionPort, deviceKey: () => CryptoKeyPair | 
         // The URI without query and fragment (RFC 9449 § 4.2).
         htu: url.origin + url.pathname,
         iat: Math.floor(Date.now() / 1000),
-        ath: base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(token)))),
+        ...(token === undefined ? {} : { ath: base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(token)))) }),
         ...(nonce === undefined ? {} : { nonce }),
       }
       const input = `${base64url(utf8(JSON.stringify(header)))}.${base64url(utf8(JSON.stringify(claims)))}`
       const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.privateKey, utf8(input))
-      return { authorization: `DPoP ${token}`, dpop: `${input}.${base64url(new Uint8Array(signature))}` }
+      const dpop = `${input}.${base64url(new Uint8Array(signature))}`
+      return token === undefined ? { dpop } : { authorization: `DPoP ${token}`, dpop }
     },
     retryWithNonce(response) {
       const next = response.headers.get('dpop-nonce')
