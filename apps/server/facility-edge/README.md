@@ -37,6 +37,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_ENCRYPTION_STATE_FILE` | none; the unit sets `/run/health/encryption.json` | The privileged probe's result. Without it, the node probes the host itself, which needs administrator rights (the Windows service runs as LocalSystem) |
 | `HEALTH_ENCRYPTION_EXEMPTION` | none | The country-configuration grant exempting this facility from full-disk encryption (ADR 0048): a standing alert |
 | `HEALTH_ENCRYPTION_SECS` | `3600` | How often disk encryption is checked |
+| `HEALTH_PKI_DIR` | `pki` beside `HEALTH_DATA_DIR` | The installed national root and facility intermediate chain. The intermediate's key is in the keystore, never here |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -58,7 +59,8 @@ The binary embeds the client and serves it, with its `runtime.json` and app-shel
 | 7 | An update step failed, or an `update` command was refused | not restarted |
 | 8 | A failed update's store is restored, and the binary is left for the service manager | not restarted; `OnFailure=` runs `packaging/facility-edge-rollback.service` |
 | 9 | A `backup` command failed | (commands only) |
-| 10 | `encryption check` refused provisioning, or an `encryption` command failed | (commands only) |
+| 10 | The encryption gate refused provisioning (`encryption check`, `provision request`), or an `encryption` command failed | (commands only) |
+| 11 | A `provision` command failed | (commands only) |
 
 The first start and three restarts are allowed within 24 hours. After that the unit stays stopped.
 
@@ -91,6 +93,27 @@ The running node takes a backup every hour and test-restores the newest one ever
 - `facility-edge backup status`: prints `status.json` and the backups kept.
 
 A backup on demand while the node runs is not available yet: the admin page (#77) shows the backup status only.
+
+## Provisioning
+
+The edge's half of provisioning (lan-security.md; ADRs 0048, 0058). Central's half is #268: the one-time code, the node ID, and recovery-key escrow.
+
+1. **`facility-edge provision request --out FILE`** runs as root or Administrator.
+   - The encryption gate comes first: it exits 10 unless the machine complies or `HEALTH_ENCRYPTION_EXEMPTION` exempts it.
+   - It then generates the facility intermediate's P-256 key and seals it as `health.facility-intermediate.key`, which is never replaced. A re-provisioned machine is a new node.
+   - Last, it writes the request for central's issuing CA.
+2. **Central issues the intermediate** from the request. Until #268, that is `tools/pki facility`.
+3. **`facility-edge provision install --chain FILE --root FILE`** takes the chain (the intermediate, then the issuing CA) and the national root.
+   - It unseals the key and checks that the certificate is a facility intermediate for it.
+   - It issues a throwaway leaf for `<HEALTH_NODE_ID>.local` and verifies it against the root.
+   - Only then does it install both under `HEALTH_PKI_DIR`.
+4. **`facility-edge provision status`** prints what is sealed and installed, and when the intermediate expires.
+
+**The keystore** (`health_node_identity::keystore`):
+- **Linux:** `systemd-creds encrypt --with-key=auto`, with the host key plus the TPM2 where present, into `/etc/credstore.encrypted/`. The unit's `LoadCredentialEncrypted=health.facility-intermediate.key` unseals it into the unprivileged service's `$CREDENTIALS_DIRECTORY`. Before provisioning it is absent, which is not fatal.
+- **Windows:** DPAPI in machine scope through PowerShell, into `%ProgramData%\health\credentials\`, readable by SYSTEM and Administrators only. The LocalSystem service unseals it itself.
+
+**At each start** the node logs `identity-loaded`, or a `not-provisioned` or `identity-invalid` alert. It serves either way until LAN TLS needs the intermediate (#74).
 
 ## Health monitoring
 
@@ -137,3 +160,11 @@ The node measures its indicators and raises alerts against the thresholds in fac
 - a corrupt file is `encryption-unknown`, never a pass;
 - `encryption check` refuses this (unprivileged) machine with exit 10, and passes it when exempted;
 - `encryption probe --out` writes the file the unit hands the service.
+
+`tests/provision.rs` runs the built binary (Unix), with the key where systemd would unseal it (`$CREDENTIALS_DIRECTORY`):
+- `provision request` refuses this unencrypted machine with exit 10, before any key or request exists;
+- `provision install` refuses a chain issued to another node, a chain for another key, and a chain under another root (exit 11);
+- the real chain is installed with its root, and the key is never written beside it;
+- `provision status` reports what is sealed and installed, and the expiry.
+
+Sealing with systemd-creds needs root. The edge-build systemd job provisions the installed unit end to end: it seals the key, issues the chain with `tools/pki`, installs it, and checks the journal for `identity-loaded`.

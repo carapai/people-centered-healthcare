@@ -9,6 +9,8 @@
 //! - `facility-edge backup …`: backups on demand, to USB, verify and restore ([`backup`]).
 //! - `facility-edge encryption …`: the full-disk encryption probe and provisioning gate
 //!   ([`encryption`]).
+//! - `facility-edge provision …`: the facility intermediate's sealed key, request and install
+//!   ([`provision`]).
 //!
 //! Exit codes, for the service manager and the update rollback:
 //!
@@ -23,11 +25,13 @@
 //! | 7 | an update step failed, or an `update` command was refused: needs a person |
 //! | 8 | a failed update's store is restored; the service manager restores the previous binary |
 //! | 9 | a `backup` command failed |
-//! | 10 | `encryption check` refused provisioning, or an `encryption` command failed |
+//! | 10 | the encryption gate refused provisioning, or an `encryption` command failed |
+//! | 11 | a `provision` command failed |
 //! | 1 | anything else (the listener, telemetry, serving) |
 
 mod backup;
 mod encryption;
+mod provision;
 mod service;
 mod update;
 
@@ -72,8 +76,21 @@ fn main() -> ExitCode {
                 ExitCode::from(10)
             }
         },
+        Some("provision") => match provision::run(&config, &args[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(provision::Failure::Refused(error)) => {
+                eprintln!("facility-edge: {error}");
+                ExitCode::from(10)
+            }
+            Err(provision::Failure::Failed(error)) => {
+                eprintln!("facility-edge: {error}");
+                ExitCode::from(11)
+            }
+        },
         Some(_) => {
-            eprintln!("usage: facility-edge [--service | update … | backup … | encryption …]");
+            eprintln!(
+                "usage: facility-edge [--service | update … | backup … | encryption … | provision …]"
+            );
             ExitCode::from(2)
         }
     }
@@ -129,6 +146,7 @@ async fn serve(
             return 2;
         }
     };
+    provision::log_identity(config);
     if buffer.is_none() {
         tracing::warn!(
             alert = "telemetry-unbuffered",

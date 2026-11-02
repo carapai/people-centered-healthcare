@@ -67,6 +67,10 @@ pub struct EdgeConfig {
     pub encryption_exemption: Option<String>,
     /// `HEALTH_ENCRYPTION_SECS`: how often disk encryption is checked, default 3600.
     pub encryption_interval: Duration,
+    /// `HEALTH_PKI_DIR`: the national root and the facility intermediate's chain, installed at
+    /// provisioning. Default: `pki` beside the data directory. The intermediate's key is in the
+    /// keystore, never here.
+    pub pki_dir: PathBuf,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -105,6 +109,9 @@ impl EdgeConfig {
             telemetry_dir: get("HEALTH_TELEMETRY_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| data_dir.with_file_name("telemetry")),
+            pki_dir: get("HEALTH_PKI_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| data_dir.with_file_name("pki")),
             data_dir,
             bind: get("HEALTH_BIND")
                 .unwrap_or_else(|| "0.0.0.0:8080".into())
@@ -172,6 +179,7 @@ mod tests {
             (None, None)
         );
         assert_eq!(c.encryption_interval, Duration::from_secs(3600));
+        assert_eq!(c.pki_dir, PathBuf::from("/var/lib/pki"));
     }
 
     #[test]

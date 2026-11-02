@@ -73,8 +73,9 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
 ## In code
 
 - **#67:** `health-pki` issues every tier from a PKCS#10 request, keeping only its public key, and refuses names outside the issuer's constraints, public IPs and certificates that would outlive their issuer. It publishes numbered CRLs, and its `Trust` verifies served chains against the root and CRLs. `tools/pki` runs the ceremonies, with a draft runbook (`tools/pki/RUNBOOK.md`).
+- **#73:** `facility-edge provision request` passes the encryption gate, generates the intermediate's key on the edge, seals it in the keystore (systemd-creds or DPAPI) and writes the request. `provision install` keeps a chain only if a leaf it issues for `<node-id>.local` verifies against the root. The systemd unit unseals the key for the service with `LoadCredentialEncrypted=`.
 - **Still to come:**
-  - keystore and HSM signing (#73 and central provisioning);
+  - central provisioning and HSM signing for the issuing CA (#268);
   - the edge's leaf renewal and pairing pins (#74);
   - CRL delivery in the sync revocation lane;
   - the real ceremony and root custody (#265).

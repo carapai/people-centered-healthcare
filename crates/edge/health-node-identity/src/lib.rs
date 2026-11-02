@@ -3,7 +3,8 @@
 //!
 //! - [`encryption`]: the full-disk encryption check, the provisioning gate and its exemption
 //!   (ADR 0048).
-//!
-//! Node keys in the OS keystore and the facility intermediate's installation follow (#73).
+//! - [`keystore`]: sealed secrets, such as the facility intermediate's key: systemd-creds on
+//!   Linux, DPAPI in machine scope on Windows.
 
 pub mod encryption;
+pub mod keystore;

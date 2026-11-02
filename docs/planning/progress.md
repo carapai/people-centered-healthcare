@@ -6,10 +6,10 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 25 | 26 |
-| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 4 | 7 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
+| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 5 | 8 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
-| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
+| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 12 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 0 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 0 | 4 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 71 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 71 of 136 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
 
 ## Log
 
@@ -222,3 +222,4 @@ Total: 71 of 134 implementation tasks done. Validation spikes open: 3.
   - **Tests:** unit tests for each threshold, the buffer's bound and restarts, the OTLP encoding, loopback-only access, and shipping after an outage. `tests/health.rs` runs the binary against a collector that is down, then up. A Playwright edge spec opens the page from the real binary with axe.
 - 2026-11-02: #77 merged (#264). #67 split: ADR 0058 (#266) adds the online facility issuing CA under the offline root. `health-pki` issues the root, the issuing CA, facility intermediates, edge leaves and publication signing, each from a request, with exact name constraints, EKUs and path lengths, refusing anything a verifier would reject. It also publishes numbered CRLs and verifies chains with rustls-webpki. `tools/pki` runs the ceremonies, with a draft RUNBOOK.md. 10 security tests show a stolen facility or issuing-CA key cannot mint other names, public names, public IPs or sub-CAs, and that revocation reaches verifiers. The ceremony and custody are #265, which needs people.
 - 2026-11-02: #67 merged (#267). #73 split: part 1, the full-disk encryption check. `health-node-identity` (runtime, composed in `facility-edge`) probes Linux (findmnt, lsblk, the LUKS2 `systemd-tpm2` token sealed to PCR 7, sysfs) and Windows (BitLocker, Win32_Tpm, Secure Boot through PowerShell), failing closed. `facility-edge encryption check` is the provisioning gate, exit 10 unless compliant or exempted. The systemd unit runs the root-only probe as `ExecStartPre=+`, and the status page shows the state with its alerts. Part 2 is node keys and the facility intermediate; the central side is #268.
+- 2026-11-02: #73 part 1 merged (#269). Part 2: `health_node_identity::keystore` seals secrets with systemd-creds (`--with-key=auto`, unsealed for the service by `LoadCredentialEncrypted=`) or DPAPI in machine scope through PowerShell (SYSTEM and Administrators only), with no `unsafe` code. `facility-edge provision request | install | status` gates on encryption, seals the facility intermediate's key, and installs a chain only if a leaf for `<node-id>.local` verifies against the root. The edge-build systemd job provisions end to end. #73 is complete; the central side is #268 (Phase 4 now has 8 tasks).
