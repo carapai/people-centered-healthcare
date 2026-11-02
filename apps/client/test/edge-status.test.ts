@@ -2,7 +2,7 @@ import { createIntl } from 'react-intl'
 import { describe, expect, test } from 'vitest'
 
 import { EdgeStatusError, REFRESH_MS, statusQuery, usedPercent } from '../src/features/edge-status/api'
-import { formatBytes } from '../src/features/edge-status/StatusPage'
+import { alertText, formatBytes } from '../src/features/edge-status/StatusPage'
 import { parseJson } from '../src/platform/json'
 import { fakeTransport } from './fake'
 
@@ -16,6 +16,14 @@ const report = parseJson(
     ups: { power: 'on-battery' },
     tasks: [],
     telemetry: { buffered_bytes: 0, dropped_bytes: 0, shipping: false, last_shipped: null, failing: false },
+    encryption: {
+      checked: '2026-11-02T09:00:00Z',
+      tpm2: true,
+      secure_boot: true,
+      volumes: [{ name: 'data', protection: 'unencrypted', reason: null }],
+      findings: [{ code: 'disk-unencrypted', subject: 'data' }],
+      exemption: null,
+    },
     pending: ['sync'],
     alerts: [{ code: 'disk-full', subject: 'data' }],
   }),
@@ -44,5 +52,26 @@ describe('edge status', () => {
     expect(formatBytes(intl, 1536)).toBe('1.5 kB')
     expect(formatBytes(intl, 3 * 1024 ** 3)).toBe('3 GB')
     expect(usedPercent({ total_bytes: 0, free_bytes: 0 })).toBe(0)
+  })
+
+  test('every encryption alert the edge raises has its sentence', () => {
+    const intl = createIntl({ locale: 'en', defaultLocale: 'en' })
+    const codes = [
+      ['disk-unencrypted', 'system'],
+      ['tpm-protector-missing', 'data'],
+      ['encryption-suspended', 'data'],
+      ['tpm-not-sealed-to-secure-boot', 'data'],
+      ['encryption-unknown', 'data'],
+      ['tpm-missing', null],
+      ['tpm-unknown', null],
+      ['secure-boot-off', null],
+      ['secure-boot-unknown', null],
+      ['encryption-exempt', null],
+    ] as const
+    for (const [code, subject] of codes) {
+      const text = alertText(intl, { code, subject })
+      expect(text).not.toBe(code)
+      if (subject !== null) expect(text).toContain(`${subject} disk`)
+    }
   })
 })

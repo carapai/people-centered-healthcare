@@ -34,6 +34,7 @@ members = [
     "crates/infrastructure/health-surrealdb",
     "crates/testing/health-persistence-memory",
     "crates/edge/health-edge-runtime",
+    "crates/edge/health-node-identity",
     "apps/server/central-server",
     "apps/server/facility-edge",
     "tools/architecture-checks",
@@ -68,6 +69,7 @@ health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
+health-node-identity = { path = "crates/edge/health-node-identity" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
 health-patient-engagement = { path = "crates/domains/health-patient-engagement" }

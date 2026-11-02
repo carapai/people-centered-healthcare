@@ -7,6 +7,8 @@
 //!   Manager (`packaging/install-service.ps1`).
 //! - `facility-edge update …`: signed updates ([`update`]).
 //! - `facility-edge backup …`: backups on demand, to USB, verify and restore ([`backup`]).
+//! - `facility-edge encryption …`: the full-disk encryption probe and provisioning gate
+//!   ([`encryption`]).
 //!
 //! Exit codes, for the service manager and the update rollback:
 //!
@@ -21,9 +23,11 @@
 //! | 7 | an update step failed, or an `update` command was refused: needs a person |
 //! | 8 | a failed update's store is restored; the service manager restores the previous binary |
 //! | 9 | a `backup` command failed |
+//! | 10 | `encryption check` refused provisioning, or an `encryption` command failed |
 //! | 1 | anything else (the listener, telemetry, serving) |
 
 mod backup;
+mod encryption;
 mod service;
 mod update;
 
@@ -61,8 +65,15 @@ fn main() -> ExitCode {
                 ExitCode::from(9)
             }
         },
+        Some("encryption") => match encryption::run(&config, &args[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("facility-edge: {error}");
+                ExitCode::from(10)
+            }
+        },
         Some(_) => {
-            eprintln!("usage: facility-edge [--service | update … | backup …]");
+            eprintln!("usage: facility-edge [--service | update … | backup … | encryption …]");
             ExitCode::from(2)
         }
     }
@@ -124,7 +135,15 @@ async fn serve(
             "cannot open HEALTH_TELEMETRY_DIR: telemetry is not buffered"
         );
     }
-    match run(config, manager, buffer, stop).await {
+    match run(
+        config,
+        manager,
+        buffer,
+        Some(encryption::check(config)),
+        stop,
+    )
+    .await
+    {
         Ok(stop) => {
             tracing::info!(reason = ?stop, "facility edge exited");
             0

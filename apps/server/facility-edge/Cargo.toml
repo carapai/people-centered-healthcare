@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 health-backup = { workspace = true }
 health-edge-runtime = { workspace = true }
+health-node-identity = { workspace = true }
 health-observability = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }

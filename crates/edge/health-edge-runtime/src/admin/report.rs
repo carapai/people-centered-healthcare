@@ -6,6 +6,7 @@ use std::time::Duration;
 use health_time::{SignedDuration, Timestamp};
 use serde::Serialize;
 
+use super::encryption::Encryption;
 use crate::backup::Status;
 use crate::ups::Power;
 
@@ -20,7 +21,6 @@ pub(crate) const PENDING: &[&str] = &[
     "clock-skew",
     "certificates",
     "permission-snapshot",
-    "disk-encryption",
     "sessions",
 ];
 
@@ -38,6 +38,8 @@ pub(crate) struct Facts {
     pub(crate) ups: Option<Option<Power>>,
     pub(crate) tasks: Vec<(&'static str, usize)>,
     pub(crate) telemetry: Telemetry,
+    /// The last disk-encryption check; the outer `None` when no check is wired in.
+    pub(crate) encryption: Option<Option<Encryption>>,
 }
 
 /// The node's status, as `GET /api/admin/status` returns it. Holds no personal health data.
@@ -59,6 +61,8 @@ pub struct Report {
     pub tasks: Vec<Task>,
     /// The telemetry buffer and its shipping.
     pub telemetry: Telemetry,
+    /// The last disk-encryption check; `None` until one has run.
+    pub encryption: Option<Encryption>,
     /// Indicators not reported yet.
     pub pending: Vec<&'static str>,
     /// The alerts raised now, most severe first.
@@ -232,6 +236,16 @@ pub(crate) fn assess(facts: Facts, now: Timestamp) -> Report {
             alerts.push(Alert::about("task-restarts", task.name));
         }
     }
+    let mut pending = PENDING.to_vec();
+    let encryption = facts.encryption.flatten();
+    match &encryption {
+        None => pending.push("disk-encryption"),
+        // An exemption is one standing alert in place of what it exempts (ADR 0048).
+        Some(found) if found.exemption.is_some() && !found.findings.is_empty() => {
+            alerts.push(Alert::new("encryption-exempt"));
+        }
+        Some(found) => alerts.extend(found.findings.iter().cloned()),
+    }
     alerts.sort_by_key(|alert| severity(alert.code));
     Report {
         at: now,
@@ -246,7 +260,8 @@ pub(crate) fn assess(facts: Facts, now: Timestamp) -> Report {
         ups,
         tasks,
         telemetry: facts.telemetry,
-        pending: PENDING.to_vec(),
+        encryption,
+        pending,
         alerts,
     }
 }
@@ -311,6 +326,14 @@ mod tests {
             ups: Some(Some(Power::Online)),
             tasks: vec![],
             telemetry: Telemetry::default(),
+            encryption: Some(Some(Encryption {
+                checked: at("2026-11-02T08:00:00Z"),
+                tpm2: Some(true),
+                secure_boot: Some(true),
+                volumes: Vec::new(),
+                findings: Vec::new(),
+                exemption: None,
+            })),
         }
     }
 
@@ -328,6 +351,43 @@ mod tests {
         );
         assert_eq!(report.volumes[0].used_percent(), 50);
         assert!(report.pending.contains(&"sync"));
+        assert!(!report.pending.contains(&"disk-encryption"));
+    }
+
+    #[test]
+    fn encryption_findings_are_alerts_and_an_exemption_stands_in_for_them() {
+        let unencrypted = Alert::about("disk-unencrypted", "data");
+        let mut facts = healthy();
+        if let Some(Some(found)) = &mut facts.encryption {
+            found.findings = vec![unencrypted.clone(), Alert::new("secure-boot-off")];
+        }
+        let report = assess(facts.clone(), at("2026-11-02T09:30:00Z"));
+        assert_eq!(
+            codes(&report),
+            vec![
+                ("disk-unencrypted", Some("data")),
+                ("secure-boot-off", None)
+            ]
+        );
+
+        if let Some(Some(found)) = &mut facts.encryption {
+            found.exemption = Some("UG-FDE-2026-014".into());
+        }
+        let report = assess(facts.clone(), at("2026-11-02T09:30:00Z"));
+        assert_eq!(codes(&report), vec![("encryption-exempt", None)]);
+        assert_eq!(
+            report.encryption.map(|e| e.findings.len()),
+            Some(2),
+            "the page still shows what is exempted"
+        );
+
+        // Not checked yet, or no check wired in: pending, and no alert.
+        for encryption in [Some(None), None] {
+            facts.encryption = encryption;
+            let report = assess(facts.clone(), at("2026-11-02T09:30:00Z"));
+            assert_eq!(codes(&report), vec![]);
+            assert!(report.pending.contains(&"disk-encryption"));
+        }
     }
 
     #[test]

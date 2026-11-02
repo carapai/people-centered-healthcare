@@ -10,7 +10,7 @@ use health_http::{Readiness, ReadinessCheck, app};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
 
-use crate::admin::{self, Buffer, Monitor, ShipState};
+use crate::admin::{self, Buffer, EncryptionCheck, EncryptionState, Monitor, ShipState};
 use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
 use crate::notify::ServiceManager;
@@ -143,11 +143,14 @@ async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
 }
 
 /// Runs the node until `stop` resolves, the UPS reports low battery, or a supervised task keeps
-/// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready.
+/// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready, and
+/// `encryption` is the composition root's disk-encryption check, run every
+/// `HEALTH_ENCRYPTION_SECS` for the status page.
 pub async fn run(
     config: &EdgeConfig,
     manager: Arc<dyn ServiceManager>,
     telemetry: Option<Arc<Buffer>>,
+    encryption: Option<EncryptionCheck>,
     stop: impl Future<Output = ()>,
 ) -> Result<Stop, EdgeError> {
     let store = Store::default();
@@ -167,6 +170,7 @@ pub async fn run(
         restarts: supervisor.restarts(),
         buffer: telemetry.clone(),
         shipping: ShipState::default(),
+        encryption: encryption.as_ref().map(|_| EncryptionState::default()),
     };
     let routes = web::routes(Bundle::embedded()).merge(admin::routes(monitor.clone()));
     let router = app(routes, readiness);
@@ -260,6 +264,12 @@ pub async fn run(
         supervisor.spawn("ups", move || {
             ups.clone()
                 .watch(poll, Arc::clone(&low), Arc::clone(&power))
+        });
+    }
+    if let (Some(check), Some(state)) = (encryption, &monitor.encryption) {
+        let (state, every) = (Arc::clone(state), config.encryption_interval);
+        supervisor.spawn("encryption", move || {
+            admin::watch_encryption(Arc::clone(&check), Arc::clone(&state), every)
         });
     }
     let every = config.indicators_interval;

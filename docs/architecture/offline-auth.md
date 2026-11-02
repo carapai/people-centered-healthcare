@@ -25,7 +25,7 @@ flowchart LR
 |---|---|
 | Session start | Username and password on an **enrolled device**. Minimum 8 characters, checked against a breached-password list, because the enrolled device key is the second factor. Where no device factor exists, the minimum is 15 characters. |
 | Hash | Argon2id, m=19456 KiB, t=2, p=1, provisioned by central. Only staff assigned to the facility are provisioned. |
-| Pepper | In the edge's OS keystore: a CNG machine key on Windows (the service runs without a user profile), TPM-backed where present. The Linux keystore choice falls to implementation. |
+| Pepper | In the edge's OS keystore: a CNG machine key on Windows (the service runs without a user profile), TPM-backed where present. On Linux, keys are systemd credentials sealed to the TPM2 (`systemd-creds`, `LoadCredentialEncrypted=`), because the system service has no user session for Secret Service (#73). |
 | PIN | 6 digits. Used only to resume or switch to a user who already has a live session on that device. Never used to start a session. |
 | Lockout | 10 failures trigger a 15-minute lock; the hard cap is 100. Lockout counters are per user per edge. |
 

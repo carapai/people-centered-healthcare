@@ -19,12 +19,30 @@ const alertLabels: Record<string, Messages['esAlertBackupsOff']> = {
   'ups-on-battery': edgeStatusMessages.esAlertOnBattery,
   'ups-low-battery': edgeStatusMessages.esAlertLowBattery,
   'ups-unreachable': edgeStatusMessages.esAlertUpsUnreachable,
+  'tpm-missing': edgeStatusMessages.esAlertTpmMissing,
+  'tpm-unknown': edgeStatusMessages.esAlertTpmUnknown,
+  'secure-boot-off': edgeStatusMessages.esAlertSecureBootOff,
+  'secure-boot-unknown': edgeStatusMessages.esAlertSecureBootUnknown,
+  'encryption-exempt': edgeStatusMessages.esAlertEncryptionExempt,
 }
 
 /** Alerts about a volume or a task. */
 const subjectAlertLabels: Record<string, Messages['esAlertDiskFull']> = {
   'disk-full': edgeStatusMessages.esAlertDiskFull,
   'task-restarts': edgeStatusMessages.esAlertTaskRestarts,
+  'disk-unencrypted': edgeStatusMessages.esAlertDiskUnencrypted,
+  'tpm-protector-missing': edgeStatusMessages.esAlertTpmProtectorMissing,
+  'encryption-suspended': edgeStatusMessages.esAlertEncryptionSuspended,
+  'tpm-not-sealed-to-secure-boot': edgeStatusMessages.esAlertTpmNotSealed,
+  'encryption-unknown': edgeStatusMessages.esAlertEncryptionUnknown,
+}
+
+const protectionLabels: Record<string, Messages['esProtTpm']> = {
+  tpm: edgeStatusMessages.esProtTpm,
+  suspended: edgeStatusMessages.esProtSuspended,
+  'no-tpm-protector': edgeStatusMessages.esProtNoTpm,
+  'not-sealed': edgeStatusMessages.esProtNotSealed,
+  unencrypted: edgeStatusMessages.esProtUnencrypted,
 }
 
 const powerLabels: Record<string, Messages['esPowerOnline']> = {
@@ -129,6 +147,7 @@ function Report({ report }: { report: EdgeReport }) {
               : intl.formatMessage(powerLabels[report.ups.power] ?? edgeStatusMessages.esUnknown)}
         </Fact>
       </Facts>
+      {report.encryption === null ? null : <Encryption encryption={report.encryption} />}
       <Facts id="edge-telemetry" title={intl.formatMessage(edgeStatusMessages.esTelemetry)}>
         <Fact label={intl.formatMessage(edgeStatusMessages.esBuffered)}>{formatBytes(intl, report.telemetry.buffered_bytes)}</Fact>
         {report.telemetry.dropped_bytes > 0 ? <Fact label={intl.formatMessage(edgeStatusMessages.esDropped)}>{formatBytes(intl, report.telemetry.dropped_bytes)}</Fact> : null}
@@ -147,6 +166,26 @@ function Report({ report }: { report: EdgeReport }) {
       </Facts>
       {report.pending.length === 0 ? null : <p className={term}>{intl.formatMessage(edgeStatusMessages.esPending, { indicators: report.pending.join(', ') })}</p>}
     </>
+  )
+}
+
+function Encryption({ encryption }: { encryption: NonNullable<EdgeReport['encryption']> }) {
+  const intl = useIntl()
+  const check = (value: boolean | null) =>
+    intl.formatMessage(value === null ? edgeStatusMessages.esUnknown : value ? edgeStatusMessages.esYes : edgeStatusMessages.esNo)
+  return (
+    <Facts id="edge-encryption" title={intl.formatMessage(edgeStatusMessages.esEncryption)}>
+      <Fact label={intl.formatMessage(edgeStatusMessages.esTpm)}>{check(encryption.tpm2)}</Fact>
+      <Fact label={intl.formatMessage(edgeStatusMessages.esSecureBoot)}>{check(encryption.secure_boot)}</Fact>
+      {encryption.volumes.map((v) => (
+        <Fact key={v.name} label={intl.formatMessage(v.name === 'system' ? edgeStatusMessages.esSystemDisk : edgeStatusMessages.esDataDisk)}>
+          {v.protection === 'unknown'
+            ? intl.formatMessage(edgeStatusMessages.esProtUnknown, { reason: v.reason ?? '' })
+            : intl.formatMessage(protectionLabels[v.protection] ?? edgeStatusMessages.esUnknown)}
+        </Fact>
+      ))}
+      {encryption.exemption === null ? null : <Fact label={intl.formatMessage(edgeStatusMessages.esExemption)}>{encryption.exemption}</Fact>}
+    </Facts>
   )
 }
 
@@ -170,7 +209,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function alertText(intl: ReturnType<typeof useIntl>, alert: { code: string; subject: string | null }): string {
+/** An alert's sentence; an unknown code is shown as itself. */
+export function alertText(intl: ReturnType<typeof useIntl>, alert: { code: string; subject: string | null }): string {
   const plain = alertLabels[alert.code]
   if (plain !== undefined) return intl.formatMessage(plain)
   const about = subjectAlertLabels[alert.code]
@@ -180,7 +220,9 @@ function alertText(intl: ReturnType<typeof useIntl>, alert: { code: string; subj
       ? intl.formatMessage(edgeStatusMessages.esDataVolume)
       : alert.subject === 'backup'
         ? intl.formatMessage(edgeStatusMessages.esBackupVolume)
-        : (alert.subject ?? '')
+        : alert.subject === 'system'
+          ? intl.formatMessage(edgeStatusMessages.esSystemVolume)
+          : (alert.subject ?? '')
   return intl.formatMessage(about, { subject })
 }
 

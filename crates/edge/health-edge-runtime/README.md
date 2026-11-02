@@ -4,7 +4,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 
 ## `run`
 
-`run(config, manager, telemetry, stop)` is the node's whole life (`telemetry` is the buffer the process's log lines go to):
+`run(config, manager, telemetry, encryption, stop)` is the node's whole life. `telemetry` is the buffer the process's log lines go to, and `encryption` is the composition root's disk-encryption check:
 1. **Listen.** The listener starts at once: `/health` answers, `/ready` is 503 until the store is ready (the shared `health-http` system routes), the embedded web app is served (`web`), and so is `/api/admin/status` (`admin`).
 2. **Update check.** A pending update copies the store to `pre-update-store/` on its first start, or rolls back after three starts that never reached ready (`update::before_open`), before the store is opened.
 3. **Open the store.** The embedded store (`Target::RocksDb`, `sync=every`) is opened once. If it fails, `run` returns `EdgeError::Store` and the service manager restarts the process.
@@ -21,6 +21,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 - **`admin`:** health monitoring (#77, facility-edge.md § Health monitoring).
   - **Indicators:** node ID and version, store size, free space on the data and backup volumes, the backup schedule (`status.json`), the UPS's last poll, supervised-task failures, and the telemetry buffer.
   - **Alerts,** against the thresholds in facility-edge.md: a volume over 80% used (`disk-full`), backups off, failed (`backup-failed`), older than twice the interval (`backup-stale`, counted from the node's start before a first backup), a failed test restore, the UPS on battery, low or unreachable, and a task with two or more failures in the supervisor's window (`task-restarts`).
+  - **Disk encryption (#73):** the composition root's `EncryptionCheck` (`health-node-identity`, which this crate may not depend on) runs every `HEALTH_ENCRYPTION_SECS` on a supervised `encryption` task. Its findings are alerts (`disk-unencrypted`, `encryption-suspended`, `tpm-protector-missing`, `secure-boot-off`, …). With an exemption they become one standing `encryption-exempt` alert, while the report still shows what is exempted. Before the first check, or with no check wired in, `disk-encryption` is listed as pending.
   - **`GET /api/admin/status`:** the `Report` as JSON, `Cache-Control: no-store`, for the client's edge status page. It answers loopback peers only (403 otherwise) until the local authorization server can require an admin (#75). It holds no personal health data.
   - **Telemetry:** every `HEALTH_INDICATORS_SECS` an `indicators` line carries the measures as allowlisted fields (`store_bytes`, `data_free_bytes`, `backup_age_seconds`, `state`, …), and each alert is logged with `alert` when raised and with `outcome = "cleared"` when it clears.
   - **`Buffer`** is the process's `LogSink`: each line goes to standard output and to 256 KiB segment files under `HEALTH_TELEMETRY_DIR`, bounded at 64 MiB with the oldest segments dropped first. It survives restarts.
@@ -52,7 +53,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 - **Event Log output on Windows:** logs go to the console and telemetry; the Event Log sink comes with the MSI.
 - **Final backup on a UPS stop:** the stop drains requests and closes the store; a last backup within the UPS budget is not taken yet.
 - **Blobs:** the edge has no blob store yet, so its backups hold the export only.
-- **Indicators from later work:** sync lag and conflicts (Phase 5), clock skew against central, certificate and permission-snapshot expiry (#73, #74, #75), the disk-encryption check (#73) and active sessions (#75). The report lists them as `pending`.
+- **Indicators from later work:** sync lag and conflicts (Phase 5), clock skew against central, certificate and permission-snapshot expiry (#74, #75) and active sessions (#75). The report lists them as `pending`.
 - **Spans offline:** spans still go straight to `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and are lost while it is unreachable; only log lines are buffered.
 - **HTTPS to central:** the shipper speaks plain HTTP to the in-country collector, like the span exporter; mutual TLS with the node certificate comes with provisioning (#73).
 - **A backup on demand while the node runs**, from the admin page: `facility-edge backup now` still needs the service stopped.
