@@ -47,14 +47,6 @@ pub(crate) async fn run(
         .to_owned();
     let credentials =
         Credentials::new(settings.pepper.clone()).map_err(|_| "the pepper cannot be used")?;
-    let credential = credentials
-        .set_password(
-            &PasswordPolicy::default(),
-            BreachedPasswords::platform(),
-            &password,
-            false,
-        )
-        .map_err(|e| format!("the password is refused: {e}"))?;
 
     let db_password = std::fs::read_to_string(&config.surrealdb_password_file)
         .map_err(|_| "cannot read HEALTH_SURREALDB_PASSWORD_FILE")?
@@ -83,6 +75,16 @@ pub(crate) async fn run(
         Some(existing) => existing.id,
         None => AccountId(uuid::Uuid::now_v7()),
     };
+    // Sealed for this account under central's pepper key (ADR 0059).
+    let credential = credentials
+        .set_password(
+            account,
+            &PasswordPolicy::default(),
+            BreachedPasswords::platform(),
+            &password,
+            false,
+        )
+        .map_err(|e| format!("the password is refused: {e}"))?;
     store
         .put_account(&LoginAccount {
             id: account,

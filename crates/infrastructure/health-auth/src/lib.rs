@@ -7,7 +7,8 @@
 //!   replayed one ends the session. ID tokens for `openid`.
 //! - **Logout:** `/revoke` ends the session; [`AccessVerifier`] checks the session on every
 //!   request, so its access tokens stop working at once.
-//! - **Credentials:** Argon2id with the fixed parameters and an optional pepper; lockout per
+//! - **Credentials:** Argon2id with the fixed parameters, stored encrypted under the node's pepper
+//!   key (ADR 0059); lockout per
 //!   `health_identity::LockoutPolicy`; one refusal message for every failure.
 //! - **Permission snapshots** (ADR 0011): central signs them ([`SnapshotSigner`]); an edge's
 //!   [`SnapshotGate`] requires a valid one for each login and refresh, behind the clock floor, and
@@ -31,7 +32,7 @@ mod surreal;
 
 pub use breached::{BreachedPasswords, InvalidFilter};
 pub use caregivers::{CAREGIVER_PERMISSION, CaregiverRoutes};
-pub use credentials::{Credentials, HashError, SetPasswordError};
+pub use credentials::{Credentials, HashError, PEPPER_LEN, SetPasswordError};
 pub use devices::{CONSOLE, DeviceAdmin, DeviceConfig, DeviceGate, DeviceStore, EnrolledDevice};
 pub use jose::{InvalidKey, TokenSigner};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};

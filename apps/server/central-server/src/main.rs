@@ -155,7 +155,7 @@ fn auth_settings(
     files: &config::AuthFiles,
 ) -> Result<auth::AuthSettings, Box<dyn std::error::Error>> {
     let pepper = match &files.pepper_file {
-        Some(path) => std::fs::read(path).map_err(|_| "cannot read HEALTH_AUTH_PEPPER_FILE")?,
+        Some(path) => auth::read_pepper(path)?.to_vec(),
         None => Vec::new(),
     };
     Ok(auth::AuthSettings {

@@ -46,13 +46,15 @@ fn harness(require_dpop: bool) -> Harness {
     let clock = Arc::new(FixedClock::new(
         Timestamp::from_second(1_800_000_000).expect("time"),
     ));
-    let credentials = Credentials::new(b"pepper".to_vec()).expect("credentials");
+    let credentials = Credentials::new([7; 32].to_vec()).expect("credentials");
     let store = MemoryStore::default();
     let account = AccountId(Uuid::now_v7());
     store.put_account(LoginAccount {
         id: account,
         username: "nakato".into(),
-        credential: credentials.hash("correct horse battery").expect("hash"),
+        credential: credentials
+            .credential(account, "correct horse battery")
+            .expect("hash"),
         status: AccountStatus::Active,
         lockout: Lockout::default(),
     });

@@ -54,7 +54,7 @@ fn serve(node: &Node) -> Router {
     let server = AuthServer::new(
         config,
         node.signer.clone(),
-        Credentials::new(b"pepper".to_vec()).expect("credentials"),
+        Credentials::new([7; 32].to_vec()).expect("credentials"),
         node.store.clone(),
         node.clock.clone(),
     );
@@ -76,12 +76,15 @@ async fn node() -> Node {
         SurrealStore::new(connection, Arc::new(SystemClock)),
         SessionPolicy::default().hard_cap,
     );
-    let credentials = Credentials::new(b"pepper".to_vec()).expect("credentials");
+    let credentials = Credentials::new([7; 32].to_vec()).expect("credentials");
+    let account = AccountId(Uuid::now_v7());
     store
         .put_account(&LoginAccount {
-            id: AccountId(Uuid::now_v7()),
+            id: account,
             username: "nakato".into(),
-            credential: credentials.hash("correct horse battery").expect("hash"),
+            credential: credentials
+                .credential(account, "correct horse battery")
+                .expect("hash"),
             status: AccountStatus::Active,
             lockout: Lockout::default(),
         })

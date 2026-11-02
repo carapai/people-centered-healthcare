@@ -36,7 +36,7 @@ pub(crate) struct AuthSettings {
     pub(crate) issuer: String,
     /// The signing keys: the first signs, the rest (rotated out) still verify.
     pub(crate) keys: Vec<[u8; 32]>,
-    /// The Argon2id pepper (empty for none).
+    /// The pepper key that stored hashes are encrypted under (ADR 0059); empty for none.
     pub(crate) pepper: Vec<u8>,
     /// The registered clients.
     pub(crate) clients: Vec<Client>,
@@ -125,6 +125,24 @@ impl std::fmt::Debug for AuthSettings {
 
 /// A key file: one hex-encoded 32-byte P-256 secret per line, the active key first. Blank lines
 /// and `#` comments are ignored.
+/// The pepper key (ADR 0059): 64 hex characters, which every stored password hash is encrypted
+/// under.
+pub(crate) fn read_pepper(path: &Path) -> Result<[u8; 32], &'static str> {
+    let text = std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_AUTH_PEPPER_FILE")?;
+    let text = text.trim();
+    let bytes: Vec<u8> = (0..text.len())
+        .step_by(2)
+        .map(|i| {
+            text.get(i..i + 2)
+                .and_then(|h| u8::from_str_radix(h, 16).ok())
+        })
+        .collect::<Option<_>>()
+        .ok_or("HEALTH_AUTH_PEPPER_FILE is not hex")?;
+    bytes
+        .try_into()
+        .map_err(|_| "HEALTH_AUTH_PEPPER_FILE holds a 32-byte key, 64 hex characters")
+}
+
 pub(crate) fn read_keys(path: &Path) -> Result<Vec<[u8; 32]>, &'static str> {
     let text = std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_AUTH_KEYS_FILE")?;
     let keys: Vec<[u8; 32]> = text
@@ -774,7 +792,9 @@ mod tests {
             .put_account(&LoginAccount {
                 id: account,
                 username: "nakato".into(),
-                credential: credentials.hash("correct horse battery").expect("hash"),
+                credential: credentials
+                    .credential(account, "correct horse battery")
+                    .expect("hash"),
                 status: AccountStatus::Active,
                 lockout: Lockout::default(),
             })
@@ -1028,7 +1048,9 @@ mod tests {
             .put_account(&LoginAccount {
                 id: account,
                 username: username.into(),
-                credential: credentials.hash("correct horse battery").expect("hash"),
+                credential: credentials
+                    .credential(account, "correct horse battery")
+                    .expect("hash"),
                 status: AccountStatus::Active,
                 lockout: Lockout::default(),
             })
@@ -1439,5 +1461,17 @@ mod tests {
         assert!(read_keys(&path).is_err());
         std::fs::write(&path, "# nothing\n").expect("write");
         assert!(read_keys(&path).is_err());
+    }
+
+    #[test]
+    fn the_pepper_file_is_a_32_byte_hex_key() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let path = dir.path().join("pepper");
+        std::fs::write(&path, format!("{}\n", "07".repeat(32))).expect("write");
+        assert_eq!(read_pepper(&path), Ok([7u8; 32]));
+        for bad in ["pepper", "0707", &"zz".repeat(32)] {
+            std::fs::write(&path, bad).expect("write");
+            assert!(read_pepper(&path).is_err(), "{bad}");
+        }
     }
 }
