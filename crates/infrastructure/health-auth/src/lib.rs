@@ -18,6 +18,7 @@
 //!   is not by an enrolled, active device.
 
 mod breached;
+mod bundle;
 mod caregivers;
 mod credentials;
 mod devices;
@@ -31,6 +32,7 @@ mod subject;
 mod surreal;
 
 pub use breached::{BreachedPasswords, InvalidFilter};
+pub use bundle::{BUNDLE_TYP, Bundle, BundleAccount, BundleError};
 pub use caregivers::{CAREGIVER_PERMISSION, CaregiverRoutes};
 pub use credentials::{Credentials, HashError, PEPPER_LEN, SetPasswordError};
 pub use devices::{CONSOLE, DeviceAdmin, DeviceConfig, DeviceGate, DeviceStore, EnrolledDevice};

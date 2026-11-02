@@ -411,6 +411,24 @@ impl SurrealTx {
         Ok(())
     }
 
+    /// Every snapshot at `facility`, as (account, JWS): what a provisioning bundle carries.
+    pub async fn auth_snapshots_at(
+        &mut self,
+        facility: &str,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [<string>record::id(id)[0], jws] FROM auth_snapshot WHERE record::id(id)[1] = $facility",
+                vec![("facility", facility.to_owned())],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| <[String; 2]>::try_from(row).ok())
+            .map(|[account, jws]| (account, jws))
+            .collect())
+    }
+
     /// Records a break-glass grant (migration `0009_break_glass`).
     pub async fn put_break_glass(&mut self, row: &BreakGlassRow) -> Result<(), WriteError> {
         self.run(

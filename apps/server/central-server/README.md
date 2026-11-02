@@ -62,6 +62,12 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 
 `central-server provision <username> <facility> <role>[,<role>…]` creates or updates a Login Account and signs its permission snapshot at `facility`. It is the stopgap until the workforce registry provisions staff.
 
+`central-server provision bundle <facility> <node-id> <intermediate.pem> <out>` exports a facility's provisioning bundle for one edge (ADR 0059):
+- **What it holds:** every account with a snapshot at the facility, their signed snapshots, and each account's plain Argon2id hash.
+- **Hashes:** central's pepper key unseals each one, and the bundle encrypts it to the edge's facility intermediate, the certificate central issued it.
+- **Signature:** the bundle is signed with the snapshot key.
+- **Output:** the command prints the intermediate's SPKI pin it encrypted to. The edge imports the bundle on its console (#75).
+
 - It reads the same configuration as the server, and needs the auth settings, `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE`.
 - The password comes from `HEALTH_PROVISION_PASSWORD_FILE`. It must pass the password policy and the breached-password list (15 characters, since central sign-in has no device factor).
 - The roles must be defined in the access policy.

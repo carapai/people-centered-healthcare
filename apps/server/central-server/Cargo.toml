@@ -26,10 +26,12 @@ health-http = { workspace = true }
 health-identifiers = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-pki = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
 jiff = { workspace = true }
+p256 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

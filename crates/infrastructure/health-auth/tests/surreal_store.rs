@@ -540,3 +540,41 @@ async fn break_glass_grants_end_after_their_hour_and_alert_their_facility() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn a_facility_s_snapshots_are_listed_for_its_bundle() {
+    let node = node().await;
+    let (a, b) = (AccountId(Uuid::now_v7()), AccountId(Uuid::now_v7()));
+    node.store
+        .put_snapshot(a, "ug-kla-mulago", "a.at.mulago")
+        .await
+        .expect("put");
+    node.store
+        .put_snapshot(b, "ug-kla-mulago", "b.at.mulago")
+        .await
+        .expect("put");
+    node.store
+        .put_snapshot(a, "ug-gul-lacor", "a.at.lacor")
+        .await
+        .expect("put");
+    let mut mulago = node
+        .store
+        .snapshots_at("ug-kla-mulago")
+        .await
+        .expect("list");
+    mulago.sort();
+    let mut expected = vec![(a, "a.at.mulago".to_owned()), (b, "b.at.mulago".to_owned())];
+    expected.sort();
+    assert_eq!(mulago, expected);
+    assert_eq!(
+        node.store.snapshots_at("ug-gul-lacor").await.expect("list"),
+        vec![(a, "a.at.lacor".to_owned())]
+    );
+    assert!(
+        node.store
+            .snapshots_at("nowhere")
+            .await
+            .expect("list")
+            .is_empty()
+    );
+}

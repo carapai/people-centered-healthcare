@@ -67,6 +67,15 @@ impl SnapshotSigner {
         EcJwk::of(self.key.verifying_key())
     }
 
+    /// Signs `claims` as a JWS of type `typ` with this key: a provisioning bundle (ADR 0059).
+    pub(crate) fn sign_as(&self, typ: &str, claims: &Value) -> String {
+        sign(
+            &self.key,
+            &json!({ "alg": "ES256", "typ": typ, "kid": self.kid }),
+            claims,
+        )
+    }
+
     /// Signs `snapshot` after checking its roles against `roles`.
     pub fn sign(
         &self,
@@ -101,8 +110,14 @@ impl SnapshotVerifier {
 
     /// The snapshot in `jws`, if a trusted key signed exactly these bytes.
     pub fn verify(&self, jws: &str) -> Result<PermissionSnapshot, SnapshotError> {
+        let claims = self.verify_as(TYP, jws)?;
+        serde_json::from_value::<PermissionSnapshot>(claims).map_err(|_| SnapshotError::Invalid)
+    }
+
+    /// The claims of `jws`, of type `typ`, if a trusted key signed exactly these bytes.
+    pub(crate) fn verify_as(&self, typ: &str, jws: &str) -> Result<Value, SnapshotError> {
         let (header, claims, input, signature) = split(jws)?;
-        if header["alg"] != "ES256" || header["typ"] != TYP {
+        if header["alg"] != "ES256" || header["typ"] != typ {
             return Err(SnapshotError::Invalid);
         }
         let (_, key) = self
@@ -112,7 +127,7 @@ impl SnapshotVerifier {
             .ok_or(SnapshotError::Invalid)?;
         key.verify(input.as_bytes(), &signature)
             .map_err(|_| SnapshotError::Invalid)?;
-        serde_json::from_value::<PermissionSnapshot>(claims).map_err(|_| SnapshotError::Invalid)
+        Ok(claims)
     }
 }
 
