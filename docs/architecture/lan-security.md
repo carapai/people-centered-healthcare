@@ -69,3 +69,12 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
 - The enrollment endpoint is rate-limited per source address.
 - Failed enrollments, unknown-key token attempts and repeated authentication failures are audited, and an alert is raised on the edge status page and at central.
 - Network controls (Wi-Fi password, VLAN) are an extra layer, never the only control.
+
+## In code
+
+- **#67:** `health-pki` issues every tier from a PKCS#10 request, keeping only its public key, and refuses names outside the issuer's constraints, public IPs and certificates that would outlive their issuer. It publishes numbered CRLs, and its `Trust` verifies served chains against the root and CRLs. `tools/pki` runs the ceremonies, with a draft runbook (`tools/pki/RUNBOOK.md`).
+- **Still to come:**
+  - keystore and HSM signing (#73 and central provisioning);
+  - the edge's leaf renewal and pairing pins (#74);
+  - CRL delivery in the sync revocation lane;
+  - the real ceremony and root custody (#265).

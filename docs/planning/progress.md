@@ -6,7 +6,7 @@ _Update after each task (AGENTS.md process step 4)._
 |---|---|---|
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
-| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
+| [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 25 | 26 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 4 | 7 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 11 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 70 of 134 implementation tasks done. Validation spikes open: 3.
+Total: 71 of 134 implementation tasks done. Validation spikes open: 3.
 
 ## Log
 
@@ -220,3 +220,4 @@ Total: 70 of 134 implementation tasks done. Validation spikes open: 3.
   - **Telemetry:** the process's log lines go to a bounded on-disk buffer (64 MiB, oldest dropped first) as well as stdout. Every interval an `indicators` line and each raised or cleared alert are logged. The buffer is shipped as OTLP/HTTP log records when the collector answers. `alert` and `state` join the allowlist; the redaction test covers them.
   - **Client:** `/edge/status`, linked from the home page on an edge (the `edgeStatus` capability), with the alerts first and the indicators not reported yet listed.
   - **Tests:** unit tests for each threshold, the buffer's bound and restarts, the OTLP encoding, loopback-only access, and shipping after an outage. `tests/health.rs` runs the binary against a collector that is down, then up. A Playwright edge spec opens the page from the real binary with axe.
+- 2026-11-02: #77 merged (#264). #67 split: ADR 0058 (#266) adds the online facility issuing CA under the offline root. `health-pki` issues the root, the issuing CA, facility intermediates, edge leaves and publication signing, each from a request, with exact name constraints, EKUs and path lengths, refusing anything a verifier would reject. It also publishes numbered CRLs and verifies chains with rustls-webpki. `tools/pki` runs the ceremonies, with a draft RUNBOOK.md. 10 security tests show a stolen facility or issuing-CA key cannot mint other names, public names, public IPs or sub-CAs, and that revocation reaches verifiers. The ceremony and custody are #265, which needs people.

@@ -1,0 +1,28 @@
+[package]
+name = "health-pki"
+description = "The private PKI (ADRs 0008, 0058): the national root, the facility issuing CA, name-constrained facility intermediates, publication signing, CRLs and chain verification."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+base64 = { workspace = true }
+health-time = { workspace = true }
+rand_core = { workspace = true }
+rcgen = { workspace = true }
+rustls-pki-types = { workspace = true }
+rustls-webpki = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+x509-parser = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

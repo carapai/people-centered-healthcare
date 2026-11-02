@@ -1,0 +1,22 @@
+[package]
+name = "pki"
+description = "The private PKI's ceremony and issuance tooling over health-pki: the root, the issuing CA, publication signing, facility intermediates and CRLs (ADRs 0008, 0058)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "tooling"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+health-pki = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
