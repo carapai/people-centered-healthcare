@@ -28,5 +28,8 @@ tracing = { workspace = true }
 windows-service = { workspace = true }
 
 [dev-dependencies]
+health-auth = { workspace = true }
 p256 = { workspace = true }
+rand_core = { workspace = true }
 tempfile = { workspace = true }
+uuid = { workspace = true }

@@ -1549,6 +1549,7 @@ dependencies = [
 name = "facility-edge"
 version = "0.1.0"
 dependencies = [
+ "health-auth",
  "health-backup",
  "health-edge-runtime",
  "health-node-identity",
@@ -1557,10 +1558,12 @@ dependencies = [
  "health-surrealdb",
  "health-time",
  "p256",
+ "rand_core 0.6.4",
  "serde_json",
  "tempfile",
  "tokio",
  "tracing",
+ "uuid",
  "windows-service",
 ]
 
@@ -2140,6 +2143,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower",
+ "tracing",
  "uuid",
 ]
 
@@ -2191,9 +2195,11 @@ dependencies = [
  "axum",
  "flate2",
  "fs4",
+ "health-auth",
  "health-backup",
  "health-files",
  "health-http",
+ "health-identity",
  "health-observability",
  "health-surrealdb",
  "health-time",

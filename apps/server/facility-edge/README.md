@@ -38,6 +38,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_ENCRYPTION_EXEMPTION` | none | The country-configuration grant exempting this facility from full-disk encryption (ADR 0048): a standing alert |
 | `HEALTH_ENCRYPTION_SECS` | `3600` | How often disk encryption is checked |
 | `HEALTH_PKI_DIR` | `pki` beside `HEALTH_DATA_DIR` | The installed national root and facility intermediate chain. The intermediate's key is in the keystore, never here |
+| `HEALTH_ORIGINS` | `https://<node-id>.local` | The origins LAN devices reach the node by, comma-separated. A device's DPoP proofs must name one of them (#74) |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -114,6 +115,10 @@ The edge's half of provisioning (lan-security.md; ADRs 0048, 0058). Central's ha
 - **Windows:** DPAPI in machine scope through PowerShell, into `%ProgramData%\health\credentials\`, readable by SYSTEM and Administrators only. The LocalSystem service unseals it itself.
 
 **At each start** the node logs `identity-loaded`, or a `not-provisioned` or `identity-invalid` alert. It serves either way until LAN TLS needs the intermediate (#74).
+
+## Devices
+
+Every `/api/…` route except enrollment and the status page needs a DPoP proof by an enrolled, active device (#74; lan-security.md § Device enrollment). A device asks with `POST /api/enrollment` and shows the pairing code it gets back. On the node's own console, an admin approves it with `POST /api/admin/enrollments/approve` (the code, a name and a location) or revokes it with `POST /api/admin/devices/{id}/revoke`. Requests expire after 10 minutes. The routes are described in `health-auth`'s README; the client screens are #74 part 3.
 
 ## Health monitoring
 
