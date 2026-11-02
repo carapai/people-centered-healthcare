@@ -8,7 +8,9 @@ on:
     branches: [main]
 
 # Cargo caches use actions/cache (MIT), keyed per job on the toolchain and Cargo.lock;
-# Swatinem/rust-cache is LGPL-3.0, which ADR 0045's licence allowlist excludes.
+# Swatinem/rust-cache is LGPL-3.0, which ADR 0045's licence allowlist excludes. As rust-cache
+# does, every run restores and only main saves, after tools/github/prune-target.sh leaves just the
+# dependencies: PR caches would evict main's from the 10 GB the repository is allowed.
 
 permissions:
   contents: read
@@ -77,11 +79,13 @@ jobs:
       contents: read
     env:
       CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -99,6 +103,21 @@ jobs:
       # The same FhirClient suite against a central (bearer) and an edge (DPoP) base URL.
       - run: bun run test:contract
         working-directory: apps/client
+      # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
+      # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
+      # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
 
   generated-types:
     name: generated FHIR and API types, typecheck, tests, drift
@@ -107,11 +126,13 @@ jobs:
       contents: read
     env:
       CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -134,3 +155,18 @@ jobs:
         working-directory: packages/fhir-types
       - run: bun run check
         working-directory: packages/api-client
+      # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
+      # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
+      # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}

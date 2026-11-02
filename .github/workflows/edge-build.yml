@@ -1,6 +1,9 @@
-# The Facility Edge Node on its two platforms (deployment.md § Workflows): a release build, the
-# edge crates' checks, and the binary run under the real service manager (facility-edge.md § OS
-# service). PR builds are unsigned; release signing comes with release.yml.
+# The Facility Edge Node on its two platforms (deployment.md § Workflows): the edge crates'
+# checks, and the binary run under the real service manager (facility-edge.md § OS service).
+# On Ubuntu, pull requests run the debug binary; the release build, three times as slow from
+# cold, runs on main and in the merge queue. Windows always runs the release binary: the debug
+# one does not start under the SCM (its large debug futures likely overflow the service thread's
+# 1 MB stack). PR builds are unsigned; release signing comes with release.yml.
 name: edge-build
 
 on:
@@ -19,6 +22,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # Line tables keep backtraces, and the target directory and its cache small.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   windows:
@@ -33,7 +38,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -74,6 +80,21 @@ jobs:
           if ($service.State -ne 'Stopped' -or $service.ExitCode -ne 0 -or $service.ServiceSpecificExitCode -ne 0) {
             throw 'the service did not stop cleanly'
           }
+      # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
+      # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
+      # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
 
   linux:
     name: systemd service
@@ -84,7 +105,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -96,15 +118,17 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      # The web app first, so the release binary embeds it (#76).
+      # The web app first, so the binary embeds it (#76).
       - run: bun install --frozen-lockfile
       - run: bun run codegen && bun run build
         working-directory: apps/client
-      - run: cargo build --locked --release -p facility-edge -p pki
+      - run: cargo build --locked -p facility-edge -p pki
+      - if: github.event_name != 'pull_request'
+        run: cargo build --locked --release -p facility-edge -p pki
       - name: Run it under systemd
         run: |
           sudo useradd --system --no-create-home health
-          sudo install -D -m 0755 target/release/facility-edge /opt/health/bin/facility-edge
+          sudo install -D -m 0755 target/debug/facility-edge /opt/health/bin/facility-edge
           sudo install -d /etc/health
           # The runner is not encrypted, so provisioning needs an exemption.
           printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8443\nHEALTH_ENCRYPTION_EXEMPTION=ci-runner\n' \
@@ -115,7 +139,7 @@ jobs:
           # Provision: the edge seals its key with systemd-creds and requests its intermediate,
           # a test PKI issues it, and the edge installs the chain.
           edge() { sudo bash -c 'set -a; . /etc/health/facility-edge.env; exec /opt/health/bin/facility-edge "$@"' edge "$@"; }
-          pki=target/release/pki
+          pki=target/debug/pki
           edge provision request --out "$RUNNER_TEMP/request.pem"
           sudo test -f /etc/credstore.encrypted/health.facility-intermediate.key
           $pki root --name 'CI Root' --out "$RUNNER_TEMP/root"
@@ -176,3 +200,18 @@ jobs:
           test "$(systemctl show facility-edge -p ExecMainStatus --value)" = 0
       - if: failure()
         run: sudo journalctl -u facility-edge --no-pager
+      # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
+      # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
+      # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
