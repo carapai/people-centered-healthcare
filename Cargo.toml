@@ -108,6 +108,8 @@ octofhir-fhirpath = "=0.4.57"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
+# The edge's private LAN addresses, for its leaf certificate.
+if-addrs = "0.15.0"
 p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
 pollster = "1.0.1"
 # Certificates and CRLs for the private PKI (ADRs 0008, 0058), on ring like rustls.
@@ -117,6 +119,8 @@ regex = "1.13.1"
 rustls-pki-types = { version = "1.15.1", features = ["std"] }
 rustls-webpki = { version = "0.103.16", default-features = false, features = ["std", "ring"] }
 rust_decimal = "1.43.0"
+# The edge serves the LAN over TLS with its own leaf (lan-security.md), on ring like rcgen.
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 reqwest = { version = "0.13.5", default-features = false }
 rphonetic = { version = "4.0.0", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -130,6 +134,7 @@ tempfile = "3.27.0"
 tar = { version = "0.4.44", default-features = false }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12", "logging"] }
 toml = "1.1.8"
 tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tracing = "0.1.44"

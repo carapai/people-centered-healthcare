@@ -168,6 +168,17 @@ pub(crate) fn status(config: &EdgeConfig, keystore: &Keystore) -> serde_json::Va
     })
 }
 
+/// The facility intermediate's key from the keystore, for the node to issue its TLS leaf.
+pub(crate) fn intermediate_key() -> health_edge_runtime::IntermediateKey {
+    std::sync::Arc::new(|| {
+        Keystore::system()
+            .unseal(KEY)
+            .map_err(|e| e.to_string())?
+            .map(|key| String::from_utf8(key).map_err(|_| format!("{KEY} is not PEM")))
+            .transpose()
+    })
+}
+
 /// Logs whether this start found its identity: `identity-loaded`, or a `not-provisioned` or
 /// `identity-invalid` alert. The node serves either way until LAN TLS needs it (#74).
 pub(crate) fn log_identity(config: &EdgeConfig) {

@@ -16,7 +16,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | Variable | Default | |
 |---|---|---|
 | `HEALTH_DATA_DIR` | required | The embedded store's directory. This process owns it alone |
-| `HEALTH_BIND` | `0.0.0.0:8080` | Listen address |
+| `HEALTH_BIND` | `0.0.0.0:443` | Listen address. HTTPS once provisioned; before that, plain HTTP on the loopback address with this port (see TLS) |
 | `HEALTH_TENANT` | `ug` | SurrealDB namespace |
 | `HEALTH_DATABASE` | `main` | |
 | `HEALTH_UPS` | none | The NUT UPS to watch, `name@host[:port]` (port 3493 by default). Without it, durability rests on `sync=every` |
@@ -39,6 +39,9 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_ENCRYPTION_SECS` | `3600` | How often disk encryption is checked |
 | `HEALTH_PKI_DIR` | `pki` beside `HEALTH_DATA_DIR` | The installed national root and facility intermediate chain. The intermediate's key is in the keystore, never here |
 | `HEALTH_ORIGINS` | `https://<node-id>.local` | The origins LAN devices reach the node by, comma-separated. A device's DPoP proofs must name one of them (#74) |
+| `HEALTH_TLS_DIR` | `tls` beside `HEALTH_DATA_DIR` | The server leaf and its key (`leaf.pem`, `leaf.key`, the key readable by the service alone), issued and renewed by the node |
+| `HEALTH_DNS_NAME` | none | The facility's configured DNS name, named in the leaf beside `<node-id>.local` |
+| `HEALTH_CERTIFICATE_SECS` | `3600` | How often the leaf is checked for renewal and address changes |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -114,7 +117,17 @@ The edge's half of provisioning (lan-security.md; ADRs 0048, 0058). Central's ha
 - **Linux:** `systemd-creds encrypt --with-key=auto`, with the host key plus the TPM2 where present, into `/etc/credstore.encrypted/`. The unit's `LoadCredentialEncrypted=health.facility-intermediate.key` unseals it into the unprivileged service's `$CREDENTIALS_DIRECTORY`. Before provisioning it is absent, which is not fatal.
 - **Windows:** DPAPI in machine scope through PowerShell, into `%ProgramData%\health\credentials\`, readable by SYSTEM and Administrators only. The LocalSystem service unseals it itself.
 
-**At each start** the node logs `identity-loaded`, or a `not-provisioned` or `identity-invalid` alert. It serves either way until LAN TLS needs the intermediate (#74).
+**At each start** the node logs `identity-loaded`, or a `not-provisioned` or `identity-invalid` alert. Restart the service after `provision install` so it starts serving TLS.
+
+## TLS
+
+Once provisioned, the node serves HTTPS only, with a server leaf it issues itself under its facility intermediate (#74; lan-security.md § Certificate hierarchy):
+- **The leaf:** ECDSA P-256 with serverAuth, valid 397 days. It names `<node-id>.local`, `HEALTH_DNS_NAME` and the node's private LAN addresses: the bound address if it is a specific private one, else every RFC 1918 or ULA address on its interfaces. A client trusting the national root accepts it.
+- **Its key** is new at each issue. It is kept in `HEALTH_TLS_DIR` and readable by the service alone. The intermediate's key is unsealed from the keystore only to issue.
+- **Renewal:** every `HEALTH_CERTIFICATE_SECS` the leaf is reissued if two-thirds of its life has passed or the addresses changed (`address-changed`, standing for a day). It is served from the next handshake, with no restart. If renewal fails, the current leaf is kept while it is valid, with a `certificate-renewal-failed` alert.
+- **Expiry alerts:** `certificate-expiring` under 30 days. `intermediate-expiring` under 400 days, because a leaf cannot outlive its intermediate, so re-provision before then.
+- **Before provisioning,** or if no leaf can be served (`identity-invalid`), the node listens with plain HTTP on the loopback address only, so nothing on the LAN talks to it in the clear. The status page and `provision` still work on the machine itself.
+- **Linux:** the unit grants `CAP_NET_BIND_SERVICE` so the unprivileged service can bind 443.
 
 ## Devices
 

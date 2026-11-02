@@ -10,7 +10,9 @@ use crate::ups::Ups;
 /// What the edge needs to start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EdgeConfig {
-    /// `HEALTH_BIND`, default `0.0.0.0:8080`.
+    /// `HEALTH_BIND`, default `0.0.0.0:443` (lan-security.md: the edge listens on TCP 443 only).
+    /// HTTPS once the facility intermediate is installed; before that, plain HTTP on the
+    /// loopback address with this port, whatever the address.
     pub bind: SocketAddr,
     /// `HEALTH_DATA_DIR`: the embedded store's directory, owned by this process alone. Required.
     pub data_dir: PathBuf,
@@ -74,6 +76,15 @@ pub struct EdgeConfig {
     /// `HEALTH_ORIGINS`: the origins LAN devices reach this node by, comma-separated, default
     /// `https://<node-id>.local`. A device's DPoP proofs must name one of them.
     pub origins: Vec<String>,
+    /// `HEALTH_TLS_DIR`: the server leaf and its key, which the node issues and renews itself.
+    /// Default: `tls` beside the data directory.
+    pub tls_dir: PathBuf,
+    /// `HEALTH_DNS_NAME`: the facility's configured DNS name, named in the leaf beside
+    /// `<node-id>.local`.
+    pub dns_name: Option<String>,
+    /// `HEALTH_CERTIFICATE_SECS`: how often the leaf is checked for renewal and address
+    /// changes, default 3600.
+    pub certificate_interval: Duration,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -134,9 +145,12 @@ impl EdgeConfig {
             pki_dir: get("HEALTH_PKI_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| data_dir.with_file_name("pki")),
+            tls_dir: get("HEALTH_TLS_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| data_dir.with_file_name("tls")),
             data_dir,
             bind: get("HEALTH_BIND")
-                .unwrap_or_else(|| "0.0.0.0:8080".into())
+                .unwrap_or_else(|| "0.0.0.0:443".into())
                 .parse()
                 .map_err(|_| ConfigError::Malformed("HEALTH_BIND"))?,
             tenant: get("HEALTH_TENANT").unwrap_or_else(|| "ug".into()),
@@ -150,6 +164,8 @@ impl EdgeConfig {
             drain: seconds("HEALTH_DRAIN_SECS", 20)?,
             node_id,
             origins,
+            dns_name: get("HEALTH_DNS_NAME").map(|n| n.trim().to_ascii_lowercase()),
+            certificate_interval: positive("HEALTH_CERTIFICATE_SECS", 3600)?,
             backup_key_file: match (get("HEALTH_BACKUP_DIR"), get("HEALTH_BACKUP_KEY_FILE")) {
                 (Some(_), None) => return Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE")),
                 (_, key) => key.map(PathBuf::from),
@@ -183,7 +199,10 @@ mod tests {
     fn the_data_directory_is_required_and_the_rest_defaults() {
         assert_eq!(config(&[]), Err(ConfigError::Missing("HEALTH_DATA_DIR")));
         let c = config(&[("HEALTH_DATA_DIR", "/var/lib/health")]).expect("config");
-        assert_eq!(c.bind.to_string(), "0.0.0.0:8080");
+        assert_eq!(c.bind.to_string(), "0.0.0.0:443");
+        assert_eq!(c.tls_dir, PathBuf::from("/var/lib/tls"));
+        assert_eq!(c.dns_name, None);
+        assert_eq!(c.certificate_interval, Duration::from_secs(3600));
         assert_eq!((c.tenant.as_str(), c.database.as_str()), ("ug", "main"));
         assert_eq!(c.ups, None);
         assert_eq!(c.drain, Duration::from_secs(20));

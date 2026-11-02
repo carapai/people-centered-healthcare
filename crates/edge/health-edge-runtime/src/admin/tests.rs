@@ -29,6 +29,7 @@ fn monitor(dir: &Path) -> Monitor {
         buffer: None,
         shipping: ShipState::default(),
         encryption: None,
+        certificate: Arc::new(Mutex::new(crate::tls::Certificate::unprovisioned())),
     }
 }
 

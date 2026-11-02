@@ -31,6 +31,16 @@ export interface EdgeReport {
     findings: { code: string; subject: string | null }[]
     exemption: string | null
   } | null
+  certificate: {
+    state: 'serving' | 'not-provisioned' | 'invalid'
+    names: string[]
+    addresses: string[]
+    expires: string | null
+    renews: string | null
+    intermediate_expires: string | null
+    problem: string | null
+    address_changed: string | null
+  }
   pending: string[]
   alerts: { code: string; subject: string | null }[]
 }

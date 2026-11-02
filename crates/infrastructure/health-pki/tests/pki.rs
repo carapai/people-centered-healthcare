@@ -537,3 +537,35 @@ fn a_forged_crl_fails_the_chain_rather_than_passing_it() {
         ))
     ));
 }
+
+#[test]
+fn a_leaf_reads_back_its_names_addresses_and_validity() {
+    let pki = pki();
+    let leaf = pki
+        .facility
+        .issue_server(
+            &new_key().expect("key"),
+            &[format!("{NODE}.local")],
+            &[
+                "192.168.1.10".parse().expect("ip"),
+                "fd00::5".parse().expect("ip"),
+            ],
+            at(),
+        )
+        .expect("leaf");
+    let read = health_pki::inspect(&leaf.pem()).expect("inspect");
+    assert_eq!(read.dns_names, vec![format!("{NODE}.local")]);
+    assert_eq!(
+        read.addresses,
+        vec![
+            "192.168.1.10".parse::<IpAddr>().expect("ip"),
+            "fd00::5".parse::<IpAddr>().expect("ip")
+        ]
+    );
+    let lifetime = read.not_after.as_second() - read.not_before.as_second();
+    assert_eq!(
+        lifetime,
+        health_pki::LEAF_DAYS * 86_400 + health_pki::BACKDATE_SECONDS
+    );
+    assert!(health_pki::inspect("not a certificate").is_err());
+}

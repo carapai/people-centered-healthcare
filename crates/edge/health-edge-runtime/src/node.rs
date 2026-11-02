@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use axum::serve::ListenerExt;
 use health_http::{Readiness, ReadinessCheck, app};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
@@ -16,6 +17,7 @@ use crate::config::EdgeConfig;
 use crate::enrollment::Api;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
+use crate::tls::{self, Certificate, Identity, IntermediateKey, Listen, TlsListener};
 use crate::update::{self, Startup, Updates};
 use crate::ups::PowerState;
 use crate::web::{self, Bundle};
@@ -99,6 +101,17 @@ impl ReadinessCheck for Serving {
     }
 }
 
+/// `bind`'s port on the loopback address: where an unprovisioned node listens.
+fn loopback(bind: std::net::SocketAddr) -> std::net::SocketAddr {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    let ip = match bind.ip() {
+        ip if ip.is_loopback() => ip,
+        IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::LOCALHOST),
+        IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::LOCALHOST),
+    };
+    std::net::SocketAddr::new(ip, bind.port())
+}
+
 /// Runs `work` while asking `manager` for more time every [`EXTEND_EVERY`].
 async fn extending<T>(manager: &dyn ServiceManager, work: impl Future<Output = T>) -> T {
     let mut work = std::pin::pin!(work);
@@ -146,12 +159,14 @@ async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
 /// Runs the node until `stop` resolves, the UPS reports low battery, or a supervised task keeps
 /// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready, and
 /// `encryption` is the composition root's disk-encryption check, run every
-/// `HEALTH_ENCRYPTION_SECS` for the status page.
+/// `HEALTH_ENCRYPTION_SECS` for the status page, and `intermediate_key` unseals the facility
+/// intermediate's key to issue the node's TLS leaf (`tls`).
 pub async fn run(
     config: &EdgeConfig,
     manager: Arc<dyn ServiceManager>,
     telemetry: Option<Arc<Buffer>>,
     encryption: Option<EncryptionCheck>,
+    intermediate_key: Option<IntermediateKey>,
     stop: impl Future<Output = ()>,
 ) -> Result<Stop, EdgeError> {
     let store = Store::default();
@@ -172,24 +187,62 @@ pub async fn run(
         buffer: telemetry.clone(),
         shipping: ShipState::default(),
         encryption: encryption.as_ref().map(|_| EncryptionState::default()),
+        certificate: Arc::new(std::sync::Mutex::new(Certificate::unprovisioned())),
     };
     let api = Api::default();
     let routes = web::routes(Bundle::embedded())
         .merge(admin::routes(monitor.clone()))
         .merge(api.routes());
     let router = app(routes, readiness);
-    let listener = tokio::net::TcpListener::bind(config.bind)
-        .await
-        .map_err(EdgeError::Listen)?;
-    tracing::info!(outcome = "listening", "facility edge listening");
+    let identity = Arc::new(Identity::new(config, intermediate_key));
+    let certificate = Arc::clone(&monitor.certificate);
+    let serving_with = {
+        let (identity, certificate) = (Arc::clone(&identity), Arc::clone(&certificate));
+        tokio::task::spawn_blocking(move || tls::prepare(&identity, &certificate))
+            .await
+            .unwrap_or(Listen::Loopback)
+    };
     let drain = Arc::new(Notify::new());
     let draining = Arc::clone(&drain);
-    let server = tokio::spawn(async move {
-        let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
-        axum::serve(listener, service)
-            .with_graceful_shutdown(async move { draining.notified().await })
-            .await
-    });
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let shutdown = async move { draining.notified().await };
+    let (server, resolver) = match serving_with {
+        Listen::Https(resolver) => {
+            let tcp = tokio::net::TcpListener::bind(config.bind)
+                .await
+                .map_err(EdgeError::Listen)?;
+            let tls = resolver
+                .server_config()
+                .map_err(|e| EdgeError::Listen(std::io::Error::other(e)))?;
+            // `tap_io` gives the connections the peer address `ConnectInfo` reads.
+            let listener = TlsListener::new(tcp, tls)
+                .map_err(EdgeError::Listen)?
+                .tap_io(|_| {});
+            tracing::info!(outcome = "listening", tls = true, "facility edge listening");
+            let server = tokio::spawn(async move {
+                axum::serve(listener, service)
+                    .with_graceful_shutdown(shutdown)
+                    .await
+            });
+            (server, Some(resolver))
+        }
+        Listen::Loopback => {
+            let listener = tokio::net::TcpListener::bind(loopback(config.bind))
+                .await
+                .map_err(EdgeError::Listen)?;
+            tracing::info!(
+                outcome = "listening",
+                tls = false,
+                "facility edge listening"
+            );
+            let server = tokio::spawn(async move {
+                axum::serve(listener, service)
+                    .with_graceful_shutdown(shutdown)
+                    .await
+            });
+            (server, None)
+        }
+    };
 
     let updates = Updates::new(&config.update_dir);
     let binary = std::env::current_exe().map_err(|e| EdgeError::Update(e.into()))?;
@@ -275,6 +328,17 @@ pub async fn run(
         let (state, every) = (Arc::clone(state), config.encryption_interval);
         supervisor.spawn("encryption", move || {
             admin::watch_encryption(Arc::clone(&check), Arc::clone(&state), every)
+        });
+    }
+    if let Some(resolver) = resolver {
+        let (every, state) = (config.certificate_interval, Arc::clone(&certificate));
+        supervisor.spawn("certificate", move || {
+            tls::watch(
+                Arc::clone(&identity),
+                Arc::clone(&resolver),
+                Arc::clone(&state),
+                every,
+            )
         });
     }
     let every = config.indicators_interval;
