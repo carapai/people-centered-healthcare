@@ -51,7 +51,7 @@ jobs:
           $store = Join-Path $env:RUNNER_TEMP 'edge\store'
           ./apps/server/facility-edge/packaging/install-service.ps1 `
             -Binary (Resolve-Path target/release/facility-edge.exe) `
-            -Environment "HEALTH_DATA_DIR=$store", 'HEALTH_BIND=127.0.0.1:8080'
+            -Environment "HEALTH_DATA_DIR=$store", 'HEALTH_CONSOLE_BIND=127.0.0.1:8080'
           Start-Service facility-edge
           $deadline = (Get-Date).AddMinutes(2)
           while ($true) {
@@ -107,7 +107,7 @@ jobs:
           sudo install -D -m 0755 target/release/facility-edge /opt/health/bin/facility-edge
           sudo install -d /etc/health
           # The runner is not encrypted, so provisioning needs an exemption.
-          printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8080\nHEALTH_ENCRYPTION_EXEMPTION=ci-runner\n' \
+          printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8443\nHEALTH_ENCRYPTION_EXEMPTION=ci-runner\n' \
             | sudo tee /etc/health/facility-edge.env
           sudo install -m 0644 apps/server/facility-edge/packaging/facility-edge.service \
             apps/server/facility-edge/packaging/facility-edge-rollback.service /etc/systemd/system/
@@ -132,15 +132,19 @@ jobs:
           # Type=notify: start returns once the edge has migrated and sent READY=1.
           sudo systemctl start facility-edge
           # Provisioned, it serves HTTPS with a leaf it issued under its intermediate, which a
-          # client trusting only the root accepts for facility-edge.local, and no plain HTTP.
+          # client trusting only the root accepts for facility-edge.local, and no plain HTTP on
+          # the LAN listener.
           https() {
             curl --fail --silent --cacert "$RUNNER_TEMP/root/certificate.pem" \
-              --resolve facility-edge.local:8080:127.0.0.1 "https://facility-edge.local:8080$1"
+              --resolve facility-edge.local:8443:127.0.0.1 "https://facility-edge.local:8443$1"
           }
           https /ready
-          if curl --silent --max-time 5 http://127.0.0.1:8080/ready; then
-            echo 'plain HTTP answered on a provisioned node'; exit 1
+          if curl --silent --max-time 5 http://127.0.0.1:8443/ready; then
+            echo 'plain HTTP answered on the LAN listener'; exit 1
           fi
+          # The edge's own screen keeps its plain-HTTP console on the loopback address.
+          curl --fail --silent http://127.0.0.1:8080/ready
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/api/admin/status
           sudo test -f /var/lib/health/tls/leaf.pem
           test "$(sudo stat -c %a /var/lib/health/tls/leaf.key)" = 600
           # The embedded app: the page, its runtime.json and the shell's service worker.

@@ -11,9 +11,12 @@ use crate::ups::Ups;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EdgeConfig {
     /// `HEALTH_BIND`, default `0.0.0.0:443` (lan-security.md: the edge listens on TCP 443 only).
-    /// HTTPS once the facility intermediate is installed; before that, plain HTTP on the
-    /// loopback address with this port, whatever the address.
+    /// HTTPS, once the facility intermediate is installed; before that, nothing listens here.
     pub bind: SocketAddr,
+    /// `HEALTH_CONSOLE_BIND`, default `127.0.0.1:8080`: plain HTTP for the edge's own screen,
+    /// where the admin pages are served until staff sign-in (#75). A loopback address only, so
+    /// nothing on the LAN reaches it, and never `HEALTH_BIND`'s own address and port.
+    pub console_bind: SocketAddr,
     /// `HEALTH_DATA_DIR`: the embedded store's directory, owned by this process alone. Required.
     pub data_dir: PathBuf,
     /// `HEALTH_TENANT`, the SurrealDB namespace, default `ug`.
@@ -134,6 +137,22 @@ impl EdgeConfig {
         let data_dir: PathBuf = get("HEALTH_DATA_DIR")
             .map(PathBuf::from)
             .ok_or(ConfigError::Missing("HEALTH_DATA_DIR"))?;
+        let bind: SocketAddr = get("HEALTH_BIND")
+            .unwrap_or_else(|| "0.0.0.0:443".into())
+            .parse()
+            .map_err(|_| ConfigError::Malformed("HEALTH_BIND"))?;
+        let console_bind: SocketAddr = get("HEALTH_CONSOLE_BIND")
+            .unwrap_or_else(|| "127.0.0.1:8080".into())
+            .parse()
+            .ok()
+            .filter(|c: &SocketAddr| c.ip().is_loopback())
+            .ok_or(ConfigError::Malformed("HEALTH_CONSOLE_BIND"))?;
+        // A wildcard LAN address covers the loopback one too.
+        if console_bind.port() == bind.port()
+            && (bind.ip().is_unspecified() || bind.ip() == console_bind.ip())
+        {
+            return Err(ConfigError::Malformed("HEALTH_CONSOLE_BIND"));
+        }
         Ok(Self {
             update_dir: get("HEALTH_UPDATE_DIR")
                 .map(PathBuf::from)
@@ -149,10 +168,8 @@ impl EdgeConfig {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| data_dir.with_file_name("tls")),
             data_dir,
-            bind: get("HEALTH_BIND")
-                .unwrap_or_else(|| "0.0.0.0:443".into())
-                .parse()
-                .map_err(|_| ConfigError::Malformed("HEALTH_BIND"))?,
+            bind,
+            console_bind,
             tenant: get("HEALTH_TENANT").unwrap_or_else(|| "ug".into()),
             database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".into()),
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
@@ -247,6 +264,31 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn the_console_listens_on_the_loopback_address_only() {
+        let dir = ("HEALTH_DATA_DIR", "/d");
+        let c = config(&[dir]).expect("config");
+        assert_eq!(c.console_bind.to_string(), "127.0.0.1:8080");
+        let c = config(&[dir, ("HEALTH_CONSOLE_BIND", "[::1]:9000")]).expect("config");
+        assert_eq!(c.console_bind.to_string(), "[::1]:9000");
+        for bad in ["0.0.0.0:8080", "10.0.0.5:8080", "nowhere"] {
+            assert_eq!(
+                config(&[dir, ("HEALTH_CONSOLE_BIND", bad)]),
+                Err(ConfigError::Malformed("HEALTH_CONSOLE_BIND")),
+                "{bad}"
+            );
+        }
+        // Never the LAN listener's own address and port.
+        for bind in ["0.0.0.0:8080", "127.0.0.1:8080", "[::]:8080"] {
+            assert_eq!(
+                config(&[dir, ("HEALTH_BIND", bind)]),
+                Err(ConfigError::Malformed("HEALTH_CONSOLE_BIND")),
+                "{bind}"
+            );
+        }
+        assert!(config(&[dir, ("HEALTH_BIND", "10.0.0.5:8080")]).is_ok());
     }
 
     #[test]

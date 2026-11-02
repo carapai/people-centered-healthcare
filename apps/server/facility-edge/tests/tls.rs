@@ -1,7 +1,8 @@
 //! LAN TLS through the built binary (lan-security.md § Certificate hierarchy; #74): once
 //! provisioned, the node serves HTTPS with a leaf it issued under its facility intermediate,
 //! which a client trusting only the national root accepts for `<node-id>.local`; it then no
-//! longer speaks plain HTTP. Unix: the keystore stands in for systemd's `$CREDENTIALS_DIRECTORY`.
+//! longer speaks plain HTTP on the LAN, only on its loopback console. Unix: the keystore stands
+//! in for systemd's `$CREDENTIALS_DIRECTORY`.
 
 #![cfg(unix)]
 
@@ -119,12 +120,13 @@ fn a_provisioned_node_serves_https_under_its_intermediate() {
     let credentials = dir.path().join("credentials");
     std::fs::create_dir_all(&credentials).expect("dir");
     let root = provision(dir.path(), &credentials);
-    let port = common::free_port();
+    let (port, console) = (common::free_port(), common::free_port());
     let mut node = edge(
         &dir.path().join("store"),
-        port,
+        console,
         &[],
         &[
+            ("HEALTH_BIND", format!("127.0.0.1:{port}")),
             ("HEALTH_NODE_ID", NODE.to_owned()),
             ("CREDENTIALS_DIRECTORY", credentials.display().to_string()),
         ],
@@ -142,8 +144,12 @@ fn a_provisioned_node_serves_https_under_its_intermediate() {
     }
     // Only the node's own names: a client checking another name refuses it.
     assert!(get_tls(port, &root, "ug-kla-0002.local", "/ready").is_err());
-    // And no plain HTTP.
+    // And no plain HTTP on the LAN listener.
     assert_eq!(common::get(port, "/ready"), None);
+    // The edge's own screen keeps its plain-HTTP console on the loopback address, where the
+    // admin pages answer (lan-security.md § Denying unauthorized LAN devices).
+    assert_eq!(common::get(console, "/ready"), Some(200));
+    assert_eq!(common::get(console, "/api/admin/status"), Some(200));
     // The leaf and its key, kept for the next start.
     let tls = dir.path().join("tls");
     assert!(tls.join("leaf.pem").is_file() && tls.join("leaf.key").is_file());

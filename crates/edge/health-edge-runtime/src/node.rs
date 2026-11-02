@@ -101,17 +101,6 @@ impl ReadinessCheck for Serving {
     }
 }
 
-/// `bind`'s port on the loopback address: where an unprovisioned node listens.
-fn loopback(bind: std::net::SocketAddr) -> std::net::SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-    let ip = match bind.ip() {
-        ip if ip.is_loopback() => ip,
-        IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::LOCALHOST),
-        IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::LOCALHOST),
-    };
-    std::net::SocketAddr::new(ip, bind.port())
-}
-
 /// Runs `work` while asking `manager` for more time every [`EXTEND_EVERY`].
 async fn extending<T>(manager: &dyn ServiceManager, work: impl Future<Output = T>) -> T {
     let mut work = std::pin::pin!(work);
@@ -200,13 +189,34 @@ pub async fn run(
         let (identity, certificate) = (Arc::clone(&identity), Arc::clone(&certificate));
         tokio::task::spawn_blocking(move || tls::prepare(&identity, &certificate))
             .await
-            .unwrap_or(Listen::Loopback)
+            .unwrap_or(Listen::ConsoleOnly)
     };
-    let drain = Arc::new(Notify::new());
-    let draining = Arc::clone(&drain);
+    // One stop signal for every listener: a `Notify` would wake only one of them.
+    let (drain, draining) = tokio::sync::watch::channel(false);
+    let shutdown = move || {
+        let mut draining = draining.clone();
+        async move {
+            let _ = draining.wait_for(|stop| *stop).await;
+        }
+    };
     let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
-    let shutdown = async move { draining.notified().await };
-    let (server, resolver) = match serving_with {
+    let mut servers = Vec::new();
+    // The edge's own screen: plain HTTP on the loopback address, provisioned or not, where the
+    // admin pages answer until staff sign-in (#75). The LAN never reaches it.
+    let console = tokio::net::TcpListener::bind(config.console_bind)
+        .await
+        .map_err(EdgeError::Listen)?;
+    tracing::info!(
+        outcome = "listening",
+        tls = false,
+        "facility edge console listening"
+    );
+    servers.push(tokio::spawn(
+        axum::serve(console, service.clone())
+            .with_graceful_shutdown(shutdown())
+            .into_future(),
+    ));
+    let resolver = match serving_with {
         Listen::Https(resolver) => {
             let tcp = tokio::net::TcpListener::bind(config.bind)
                 .await
@@ -219,29 +229,15 @@ pub async fn run(
                 .map_err(EdgeError::Listen)?
                 .tap_io(|_| {});
             tracing::info!(outcome = "listening", tls = true, "facility edge listening");
-            let server = tokio::spawn(async move {
+            servers.push(tokio::spawn(
                 axum::serve(listener, service)
-                    .with_graceful_shutdown(shutdown)
-                    .await
-            });
-            (server, Some(resolver))
+                    .with_graceful_shutdown(shutdown())
+                    .into_future(),
+            ));
+            Some(resolver)
         }
-        Listen::Loopback => {
-            let listener = tokio::net::TcpListener::bind(loopback(config.bind))
-                .await
-                .map_err(EdgeError::Listen)?;
-            tracing::info!(
-                outcome = "listening",
-                tls = false,
-                "facility edge listening"
-            );
-            let server = tokio::spawn(async move {
-                axum::serve(listener, service)
-                    .with_graceful_shutdown(shutdown)
-                    .await
-            });
-            (server, None)
-        }
+        // Nothing to serve the LAN with: the console alone.
+        Listen::ConsoleOnly => None,
     };
 
     let updates = Updates::new(&config.update_dir);
@@ -378,13 +374,27 @@ pub async fn run(
     // Stop: report not-ready, then let in-flight requests finish within the drain time.
     serving.0.store(false, Ordering::SeqCst);
     manager.stopping();
-    drain.notify_one();
-    let served = extending(manager.as_ref(), tokio::time::timeout(config.drain, server)).await;
+    let _ = drain.send(true);
+    let all = async {
+        let mut results = Vec::new();
+        for server in servers {
+            results.push(server.await);
+        }
+        results
+    };
+    let served = extending(manager.as_ref(), tokio::time::timeout(config.drain, all)).await;
     drop(supervisor);
     match served {
-        Ok(Ok(Ok(()))) => tracing::info!(outcome = "stopped", "facility edge stopped"),
-        Ok(Ok(Err(error))) => return Err(EdgeError::Serve(error)),
-        Ok(Err(_)) => return Err(EdgeError::Serve(std::io::ErrorKind::Other.into())),
+        Ok(results) => {
+            for result in results {
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => return Err(EdgeError::Serve(error)),
+                    Err(_) => return Err(EdgeError::Serve(std::io::ErrorKind::Other.into())),
+                }
+            }
+            tracing::info!(outcome = "stopped", "facility edge stopped");
+        }
         Err(_) => tracing::warn!(
             outcome = "drain-timeout",
             "requests still in flight at stop"

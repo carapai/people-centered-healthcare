@@ -70,7 +70,7 @@ fn before_provisioning_nothing_is_served_but_loopback() {
     let dir = tempfile::tempdir().expect("dir");
     let state = state();
     let identity = identity(dir.path(), "192.168.1.10", None);
-    assert!(matches!(prepare(&identity, &state), Listen::Loopback));
+    assert!(matches!(prepare(&identity, &state), Listen::ConsoleOnly));
     assert_eq!(lock(&state).state, "not-provisioned");
 }
 
@@ -182,6 +182,6 @@ fn without_the_key_the_current_leaf_is_kept_while_valid() {
     provisioned(&empty.path().join("pki"));
     let state = self::state();
     let locked = identity(empty.path(), "192.168.1.10", None);
-    assert!(matches!(prepare(&locked, &state), Listen::Loopback));
+    assert!(matches!(prepare(&locked, &state), Listen::ConsoleOnly));
     assert_eq!(lock(&state).state, "invalid");
 }

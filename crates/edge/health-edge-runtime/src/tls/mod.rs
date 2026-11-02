@@ -9,9 +9,9 @@
 //! - **Renewal.** Every `HEALTH_CERTIFICATE_SECS` the leaf is reissued if two-thirds of its life
 //!   has passed or the node's addresses changed (an `address-changed` alert). The new leaf is
 //!   served from the next handshake on, with no restart.
-//! - **Before provisioning** there is nothing to serve: the node listens with plain HTTP on the
-//!   loopback address only, with a `not-provisioned` alert, so nothing on the LAN ever talks to
-//!   it in the clear.
+//! - **Before provisioning** there is nothing to serve: the node opens no LAN listener, with a
+//!   `not-provisioned` alert, so nothing on the LAN ever talks to it in the clear. Its
+//!   plain-HTTP console on the loopback address (`HEALTH_CONSOLE_BIND`) answers either way.
 
 mod listener;
 
@@ -367,28 +367,28 @@ fn write(path: &Path, contents: &str, private: bool) -> Result<(), String> {
 pub(crate) enum Listen {
     /// HTTPS on the configured address, with this leaf.
     Https(Arc<Resolver>),
-    /// Plain HTTP on the loopback address only.
-    Loopback,
+    /// No LAN listener: the loopback console alone.
+    ConsoleOnly,
 }
 
-/// At start: the leaf to serve, issued or renewed if needed, or loopback HTTP when there is
-/// none. Blocking.
+/// At start: the leaf to serve, issued or renewed if needed, or the console alone when there
+/// is none. Blocking.
 pub(crate) fn prepare(identity: &Identity, state: &CertificateState) -> Listen {
     match identity.refresh(state, Timestamp::now()) {
         Ok((key, _)) => Listen::Https(Arc::new(Resolver(RwLock::new(key)))),
         Err(_) if lock(state).state == "not-provisioned" => {
             tracing::warn!(
                 alert = "not-provisioned",
-                "no facility intermediate: serving plain HTTP on the loopback address only"
+                "no facility intermediate: serving the loopback console only"
             );
-            Listen::Loopback
+            Listen::ConsoleOnly
         }
         Err(_) => {
             tracing::error!(
                 alert = "identity-invalid",
-                "no server certificate can be served: plain HTTP on the loopback address only"
+                "no server certificate can be served: serving the loopback console only"
             );
-            Listen::Loopback
+            Listen::ConsoleOnly
         }
     }
 }

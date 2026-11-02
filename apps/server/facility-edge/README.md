@@ -16,7 +16,8 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | Variable | Default | |
 |---|---|---|
 | `HEALTH_DATA_DIR` | required | The embedded store's directory. This process owns it alone |
-| `HEALTH_BIND` | `0.0.0.0:443` | Listen address. HTTPS once provisioned; before that, plain HTTP on the loopback address with this port (see TLS) |
+| `HEALTH_BIND` | `0.0.0.0:443` | The LAN listener: HTTPS once provisioned, nothing before that (see TLS) |
+| `HEALTH_CONSOLE_BIND` | `127.0.0.1:8080` | The console for the edge's own screen: plain HTTP, loopback addresses only, never `HEALTH_BIND`'s address and port. The admin pages answer here until staff sign-in (#75) |
 | `HEALTH_TENANT` | `ug` | SurrealDB namespace |
 | `HEALTH_DATABASE` | `main` | |
 | `HEALTH_UPS` | none | The NUT UPS to watch, `name@host[:port]` (port 3493 by default). Without it, durability rests on `sync=every` |
@@ -126,7 +127,8 @@ Once provisioned, the node serves HTTPS only, with a server leaf it issues itsel
 - **Its key** is new at each issue. It is kept in `HEALTH_TLS_DIR` and readable by the service alone. The intermediate's key is unsealed from the keystore only to issue.
 - **Renewal:** every `HEALTH_CERTIFICATE_SECS` the leaf is reissued if two-thirds of its life has passed or the addresses changed (`address-changed`, standing for a day). It is served from the next handshake, with no restart. If renewal fails, the current leaf is kept while it is valid, with a `certificate-renewal-failed` alert.
 - **Expiry alerts:** `certificate-expiring` under 30 days. `intermediate-expiring` under 400 days, because a leaf cannot outlive its intermediate, so re-provision before then.
-- **Before provisioning,** or if no leaf can be served (`identity-invalid`), the node listens with plain HTTP on the loopback address only, so nothing on the LAN talks to it in the clear. The status page and `provision` still work on the machine itself.
+- **The console** on `HEALTH_CONSOLE_BIND` serves plain HTTP on the loopback address, provisioned or not. Browsers treat `http://localhost` as a secure context, and the admin pages, which answer loopback peers only, work on the edge's own screen with no certificate warning.
+- **Before provisioning,** or if no leaf can be served (`identity-invalid`), the node opens no LAN listener, so nothing on the LAN talks to it in the clear. The console and `provision` still work on the machine itself.
 - **Linux:** the unit grants `CAP_NET_BIND_SERVICE` so the unprivileged service can bind 443.
 
 ## Devices

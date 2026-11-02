@@ -24,7 +24,9 @@ pub fn edge(data: &Path, port: u16, args: &[&str], env: &[(&str, String)]) -> Ch
     edge_at(Path::new(BINARY), data, port, args, env)
 }
 
-/// Runs `program` (an installed copy of the binary) as the node.
+/// Runs `program` (an installed copy of the binary) as the node, with its plain-HTTP console on
+/// `port`. Its LAN listener (HTTPS, once provisioned) gets a port of its own unless `env` sets
+/// `HEALTH_BIND`.
 pub fn edge_at(
     program: &Path,
     data: &Path,
@@ -36,7 +38,8 @@ pub fn edge_at(
         .args(args)
         .env_clear()
         .env("HEALTH_DATA_DIR", data)
-        .env("HEALTH_BIND", format!("127.0.0.1:{port}"))
+        .env("HEALTH_CONSOLE_BIND", format!("127.0.0.1:{port}"))
+        .env("HEALTH_BIND", format!("127.0.0.1:{}", free_port()))
         .env("HEALTH_DRAIN_SECS", "5")
         .env("HEALTH_LOG", "warn")
         .envs(env.iter().map(|(k, v)| (*k, v.as_str())))
