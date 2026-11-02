@@ -145,6 +145,13 @@ jobs:
           # The edge's own screen keeps its plain-HTTP console on the loopback address.
           curl --fail --silent http://127.0.0.1:8080/ready
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/api/admin/status
+          # The pairing payload pins the installed intermediate's key, as openssl computes it.
+          pin="sha256/$(openssl x509 -in "$RUNNER_TEMP/facility.pem" -pubkey -noout \
+            | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64)"
+          curl --fail --silent http://127.0.0.1:8080/api/admin/pairing > pairing.json
+          cat pairing.json
+          grep --quiet "\"spki\":\"$pin\"" pairing.json
+          grep --quiet '"uri":"health-edge://pair?v=1&node=facility-edge&' pairing.json
           sudo test -f /var/lib/health/tls/leaf.pem
           test "$(sudo stat -c %a /var/lib/health/tls/leaf.key)" = 600
           # The embedded app: the page, its runtime.json and the shell's service worker.

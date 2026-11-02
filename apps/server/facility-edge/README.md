@@ -43,6 +43,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_TLS_DIR` | `tls` beside `HEALTH_DATA_DIR` | The server leaf and its key (`leaf.pem`, `leaf.key`, the key readable by the service alone), issued and renewed by the node |
 | `HEALTH_DNS_NAME` | none | The facility's configured DNS name, named in the leaf beside `<node-id>.local` |
 | `HEALTH_CERTIFICATE_SECS` | `3600` | How often the leaf is checked for renewal and address changes |
+| `HEALTH_MDNS` | `on` | `off` stops the `_health-edge._tcp` mDNS announcement |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -134,6 +135,16 @@ Once provisioned, the node serves HTTPS only, with a server leaf it issues itsel
 ## Devices
 
 Every `/api/…` route except enrollment and the status page needs a DPoP proof by an enrolled, active device (#74; lan-security.md § Device enrollment). A device asks with `POST /api/enrollment` and shows the pairing code it gets back. On the node's own console, an admin approves it with `POST /api/admin/enrollments/approve` (the code, a name and a location) or revokes it with `POST /api/admin/devices/{id}/revoke`. Requests expire after 10 minutes. The routes are described in `health-auth`'s README; the client screens are #74 part 3.
+
+## Pairing and discovery
+
+Devices find and pin the edge by pairing, with mDNS as a hint only (#74; lan-security.md § Addressing and discovery):
+- **Pairing:** the status page on the edge's own screen shows a QR code and its text, from `GET /api/admin/pairing` (console only). It carries:
+  - the first `https` origin in `HEALTH_ORIGINS`;
+  - the node ID;
+  - the facility intermediate's SPKI fingerprint (`sha256/<base64>`), as `health-edge://pair?v=1&node=…&url=…&spki=…`.
+  Before provisioning it answers 409 `not-provisioned`.
+- **mDNS:** while the node serves HTTPS, it announces `<node-id>._health-edge._tcp.local.` on `HEALTH_BIND`'s port, at its leaf's addresses (every interface's when it names none), with TXT `node` and `v`. It re-announces when the addresses change. Clients still check the node ID and the fingerprint, so a spoofed announcement gets them nowhere. The host firewall must allow UDP 5353 on the LAN.
 
 ## Health monitoring
 

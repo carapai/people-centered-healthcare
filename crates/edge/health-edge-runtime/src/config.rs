@@ -88,6 +88,9 @@ pub struct EdgeConfig {
     /// `HEALTH_CERTIFICATE_SECS`: how often the leaf is checked for renewal and address
     /// changes, default 3600.
     pub certificate_interval: Duration,
+    /// `HEALTH_MDNS`: `off` stops the `_health-edge._tcp` announcement, which is on by default
+    /// while the node serves HTTPS.
+    pub mdns: bool,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -183,6 +186,11 @@ impl EdgeConfig {
             origins,
             dns_name: get("HEALTH_DNS_NAME").map(|n| n.trim().to_ascii_lowercase()),
             certificate_interval: positive("HEALTH_CERTIFICATE_SECS", 3600)?,
+            mdns: match get("HEALTH_MDNS").as_deref().map(str::trim) {
+                None | Some("on") => true,
+                Some("off") => false,
+                Some(_) => return Err(ConfigError::Malformed("HEALTH_MDNS")),
+            },
             backup_key_file: match (get("HEALTH_BACKUP_DIR"), get("HEALTH_BACKUP_KEY_FILE")) {
                 (Some(_), None) => return Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE")),
                 (_, key) => key.map(PathBuf::from),
@@ -220,6 +228,7 @@ mod tests {
         assert_eq!(c.tls_dir, PathBuf::from("/var/lib/tls"));
         assert_eq!(c.dns_name, None);
         assert_eq!(c.certificate_interval, Duration::from_secs(3600));
+        assert!(c.mdns);
         assert_eq!((c.tenant.as_str(), c.database.as_str()), ("ug", "main"));
         assert_eq!(c.ups, None);
         assert_eq!(c.drain, Duration::from_secs(20));

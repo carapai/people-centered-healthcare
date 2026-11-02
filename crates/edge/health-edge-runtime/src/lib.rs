@@ -23,6 +23,7 @@
 pub mod admin;
 pub mod backup;
 mod config;
+mod discovery;
 mod enrollment;
 mod node;
 mod notify;

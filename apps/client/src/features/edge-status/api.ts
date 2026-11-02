@@ -53,6 +53,41 @@ export class EdgeStatusError extends Error {
   }
 }
 
+/** What a device needs to pair with the edge (lan-security.md § Addressing and discovery). */
+export interface Pairing {
+  version: string
+  node_id: string
+  /** The origin devices reach the node by. */
+  url: string
+  /** The facility intermediate's SPKI fingerprint, `sha256/<base64>`, which Tauri clients pin. */
+  spki: string
+  /** All of it as one `health-edge://pair?…` URI: what the QR code carries. */
+  uri: string
+}
+
+/** Why the edge has no pairing payload yet: `not-provisioned`, `identity-invalid` or `no-https-origin`. */
+export class PairingUnavailable extends Error {
+  constructor(readonly reason: string) {
+    super(`pairing unavailable: ${reason}`)
+    this.name = 'PairingUnavailable'
+  }
+}
+
+/** The edge's pairing payload, for the QR code on its own screen. */
+export function pairingQuery(transport: Transport) {
+  return {
+    queryKey: ['edge-pairing'],
+    queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<Pairing> => {
+      const response = await transport.request({ method: 'GET', path: '/admin/pairing', ...(signal === undefined ? {} : { signal }) })
+      const body = typeof response.body === 'object' && response.body !== null ? (plain(response.body) as Record<string, unknown>) : null
+      if (response.status === 409) throw new PairingUnavailable(typeof body?.['error'] === 'string' ? body['error'] : 'unknown')
+      if (response.status !== 200 || body === null) throw new EdgeStatusError(response.status)
+      return body as unknown as Pairing
+    },
+    refetchInterval: REFRESH_MS,
+  }
+}
+
 /** How often the page refreshes the report. */
 export const REFRESH_MS = 30_000
 

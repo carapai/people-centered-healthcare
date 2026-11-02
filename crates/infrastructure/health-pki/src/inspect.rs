@@ -20,6 +20,9 @@ pub struct Inspected {
     pub dns_names: Vec<String>,
     /// Its IP address subject alternative names, in order.
     pub addresses: Vec<IpAddr>,
+    /// The SHA-256 of its SubjectPublicKeyInfo, as `sha256/<base64>`: what a client pins
+    /// (lan-security.md: Tauri pins the facility intermediate's SPKI).
+    pub spki_sha256: String,
 }
 
 /// Reads the first certificate in `pem`.
@@ -48,7 +51,17 @@ pub fn inspect(pem: &str) -> Result<Inspected> {
             }
         }
     }
+    let spki_sha256 = {
+        use base64::Engine as _;
+        use sha2::Digest as _;
+        let digest = sha2::Sha256::digest(x509.public_key().raw);
+        format!(
+            "sha256/{}",
+            base64::engine::general_purpose::STANDARD.encode(digest)
+        )
+    };
     Ok(Inspected {
+        spki_sha256,
         not_before: at(x509.validity().not_before.timestamp())?,
         not_after: at(x509.validity().not_after.timestamp())?,
         dns_names,
