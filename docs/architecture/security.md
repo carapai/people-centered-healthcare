@@ -55,9 +55,9 @@ Permissions are enforced in the Rust services on every node, never only in the U
 |---|---|---|---|---|
 | National root | Offline; the platform operator until MoH governance is decided | Anchors the private PKI | Ceremony; custody in fog | ADR 0008 |
 | Facility issuing CA | Central HSM/KMS, non-exportable | Issues facility intermediates at provisioning | 10 years, issuing for the first 5; issued at a root ceremony | ADR 0058 |
-| Facility intermediate | Edge OS keystore | LAN TLS for the facility's names | 5 years; revoked on the issuing CA's CRL | ADRs 0008, 0058 |
+| Facility intermediate | Edge keystore: systemd-creds (Linux) or DPAPI machine scope (Windows); generated on the edge and never exported | LAN TLS for the facility's names | 5 years; revoked on the issuing CA's CRL | ADRs 0008, 0058 |
 | Node and device keys | OS keystore (edge, desktop); non-extractable WebCrypto key (browser) | mTLS and DPoP | Re-enrollment; never recycled | ADRs 0009, 0013, 0040 |
-| Edge pepper | Edge OS keystore (CNG machine key, or TPM where present) | Wraps the credential hashes | — | offline-auth.md |
+| Edge pepper | Edge keystore: systemd-creds with the TPM2 (Linux) or DPAPI machine scope (Windows) | Wraps the credential hashes | — | offline-auth.md |
 | Permission-snapshot signing | Central | Signs per-user snapshots | — | ADR 0011 |
 | Publication signing | Central HSM/KMS | Signs definition packages; a code-signing certificate under the root, never a CA | Yearly, at a root ceremony | ADRs 0024, 0058 |
 | Release signing | Azure Artifact Signing, KMS, GPG, cosign | Installers, updater artifacts, edge packages, images | Per ADR 0045 | ADRs 0041, 0045 |

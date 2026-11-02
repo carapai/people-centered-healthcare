@@ -100,17 +100,34 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run codegen && bun run build
         working-directory: apps/client
-      - run: cargo build --locked --release -p facility-edge
+      - run: cargo build --locked --release -p facility-edge -p pki
       - name: Run it under systemd
         run: |
           sudo useradd --system --no-create-home health
           sudo install -D -m 0755 target/release/facility-edge /opt/health/bin/facility-edge
           sudo install -d /etc/health
-          printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8080\n' \
+          # The runner is not encrypted, so provisioning needs an exemption.
+          printf 'HEALTH_DATA_DIR=/var/lib/health/store\nHEALTH_BIND=127.0.0.1:8080\nHEALTH_ENCRYPTION_EXEMPTION=ci-runner\n' \
             | sudo tee /etc/health/facility-edge.env
           sudo install -m 0644 apps/server/facility-edge/packaging/facility-edge.service \
             apps/server/facility-edge/packaging/facility-edge-rollback.service /etc/systemd/system/
           sudo systemd-analyze verify /etc/systemd/system/facility-edge.service
+          # Provision: the edge seals its key with systemd-creds and requests its intermediate,
+          # a test PKI issues it, and the edge installs the chain.
+          edge() { sudo bash -c 'set -a; . /etc/health/facility-edge.env; exec /opt/health/bin/facility-edge "$@"' edge "$@"; }
+          pki=target/release/pki
+          edge provision request --out "$RUNNER_TEMP/request.pem"
+          sudo test -f /etc/credstore.encrypted/health.facility-intermediate.key
+          $pki root --name 'CI Root' --out "$RUNNER_TEMP/root"
+          $pki request --name issuing --out "$RUNNER_TEMP/issuing"
+          $pki issuing-ca --ca "$RUNNER_TEMP/root" --request "$RUNNER_TEMP/issuing/request.pem" \
+            --name 'CI Issuing CA' --suffixes example.ug --out "$RUNNER_TEMP/issuing/certificate.pem"
+          echo '{"number":0,"revoked":[]}' > "$RUNNER_TEMP/issuing/revocations.json"
+          $pki facility --ca "$RUNNER_TEMP/issuing" --request "$RUNNER_TEMP/request.pem" \
+            --node-id facility-edge --out "$RUNNER_TEMP/facility.pem"
+          cat "$RUNNER_TEMP/facility.pem" "$RUNNER_TEMP/issuing/certificate.pem" > "$RUNNER_TEMP/chain.pem"
+          edge provision install --chain "$RUNNER_TEMP/chain.pem" --root "$RUNNER_TEMP/root/certificate.pem"
+          edge provision status
           sudo systemctl daemon-reload
           # Type=notify: start returns once the edge has migrated and sent READY=1.
           sudo systemctl start facility-edge
@@ -128,6 +145,8 @@ jobs:
           done
           grep --quiet '"encryption":{' status.json
           grep --only-matching '"encryption":{[^]]*]' status.json
+          # systemd unsealed the key for the unprivileged service.
+          sudo journalctl -u facility-edge --no-pager | grep --quiet identity-loaded
           sudo systemctl stop facility-edge
           systemctl show facility-edge -p Result -p ExecMainStatus
           test "$(systemctl show facility-edge -p Result --value)" = success

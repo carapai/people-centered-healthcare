@@ -1553,6 +1553,7 @@ dependencies = [
  "health-edge-runtime",
  "health-node-identity",
  "health-observability",
+ "health-pki",
  "health-surrealdb",
  "health-time",
  "p256",
@@ -2416,9 +2417,12 @@ dependencies = [
 name = "health-node-identity"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "health-time",
  "serde",
  "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

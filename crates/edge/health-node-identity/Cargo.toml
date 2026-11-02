@@ -1,6 +1,6 @@
 [package]
 name = "health-node-identity"
-description = "A node's identity on its host, shared by the edge and desktop: the full-disk encryption check and provisioning gate (ADR 0048); node keys and the facility intermediate follow (#73)."
+description = "A node's identity on its host, shared by the edge and desktop: the full-disk encryption check and provisioning gate (ADR 0048), and the sealed keystore (systemd-creds, DPAPI)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,6 +13,11 @@ layer = "runtime"
 workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 health-time = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

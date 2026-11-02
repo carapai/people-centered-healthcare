@@ -26,9 +26,26 @@ Layer: **runtime**. A node's identity on its host, shared by the edge and the de
   - otherwise `Refused` with the findings.
 - **`system_root()`** is `/`, or `%SystemDrive%\` on Windows.
 
+## `keystore`: sealed secrets
+
+`Keystore::system()` seals and unseals named secrets, such as the facility intermediate's key. Secrets cross to the tools on standard input and output, never in arguments.
+
+- **Linux:**
+  - `seal` runs `systemd-creds encrypt --with-key=auto` as root, with the host key plus the TPM2 where present, into `/etc/credstore.encrypted/<name>`.
+  - The service unit's `LoadCredentialEncrypted=<name>` makes systemd unseal it into `$CREDENTIALS_DIRECTORY`, which `unseal` reads first.
+  - Root commands unseal with `systemd-creds decrypt`.
+- **Windows:**
+  - `seal` uses DPAPI in machine scope through PowerShell (`ProtectedData.Protect`, `LocalMachine`), into `%ProgramData%\health\credentials\<name>`.
+  - The file's ACL is reset to SYSTEM and Administrators only.
+  - The LocalSystem service unseals it with `ProtectedData.Unprotect`.
+  - DPAPI binds the secret to the machine rather than the TPM chip; the BitLocker volume beneath it is TPM-bound. A CNG key would need FFI, and the workspace forbids `unsafe`.
+- **Names and replacement:**
+  - Names are plain credential names: letters, digits, `.`, `-` and `_`, not starting with `.`.
+  - `seal` never replaces an existing secret (`KeystoreError::Exists`).
+
 ## Not yet
 
-- **Node keys:** the node keys in the OS keystore, with systemd-creds sealed to the TPM2 on Linux and a CNG machine key on Windows. Also installing the facility intermediate from a request through `health-pki`. Both are #73 part 2.
+- **Other node keys:** the sync mTLS node key and the edge pepper use the same keystore when their features arrive.
 - **The central side:** provisioning codes, recovery-key escrow and the decommission record are #268.
 - **Exemptions:** an exemption is configuration (`HEALTH_ENCRYPTION_EXEMPTION`). Checking it against signed country configuration comes with configuration packages.
 
@@ -39,3 +56,9 @@ Layer: **runtime**. A node's identity on its host, shared by the edge and the de
 - **Findings:** every shortfall is its own finding and refuses provisioning. An exemption lets them through and names its grant.
 - **The state file:** the state round-trips through the probe's file.
 - **This machine:** the real probe reports it without failing.
+
+`src/keystore.rs`:
+- **Unsealed secrets:** the service reads what systemd unsealed.
+- **No replacement:** a sealed secret is never replaced.
+- **Names:** credential names are plain.
+- **DPAPI (Windows):** seals and unseals in machine scope, with nothing readable at rest. The edge-build Windows job runs this.

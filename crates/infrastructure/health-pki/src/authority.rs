@@ -228,6 +228,11 @@ impl Authority {
         self.tier
     }
 
+    /// When its certificate expires.
+    pub fn expires(&self) -> Timestamp {
+        Timestamp::from_second(self.not_after.unix_timestamp()).unwrap_or(Timestamp::MAX)
+    }
+
     /// Its certificate.
     pub fn certificate(&self) -> &CertificateDer<'static> {
         &self.certificate
