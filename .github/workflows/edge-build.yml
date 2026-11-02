@@ -42,8 +42,8 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
-      - run: cargo clippy --locked -p health-edge-runtime -p facility-edge --all-targets -- -D warnings
-      - run: cargo test --locked -p health-edge-runtime
+      - run: cargo clippy --locked -p health-edge-runtime -p health-node-identity -p facility-edge --all-targets -- -D warnings
+      - run: cargo test --locked -p health-edge-runtime -p health-node-identity
       - run: cargo build --locked --release -p facility-edge
       - name: Run it as a Windows service
         shell: pwsh
@@ -61,6 +61,13 @@ jobs:
             if ((Get-Date) -gt $deadline) { throw 'not ready in time' }
             Start-Sleep -Seconds 1
           }
+          # The node probes BitLocker itself, as LocalSystem, and reports what it found.
+          $deadline = (Get-Date).AddMinutes(1)
+          while ($null -eq ($status = Invoke-RestMethod http://127.0.0.1:8080/api/admin/status).encryption) {
+            if ((Get-Date) -gt $deadline) { throw 'no encryption state in the status report' }
+            Start-Sleep -Seconds 1
+          }
+          $status.encryption | ConvertTo-Json -Depth 4
           Stop-Service facility-edge
           $service = Get-CimInstance Win32_Service -Filter "Name='facility-edge'"
           "state=$($service.State) exit=$($service.ExitCode) specific=$($service.ServiceSpecificExitCode)"
@@ -112,6 +119,15 @@ jobs:
           curl --fail --silent http://127.0.0.1:8080/ | grep --quiet 'id="root"'
           curl --fail --silent http://127.0.0.1:8080/runtime.json | grep --quiet '"mode":"edge"'
           curl --fail --silent --output /dev/null http://127.0.0.1:8080/sw.js
+          # The root probe ran before the start, and the node reports its result.
+          sudo cat /run/health/encryption.json
+          for _ in $(seq 30); do
+            curl --fail --silent http://127.0.0.1:8080/api/admin/status > status.json
+            grep --quiet '"encryption":{' status.json && break
+            sleep 1
+          done
+          grep --quiet '"encryption":{' status.json
+          grep --only-matching '"encryption":{[^]]*]' status.json
           sudo systemctl stop facility-edge
           systemctl show facility-edge -p Result -p ExecMainStatus
           test "$(systemctl show facility-edge -p Result --value)" = success

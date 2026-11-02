@@ -58,6 +58,15 @@ pub struct EdgeConfig {
     /// `HEALTH_INDICATORS_SECS`: how often the indicators are logged and alerts raised,
     /// default 60.
     pub indicators_interval: Duration,
+    /// `HEALTH_ENCRYPTION_STATE_FILE`: where a privileged probe left the disk-encryption
+    /// state (the Linux unit's `ExecStartPre`). Without it, the node probes itself, which needs
+    /// administrator rights (the Windows service runs as LocalSystem).
+    pub encryption_state_file: Option<PathBuf>,
+    /// `HEALTH_ENCRYPTION_EXEMPTION`: the country-configuration grant exempting this facility
+    /// from full-disk encryption (ADR 0048), shown as a standing alert.
+    pub encryption_exemption: Option<String>,
+    /// `HEALTH_ENCRYPTION_SECS`: how often disk encryption is checked, default 3600.
+    pub encryption_interval: Duration,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -121,6 +130,9 @@ impl EdgeConfig {
             logs_endpoint: get("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"),
             ship_interval: positive("HEALTH_TELEMETRY_SHIP_SECS", 30)?,
             indicators_interval: positive("HEALTH_INDICATORS_SECS", 60)?,
+            encryption_state_file: get("HEALTH_ENCRYPTION_STATE_FILE").map(PathBuf::from),
+            encryption_exemption: get("HEALTH_ENCRYPTION_EXEMPTION").map(|g| g.trim().to_owned()),
+            encryption_interval: positive("HEALTH_ENCRYPTION_SECS", 3600)?,
         })
     }
 }
@@ -155,6 +167,11 @@ mod tests {
             (c.ship_interval, c.indicators_interval),
             (Duration::from_secs(30), Duration::from_secs(60))
         );
+        assert_eq!(
+            (c.encryption_state_file, c.encryption_exemption),
+            (None, None)
+        );
+        assert_eq!(c.encryption_interval, Duration::from_secs(3600));
     }
 
     #[test]

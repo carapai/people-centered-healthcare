@@ -99,6 +99,7 @@ Local backups, restore, failover and recovery targets are in [backup-and-recover
 
 - **In code (#77):** `health_edge_runtime::admin`, `GET /api/admin/status`, and the client's `/edge/status` page.
   - **Reported:** identity, version, store size, free disk, backups, UPS, task restarts (two or more within the supervisor's window) and the telemetry buffer.
-  - **Pending:** sync, clock skew, certificates, the permission snapshot, disk encryption and sessions arrive with their features (Phase 5, #73–#75). The report lists them as pending.
+  - **Disk encryption (#73):** `health-node-identity` probes BitLocker or LUKS2 with its TPM2 token, the TPM and Secure Boot. `facility-edge encryption check` is the provisioning gate, refusing a non-compliant machine unless it is exempted. The status page shows the result and raises its alerts, and an exemption stands as `encryption-exempt`. On Linux, systemd runs the root-only probe before each start; on Windows the LocalSystem service probes hourly.
+  - **Pending:** sync, clock skew, certificates, the permission snapshot and sessions arrive with their features (Phase 5, #74, #75). The report lists them as pending.
   - **Access:** until the local authorization server can require an admin (#75), the report is served only to the node itself.
   - **Telemetry:** the buffer is under `HEALTH_TELEMETRY_DIR`, shipped to `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`. Spans are not buffered yet.

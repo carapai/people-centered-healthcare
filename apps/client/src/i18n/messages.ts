@@ -336,6 +336,30 @@ type EdgeStatusValues = {
   esAlertLowBattery: {}
   esAlertUpsUnreachable: {}
   esAlertTaskRestarts: { subject: string }
+  esAlertDiskUnencrypted: { subject: string }
+  esAlertTpmProtectorMissing: { subject: string }
+  esAlertEncryptionSuspended: { subject: string }
+  esAlertTpmNotSealed: { subject: string }
+  esAlertEncryptionUnknown: { subject: string }
+  esAlertTpmMissing: {}
+  esAlertTpmUnknown: {}
+  esAlertSecureBootOff: {}
+  esAlertSecureBootUnknown: {}
+  esAlertEncryptionExempt: {}
+  esSystemVolume: {}
+  esSystemDisk: {}
+  esEncryption: {}
+  esTpm: {}
+  esSecureBoot: {}
+  esYes: {}
+  esNo: {}
+  esExemption: {}
+  esProtTpm: {}
+  esProtSuspended: {}
+  esProtNoTpm: {}
+  esProtNotSealed: {}
+  esProtUnencrypted: {}
+  esProtUnknown: { reason: string }
   esNode: {}
   esNodeId: {}
   esVersion: {}
@@ -392,6 +416,30 @@ export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
   esAlertLowBattery: { id: 'app.edgeStatus.alert.lowBattery', defaultMessage: 'The UPS battery is low: the node is stopping.', description: 'Alert' },
   esAlertUpsUnreachable: { id: 'app.edgeStatus.alert.upsUnreachable', defaultMessage: 'The UPS cannot be reached.', description: 'Alert' },
   esAlertTaskRestarts: { id: 'app.edgeStatus.alert.taskRestarts', defaultMessage: 'The {subject} task keeps restarting.', description: 'Alert: a background task fails repeatedly; subject is its name' },
+  esAlertDiskUnencrypted: { id: 'app.edgeStatus.alert.diskUnencrypted', defaultMessage: 'The {subject} is not encrypted.', description: 'Alert: full-disk encryption is off; subject is the volume' },
+  esAlertTpmProtectorMissing: { id: 'app.edgeStatus.alert.tpmProtectorMissing', defaultMessage: 'The {subject} has no TPM unlock, so the edge cannot restart unattended.', description: 'Alert: encrypted without a TPM protector; subject is the volume' },
+  esAlertEncryptionSuspended: { id: 'app.edgeStatus.alert.encryptionSuspended', defaultMessage: 'Encryption of the {subject} is suspended.', description: 'Alert: BitLocker protection suspended; subject is the volume' },
+  esAlertTpmNotSealed: { id: 'app.edgeStatus.alert.tpmNotSealed', defaultMessage: 'The TPM unlock of the {subject} is not tied to Secure Boot.', description: 'Alert: the LUKS TPM token is not sealed to PCR 7; subject is the volume' },
+  esAlertEncryptionUnknown: { id: 'app.edgeStatus.alert.encryptionUnknown', defaultMessage: 'The encryption of the {subject} could not be checked.', description: 'Alert: the encryption probe failed; subject is the volume' },
+  esAlertTpmMissing: { id: 'app.edgeStatus.alert.tpmMissing', defaultMessage: 'This machine has no TPM 2.0.', description: 'Alert' },
+  esAlertTpmUnknown: { id: 'app.edgeStatus.alert.tpmUnknown', defaultMessage: 'The TPM could not be checked.', description: 'Alert' },
+  esAlertSecureBootOff: { id: 'app.edgeStatus.alert.secureBootOff', defaultMessage: 'Secure Boot is off.', description: 'Alert' },
+  esAlertSecureBootUnknown: { id: 'app.edgeStatus.alert.secureBootUnknown', defaultMessage: 'Secure Boot could not be checked.', description: 'Alert' },
+  esAlertEncryptionExempt: { id: 'app.edgeStatus.alert.encryptionExempt', defaultMessage: 'This facility is exempt from full-disk encryption.', description: 'Alert: a standing country-configuration exemption' },
+  esSystemVolume: { id: 'app.edgeStatus.systemVolume', defaultMessage: 'system disk', description: 'Edge status: the volume holding the operating system' },
+  esSystemDisk: { id: 'app.edgeStatus.systemDisk', defaultMessage: 'System disk', description: 'Edge status: label for the volume holding the operating system' },
+  esEncryption: { id: 'app.edgeStatus.encryption', defaultMessage: 'Disk encryption', description: 'Edge status: disk encryption section' },
+  esTpm: { id: 'app.edgeStatus.tpm', defaultMessage: 'TPM 2.0', description: 'Edge status: whether the machine has a TPM 2.0' },
+  esSecureBoot: { id: 'app.edgeStatus.secureBoot', defaultMessage: 'Secure Boot', description: 'Edge status: whether Secure Boot is on' },
+  esYes: { id: 'app.edgeStatus.yes', defaultMessage: 'Yes', description: 'Edge status: a check that holds' },
+  esNo: { id: 'app.edgeStatus.no', defaultMessage: 'No', description: 'Edge status: a check that does not hold' },
+  esExemption: { id: 'app.edgeStatus.exemption', defaultMessage: 'Exemption', description: 'Edge status: the country-configuration grant exempting the facility' },
+  esProtTpm: { id: 'app.edgeStatus.protection.tpm', defaultMessage: 'Encrypted, unlocked by the TPM', description: 'Disk protection state' },
+  esProtSuspended: { id: 'app.edgeStatus.protection.suspended', defaultMessage: 'Encrypted, protection suspended', description: 'Disk protection state' },
+  esProtNoTpm: { id: 'app.edgeStatus.protection.noTpm', defaultMessage: 'Encrypted, no TPM unlock', description: 'Disk protection state' },
+  esProtNotSealed: { id: 'app.edgeStatus.protection.notSealed', defaultMessage: 'Encrypted, TPM unlock not tied to Secure Boot', description: 'Disk protection state' },
+  esProtUnencrypted: { id: 'app.edgeStatus.protection.unencrypted', defaultMessage: 'Not encrypted', description: 'Disk protection state' },
+  esProtUnknown: { id: 'app.edgeStatus.protection.unknown', defaultMessage: 'Could not be checked: {reason}', description: 'Disk protection state; reason is the probe error' },
   esNode: { id: 'app.edgeStatus.node', defaultMessage: 'Node', description: 'Edge status: node section' },
   esNodeId: { id: 'app.edgeStatus.nodeId', defaultMessage: 'Node ID', description: 'Edge status' },
   esVersion: { id: 'app.edgeStatus.version', defaultMessage: 'Version', description: 'Edge status' },

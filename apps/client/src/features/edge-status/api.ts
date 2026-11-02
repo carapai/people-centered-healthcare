@@ -23,6 +23,14 @@ export interface EdgeReport {
     last_shipped: string | null
     failing: boolean
   }
+  encryption: {
+    checked: string
+    tpm2: boolean | null
+    secure_boot: boolean | null
+    volumes: { name: 'system' | 'data'; protection: 'tpm' | 'suspended' | 'no-tpm-protector' | 'not-sealed' | 'unencrypted' | 'unknown'; reason: string | null }[]
+    findings: { code: string; subject: string | null }[]
+    exemption: string | null
+  } | null
   pending: string[]
   alerts: { code: string; subject: string | null }[]
 }

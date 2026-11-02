@@ -13,6 +13,7 @@
 //!   allowlist; the report holds no personal health data.
 
 mod buffer;
+mod encryption;
 mod report;
 mod ship;
 
@@ -34,6 +35,8 @@ use crate::supervisor::Restarts;
 use crate::ups::PowerState;
 
 pub use buffer::{Buffer, DEFAULT_CAP};
+pub use encryption::{EncryptedVolume, Encryption, EncryptionCheck};
+pub(crate) use encryption::{EncryptionState, watch as watch_encryption};
 pub use report::{Alert, Backup, Node, Report, Task, Telemetry, Ups, Volume};
 pub(crate) use ship::{ShipState, ship};
 
@@ -48,6 +51,8 @@ pub(crate) struct Monitor {
     pub(crate) restarts: Restarts,
     pub(crate) buffer: Option<Arc<Buffer>>,
     pub(crate) shipping: ShipState,
+    /// The disk-encryption check's last result, when a check is wired in.
+    pub(crate) encryption: Option<EncryptionState>,
 }
 
 impl Monitor {
@@ -99,6 +104,10 @@ impl Monitor {
                 .map(|p| *p.lock().unwrap_or_else(|e| e.into_inner())),
             tasks: self.restarts.recent(),
             telemetry: ship::Shipping::telemetry(&self.shipping, self.buffer.as_deref()),
+            encryption: self
+                .encryption
+                .as_ref()
+                .map(|e| e.lock().unwrap_or_else(|e| e.into_inner()).clone()),
         }
     }
 

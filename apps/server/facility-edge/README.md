@@ -34,6 +34,9 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_TELEMETRY_DIR` | `telemetry` beside `HEALTH_DATA_DIR` | The bounded buffer (64 MiB) of log lines waiting to be shipped |
 | `HEALTH_TELEMETRY_SHIP_SECS` | `30` | How often the buffer is shipped |
 | `HEALTH_INDICATORS_SECS` | `60` | How often the indicators are logged and alerts raised |
+| `HEALTH_ENCRYPTION_STATE_FILE` | none; the unit sets `/run/health/encryption.json` | The privileged probe's result. Without it, the node probes the host itself, which needs administrator rights (the Windows service runs as LocalSystem) |
+| `HEALTH_ENCRYPTION_EXEMPTION` | none | The country-configuration grant exempting this facility from full-disk encryption (ADR 0048): a standing alert |
+| `HEALTH_ENCRYPTION_SECS` | `3600` | How often disk encryption is checked |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -55,6 +58,7 @@ The binary embeds the client and serves it, with its `runtime.json` and app-shel
 | 7 | An update step failed, or an `update` command was refused | not restarted |
 | 8 | A failed update's store is restored, and the binary is left for the service manager | not restarted; `OnFailure=` runs `packaging/facility-edge-rollback.service` |
 | 9 | A `backup` command failed | (commands only) |
+| 10 | `encryption check` refused provisioning, or an `encryption` command failed | (commands only) |
 
 The first start and three restarts are allowed within 24 hours. After that the unit stays stopped.
 
@@ -94,6 +98,12 @@ The node measures its indicators and raises alerts against the thresholds in fac
 
 - **Status page:** `/edge/status` in the embedded app, from `GET /api/admin/status`. Until edge sign-in arrives (#75), the node serves the report to a browser on the node itself only (403 elsewhere).
 - **Telemetry:** every log line goes to standard output and to the buffer under `HEALTH_TELEMETRY_DIR`, including an `indicators` line every `HEALTH_INDICATORS_SECS` and each alert as it is raised and cleared. The buffer is shipped to `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` when the collector answers, so indicators recorded offline reach central once the link is back. When the buffer is full, the oldest lines are dropped first.
+- **Disk encryption** (ADR 0048, `health-node-identity`):
+  - `facility-edge encryption probe [--out FILE]` reads the host's TPM, Secure Boot and the protection of the system and data volumes, as JSON.
+  - `facility-edge encryption check` is the provisioning gate. It exits 10 unless the machine complies or `HEALTH_ENCRYPTION_EXEMPTION` exempts it.
+  - The probe needs root on Linux, so the unit runs it with full privileges before each start (`ExecStartPre=-+…encryption probe --out /run/health/encryption.json`), and the unprivileged service reads the file. A Linux node's encryption state therefore refreshes at each start.
+  - On Windows the service probes BitLocker itself every `HEALTH_ENCRYPTION_SECS`.
+  - A missing or unreadable state is reported as unknown, never as encrypted.
 - Everything shipped passes the telemetry allowlist (`health-observability`), so it carries no personal health data.
 
 ## Tests
@@ -120,3 +130,10 @@ The node measures its indicators and raises alerts against the thresholds in fac
 - `/api/admin/status` returns the report with the `backups-off` alert;
 - while the collector refuses, the report says shipping is failing and the lines stay in the buffer;
 - once it accepts, the buffered alert and an `indicators` line reach it.
+
+`tests/encryption.rs` runs the built binary (Unix):
+- a probe file with an unencrypted data volume reaches the status page as `disk-unencrypted`;
+- an exemption shows `encryption-exempt` in its place;
+- a corrupt file is `encryption-unknown`, never a pass;
+- `encryption check` refuses this (unprivileged) machine with exit 10, and passes it when exempted;
+- `encryption probe --out` writes the file the unit hands the service.

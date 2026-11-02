@@ -14,11 +14,17 @@ OnFailure=facility-edge-rollback.service
 [Service]
 Type=notify
 NotifyAccess=main
+# The full-disk encryption probe needs root (cryptsetup reads the LUKS2 header), so systemd
+# runs it with full privileges ("+") before each start; the unprivileged service reads its
+# file. A failed probe ("-") does not stop the node: an unreadable state is reported as unknown.
+ExecStartPre=-+/opt/health/bin/facility-edge encryption probe --out /run/health/encryption.json
 ExecStart=/opt/health/bin/facility-edge --service
 EnvironmentFile=/etc/health/facility-edge.env
+Environment=HEALTH_ENCRYPTION_STATE_FILE=/run/health/encryption.json
 User=health
 Group=health
 StateDirectory=health
+RuntimeDirectory=health
 # HEALTH_DATA_DIR is under /var/lib/health, the only writable path.
 # The edge keeps systemd informed: READY after migrations, WATCHDOG while alive, and
 # EXTEND_TIMEOUT_USEC while a migration or drain runs.

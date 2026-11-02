@@ -28,6 +28,7 @@ fn monitor(dir: &Path) -> Monitor {
         restarts: Supervisor::new(RestartPolicy::default()).restarts(),
         buffer: None,
         shipping: ShipState::default(),
+        encryption: None,
     }
 }
 
@@ -177,4 +178,68 @@ async fn lines_buffered_offline_are_shipped_when_online() {
         .sum();
     assert!(records >= 2, "both lines shipped: {batches:?}");
     assert!(state.lock().expect("state").last_shipped.is_some());
+}
+
+#[tokio::test]
+async fn the_encryption_check_runs_on_its_schedule_and_reaches_the_page() {
+    let dir = tempfile::tempdir().expect("dir");
+    let mut monitor = monitor(dir.path());
+    let state = EncryptionState::default();
+    monitor.encryption = Some(Arc::clone(&state));
+    let before = monitor.report().await;
+    assert!(before.pending.contains(&"disk-encryption"));
+
+    let check: EncryptionCheck = Arc::new(|| Encryption {
+        checked: Timestamp::now(),
+        tpm2: Some(true),
+        secure_boot: Some(true),
+        volumes: vec![EncryptedVolume {
+            name: "data",
+            protection: "unencrypted",
+            reason: None,
+        }],
+        findings: vec![Alert {
+            code: "disk-unencrypted",
+            subject: Some("data"),
+        }],
+        exemption: None,
+    });
+    let task = tokio::spawn(watch_encryption(
+        check,
+        Arc::clone(&state),
+        Duration::from_secs(3600),
+    ));
+    let started = std::time::Instant::now();
+    while state.lock().expect("state").is_none() {
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the check never ran"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    task.abort();
+    let response = get_status(monitor, "127.0.0.1:50000").await;
+    let body = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .expect("body");
+    let report: serde_json::Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(
+        report["encryption"]["volumes"][0]["protection"],
+        "unencrypted"
+    );
+    assert!(
+        report["alerts"]
+            .as_array()
+            .expect("alerts")
+            .iter()
+            .any(|a| a["code"] == "disk-unencrypted" && a["subject"] == "data"),
+        "{report}"
+    );
+    assert!(
+        !report["pending"]
+            .as_array()
+            .expect("pending")
+            .iter()
+            .any(|p| p == "disk-encryption")
+    );
 }
