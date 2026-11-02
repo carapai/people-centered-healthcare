@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { edgeStatusMessages, messages } from '../i18n/messages'
+import { edgeStatusMessages, enrollmentMessages, messages } from '../i18n/messages'
 import { usePlatform } from '../platform'
 
 export const Route = createFileRoute('/')({
@@ -37,6 +37,8 @@ function Home() {
       <h1 className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>{intl.formatMessage(messages.appName)}</h1>
       {/* The edge's own status needs no sign-in yet: the edge serves it to the node itself only. */}
       {platform.capabilities.edgeStatus ? <Link to="/edge/status">{intl.formatMessage(edgeStatusMessages.esTitle)}</Link> : null}
+      {/* On an edge, each device must be enrolled before it may use the API (ADR 0009). */}
+      {platform.device === undefined ? null : <Link to="/enroll">{intl.formatMessage(enrollmentMessages.enTitle)}</Link>}
       {platform.signIn === undefined ? null : signedIn ? (
         <>
           <p role="status">{intl.formatMessage(messages.signedIn)}</p>

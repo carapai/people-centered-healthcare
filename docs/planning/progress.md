@@ -7,7 +7,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 1 — Monorepo foundations](https://github.com/carapai/people-centered-healthcare/milestone/1) | 11 | 12 |
 | [Phase 2 — Persistence and runtime adapters](https://github.com/carapai/people-centered-healthcare/milestone/2) | 17 | 17 |
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
-| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 5 | 8 |
+| [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 6 | 8 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 0 | 8 |
 | [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 3 | 12 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 1 | 7 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 0 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 71 of 136 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
+Total: 72 of 136 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
 
 ## Log
 
@@ -226,3 +226,4 @@ Total: 71 of 136 implementation tasks done (counted from the GitHub milestones).
 - 2026-11-02: #73 part 2 merged (#270), completing #73. #74 split in three. Part 1: `health-identity` enrollment rules (6-digit pairing codes, 10-minute requests, versioned final revocation); migration `0020_devices`; `health_auth::DeviceGate` with `POST`/`GET /api/enrollment`, the registry's admin routes (served to the edge's console only until #75) and a gate that requires a fresh, unreplayed DPoP proof by an enrolled, active device on every other edge API route. Enrollment and revocation commit with their AuditEvents. Part 2 is TLS, the pairing QR and mDNS; part 3 the client.
 - 2026-11-02: #74 part 1 merged (#271). Part 2 split into 2a (TLS) and 2b (pairing and mDNS). Part 2a: the edge issues its own ECDSA leaf under the installed facility intermediate (unsealed from the keystore only to issue) for `<node-id>.local`, `HEALTH_DNS_NAME` and its private addresses, keeps it with a fresh key in `HEALTH_TLS_DIR`, and serves HTTPS only with rustls. A supervised task renews it at two-thirds of its life or on an address change, swapping it with no restart. Unprovisioned or unservable, the node listens with plain HTTP on the loopback address only. The status page shows the certificate and its alerts; `HEALTH_BIND` now defaults to `0.0.0.0:443`, and the unit grants `CAP_NET_BIND_SERVICE`. The edge-build systemd job checks HTTPS against the root, and that plain HTTP no longer answers.
 - 2026-11-02: #74 part 2a merged (#272), with a plain-HTTP console on the loopback address for the edge's own screen. Part 2b: `GET /api/admin/pairing` (console only) gives the node's https origin, node ID and facility intermediate's SPKI fingerprint (`health_pki::inspect`), as a `health-edge://pair` URI that the status page draws as a QR code (`uqr`, SVG path). While serving HTTPS the node announces `_health-edge._tcp` over mDNS (`mdns-sd`; TXT `node`, `v=1`) at its leaf's addresses, re-announcing on change; `HEALTH_MDNS=off` stops it. The edge-build systemd job checks the payload's pin against openssl's.
+- 2026-11-02: #74 part 2b merged (#273). Part 3, the browser client: `src/platform/device.ts` keeps a non-extractable ECDSA P-256 key pair in IndexedDB (allowlisted in `check-boundaries.ts`), and `dpopAuth` proves every edge request with it, before sign-in too. `/enroll` makes the key, asks, shows the pairing code and polls until approved, then confirms through the gate; a revoked device starts over. The edge status page's Devices section lists pending requests without their codes, approves by the typed code with a name and location, and revokes. The edge e2e harness now uses the console listener, and a new scenario shows an unknown device refused, an approved one let in and a revoked one shut out. This completes #74; Tauri keyring keys and SPKI pinning come with the desktop and Android builds.

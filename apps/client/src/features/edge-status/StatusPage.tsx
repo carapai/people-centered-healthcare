@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useIntl } from 'react-intl'
 
 import { edgeStatusMessages } from '../../i18n/messages'
+import { DevicesSection } from '../enrollment/DevicesSection'
 import { usePlatform } from '../../platform'
 import { EdgeStatusError, PairingUnavailable, pairingQuery, statusQuery, usedPercent } from './api'
 import { qrPath } from './qr'
@@ -194,6 +195,7 @@ function Report({ report }: { report: EdgeReport }) {
         ))}
       </Facts>
       <PairDevice />
+      <DevicesSection />
       {report.pending.length === 0 ? null : <p className={term}>{intl.formatMessage(edgeStatusMessages.esPending, { indicators: report.pending.join(', ') })}</p>}
     </>
   )
