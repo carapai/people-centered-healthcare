@@ -26,12 +26,18 @@ function freePort(): Promise<number> {
 }
 
 export async function startEdge(): Promise<Edge> {
+  // An unprovisioned edge serves only its console, the plain-HTTP loopback listener for its own
+  // screen; the LAN port stays closed until it has a certificate. Devices' DPoP proofs name the
+  // console's origin, so it is one the edge accepts.
   const port = await freePort()
   const origin = `http://127.0.0.1:${port}`
   const child = spawn(binary, [], {
     env: {
       HEALTH_DATA_DIR: join(mkdtempSync(join(tmpdir(), 'health-edge-e2e-')), 'store'),
-      HEALTH_BIND: `127.0.0.1:${port}`,
+      HEALTH_CONSOLE_BIND: `127.0.0.1:${port}`,
+      HEALTH_BIND: `127.0.0.1:${await freePort()}`,
+      HEALTH_ORIGINS: origin,
+      HEALTH_MDNS: 'off',
       HEALTH_DRAIN_SECS: '2',
       HEALTH_LOG: 'warn',
     },

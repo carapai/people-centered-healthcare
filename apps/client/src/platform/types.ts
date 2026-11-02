@@ -1,6 +1,7 @@
 // The platform boundary (client-application.md § Composition boundary). Feature code sees only
 // these types; how a request travels (HTTP or Tauri IPC) is decided once, in compose.ts.
 
+import type { DeviceKeys } from './device'
 import type { FhirClient } from './fhir'
 import type { OperationClient } from './operations'
 import type { RegistriesCommands } from './registries'
@@ -95,5 +96,7 @@ export interface Platform {
    * with their phone, with a session of their own, never a staff session. */
   portal?: Portal
   events: EventSourcePort
+  /** The device's key, on an edge: what enrollment registers and every request is proved with. */
+  device?: DeviceKeys
   capabilities: Capabilities
 }

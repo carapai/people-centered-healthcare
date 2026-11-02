@@ -370,6 +370,23 @@ type EdgeStatusValues = {
   esPairingCode: {}
   esPairingNotProvisioned: {}
   esPairingUnavailable: { reason: string }
+  esDevices: {}
+  esPendingRequests: {}
+  esNoPending: {}
+  esRequested: { label: string; expires: string }
+  esApprove: {}
+  esApproveCode: {}
+  esDeviceName: {}
+  esDeviceLocation: {}
+  esApproved: { name: string }
+  esEnrolledDevices: {}
+  esNoDevices: {}
+  esDeviceLine: { name: string; location: string; label: string }
+  esDeviceRevokedAt: { at: string }
+  esRevoke: { name: string }
+  esConfirmRevoke: { name: string }
+  esCancel: {}
+  esActionFailed: { reason: string }
   esSystemVolume: {}
   esSystemDisk: {}
   esEncryption: {}
@@ -473,6 +490,23 @@ export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
   esPairingPin: { id: 'app.edgeStatus.pairing.pin', defaultMessage: 'Key fingerprint', description: "Edge status: the facility intermediate's SPKI fingerprint" },
   esPairingCode: { id: 'app.edgeStatus.pairing.code', defaultMessage: 'Pairing code', description: 'Edge status: the pairing URI as text' },
   esPairingNotProvisioned: { id: 'app.edgeStatus.pairing.notProvisioned', defaultMessage: 'Devices can pair once this edge is provisioned.', description: 'Edge status: no pairing before provisioning' },
+  esDevices: { id: 'app.edgeStatus.devices', defaultMessage: 'Devices', description: 'Edge status section heading: enrolled devices and requests' },
+  esPendingRequests: { id: 'app.edgeStatus.devices.pending', defaultMessage: 'Waiting for approval', description: 'Edge status: heading of the pending enrollment requests' },
+  esNoPending: { id: 'app.edgeStatus.devices.noPending', defaultMessage: 'No device is asking to enroll.', description: 'Edge status: no pending requests' },
+  esRequested: { id: 'app.edgeStatus.devices.requested', defaultMessage: '{label}, until {expires}', description: 'Edge status: a pending request; label is the device, expires a time' },
+  esApprove: { id: 'app.edgeStatus.devices.approve', defaultMessage: 'Approve a device', description: 'Edge status: approval form heading and button' },
+  esApproveCode: { id: 'app.edgeStatus.devices.code', defaultMessage: 'Pairing code shown on the device', description: 'Edge status: approval form field' },
+  esDeviceName: { id: 'app.edgeStatus.devices.name', defaultMessage: 'Device name', description: 'Edge status: approval form field' },
+  esDeviceLocation: { id: 'app.edgeStatus.devices.location', defaultMessage: 'Location or ward', description: 'Edge status: approval form field' },
+  esApproved: { id: 'app.edgeStatus.devices.approved', defaultMessage: '{name} is enrolled.', description: 'Edge status: a device was approved' },
+  esEnrolledDevices: { id: 'app.edgeStatus.devices.enrolled', defaultMessage: 'Enrolled devices', description: 'Edge status: heading of the device list' },
+  esNoDevices: { id: 'app.edgeStatus.devices.none', defaultMessage: 'No device is enrolled yet.', description: 'Edge status: empty device list' },
+  esDeviceLine: { id: 'app.edgeStatus.devices.line', defaultMessage: '{name}, {location} ({label})', description: 'Edge status: one enrolled device' },
+  esDeviceRevokedAt: { id: 'app.edgeStatus.devices.revokedAt', defaultMessage: 'revoked {at}', description: 'Edge status: when a device was revoked' },
+  esRevoke: { id: 'app.edgeStatus.devices.revoke', defaultMessage: 'Revoke {name}', description: 'Edge status: revoke button; name is the device' },
+  esConfirmRevoke: { id: 'app.edgeStatus.devices.confirmRevoke', defaultMessage: 'Yes, revoke {name}', description: 'Edge status: confirm revoking a device' },
+  esCancel: { id: 'app.edgeStatus.devices.cancel', defaultMessage: 'Cancel', description: 'Edge status: cancel revoking' },
+  esActionFailed: { id: 'app.edgeStatus.devices.failed', defaultMessage: 'That did not work: {reason}.', description: 'Edge status: an approval or revocation failed; reason is a code' },
   esPairingUnavailable: { id: 'app.edgeStatus.pairing.unavailable', defaultMessage: 'Pairing is unavailable: {reason}.', description: 'Edge status: the pairing payload could not be made; reason is a code' },
   esSystemVolume: { id: 'app.edgeStatus.systemVolume', defaultMessage: 'system disk', description: 'Edge status: the volume holding the operating system' },
   esSystemDisk: { id: 'app.edgeStatus.systemDisk', defaultMessage: 'System disk', description: 'Edge status: label for the volume holding the operating system' },
@@ -524,4 +558,56 @@ export const edgeStatusMessages = defineMessages<EdgeStatusValues>({
   esNever: { id: 'app.edgeStatus.never', defaultMessage: 'Never', description: 'Edge status: no time yet' },
   esUnknown: { id: 'app.edgeStatus.unknown', defaultMessage: 'Unknown', description: 'Edge status: not measured' },
   esPending: { id: 'app.edgeStatus.pending', defaultMessage: 'Not reported yet: {indicators}.', description: 'Edge status: indicators that arrive with later work' },
+})
+
+/** The device enrollment page's messages' ICU arguments. */
+type EnrollmentValues = {
+  enTitle: {}
+  enIntro: {}
+  enStart: {}
+  enCode: {}
+  enShowCode: { expires: string }
+  enWaiting: {}
+  enEnrolled: { name: string; location: string }
+  enRevoked: {}
+  enStartOver: {}
+  enExpired: {}
+  enNotEdge: {}
+  enFailed: { reason: string }
+}
+
+// The device enrollment page's strings (features/enrollment).
+export const enrollmentMessages = defineMessages<EnrollmentValues>({
+  enTitle: { id: 'app.enroll.title', defaultMessage: 'Enroll this device', description: 'Device enrollment page heading and home link' },
+  enIntro: {
+    id: 'app.enroll.intro',
+    defaultMessage: 'This device needs a facility admin to approve it before it can use the facility edge.',
+    description: 'Device enrollment: why the device must be enrolled',
+  },
+  enStart: { id: 'app.enroll.start', defaultMessage: 'Ask to enroll', description: 'Device enrollment: button that sends the request' },
+  enCode: { id: 'app.enroll.code', defaultMessage: 'Pairing code', description: 'Device enrollment: label of the code the admin types' },
+  enShowCode: {
+    id: 'app.enroll.showCode',
+    defaultMessage: 'Give this code to the facility admin, who approves the device on the edge. It expires at {expires}.',
+    description: 'Device enrollment: what to do with the pairing code; expires is a time',
+  },
+  enWaiting: { id: 'app.enroll.waiting', defaultMessage: 'Waiting for approval…', description: 'Device enrollment: polling for approval' },
+  enEnrolled: {
+    id: 'app.enroll.enrolled',
+    defaultMessage: 'This device is enrolled as {name}, at {location}.',
+    description: 'Device enrollment: the device was approved',
+  },
+  enRevoked: {
+    id: 'app.enroll.revoked',
+    defaultMessage: 'This device was revoked. To use it again, start over and ask the admin to approve it.',
+    description: 'Device enrollment: the device was revoked',
+  },
+  enStartOver: { id: 'app.enroll.startOver', defaultMessage: 'Start over', description: 'Device enrollment: forget the key and enroll again' },
+  enExpired: {
+    id: 'app.enroll.expired',
+    defaultMessage: 'The last request was not approved in time. Ask again for a new code.',
+    description: 'Device enrollment: the pending request expired',
+  },
+  enNotEdge: { id: 'app.enroll.notEdge', defaultMessage: 'Devices enroll with a facility edge, not with central.', description: 'Device enrollment: shown away from an edge' },
+  enFailed: { id: 'app.enroll.failed', defaultMessage: 'The request failed: {reason}.', description: 'Device enrollment: a request failed; reason is a code' },
 })
