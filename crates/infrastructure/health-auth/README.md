@@ -52,6 +52,29 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - **Purging:** `purge(now)` deletes expired codes and jtis, and sessions past their 12-hour cap, as a background job.
   - Only hashes of codes and refresh tokens are stored.
 
+## Devices (#74)
+
+`DeviceGate` enrolls LAN devices and keeps the device registry (lan-security.md § Device enrollment; ADR 0009). It is configured with `DeviceConfig`: the origins clients reach the node by, the enrollment rules, a 300 s DPoP window and a rate limit of 10 requests per source address per 10 minutes.
+
+| Route | What it does |
+|---|---|
+| `POST /api/enrollment` | Open. A DPoP proof by the device's key, which proves it holds the key, and a `label`. Answers 201 with the request id, the pairing code to show and when it expires. 409 if the key is already an active device, 403 if it was revoked, 429 past the rate limit |
+| `GET /api/enrollment` | Open. With a proof by the same key: `pending` (with the code), `enrolled` (with the device), `revoked`, or 404 |
+| `GET /api/admin/enrollments` | The pending requests, without their codes: the admin types the code the device shows |
+| `POST /api/admin/enrollments/approve` | `code`, `name` and `location`. 201 with the device; 404 for an unknown code, 410 for an expired request, 422 without a name or location |
+| `GET /api/admin/devices` | Every device, revoked ones too |
+| `POST /api/admin/devices/{id}/revoke` | Revokes a device; 409 if it already is |
+| `GET /api/device` | Behind the gate: the calling device |
+
+- **The gate:** `DeviceGate::layer(routes)` puts routes behind a check that each request carries a DPoP proof (RFC 9449) whose `htm` and `htu` match the request on one of the configured origins, at most 300 s from our clock and never seen before. Its key must be an enrolled, active device. Otherwise:
+  - no proof, or a bad, stale or replayed one, is 401 with `WWW-Authenticate: DPoP`;
+  - an unknown key is 403 `device-not-enrolled`;
+  - a revoked device is 403 `device-revoked`, from its next request on.
+  - Handlers find the device and the checked proof as an `EnrolledDevice` extension. Token verification (#75) must take the proof from there rather than check its `jti` again.
+- **The admin routes are the caller's to guard.** The actor is a `DeviceAdmin` extension the guard inserts, or `edge-console` without one.
+- **Audit:** an enrollment or a revocation commits with its AuditEvent (DICOM `110137`, coded `device-enrolled` or `device-revoked`, naming the device by `urn:health:device-id`). Refused enrollments and requests from unknown keys are logged with `alert = "enrollment-refused"` or `"unenrolled-device"`, so they reach the status page's telemetry and central, rather than writing a record per attempt.
+- **State:** the `DeviceStore` port, on `MemoryStore` and on `SurrealAuthStore` (migration `0020_devices`). Approval takes the request and creates the device in one transaction, so a code is used once; revocation is a compare-and-set on the device's `version`.
+
 ## Request subjects (ADR 0056)
 
 `Subjects` and the `subject_layer` middleware turn each resource request into the `health_access_policy::Subject` and `health_audit::Agent` request extensions that `health-fhir-server` decides and audits with. The subject is built from:

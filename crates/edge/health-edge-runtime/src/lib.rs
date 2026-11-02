@@ -16,11 +16,12 @@
 //!
 //! Once ready, the node also takes its scheduled backups ([`backup`]) and logs its health
 //! indicators, which `/api/admin/status` serves to the admin page and the telemetry buffer ships to
-//! central ([`admin`]).
+//! central ([`admin`]). Its API is open only to enrolled LAN devices (`enrollment`, #74).
 
 pub mod admin;
 pub mod backup;
 mod config;
+mod enrollment;
 mod node;
 mod notify;
 mod supervisor;

@@ -12,10 +12,14 @@
 //! - **Permission snapshots** (ADR 0011): central signs them ([`SnapshotSigner`]); an edge's
 //!   [`SnapshotGate`] requires a valid one for each login and refresh, behind the clock floor, and
 //!   tokens carry `facility` and `snapshot_version` and never outlive the snapshot.
+//! - **Devices** (lan-security.md; ADR 0009): [`DeviceGate`] enrolls LAN devices by pairing
+//!   code and admin approval, keeps the device registry, and refuses any request whose DPoP proof
+//!   is not by an enrolled, active device.
 
 mod breached;
 mod caregivers;
 mod credentials;
+mod devices;
 pub mod jose;
 mod otp;
 mod patient;
@@ -28,6 +32,7 @@ mod surreal;
 pub use breached::{BreachedPasswords, InvalidFilter};
 pub use caregivers::{CAREGIVER_PERMISSION, CaregiverRoutes};
 pub use credentials::{Credentials, HashError, SetPasswordError};
+pub use devices::{CONSOLE, DeviceAdmin, DeviceConfig, DeviceGate, DeviceStore, EnrolledDevice};
 pub use jose::{InvalidKey, TokenSigner};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};
 pub use patient::patient_layer;

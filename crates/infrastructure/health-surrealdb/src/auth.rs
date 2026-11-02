@@ -635,8 +635,8 @@ impl SurrealTx {
         Ok(())
     }
 
-    /// Deletes expired codes and jtis, and sessions (with their retired refresh hashes) past their
-    /// end; returns how many rows went.
+    /// Deletes expired codes, jtis and enrollment requests, and sessions (with their retired
+    /// refresh hashes) past their end; returns how many rows went.
     pub async fn purge_auth(&mut self, now: Timestamp) -> Result<usize, WriteError> {
         let mut gone = 0;
         for (table, field) in [
@@ -644,6 +644,7 @@ impl SurrealTx {
             ("auth_jti", "until"),
             ("auth_retired_refresh", "ends_at"),
             ("auth_session", "ends_at"),
+            ("auth_enrollment", "expires"),
         ] {
             let ids = self
                 .run(&format!("DELETE {table} WHERE {field} < <datetime>$now RETURN VALUE <string>record::id($before.id)"), vec![("now", now.to_string())])

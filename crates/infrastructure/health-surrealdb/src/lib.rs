@@ -17,6 +17,7 @@ mod auth;
 mod blocking;
 mod connection;
 mod consent;
+mod devices;
 mod history;
 mod inbound;
 mod migrations;
@@ -30,6 +31,7 @@ mod store;
 
 pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};
+pub use devices::DeviceRow;
 pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};

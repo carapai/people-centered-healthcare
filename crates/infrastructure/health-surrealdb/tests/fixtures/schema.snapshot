@@ -104,6 +104,19 @@ DEFINE TABLE auth_clock_floor TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE auth_code TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON auth_code TYPE string PERMISSIONS FULL
   DEFINE FIELD expires_at ON auth_code TYPE datetime PERMISSIONS FULL
+DEFINE TABLE auth_device TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON auth_device TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON auth_device TYPE string ASSERT $value INSIDE ['active', 'revoked'] PERMISSIONS FULL
+  DEFINE FIELD thumbprint ON auth_device TYPE string PERMISSIONS FULL
+  DEFINE FIELD version ON auth_device TYPE int PERMISSIONS FULL
+  DEFINE INDEX auth_device_thumbprint ON auth_device FIELDS thumbprint UNIQUE
+DEFINE TABLE auth_enrollment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD code ON auth_enrollment TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON auth_enrollment TYPE string PERMISSIONS FULL
+  DEFINE FIELD expires ON auth_enrollment TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD thumbprint ON auth_enrollment TYPE string PERMISSIONS FULL
+  DEFINE INDEX auth_enrollment_code ON auth_enrollment FIELDS code UNIQUE
+  DEFINE INDEX auth_enrollment_thumbprint ON auth_enrollment FIELDS thumbprint UNIQUE
 DEFINE TABLE auth_jti TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD until ON auth_jti TYPE datetime PERMISSIONS FULL
 DEFINE TABLE auth_otp TYPE NORMAL SCHEMAFULL PERMISSIONS NONE

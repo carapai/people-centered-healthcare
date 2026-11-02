@@ -6,6 +6,10 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
 - **`PhoneAccount`** (#111; ADR 0029): a patient's Login Account, one per verified phone number. It has no password: each sign-in is a one-time code to the phone. It reaches patient data only through a Person (`health-client-registry`), never because a Patient's phone number matches.
   - **`PhoneNumber`:** E.164. `parse` accepts what people write (`+256 772 123 456`, `00256…`, or the national `0772…` with the country code given) and refuses letters and lengths outside 8–15 digits. Stored numbers deserialize only in E.164.
   - **`OtpPolicy` / `OtpChallenge`:** six digits, valid 5 minutes, 5 tries. One code a minute and 5 an hour per phone (`may_send`). `attempt` counts every try, refuses an expired, used or spent challenge, and accepts a code once. The code is kept only as a hash that this crate never reads.
+- **Devices** (#74; lan-security.md § Device enrollment; ADR 0009):
+  - **`EnrollmentPolicy` / `EnrollmentRequest`:** a device asks to enroll with its key's RFC 7638 thumbprint and a label, and shows a 6-digit pairing code. The request expires 10 minutes after it was made.
+  - **`EnrollmentRequest::approve`** gives the `Device` an admin approves: a new `DeviceId` (UUIDv7), a name and a location, both required, and who approved it and when. An expired request is refused.
+  - **`Device::revoke`** is final and bumps `version`, which the registry syncs by (revocation wins).
 - **`LockoutPolicy` / `Lockout`**:
   - every 10th consecutive failure locks the account for 15 minutes;
   - 100 consecutive failures lock it until an administrator unlocks it;

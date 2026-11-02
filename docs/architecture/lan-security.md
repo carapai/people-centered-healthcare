@@ -74,8 +74,10 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
 
 - **#67:** `health-pki` issues every tier from a PKCS#10 request, keeping only its public key, and refuses names outside the issuer's constraints, public IPs and certificates that would outlive their issuer. It publishes numbered CRLs, and its `Trust` verifies served chains against the root and CRLs. `tools/pki` runs the ceremonies, with a draft runbook (`tools/pki/RUNBOOK.md`).
 - **#73:** `facility-edge provision request` passes the encryption gate, generates the intermediate's key on the edge, seals it in the keystore (systemd-creds or DPAPI) and writes the request. `provision install` keeps a chain only if a leaf it issues for `<node-id>.local` verifies against the root. The systemd unit unseals the key for the service with `LoadCredentialEncrypted=`.
+- **#74, part 1:** the device registry and enrollment. A device's request carries a DPoP proof by its key and gets a 6-digit pairing code; the admin approves by typing it, with a name and a location, or revokes a device, and both are audited. Pending requests expire after 10 minutes and are rate-limited per address. Every other edge API route needs a fresh, unreplayed DPoP proof by an enrolled, active key (`health_auth::DeviceGate`), so an unenrolled or revoked device is refused at its next request. Until staff sign-in (#75), approval and revocation are served to the edge's own console.
 - **Still to come:**
   - central provisioning and HSM signing for the issuing CA (#268);
-  - the edge's leaf renewal and pairing pins (#74);
+  - the edge's leaf, TLS serving, renewal, the pairing QR and mDNS (#74, part 2), and the client's key and enrollment screens (#74, part 3);
+  - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;
   - the real ceremony and root custody (#265).

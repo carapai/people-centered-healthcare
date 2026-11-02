@@ -512,3 +512,142 @@ impl AuthStore for SurrealAuthStore {
         }
     }
 }
+
+fn device_row(device: &health_identity::Device) -> Result<health_surrealdb::DeviceRow, StoreError> {
+    Ok(health_surrealdb::DeviceRow {
+        id: device.id.to_string(),
+        thumbprint: device.thumbprint.clone(),
+        status: match device.status {
+            health_identity::DeviceStatus::Active => "active",
+            health_identity::DeviceStatus::Revoked => "revoked",
+        },
+        version: device.version,
+        data: serde_json::to_string(device).map_err(failed)?,
+    })
+}
+
+fn parsed<T: serde::de::DeserializeOwned>(data: Option<String>) -> Result<Option<T>, StoreError> {
+    data.map(|d| serde_json::from_str(&d).map_err(failed))
+        .transpose()
+}
+
+impl crate::devices::DeviceStore for SurrealAuthStore {
+    async fn put_enrollment(
+        &self,
+        request: &health_identity::EnrollmentRequest,
+        now: Timestamp,
+    ) -> Result<bool, StoreError> {
+        let data = serde_json::to_string(request).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        tx.put_enrollment(
+            &request.id.to_string(),
+            &request.thumbprint,
+            &request.code,
+            request.expires,
+            &data,
+            now,
+        )
+        .await
+        .map_err(failed)?;
+        // A code another pending request holds fails the unique index at commit.
+        Ok(tx.commit().await.is_ok())
+    }
+
+    async fn enrollment_by_code(
+        &self,
+        code: &str,
+    ) -> Result<Option<health_identity::EnrollmentRequest>, StoreError> {
+        let mut tx = self.begin().await?;
+        parsed(tx.enrollment_by_code(code).await.map_err(failed)?)
+    }
+
+    async fn enrollment_by_thumbprint(
+        &self,
+        thumbprint: &str,
+    ) -> Result<Option<health_identity::EnrollmentRequest>, StoreError> {
+        let mut tx = self.begin().await?;
+        parsed(
+            tx.enrollment_by_thumbprint(thumbprint)
+                .await
+                .map_err(failed)?,
+        )
+    }
+
+    async fn enrollments(
+        &self,
+        now: Timestamp,
+    ) -> Result<Vec<health_identity::EnrollmentRequest>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.enrollments(now)
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|d| serde_json::from_str(d).map_err(failed))
+            .collect()
+    }
+
+    async fn enroll(
+        &self,
+        request: Uuid,
+        device: &health_identity::Device,
+        audit: &Value,
+    ) -> Result<bool, StoreError> {
+        let row = device_row(device)?;
+        let mut tx = self.begin().await?;
+        if !tx
+            .take_enrollment(&request.to_string())
+            .await
+            .map_err(failed)?
+        {
+            return Ok(false);
+        }
+        if tx.create_device(&row).await.is_err() {
+            return Ok(false);
+        }
+        // The device and its AuditEvent commit together, or neither does; a concurrent
+        // approval of the same request conflicts here.
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        Ok(tx.commit().await.is_ok())
+    }
+
+    async fn device_by_thumbprint(
+        &self,
+        thumbprint: &str,
+    ) -> Result<Option<health_identity::Device>, StoreError> {
+        let mut tx = self.begin().await?;
+        parsed(tx.device_by_thumbprint(thumbprint).await.map_err(failed)?)
+    }
+
+    async fn device(
+        &self,
+        id: health_identity::DeviceId,
+    ) -> Result<Option<health_identity::Device>, StoreError> {
+        let mut tx = self.begin().await?;
+        parsed(tx.device(&id.to_string()).await.map_err(failed)?)
+    }
+
+    async fn devices(&self) -> Result<Vec<health_identity::Device>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.devices()
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|d| serde_json::from_str(d).map_err(failed))
+            .collect()
+    }
+
+    async fn update_device(
+        &self,
+        device: &health_identity::Device,
+        before: u64,
+        audit: &Value,
+    ) -> Result<bool, StoreError> {
+        let row = device_row(device)?;
+        let mut tx = self.begin().await?;
+        if !tx.update_device(&row, before).await.map_err(failed)? {
+            return Ok(false);
+        }
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        Ok(tx.commit().await.is_ok())
+    }
+}

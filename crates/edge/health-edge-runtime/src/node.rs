@@ -13,6 +13,7 @@ use tokio::sync::{Notify, OnceCell};
 use crate::admin::{self, Buffer, EncryptionCheck, EncryptionState, Monitor, ShipState};
 use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
+use crate::enrollment::Api;
 use crate::notify::ServiceManager;
 use crate::supervisor::{RestartPolicy, Supervisor};
 use crate::update::{self, Startup, Updates};
@@ -172,7 +173,10 @@ pub async fn run(
         shipping: ShipState::default(),
         encryption: encryption.as_ref().map(|_| EncryptionState::default()),
     };
-    let routes = web::routes(Bundle::embedded()).merge(admin::routes(monitor.clone()));
+    let api = Api::default();
+    let routes = web::routes(Bundle::embedded())
+        .merge(admin::routes(monitor.clone()))
+        .merge(api.routes());
     let router = app(routes, readiness);
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
@@ -219,6 +223,7 @@ pub async fn run(
         }
         Err(error) => return Err(error),
     };
+    api.open(config, &connection);
     let _ = store.0.set(connection);
     if startup == Startup::Updating {
         update::commit(&updates).map_err(EdgeError::Update)?;

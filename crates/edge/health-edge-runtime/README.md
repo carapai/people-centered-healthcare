@@ -5,7 +5,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 ## `run`
 
 `run(config, manager, telemetry, encryption, stop)` is the node's whole life. `telemetry` is the buffer the process's log lines go to, and `encryption` is the composition root's disk-encryption check:
-1. **Listen.** The listener starts at once: `/health` answers, `/ready` is 503 until the store is ready (the shared `health-http` system routes), the embedded web app is served (`web`), and so is `/api/admin/status` (`admin`).
+1. **Listen.** The listener starts at once: `/health` answers, `/ready` is 503 until the store is ready (the shared `health-http` system routes), the embedded web app is served (`web`), and so is `/api/admin/status` (`admin`). The rest of `/api/…` answers 503 until the store is open (`enrollment`).
 2. **Update check.** A pending update copies the store to `pre-update-store/` on its first start, or rolls back after three starts that never reached ready (`update::before_open`), before the store is opened.
 3. **Open the store.** The embedded store (`Target::RocksDb`, `sync=every`) is opened once. If it fails, `run` returns `EdgeError::Store` and the service manager restarts the process.
 4. **Migrate.** Migrations run before ready. The service manager is asked for 30 s more every 10 s while they run. A store that a newer binary migrated is refused (`EdgeError::Migration`), so an old binary never runs against it. During an update, a failed migration marks the update failed and the next start rolls it back.
@@ -26,6 +26,10 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - **Telemetry:** every `HEALTH_INDICATORS_SECS` an `indicators` line carries the measures as allowlisted fields (`store_bytes`, `data_free_bytes`, `backup_age_seconds`, `state`, …), and each alert is logged with `alert` when raised and with `outcome = "cleared"` when it clears.
   - **`Buffer`** is the process's `LogSink`: each line goes to standard output and to 256 KiB segment files under `HEALTH_TELEMETRY_DIR`, bounded at 64 MiB with the oldest segments dropped first. It survives restarts.
   - **Shipping:** every `HEALTH_TELEMETRY_SHIP_SECS`, the sealed segments are posted oldest first to `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` as OTLP/HTTP JSON log records, and each is removed only once the collector accepts it. A failing collector raises `telemetry-unshipped` once, and its recovery clears it.
+- **`enrollment`:** LAN device enrollment (#74), `health_auth::DeviceGate` over the embedded store, composed once the store is open. Until then `/api/…` answers 503 while the app shell loads.
+  - `POST` / `GET /api/enrollment` are open to the LAN.
+  - The registry's admin routes answer this machine only, as the status page does, until staff sign-in (#75) can require an admin.
+  - Every other `/api/…` path, unknown ones included, needs a DPoP proof by an enrolled, active device, so an unenrolled device cannot call or map the API. Proofs must name one of `HEALTH_ORIGINS` (default `https://<node-id>.local`).
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.
   - **Retention:** the 48 newest, and the newest of each of the last 14 days (UTC). Pruning also removes unfinished backups and blobs that no kept backup refers to.

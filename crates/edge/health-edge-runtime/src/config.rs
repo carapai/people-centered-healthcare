@@ -71,6 +71,9 @@ pub struct EdgeConfig {
     /// provisioning. Default: `pki` beside the data directory. The intermediate's key is in the
     /// keystore, never here.
     pub pki_dir: PathBuf,
+    /// `HEALTH_ORIGINS`: the origins LAN devices reach this node by, comma-separated, default
+    /// `https://<node-id>.local`. A device's DPoP proofs must name one of them.
+    pub origins: Vec<String>,
 }
 
 /// A configuration value that is missing or malformed. Names the variable, never its value.
@@ -97,6 +100,25 @@ impl EdgeConfig {
         let positive = |name: &'static str, default: u64| match seconds(name, default)? {
             d if d.is_zero() => Err(ConfigError::Malformed(name)),
             d => Ok(d),
+        };
+        let node_id = get("HEALTH_NODE_ID").unwrap_or_else(|| "facility-edge".into());
+        let origins = match get("HEALTH_ORIGINS") {
+            Some(list) => list
+                .split(',')
+                .map(|o| o.trim().trim_end_matches('/').to_owned())
+                .filter(|o| !o.is_empty())
+                .map(|o| {
+                    let host = o
+                        .strip_prefix("https://")
+                        .or_else(|| o.strip_prefix("http://"))
+                        .ok_or(ConfigError::Malformed("HEALTH_ORIGINS"))?;
+                    if host.is_empty() || host.contains(['/', '?', '#']) {
+                        return Err(ConfigError::Malformed("HEALTH_ORIGINS"));
+                    }
+                    Ok(o)
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            None => vec![format!("https://{node_id}.local")],
         };
         let data_dir: PathBuf = get("HEALTH_DATA_DIR")
             .map(PathBuf::from)
@@ -126,7 +148,8 @@ impl EdgeConfig {
                 .transpose()?,
             ups_poll: seconds("HEALTH_UPS_POLL_SECS", 5)?,
             drain: seconds("HEALTH_DRAIN_SECS", 20)?,
-            node_id: get("HEALTH_NODE_ID").unwrap_or_else(|| "facility-edge".into()),
+            node_id,
+            origins,
             backup_key_file: match (get("HEALTH_BACKUP_DIR"), get("HEALTH_BACKUP_KEY_FILE")) {
                 (Some(_), None) => return Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE")),
                 (_, key) => key.map(PathBuf::from),
@@ -180,6 +203,31 @@ mod tests {
         );
         assert_eq!(c.encryption_interval, Duration::from_secs(3600));
         assert_eq!(c.pki_dir, PathBuf::from("/var/lib/pki"));
+        assert_eq!(c.origins, vec!["https://facility-edge.local".to_owned()]);
+    }
+
+    #[test]
+    fn origins_are_bare_http_or_https() {
+        let dir = ("HEALTH_DATA_DIR", "/d");
+        let c = config(&[
+            dir,
+            (
+                "HEALTH_ORIGINS",
+                "https://ug-kla-0001.local/, http://10.0.0.5:8080",
+            ),
+        ])
+        .expect("config");
+        assert_eq!(
+            c.origins,
+            vec!["https://ug-kla-0001.local", "http://10.0.0.5:8080"]
+        );
+        for bad in ["ug-kla-0001.local", "https://x.local/api", "ftp://x"] {
+            assert_eq!(
+                config(&[dir, ("HEALTH_ORIGINS", bad)]),
+                Err(ConfigError::Malformed("HEALTH_ORIGINS")),
+                "{bad}"
+            );
+        }
     }
 
     #[test]

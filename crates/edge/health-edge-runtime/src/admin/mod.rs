@@ -226,6 +226,21 @@ async fn status(
     response
 }
 
+/// `routes`, served to this machine only: 403 for any other peer.
+pub(crate) fn local_only(routes: Router) -> Router {
+    routes.layer(axum::middleware::from_fn(
+        |ConnectInfo(peer): ConnectInfo<SocketAddr>,
+         request: axum::extract::Request,
+         next: axum::middleware::Next| async move {
+            if local(peer) {
+                next.run(request).await
+            } else {
+                StatusCode::FORBIDDEN.into_response()
+            }
+        },
+    ))
+}
+
 /// Whether `peer` is this machine.
 fn local(peer: SocketAddr) -> bool {
     match peer.ip() {

@@ -9,7 +9,8 @@ use std::sync::Mutex;
 use health_access_policy::BreakGlassEvent;
 use health_identity::snapshot::ClockFloor;
 use health_identity::{
-    AccountId, Lockout, LoginAccount, PhoneAccount, PhoneNumber, Scopes, SessionState,
+    AccountId, Device, DeviceId, EnrollmentRequest, Lockout, LoginAccount, PhoneAccount,
+    PhoneNumber, Scopes, SessionState,
 };
 use health_time::Timestamp;
 use serde_json::Value;
@@ -312,7 +313,7 @@ pub trait AuthStore: Send + Sync {
 }
 
 #[derive(Debug, Default)]
-struct State {
+pub(crate) struct State {
     accounts: HashMap<AccountId, LoginAccount>,
     codes: HashMap<String, AuthorizationCode>,
     sessions: HashMap<Uuid, Session>,
@@ -324,6 +325,8 @@ struct State {
     break_glass: Vec<BreakGlassRecord>,
     phone_accounts: HashMap<AccountId, PhoneAccount>,
     otps: HashMap<PhoneNumber, PhoneOtp>,
+    pub(crate) devices: HashMap<DeviceId, Device>,
+    pub(crate) enrollments: HashMap<Uuid, EnrollmentRequest>,
 }
 
 /// An in-memory store.
@@ -343,7 +346,7 @@ impl MemoryStore {
             .insert((account, facility.to_owned()), jws);
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, State> {
+    pub(crate) fn lock(&self) -> std::sync::MutexGuard<'_, State> {
         self.0
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
