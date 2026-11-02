@@ -16,5 +16,6 @@ DEFINE FIELD data ON auth_enrollment TYPE string;
 DEFINE FIELD thumbprint ON auth_enrollment TYPE string;
 DEFINE FIELD code ON auth_enrollment TYPE string;
 DEFINE FIELD expires ON auth_enrollment TYPE datetime;
-DEFINE INDEX auth_enrollment_thumbprint ON auth_enrollment FIELDS thumbprint UNIQUE;
+DEFINE INDEX auth_enrollment_thumbprint ON auth_enrollment FIELDS thumbprint
+  UNIQUE;
 DEFINE INDEX auth_enrollment_code ON auth_enrollment FIELDS code UNIQUE;
