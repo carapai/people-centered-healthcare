@@ -277,3 +277,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - `POST /api/provisioning/nodes`;
     - the exempt nodes as an hourly `encryption-exempt` alert.
   - **central-server:** `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE`, and `central-server provision code`.
+- 2026-11-03: #268 part 1 merged (#290). Part 2, the edge's online `facility-edge provision --code CODE --central URL --root FILE [--central-ca FILE]`:
+  - **Steps:** the encryption gate, with central deciding an exemption; the key sealed, or reused from an unfinished attempt; the HTTPS call; the chain installed for the minted node ID; and `node.json`, adopted at start unless `HEALTH_NODE_ID` or `HEALTH_FACILITY` is set.
+  - **The HTTPS client:** `hyper-rustls` with the ring provider and the OS trust store (`rustls-native-certs`, Apache-2.0/ISC/MIT).
+    - reqwest's TLS features bring `webpki-root-certs` (CDLA-Permissive-2.0), which `cargo deny` refuses.
+  - **Test:** the binary against `health-provisioning`'s router over TLS. It covers:
+    - an untrusted central;
+    - an unencrypted edge without an exemption;
+    - a wrong code;
+    - an exempt code provisioning `E1`;
+    - a second provisioning, refused.

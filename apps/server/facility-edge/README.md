@@ -104,7 +104,22 @@ A backup on demand while the node runs is not available yet: the admin page (#77
 
 ## Provisioning
 
-The edge's half of provisioning (lan-security.md; ADRs 0048, 0058). Central's half is #268: the one-time code, the node ID, and recovery-key escrow.
+The edge's half of provisioning (lan-security.md; ADRs 0048, 0058; #268). Central's half is `health-provisioning`. Recovery-key escrow is still to come.
+
+**Online, with a one-time code** (the usual way): `facility-edge provision --code XXXX-XXXX --central https://central… --root FILE [--central-ca FILE]`, as root or Administrator, with the national root from the installation media.
+1. It runs the encryption gate. An edge that fails it reports itself unencrypted, and central accepts that only if the operator exempted the code (`central-server provision code --exempt`). Otherwise it exits 10.
+2. It seals the intermediate's key, and the pepper and token keys, as `provision request` does. A key left by an attempt that did not finish is reused. A machine already provisioned is refused, since a re-provisioned machine is a new node.
+3. It posts the request to `POST /api/provisioning/nodes` over HTTPS.
+   - Central's certificate is verified against the system trust store, or against `--central-ca` alone for an in-country private CA.
+   - There is no bundled root store, and verification cannot be turned off.
+4. It installs central's chain as `provision install` does, for the node ID central minted.
+5. It writes `node.json` (node ID, short code, facility) to `HEALTH_PKI_DIR`.
+   - The node runs under them unless `HEALTH_NODE_ID` or `HEALTH_FACILITY` is set.
+   - `provision status` shows the short code.
+
+A wrong or used code exits 11. So does an unreachable or untrusted central, and the code stays redeemable.
+
+**By files** (no connectivity at the edge):
 
 1. **`facility-edge provision request --out FILE`** runs as root or Administrator.
    - The encryption gate comes first: it exits 10 unless the machine complies or `HEALTH_ENCRYPTION_EXEMPTION` exempts it.

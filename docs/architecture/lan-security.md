@@ -83,8 +83,12 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
   - An edge redeems the code at `POST /api/provisioning/nodes` with its certificate request and encryption state.
   - Central mints the `node_id` and the next short code (`E1`, `E2`, …), and has the issuing CA issue the intermediate for `<node-id>.local` and the facility's names, all in one audited transaction.
   - The issuing CA's key is read from a file behind an `Issuer` port, until the KMS adapter.
+- **#268, part 2:** `facility-edge provision --code … --central … --root …` provisions the edge online.
+  - It runs the gate, and seals the key, or resumes an unfinished attempt.
+  - It redeems the code at central over HTTPS, with `hyper-rustls` verifying central against the OS trust store or a given CA. There is no bundled root store.
+  - It installs the chain for the node ID central minted, and records `node.json`, which the node runs under.
 - **Still to come:**
-  - the edge's online `provision --code`, recovery-key escrow, decommissioning, and HSM or KMS signing for the issuing CA (#268);
+  - recovery-key escrow, decommissioning, and HSM or KMS signing for the issuing CA (#268);
   - the Tauri apps' keyring key and their pinning of the intermediate's SPKI from the pairing code (with the desktop and Android builds);
   - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;
