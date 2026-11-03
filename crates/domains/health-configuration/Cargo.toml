@@ -1,0 +1,21 @@
+[package]
+name = "health-configuration"
+description = "Published Definition packages (ADR 0024; configuration.md): the package model, exact versions and the rules a package must meet to be published."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "terminology-metadata"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

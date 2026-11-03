@@ -69,6 +69,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-files` | crate |
 | `health-backup` | crate (encrypted logical backups, verify and restore) |
 | `health-pki` | crate (the private PKI: each tier's issuance from requests, CRLs and chain verification; ADRs 0008, 0058) |
+| `health-packages` | crate (Published Definition packages: deterministic tarballs, sha-256 identity, detached publication signatures; ADR 0024) |
 | `health-crypto` | crate |
 | `health-sync-server` | crate |
 | `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |

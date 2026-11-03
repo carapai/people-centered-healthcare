@@ -242,3 +242,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **e2e:** an admin creates an account; its user is refused a mismatched and a breached password, then sets their own; the admin revokes them, and they can no longer sign in.
 
   This completes #75.
+- 2026-11-03: #75 part 3c merged (#287), completing #75. Decisions for what comes next:
+  - **#86:** a package's `.sig` is a detached JWS (ES256, `x5c`, `iat`) over the tarball's sha-256.
+  - **#268:** central's KMS starts as a key-wrapping port with a local adapter, and the HSM or KMS product comes later.
+
+  #86 part 1, the package format, pinning and signing:
+  - **`health-configuration`** (domain) holds the package model, exact semver versions, and the publication rules: R5 only, pinned dependencies, a manifest that pins every canonical, versioned artefacts, no duplicates, and the folder layout.
+  - **`health-packages`** (infrastructure) does the rest:
+    - deterministic tarballs that refuse hostile archives;
+    - the generated `.index.json`;
+    - `publish` with a `PublicationSigner` port and a local signer;
+    - `verify`, which checks the expected sha-256, then the signature against the national root at the signing time with CRLs, then the archive, the index and the rules.
+
+  Part 2 is JSON Schema validation of `configuration/`.
