@@ -87,8 +87,13 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
   - It runs the gate, and seals the key, or resumes an unfinished attempt.
   - It redeems the code at central over HTTPS, with `hyper-rustls` verifying central against the OS trust store or a given CA. There is no bundled root store.
   - It installs the chain for the node ID central minted, and records `node.json`, which the node runs under.
+- **#268, part 3a:** recovery-key escrow at central.
+  - An edge escrows each volume's disk recovery key in a JWS signed with its facility intermediate's key, which central recorded at provisioning (`POST /api/provisioning/recovery`).
+  - Central wraps each key through a `KeyWrap` port: XChaCha20-Poly1305 under `HEALTH_KMS_KEY_FILE` until the KMS.
+  - It refuses a replayed or stale escrow.
+  - `central-server recovery read` is the audited phone read-out. A key read out alerts hourly until it is rotated.
 - **Still to come:**
-  - recovery-key escrow, decommissioning, and HSM or KMS signing for the issuing CA (#268);
+  - the edge's half of escrow and rotation, decommissioning, and HSM or KMS signing for the issuing CA (#268);
   - the Tauri apps' keyring key and their pinning of the intermediate's SPKI from the pairing code (with the desktop and Android builds);
   - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;

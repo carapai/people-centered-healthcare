@@ -23,7 +23,7 @@ use health_fhir_server::{FacilityTag, FhirServer};
 use health_identity::PhoneNumber;
 use health_identity::SessionPolicy;
 use health_identity::snapshot::{RolePermissions, SnapshotPolicy};
-use health_provisioning::{Issuer, NodeRegistry};
+use health_provisioning::{Issuer, KeyWrap, LocalKeyWrap, NodeRegistry};
 use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use serde::Deserialize;
@@ -58,6 +58,8 @@ pub(crate) struct AuthSettings {
     pub(crate) payments: Option<health_fhir_server::PaymentConfig>,
     /// The facility issuing CA (#268), with its key at hand until the KMS adapter.
     pub(crate) issuing_ca: Option<Arc<health_pki::Authority>>,
+    /// What wraps escrowed recovery keys (#268): the local adapter until the KMS.
+    pub(crate) kms: Option<Arc<LocalKeyWrap>>,
 }
 
 /// The patient portal's phone sign-in.
@@ -127,6 +129,7 @@ impl std::fmt::Debug for AuthSettings {
             .field("snapshot_keys", &self.snapshot_keys.len())
             .field("policy", &self.policy.is_some())
             .field("issuing_ca", &self.issuing_ca.is_some())
+            .field("kms", &self.kms.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -149,6 +152,23 @@ pub(crate) fn read_pepper(path: &Path) -> Result<[u8; 32], &'static str> {
     bytes
         .try_into()
         .map_err(|_| "HEALTH_AUTH_PEPPER_FILE holds a 32-byte key, 64 hex characters")
+}
+
+/// The KMS master key (#268): 64 hex characters, read like the pepper key.
+pub(crate) fn read_kms_key(path: &Path) -> Result<[u8; 32], &'static str> {
+    let text = std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_KMS_KEY_FILE")?;
+    let text = text.trim();
+    let bytes: Vec<u8> = (0..text.len())
+        .step_by(2)
+        .map(|i| {
+            text.get(i..i + 2)
+                .and_then(|h| u8::from_str_radix(h, 16).ok())
+        })
+        .collect::<Option<_>>()
+        .ok_or("HEALTH_KMS_KEY_FILE is not hex")?;
+    bytes
+        .try_into()
+        .map_err(|_| "HEALTH_KMS_KEY_FILE holds a 32-byte key, 64 hex characters")
 }
 
 pub(crate) fn read_keys(path: &Path) -> Result<Vec<[u8; 32]>, &'static str> {
@@ -214,13 +234,23 @@ pub(crate) fn routes(
         });
     }
     let accounts = store.clone();
-    // Edge provisioning (#268): the code is its only credential, so it is outside the gates.
-    let provisioning = settings.issuing_ca.as_ref().map(|issuer| {
+    // Edge provisioning and recovery-key escrow (#268): a one-time code, or the node's own
+    // signature, is the only credential, so they are outside the gates.
+    let mut provisioning = None;
+    if settings.issuing_ca.is_some() || settings.kms.is_some() {
         let registry = NodeRegistry::new(fhir_store.clone(), Arc::new(SystemClock), "central");
-        alert_exempt_hourly(registry.clone());
-        let issuer: Arc<dyn Issuer> = issuer.clone();
-        health_provisioning::router(registry, issuer)
-    });
+        alert_hourly(registry.clone());
+        let mut routes = Router::new();
+        if let Some(issuer) = &settings.issuing_ca {
+            let issuer: Arc<dyn Issuer> = issuer.clone();
+            routes = routes.merge(health_provisioning::router(registry.clone(), issuer));
+        }
+        if let Some(kms) = &settings.kms {
+            let kms: Arc<dyn KeyWrap> = kms.clone();
+            routes = routes.merge(health_provisioning::recovery_router(registry, kms));
+        }
+        provisioning = Some(routes);
+    }
     let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
     let mut api = server.session_route();
     if let Some(provisioning) = provisioning {
@@ -286,9 +316,9 @@ pub(crate) fn routes(
     Ok(router.nest("/api", api))
 }
 
-/// Keeps every active edge running under an encryption exemption alerting, hourly (ADR 0048:
-/// a standing alert at central).
-fn alert_exempt_hourly(registry: NodeRegistry) {
+/// Keeps the standing alerts of ADR 0048 going, hourly: every active edge running under an
+/// encryption exemption, and every recovery key read out and not yet rotated.
+fn alert_hourly(registry: NodeRegistry) {
     tokio::spawn(async move {
         let mut hourly = tokio::time::interval(std::time::Duration::from_secs(3600));
         loop {
@@ -300,6 +330,14 @@ fn alert_exempt_hourly(registry: NodeRegistry) {
                     }
                 }
                 Err(error) => tracing::error!(%error, "the node registry could not be read"),
+            }
+            match registry.used_recovery_keys().await {
+                Ok(keys) => {
+                    for key in keys {
+                        tracing::warn!(alert = "recovery-key-used", node = %key.node, volume = key.volume.as_str(), "a disk recovery key was read out and the edge has not rotated it");
+                    }
+                }
+                Err(error) => tracing::error!(%error, "the recovery keys could not be read"),
             }
         }
     });
@@ -546,6 +584,7 @@ mod tests {
             portal: None,
             payments: None,
             issuing_ca: None,
+            kms: None,
             node_code: "C1".parse().expect("node code"),
         }
     }

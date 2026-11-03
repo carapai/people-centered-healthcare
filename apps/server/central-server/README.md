@@ -30,6 +30,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_PAYMENT_TILLS` | none | The tills, comma-separated (#254). With them and the access policy, `/api/payments` takes payments and runs cashier shifts |
 | `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217) |
 | `HEALTH_ISSUING_CA_CERT_FILE`, `HEALTH_ISSUING_CA_KEY_FILE` | none | The facility issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS (#268). With them, `/api/provisioning/nodes` is served, so an edge can provision itself with a one-time code. Set both or neither |
+| `HEALTH_KMS_KEY_FILE` | none | The master key, 64 hex characters, that wraps the edges' escrowed disk recovery keys until a KMS or HSM holds it (#268). With it, `/api/provisioning/recovery` is served and `central-server recovery` reads keys out |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup
@@ -73,6 +74,12 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - **`--dns`:** the facility's DNS names, for its intermediate.
 - **`--exempt`:** grants the edge an exemption from full-disk encryption (ADR 0048), with its reason. The exemption is audited, and central alerts on the node hourly while it is active.
 - **Where the edge redeems it:** `POST /api/provisioning/nodes`, served when `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE` are set ([health-provisioning](../../../crates/infrastructure/health-provisioning/README.md)).
+
+`central-server recovery read <node-id> <system|data> --by <operator> --verified <how>` reads an edge's disk recovery key out, for an operator to give by phone to a facility admin whose identity they verified (ADR 0048).
+- It prints the key once. The read is audited as a warning, with who read it and how the caller was verified.
+- From then on the key is used: an hourly `recovery-key-used` alert until the edge escrows its replacement.
+- `central-server recovery used` lists the used keys.
+- No web endpoint returns a key.
 
 `central-server provision snapshot-keys <out>` writes the snapshot public keys edges trust, `HEALTH_SNAPSHOT_KEYS_FILE` on an edge, as a JSON array of JWKs.
 

@@ -6,6 +6,13 @@
 //! `node_id`, `short_code`, `facility` and `chain` (the intermediate, then the issuing CA, PEM);
 //! 403 `code_refused` for an unknown, expired or used code; 422 `not_encrypted`; 400
 //! `invalid_request` for a request the issuing CA refuses; 503 if the store failed.
+//!
+//! `POST /provisioning/recovery` ([`recovery_router`]): an edge escrows its disk recovery keys.
+//! The body is the compact JWS [`crate::recovery_jws`] makes, signed with the node's facility
+//! intermediate key. The answer is 204; 401 `unauthorized` for a node that is not active or a
+//! signature that is not its own; 409 `escrow_refused` for an escrow that is stale or too far
+//! from central's clock; 400 `invalid_request` for a JWS that does not read; 503 if the store or
+//! the KMS failed.
 
 use std::sync::Arc;
 
@@ -18,7 +25,7 @@ use health_identity::CodeRefused;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{Error, Issuer, NodeRegistry};
+use crate::{Error, Issuer, KeyWrap, NodeRegistry};
 
 #[derive(Clone)]
 struct Routes {
@@ -77,12 +84,46 @@ async fn provision(State(routes): State<Routes>, Json(body): Json<ProvisionReque
             StatusCode::BAD_REQUEST,
             json!({ "error": "invalid_request", "detail": detail }),
         ),
-        Err(Error::Store(detail)) => {
-            tracing::error!(%detail, "node provisioning failed");
-            answer(
-                StatusCode::SERVICE_UNAVAILABLE,
-                json!({ "error": "unavailable" }),
-            )
-        }
+        Err(other) => unavailable(&other),
+    }
+}
+
+fn unavailable(error: &Error) -> Response {
+    tracing::error!(%error, "a node's request to central failed");
+    answer(
+        StatusCode::SERVICE_UNAVAILABLE,
+        json!({ "error": "unavailable" }),
+    )
+}
+
+#[derive(Clone)]
+struct Recovery {
+    registry: NodeRegistry,
+    kms: Arc<dyn KeyWrap>,
+}
+
+/// The recovery-key escrow route over `registry`, wrapping keys with `kms`.
+pub fn recovery_router(registry: NodeRegistry, kms: Arc<dyn KeyWrap>) -> Router {
+    Router::new()
+        .route("/provisioning/recovery", post(escrow))
+        .with_state(Recovery { registry, kms })
+}
+
+async fn escrow(State(recovery): State<Recovery>, body: String) -> Response {
+    match recovery.registry.escrow(&body, recovery.kms.as_ref()).await {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(Error::Unauthorized(detail)) => answer(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "unauthorized", "detail": detail }),
+        ),
+        Err(Error::Escrow(refused)) => answer(
+            StatusCode::CONFLICT,
+            json!({ "error": "escrow_refused", "detail": refused.to_string() }),
+        ),
+        Err(Error::Malformed(detail)) => answer(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "invalid_request", "detail": detail }),
+        ),
+        Err(other) => unavailable(&other),
     }
 }

@@ -10,7 +10,8 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
   - **`ProvisioningPolicy`:** one-time codes of 8 Crockford base32 characters, `XXXX-XXXX`. `normalise` reads one forgivingly. A code expires after 72 hours.
   - **`ProvisioningCode::redeemable`:** a code redeems once, before it expires, for an encrypted edge (`Encryption::Compliant`). An unencrypted edge needs an exemption granted with the code (`Encryption::Exempt { reason }`).
   - **`NodeKind::next_short_code`:** `E1`, `E2`, … per facility, one past the highest, so a decommissioned node's code is never reused.
-  - **`Node`:** the registry's record, holding its id, facility, short code, status, encryption, intermediate serial and code.
+  - **`Node`:** the registry's record, holding its id, facility, short code, status, encryption, intermediate serial, intermediate public key and code.
+  - **`RecoveryKey::escrow`:** a volume's recovery key (`RecoveryVolume`) is escrowed only within 5 minutes of central's clock, and only if signed after the key it replaces, so a replay cannot restore a key that was read out. A key with any `Retrieval` is `used`.
 - **Devices** (#74; lan-security.md § Device enrollment; ADR 0009):
   - **`EnrollmentPolicy` / `EnrollmentRequest`:** a device asks to enroll with its key's RFC 7638 thumbprint and a label, and shows a 6-digit pairing code. The request expires 10 minutes after it was made.
   - **`EnrollmentRequest::approve`** gives the `Device` an admin approves: a new `DeviceId` (UUIDv7), a name and a location, both required, and who approved it and when. An expired request is refused.

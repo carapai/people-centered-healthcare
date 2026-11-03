@@ -14,25 +14,39 @@
 //! - **Exemptions** (ADR 0048): an exempt node is audited as a warning, raises an
 //!   `encryption-exempt` alert when provisioned, and stands in [`NodeRegistry::exempt`] for
 //!   central to keep alerting on.
+//! - **Recovery keys** (ADR 0048): [`NodeRegistry::escrow`] takes an edge's disk recovery keys in
+//!   a JWS ([`recovery_jws`]) signed with its facility intermediate's key, which central recorded
+//!   at provisioning. It wraps each key through the [`KeyWrap`] port, never storing it in the
+//!   clear, and refuses an escrow no newer than the key it replaces.
+//!   [`NodeRegistry::read_recovery`] is the audited phone read-out, with who read it and how
+//!   they verified the caller. A key read out is used, and stays in
+//!   [`NodeRegistry::used_recovery_keys`] for central to alert on until the edge escrows its
+//!   replacement.
 
+mod kms;
 mod routes;
 
 use std::sync::Arc;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use health_identity::{
-    CodeRefused, Encryption, Node, NodeId, NodeKind, NodeStatus, ProvisioningCode,
-    ProvisioningPolicy,
+    CodeRefused, Encryption, EscrowRefused, Node, NodeId, NodeKind, NodeStatus, ProvisioningCode,
+    ProvisioningPolicy, RecoveryKey, RecoveryVolume, Retrieval,
 };
 use health_persistence::{Store, Transaction};
 use health_pki::{Authority, Facility};
 use health_surrealdb::{SurrealStore, SurrealTx};
 use health_time::{Clock, Timestamp};
+use p256::ecdsa::signature::{Signer as _, Verifier as _};
+use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use rand_core::RngCore;
 use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
-pub use routes::router;
+pub use kms::{KeyWrap, LocalKeyWrap};
+pub use routes::{recovery_router, router};
 
 /// What issues facility intermediates: central's issuing CA, whose key is held in the HSM or KMS
 /// (security.md § Keys), so issuance is a port.
@@ -80,6 +94,53 @@ pub enum Error {
     /// The store failed, or a concurrent redemption won.
     #[error("the registry failed: {0}")]
     Store(String),
+    /// A signed request from a node that is not an active one, or whose signature fails.
+    #[error("not signed by an active node: {0}")]
+    Unauthorized(String),
+    /// A request that does not read.
+    #[error("malformed: {0}")]
+    Malformed(String),
+    /// An escrow refused by the rules.
+    #[error(transparent)]
+    Escrow(#[from] EscrowRefused),
+    /// No such node or recovery key.
+    #[error("not found: {0}")]
+    NotFound(String),
+}
+
+/// The JWS `typ` of a recovery-key escrow.
+pub const RECOVERY_TYP: &str = "health-recovery+jwt";
+
+/// The escrow an edge sends: its `keys` by volume, signed at `at` with its facility
+/// intermediate's `key`, as a compact ES256 JWS.
+pub fn recovery_jws(
+    node: NodeId,
+    keys: &[(RecoveryVolume, String)],
+    key: &SigningKey,
+    at: Timestamp,
+) -> String {
+    let header = URL_SAFE_NO_PAD.encode(json!({ "alg": "ES256", "typ": RECOVERY_TYP }).to_string());
+    let payload = URL_SAFE_NO_PAD.encode(
+        json!({
+            "node": node.to_string(),
+            "iat": at.as_second(),
+            "keys": keys
+                .iter()
+                .map(|(volume, key)| json!({ "volume": volume.as_str(), "key": key }))
+                .collect::<Vec<_>>(),
+        })
+        .to_string(),
+    );
+    let signature: Signature = key.sign(format!("{header}.{payload}").as_bytes());
+    format!(
+        "{header}.{payload}.{}",
+        URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    )
+}
+
+/// What a recovery key is wrapped against: its node and volume.
+fn context(node: NodeId, volume: RecoveryVolume) -> String {
+    format!("health-recovery/{node}/{}", volume.as_str())
 }
 
 fn failed(error: impl std::fmt::Display) -> Error {
@@ -236,6 +297,9 @@ impl NodeRegistry {
         let (intermediate, serial) = issuer
             .issue(request, &facility, now)
             .map_err(Error::Request)?;
+        let intermediate_key = health_pki::inspect(&intermediate)
+            .map(|inspected| URL_SAFE_NO_PAD.encode(inspected.public_key))
+            .map_err(|e| Error::Request(e.to_string()))?;
         let node = Node {
             id,
             facility: stored.facility.clone(),
@@ -244,6 +308,7 @@ impl NodeRegistry {
             status: NodeStatus::Active,
             encryption,
             intermediate_serial: serial,
+            intermediate_key,
             code: stored.id,
             provisioned_at: now,
         };
@@ -321,5 +386,199 @@ impl NodeRegistry {
                 n.status == NodeStatus::Active && matches!(n.encryption, Encryption::Exempt { .. })
             })
             .collect())
+    }
+
+    async fn node(&self, tx: &mut SurrealTx, id: &str) -> Result<Option<Node>, Error> {
+        tx.node(id)
+            .await
+            .map_err(failed)?
+            .map(|json| serde_json::from_str(&json).map_err(failed))
+            .transpose()
+    }
+
+    /// Escrows the recovery keys in `jws`, an edge's [`recovery_jws`], wrapping each with
+    /// `kms`. Returns the node and the volumes escrowed.
+    pub async fn escrow(
+        &self,
+        jws: &str,
+        kms: &dyn KeyWrap,
+    ) -> Result<(NodeId, Vec<RecoveryVolume>), Error> {
+        let malformed = |why: &str| Error::Malformed(why.to_owned());
+        let mut parts = jws.trim().split('.');
+        let (Some(header), Some(payload), Some(signature), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return Err(malformed("not a compact JWS"));
+        };
+        let decode = |part: &str| -> Result<Value, Error> {
+            URL_SAFE_NO_PAD
+                .decode(part)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .ok_or_else(|| malformed("unreadable JWS"))
+        };
+        let (head, claims) = (decode(header)?, decode(payload)?);
+        if head["alg"] != "ES256" || head["typ"] != RECOVERY_TYP || head.get("crit").is_some() {
+            return Err(malformed("not a recovery-key escrow"));
+        }
+        let node_id = claims["node"]
+            .as_str()
+            .and_then(|id| id.parse().ok())
+            .map(NodeId)
+            .ok_or_else(|| malformed("no node"))?;
+        let signed_at = claims["iat"]
+            .as_i64()
+            .and_then(|s| Timestamp::from_second(s).ok())
+            .ok_or_else(|| malformed("no signing time"))?;
+        let keys: Vec<(RecoveryVolume, String)> = claims["keys"]
+            .as_array()
+            .ok_or_else(|| malformed("no keys"))?
+            .iter()
+            .map(|entry| {
+                let volume = serde_json::from_value(entry["volume"].clone()).ok();
+                let key = entry["key"].as_str().filter(|k| !k.is_empty());
+                volume
+                    .zip(key.map(str::to_owned))
+                    .ok_or_else(|| malformed("a key without its volume"))
+            })
+            .collect::<Result<_, _>>()?;
+        if keys.is_empty() {
+            return Err(malformed("no keys"));
+        }
+
+        let now = self.clock.now();
+        let mut tx = self.begin().await?;
+        let unauthorized = |why: &str| Error::Unauthorized(why.to_owned());
+        let node = self
+            .node(&mut tx, &node_id.to_string())
+            .await?
+            .filter(|node| node.status == NodeStatus::Active)
+            .ok_or_else(|| unauthorized("no active node by that id"))?;
+        let key = URL_SAFE_NO_PAD
+            .decode(&node.intermediate_key)
+            .ok()
+            .and_then(|sec1| VerifyingKey::from_sec1_bytes(&sec1).ok())
+            .ok_or_else(|| unauthorized("the node has no key on record"))?;
+        let signature = URL_SAFE_NO_PAD
+            .decode(signature)
+            .ok()
+            .and_then(|bytes| Signature::from_slice(&bytes).ok())
+            .ok_or_else(|| unauthorized("unreadable signature"))?;
+        key.verify(format!("{header}.{payload}").as_bytes(), &signature)
+            .map_err(|_| unauthorized("the signature is not the node's"))?;
+
+        let mut volumes = Vec::new();
+        for (volume, secret) in &keys {
+            let id = node_id.to_string();
+            let current: Option<RecoveryKey> = tx
+                .recovery_key(&id, volume.as_str())
+                .await
+                .map_err(failed)?
+                .map(|(json, _)| serde_json::from_str(&json).map_err(failed))
+                .transpose()?;
+            let record = RecoveryKey::escrow(current.as_ref(), node_id, *volume, signed_at, now)?;
+            let wrapped = kms
+                .wrap(secret.as_bytes(), &context(node_id, *volume))
+                .map_err(Error::Store)?;
+            tx.put_recovery_key(
+                &id,
+                volume.as_str(),
+                &serde_json::to_string(&record).map_err(failed)?,
+                &URL_SAFE_NO_PAD.encode(wrapped),
+            )
+            .await
+            .map_err(failed)?;
+            volumes.push(*volume);
+        }
+        let names: Vec<&str> = volumes.iter().map(|v| v.as_str()).collect();
+        let audit = self.audit(
+            "node-recovery-escrowed",
+            "notice",
+            &format!("node {node_id}"),
+            &format!("node {node_id}"),
+            &format!("recovery keys escrowed for {}", names.join(", ")),
+        );
+        health_audit::append(&mut tx, &audit)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok((node_id, volumes))
+    }
+
+    /// Reads out `node`'s recovery key for `volume`, by the central operations person `by`, who
+    /// verified the caller as `verified` (ADR 0048 § Retrieval). Audited as a warning; the key is
+    /// used from then on.
+    pub async fn read_recovery(
+        &self,
+        node: NodeId,
+        volume: RecoveryVolume,
+        by: &str,
+        verified: &str,
+        kms: &dyn KeyWrap,
+    ) -> Result<String, Error> {
+        if by.trim().is_empty() || verified.trim().is_empty() {
+            return Err(Error::Malformed(
+                "a read-out needs who reads it and how the caller was verified".into(),
+            ));
+        }
+        let mut tx = self.begin().await?;
+        let id = node.to_string();
+        let (json, wrapped) = tx
+            .recovery_key(&id, volume.as_str())
+            .await
+            .map_err(failed)?
+            .ok_or_else(|| {
+                Error::NotFound(format!("no {} key for node {node}", volume.as_str()))
+            })?;
+        let mut record: RecoveryKey = serde_json::from_str(&json).map_err(failed)?;
+        let secret = URL_SAFE_NO_PAD
+            .decode(wrapped)
+            .map_err(failed)
+            .and_then(|wrapped| {
+                kms.unwrap(&wrapped, &context(node, volume))
+                    .map_err(Error::Store)
+            })?;
+        let secret = String::from_utf8(secret).map_err(failed)?;
+        record.retrievals.push(Retrieval {
+            at: self.clock.now(),
+            by: by.to_owned(),
+            verified: verified.to_owned(),
+        });
+        tx.update_recovery_key(
+            &id,
+            volume.as_str(),
+            &serde_json::to_string(&record).map_err(failed)?,
+        )
+        .await
+        .map_err(failed)?;
+        let audit = self.audit(
+            "node-recovery-read",
+            "warning",
+            by,
+            &format!("node {node}"),
+            &format!(
+                "{} recovery key read out; caller verified: {verified}",
+                volume.as_str()
+            ),
+        );
+        health_audit::append(&mut tx, &audit)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        tracing::warn!(alert = "recovery-key-used", node = %node, volume = volume.as_str(), "a disk recovery key was read out; the edge must rotate it");
+        Ok(secret)
+    }
+
+    /// The recovery keys read out and not yet replaced: a standing alert at central.
+    pub async fn used_recovery_keys(&self) -> Result<Vec<RecoveryKey>, Error> {
+        let mut tx = self.begin().await?;
+        let keys: Vec<RecoveryKey> = tx
+            .recovery_keys()
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|json| serde_json::from_str(json).map_err(failed))
+            .collect::<Result<_, _>>()?;
+        Ok(keys.into_iter().filter(RecoveryKey::used).collect())
     }
 }

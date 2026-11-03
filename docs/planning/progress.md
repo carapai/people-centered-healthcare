@@ -287,3 +287,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a wrong code;
     - an exempt code provisioning `E1`;
     - a second provisioning, refused.
+- 2026-11-04: #268 part 2 merged (#291). Decisions for part 3:
+  - after provisioning, an edge authenticates its escrows with a JWS signed by its facility intermediate's key;
+  - a recovery key is read out with a `central-server` command only, never a web endpoint.
+
+  Part 3 is split, and 3a is central's half:
+  - **Domain:** `RecoveryKey` with its retrievals and the escrow freshness rule, and the node's intermediate key, recorded at provisioning.
+  - **Migration `0025_recovery_keys`.**
+  - **`health-provisioning`:**
+    - the `KeyWrap` port with `LocalKeyWrap` (XChaCha20-Poly1305, the node and volume as associated data);
+    - `recovery_jws`, `escrow`, `read_recovery` and `used_recovery_keys`;
+    - `POST /api/provisioning/recovery`.
+  - **central-server:** `HEALTH_KMS_KEY_FILE`, `central-server recovery read | used`, and the hourly `recovery-key-used` alert.
+
+  3b is the edge: creating recovery protectors, escrowing them, and `rotate-recovery`.
