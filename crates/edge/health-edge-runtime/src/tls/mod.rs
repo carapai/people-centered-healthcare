@@ -44,7 +44,7 @@ const LEAF_KEY: &str = "leaf.key";
 
 /// The composition root's access to the facility intermediate's sealed key, as PEM; `None`
 /// before provisioning. Blocking: it may run the platform keystore's tools.
-pub type IntermediateKey = Arc<dyn Fn() -> Result<Option<String>, String> + Send + Sync>;
+pub(crate) type IntermediateKey = Arc<dyn Fn() -> Result<Option<String>, String> + Send + Sync>;
 
 /// The leaf, as the status page shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

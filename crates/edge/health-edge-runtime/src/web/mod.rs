@@ -98,11 +98,18 @@ impl Bundle {
 }
 
 /// The app's routes, to merge beside the API's. Without a bundle only `runtime.json` is served.
-pub(crate) fn routes(bundle: Bundle) -> Router {
+pub(crate) fn routes(bundle: Bundle, auth: Option<serde_json::Value>) -> Router {
     Router::new()
         .route(
             "/runtime.json",
-            get(move || async move { (revalidated(), axum::Json(bundle.runtime())) }),
+            get(move || async move {
+                let mut runtime = bundle.runtime();
+                // The node's sign-in, when it serves one (`auth`, #75).
+                if let Some(auth) = auth.clone() {
+                    runtime["auth"] = auth;
+                }
+                (revalidated(), axum::Json(runtime))
+            }),
         )
         .route(
             "/sw.js",
@@ -197,7 +204,7 @@ mod tests {
     ];
 
     async fn get(bundle: Bundle, path: &str) -> (StatusCode, axum::http::HeaderMap, String) {
-        let response = routes(bundle)
+        let response = routes(bundle, None)
             .oneshot(Request::get(path).body(Body::empty()).expect("a request"))
             .await
             .expect("the router answers");

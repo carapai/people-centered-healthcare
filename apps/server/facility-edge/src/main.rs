@@ -158,7 +158,7 @@ async fn serve(
         manager,
         buffer,
         Some(encryption::check(config)),
-        Some(provision::intermediate_key()),
+        Some(provision::secrets()),
         stop,
     )
     .await

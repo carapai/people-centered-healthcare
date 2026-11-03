@@ -25,6 +25,10 @@ Environment=HEALTH_ENCRYPTION_STATE_FILE=/run/health/encryption.json
 # systemd-creds into /etc/credstore.encrypted/. systemd unseals it into $CREDENTIALS_DIRECTORY
 # for the unprivileged service; before provisioning it is absent, which is not fatal.
 LoadCredentialEncrypted=health.facility-intermediate.key
+# The local authorization server's pepper and token-signing keys (offline-auth.md; ADR 0059),
+# sealed by `provision request` beside it.
+LoadCredentialEncrypted=health.pepper.key
+LoadCredentialEncrypted=health.token-signing.key
 User=health
 Group=health
 # The unprivileged service may bind TCP 443 (lan-security.md), and nothing else privileged.

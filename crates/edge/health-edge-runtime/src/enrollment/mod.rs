@@ -22,6 +22,7 @@ use health_time::{Clock, SystemClock};
 use tower::ServiceExt;
 
 use crate::admin;
+use crate::auth::{self, Secrets};
 use crate::config::EdgeConfig;
 
 /// The API, set once the store is open.
@@ -30,21 +31,38 @@ pub(crate) struct Api(Arc<OnceLock<Router>>);
 
 impl Api {
     /// Composes the API over the open store.
-    pub(crate) fn open(&self, config: &EdgeConfig, connection: &Connection) {
+    pub(crate) fn open(
+        &self,
+        config: &EdgeConfig,
+        connection: &Connection,
+        secrets: Option<&Secrets>,
+    ) {
         let clock: Arc<dyn Clock> = Arc::new(SystemClock);
         let store = SurrealAuthStore::new(
             SurrealStore::new(connection.clone(), Arc::clone(&clock)),
             SessionPolicy::default().hard_cap,
         );
         let gate = DeviceGate::new(
-            store,
+            store.clone(),
             DeviceConfig::new(config.origins.clone(), config.node_id.clone()),
-            clock,
+            Arc::clone(&clock),
         );
-        let api = gate
+        let mut api = gate
             .enrollment_router()
             .merge(admin::local_only(gate.admin_router()))
             .merge(gate.device_router());
+        match auth::routes(config, store, &gate, secrets, clock) {
+            Ok(routes) => {
+                api = api.merge(routes);
+                tracing::info!(
+                    outcome = "sign-in-on",
+                    "the local authorization server is serving"
+                );
+            }
+            Err(reason) => {
+                tracing::warn!(alert = "sign-in-off", reason = %reason, "no staff sign-in on this edge");
+            }
+        }
         let _ = self.0.set(api);
     }
 
@@ -53,6 +71,7 @@ impl Api {
     pub(crate) fn routes(&self) -> Router {
         Router::new()
             .route("/api/{*rest}", any(forward))
+            .route("/auth/{*rest}", any(forward))
             .with_state(self.clone())
     }
 }
@@ -111,7 +130,7 @@ mod tests {
         let config =
             EdgeConfig::from_lookup(|name| (name == "HEALTH_DATA_DIR").then(|| "/d".into()))
                 .expect("config");
-        api.open(&config, &connection);
+        api.open(&config, &connection, None);
 
         let lan = "192.168.1.20:5000";
         for (method, path) in [
