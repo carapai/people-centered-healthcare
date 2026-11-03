@@ -9,6 +9,9 @@
 //!   central to ratify, and audited.
 //! - `GET /access/revocations`, `POST /access/revocations` (`username`): local access revoked at
 //!   once: the user's tokens stop working at their next request, and they cannot sign in here.
+//! - `POST /access/accounts` (`username`, `password`, `role`, `days`): a provisional account for
+//!   new staff, its role a local grant, lasting as long; its user sets their own password at
+//!   their first sign-in.
 
 use std::sync::Arc;
 
@@ -85,6 +88,7 @@ impl<S: AuthStore + 'static> LocalAdmin<S> {
                 "/access/revocations",
                 get(revocations::<S>).post(revoke::<S>),
             )
+            .route("/access/accounts", axum::routing::post(provision::<S>))
             .with_state(self.clone())
     }
 
@@ -413,6 +417,149 @@ async fn revoke<S: AuthStore + 'static>(
             StatusCode::SERVICE_UNAVAILABLE,
             "unavailable",
             "the store failed",
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct ProvisionForm {
+    username: String,
+    password: String,
+    role: String,
+    days: i64,
+}
+
+async fn provision<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+    Form(form): Form<ProvisionForm>,
+) -> Response {
+    let who = match admin.admin(&headers, "POST", uri.path()).await {
+        Ok(who) => who,
+        Err(refused) => return *refused,
+    };
+    let username = form.username.trim();
+    if username.is_empty() {
+        return error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid",
+            "the account needs a username",
+        );
+    }
+    let store = admin.verifier.store();
+    let config = match store.local_config().await {
+        Ok(config) => config.unwrap_or_default(),
+        Err(_) => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the store failed",
+            );
+        }
+    };
+    let now = admin.verifier.now();
+    let account = AccountId(uuid::Uuid::now_v7());
+    let grant = match LocalGrantPolicy::default().grant(
+        form.role.trim(),
+        &config.roles,
+        &config.grantable,
+        account,
+        &who.facility,
+        who.principal.account,
+        form.days,
+        now,
+    ) {
+        Ok(grant) => grant,
+        Err(refused) => {
+            return error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "refused",
+                refused.to_string(),
+            );
+        }
+    };
+    // The admin's password must already meet the policy; the user replaces it at first sign-in.
+    let credential = match admin.verifier.credentials().set_password(
+        account,
+        &health_identity::PasswordPolicy::default(),
+        crate::BreachedPasswords::platform(),
+        &form.password,
+        true,
+    ) {
+        Ok(credential) => credential,
+        Err(refused) => {
+            return error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "password_rejected",
+                refused.to_string(),
+            );
+        }
+    };
+    let provisional = health_identity::snapshot::ProvisionalAccount {
+        account,
+        facility: who.facility.clone(),
+        created_by: who.principal.account,
+        created_at: now,
+        not_after: grant.not_after,
+        must_change_password: true,
+    };
+    let claims = match serde_json::to_value(&grant) {
+        Ok(claims) => claims,
+        Err(_) => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the grant cannot be encoded",
+            );
+        }
+    };
+    let signer = Arc::clone(&admin.signer);
+    let jws = match tokio::task::spawn_blocking(move || signer(&claims)).await {
+        Ok(Ok(jws)) => jws,
+        _ => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the node's key cannot sign",
+            );
+        }
+    };
+    let login = health_identity::LoginAccount {
+        id: account,
+        username: username.to_owned(),
+        credential,
+        status: health_identity::AccountStatus::Active,
+        lockout: health_identity::Lockout::default(),
+    };
+    let audit = admin.audit(
+        "provisional-account",
+        "C",
+        who.principal.account,
+        account,
+        &format!("{username} as {} until {}", grant.role, grant.not_after),
+    );
+    match store
+        .create_provisional(&login, &provisional, &grant, &jws, &audit)
+        .await
+    {
+        Ok(()) => {
+            tracing::warn!(alert = "provisional-account", role = %grant.role, "a provisional account was created offline, pending reconciliation");
+            (
+                StatusCode::CREATED,
+                Json(json!({
+                    "account": account.to_string(),
+                    "username": username,
+                    "role": grant.role,
+                    "not_after": grant.not_after.to_string(),
+                })),
+            )
+                .into_response()
+        }
+        Err(_) => error(
+            StatusCode::CONFLICT,
+            "taken",
+            "an account by that username exists",
         ),
     }
 }

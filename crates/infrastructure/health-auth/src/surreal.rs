@@ -20,7 +20,7 @@ use crate::store::{
     AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, LocalConfig, Session,
     StoreError,
 };
-use health_identity::snapshot::{LocalGrant, LocalRevocation};
+use health_identity::snapshot::{LocalGrant, LocalRevocation, ProvisionalAccount};
 
 /// The SurrealDB [`AuthStore`].
 #[derive(Clone)]
@@ -644,6 +644,88 @@ impl AuthStore for SurrealAuthStore {
             .await
             .map_err(failed)?;
         health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn provisional(
+        &self,
+        account: AccountId,
+    ) -> Result<Option<ProvisionalAccount>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.local_provisional(&account.to_string())
+            .await
+            .map_err(failed)?
+            .map(|d| serde_json::from_str(&d).map_err(failed))
+            .transpose()
+    }
+
+    async fn create_provisional(
+        &self,
+        account: &LoginAccount,
+        provisional: &ProvisionalAccount,
+        grant: &LocalGrant,
+        jws: &str,
+        audit: &Value,
+    ) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        if tx
+            .login_account_by_username(&account.username)
+            .await
+            .map_err(failed)?
+            .is_some()
+        {
+            return Err(StoreError("the username is taken".into()));
+        }
+        tx.put_login_account(account).await.map_err(failed)?;
+        tx.put_local_provisional(
+            &account.id.to_string(),
+            &serde_json::to_string(provisional).map_err(failed)?,
+        )
+        .await
+        .map_err(failed)?;
+        tx.put_local_grant(
+            &grant.id.to_string(),
+            &grant.account.to_string(),
+            &grant.facility,
+            grant.not_after,
+            &serde_json::to_string(grant).map_err(failed)?,
+            jws,
+        )
+        .await
+        .map_err(failed)?;
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        // The username's unique index refuses a concurrent second account at commit.
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn set_credential(
+        &self,
+        account: AccountId,
+        credential: String,
+    ) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        let mut found = tx
+            .login_account(account)
+            .await
+            .map_err(failed)?
+            .ok_or_else(|| StoreError("no such account".into()))?;
+        found.credential = credential;
+        tx.put_login_account(&found).await.map_err(failed)?;
+        if let Some(data) = tx
+            .local_provisional(&account.to_string())
+            .await
+            .map_err(failed)?
+        {
+            let mut provisional: ProvisionalAccount =
+                serde_json::from_str(&data).map_err(failed)?;
+            provisional.must_change_password = false;
+            tx.put_local_provisional(
+                &account.to_string(),
+                &serde_json::to_string(&provisional).map_err(failed)?,
+            )
+            .await
+            .map_err(failed)?;
+        }
         tx.commit().await.map_err(failed)
     }
 

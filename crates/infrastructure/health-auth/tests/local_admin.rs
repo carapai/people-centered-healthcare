@@ -97,6 +97,11 @@ impl Edge {
 
     /// Signs in as `username`: the access token, or `None` when refused.
     async fn sign_in(&self, username: &str) -> Option<String> {
+        self.sign_in_with(username, "correct horse battery").await
+    }
+
+    /// Signs in as `username` with `password`.
+    async fn sign_in_with(&self, username: &str, password: &str) -> Option<String> {
         let (status, _, location) = self
             .post(
                 "/auth/authorize",
@@ -111,7 +116,7 @@ impl Edge {
                     ),
                     ("code_challenge_method", "S256"),
                     ("username", username),
-                    ("password", "correct horse battery"),
+                    ("password", password),
                 ],
                 None,
             )
@@ -276,4 +281,119 @@ async fn a_facility_admin_grants_locally_grantable_roles_and_revokes_access() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     let (_, revoked) = edge.get("/api/access/revocations", &admin).await;
     assert_eq!(revoked.as_array().map(Vec::len), Some(1));
+}
+
+/// New staff offline (offline-auth.md § Offline user and role administration): a provisional
+/// account whose role is a local grant, whose user must set their own password first.
+#[tokio::test]
+async fn a_provisional_account_signs_in_once_its_user_sets_their_password() {
+    let edge = edge().await;
+    let admin = edge.sign_in("okello").await.expect("admin signs in");
+    let create = |username: &'static str, password: &'static str, role: &'static str| {
+        let admin = admin.clone();
+        let edge = &edge;
+        async move {
+            edge.post(
+                "/api/access/accounts",
+                &[
+                    ("username", username),
+                    ("password", password),
+                    ("role", role),
+                    ("days", "5"),
+                ],
+                Some(&admin),
+            )
+            .await
+        }
+    };
+    let (status, created, _) = create("mukasa", "tumbling otter quarry 7919", "nurse").await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    assert_eq!(created["role"], "nurse");
+    assert_eq!(
+        create("mukasa", "tumbling otter quarry 7919", "nurse")
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        create("waswa", "tumbling otter quarry 7919", "in-charge")
+            .await
+            .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        create("waswa", "password123", "nurse").await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+
+    // The admin's password works once only to set their own.
+    let (status, body, _) = edge
+        .post(
+            "/auth/authorize",
+            &[
+                ("response_type", "code"),
+                ("client_id", CLIENT),
+                ("redirect_uri", REDIRECT),
+                ("scope", "user/Patient.rs"),
+                (
+                    "code_challenge",
+                    "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                ),
+                ("code_challenge_method", "S256"),
+                ("username", "mukasa"),
+                ("password", "tumbling otter quarry 7919"),
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(
+        (status, body["error"].as_str()),
+        (StatusCode::FORBIDDEN, Some("change_password"))
+    );
+    let change = |old: &'static str, new: &'static str| {
+        let edge = &edge;
+        async move {
+            edge.post(
+                "/auth/password",
+                &[
+                    ("username", "mukasa"),
+                    ("password", old),
+                    ("new_password", new),
+                ],
+                None,
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(
+        change("wrong old password", "bright kettle river 5521").await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        change("tumbling otter quarry 7919", "password123").await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        change("tumbling otter quarry 7919", "bright kettle river 5521").await,
+        StatusCode::NO_CONTENT
+    );
+
+    // Now signed in, with nothing but the granted role: not an admin.
+    let token = edge
+        .sign_in_with("mukasa", "bright kettle river 5521")
+        .await
+        .expect("signs in with their own password");
+    assert_eq!(
+        edge.get("/api/access/grants", &token).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let (_, grants) = edge.get("/api/access/grants", &admin).await;
+    assert!(
+        grants
+            .as_array()
+            .expect("grants")
+            .iter()
+            .any(|g| g["role"] == "nurse")
+    );
 }

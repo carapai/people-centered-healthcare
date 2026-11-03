@@ -184,6 +184,7 @@ impl<S: AuthStore + 'static> AuthServer<S> {
             .route("/token", post(token::<S>))
             .route("/revoke", post(revoke::<S>))
             .route("/pin", post(set_pin::<S>))
+            .route("/password", post(change_password::<S>))
             .route("/unlock", post(unlock::<S>))
             .with_state(Arc::clone(&self.inner))
     }
@@ -596,6 +597,16 @@ async fn authorize_login<S: AuthStore>(
             };
         }
     };
+    // A provisional account sets its own password before it gets any token.
+    if let Ok(Some(provisional)) = inner.store.provisional(account.id).await
+        && provisional.must_change_password
+    {
+        return match &inner.config.login_page {
+            Some(page) => Redirect::to(&with_query(page, &form.request, Some("change_password")))
+                .into_response(),
+            None => oauth_error(StatusCode::FORBIDDEN, "change_password"),
+        };
+    }
     // The password alone is not enough: the user needs a live snapshot for the facility. The
     // refusal looks like any other.
     if inner
@@ -972,23 +983,37 @@ impl<S: AuthStore> Inner<S> {
         }
         let floor = self.store.clock_floor().await.map_err(|_| ())?;
         let at = floor.check(now).map_err(|_| ())?;
-        let jws = self
+        let central = self
             .store
             .snapshot(account, facility)
             .await
-            .map_err(|_| ())?
-            .ok_or(())?;
-        let snapshot = gate.verifier.verify(&jws).map_err(|_| ())?;
-        if snapshot.account != account || snapshot.facility != facility {
-            return Err(());
-        }
-        gate.policy.check(&snapshot, at).map_err(|_| ())?;
-        // Only an advance is written: every request writing the floor would make concurrent
-        // requests conflict.
-        let raised = floor.observe(snapshot.issued_at);
-        if raised != floor {
-            self.store.set_clock_floor(raised).await.map_err(|_| ())?;
-        }
+            .map_err(|_| ())?;
+        let snapshot = match central {
+            Some(jws) => {
+                let snapshot = gate.verifier.verify(&jws).map_err(|_| ())?;
+                if snapshot.account != account || snapshot.facility != facility {
+                    return Err(());
+                }
+                gate.policy.check(&snapshot, at).map_err(|_| ())?;
+                // Only an advance is written: every request writing the floor would make
+                // concurrent requests conflict.
+                let raised = floor.observe(snapshot.issued_at);
+                if raised != floor {
+                    self.store.set_clock_floor(raised).await.map_err(|_| ())?;
+                }
+                snapshot
+            }
+            // A provisional account created here offline: local grants are all it has, and it
+            // lapses with them (offline-auth.md § Offline user and role administration).
+            None => self
+                .store
+                .provisional(account)
+                .await
+                .map_err(|_| ())?
+                .filter(|p| p.facility == facility)
+                .and_then(|p| p.snapshot(at))
+                .ok_or(())?,
+        };
         // Offline administration (offline-auth.md; ADR 0011): local access revoked here ends at
         // once, and unexpired local grants add their roles.
         if self
@@ -1212,6 +1237,68 @@ async fn refresh<S: AuthStore>(
         object.remove("id_token");
     }
     (no_store(), Json(body)).into_response()
+}
+
+/// `POST /password`: a user changes their own password, with the current one. The new one must
+/// pass the password policy and the breached-password list (offline-auth.md § Credentials); a
+/// provisional account's first change lets it sign in.
+#[derive(Deserialize)]
+struct PasswordForm {
+    username: String,
+    password: String,
+    new_password: String,
+}
+
+async fn change_password<S: AuthStore>(
+    State(inner): State<Arc<Inner<S>>>,
+    Form(form): Form<PasswordForm>,
+) -> Response {
+    let now = inner.clock.now();
+    let refused = || oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant");
+    let account = match inner.store.account_by_username(&form.username).await {
+        Ok(Some(account))
+            if account.status == AccountStatus::Active
+                && account.lockout.check(&inner.config.lockout, now).is_ok() =>
+        {
+            account
+        }
+        _ => {
+            inner.credentials.verify_decoy(&form.password);
+            return refused();
+        }
+    };
+    if !inner
+        .credentials
+        .verify(account.id, &form.password, &account.credential)
+    {
+        let lockout = account.lockout.failed(&inner.config.lockout, now);
+        let _ = inner.store.set_lockout(account.id, lockout).await;
+        return refused();
+    }
+    // An enrolled device is the second factor on an edge (ADR 0009).
+    let device_factor = inner.config.devices.is_some();
+    let credential = match inner.credentials.set_password(
+        account.id,
+        &health_identity::PasswordPolicy::default(),
+        crate::BreachedPasswords::platform(),
+        &form.new_password,
+        device_factor,
+    ) {
+        Ok(credential) => credential,
+        Err(crate::SetPasswordError::Rejected(rejected)) => {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                no_store(),
+                Json(json!({ "error": "password_rejected", "detail": rejected.to_string() })),
+            )
+                .into_response();
+        }
+        Err(_) => return oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable"),
+    };
+    match inner.store.set_credential(account.id, credential).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable"),
+    }
 }
 
 /// `POST /pin`: sets the signed-in user's PIN on the device their token is bound to.
@@ -1557,6 +1644,11 @@ impl<S> AccessVerifier<S> {
     /// The server's store.
     pub(crate) fn store(&self) -> &S {
         &self.inner.store
+    }
+
+    /// The server's credentials.
+    pub(crate) fn credentials(&self) -> &Credentials {
+        &self.inner.credentials
     }
 
     /// The server's clock.

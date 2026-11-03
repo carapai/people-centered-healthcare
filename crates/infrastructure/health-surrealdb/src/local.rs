@@ -104,6 +104,32 @@ impl SurrealTx {
             .collect())
     }
 
+    /// Records a provisional account.
+    pub async fn put_local_provisional(
+        &mut self,
+        account: &str,
+        data: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('auth_local_provisional', $account) CONTENT { data: $data } \
+             RETURN VALUE record::id(id)",
+            vec![("account", account.to_owned()), ("data", data.to_owned())],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The JSON of `account`'s provisional record, if it has one.
+    pub async fn local_provisional(&mut self, account: &str) -> Result<Option<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM type::record('auth_local_provisional', $account)",
+                vec![("account", account.to_owned())],
+            )
+            .await?;
+        Ok(rows.into_iter().next().and_then(|r| r.into_iter().next()))
+    }
+
     /// Replaces the local configuration.
     pub async fn put_local_config(&mut self, data: &str) -> Result<(), WriteError> {
         self.run(
