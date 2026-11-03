@@ -26,6 +26,7 @@ fn bundle() -> Bundle {
             phc: Credentials::hash("correct horse battery").expect("hash"),
         }],
         snapshots: vec!["header.claims.signature".into()],
+        local: health_auth::LocalConfig::default(),
     }
 }
 

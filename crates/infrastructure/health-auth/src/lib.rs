@@ -23,6 +23,7 @@ mod caregivers;
 mod credentials;
 mod devices;
 pub mod jose;
+mod local_admin;
 mod otp;
 mod patient;
 mod provisioning;
@@ -38,6 +39,7 @@ pub use caregivers::{CAREGIVER_PERMISSION, CaregiverRoutes};
 pub use credentials::{Credentials, HashError, PEPPER_LEN, SetPasswordError};
 pub use devices::{CONSOLE, DeviceAdmin, DeviceConfig, DeviceGate, DeviceStore, EnrolledDevice};
 pub use jose::{InvalidKey, TokenSigner};
+pub use local_admin::{GrantSigner, LocalAdmin};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};
 pub use patient::patient_layer;
 pub use provisioning::{ImportError, Imported, Provisioning, RecipientKey};
@@ -47,8 +49,8 @@ pub use server::{
 };
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
 pub use store::{
-    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, MemoryStore, Session,
-    StoreError,
+    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, LocalConfig, MemoryStore,
+    Session, StoreError,
 };
 pub use subject::{
     ALERTS_PERMISSION, ALERTS_WORKLIST, PURPOSE_HEADER, REVIEW_PERMISSION, REVIEW_WITHIN,

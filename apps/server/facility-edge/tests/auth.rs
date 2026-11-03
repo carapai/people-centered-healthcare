@@ -340,6 +340,7 @@ fn staff_sign_in_on_an_enrolled_device_with_no_internet() {
             central.sign(&current, &roles).expect("sign"),
             central.sign(&lapsed, &roles).expect("sign"),
         ],
+        local: health_auth::LocalConfig::default(),
     }
     .seal(&central, &recipient)
     .expect("seal");

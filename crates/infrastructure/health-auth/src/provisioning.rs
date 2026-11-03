@@ -132,6 +132,10 @@ impl Provisioning {
                 .await
                 .map_err(unavailable)?;
         }
+        self.store
+            .put_local_config(&bundle.local)
+            .await
+            .map_err(unavailable)?;
         for (account, jws) in &snapshots {
             self.store
                 .put_snapshot(*account, &self.facility, jws)

@@ -195,12 +195,22 @@ async fn bundle(config: &Config, args: &[String]) -> Result<(), Box<dyn std::err
         });
         snapshots.push(jws);
     }
+    // The country's role mappings and locally grantable roles, for offline administration.
+    let local = settings
+        .policy
+        .as_ref()
+        .map(|policy| health_auth::LocalConfig {
+            roles: policy.roles.clone(),
+            grantable: policy.locally_grantable.clone(),
+        })
+        .unwrap_or_default();
     let sealed = Bundle {
         facility: facility.clone(),
         node_id: node_id.clone(),
         issued_at: Timestamp::now(),
         accounts,
         snapshots,
+        local,
     }
     .seal(&signer, &recipient)?;
     std::fs::write(out, sealed).map_err(|_| format!("cannot write {out}"))?;

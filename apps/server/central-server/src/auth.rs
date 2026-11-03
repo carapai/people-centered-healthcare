@@ -94,6 +94,10 @@ pub(crate) struct AccessPolicy {
     /// The labels that restrict records, and the program that opens each.
     #[serde(default)]
     pub(crate) labels: Vec<LabelFile>,
+    /// The roles a facility admin may grant on an edge offline (offline-auth.md § Offline user
+    /// and role administration). Roles carrying a never-offline permission are refused anyway.
+    #[serde(default)]
+    pub(crate) locally_grantable: Vec<String>,
 }
 
 /// One label rule in the policy file.

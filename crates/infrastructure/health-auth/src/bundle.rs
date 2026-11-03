@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::snapshot::{SnapshotSigner, SnapshotVerifier};
+use crate::store::LocalConfig;
 
 /// The JWS type of a provisioning bundle.
 pub const BUNDLE_TYP: &str = "health-bundle+jwt";
@@ -53,6 +54,8 @@ pub struct Bundle {
     pub accounts: Vec<BundleAccount>,
     /// Their signed permission snapshots (compact JWS), for this facility.
     pub snapshots: Vec<String>,
+    /// The country's role mappings and locally grantable roles, for offline administration.
+    pub local: LocalConfig,
 }
 
 /// Why a bundle could not be made or opened.
@@ -82,6 +85,8 @@ struct Claims {
     epk: String,
     accounts: Vec<SealedAccount>,
     snapshots: Vec<String>,
+    #[serde(default)]
+    local: LocalConfig,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -148,6 +153,7 @@ impl Bundle {
             epk: URL_SAFE_NO_PAD.encode(ephemeral.public_key().to_encoded_point(false).as_bytes()),
             accounts,
             snapshots: self.snapshots.clone(),
+            local: self.local.clone(),
         };
         let claims = serde_json::to_value(claims).map_err(|_| BundleError::Malformed("claims"))?;
         Ok(signer.sign_as(BUNDLE_TYP, &claims))
@@ -220,6 +226,7 @@ impl Bundle {
             issued_at: claims.issued_at,
             accounts,
             snapshots: claims.snapshots,
+            local: claims.local,
         })
     }
 }

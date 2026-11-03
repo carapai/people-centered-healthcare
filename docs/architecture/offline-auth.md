@@ -87,6 +87,15 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
   - **PINs are per user per device:** set at `/auth/pin`, sealed under the pepper key.
   - **Unlocking and switching:** `/auth/unlock` resumes, or switches a shared device to, a user's live session there; five wrong PINs end it.
   - **The browser** locks after 15 minutes without use and clears its view and cache before anyone unlocks (`apps/client/src/features/lock`).
+- **Offline administration** (#75, part 3), with the decisions taken there:
+  - **Who:** a signed-in facility admin whose snapshot gives `access.administer-local`.
+  - **The grantable list and role mappings** come in central's signed bundle.
+  - **Grants:**
+    - stored with a JWS signed by the facility intermediate's key, for central to ratify;
+    - laid over the central snapshot at sign-in and on every request, for at most 7 days;
+    - refused for any role carrying a never-offline permission, even if the list names it.
+  - **Revocations** are a local deny-list that refuses the user at once.
+  - **Provisional accounts** follow in part 3b.
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);
