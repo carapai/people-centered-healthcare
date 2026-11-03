@@ -25,6 +25,7 @@ mod devices;
 pub mod jose;
 mod otp;
 mod patient;
+mod provisioning;
 mod server;
 mod snapshot;
 mod store;
@@ -39,7 +40,11 @@ pub use devices::{CONSOLE, DeviceAdmin, DeviceConfig, DeviceGate, DeviceStore, E
 pub use jose::{InvalidKey, TokenSigner};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};
 pub use patient::patient_layer;
-pub use server::{AccessError, AccessVerifier, AuthConfig, AuthServer, Client, Principal};
+pub use provisioning::{ImportError, Imported, Provisioning, RecipientKey};
+pub use server::{
+    AccessError, AccessVerifier, AuthConfig, AuthServer, Client, DeviceAnswer, DeviceCheck,
+    Principal,
+};
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
 pub use store::{
     AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, MemoryStore, Session,

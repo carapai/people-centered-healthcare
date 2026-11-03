@@ -43,6 +43,10 @@ async fn protected(
 }
 
 fn harness(require_dpop: bool) -> Harness {
+    harness_with(require_dpop, None)
+}
+
+fn harness_with(require_dpop: bool, devices: Option<health_auth::DeviceCheck>) -> Harness {
     let clock = Arc::new(FixedClock::new(
         Timestamp::from_second(1_800_000_000).expect("time"),
     ));
@@ -59,6 +63,7 @@ fn harness(require_dpop: bool) -> Harness {
         lockout: Lockout::default(),
     });
     let mut config = AuthConfig::new(ISSUER, "central", require_dpop);
+    config.devices = devices;
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
@@ -543,4 +548,44 @@ async fn bad_clients_and_redirects_are_never_redirected_to() {
         json!(["S256"])
     );
     assert_eq!(metadata["token_endpoint"], format!("{ISSUER}/token"));
+}
+
+/// On an edge, a token goes only to an enrolled device's key (ADR 0009), at login and at refresh,
+/// so revoking a device ends its session within one token lifetime.
+#[tokio::test]
+async fn tokens_go_only_to_an_enrolled_device_s_key() {
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+    let enrolled: Arc<Mutex<HashSet<String>>> = Arc::default();
+    let check = {
+        let enrolled = Arc::clone(&enrolled);
+        health_auth::DeviceCheck(Arc::new(move |jkt| {
+            let allowed = enrolled.lock().expect("lock").contains(&jkt);
+            Box::pin(async move { allowed })
+        }))
+    };
+    let h = harness_with(true, Some(check));
+    let key = SigningKey::random(&mut rand_core::OsRng);
+    let jkt = health_auth::jose::EcJwk::of(key.verifying_key()).thumbprint();
+
+    // Correct credentials, from a device the edge has not enrolled: no token.
+    let code = login(&h).await;
+    let (status, body) = redeem(&h, &code, Some(&key)).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["error"], "invalid_dpop_proof");
+
+    // Enrolled: the token is issued, and refreshes.
+    enrolled.lock().expect("lock").insert(jkt.clone());
+    let code = login(&h).await;
+    let (status, body) = redeem(&h, &code, Some(&key)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
+    let (status, body) = refresh(&h, &refresh_token, &key).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // Revoked: the next refresh is refused.
+    enrolled.lock().expect("lock").remove(&jkt);
+    let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
+    let (status, _) = refresh(&h, &refresh_token, &key).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
