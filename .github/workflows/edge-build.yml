@@ -142,6 +142,9 @@ jobs:
           pki=target/debug/pki
           edge provision request --out "$RUNNER_TEMP/request.pem"
           sudo test -f /etc/credstore.encrypted/health.facility-intermediate.key
+          # And the local authorization server's pepper and token-signing keys (#75).
+          sudo test -f /etc/credstore.encrypted/health.pepper.key
+          sudo test -f /etc/credstore.encrypted/health.token-signing.key
           $pki root --name 'CI Root' --out "$RUNNER_TEMP/root"
           $pki request --name issuing --out "$RUNNER_TEMP/issuing"
           $pki issuing-ca --ca "$RUNNER_TEMP/root" --request "$RUNNER_TEMP/issuing/request.pem" \

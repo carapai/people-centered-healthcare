@@ -44,6 +44,8 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_DNS_NAME` | none | The facility's configured DNS name, named in the leaf beside `<node-id>.local` |
 | `HEALTH_CERTIFICATE_SECS` | `3600` | How often the leaf is checked for renewal and address changes |
 | `HEALTH_MDNS` | `on` | `off` stops the `_health-edge._tcp` mDNS announcement |
+| `HEALTH_FACILITY` | none | The facility this edge serves. With `HEALTH_SNAPSHOT_KEYS_FILE`, the node serves staff sign-in (#75) |
+| `HEALTH_SNAPSHOT_KEYS_FILE` | none | Central's snapshot public keys, a JSON array of JWKs (`central-server provision snapshot-keys`) |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
@@ -135,6 +137,19 @@ Once provisioned, the node serves HTTPS only, with a server leaf it issues itsel
 ## Devices
 
 Every `/api/…` route except enrollment and the status page needs a DPoP proof by an enrolled, active device (#74; lan-security.md § Device enrollment). A device asks with `POST /api/enrollment` and shows the pairing code it gets back. On the node's own console, an admin approves it with `POST /api/admin/enrollments/approve` (the code, a name and a location) or revokes it with `POST /api/admin/devices/{id}/revoke`. Requests expire after 10 minutes. The routes are described in `health-auth`'s README; the client screens are #74 part 3.
+
+## Staff sign-in
+
+The edge runs the same authorization server as central (offline-auth.md; #75), so staff sign in on an enrolled device with no internet.
+- **Keys:** `provision request` seals the pepper key (ADR 0059) and the access-token signing key beside the intermediate's, and the unit unseals all three for the service.
+- **Accounts:** central exports a facility's staff in a signed bundle (`central-server provision bundle`), and the edge's own screen imports it with `POST /api/admin/provision/accounts`. Each hash is re-encrypted under the edge's pepper key.
+- **Sign-in:**
+  - `/auth` is the authorization code flow with PKCE;
+  - tokens are DPoP-bound, `acr` `offline-local`, and issued only to an enrolled device's key;
+  - each login and refresh needs the user's central-signed snapshot for `HEALTH_FACILITY`, unexpired, at a clock that has not gone back;
+  - `/api/session` is behind the device gate;
+  - `runtime.json` gives the web client the issuer, the first https origin under `/auth`.
+- **Without** `HEALTH_FACILITY`, `HEALTH_SNAPSHOT_KEYS_FILE` or the sealed keys, the node serves no sign-in and logs `sign-in-off` with the reason.
 
 ## Pairing and discovery
 

@@ -22,7 +22,7 @@ use health_time::Timestamp;
 
 /// The facility intermediate's key in the keystore; the unit's `LoadCredentialEncrypted=`
 /// names it too.
-pub(crate) const KEY: &str = "health.facility-intermediate.key";
+pub(crate) const KEY: &str = health_edge_runtime::INTERMEDIATE_KEY;
 /// The installed national root.
 const ROOT: &str = "root.pem";
 /// The installed chain: the facility intermediate, then the issuing CA.
@@ -91,6 +91,18 @@ fn request_identity(config: &EdgeConfig, keystore: &Keystore, out: &Path) -> Res
     keystore
         .seal(KEY, key.serialize_pem().as_bytes())
         .map_err(|e| e.to_string())?;
+    // The authorization server's keys (offline-auth.md; ADR 0059), sealed here, as root, where
+    // the platform keystore can seal: the pepper key every stored hash is encrypted under, and
+    // the access-token signing key. Kept if already sealed.
+    for name in [
+        health_edge_runtime::PEPPER_KEY,
+        health_edge_runtime::TOKEN_KEY,
+    ] {
+        if !keystore.contains(name) {
+            let secret = p256::SecretKey::random(&mut rand_core::OsRng).to_bytes();
+            keystore.seal(name, &secret).map_err(|e| e.to_string())?;
+        }
+    }
     std::fs::write(out, csr).map_err(|e| format!("cannot write {}: {e}", out.display()))?;
     eprintln!(
         "facility-edge: the facility intermediate's key is sealed; send {} to central",
@@ -168,15 +180,10 @@ pub(crate) fn status(config: &EdgeConfig, keystore: &Keystore) -> serde_json::Va
     })
 }
 
-/// The facility intermediate's key from the keystore, for the node to issue its TLS leaf.
-pub(crate) fn intermediate_key() -> health_edge_runtime::IntermediateKey {
-    std::sync::Arc::new(|| {
-        Keystore::system()
-            .unseal(KEY)
-            .map_err(|e| e.to_string())?
-            .map(|key| String::from_utf8(key).map_err(|_| format!("{KEY} is not PEM")))
-            .transpose()
-    })
+/// The keystore's secrets by name, for the node: the facility intermediate's key to issue its TLS
+/// leaf, and its authorization server's pepper and token-signing keys.
+pub(crate) fn secrets() -> health_edge_runtime::Secrets {
+    std::sync::Arc::new(|name: &str| Keystore::system().unseal(name).map_err(|e| e.to_string()))
 }
 
 /// Logs whether this start found its identity: `identity-loaded`, or a `not-provisioned` or

@@ -21,6 +21,7 @@
 //! provisioning it serves plain HTTP on the loopback address only.
 
 pub mod admin;
+mod auth;
 pub mod backup;
 mod config;
 mod discovery;
@@ -33,11 +34,12 @@ pub mod update;
 mod ups;
 pub mod web;
 
+pub use auth::{CLIENT_ID, INTERMEDIATE_KEY, PEPPER_KEY, REDIRECT_PATH, Secrets, TOKEN_KEY};
 pub use config::{ConfigError, EdgeConfig};
 pub use node::{EdgeError, Stop, run, shutdown_signal};
 #[cfg(windows)]
 pub use notify::WindowsScm;
 pub use notify::{Foreground, ServiceManager, Systemd};
 pub use supervisor::{RestartPolicy, Restarts, Supervisor};
-pub use tls::{Certificate, IntermediateKey};
+pub use tls::Certificate;
 pub use ups::{Power, PowerState, Ups, UpsError};

@@ -12,6 +12,7 @@ use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
 use tokio::sync::{Notify, OnceCell};
 
 use crate::admin::{self, Buffer, EncryptionCheck, EncryptionState, Monitor, ShipState};
+use crate::auth::{INTERMEDIATE_KEY, Secrets};
 use crate::backup::{Backups, Schedule};
 use crate::config::EdgeConfig;
 use crate::discovery::{self, Pairing};
@@ -149,14 +150,15 @@ async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
 /// Runs the node until `stop` resolves, the UPS reports low battery, or a supervised task keeps
 /// failing. `telemetry` is the buffer the process's log lines go to, shipped once ready, and
 /// `encryption` is the composition root's disk-encryption check, run every
-/// `HEALTH_ENCRYPTION_SECS` for the status page, and `intermediate_key` unseals the facility
-/// intermediate's key to issue the node's TLS leaf (`tls`).
+/// `HEALTH_ENCRYPTION_SECS` for the status page, and `secrets` unseals keys from the keystore:
+/// the facility intermediate's, to issue the node's TLS leaf (`tls`), and the pepper and
+/// token-signing keys of its authorization server (`auth`).
 pub async fn run(
     config: &EdgeConfig,
     manager: Arc<dyn ServiceManager>,
     telemetry: Option<Arc<Buffer>>,
     encryption: Option<EncryptionCheck>,
-    intermediate_key: Option<IntermediateKey>,
+    secrets: Option<Secrets>,
     stop: impl Future<Output = ()>,
 ) -> Result<Stop, EdgeError> {
     let store = Store::default();
@@ -180,11 +182,20 @@ pub async fn run(
         certificate: Arc::new(std::sync::Mutex::new(Certificate::unprovisioned())),
     };
     let api = Api::default();
-    let routes = web::routes(Bundle::embedded())
+    let routes = web::routes(Bundle::embedded(), crate::auth::runtime(config))
         .merge(admin::routes(monitor.clone()))
         .merge(admin::local_only(discovery::routes(Pairing::new(config))))
         .merge(api.routes());
     let router = app(routes, readiness);
+    let intermediate_key: Option<IntermediateKey> = secrets.clone().map(|secrets| {
+        Arc::new(move || {
+            secrets(INTERMEDIATE_KEY)?
+                .map(|pem| {
+                    String::from_utf8(pem).map_err(|_| format!("{INTERMEDIATE_KEY} is not PEM"))
+                })
+                .transpose()
+        }) as IntermediateKey
+    });
     let identity = Arc::new(Identity::new(config, intermediate_key));
     let certificate = Arc::clone(&monitor.certificate);
     let serving_with = {
@@ -274,7 +285,7 @@ pub async fn run(
         }
         Err(error) => return Err(error),
     };
-    api.open(config, &connection);
+    api.open(config, &connection, secrets.as_ref());
     let _ = store.0.set(connection);
     if startup == Startup::Updating {
         update::commit(&updates).map_err(EdgeError::Update)?;

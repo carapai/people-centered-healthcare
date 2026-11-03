@@ -88,6 +88,11 @@ pub struct EdgeConfig {
     /// `HEALTH_CERTIFICATE_SECS`: how often the leaf is checked for renewal and address
     /// changes, default 3600.
     pub certificate_interval: Duration,
+    /// `HEALTH_FACILITY`: the facility this edge serves; sign-in needs a snapshot for it.
+    pub facility: Option<String>,
+    /// `HEALTH_SNAPSHOT_KEYS_FILE`: central's snapshot public keys, a JSON array of JWKs
+    /// (`central-server provision snapshot-keys`). With `HEALTH_FACILITY`, the node serves sign-in.
+    pub snapshot_keys_file: Option<PathBuf>,
     /// `HEALTH_MDNS`: `off` stops the `_health-edge._tcp` announcement, which is on by default
     /// while the node serves HTTPS.
     pub mdns: bool,
@@ -186,6 +191,8 @@ impl EdgeConfig {
             origins,
             dns_name: get("HEALTH_DNS_NAME").map(|n| n.trim().to_ascii_lowercase()),
             certificate_interval: positive("HEALTH_CERTIFICATE_SECS", 3600)?,
+            facility: get("HEALTH_FACILITY").map(|f| f.trim().to_owned()),
+            snapshot_keys_file: get("HEALTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
             mdns: match get("HEALTH_MDNS").as_deref().map(str::trim) {
                 None | Some("on") => true,
                 Some("off") => false,

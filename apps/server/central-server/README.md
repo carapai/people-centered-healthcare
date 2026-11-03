@@ -68,6 +68,8 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - **Signature:** the bundle is signed with the snapshot key.
 - **Output:** the command prints the intermediate's SPKI pin it encrypted to. The edge imports the bundle on its console (#75).
 
+`central-server provision snapshot-keys <out>` writes the snapshot public keys edges trust, `HEALTH_SNAPSHOT_KEYS_FILE` on an edge, as a JSON array of JWKs.
+
 - It reads the same configuration as the server, and needs the auth settings, `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE`.
 - The password comes from `HEALTH_PROVISION_PASSWORD_FILE`. It must pass the password policy and the breached-password list (15 characters, since central sign-in has no device factor).
 - The roles must be defined in the access policy.

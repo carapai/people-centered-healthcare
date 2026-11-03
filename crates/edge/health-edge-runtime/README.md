@@ -4,7 +4,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 
 ## `run`
 
-`run(config, manager, telemetry, encryption, intermediate_key, stop)` is the node's whole life. `telemetry` is the buffer the process's log lines go to, `encryption` is the composition root's disk-encryption check, and `intermediate_key` unseals the facility intermediate's key from the composition root's keystore (`IntermediateKey`):
+`run(config, manager, telemetry, encryption, secrets, stop)` is the node's whole life. `telemetry` is the buffer the process's log lines go to, `encryption` is the composition root's disk-encryption check, and `secrets` unseals keys by name from the composition root's keystore (`Secrets`): the facility intermediate's, and the authorization server's pepper and token-signing keys:
 1. **Listen.** Plain HTTP on the loopback console (`HEALTH_CONSOLE_BIND`) always; with the facility intermediate installed, also over TLS on the LAN with the node's own leaf (`tls`). Without it, nothing listens on the LAN. The listener starts at once: `/health` answers, `/ready` is 503 until the store is ready (the shared `health-http` system routes), the embedded web app is served (`web`), and so is `/api/admin/status` (`admin`). The rest of `/api/…` answers 503 until the store is open (`enrollment`).
 2. **Update check.** A pending update copies the store to `pre-update-store/` on its first start, or rolls back after three starts that never reached ready (`update::before_open`), before the store is opened.
 3. **Open the store.** The embedded store (`Target::RocksDb`, `sync=every`) is opened once. If it fails, `run` returns `EdgeError::Store` and the service manager restarts the process.
@@ -31,6 +31,12 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - `POST` / `GET /api/enrollment` are open to the LAN.
   - The registry's admin routes answer this machine only, as the status page does, until staff sign-in (#75) can require an admin.
   - Every other `/api/…` path, unknown ones included, needs a DPoP proof by an enrolled, active device, so an unenrolled device cannot call or map the API. Proofs must name one of `HEALTH_ORIGINS` (default `https://<node-id>.local`).
+- **`auth`:** the local authorization server (#75), `health_auth::AuthServer` over the embedded store.
+  - **Routes:** `/auth`, and `/api/session` behind the device gate. Tokens are DPoP-bound, `acr` `offline-local`, and go only to enrolled devices' keys (`AuthConfig::devices`).
+  - **Snapshots:** every login and refresh needs one for `HEALTH_FACILITY`, verified with central's keys from `HEALTH_SNAPSHOT_KEYS_FILE`.
+  - **Bundle import:** `POST /api/admin/provision/accounts` (this machine only) imports central's bundle.
+  - **The web client:** `runtime.json`'s `auth` names the issuer, `health-edge` and `/callback`.
+  - **Without its settings or keys,** the node logs `sign-in-off`.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.
   - **Retention:** the 48 newest, and the newest of each of the last 14 days (UTC). Pruning also removes unfinished backups and blobs that no kept backup refers to.

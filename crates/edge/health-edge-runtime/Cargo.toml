@@ -27,7 +27,7 @@ health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
 if-addrs = { workspace = true }
 mdns-sd = { workspace = true }
-p256 = { workspace = true }
+p256 = { workspace = true, features = ["pkcs8", "pem"] }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }

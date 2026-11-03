@@ -27,12 +27,14 @@ pub(crate) async fn run(
     config: &Config,
     args: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if args.first().map(String::as_str) == Some("bundle") {
-        return bundle(config, &args[1..]).await;
+    match args.first().map(String::as_str) {
+        Some("bundle") => return bundle(config, &args[1..]).await,
+        Some("snapshot-keys") => return snapshot_keys(config, &args[1..]),
+        _ => {}
     }
     let [username, facility, roles] = args else {
         return Err(
-            "usage: central-server provision <username> <facility> <role>[,<role>…] | bundle <facility> <node-id> <intermediate.pem> <out>".into(),
+            "usage: central-server provision <username> <facility> <role>[,<role>…] | bundle <facility> <node-id> <intermediate.pem> <out> | snapshot-keys <out>".into(),
         );
     };
     let files = config
@@ -210,5 +212,29 @@ async fn bundle(config: &Config, args: &[String]) -> Result<(), Box<dyn std::err
         )
         .as_bytes(),
     )?;
+    Ok(())
+}
+
+/// `central-server provision snapshot-keys <out>`: the snapshot public keys edges trust
+/// (`HEALTH_SNAPSHOT_KEYS_FILE` on an edge), as a JSON array of JWKs, the active key first.
+fn snapshot_keys(config: &Config, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let [out] = args else {
+        return Err("usage: central-server provision snapshot-keys <out>".into());
+    };
+    let files = config
+        .auth
+        .as_ref()
+        .ok_or("snapshot keys need HEALTH_AUTH_ISSUER and the auth settings")?;
+    let keys = crate::auth_settings(files)?
+        .snapshot_keys
+        .iter()
+        .map(|key| SnapshotSigner::from_secret(key).map(|s| s.public()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?;
+    if keys.is_empty() {
+        return Err("HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds no key".into());
+    }
+    std::fs::write(out, serde_json::to_string_pretty(&keys)?)
+        .map_err(|_| format!("cannot write {out}"))?;
     Ok(())
 }
