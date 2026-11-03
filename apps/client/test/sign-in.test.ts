@@ -156,6 +156,17 @@ describe('signIn', () => {
     expect(proved).toEqual([undefined, 'a1', undefined])
   })
 
+  test('a temporary password is changed at /password; a wrong one is refused, a weak new one rejected', async () => {
+    const h = harness([new Response(null, { status: 204 }), new Response('{}', { status: 401 }), new Response('{"error":"password_rejected"}', { status: 422 })])
+    await h.client.changePassword('auma', 'temporary pass 1', 'river lantern copper 42')
+    expect(h.calls[0]?.url).toBe(`${ISSUER}/password`)
+    expect(Object.fromEntries(new URLSearchParams(h.calls[0]?.body))).toEqual({ username: 'auma', password: 'temporary pass 1', new_password: 'river lantern copper 42' })
+    await expect(h.client.changePassword('auma', 'wrong', 'river lantern copper 42')).rejects.toEqual(new SignInError('refused'))
+    await expect(h.client.changePassword('auma', 'temporary pass 1', 'password')).rejects.toEqual(new SignInError('rejected'))
+    // Nothing about it signs the user in.
+    expect(h.session.accessToken()).toBeUndefined()
+  })
+
   test('a wrong PIN is refused, and central (no proof) has no PIN at all', async () => {
     const h = harness([new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 401 })], async () => 'device-proof')
     await expect(h.client.unlock?.('nakato', '999999')).rejects.toEqual(new SignInError('refused'))

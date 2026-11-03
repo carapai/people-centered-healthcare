@@ -5,6 +5,9 @@
 //! - `credentials/`: the keys systemd would unseal into `$CREDENTIALS_DIRECTORY`;
 //! - `snapshot-keys.json`: central's snapshot public keys (`HEALTH_SNAPSHOT_KEYS_FILE`);
 //! - `bundle.jws`: the bundle, for `POST /api/admin/provision/accounts`.
+//!
+//! The member of staff is a `clinician` and a `facility-admin`, who administers access offline;
+//! `clinician` is the one locally grantable role.
 
 #![allow(missing_docs)]
 
@@ -49,19 +52,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let snapshot = PermissionSnapshot {
         account,
         facility: facility.clone(),
-        roles: vec![RoleAssignment {
-            role: "clinician".into(),
-            locations: Vec::new(),
-        }],
+        roles: ["clinician", "facility-admin"]
+            .map(|role| RoleAssignment {
+                role: role.into(),
+                locations: Vec::new(),
+            })
+            .to_vec(),
         programs: Vec::new(),
         issued_at: now,
         not_after: now.checked_add(SignedDuration::from_hours(24 * 14))?,
         snapshot_version: 1,
     };
-    let roles = RolePermissions(BTreeMap::from([(
-        "clinician".into(),
-        BTreeSet::from(["record.read".into()]),
-    )]));
+    let roles = RolePermissions(BTreeMap::from([
+        ("clinician".into(), BTreeSet::from(["record.read".into()])),
+        (
+            "facility-admin".into(),
+            BTreeSet::from([health_identity::snapshot::ADMINISTER_LOCAL.into()]),
+        ),
+    ]));
     let bundle = Bundle {
         facility: facility.clone(),
         node_id: node.clone(),
@@ -73,7 +81,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             phc: Credentials::hash(password).map_err(|e| e.to_string())?,
         }],
         snapshots: vec![central.sign(&snapshot, &roles)?],
-        local: health_auth::LocalConfig::default(),
+        local: health_auth::LocalConfig {
+            roles: roles.clone(),
+            grantable: vec!["clinician".into()],
+        },
     }
     .seal(
         &central,

@@ -96,6 +96,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
     - refused for any role carrying a never-offline permission, even if the list names it.
   - **Revocations** are a local deny-list that refuses the user at once.
   - **Provisional accounts** (part 3b): created by the admin with a role's local grant, lasting as long. The user must set their own password at `/auth/password` before any token. With no central snapshot, the account's roles come from its grant alone.
+  - **The screens** (part 3c): the client's `/access` page grants, creates provisional accounts and revokes, and the sign-in page takes a provisional user's new password before signing them in (`apps/client/src/features/access`).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);
