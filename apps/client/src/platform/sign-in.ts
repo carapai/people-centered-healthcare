@@ -33,6 +33,13 @@ export interface SignIn {
   /** The authorization endpoint the sign-in page posts the credentials to. */
   readonly authorizeEndpoint: string
   /**
+   * Replaces `username`'s password (offline-auth.md § Offline user and role administration): the
+   * temporary one an admin set must be changed before the first sign-in. Throws
+   * `SignInError('refused')` on a wrong current password, `SignInError('rejected')` when the new
+   * one fails the password policy or is a known breached password.
+   */
+  changePassword(username: string, password: string, newPassword: string): Promise<void>
+  /**
    * On an edge (offline-auth.md § Tokens and sessions): locks the session after idling. Its tokens
    * are forgotten and the query cache cleared (`end('lock')`); the session lives on at the edge.
    */
@@ -48,7 +55,7 @@ export interface SignIn {
 
 /** Why a sign-in could not complete. */
 export class SignInError extends Error {
-  constructor(readonly reason: 'state' | 'issuer' | 'refused' | 'locked' | 'no-transaction') {
+  constructor(readonly reason: 'state' | 'issuer' | 'refused' | 'rejected' | 'locked' | 'no-transaction' | 'unavailable') {
     super(`sign-in failed: ${reason}`)
     this.name = 'SignInError'
   }
@@ -163,6 +170,17 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
   return {
     ...pinned,
     authorizeEndpoint: `${issuer}/authorize`,
+
+    async changePassword(username, password, newPassword) {
+      const response = await fetchImpl(`${issuer}/password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username, password, new_password: newPassword }).toString(),
+      })
+      if (response.ok) return
+      if (response.status === 422) throw new SignInError('rejected')
+      throw new SignInError(response.status === 401 ? 'refused' : 'unavailable')
+    },
 
     async start(returnTo) {
       const verifier = random(32)

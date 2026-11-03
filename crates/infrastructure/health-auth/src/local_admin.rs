@@ -3,6 +3,8 @@
 //! `access.administer-local` under the country's role mappings, which central provisions in its
 //! bundle ([`LocalConfig`](crate::LocalConfig)).
 //!
+//! - `GET /access/roles`: the roles this edge may grant offline, those on the country's locally
+//!   grantable list that carry no never-offline permission.
 //! - `GET /access/grants`, `POST /access/grants` (`username`, `role`, `days`): roles granted
 //!   locally, only from the country's locally grantable list, never a role carrying a
 //!   never-offline permission, for at most 7 days. Each grant is signed with the node's key for
@@ -12,6 +14,8 @@
 //! - `POST /access/accounts` (`username`, `password`, `role`, `days`): a provisional account for
 //!   new staff, its role a local grant, lasting as long; its user sets their own password at
 //!   their first sign-in.
+//!
+//! Grants and revocations are listed with their user's `username` where the edge knows it.
 
 use std::sync::Arc;
 
@@ -22,7 +26,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Form, Json};
 use health_identity::AccountId;
-use health_identity::snapshot::{ADMINISTER_LOCAL, LocalGrant, LocalGrantPolicy, LocalRevocation};
+use health_identity::snapshot::{
+    ADMINISTER_LOCAL, LocalGrant, LocalGrantPolicy, LocalRevocation, NEVER_OFFLINE,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -80,9 +86,11 @@ impl<S: AuthStore + 'static> LocalAdmin<S> {
         }
     }
 
-    /// `/access/grants` and `/access/revocations`; nest them where the API is.
+    /// `/access/roles`, `/access/grants`, `/access/revocations` and `/access/accounts`; nest
+    /// them where the API is.
     pub fn router(&self) -> Router {
         Router::new()
+            .route("/access/roles", get(roles::<S>))
             .route("/access/grants", get(grants::<S>).post(grant::<S>))
             .route(
                 "/access/revocations",
@@ -169,6 +177,14 @@ impl<S: AuthStore + 'static> LocalAdmin<S> {
         })
     }
 
+    /// The username of `account`, if the edge knows it.
+    async fn username(&self, account: AccountId) -> Option<String> {
+        match self.verifier.store().account(account).await {
+            Ok(Some(login)) => Some(login.username),
+            _ => None,
+        }
+    }
+
     async fn account(&self, username: &str) -> Result<AccountId, Box<Response>> {
         match self
             .verifier
@@ -191,10 +207,49 @@ impl<S: AuthStore + 'static> LocalAdmin<S> {
     }
 }
 
-fn grant_json(grant: &LocalGrant) -> Value {
+/// `GET /access/roles`: the roles this edge may grant offline.
+async fn roles<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+) -> Response {
+    if let Err(refused) = admin.admin(&headers, "GET", uri.path()).await {
+        return *refused;
+    }
+    match admin.verifier.store().local_config().await {
+        Ok(config) => {
+            let config = config.unwrap_or_default();
+            let grantable: Vec<&str> = config
+                .grantable
+                .iter()
+                .filter(|role| {
+                    config
+                        .roles
+                        .0
+                        .get(role.as_str())
+                        .is_some_and(|permissions| {
+                            !permissions
+                                .iter()
+                                .any(|p| NEVER_OFFLINE.contains(&p.as_str()))
+                        })
+                })
+                .map(String::as_str)
+                .collect();
+            Json(json!(grantable)).into_response()
+        }
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "the store failed",
+        ),
+    }
+}
+
+fn grant_json(grant: &LocalGrant, username: Option<&str>) -> Value {
     json!({
         "id": grant.id.to_string(),
         "account": grant.account.to_string(),
+        "username": username,
         "role": grant.role,
         "granted_by": grant.granted_by.to_string(),
         "granted_at": grant.granted_at.to_string(),
@@ -218,7 +273,12 @@ async fn grants<S: AuthStore + 'static>(
         .await
     {
         Ok(grants) => {
-            Json(json!(grants.iter().map(grant_json).collect::<Vec<_>>())).into_response()
+            let mut listed = Vec::with_capacity(grants.len());
+            for grant in &grants {
+                let username = admin.username(grant.account).await;
+                listed.push(grant_json(grant, username.as_deref()));
+            }
+            Json(listed).into_response()
         }
         Err(_) => error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -329,7 +389,11 @@ async fn grant<S: AuthStore + 'static>(
     match store.put_local_grant(&grant, &jws, &audit).await {
         Ok(()) => {
             tracing::warn!(alert = "local-grant", role = %grant.role, "a role was granted offline, pending ratification");
-            (StatusCode::CREATED, Json(grant_json(&grant))).into_response()
+            (
+                StatusCode::CREATED,
+                Json(grant_json(&grant, Some(form.username.trim()))),
+            )
+                .into_response()
         }
         Err(_) => error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -339,9 +403,10 @@ async fn grant<S: AuthStore + 'static>(
     }
 }
 
-fn revocation_json(revocation: &LocalRevocation) -> Value {
+fn revocation_json(revocation: &LocalRevocation, username: Option<&str>) -> Value {
     json!({
         "account": revocation.account.to_string(),
+        "username": username,
         "revoked_by": revocation.revoked_by.to_string(),
         "revoked_at": revocation.revoked_at.to_string(),
     })
@@ -356,7 +421,14 @@ async fn revocations<S: AuthStore + 'static>(
         return *refused;
     }
     match admin.verifier.store().local_revocations().await {
-        Ok(all) => Json(json!(all.iter().map(revocation_json).collect::<Vec<_>>())).into_response(),
+        Ok(all) => {
+            let mut listed = Vec::with_capacity(all.len());
+            for revocation in &all {
+                let username = admin.username(revocation.account).await;
+                listed.push(revocation_json(revocation, username.as_deref()));
+            }
+            Json(listed).into_response()
+        }
         Err(_) => error(
             StatusCode::SERVICE_UNAVAILABLE,
             "unavailable",
@@ -411,7 +483,11 @@ async fn revoke<S: AuthStore + 'static>(
     {
         Ok(()) => {
             tracing::warn!(alert = "local-revocation", "local access was revoked");
-            (StatusCode::CREATED, Json(revocation_json(&revocation))).into_response()
+            (
+                StatusCode::CREATED,
+                Json(revocation_json(&revocation, Some(form.username.trim()))),
+            )
+                .into_response()
         }
         Err(_) => error(
             StatusCode::SERVICE_UNAVAILABLE,

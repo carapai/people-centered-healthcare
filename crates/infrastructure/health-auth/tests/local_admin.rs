@@ -224,6 +224,15 @@ async fn a_facility_admin_grants_locally_grantable_roles_and_revokes_access() {
         )
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        edge.get("/api/access/roles", &clerk).await.0,
+        StatusCode::FORBIDDEN
+    );
+
+    // What may be granted: on the list, and carrying no never-offline permission.
+    let (status, roles) = edge.get("/api/access/roles", &admin).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(roles, serde_json::json!(["nurse"]));
 
     // A grantable role, for at most 7 days.
     let (status, grant, _) = edge
@@ -257,6 +266,7 @@ async fn a_facility_admin_grants_locally_grantable_roles_and_revokes_access() {
     let (status, grants) = edge.get("/api/access/grants", &admin).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(grants.as_array().map(Vec::len), Some(1));
+    assert_eq!(grants[0]["username"], "nakato");
 
     // Revoked: the clerk's next request is refused, and they cannot sign in here.
     let (status, _, _) = edge
@@ -281,6 +291,7 @@ async fn a_facility_admin_grants_locally_grantable_roles_and_revokes_access() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     let (_, revoked) = edge.get("/api/access/revocations", &admin).await;
     assert_eq!(revoked.as_array().map(Vec::len), Some(1));
+    assert_eq!(revoked[0]["username"], "nakato");
 }
 
 /// New staff offline (offline-auth.md § Offline user and role administration): a provisional

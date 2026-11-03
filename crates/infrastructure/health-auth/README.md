@@ -108,7 +108,9 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 ## Offline administration (#75; ADR 0011)
 
 `LocalAdmin` serves a signed-in facility admin on an edge (offline-auth.md § Offline user and role administration):
+- **`GET /access/roles`** lists the roles the admin may grant here: those on the bundle's locally grantable list that carry no never-offline permission.
 - **`GET /access/grants`** lists the facility's unexpired local grants. **`POST /access/grants`** takes `username`, `role` and `days`; the role must be on the bundle's locally grantable list and carry no never-offline permission (`health_identity::snapshot::NEVER_OFFLINE`), for 1 to 7 days, to staff already provisioned here.
+- **Usernames:** grants and revocations are listed with the user's `username` where the edge knows it.
 - **`GET /access/revocations`** lists local revocations. **`POST /access/revocations`** takes `username`. An admin cannot revoke their own access.
 - **`POST /access/accounts`** creates a provisional account for new staff. It takes `username`, the admin's initial `password` (which must meet the policy), `role` and `days`, and creates the Login Account, its `ProvisionalAccount` record and the role's local grant in one transaction, audited. It answers 409 for a taken username.
   - **The first sign-in** with the admin's password is answered `change_password` (the login page's `error`, or 403 without one) until the user sets their own.

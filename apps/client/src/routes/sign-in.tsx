@@ -1,10 +1,12 @@
 import { Field } from '@health/design-system'
 import { css } from '@health/design-system/css'
 import { createFileRoute } from '@tanstack/react-router'
+import { useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 
 import { messages } from '../i18n/messages'
 import { usePlatform } from '../platform'
+import { SignInError } from '../platform/sign-in'
 
 /** The authorization request's parameters, passed through untouched to `/authorize`. */
 const PASSED = ['response_type', 'client_id', 'redirect_uri', 'scope', 'state', 'nonce', 'code_challenge', 'code_challenge_method'] as const
@@ -19,7 +21,8 @@ export const Route = createFileRoute('/sign-in')({
  * The sign-in page the authorization server sends the browser to (offline-auth.md). It posts
  * the credentials straight to `/authorize` as an ordinary form, so the password never passes
  * through application code, and comes back here with `error=refused` on any refusal, or with
- * `error=facility` when the user works at several facilities and named none (ADR 0056).
+ * `error=facility` when the user works at several facilities and named none (ADR 0056), or
+ * with `error=change_password` when the account's password is a temporary one an admin set.
  */
 function SignInPage() {
   const intl = useIntl()
@@ -28,6 +31,9 @@ function SignInPage() {
   const action = platform.signIn?.authorizeEndpoint ?? '/auth/authorize'
   if (platform.portal !== undefined && search['client_id'] === platform.portal.clientId) {
     return <PhoneSignIn search={search} action={platform.portal.signIn.authorizeEndpoint} />
+  }
+  if (search['error'] === 'change_password' && platform.signIn !== undefined) {
+    return <ChangePassword search={search} action={action} change={(username, password, newPassword) => platform.signIn!.changePassword(username, password, newPassword)} />
   }
   return (
     <section className={css({ maxWidth: 'sm', mx: 'auto', display: 'flex', flexDirection: 'column', gap: '4' })}>
@@ -62,6 +68,95 @@ function SignInPage() {
           className={css({ minHeight: 'control', px: 'controlX', bg: 'accent.default', color: 'accent.fg', borderRadius: 'md', fontSize: 'control', cursor: 'pointer', _focusVisible: { outline: '2px solid', outlineColor: 'focusRing' } })}
         >
           {intl.formatMessage(messages.signInSubmit)}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+const CHANGE_ERRORS = {
+  mismatch: messages.signInMismatch,
+  refused: messages.signInRefused,
+  rejected: messages.signInRejected,
+  failed: messages.signInChangeFailed,
+} as const
+
+/**
+ * The first sign-in of an account an admin created offline (offline-auth.md § Offline user and
+ * role administration): the temporary password, then the user's own, set at `/password`; then
+ * the sign-in carries on to `/authorize` with the new password, as the ordinary form does.
+ */
+function ChangePassword({
+  search,
+  action,
+  change,
+}: {
+  search: Record<string, string>
+  action: string
+  change: (username: string, password: string, newPassword: string) => Promise<void>
+}) {
+  const intl = useIntl()
+  const form = useRef<HTMLFormElement>(null)
+  const chosen = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState<keyof typeof CHANGE_ERRORS | null>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <section className={css({ maxWidth: 'sm', mx: 'auto', display: 'flex', flexDirection: 'column', gap: '4' })}>
+      <h1 className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>{intl.formatMessage(messages.signInChangeTitle)}</h1>
+      <p>{intl.formatMessage(messages.signInChangeIntro)}</p>
+      {error === null ? null : (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(CHANGE_ERRORS[error])}
+        </p>
+      )}
+      <form
+        ref={form}
+        method="post"
+        action={action}
+        className={css({ display: 'flex', flexDirection: 'column', gap: '4' })}
+        onSubmit={(event) => {
+          event.preventDefault()
+          const data = new FormData(event.currentTarget)
+          const field = (name: string) => String(data.get(name) ?? '')
+          if (field('new_password') !== field('confirm_password')) {
+            setError('mismatch')
+            return
+          }
+          setBusy(true)
+          change(field('username'), field('current_password'), field('new_password')).then(
+            () => {
+              // Signed in with the new password, through the ordinary form post.
+              if (chosen.current !== null) chosen.current.value = field('new_password')
+              form.current?.submit()
+            },
+            (failure: unknown) => {
+              setBusy(false)
+              setError(failure instanceof SignInError && (failure.reason === 'refused' || failure.reason === 'rejected') ? failure.reason : 'failed')
+            },
+          )
+        }}
+      >
+        {PASSED.map((name) => (search[name] === undefined ? null : <input key={name} type="hidden" name={name} value={search[name]} />))}
+        <input ref={chosen} type="hidden" name="password" />
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(messages.signInUsername)}</Field.Label>
+          <Field.Input name="username" autoComplete="username" />
+        </Field.Root>
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(messages.signInCurrentPassword)}</Field.Label>
+          <Field.Input name="current_password" type="password" autoComplete="current-password" />
+        </Field.Root>
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(messages.signInNewPassword)}</Field.Label>
+          <Field.Input name="new_password" type="password" autoComplete="new-password" />
+          <Field.HelperText>{intl.formatMessage(messages.signInNewPasswordHelp)}</Field.HelperText>
+        </Field.Root>
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(messages.signInConfirmPassword)}</Field.Label>
+          <Field.Input name="confirm_password" type="password" autoComplete="new-password" />
+        </Field.Root>
+        <button type="submit" className={submitButton} disabled={busy}>
+          {intl.formatMessage(messages.signInChangeSubmit)}
         </button>
       </form>
     </section>

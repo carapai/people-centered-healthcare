@@ -210,6 +210,28 @@ export const messages = defineMessages({
     defaultMessage: 'You work at more than one facility. Enter the code of the facility you are signing in for, then sign in again.',
     description: 'Sign-in page: shown when the user holds roles at several facilities and named none',
   },
+  signInChangeTitle: { id: 'app.signIn.changeTitle', defaultMessage: 'Choose your own password', description: 'Sign-in page: heading when the user must replace the password an admin set' },
+  signInChangeIntro: {
+    id: 'app.signIn.changeIntro',
+    defaultMessage: 'Your account was created with a temporary password. Enter it, then choose a password only you know.',
+    description: 'Sign-in page: why the user must change their password before signing in',
+  },
+  signInCurrentPassword: { id: 'app.signIn.currentPassword', defaultMessage: 'Temporary password', description: 'Sign-in page: the password the admin set' },
+  signInNewPassword: { id: 'app.signIn.newPassword', defaultMessage: 'New password', description: 'Sign-in page: the user\'s own new password' },
+  signInConfirmPassword: { id: 'app.signIn.confirmPassword', defaultMessage: 'New password again', description: 'Sign-in page: the new password, repeated' },
+  signInNewPasswordHelp: {
+    id: 'app.signIn.newPasswordHelp',
+    defaultMessage: 'At least 8 characters. A few unrelated words make a strong one.',
+    description: 'Sign-in page: the password policy on an enrolled device',
+  },
+  signInChangeSubmit: { id: 'app.signIn.changeSubmit', defaultMessage: 'Set password and sign in', description: 'Sign-in page: change the password, then sign in' },
+  signInMismatch: { id: 'app.signIn.mismatch', defaultMessage: 'The new passwords do not match.', description: 'Sign-in page: the two new passwords differ' },
+  signInRejected: {
+    id: 'app.signIn.rejected',
+    defaultMessage: 'That password cannot be used: it is too short or too common. Choose another.',
+    description: 'Sign-in page: the new password failed the policy or the breached-password list',
+  },
+  signInChangeFailed: { id: 'app.signIn.changeFailed', defaultMessage: 'The password could not be changed. Please try again.', description: 'Sign-in page: the change failed for another reason' },
   lockTitle: { id: 'app.lock.title', defaultMessage: 'This device is locked', description: 'Lock screen heading' },
   lockIntro: {
     id: 'app.lock.intro',
@@ -626,4 +648,95 @@ export const enrollmentMessages = defineMessages<EnrollmentValues>({
   },
   enNotEdge: { id: 'app.enroll.notEdge', defaultMessage: 'Devices enroll with a facility edge, not with central.', description: 'Device enrollment: shown away from an edge' },
   enFailed: { id: 'app.enroll.failed', defaultMessage: 'The request failed: {reason}.', description: 'Device enrollment: a request failed; reason is a code' },
+})
+
+type AccessValues = {
+  acTitle: {}
+  acIntro: {}
+  acLoading: {}
+  acForbidden: {}
+  acFailed: {}
+  acUsername: {}
+  acRole: {}
+  acChooseRole: {}
+  acDays: {}
+  acDayCount: { days: number }
+  acGrants: {}
+  acNoGrants: {}
+  acGrantLine: { username: string; role: string; until: string }
+  acGrant: {}
+  acGranted: { username: string; role: string; until: string }
+  acNewStaff: {}
+  acNewStaffIntro: {}
+  acTemporaryPassword: {}
+  acTemporaryPasswordHelp: {}
+  acCreate: {}
+  acCreated: { username: string; role: string; until: string }
+  acRevocations: {}
+  acRevokeIntro: {}
+  acNoRevocations: {}
+  acRevocationLine: { username: string; at: string }
+  acRevoke: {}
+  acConfirmRevoke: { username: string }
+  acCancel: {}
+  acRevoked: { username: string }
+  acRefused: { reason: string }
+  acNoSuchUser: {}
+  acTaken: {}
+}
+
+// The offline administration page's strings (features/access).
+export const accessMessages = defineMessages<AccessValues>({
+  acTitle: { id: 'app.access.title', defaultMessage: 'Access at this facility', description: 'Offline administration page heading and home link' },
+  acIntro: {
+    id: 'app.access.intro',
+    defaultMessage: 'While the facility is offline, grant a role for up to 7 days, create an account for new staff, or revoke access here. Central confirms or reverses each change when the facility reconnects.',
+    description: 'Offline administration page: what it is for',
+  },
+  acLoading: { id: 'app.access.loading', defaultMessage: 'Loading…', description: 'Offline administration page: loading' },
+  acForbidden: { id: 'app.access.forbidden', defaultMessage: 'Your role does not include administering access here.', description: 'Offline administration page: the user is not a facility admin' },
+  acFailed: { id: 'app.access.failed', defaultMessage: 'Access administration could not be loaded. Please try again.', description: 'Offline administration page: loading failed' },
+  acUsername: { id: 'app.access.username', defaultMessage: 'Username', description: 'Offline administration: whose access' },
+  acRole: { id: 'app.access.role', defaultMessage: 'Role', description: 'Offline administration: the role to grant' },
+  acChooseRole: { id: 'app.access.chooseRole', defaultMessage: 'Choose a role', description: 'Offline administration: no role chosen yet' },
+  acDays: { id: 'app.access.days', defaultMessage: 'For how long', description: 'Offline administration: how long the grant lasts' },
+  acDayCount: { id: 'app.access.dayCount', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'Offline administration: a duration option' },
+  acGrants: { id: 'app.access.grants', defaultMessage: 'Roles granted here', description: 'Offline administration: the local grants section' },
+  acNoGrants: { id: 'app.access.noGrants', defaultMessage: 'No roles are granted here.', description: 'Offline administration: no local grants' },
+  acGrantLine: { id: 'app.access.grantLine', defaultMessage: '{username}: {role} until {until}', description: 'Offline administration: one local grant' },
+  acGrant: { id: 'app.access.grant', defaultMessage: 'Grant the role', description: 'Offline administration: grant button' },
+  acGranted: { id: 'app.access.granted', defaultMessage: '{username} is a {role} here until {until}.', description: 'Offline administration: the role was granted' },
+  acNewStaff: { id: 'app.access.newStaff', defaultMessage: 'Account for new staff', description: 'Offline administration: the provisional account section' },
+  acNewStaffIntro: {
+    id: 'app.access.newStaffIntro',
+    defaultMessage: 'For someone central has not registered yet. The account lasts as long as its role, and its user chooses their own password when they first sign in.',
+    description: 'Offline administration: what a provisional account is',
+  },
+  acTemporaryPassword: { id: 'app.access.temporaryPassword', defaultMessage: 'Temporary password', description: 'Offline administration: the password the admin sets' },
+  acTemporaryPasswordHelp: {
+    id: 'app.access.temporaryPasswordHelp',
+    defaultMessage: 'Give it to them in person. They must replace it at their first sign-in.',
+    description: 'Offline administration: how to hand over the temporary password',
+  },
+  acCreate: { id: 'app.access.create', defaultMessage: 'Create the account', description: 'Offline administration: create a provisional account' },
+  acCreated: {
+    id: 'app.access.created',
+    defaultMessage: 'The account {username} is a {role} here until {until}.',
+    description: 'Offline administration: the provisional account was created',
+  },
+  acRevocations: { id: 'app.access.revocations', defaultMessage: 'Access revoked here', description: 'Offline administration: the revocations section' },
+  acRevokeIntro: {
+    id: 'app.access.revokeIntro',
+    defaultMessage: 'Revoking takes effect at once: the user is signed out and cannot sign in here.',
+    description: 'Offline administration: what revoking does',
+  },
+  acNoRevocations: { id: 'app.access.noRevocations', defaultMessage: 'No access is revoked here.', description: 'Offline administration: no revocations' },
+  acRevocationLine: { id: 'app.access.revocationLine', defaultMessage: '{username}: revoked {at}', description: 'Offline administration: one revocation' },
+  acRevoke: { id: 'app.access.revoke', defaultMessage: 'Revoke access', description: 'Offline administration: revoke button' },
+  acConfirmRevoke: { id: 'app.access.confirmRevoke', defaultMessage: 'Revoke access for {username}', description: 'Offline administration: confirm the revocation' },
+  acCancel: { id: 'app.access.cancel', defaultMessage: 'Cancel', description: 'Offline administration: do not revoke' },
+  acRevoked: { id: 'app.access.revoked', defaultMessage: 'Access for {username} is revoked here.', description: 'Offline administration: access was revoked' },
+  acRefused: { id: 'app.access.refused', defaultMessage: 'Not done: {reason}', description: 'Offline administration: the edge refused; reason is its explanation' },
+  acNoSuchUser: { id: 'app.access.noSuchUser', defaultMessage: 'there is no account with that username here', description: 'Offline administration: unknown username' },
+  acTaken: { id: 'app.access.taken', defaultMessage: 'that username is already taken', description: 'Offline administration: the username exists' },
 })
