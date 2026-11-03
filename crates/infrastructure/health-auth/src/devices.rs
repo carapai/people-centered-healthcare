@@ -363,6 +363,18 @@ impl<S: AuthStore + DeviceStore + 'static> DeviceGate<S> {
         self.layer(Router::new().route("/api/device", get(this_device)))
     }
 
+    /// The check the authorization server makes at `/token` (`AuthConfig::devices`): whether a
+    /// key thumbprint is an enrolled, active device's.
+    pub fn check(&self) -> crate::server::DeviceCheck {
+        let gate = self.clone();
+        crate::server::DeviceCheck(Arc::new(move |jkt| {
+            let gate = gate.clone();
+            Box::pin(async move {
+                matches!(gate.inner.store.device_by_thumbprint(&jkt).await, Ok(Some(d)) if d.active())
+            })
+        }))
+    }
+
     /// `routes` behind the gate: each request must carry a DPoP proof by an enrolled, active
     /// device, which the handlers find as an [`EnrolledDevice`] extension.
     pub fn layer(&self, routes: Router) -> Router {
@@ -381,6 +393,9 @@ impl<S: AuthStore + DeviceStore + 'static> DeviceGate<S> {
         path: &str,
     ) -> Result<DpopProof, Refusal> {
         let inner = &self.inner;
+        // With a token, the proof's replay is checked once, where the token is verified
+        // (`AccessVerifier`); alone, it is checked here.
+        let remember = !headers.contains_key(header::AUTHORIZATION);
         let proof = headers
             .get("dpop")
             .and_then(|v| v.to_str().ok())
@@ -398,7 +413,7 @@ impl<S: AuthStore + DeviceStore + 'static> DeviceGate<S> {
             return Err(Refusal::Proof);
         }
         let until = now.checked_add(inner.config.dpop_window).unwrap_or(now);
-        if inner.store.remember_jti(&verified.jti, until, now).await? {
+        if !remember || inner.store.remember_jti(&verified.jti, until, now).await? {
             Ok(verified)
         } else {
             Err(Refusal::Proof)

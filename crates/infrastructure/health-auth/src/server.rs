@@ -64,6 +64,23 @@ pub struct AuthConfig {
     pub login_page: Option<String>,
     /// Sign-in by one-time code for patient clients (#111). Without it they cannot sign in.
     pub phone_sign_in: Option<PhoneSignIn>,
+    /// On an edge: tokens are issued only to an enrolled, active device's key (ADR 0009), which
+    /// this checks by the DPoP proof's thumbprint. `/authorize` is a browser navigation, which
+    /// carries no proof, so the device is checked here, where the token is bound to it.
+    pub devices: Option<DeviceCheck>,
+}
+
+/// The future a [`DeviceCheck`] answers with.
+pub type DeviceAnswer = std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>;
+
+/// Whether a key thumbprint is an enrolled, active device's ([`crate::DeviceGate::check`]).
+#[derive(Clone)]
+pub struct DeviceCheck(pub std::sync::Arc<dyn Fn(String) -> DeviceAnswer + Send + Sync>);
+
+impl std::fmt::Debug for DeviceCheck {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DeviceCheck")
+    }
 }
 
 impl AuthConfig {
@@ -81,6 +98,7 @@ impl AuthConfig {
             snapshots: None,
             login_page: None,
             phone_sign_in: None,
+            devices: None,
         }
     }
 
@@ -1009,6 +1027,16 @@ async fn token<S: AuthStore>(
     };
     if inner.config.require_dpop && proof.is_none() {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_dpop_proof");
+    }
+    // A refresh is refused too, so a revoked device's session ends within one token lifetime.
+    if let (Some(devices), Some(proof)) = (&inner.config.devices, &proof)
+        && !(devices.0)(proof.jkt.clone()).await
+    {
+        tracing::warn!(
+            alert = "unenrolled-device",
+            "a token request from a key that is not an enrolled device"
+        );
+        return oauth_error(StatusCode::UNAUTHORIZED, "invalid_dpop_proof");
     }
     match params.grant_type.as_deref() {
         Some("authorization_code") => {

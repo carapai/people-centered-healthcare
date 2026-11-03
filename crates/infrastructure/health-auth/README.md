@@ -87,6 +87,16 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 - The snapshots inside are verified at login, as every snapshot is.
 - `SurrealAuthStore::snapshots_at(facility)` lists what a bundle carries.
 
+## The edge's authorization server (#75)
+
+- **Device-bound tokens** (ADR 0009): with `AuthConfig::devices`, `/token` issues and refreshes tokens only for a DPoP key that is an enrolled, active device. The check is `DeviceGate::check`. An unknown or revoked key gets 401 `invalid_dpop_proof`, so revoking a device ends its session within one access-token lifetime.
+  - The check is at `/token`, not at `/authorize`: `/authorize` is a browser navigation, which carries no proof.
+- **One replay check per proof:** `DeviceGate`'s layer records a proof's `jti` only when no `Authorization` header comes with it. With a token, `AccessVerifier` records it. A gated route that does not verify the token therefore does not record the replay.
+- **Importing the bundle** (ADR 0059): `Provisioning::router` serves `POST /api/admin/provision/accounts`, for the caller to guard. It takes the bundle's JWS as the body.
+  - **What it refuses:** with 422, a bundle that is not central's, or is for another node or facility; a bundle encrypted to another key; and any snapshot inside that is not central's or not for one of the bundle's accounts at this facility.
+  - **What it stores:** each hash re-encrypted under the edge's pepper key. An account already here keeps its failed-login state.
+  - The node's intermediate key comes from a `RecipientKey`, unsealed from the keystore on a blocking thread.
+
 ## Request subjects (ADR 0056)
 
 `Subjects` and the `subject_layer` middleware turn each resource request into the `health_access_policy::Subject` and `health_audit::Agent` request extensions that `health-fhir-server` decides and audits with. The subject is built from:
