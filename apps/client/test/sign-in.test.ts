@@ -6,12 +6,13 @@ import { SignInError, signIn } from '../src/platform/sign-in'
 const ORIGIN = 'https://central.example'
 const ISSUER = `${ORIGIN}/auth`
 
-function harness(responses: Response[], proof?: (method: string, url: URL) => Promise<string | undefined>) {
+function harness(responses: Response[], proof?: (method: string, url: URL, token?: string) => Promise<string | undefined>) {
   const store = new Map<string, string>()
   const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) }
-  const calls: { url: string; body: string; dpop: string | undefined }[] = []
+  const calls: { url: string; body: string; dpop: string | undefined; authorization: string | undefined }[] = []
   const fetchImpl: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), body: String(init?.body ?? ''), dpop: (init?.headers as Record<string, string> | undefined)?.['dpop'] })
+    const headers = init?.headers as Record<string, string> | undefined
+    calls.push({ url: String(input), body: String(init?.body ?? ''), dpop: headers?.['dpop'], authorization: headers?.['authorization'] })
     return responses.shift() ?? new Response('{}', { status: 500 })
   }
   const navigated: string[] = []
@@ -117,5 +118,47 @@ describe('signIn', () => {
     const { callback } = await startAndCallback(h)
     await h.client.complete(callback)
     expect(h.calls[0]?.dpop).toBeUndefined()
+  })
+
+  test('on an edge, idling at the server locks the session rather than ending it', async () => {
+    const locked = new Response(JSON.stringify({ error: 'session_locked' }), { status: 401 })
+    const h = harness([tokens('a1', 'r1'), locked], async () => 'device-proof')
+    const ended: string[] = []
+    h.session.onEnd((reason) => ended.push(reason))
+    const { callback } = await startAndCallback(h)
+    await h.client.complete(callback)
+    h.timers[0]?.callback()
+    await vi.waitFor(() => expect(ended).toEqual(['lock']))
+    expect(h.session.accessToken()).toBeUndefined()
+  })
+
+  test('the PIN unlocks with the device proof, and sets with the token', async () => {
+    const proved: (string | undefined)[] = []
+    const h = harness([tokens('a1', 'r1'), new Response(null, { status: 204 }), tokens('a2', 'r2')], async (_m, _u, token) => {
+      proved.push(token)
+      return 'device-proof'
+    })
+    const { callback } = await startAndCallback(h)
+    await h.client.complete(callback)
+    await h.client.setPin?.('042137')
+    expect(h.calls[1]?.url).toBe(`${ISSUER}/pin`)
+    expect(h.calls[1]?.authorization).toBe('DPoP a1')
+    expect(new URLSearchParams(h.calls[1]?.body).get('pin')).toBe('042137')
+
+    h.client.lock?.()
+    expect(h.session.accessToken()).toBeUndefined()
+    await h.client.unlock?.('nakato', '042137')
+    expect(h.calls[2]?.url).toBe(`${ISSUER}/unlock`)
+    expect(Object.fromEntries(new URLSearchParams(h.calls[2]?.body))).toEqual({ username: 'nakato', pin: '042137', client_id: 'health-client' })
+    expect(h.calls[2]?.authorization).toBeUndefined()
+    expect(h.session.accessToken()).toBe('a2')
+    // The PIN request's proof is bound to the token; the unlock's to none.
+    expect(proved).toEqual([undefined, 'a1', undefined])
+  })
+
+  test('a wrong PIN is refused, and central (no proof) has no PIN at all', async () => {
+    const h = harness([new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 401 })], async () => 'device-proof')
+    await expect(h.client.unlock?.('nakato', '999999')).rejects.toEqual(new SignInError('refused'))
+    expect(harness([]).client.unlock).toBeUndefined()
   })
 })

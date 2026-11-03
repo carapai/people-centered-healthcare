@@ -122,9 +122,9 @@ export function httpPlatform(
             ...(device === undefined
               ? {}
               : {
-                  proof: async (method: string, url: URL) => {
+                  proof: async (method: string, url: URL, token?: string) => {
                     const keys = device.current()
-                    return keys === undefined ? undefined : dpopProof(keys, method, url)
+                    return keys === undefined ? undefined : dpopProof(keys, method, url, token)
                   },
                 }),
           }),

@@ -32,11 +32,23 @@ export interface SignIn {
   signOut(): Promise<void>
   /** The authorization endpoint the sign-in page posts the credentials to. */
   readonly authorizeEndpoint: string
+  /**
+   * On an edge (offline-auth.md § Tokens and sessions): locks the session after idling. Its tokens
+   * are forgotten and the query cache cleared (`end('lock')`); the session lives on at the edge.
+   */
+  lock?(): void
+  /**
+   * Resumes this device's session for `username`, or switches the device to that user's live
+   * session here, with their PIN. Throws `SignInError('refused')` on a wrong PIN.
+   */
+  unlock?(username: string, pin: string): Promise<void>
+  /** Sets the signed-in user's 6-digit PIN on this device. */
+  setPin?(pin: string): Promise<void>
 }
 
 /** Why a sign-in could not complete. */
 export class SignInError extends Error {
-  constructor(readonly reason: 'state' | 'issuer' | 'refused' | 'no-transaction') {
+  constructor(readonly reason: 'state' | 'issuer' | 'refused' | 'locked' | 'no-transaction') {
     super(`sign-in failed: ${reason}`)
     this.name = 'SignInError'
   }
@@ -55,10 +67,11 @@ export interface SignInOptions {
   setTimer?: (callback: () => void, ms: number) => unknown
   clearTimer?: (timer: unknown) => void
   /**
-   * A DPoP proof for a request to the authorization server: on an edge, by the device's key, so
-   * tokens are bound to it and issued only to an enrolled device (ADR 0009).
+   * A DPoP proof for a request to the authorization server, bound to `token` when given: on an
+   * edge, by the device's key, so tokens are bound to it and issued only to an enrolled device
+   * (ADR 0009). With it, the session can lock and be unlocked with a PIN.
    */
-  proof?: (method: string, url: URL) => Promise<string | undefined>
+  proof?: (method: string, url: URL, token?: string) => Promise<string | undefined>
 }
 
 function random(bytes: number): string {
@@ -83,18 +96,20 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
   let refreshToken: string | undefined
   let timer: unknown
 
-  async function post(path: string, form: Record<string, string>): Promise<Response> {
+  async function post(path: string, form: Record<string, string>, token?: string): Promise<Response> {
     const url = new URL(`${issuer}${path}`)
     const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' }
-    const proof = await options.proof?.('POST', url)
+    const proof = await options.proof?.('POST', url, token)
     if (proof !== undefined) headers['dpop'] = proof
+    if (token !== undefined) headers['authorization'] = `DPoP ${token}`
     return fetchImpl(url.toString(), { method: 'POST', headers, body: new URLSearchParams(form).toString() })
   }
 
-  async function tokens(form: Record<string, string>): Promise<void> {
-    const response = await post('/token', form)
+  async function tokens(form: Record<string, string>, path = '/token'): Promise<void> {
+    const response = await post(path, form)
     if (!response.ok) {
-      throw new SignInError('refused')
+      const error = (await response.json().catch(() => ({}))) as { error?: string }
+      throw new SignInError(error.error === 'session_locked' ? 'locked' : 'refused')
     }
     const body = (await response.json()) as { access_token: string; refresh_token?: string; expires_in: number }
     session.setAccessToken(body.access_token)
@@ -109,14 +124,44 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
     if (refreshToken === undefined) return
     try {
       await tokens({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: config.clientId })
-    } catch {
+    } catch (error) {
+      // Idle at the edge: locked, not ended; the PIN resumes it.
+      if (error instanceof SignInError && error.reason === 'locked') {
+        lock()
+        return
+      }
       // The session hit its cap or was revoked: sign out locally.
       refreshToken = undefined
       session.end('logout')
     }
   }
 
+  function lock(): void {
+    if (timer !== undefined) clearTimer(timer)
+    timer = undefined
+    refreshToken = undefined
+    session.end('lock')
+  }
+
+  // Only where requests are proved with the device's key: an edge.
+  const pinned =
+    options.proof === undefined
+      ? {}
+      : {
+          lock,
+          async unlock(username: string, pin: string) {
+            await tokens({ username, pin, client_id: config.clientId }, '/unlock')
+          },
+          async setPin(pin: string) {
+            const token = session.accessToken()
+            if (token === undefined) throw new SignInError('refused')
+            const response = await post('/pin', { pin }, token)
+            if (!response.ok) throw new SignInError('refused')
+          },
+        }
+
   return {
+    ...pinned,
     authorizeEndpoint: `${issuer}/authorize`,
 
     async start(returnTo) {

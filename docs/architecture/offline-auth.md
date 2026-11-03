@@ -82,6 +82,11 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
   - Snapshots are checked for `HEALTH_FACILITY`.
   - Keys: the pepper and token-signing keys are sealed at `provision request`.
   - Accounts arrive in central's signed bundle (ADR 0059), imported on the edge's own screen.
+- **Idle lock and PIN** (#75, part 2), with the decisions taken there:
+  - **The lock is enforced by the edge:** a refresh after 15 minutes idle gets `session_locked` until the user unlocks.
+  - **PINs are per user per device:** set at `/auth/pin`, sealed under the pepper key.
+  - **Unlocking and switching:** `/auth/unlock` resumes, or switches a shared device to, a user's live session there; five wrong PINs end it.
+  - **The browser** locks after 15 minutes without use and clears its view and cache before anyone unlocks (`apps/client/src/features/lock`).
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);

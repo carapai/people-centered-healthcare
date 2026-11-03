@@ -1,6 +1,7 @@
 import { css } from '@health/design-system/css'
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
 
+import { LockGuard } from '../features/lock/LockGuard'
 import { StatusArea } from '../features/status/StatusArea'
 import type { RouterContext } from '../router'
 
@@ -13,7 +14,9 @@ function RootLayout() {
     <div className={css({ minHeight: '100vh', display: 'flex', flexDirection: 'column' })}>
       <StatusArea />
       <main className={css({ flex: '1', p: '6' })}>
-        <Outlet />
+        <LockGuard>
+          <Outlet />
+        </LockGuard>
       </main>
     </div>
   )

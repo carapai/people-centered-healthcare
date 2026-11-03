@@ -29,6 +29,10 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
   - `shell.ts` registers the edge's app-shell service worker and runs the version check against `runtime.json`'s `build` (#76).
   - The build's ID is `HEALTH_BUILD_ID`, or the commit. `vite.config.ts` puts it in the bundle and in `dist/build.json`, which the edge embeds beside the bundle.
 - `src/features/` holds one folder per Bounded Context. Feature code uses `usePlatform()` and the ports.
+  - `lock/` (#75; offline-auth.md § Tokens and sessions), on an edge:
+    - `LockGuard` wraps every page. After 15 minutes without a pointer, key, wheel or touch event, or when the edge refuses a refresh as `session_locked`, it calls `signIn.lock()`, which forgets the tokens and clears the query cache (`end('lock')`), and shows the lock screen instead of the page.
+    - The lock screen's username and PIN either resume the session or switch the device to another user's live session there (`signIn.unlock`). Its fallback is a full password sign-in.
+    - `SetPin` on the home page sets the user's PIN for this device (`signIn.setPin`).
   - `enrollment/` (#74) has two parts:
     - **`/enroll`:** the device makes its key, asks the edge, shows the pairing code, and polls until approved. It then confirms through the gate (`GET /api/device`), or offers to start over when revoked.
     - **`DevicesSection`:** on the edge status page, the pending requests (without their codes), approval by the typed code with a name and a location, and the enrolled devices, each revocable.
