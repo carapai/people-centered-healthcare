@@ -14,6 +14,7 @@
 mod auth;
 mod config;
 mod provision;
+mod recovery;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -214,6 +215,12 @@ fn auth_settings(
             None => Vec::new(),
         },
         registry_nin_system: files.registry_nin_system.clone(),
+        kms: files
+            .kms_key_file
+            .as_deref()
+            .map(auth::read_kms_key)
+            .transpose()?
+            .map(|key| Arc::new(health_provisioning::LocalKeyWrap::new(&key))),
         issuing_ca: files
             .issuing_ca
             .as_ref()
@@ -241,6 +248,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
+    if std::env::args().nth(1).as_deref() == Some("recovery") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return recovery::run(&config, &args).await;
+    }
     if std::env::args().nth(1).as_deref() == Some("provision") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         return provision::run(&config, &args).await;

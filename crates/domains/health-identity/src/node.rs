@@ -12,6 +12,12 @@
 //!   as an alert at central.
 //! - **Short codes** are `E1`, `E2`, … for edges, unique within the facility and never reused: a
 //!   decommissioned node keeps its record (identifiers.md § Never recycled).
+//! - **Recovery keys** (ADR 0048): each encrypted volume's disk recovery key is escrowed at
+//!   central, wrapped, never kept on site. An operator reads one out by phone to a facility admin
+//!   whose identity they verified, and every read is recorded. A key that has been read is
+//!   **used**, and stays an alert until the edge escrows its replacement. The edge signs each
+//!   escrow; a signing time no later than the current key's is refused, so an old escrow cannot
+//!   be replayed to bring back a key that was read out.
 
 use std::fmt;
 
@@ -230,10 +236,106 @@ pub struct Node {
     pub encryption: Encryption,
     /// The serial of its facility intermediate, to revoke it by.
     pub intermediate_serial: String,
+    /// The facility intermediate's public key (SEC1, base64url): what the node's signed
+    /// requests to central, such as escrowing a recovery key, verify against.
+    #[serde(default)]
+    pub intermediate_key: String,
     /// The code it was provisioned with.
     pub code: Uuid,
     /// When.
     pub provisioned_at: Timestamp,
+}
+
+/// A volume whose recovery key is escrowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RecoveryVolume {
+    /// The operating system's volume.
+    System,
+    /// The volume holding the node's data directory, when it is another one.
+    Data,
+}
+
+impl RecoveryVolume {
+    /// Its name: `system` or `data`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Data => "data",
+        }
+    }
+}
+
+/// One read-out of a recovery key, by phone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Retrieval {
+    /// When.
+    pub at: Timestamp,
+    /// The central operations person who read it.
+    pub by: String,
+    /// How the facility admin's identity was verified against the device registry.
+    pub verified: String,
+}
+
+/// An escrowed recovery key, without the key: the wrapped key is the store's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryKey {
+    /// The node.
+    pub node: NodeId,
+    /// Which volume.
+    pub volume: RecoveryVolume,
+    /// When the node signed the escrow.
+    pub signed_at: Timestamp,
+    /// When central stored it.
+    pub escrowed_at: Timestamp,
+    /// Every read-out.
+    pub retrievals: Vec<Retrieval>,
+}
+
+/// Why an escrow was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum EscrowRefused {
+    /// Signed no later than the key it would replace: a replay, or out of order.
+    #[error("the escrow is older than the key it would replace")]
+    Stale,
+    /// Signed too far from central's clock.
+    #[error("the escrow's signing time is too far from central's clock")]
+    Clock,
+}
+
+/// How far an escrow's signing time may be from central's clock.
+pub const ESCROW_SKEW: SignedDuration = SignedDuration::from_mins(5);
+
+impl RecoveryKey {
+    /// Whether it has been read out, so the edge must rotate it.
+    pub fn used(&self) -> bool {
+        !self.retrievals.is_empty()
+    }
+
+    /// The key a node escrows for `volume`, signed at `signed_at`, replacing `current`, at `now`.
+    pub fn escrow(
+        current: Option<&Self>,
+        node: NodeId,
+        volume: RecoveryVolume,
+        signed_at: Timestamp,
+        now: Timestamp,
+    ) -> Result<Self, EscrowRefused> {
+        let early = now.checked_sub(ESCROW_SKEW).unwrap_or(now);
+        let late = now.checked_add(ESCROW_SKEW).unwrap_or(now);
+        if signed_at < early || signed_at > late {
+            return Err(EscrowRefused::Clock);
+        }
+        if current.is_some_and(|key| signed_at <= key.signed_at) {
+            return Err(EscrowRefused::Stale);
+        }
+        Ok(Self {
+            node,
+            volume,
+            signed_at,
+            escrowed_at: now,
+            retrievals: Vec::new(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -292,6 +394,39 @@ mod tests {
             })
         );
         assert_eq!(exempt.redeemable(true, now), Ok(Encryption::Compliant));
+    }
+
+    #[test]
+    fn an_escrow_must_be_fresh_and_newer_than_the_key_it_replaces() {
+        let now = at("2026-11-04T09:00:00Z");
+        let node = NodeId(Uuid::nil());
+        let first = RecoveryKey::escrow(None, node, RecoveryVolume::System, now, now)
+            .expect("first escrow");
+        assert!(!first.used());
+        // A replay of the same escrow, or an older one, cannot bring back a key.
+        assert_eq!(
+            RecoveryKey::escrow(Some(&first), node, RecoveryVolume::System, now, now),
+            Err(EscrowRefused::Stale)
+        );
+        let later = at("2026-11-04T09:01:00Z");
+        let rotated = RecoveryKey::escrow(Some(&first), node, RecoveryVolume::System, later, later)
+            .expect("rotated");
+        assert_eq!(rotated.signed_at, later);
+        for skewed in ["2026-11-04T08:54:00Z", "2026-11-04T09:06:00Z"] {
+            assert_eq!(
+                RecoveryKey::escrow(None, node, RecoveryVolume::Data, at(skewed), now),
+                Err(EscrowRefused::Clock),
+                "{skewed}"
+            );
+        }
+        let mut read = first;
+        read.retrievals.push(Retrieval {
+            at: now,
+            by: "ops:okello".into(),
+            verified: "called back on the registry number".into(),
+        });
+        assert!(read.used());
+        assert_eq!(RecoveryVolume::Data.as_str(), "data");
     }
 
     #[test]

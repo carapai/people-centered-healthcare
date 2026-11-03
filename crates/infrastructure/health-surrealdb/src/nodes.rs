@@ -1,4 +1,5 @@
-//! Central's node registry and provisioning codes (migration `0024_nodes`), used by
+//! Central's node registry, provisioning codes and escrowed recovery keys (migrations
+//! `0024_nodes`, `0025_recovery_keys`), used by
 //! `health-provisioning`: each code and node as JSON, with the columns lookups and the unique
 //! indexes need.
 
@@ -109,6 +110,79 @@ impl SurrealTx {
     pub async fn nodes(&mut self) -> Result<Vec<String>, StoreError> {
         let rows = self
             .rows("SELECT VALUE [data] FROM node ORDER BY id", Vec::new())
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .collect())
+    }
+
+    /// Stores a node's recovery key for a volume, `node:volume`: its JSON and the wrapped key.
+    pub async fn put_recovery_key(
+        &mut self,
+        node: &str,
+        volume: &str,
+        data: &str,
+        wrapped: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('node_recovery_key', $id) CONTENT { data: $data, \
+             wrapped: $wrapped, node: $node } RETURN VALUE record::id(id)",
+            vec![
+                ("id", format!("{node}:{volume}")),
+                ("data", data.to_owned()),
+                ("wrapped", wrapped.to_owned()),
+                ("node", node.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Replaces a recovery key's JSON, as when it is read out; the wrapped key is kept.
+    pub async fn update_recovery_key(
+        &mut self,
+        node: &str,
+        volume: &str,
+        data: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPDATE type::record('node_recovery_key', $id) SET data = $data \
+             RETURN VALUE record::id(id)",
+            vec![
+                ("id", format!("{node}:{volume}")),
+                ("data", data.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// A node's recovery key for a volume: its JSON and the wrapped key, if escrowed.
+    pub async fn recovery_key(
+        &mut self,
+        node: &str,
+        volume: &str,
+    ) -> Result<Option<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data, wrapped] FROM type::record('node_recovery_key', $id)",
+                vec![("id", format!("{node}:{volume}"))],
+            )
+            .await?;
+        Ok(rows.into_iter().next().and_then(|row| {
+            let mut row = row.into_iter();
+            Some((row.next()?, row.next()?))
+        }))
+    }
+
+    /// The JSON of every escrowed recovery key, without the keys.
+    pub async fn recovery_keys(&mut self) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM node_recovery_key ORDER BY id",
+                Vec::new(),
+            )
             .await?;
         Ok(rows
             .into_iter()

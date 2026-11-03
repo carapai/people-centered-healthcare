@@ -128,7 +128,9 @@ async fn open_store(config: &Config) -> Result<SurrealAuthStore, Box<dyn std::er
 }
 
 /// The database, migrated.
-async fn open_surreal(config: &Config) -> Result<SurrealStore, Box<dyn std::error::Error>> {
+pub(crate) async fn open_surreal(
+    config: &Config,
+) -> Result<SurrealStore, Box<dyn std::error::Error>> {
     let db_password = std::fs::read_to_string(&config.surrealdb_password_file)
         .map_err(|_| "cannot read HEALTH_SURREALDB_PASSWORD_FILE")?
         .trim()

@@ -2671,6 +2671,8 @@ name = "health-provisioning"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
+ "chacha20poly1305",
  "health-audit",
  "health-identity",
  "health-persistence",
@@ -2678,6 +2680,7 @@ dependencies = [
  "health-surrealdb",
  "health-time",
  "http-body-util",
+ "p256",
  "rand_core 0.6.4",
  "serde",
  "serde_json",

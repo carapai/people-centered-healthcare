@@ -20,6 +20,20 @@ Layer: **infrastructure**. Central's node registry and edge provisioning (#268; 
   - **The body (JSON):** `code`, `request` (the PKCS#10 request, PEM) and `encrypted`.
   - **201:** `node_id`, `short_code`, `facility` and `chain` (the intermediate, then the issuing CA).
   - **Refusals:** 403 `code_refused`, 422 `not_encrypted`, 400 `invalid_request`, and 503 if the store failed.
+- **Recovery keys** (ADR 0048):
+  - **`recovery_jws(node, keys, key, at)`** is the escrow an edge sends: a compact ES256 JWS, `typ` `health-recovery+jwt`, carrying `node`, `iat` and each volume's key. It is signed with the node's facility intermediate key.
+  - **`NodeRegistry::escrow(jws, kms)`:**
+    1. It verifies the signature against the intermediate key recorded on the node at provisioning, so only an active node escrows its own keys.
+    2. It refuses an `iat` more than 5 minutes from central's clock, or no later than the current key's, so a replay cannot bring back a key that was read out.
+    3. It wraps each key through the `KeyWrap` port and stores it, audited without the key.
+  - **`NodeRegistry::read_recovery(node, volume, by, verified, kms)`** is the phone read-out.
+    - It needs who reads it and how the caller was verified.
+    - It records the retrieval and audits it as a warning.
+    - From then on the key is used: it is listed by `used_recovery_keys()`, an hourly `recovery-key-used` alert at central, until the edge escrows its replacement.
+  - **`KeyWrap`** is the KMS port. `LocalKeyWrap` is XChaCha20-Poly1305 under a 32-byte master key, with a random nonce per key. Its associated data is `health-recovery/<node>/<volume>`, so a wrapped key unwraps only for its own node and volume.
+  - **`recovery_router(registry, kms)`** serves `POST /provisioning/recovery`, with the JWS as the body.
+    - **Success:** 204.
+    - **Refusals:** 401 `unauthorized`, 409 `escrow_refused`, 400 `invalid_request`, and 503 if the store or the KMS failed.
 - **`Issuer`** is the issuing CA's port, since its key belongs in the HSM or KMS. `health_pki::Authority` implements it with its key at hand, until the KMS adapter.
 
 ## Tests
@@ -29,4 +43,13 @@ Layer: **infrastructure**. Central's node registry and edge provisioning (#268; 
 - **Refusals:** unknown and malformed codes, an unencrypted edge, and an expired code. A refused request leaves the code redeemable.
 - **Exemptions:** an exempt facility provisions unencrypted and stands in `exempt()`.
 - **Short codes** count up per facility.
+- **The route:** each answer.
+
+`tests/recovery.rs`:
+- **Escrow and read-out:**
+  - a node escrows its system and data keys, and the stored row holds neither key, wrapped or not;
+  - a read-out needs who and how, returns the key, and leaves it used;
+  - the replayed escrow is refused as stale;
+  - a newer escrow rotates the system key and clears the alert, while the data key stays untouched.
+- **Refusals:** an impostor's signature, an unknown node, a skewed clock, malformed JWSs, and no keys. Reading a key never escrowed is not found, and another master key cannot unwrap.
 - **The route:** each answer.

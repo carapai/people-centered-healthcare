@@ -70,6 +70,10 @@ pub(crate) struct AuthFiles {
     /// issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS. With them,
     /// edges provision themselves at `/api/provisioning/nodes` with a one-time code.
     pub(crate) issuing_ca: Option<(PathBuf, PathBuf)>,
+    /// `HEALTH_KMS_KEY_FILE` (#268): the master key, 64 hex characters, that wraps the edges'
+    /// escrowed disk recovery keys, until a KMS or HSM holds it. With it, edges escrow their keys
+    /// at `/api/provisioning/recovery`, and `central-server recovery` reads them out.
+    pub(crate) kms_key_file: Option<PathBuf>,
 }
 
 /// The patient portal's client and its one-time codes (#111; ADR 0029).
@@ -146,6 +150,7 @@ impl Config {
                         })
                         .unwrap_or_default(),
                     currency: get("HEALTH_CURRENCY").unwrap_or_else(|| "UGX".to_owned()),
+                    kms_key_file: get("HEALTH_KMS_KEY_FILE").map(PathBuf::from),
                     issuing_ca: match (
                         get("HEALTH_ISSUING_CA_CERT_FILE"),
                         get("HEALTH_ISSUING_CA_KEY_FILE"),

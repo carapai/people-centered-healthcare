@@ -88,6 +88,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_local_provisional", "identity"),
     ("node_provisioning_code", "identity"),
     ("node", "identity"),
+    ("node_recovery_key", "identity"),
     ("caregiver_grant", "consent"),
     ("stock_transfer", "inventory"),
     ("stock_reconciliation", "inventory"),

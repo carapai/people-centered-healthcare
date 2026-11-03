@@ -28,6 +28,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
   - A code is stored by the sha-256 of its text, never the text itself.
   - Unique indexes allow one node per code and one short code per facility.
   - A node row is never deleted.
+- **Recovery keys** (migration `0025_recovery_keys`; #268): `node_recovery_key`, one row per node and volume (`node:volume`). It holds the record with its read-outs, and the key as the KMS wrapped it, never in the clear.
 - **Offline administration** (migration `0022_local_admin`; #75): `auth_local_grant` (the grant's JSON, its JWS signed with the node's key, and its account, facility and expiry, indexed), `auth_local_revocation` keyed by account, and `auth_local_config`, one record holding the country's role mappings and grantable roles.
 - **Registration review** (migration `0013_registration_review`): the review queue also takes `registration-request` items (#111).
 - **Caregiver grants** (migration `0014_caregiver_grant`): `health_consent::GrantStore`, one record per grant, indexed by patient and by caregiver.
