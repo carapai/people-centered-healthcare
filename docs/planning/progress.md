@@ -262,3 +262,18 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **The built-in set is empty for now.** Form Layouts, override points and settings bring their schemas with their features.
 
   This completes #86.
+- 2026-11-03: #86 part 2 merged (#289), completing #86. #268, with its provisioning exchanged online over HTTPS by one-time code, is split in four:
+  1. central's registry and endpoint;
+  2. the edge's online `provision --code`;
+  3. recovery-key escrow behind a KMS port with a local adapter;
+  4. decommissioning.
+
+  Part 1:
+  - **`health-identity` node rules:** Crockford one-time codes, single use within 72 hours; encryption required unless the code carries an exemption; short codes `E1`, `E2`, … never reused.
+  - **Migration `0024_nodes`.**
+  - **`health-provisioning`:**
+    - `NodeRegistry` issues codes, stored hashed and audited;
+    - `redeem` mints the node and has the `Issuer` (the issuing CA from files for now) issue its intermediate, in one audited transaction;
+    - `POST /api/provisioning/nodes`;
+    - the exempt nodes as an hourly `encryption-exempt` alert.
+  - **central-server:** `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE`, and `central-server provision code`.

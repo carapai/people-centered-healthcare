@@ -78,8 +78,13 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
 - **#74, part 2a:** the edge issues its own leaf under the installed intermediate for `<node-id>.local`, the configured name and its private addresses, with a fresh key in `HEALTH_TLS_DIR`. It serves HTTPS only (rustls), renews the leaf at two-thirds of its life or when its addresses change with no restart, and raises the certificate alerts on the status page. Before provisioning it opens no LAN listener. Either way, a plain-HTTP console on the loopback address (`HEALTH_CONSOLE_BIND`) serves the edge's own screen, where the admin pages answer until staff sign-in (#75).
 - **#74, part 2b:** pairing and discovery. The edge's status page shows a QR code and its text for `health-edge://pair?v=1&node=…&url=…&spki=…`: the node's https origin, its node ID and its facility intermediate's SPKI fingerprint (`GET /api/admin/pairing`, console only). While it serves HTTPS it announces `_health-edge._tcp` over mDNS with TXT `node` and `v`, at its leaf's addresses.
 - **#74, part 3:** the browser client. On an edge, `src/platform/device.ts` makes a non-extractable ECDSA P-256 key in IndexedDB. Every request then carries a DPoP proof by it: alone before sign-in, bound to the token after. `/enroll` asks, shows the pairing code and waits for approval. The edge status page lists pending requests, approves one by its typed code with a name and a location, and revokes devices. The edge e2e suite shows an unknown device refused, an approved one let in, and a revoked one shut out.
+- **#268, part 1:** central's node registry (`health-provisioning`).
+  - `central-server provision code` issues a one-time code for a facility. It may carry an audited encryption exemption, which then stands as an hourly alert.
+  - An edge redeems the code at `POST /api/provisioning/nodes` with its certificate request and encryption state.
+  - Central mints the `node_id` and the next short code (`E1`, `E2`, …), and has the issuing CA issue the intermediate for `<node-id>.local` and the facility's names, all in one audited transaction.
+  - The issuing CA's key is read from a file behind an `Issuer` port, until the KMS adapter.
 - **Still to come:**
-  - central provisioning and HSM signing for the issuing CA (#268);
+  - the edge's online `provision --code`, recovery-key escrow, decommissioning, and HSM or KMS signing for the issuing CA (#268);
   - the Tauri apps' keyring key and their pinning of the intermediate's SPKI from the pairing code (with the desktop and Android builds);
   - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;

@@ -1035,6 +1035,17 @@ DEFINE TABLE naming_system_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON naming_system_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON naming_system_history TYPE int PERMISSIONS FULL
   DEFINE INDEX naming_system_history_last_updated ON naming_system_history FIELDS last_updated, version_seq
+DEFINE TABLE node TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD code ON node TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON node TYPE string PERMISSIONS FULL
+  DEFINE FIELD facility ON node TYPE string PERMISSIONS FULL
+  DEFINE FIELD short_code ON node TYPE string PERMISSIONS FULL
+  DEFINE INDEX node_code ON node FIELDS code UNIQUE
+  DEFINE INDEX node_short_code ON node FIELDS facility, short_code UNIQUE
+DEFINE TABLE node_provisioning_code TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON node_provisioning_code TYPE string PERMISSIONS FULL
+  DEFINE FIELD hash ON node_provisioning_code TYPE string PERMISSIONS FULL
+  DEFINE INDEX node_provisioning_code_hash ON node_provisioning_code FIELDS hash UNIQUE
 DEFINE TABLE nutrition_order TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON nutrition_order TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON nutrition_order TYPE array<record> DEFAULT [] PERMISSIONS FULL

@@ -151,6 +151,25 @@ fn openapi() -> utoipa::openapi::OpenApi {
 }
 
 /// The authorization server's settings, read from `files` and the secret files they name.
+/// The facility issuing CA from its certificate and key files (#268).
+fn read_issuing_ca(
+    cert: &std::path::Path,
+    key: &std::path::Path,
+) -> Result<health_pki::Authority, Box<dyn std::error::Error>> {
+    let read = |path: &std::path::Path, what: &str| {
+        std::fs::read_to_string(path).map_err(|_| format!("cannot read {what}"))
+    };
+    let authority = health_pki::Authority::from_pem(
+        &read(cert, "HEALTH_ISSUING_CA_CERT_FILE")?,
+        &read(key, "HEALTH_ISSUING_CA_KEY_FILE")?,
+    )
+    .map_err(|e| format!("the issuing CA: {e}"))?;
+    if authority.tier() != health_pki::Tier::IssuingCa {
+        return Err("HEALTH_ISSUING_CA_CERT_FILE is not a facility issuing CA".into());
+    }
+    Ok(authority)
+}
+
 fn auth_settings(
     files: &config::AuthFiles,
 ) -> Result<auth::AuthSettings, Box<dyn std::error::Error>> {
@@ -195,6 +214,12 @@ fn auth_settings(
             None => Vec::new(),
         },
         registry_nin_system: files.registry_nin_system.clone(),
+        issuing_ca: files
+            .issuing_ca
+            .as_ref()
+            .map(|(cert, key)| read_issuing_ca(cert, key))
+            .transpose()?
+            .map(Arc::new),
         node_code: files
             .node_code
             .parse()

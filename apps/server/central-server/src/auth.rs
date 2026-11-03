@@ -23,6 +23,7 @@ use health_fhir_server::{FacilityTag, FhirServer};
 use health_identity::PhoneNumber;
 use health_identity::SessionPolicy;
 use health_identity::snapshot::{RolePermissions, SnapshotPolicy};
+use health_provisioning::{Issuer, NodeRegistry};
 use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use serde::Deserialize;
@@ -55,6 +56,8 @@ pub(crate) struct AuthSettings {
     pub(crate) portal: Option<PortalSettings>,
     /// Payments and cashier shifts (#254), with the access policy.
     pub(crate) payments: Option<health_fhir_server::PaymentConfig>,
+    /// The facility issuing CA (#268), with its key at hand until the KMS adapter.
+    pub(crate) issuing_ca: Option<Arc<health_pki::Authority>>,
 }
 
 /// The patient portal's phone sign-in.
@@ -123,6 +126,7 @@ impl std::fmt::Debug for AuthSettings {
             .field("clients", &self.clients)
             .field("snapshot_keys", &self.snapshot_keys.len())
             .field("policy", &self.policy.is_some())
+            .field("issuing_ca", &self.issuing_ca.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -210,8 +214,18 @@ pub(crate) fn routes(
         });
     }
     let accounts = store.clone();
+    // Edge provisioning (#268): the code is its only credential, so it is outside the gates.
+    let provisioning = settings.issuing_ca.as_ref().map(|issuer| {
+        let registry = NodeRegistry::new(fhir_store.clone(), Arc::new(SystemClock), "central");
+        alert_exempt_hourly(registry.clone());
+        let issuer: Arc<dyn Issuer> = issuer.clone();
+        health_provisioning::router(registry, issuer)
+    });
     let server = AuthServer::new(config, signer, credentials, store, Arc::new(SystemClock));
     let mut api = server.session_route();
+    if let Some(provisioning) = provisioning {
+        api = api.merge(provisioning);
+    }
     let mut router = Router::new().nest("/auth", server.router());
     if let (Some(policy), false) = (&settings.policy, settings.snapshot_keys.is_empty()) {
         let subjects = Subjects::new(server.verifier(), policy.roles.clone())
@@ -270,6 +284,25 @@ pub(crate) fn routes(
         }
     }
     Ok(router.nest("/api", api))
+}
+
+/// Keeps every active edge running under an encryption exemption alerting, hourly (ADR 0048:
+/// a standing alert at central).
+fn alert_exempt_hourly(registry: NodeRegistry) {
+    tokio::spawn(async move {
+        let mut hourly = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            hourly.tick().await;
+            match registry.exempt().await {
+                Ok(nodes) => {
+                    for node in nodes {
+                        tracing::warn!(alert = "encryption-exempt", node = %node.id, facility = %node.facility, "an edge runs without full-disk encryption, under an exemption");
+                    }
+                }
+                Err(error) => tracing::error!(%error, "the node registry could not be read"),
+            }
+        }
+    });
 }
 
 /// The FHIR API: every interaction decided for the request's subject at central's scope, and
@@ -512,6 +545,7 @@ mod tests {
             registry_nin_system: None,
             portal: None,
             payments: None,
+            issuing_ca: None,
             node_code: "C1".parse().expect("node code"),
         }
     }

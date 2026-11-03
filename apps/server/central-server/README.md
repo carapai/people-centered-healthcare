@@ -29,6 +29,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_DEV_OTP_OUTBOX` | required with the portal | **Development and e2e only.** A file each one-time code is appended to (`{phone} {code}`); nothing reaches a phone. It is the only sender until an SMS provider is chosen ([#235](https://github.com/carapai/people-centered-healthcare/issues/235)), and central logs a warning while it is in use |
 | `HEALTH_PAYMENT_TILLS` | none | The tills, comma-separated (#254). With them and the access policy, `/api/payments` takes payments and runs cashier shifts |
 | `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217) |
+| `HEALTH_ISSUING_CA_CERT_FILE`, `HEALTH_ISSUING_CA_KEY_FILE` | none | The facility issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS (#268). With them, `/api/provisioning/nodes` is served, so an edge can provision itself with a one-time code. Set both or neither |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup
@@ -67,6 +68,11 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - **Hashes:** central's pepper key unseals each one, and the bundle encrypts it to the edge's facility intermediate, the certificate central issued it.
 - **Signature:** the bundle is signed with the snapshot key.
 - **Output:** the command prints the intermediate's SPKI pin it encrypted to. The edge imports the bundle on its console (#75). The bundle also carries the access policy's `roles` and its `locally_grantable` list, the roles a facility admin may grant on an edge offline.
+
+`central-server provision code <facility> --by <operator> [--dns <name>]… [--exempt <reason>]` issues a one-time code an edge provisions itself with (#268), and prints it once.
+- **`--dns`:** the facility's DNS names, for its intermediate.
+- **`--exempt`:** grants the edge an exemption from full-disk encryption (ADR 0048), with its reason. The exemption is audited, and central alerts on the node hourly while it is active.
+- **Where the edge redeems it:** `POST /api/provisioning/nodes`, served when `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE` are set ([health-provisioning](../../../crates/infrastructure/health-provisioning/README.md)).
 
 `central-server provision snapshot-keys <out>` writes the snapshot public keys edges trust, `HEALTH_SNAPSHOT_KEYS_FILE` on an edge, as a JSON array of JWKs.
 

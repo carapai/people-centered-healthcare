@@ -714,6 +714,7 @@ dependencies = [
  "health-identity",
  "health-observability",
  "health-pki",
+ "health-provisioning",
  "health-registries-app",
  "health-surrealdb",
  "health-time",
@@ -2654,6 +2655,30 @@ dependencies = [
  "thiserror",
  "time",
  "x509-parser",
+]
+
+[[package]]
+name = "health-provisioning"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-audit",
+ "health-identity",
+ "health-persistence",
+ "health-pki",
+ "health-surrealdb",
+ "health-time",
+ "http-body-util",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

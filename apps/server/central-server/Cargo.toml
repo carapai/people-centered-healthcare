@@ -27,6 +27,7 @@ health-identifiers = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
 health-pki = { workspace = true }
+health-provisioning = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }

@@ -24,6 +24,10 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 - **Devices** (migration `0020_devices`; #74): `auth_device`, the edge's device registry, unique by key thumbprint, changed only by compare-and-set on `version` and never deleted; and `auth_enrollment`, pending requests, unique by key and by pairing code, with expired ones dropped before each new request and by `purge_auth`. Used by `health_auth::SurrealAuthStore`.
 - **PINs** (migration `0021_pins`; #75): `auth_pin`, keyed by account and device key thumbprint, holds a sealed PIN hash and its wrong tries. `auth_session` gains `account` and `jkt` columns, indexed, so `device_auth_sessions` finds a user's live session on a device.
 - **Provisional accounts** (migration `0023_provisional`; #75): `auth_local_provisional`, one record per account created offline.
+- **Nodes** (migration `0024_nodes`; #268): `node_provisioning_code` and `node`, used by `health-provisioning`.
+  - A code is stored by the sha-256 of its text, never the text itself.
+  - Unique indexes allow one node per code and one short code per facility.
+  - A node row is never deleted.
 - **Offline administration** (migration `0022_local_admin`; #75): `auth_local_grant` (the grant's JSON, its JWS signed with the node's key, and its account, facility and expiry, indexed), `auth_local_revocation` keyed by account, and `auth_local_config`, one record holding the country's role mappings and grantable roles.
 - **Registration review** (migration `0013_registration_review`): the review queue also takes `registration-request` items (#111).
 - **Caregiver grants** (migration `0014_caregiver_grant`): `health_consent::GrantStore`, one record per grant, indexed by patient and by caregiver.
