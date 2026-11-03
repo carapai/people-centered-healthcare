@@ -18,10 +18,13 @@ const QUERY: &str = "response_type=code&client_id=health-client&redirect_uri=htt
 fn app() -> Router {
     let credentials = Credentials::new(Vec::new()).expect("credentials");
     let store = MemoryStore::default();
+    let account = AccountId(Uuid::now_v7());
     store.put_account(LoginAccount {
-        id: AccountId(Uuid::now_v7()),
+        id: account,
         username: "nakato".into(),
-        credential: credentials.hash("correct horse battery").expect("hash"),
+        credential: credentials
+            .credential(account, "correct horse battery")
+            .expect("hash"),
         status: AccountStatus::Active,
         lockout: Lockout::default(),
     });
@@ -150,21 +153,22 @@ fn new_passwords_are_checked_against_the_breached_list() {
     use health_auth::{BreachedPasswords, SetPasswordError};
     use health_identity::{PasswordPolicy, PasswordRejected};
     let credentials = Credentials::new(Vec::new()).expect("credentials");
+    let account = AccountId(Uuid::now_v7());
     let policy = PasswordPolicy::default();
     let list = BreachedPasswords::platform();
     // Long enough, but one of the most common passwords: refused, with no network needed.
     assert_eq!(
-        credentials.set_password(&policy, list, "password123", true),
+        credentials.set_password(account, &policy, list, "password123", true),
         Err(SetPasswordError::Rejected(PasswordRejected::Breached))
     );
     assert_eq!(
-        credentials.set_password(&policy, list, "short", true),
+        credentials.set_password(account, &policy, list, "short", true),
         Err(SetPasswordError::Rejected(PasswordRejected::TooShort {
             minimum: 8
         }))
     );
     let hash = credentials
-        .set_password(&policy, list, "tumbling otter quarry 7919", true)
+        .set_password(account, &policy, list, "tumbling otter quarry 7919", true)
         .expect("accepted");
-    assert!(credentials.verify("tumbling otter quarry 7919", &hash));
+    assert!(credentials.verify(account, "tumbling otter quarry 7919", &hash));
 }

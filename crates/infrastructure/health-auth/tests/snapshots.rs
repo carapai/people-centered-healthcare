@@ -57,7 +57,9 @@ fn edge() -> Edge {
     store.put_account(LoginAccount {
         id: account,
         username: "okello".into(),
-        credential: credentials.hash("correct horse battery").expect("hash"),
+        credential: credentials
+            .credential(account, "correct horse battery")
+            .expect("hash"),
         status: AccountStatus::Active,
         lockout: Lockout::default(),
     });

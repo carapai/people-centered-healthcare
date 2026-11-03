@@ -543,7 +543,7 @@ async fn authorize_login<S: AuthStore>(
     }
     if !inner
         .credentials
-        .verify(&form.password, &account.credential)
+        .verify(account.id, &form.password, &account.credential)
     {
         let lockout = account.lockout.failed(&inner.config.lockout, now);
         return match inner.store.set_lockout(account.id, lockout).await {

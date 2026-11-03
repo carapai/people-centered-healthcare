@@ -36,7 +36,8 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_AUTH_KEYS_FILE`: the signing keys, one hex line each, the active key first.
     /// Required with an issuer.
     pub(crate) keys_file: PathBuf,
-    /// `HEALTH_AUTH_PEPPER_FILE`: the Argon2id pepper. Optional.
+    /// `HEALTH_AUTH_PEPPER_FILE`: the pepper key, 64 hex characters, that stored password hashes
+    /// are encrypted under (ADR 0059). Optional, for development.
     pub(crate) pepper_file: Option<PathBuf>,
     /// `HEALTH_AUTH_CLIENT_ID`, default `health-client` (the web client).
     pub(crate) client_id: String,

@@ -66,7 +66,7 @@ fn harness() -> Harness {
     let server = AuthServer::new(
         config,
         TokenSigner::generate(),
-        Credentials::new(b"pepper".to_vec()).expect("credentials"),
+        Credentials::new([7; 32].to_vec()).expect("credentials"),
         MemoryStore::default(),
         clock.clone(),
     );

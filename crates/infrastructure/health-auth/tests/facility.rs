@@ -55,7 +55,7 @@ fn central(facilities: &[&str]) -> Central {
         store.put_account(LoginAccount {
             id: account,
             username: username.into(),
-            credential: credentials.hash(PASSWORD).expect("hash"),
+            credential: credentials.credential(account, PASSWORD).expect("hash"),
             status: AccountStatus::Active,
             lockout: Lockout::default(),
         });

@@ -16,7 +16,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 | `HEALTH_AUTH_ISSUER` | none | The authorization server's issuer URL, e.g. `https://central.ug/auth`; without it nothing is mounted at `/auth` |
 | `HEALTH_AUTH_KEYS_FILE` | required with an issuer | Signing keys, one hex-encoded 32-byte P-256 secret per line, the active key first. Keep a rotated-out key on a later line until its tokens have expired |
-| `HEALTH_AUTH_PEPPER_FILE` | none | The Argon2id pepper |
+| `HEALTH_AUTH_PEPPER_FILE` | none | The pepper key: 64 hex characters (32 bytes) that every stored password hash is encrypted under (ADR 0059). Without it hashes are stored as they are, for development only |
 | `HEALTH_AUTH_CLIENT_ID` | `health-client` | The web client |
 | `HEALTH_AUTH_REDIRECT_URIS` | required with an issuer | The web client's redirect URIs, comma-separated |
 | `HEALTH_AUTH_LOGIN_PAGE` | none | The web client's sign-in page, e.g. `/sign-in`; without it the authorization server shows its own minimal form |
