@@ -110,6 +110,10 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 `LocalAdmin` serves a signed-in facility admin on an edge (offline-auth.md § Offline user and role administration):
 - **`GET /access/grants`** lists the facility's unexpired local grants. **`POST /access/grants`** takes `username`, `role` and `days`; the role must be on the bundle's locally grantable list and carry no never-offline permission (`health_identity::snapshot::NEVER_OFFLINE`), for 1 to 7 days, to staff already provisioned here.
 - **`GET /access/revocations`** lists local revocations. **`POST /access/revocations`** takes `username`. An admin cannot revoke their own access.
+- **`POST /access/accounts`** creates a provisional account for new staff. It takes `username`, the admin's initial `password` (which must meet the policy), `role` and `days`, and creates the Login Account, its `ProvisionalAccount` record and the role's local grant in one transaction, audited. It answers 409 for a taken username.
+  - **The first sign-in** with the admin's password is answered `change_password` (the login page's `error`, or 403 without one) until the user sets their own.
+  - **The snapshot:** with no central snapshot, the account signs in under `ProvisionalAccount::snapshot`, which has no roles of its own. Its local grant gives it all it has, and it lapses with the grant.
+- **`POST /password`** (any user, under `/auth`): `username`, the current `password` and a `new_password`, which must pass the password policy (8 characters with a device factor) and the breached-password list. A wrong current password counts towards lockout. It clears a provisional account's `must_change_password`.
 - **Who may:** the caller's effective snapshot must give `access.administer-local` under the role mappings central provisioned in its bundle (`LocalConfig`). Otherwise 403.
 - **Signing:** each grant is signed through a `GrantSigner` with the node's key, for central to ratify once sync exists.
 - **Audit:** each grant and revocation commits with its AuditEvent (DICOM `110137`, coded `local-grant` or `local-revocation`).

@@ -150,6 +150,42 @@ pub fn with_grants(
     snapshot
 }
 
+/// A new member of staff's account, created at an edge offline (offline-auth.md § Offline user
+/// and role administration): their roles are local grants only, it lasts as long as a grant,
+/// and they set their own password at their first sign-in. Central reconciles it into the
+/// workforce registry, or revokes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProvisionalAccount {
+    /// The account.
+    pub account: AccountId,
+    /// Where.
+    pub facility: String,
+    /// The facility admin who created it.
+    pub created_by: AccountId,
+    /// When.
+    pub created_at: Timestamp,
+    /// When it lapses, unless central reconciles it first.
+    pub not_after: Timestamp,
+    /// Whether the password the admin set must still be changed.
+    pub must_change_password: bool,
+}
+
+impl ProvisionalAccount {
+    /// The snapshot such an account signs in under at `at`: no roles of its own, so local grants
+    /// give it all it has; `None` once it has lapsed.
+    pub fn snapshot(&self, at: Timestamp) -> Option<PermissionSnapshot> {
+        (at < self.not_after).then(|| PermissionSnapshot {
+            account: self.account,
+            facility: self.facility.clone(),
+            roles: Vec::new(),
+            programs: Vec::new(),
+            issued_at: self.created_at,
+            not_after: self.not_after,
+            snapshot_version: 0,
+        })
+    }
+}
+
 /// Local access revoked at an edge: the user signs in there no more, and their sessions end.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocalRevocation {

@@ -15,7 +15,7 @@ use crate::AccountId;
 pub use clock::{ClockBroken, ClockFloor};
 pub use local::{
     ADMINISTER_LOCAL, GrantRefused, LocalGrant, LocalGrantPolicy, LocalRevocation, NEVER_OFFLINE,
-    with_grants,
+    ProvisionalAccount, with_grants,
 };
 pub use roles::{Permission, RolePermissions, UnknownRole};
 

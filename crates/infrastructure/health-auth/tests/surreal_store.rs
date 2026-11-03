@@ -730,3 +730,92 @@ async fn local_grants_revocations_and_configuration_are_kept() {
         Some(config)
     );
 }
+
+#[tokio::test]
+async fn a_provisional_account_is_created_whole_and_its_password_change_clears_the_flag() {
+    use health_auth::AuthStore;
+    use health_identity::snapshot::{LocalGrant, ProvisionalAccount};
+    use health_time::SignedDuration;
+    let node = node().await;
+    let (account, admin) = (AccountId(Uuid::now_v7()), AccountId(Uuid::now_v7()));
+    let now = health_time::Timestamp::now();
+    let until = now
+        .checked_add(SignedDuration::from_hours(72))
+        .expect("time");
+    let login = LoginAccount {
+        id: account,
+        username: "mukasa".into(),
+        credential: "sealed".into(),
+        status: AccountStatus::Active,
+        lockout: Lockout::default(),
+    };
+    let provisional = ProvisionalAccount {
+        account,
+        facility: "KAM013".into(),
+        created_by: admin,
+        created_at: now,
+        not_after: until,
+        must_change_password: true,
+    };
+    let grant = LocalGrant {
+        id: Uuid::now_v7(),
+        account,
+        facility: "KAM013".into(),
+        role: "nurse".into(),
+        granted_by: admin,
+        granted_at: now,
+        not_after: until,
+    };
+    let audit = serde_json::json!({
+        "resourceType": "AuditEvent",
+        "recorded": now.to_string(),
+        "agent": [{ "who": { "display": "admin" }, "requestor": true }],
+        "source": { "observer": { "display": "edge" } },
+        "code": { "coding": [{ "system": "urn:health:audit-event", "code": "provisional-account" }] },
+    });
+    node.store
+        .create_provisional(&login, &provisional, &grant, "jws", &audit)
+        .await
+        .expect("create");
+    assert_eq!(
+        node.store.provisional(account).await.expect("read"),
+        Some(provisional.clone())
+    );
+    assert_eq!(
+        node.store
+            .local_grants("KAM013", Some(account), now)
+            .await
+            .expect("grants"),
+        vec![grant.clone()]
+    );
+    // A second account by the same username is refused.
+    let mut again = login.clone();
+    again.id = AccountId(Uuid::now_v7());
+    assert!(
+        node.store
+            .create_provisional(&again, &provisional, &grant, "jws", &audit)
+            .await
+            .is_err()
+    );
+
+    node.store
+        .set_credential(account, "changed".into())
+        .await
+        .expect("change");
+    let stored = node
+        .store
+        .account(account)
+        .await
+        .expect("read")
+        .expect("account");
+    assert_eq!(stored.credential, "changed");
+    assert!(
+        !node
+            .store
+            .provisional(account)
+            .await
+            .expect("read")
+            .expect("record")
+            .must_change_password
+    );
+}

@@ -95,7 +95,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
     - laid over the central snapshot at sign-in and on every request, for at most 7 days;
     - refused for any role carrying a never-offline permission, even if the list names it.
   - **Revocations** are a local deny-list that refuses the user at once.
-  - **Provisional accounts** follow in part 3b.
+  - **Provisional accounts** (part 3b): created by the admin with a role's local grant, lasting as long. The user must set their own password at `/auth/password` before any token. With no central snapshot, the account's roles come from its grant alone.
 - **Its READMEs** cover the details: [health-identity](../../crates/domains/health-identity/README.md), [health-auth](../../crates/infrastructure/health-auth/README.md).
 - **Follow-ups:**
   - persistence: done in #187 (`SurrealAuthStore`, migration `0008_auth`);

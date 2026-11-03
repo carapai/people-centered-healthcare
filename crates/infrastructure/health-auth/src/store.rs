@@ -7,7 +7,9 @@ use std::future::Future;
 use std::sync::Mutex;
 
 use health_access_policy::BreakGlassEvent;
-use health_identity::snapshot::{ClockFloor, LocalGrant, LocalRevocation, RolePermissions};
+use health_identity::snapshot::{
+    ClockFloor, LocalGrant, LocalRevocation, ProvisionalAccount, RolePermissions,
+};
 use health_identity::{
     AccountId, Device, DeviceId, EnrollmentRequest, Lockout, LoginAccount, PhoneAccount,
     PhoneNumber, Scopes, SessionState,
@@ -384,6 +386,37 @@ pub trait AuthStore: Send + Sync {
         let _ = (revocation, audit);
         async { Err(StoreError("this node keeps no local revocations".into())) }
     }
+    /// `account`'s provisional record, if it was created here offline.
+    fn provisional(
+        &self,
+        account: AccountId,
+    ) -> impl Future<Output = Result<Option<ProvisionalAccount>, StoreError>> + Send {
+        let _ = account;
+        async { Ok(None) }
+    }
+    /// Creates a provisional account: its Login Account, its record, its local grant (with the
+    /// grant's JWS) and their AuditEvent, together. Fails if the username is taken.
+    fn create_provisional(
+        &self,
+        account: &LoginAccount,
+        provisional: &ProvisionalAccount,
+        grant: &LocalGrant,
+        jws: &str,
+        audit: &Value,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = (account, provisional, grant, jws, audit);
+        async { Err(StoreError("this node keeps no provisional accounts".into())) }
+    }
+    /// Replaces `account`'s stored credential after a password change, which also clears a
+    /// provisional account's need to change it.
+    fn set_credential(
+        &self,
+        account: AccountId,
+        credential: String,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = (account, credential);
+        async { Err(StoreError("this node cannot change passwords".into())) }
+    }
     /// The country's role mappings and locally grantable roles, as central provisioned them.
     fn local_config(&self) -> impl Future<Output = Result<Option<LocalConfig>, StoreError>> + Send {
         async { Ok(None) }
@@ -429,6 +462,7 @@ pub(crate) struct State {
     grants: Vec<LocalGrant>,
     revocations: HashMap<AccountId, LocalRevocation>,
     local: Option<LocalConfig>,
+    provisional: HashMap<AccountId, ProvisionalAccount>,
 }
 
 /// An in-memory store.
@@ -815,6 +849,52 @@ impl AuthStore for MemoryStore {
 
     async fn local_config(&self) -> Result<Option<LocalConfig>, StoreError> {
         Ok(self.lock().local.clone())
+    }
+
+    async fn provisional(
+        &self,
+        account: AccountId,
+    ) -> Result<Option<ProvisionalAccount>, StoreError> {
+        Ok(self.lock().provisional.get(&account).cloned())
+    }
+
+    async fn create_provisional(
+        &self,
+        account: &LoginAccount,
+        provisional: &ProvisionalAccount,
+        grant: &LocalGrant,
+        _jws: &str,
+        _audit: &Value,
+    ) -> Result<(), StoreError> {
+        let mut state = self.lock();
+        if state
+            .accounts
+            .values()
+            .any(|a| a.username == account.username)
+        {
+            return Err(StoreError("the username is taken".into()));
+        }
+        state.accounts.insert(account.id, account.clone());
+        state.provisional.insert(account.id, provisional.clone());
+        state.grants.push(grant.clone());
+        Ok(())
+    }
+
+    async fn set_credential(
+        &self,
+        account: AccountId,
+        credential: String,
+    ) -> Result<(), StoreError> {
+        let mut state = self.lock();
+        let found = state
+            .accounts
+            .get_mut(&account)
+            .ok_or_else(|| StoreError("no such account".into()))?;
+        found.credential = credential;
+        if let Some(provisional) = state.provisional.get_mut(&account) {
+            provisional.must_change_password = false;
+        }
+        Ok(())
     }
 
     async fn put_local_config(&self, config: &LocalConfig) -> Result<(), StoreError> {

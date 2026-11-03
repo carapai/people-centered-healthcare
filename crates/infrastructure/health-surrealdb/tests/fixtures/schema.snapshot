@@ -128,6 +128,8 @@ DEFINE TABLE auth_local_grant TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD jws ON auth_local_grant TYPE string PERMISSIONS FULL
   DEFINE FIELD not_after ON auth_local_grant TYPE datetime PERMISSIONS FULL
   DEFINE INDEX auth_local_grant_by ON auth_local_grant FIELDS account, facility
+DEFINE TABLE auth_local_provisional TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON auth_local_provisional TYPE string PERMISSIONS FULL
 DEFINE TABLE auth_local_revocation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON auth_local_revocation TYPE string PERMISSIONS FULL
 DEFINE TABLE auth_otp TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
