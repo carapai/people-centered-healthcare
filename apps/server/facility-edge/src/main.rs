@@ -30,6 +30,7 @@
 //! | 1 | anything else (the listener, telemetry, serving) |
 
 mod backup;
+mod central;
 mod encryption;
 mod provision;
 mod service;
@@ -45,13 +46,16 @@ use health_observability::{LogSink, Stdout, TelemetryConfig};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let config = match EdgeConfig::from_lookup(|name| std::env::var(name).ok()) {
+    let mut config = match EdgeConfig::from_lookup(|name| std::env::var(name).ok()) {
         Ok(config) => config,
         Err(error) => {
             eprintln!("facility-edge: {error}");
             return ExitCode::from(2);
         }
     };
+    // Online provisioning (#268) gave the node its identity; the environment may override it.
+    let set = |name: &str| std::env::var(name).is_ok_and(|v| !v.trim().is_empty());
+    provision::adopt_identity(&mut config, set("HEALTH_NODE_ID"), set("HEALTH_FACILITY"));
     match args.first().map(String::as_str) {
         None => ExitCode::from(block_on(&config, Arc::new(Foreground), None)),
         Some("--service") if args.len() == 1 => service::run(config),
