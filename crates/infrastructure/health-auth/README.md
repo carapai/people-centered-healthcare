@@ -91,6 +91,14 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 
 - **Device-bound tokens** (ADR 0009): with `AuthConfig::devices`, `/token` issues and refreshes tokens only for a DPoP key that is an enrolled, active device. The check is `DeviceGate::check`. An unknown or revoked key gets 401 `invalid_dpop_proof`, so revoking a device ends its session within one access-token lifetime.
   - The check is at `/token`, not at `/authorize`: `/authorize` is a browser navigation, which carries no proof.
+- **Idle lock and PIN** (`AuthConfig::idle_lock`; offline-auth.md § Tokens and sessions):
+  - **Activity:** a session records its last activity at sign-in, at each refresh and at each unlock. Idle past `SessionPolicy::idle_lock` (15 minutes), a refresh gets 401 `session_locked`; the session lives on.
+  - **`POST /pin`:** with a DPoP-bound access token, sets the user's 6-digit PIN on the device the token is bound to. It is stored per (account, device key), sealed under the pepper key like a password.
+  - **`POST /unlock`:** `username`, `pin` and `client_id`, with a DPoP proof by the device's key. It resumes the user's live session on that device, or switches a shared device to it, and issues fresh tokens without an ID token: a PIN is not a sign-in.
+    - Every failure gets one refusal, spending an Argon2 verification.
+    - Five wrong PINs (`PinPolicy`) end that session and remove the PIN, so only a password signs the user in there again.
+    - A PIN never starts a session.
+  - **One session per user per device:** a new sign-in on a device ends the user's earlier session there.
 - **One replay check per proof:** `DeviceGate`'s layer records a proof's `jti` only when no `Authorization` header comes with it. With a token, `AccessVerifier` records it. A gated route that does not verify the token therefore does not record the replay.
 - **Importing the bundle** (ADR 0059): `Provisioning::router` serves `POST /api/admin/provision/accounts`, for the caller to guard. It takes the bundle's JWS as the body.
   - **What it refuses:** with 422, a bundle that is not central's, or is for another node or facility; a bundle encrypted to another key; and any snapshot inside that is not central's or not for one of the bundle's accounts at this facility.

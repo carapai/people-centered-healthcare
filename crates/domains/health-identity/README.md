@@ -19,8 +19,10 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
   - a password on the breached-password list is refused (the list is [#189](https://github.com/carapai/people-centered-healthcare/issues/189)).
 - **`SessionPolicy`**:
   - access tokens last 15 minutes;
+  - a session idle for 15 minutes is locked (`locked`) until a PIN unlocks it;
   - a session is refreshable until 12 hours after its password login;
   - no access token outlives that cap.
+- **`PinPolicy`**: a PIN is exactly 6 digits, and 5 wrong ones end the session on that device.
 - **`Scopes`**: SMART App Launch v2 scopes.
   - Resource scopes are `{patient|user|system}/{Type|*}.{cruds}[?query]`, with the letters in order and none repeated.
   - SMART v1 forms are refused.

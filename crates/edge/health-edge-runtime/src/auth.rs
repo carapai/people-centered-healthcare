@@ -124,6 +124,9 @@ pub(crate) fn routes(
         policy: SnapshotPolicy::default(),
     });
     auth.devices = Some(gate.check());
+    // Sessions lock after 15 minutes idle, and a PIN resumes or switches users on a shared
+    // device (offline-auth.md § Tokens and sessions).
+    auth.idle_lock = true;
     let server = AuthServer::new(auth, signer, credentials.clone(), store.clone(), clock);
 
     let recipient: RecipientKey = {

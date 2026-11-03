@@ -81,6 +81,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("auth_otp", "identity"),
     ("auth_device", "identity"),
     ("auth_enrollment", "identity"),
+    ("auth_pin", "identity"),
     ("caregiver_grant", "consent"),
     ("stock_transfer", "inventory"),
     ("stock_reconciliation", "inventory"),

@@ -73,6 +73,7 @@ fn session_json(session: &Session) -> Value {
         "facility": session.facility,
         "jkt": session.jkt,
         "refresh_hash": session.refresh_hash,
+        "last_active": session.last_active.to_string(),
     })
 }
 
@@ -94,6 +95,15 @@ fn session_of(id: &str, row: &AuthSessionRow) -> Option<Session> {
         facility: v["facility"].as_str().map(str::to_owned),
         jkt: v["jkt"].as_str().map(str::to_owned),
         refresh_hash: row.refresh_hash.clone(),
+        // Sessions stored before the idle lock count as active since their login.
+        last_active: v["last_active"]
+            .as_str()
+            .and_then(|t| t.parse().ok())
+            .or(match state {
+                SessionState::Live { auth_time } => Some(auth_time),
+                SessionState::Ended => None,
+            })
+            .unwrap_or(Timestamp::UNIX_EPOCH),
     })
 }
 
@@ -298,6 +308,8 @@ impl AuthStore for SurrealAuthStore {
             refresh_hash: session.refresh_hash.clone(),
             live: matches!(session.state, SessionState::Live { .. }),
             ends_at: auth_time.checked_add(self.session_cap).unwrap_or(auth_time),
+            account: session.account.to_string(),
+            jkt: session.jkt.clone(),
         };
         let id = session.id.to_string();
         {
@@ -335,11 +347,13 @@ impl AuthStore for SurrealAuthStore {
         id: Uuid,
         previous: &str,
         next: String,
+        at: Timestamp,
     ) -> Result<bool, StoreError> {
         let Some(mut session) = self.session(id).await? else {
             return Ok(false);
         };
         session.refresh_hash.clone_from(&next);
+        session.last_active = at;
         let data = session_json(&session).to_string();
         let id = id.to_string();
         {
@@ -351,6 +365,57 @@ impl AuthStore for SurrealAuthStore {
             tx.commit().await.map_err(failed)?;
             Ok::<_, StoreError>(value)
         }
+    }
+
+    async fn device_session(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> Result<Option<Session>, StoreError> {
+        let mut tx = self.begin().await?;
+        let found = tx
+            .device_auth_sessions(&account.to_string(), jkt)
+            .await
+            .map_err(failed)?;
+        for (id, _) in found {
+            if let Some(session) = self.session(id.parse().map_err(failed)?).await?
+                && matches!(session.state, SessionState::Live { .. })
+            {
+                return Ok(Some(session));
+            }
+        }
+        Ok(None)
+    }
+
+    async fn pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> Result<Option<(String, u32)>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.auth_pin(&account.to_string(), jkt).await.map_err(failed)
+    }
+
+    async fn put_pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+        credential: String,
+        failures: u32,
+    ) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        tx.put_auth_pin(&account.to_string(), jkt, &credential, failures)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn remove_pin(&self, account: AccountId, jkt: &str) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        tx.remove_auth_pin(&account.to_string(), jkt)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)
     }
 
     async fn end_session(&self, id: Uuid) -> Result<(), StoreError> {

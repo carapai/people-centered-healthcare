@@ -65,6 +65,9 @@ pub struct Session {
     pub jkt: Option<String>,
     /// The SHA-256 of the current refresh token; the previous one is refused.
     pub refresh_hash: String,
+    /// When it last issued a token: idle past the policy's lock, it issues none until its user
+    /// unlocks it with their PIN (offline-auth.md § Tokens and sessions).
+    pub last_active: Timestamp,
 }
 
 /// A break-glass grant as stored: what it reports, the session it opens records for, the
@@ -140,13 +143,41 @@ pub trait AuthStore: Send + Sync {
         &self,
         refresh_hash: &str,
     ) -> impl Future<Output = Result<Option<(Session, bool)>, StoreError>> + Send;
-    /// Rotates the refresh token, if `previous` is still the current one (compare-and-set).
+    /// Rotates the refresh token, if `previous` is still the current one (compare-and-set), and
+    /// records the session active at `at`.
     fn rotate_refresh(
         &self,
         id: Uuid,
         previous: &str,
         next: String,
+        at: Timestamp,
     ) -> impl Future<Output = Result<bool, StoreError>> + Send;
+    /// `account`'s live session bound to device key `jkt`: one user has one session per device.
+    fn device_session(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> impl Future<Output = Result<Option<Session>, StoreError>> + Send;
+    /// `account`'s PIN on device `jkt`: its stored credential and wrong tries.
+    fn pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> impl Future<Output = Result<Option<(String, u32)>, StoreError>> + Send;
+    /// Sets `account`'s PIN on device `jkt`.
+    fn put_pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+        credential: String,
+        failures: u32,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send;
+    /// Removes `account`'s PIN on device `jkt`.
+    fn remove_pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send;
     /// Ends a session.
     fn end_session(&self, id: Uuid) -> impl Future<Output = Result<(), StoreError>> + Send;
     /// Records a DPoP proof's `jti` until `until`; false if it was already seen (a replay).
@@ -327,6 +358,7 @@ pub(crate) struct State {
     otps: HashMap<PhoneNumber, PhoneOtp>,
     pub(crate) devices: HashMap<DeviceId, Device>,
     pub(crate) enrollments: HashMap<Uuid, EnrollmentRequest>,
+    pins: HashMap<(AccountId, String), (String, u32)>,
 }
 
 /// An in-memory store.
@@ -473,6 +505,7 @@ impl AuthStore for MemoryStore {
         id: Uuid,
         previous: &str,
         next: String,
+        at: Timestamp,
     ) -> Result<bool, StoreError> {
         let mut state = self.lock();
         let Some(session) = state.sessions.get_mut(&id) else {
@@ -482,6 +515,7 @@ impl AuthStore for MemoryStore {
             return Ok(false);
         }
         session.refresh_hash = next;
+        session.last_active = at;
         state.retired.insert(previous.to_owned(), id);
         Ok(true)
     }
@@ -490,6 +524,49 @@ impl AuthStore for MemoryStore {
         if let Some(session) = self.lock().sessions.get_mut(&id) {
             session.state = SessionState::Ended;
         }
+        Ok(())
+    }
+
+    async fn device_session(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> Result<Option<Session>, StoreError> {
+        Ok(self
+            .lock()
+            .sessions
+            .values()
+            .find(|s| {
+                s.account == account
+                    && s.jkt.as_deref() == Some(jkt)
+                    && matches!(s.state, SessionState::Live { .. })
+            })
+            .cloned())
+    }
+
+    async fn pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+    ) -> Result<Option<(String, u32)>, StoreError> {
+        Ok(self.lock().pins.get(&(account, jkt.to_owned())).cloned())
+    }
+
+    async fn put_pin(
+        &self,
+        account: AccountId,
+        jkt: &str,
+        credential: String,
+        failures: u32,
+    ) -> Result<(), StoreError> {
+        self.lock()
+            .pins
+            .insert((account, jkt.to_owned()), (credential, failures));
+        Ok(())
+    }
+
+    async fn remove_pin(&self, account: AccountId, jkt: &str) -> Result<(), StoreError> {
+        self.lock().pins.remove(&(account, jkt.to_owned()));
         Ok(())
     }
 

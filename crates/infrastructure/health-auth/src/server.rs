@@ -9,7 +9,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use health_identity::{
     AccountId, AccountStatus, LockoutPolicy, OtpPurpose, OtpRefused, PhoneAccount, PhoneNumber,
-    Scope, Scopes, SessionPolicy, SessionState,
+    PinPolicy, Scope, Scopes, SessionPolicy, SessionState,
 };
 use health_time::{Clock, SignedDuration, Timestamp};
 use rand_core::RngCore;
@@ -68,6 +68,12 @@ pub struct AuthConfig {
     /// this checks by the DPoP proof's thumbprint. `/authorize` is a browser navigation, which
     /// carries no proof, so the device is checked here, where the token is bound to it.
     pub devices: Option<DeviceCheck>,
+    /// On an edge: a session idle past `session.idle_lock` issues no token until its user
+    /// unlocks it with their PIN at `/unlock`, which also switches a shared device to another
+    /// user's live session there (offline-auth.md § Tokens and sessions).
+    pub idle_lock: bool,
+    /// The PIN rules.
+    pub pin: PinPolicy,
 }
 
 /// The future a [`DeviceCheck`] answers with.
@@ -99,6 +105,8 @@ impl AuthConfig {
             login_page: None,
             phone_sign_in: None,
             devices: None,
+            idle_lock: false,
+            pin: PinPolicy::default(),
         }
     }
 
@@ -175,6 +183,8 @@ impl<S: AuthStore + 'static> AuthServer<S> {
             .route("/otp", post(send_otp::<S>))
             .route("/token", post(token::<S>))
             .route("/revoke", post(revoke::<S>))
+            .route("/pin", post(set_pin::<S>))
+            .route("/unlock", post(unlock::<S>))
             .with_state(Arc::clone(&self.inner))
     }
 
@@ -1098,7 +1108,16 @@ async fn authorization_code<S: AuthStore>(
         facility: stored.facility,
         jkt,
         refresh_hash: sha256_b64(&refresh),
+        last_active: now,
     };
+    // One session per user per device (offline-auth.md § Tokens and sessions): a new sign-in
+    // there replaces the old one.
+    if inner.config.idle_lock
+        && let Some(jkt) = &session.jkt
+        && let Ok(Some(old)) = inner.store.device_session(session.account, jkt).await
+    {
+        let _ = inner.store.end_session(old.id).await;
+    }
     if inner.store.put_session(session.clone()).await.is_err() {
         return oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
     }
@@ -1143,6 +1162,10 @@ async fn refresh<S: AuthStore>(
     {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant");
     }
+    // Idle past the lock: no token until the user unlocks with their PIN; the session lives on.
+    if inner.config.idle_lock && inner.config.session.locked(session.last_active, now) {
+        return oauth_error(StatusCode::UNAUTHORIZED, "session_locked");
+    }
     // Permissions are never cached past their snapshot: an expired one ends the session.
     let Ok(snapshot) = inner
         .session_snapshot(
@@ -1159,7 +1182,7 @@ async fn refresh<S: AuthStore>(
     let next = random_token();
     match inner
         .store
-        .rotate_refresh(session.id, &hash, sha256_b64(&next))
+        .rotate_refresh(session.id, &hash, sha256_b64(&next), now)
         .await
     {
         Ok(true) => {}
@@ -1167,6 +1190,151 @@ async fn refresh<S: AuthStore>(
     }
     let mut body = inner.tokens(&session, auth_time, &next, None, snapshot.as_ref(), now);
     // A refresh does not re-authenticate, so it issues no new ID token.
+    if let Some(object) = body.as_object_mut() {
+        object.remove("id_token");
+    }
+    (no_store(), Json(body)).into_response()
+}
+
+/// `POST /pin`: sets the signed-in user's PIN on the device their token is bound to.
+#[derive(Deserialize)]
+struct PinForm {
+    pin: String,
+}
+
+async fn set_pin<S: AuthStore>(
+    State(inner): State<Arc<Inner<S>>>,
+    headers: HeaderMap,
+    Form(form): Form<PinForm>,
+) -> Response {
+    let verifier = AccessVerifier {
+        inner: Arc::clone(&inner),
+    };
+    let principal = match verifier
+        .verify(&headers, "POST", &inner.config.endpoint("/pin"))
+        .await
+    {
+        Ok(principal) => principal,
+        Err(refused) => return refused.into_response(),
+    };
+    if !inner.config.pin.valid(&form.pin) {
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_request");
+    }
+    let Ok(Some(Session { jkt: Some(jkt), .. })) = inner.store.session(principal.session).await
+    else {
+        // A PIN belongs to a device: a session with no device key has none.
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_request");
+    };
+    let Ok(credential) = inner.credentials.credential(principal.account, &form.pin) else {
+        return oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
+    };
+    match inner
+        .store
+        .put_pin(principal.account, &jkt, credential, 0)
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable"),
+    }
+}
+
+/// `POST /unlock`: resumes a locked session, or switches the device to another user's live
+/// session there, by username and PIN, with a DPoP proof by the device's key.
+#[derive(Deserialize)]
+struct UnlockForm {
+    username: String,
+    pin: String,
+    client_id: String,
+}
+
+async fn unlock<S: AuthStore>(
+    State(inner): State<Arc<Inner<S>>>,
+    headers: HeaderMap,
+    Form(form): Form<UnlockForm>,
+) -> Response {
+    let now = inner.clock.now();
+    let Some(Ok(proof)) = headers.get("dpop").map(|v| v.to_str()) else {
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_dpop_proof");
+    };
+    let Ok(proof) = inner
+        .check_proof(proof, "POST", &inner.config.endpoint("/unlock"), now)
+        .await
+    else {
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_dpop_proof");
+    };
+    if let Some(devices) = &inner.config.devices
+        && !(devices.0)(proof.jkt.clone()).await
+    {
+        return oauth_error(StatusCode::UNAUTHORIZED, "invalid_dpop_proof");
+    }
+    // One refusal for every failure, each spending an Argon2 verification.
+    let refused = |pin: &str| {
+        inner.credentials.verify_decoy(pin);
+        oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant")
+    };
+    let account = match inner.store.account_by_username(&form.username).await {
+        Ok(Some(account)) if account.status == AccountStatus::Active => account,
+        _ => return refused(&form.pin),
+    };
+    let session = match inner.store.device_session(account.id, &proof.jkt).await {
+        Ok(Some(session))
+            if session.client_id == form.client_id
+                && inner.config.session.may_refresh(session.state, now) =>
+        {
+            session
+        }
+        _ => return refused(&form.pin),
+    };
+    let SessionState::Live { auth_time } = session.state else {
+        return refused(&form.pin);
+    };
+    let Ok(Some((stored, failures))) = inner.store.pin(account.id, &proof.jkt).await else {
+        return refused(&form.pin);
+    };
+    if !inner.credentials.verify(account.id, &form.pin, &stored) {
+        let failures = failures + 1;
+        if inner.config.pin.exhausted(failures) {
+            // Only a password signs this user in on this device again.
+            let _ = inner.store.remove_pin(account.id, &proof.jkt).await;
+            let _ = inner.store.end_session(session.id).await;
+            tracing::warn!(
+                alert = "pin-exhausted",
+                "too many wrong PINs: the session ended"
+            );
+        } else {
+            let _ = inner
+                .store
+                .put_pin(account.id, &proof.jkt, stored, failures)
+                .await;
+        }
+        return oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant");
+    }
+    if failures > 0 {
+        let _ = inner.store.put_pin(account.id, &proof.jkt, stored, 0).await;
+    }
+    let Ok(snapshot) = inner
+        .session_snapshot(
+            &session.client_id,
+            session.account,
+            session.facility.as_deref(),
+            now,
+        )
+        .await
+    else {
+        let _ = inner.store.end_session(session.id).await;
+        return oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant");
+    };
+    let next = random_token();
+    match inner
+        .store
+        .rotate_refresh(session.id, &session.refresh_hash, sha256_b64(&next), now)
+        .await
+    {
+        Ok(true) => {}
+        _ => return oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant"),
+    }
+    let mut body = inner.tokens(&session, auth_time, &next, None, snapshot.as_ref(), now);
+    // A PIN does not authenticate a sign-in, so it issues no ID token.
     if let Some(object) = body.as_object_mut() {
         object.remove("id_token");
     }
