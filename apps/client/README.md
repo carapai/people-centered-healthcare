@@ -25,7 +25,7 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
     - the OAuth transaction (`sign-in.ts`), which holds the PKCE verifier and state across the redirect and nothing clinical;
     - the device's key pair on an edge (`device.ts`, #74; ADR 0009). It is an ECDSA P-256 pair whose private key is non-extractable, kept in IndexedDB as a `CryptoKey`.
   - `device.ts` holds that key. `compose.ts` loads it for edge mode, and `dpopAuth` signs every request with it: a proof alone before sign-in, which the edge's device gate requires, and bound to the token (`ath`) after.
-  - `sign-in.ts` is central's authorization code flow with PKCE, configured by `runtime.json`'s `auth`. The `/sign-in` and `/callback` routes use it.
+  - `sign-in.ts` is the authorization code flow with PKCE, configured by `runtime.json`'s `auth`, at central and on an edge (#75). The `/sign-in` and `/callback` routes use it. On an edge, its `/token` and `/revoke` requests carry a DPoP proof by the device's key (`dpopProof`), so tokens are bound to the device and issued only to an enrolled one.
   - `shell.ts` registers the edge's app-shell service worker and runs the version check against `runtime.json`'s `build` (#76).
   - The build's ID is `HEALTH_BUILD_ID`, or the commit. `vite.config.ts` puts it in the bundle and in `dist/build.json`, which the edge embeds beside the bundle.
 - `src/features/` holds one folder per Bounded Context. Feature code uses `usePlatform()` and the ports.

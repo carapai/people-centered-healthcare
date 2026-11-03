@@ -1,4 +1,4 @@
-import { bearerAuth, dpopAuth } from './auth'
+import { bearerAuth, dpopAuth, dpopProof } from './auth'
 import { type DeviceKeys, deviceKeys, indexedDbKeyStorage } from './device'
 import { sseEventSource } from './events'
 import { fhirClient } from './fhir'
@@ -113,8 +113,22 @@ export function httpPlatform(
     operations: operationClient(transport),
     registries: registriesCommands(fhirTransport, fhirPath, ninSystem),
     session,
-    // Edges sign in with DPoP-bound tokens once devices are enrolled (#74, #75).
-    ...(signInConfig === undefined || mode !== 'central' ? {} : { signIn: signIn(signInConfig, session, { fetch: fetchImpl }) }),
+    // An edge's tokens are bound to the device's key (DPoP) and issued only to an enrolled device.
+    ...(signInConfig === undefined
+      ? {}
+      : {
+          signIn: signIn(signInConfig, session, {
+            fetch: fetchImpl,
+            ...(device === undefined
+              ? {}
+              : {
+                  proof: async (method: string, url: URL) => {
+                    const keys = device.current()
+                    return keys === undefined ? undefined : dpopProof(keys, method, url)
+                  },
+                }),
+          }),
+        }),
     ...(portal === undefined ? {} : { portal }),
     ...(device === undefined ? {} : { device }),
     events: sseEventSource(`${apiBase.replace(/\/$/, '')}/events`, auth, { fetch: fetchImpl }),

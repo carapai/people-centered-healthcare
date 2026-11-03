@@ -111,7 +111,8 @@ jobs:
       # The client first: the edge's build script embeds apps/client/dist.
       - run: bun run codegen && bun run build
         working-directory: apps/client
-      - run: cargo build --locked -p facility-edge
+      # The edge, and the fixture that plays central for its sign-in scenario (#75).
+      - run: cargo build --locked -p facility-edge --bin facility-edge --example edge-fixture
       - run: bun run test:e2e:edge
         working-directory: apps/client
         env:

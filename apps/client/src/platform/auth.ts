@@ -24,6 +24,38 @@ export function bearerAuth(session: SessionPort): AuthStrategy {
   }
 }
 
+/** The public half of a device key, as a JWK, cached per key. */
+const jwks = new WeakMap<CryptoKey, Promise<JsonWebKey>>()
+
+function publicJwk(key: CryptoKey): Promise<JsonWebKey> {
+  let jwk = jwks.get(key)
+  if (jwk === undefined) {
+    jwk = crypto.subtle.exportKey('jwk', key).then(({ kty, crv, x, y }) => ({ kty, crv, x, y }) as JsonWebKey)
+    jwks.set(key, jwk)
+  }
+  return jwk
+}
+
+/**
+ * An RFC 9449 DPoP proof for `method` on `url` by `keys`: bound to `token` (`ath`) when one is
+ * given, and carrying the server's `nonce` when it asked for one.
+ */
+export async function dpopProof(keys: CryptoKeyPair, method: string, url: URL, token?: string, nonce?: string): Promise<string> {
+  const header = { typ: 'dpop+jwt', alg: 'ES256', jwk: await publicJwk(keys.publicKey) }
+  const claims = {
+    jti: crypto.randomUUID(),
+    htm: method,
+    // The URI without query and fragment (RFC 9449 § 4.2).
+    htu: url.origin + url.pathname,
+    iat: Math.floor(Date.now() / 1000),
+    ...(token === undefined ? {} : { ath: base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(token)))) }),
+    ...(nonce === undefined ? {} : { nonce }),
+  }
+  const input = `${base64url(utf8(JSON.stringify(header)))}.${base64url(utf8(JSON.stringify(claims)))}`
+  const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.privateKey, utf8(input))
+  return `${input}.${base64url(new Uint8Array(signature))}`
+}
+
 /**
  * RFC 9449 DPoP. `deviceKey` returns the device's ES256 key pair (a non-extractable private key,
  * `DeviceKeys`), or nothing before the device has one. Every request then carries a proof, which
@@ -31,36 +63,13 @@ export function bearerAuth(session: SessionPort): AuthStrategy {
  */
 export function dpopAuth(session: SessionPort, deviceKey: () => CryptoKeyPair | undefined): AuthStrategy {
   let nonce: string | undefined
-  const jwks = new WeakMap<CryptoKey, Promise<JsonWebKey>>()
-
-  function publicJwk(key: CryptoKey): Promise<JsonWebKey> {
-    let jwk = jwks.get(key)
-    if (jwk === undefined) {
-      jwk = crypto.subtle.exportKey('jwk', key).then(({ kty, crv, x, y }) => ({ kty, crv, x, y }) as JsonWebKey)
-      jwks.set(key, jwk)
-    }
-    return jwk
-  }
-
   return {
     async headers(method, url) {
       const keys = deviceKey()
       if (keys === undefined) return {}
       // Before sign-in the proof alone, which the edge's device gate requires of every API call.
       const token = session.accessToken()
-      const header = { typ: 'dpop+jwt', alg: 'ES256', jwk: await publicJwk(keys.publicKey) }
-      const claims = {
-        jti: crypto.randomUUID(),
-        htm: method,
-        // The URI without query and fragment (RFC 9449 § 4.2).
-        htu: url.origin + url.pathname,
-        iat: Math.floor(Date.now() / 1000),
-        ...(token === undefined ? {} : { ath: base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(token)))) }),
-        ...(nonce === undefined ? {} : { nonce }),
-      }
-      const input = `${base64url(utf8(JSON.stringify(header)))}.${base64url(utf8(JSON.stringify(claims)))}`
-      const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.privateKey, utf8(input))
-      const dpop = `${input}.${base64url(new Uint8Array(signature))}`
+      const dpop = await dpopProof(keys, method, url, token, nonce)
       return token === undefined ? { dpop } : { authorization: `DPoP ${token}`, dpop }
     },
     retryWithNonce(response) {
