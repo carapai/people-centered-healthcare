@@ -10,6 +10,7 @@ members = [
     "crates/contracts/health-persistence",
     "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
+    "crates/domains/health-configuration",
     "crates/domains/health-consent",
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
@@ -30,6 +31,7 @@ members = [
     "crates/infrastructure/health-http",
     "crates/infrastructure/health-integration",
     "crates/infrastructure/health-observability",
+    "crates/infrastructure/health-packages",
     "crates/infrastructure/health-pki",
     "crates/infrastructure/health-surrealdb",
     "crates/testing/health-persistence-memory",
@@ -70,6 +72,7 @@ health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
 health-node-identity = { path = "crates/edge/health-node-identity" }
+health-configuration = { path = "crates/domains/health-configuration" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
 health-patient-engagement = { path = "crates/domains/health-patient-engagement" }
@@ -81,6 +84,7 @@ health-patient-engagement-app = { path = "crates/application/health-patient-enga
 health-payments-app = { path = "crates/application/health-payments-app" }
 health-observability = { path = "crates/infrastructure/health-observability" }
 health-persistence = { path = "crates/contracts/health-persistence" }
+health-packages = { path = "crates/infrastructure/health-packages" }
 health-pki = { path = "crates/infrastructure/health-pki" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
 health-registries-app = { path = "crates/application/health-registries-app" }

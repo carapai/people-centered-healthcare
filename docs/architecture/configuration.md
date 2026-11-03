@@ -119,5 +119,10 @@ sequenceDiagram
 
 - **Certificate.** Publication uses a dedicated **publication-signing certificate** issued by the national root at a ceremony (ADRs 0008, 0058). It is not a CA, its only EKU is code signing, and it is separate from every TLS certificate.
 - **Rotation.** It is rotated yearly, and its key is held in central's HSM or KMS.
+- **Format** (decided in #86): the `.sig` file is a compact JWS with a detached payload (RFC 7515 Appendix F).
+  - Its header has `alg` `ES256`, `typ` `health-package+jws`, `x5c` (the certificate and any chain below the root) and `iat`, the signing time.
+  - The payload it signs is the tarball's sha-256.
+  - Nodes check the certificate at `iat`, so a package outlives the certificate's yearly rotation. A revoked certificate fails at any time.
+  - [health-packages](../../crates/infrastructure/health-packages/README.md) writes and verifies it.
 - **Trust.** Nodes trust it through the root they already hold. Revocations arrive in the revocation lane.
 - **Custody.** Who holds the national root is in the map's PKI governance fog.

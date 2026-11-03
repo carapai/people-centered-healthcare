@@ -2198,6 +2198,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-configuration"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "health-consent"
 version = "0.1.0"
 dependencies = [
@@ -2468,6 +2477,24 @@ dependencies = [
  "thiserror",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "health-packages"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "flate2",
+ "health-configuration",
+ "health-pki",
+ "health-time",
+ "p256",
+ "rustls-pki-types",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tar",
+ "thiserror",
 ]
 
 [[package]]
