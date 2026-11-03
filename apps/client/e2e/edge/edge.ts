@@ -1,16 +1,23 @@
 // A facility-edge process for the edge suite (#76): the workspace's build (or FACILITY_EDGE_BIN),
 // with the web app embedded, over a fresh data directory. Tests start and stop it themselves, so
 // a test can take the edge away from a loaded page.
-import { spawn } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const binary = process.env['FACILITY_EDGE_BIN'] ?? resolve(import.meta.dirname, '../../../../target/debug/facility-edge')
+// Plays central for sign-in (#75): `cargo build -p facility-edge --example edge-fixture`.
+const fixture = process.env['EDGE_FIXTURE_BIN'] ?? resolve(import.meta.dirname, '../../../../target/debug/examples/edge-fixture')
+
+/** The member of staff central provisions to an edge started with `signIn`. */
+export const staff = { username: 'nakato', password: 'tumbling otter quarry 7919' }
 
 export interface Edge {
   readonly origin: string
+  /** Central's provisioning bundle for `staff`, when the edge serves sign-in. */
+  readonly bundle?: string
   stop(): Promise<void>
 }
 
@@ -25,15 +32,34 @@ function freePort(): Promise<number> {
   })
 }
 
-export async function startEdge(): Promise<Edge> {
+/**
+ * Starts an edge. With `signIn`, it also serves staff sign-in: the keys `provision request` would
+ * seal, central's snapshot keys, and a bundle for `staff` come from `edge-fixture`.
+ */
+export async function startEdge(options: { signIn?: boolean } = {}): Promise<Edge> {
   // An unprovisioned edge serves only its console, the plain-HTTP loopback listener for its own
   // screen; the LAN port stays closed until it has a certificate. Devices' DPoP proofs name the
   // console's origin, so it is one the edge accepts.
   const port = await freePort()
   const origin = `http://127.0.0.1:${port}`
+  const dir = mkdtempSync(join(tmpdir(), 'health-edge-e2e-'))
+  let auth: Record<string, string> = {}
+  let bundle: string | undefined
+  if (options.signIn === true) {
+    const made = spawnSync(fixture, [dir, 'ug-kla-0001', 'ug-kla-mulago', staff.username, staff.password], { stdio: 'inherit' })
+    if (made.status !== 0) throw new Error('edge-fixture failed: run `cargo build -p facility-edge --example edge-fixture`')
+    auth = {
+      HEALTH_NODE_ID: 'ug-kla-0001',
+      HEALTH_FACILITY: 'ug-kla-mulago',
+      HEALTH_SNAPSHOT_KEYS_FILE: join(dir, 'snapshot-keys.json'),
+      CREDENTIALS_DIRECTORY: join(dir, 'credentials'),
+    }
+    bundle = readFileSync(join(dir, 'bundle.jws'), 'utf8')
+  }
   const child = spawn(binary, [], {
     env: {
-      HEALTH_DATA_DIR: join(mkdtempSync(join(tmpdir(), 'health-edge-e2e-')), 'store'),
+      ...auth,
+      HEALTH_DATA_DIR: join(dir, 'store'),
       HEALTH_CONSOLE_BIND: `127.0.0.1:${port}`,
       HEALTH_BIND: `127.0.0.1:${await freePort()}`,
       HEALTH_ORIGINS: origin,
@@ -63,5 +89,5 @@ export async function startEdge(): Promise<Edge> {
     await stop()
     throw new Error('facility-edge was built without the web app: run `bun run build`, then `cargo build -p facility-edge`')
   }
-  return { origin, stop }
+  return { origin, ...(bundle === undefined ? {} : { bundle }), stop }
 }

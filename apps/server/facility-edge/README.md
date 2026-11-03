@@ -148,7 +148,7 @@ The edge runs the same authorization server as central (offline-auth.md; #75), s
   - tokens are DPoP-bound, `acr` `offline-local`, and issued only to an enrolled device's key;
   - each login and refresh needs the user's central-signed snapshot for `HEALTH_FACILITY`, unexpired, at a clock that has not gone back;
   - `/api/session` is behind the device gate;
-  - `runtime.json` gives the web client the issuer, the first https origin under `/auth`.
+  - `runtime.json` gives the web client the issuer: the first origin in `HEALTH_ORIGINS`, under `/auth`, so list the https origin LAN devices use first.
 - **Without** `HEALTH_FACILITY`, `HEALTH_SNAPSHOT_KEYS_FILE` or the sealed keys, the node serves no sign-in and logs `sign-in-off` with the reason.
 
 ## Pairing and discovery

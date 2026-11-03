@@ -47,9 +47,10 @@ pub const CLIENT_ID: &str = "health-edge";
 /// Where it receives the authorization code.
 pub const REDIRECT_PATH: &str = "/callback";
 
-/// The issuer: the node's first https origin, under `/auth`.
+/// The issuer: the node's first origin in `HEALTH_ORIGINS`, under `/auth`. List the https origin
+/// LAN devices use first; the default is `https://<node-id>.local`.
 pub(crate) fn issuer(config: &EdgeConfig) -> Option<String> {
-    let origin = config.origins.iter().find(|o| o.starts_with("https://"))?;
+    let origin = config.origins.first()?;
     Some(format!("{origin}/auth"))
 }
 
@@ -96,7 +97,7 @@ pub(crate) fn routes(
         return Err("no HEALTH_FACILITY or HEALTH_SNAPSHOT_KEYS_FILE".into());
     };
     let secrets = secrets.ok_or("no keystore")?;
-    let issuer = issuer(config).ok_or("HEALTH_ORIGINS names no https origin")?;
+    let issuer = issuer(config).ok_or("HEALTH_ORIGINS names no origin")?;
     let verifier = snapshot_keys(keys_file)?;
     let credentials = Credentials::new(secret(secrets, PEPPER_KEY)?)
         .map_err(|_| format!("{PEPPER_KEY} is not a 32-byte key"))?;

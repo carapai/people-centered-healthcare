@@ -54,6 +54,11 @@ export interface SignInOptions {
   refreshMargin?: number
   setTimer?: (callback: () => void, ms: number) => unknown
   clearTimer?: (timer: unknown) => void
+  /**
+   * A DPoP proof for a request to the authorization server: on an edge, by the device's key, so
+   * tokens are bound to it and issued only to an enrolled device (ADR 0009).
+   */
+  proof?: (method: string, url: URL) => Promise<string | undefined>
 }
 
 function random(bytes: number): string {
@@ -78,12 +83,16 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
   let refreshToken: string | undefined
   let timer: unknown
 
+  async function post(path: string, form: Record<string, string>): Promise<Response> {
+    const url = new URL(`${issuer}${path}`)
+    const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' }
+    const proof = await options.proof?.('POST', url)
+    if (proof !== undefined) headers['dpop'] = proof
+    return fetchImpl(url.toString(), { method: 'POST', headers, body: new URLSearchParams(form).toString() })
+  }
+
   async function tokens(form: Record<string, string>): Promise<void> {
-    const response = await fetchImpl(`${issuer}/token`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(form).toString(),
-    })
+    const response = await post('/token', form)
     if (!response.ok) {
       throw new SignInError('refused')
     }
@@ -154,11 +163,7 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
       refreshToken = undefined
       session.end('logout')
       if (token !== undefined) {
-        await fetchImpl(`${issuer}/revoke`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ token, client_id: config.clientId }).toString(),
-        }).catch(() => undefined)
+        await post('/revoke', { token, client_id: config.clientId }).catch(() => undefined)
       }
     },
   }

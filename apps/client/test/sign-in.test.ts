@@ -6,12 +6,12 @@ import { SignInError, signIn } from '../src/platform/sign-in'
 const ORIGIN = 'https://central.example'
 const ISSUER = `${ORIGIN}/auth`
 
-function harness(responses: Response[]) {
+function harness(responses: Response[], proof?: (method: string, url: URL) => Promise<string | undefined>) {
   const store = new Map<string, string>()
   const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) }
-  const calls: { url: string; body: string }[] = []
+  const calls: { url: string; body: string; dpop: string | undefined }[] = []
   const fetchImpl: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), body: String(init?.body ?? '') })
+    calls.push({ url: String(input), body: String(init?.body ?? ''), dpop: (init?.headers as Record<string, string> | undefined)?.['dpop'] })
     return responses.shift() ?? new Response('{}', { status: 500 })
   }
   const navigated: string[] = []
@@ -24,6 +24,7 @@ function harness(responses: Response[]) {
     origin: ORIGIN,
     setTimer: (callback, ms) => timers.push({ callback, ms }),
     clearTimer: () => {},
+    ...(proof === undefined ? {} : { proof }),
   })
   return { client, session, calls, navigated, timers, store }
 }
@@ -96,5 +97,25 @@ describe('signIn', () => {
     expect(h.calls[1]?.url).toBe(`${ISSUER}/revoke`)
     expect(new URLSearchParams(h.calls[1]?.body).get('token')).toBe('r1')
     expect(h.client.authorizeEndpoint).toBe(`${ISSUER}/authorize`)
+  })
+
+  test('on an edge, the token and revoke requests carry the device key’s proof', async () => {
+    const proved: string[] = []
+    const h = harness([tokens('a1', 'r1'), new Response(null, { status: 200 })], async (method, url) => {
+      proved.push(`${method} ${url.toString()}`)
+      return 'device-proof'
+    })
+    const { callback } = await startAndCallback(h)
+    await h.client.complete(callback)
+    await h.client.signOut()
+    expect(proved).toEqual([`POST ${ISSUER}/token`, `POST ${ISSUER}/revoke`])
+    expect(h.calls.map((c) => c.dpop)).toEqual(['device-proof', 'device-proof'])
+  })
+
+  test('without a proof signer, no DPoP header is sent', async () => {
+    const h = harness([tokens('a1', 'r1')])
+    const { callback } = await startAndCallback(h)
+    await h.client.complete(callback)
+    expect(h.calls[0]?.dpop).toBeUndefined()
   })
 })
