@@ -75,6 +75,18 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
 - **Audit:** an enrollment or a revocation commits with its AuditEvent (DICOM `110137`, coded `device-enrolled` or `device-revoked`, naming the device by `urn:health:device-id`). Refused enrollments and requests from unknown keys are logged with `alert = "enrollment-refused"` or `"unenrolled-device"`, so they reach the status page's telemetry and central, rather than writing a record per attempt.
 - **State:** the `DeviceStore` port, on `MemoryStore` and on `SurrealAuthStore` (migration `0020_devices`). Approval takes the request and creates the device in one transaction, so a code is used once; revocation is a compare-and-set on the device's `version`.
 
+## Provisioning bundles (ADR 0059)
+
+`Bundle` carries a facility's Login Accounts and their signed snapshots from central to one edge.
+- `seal(signer, recipient)` signs the bundle with central's snapshot key, as a JWS of type `health-bundle+jwt`.
+- Each plain Argon2id hash is encrypted to the edge's facility intermediate public key: ECDH with a fresh P-256 key, HKDF-SHA-256 keyed on the node id, then XChaCha20-Poly1305 with the account id as associated data.
+- `open(jws, verifier, node_id, recipient)` refuses a bundle with `BundleError` when:
+  - it is not signed by a trusted snapshot key;
+  - it is for another node;
+  - its hashes do not decrypt with this node's intermediate key.
+- The snapshots inside are verified at login, as every snapshot is.
+- `SurrealAuthStore::snapshots_at(facility)` lists what a bundle carries.
+
 ## Request subjects (ADR 0056)
 
 `Subjects` and the `subject_layer` middleware turn each resource request into the `health_access_policy::Subject` and `health_audit::Agent` request extensions that `health-fhir-server` decides and audits with. The subject is built from:

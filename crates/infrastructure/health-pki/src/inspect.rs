@@ -23,6 +23,9 @@ pub struct Inspected {
     /// The SHA-256 of its SubjectPublicKeyInfo, as `sha256/<base64>`: what a client pins
     /// (lan-security.md: Tauri pins the facility intermediate's SPKI).
     pub spki_sha256: String,
+    /// The subject public key's bytes (SEC1 for P-256): what a provisioning bundle's hashes
+    /// are encrypted to (ADR 0059).
+    pub public_key: Vec<u8>,
 }
 
 /// Reads the first certificate in `pem`.
@@ -60,8 +63,10 @@ pub fn inspect(pem: &str) -> Result<Inspected> {
             base64::engine::general_purpose::STANDARD.encode(digest)
         )
     };
+    let public_key = x509.public_key().subject_public_key.data.to_vec();
     Ok(Inspected {
         spki_sha256,
+        public_key,
         not_before: at(x509.validity().not_before.timestamp())?,
         not_after: at(x509.validity().not_after.timestamp())?,
         dns_names,

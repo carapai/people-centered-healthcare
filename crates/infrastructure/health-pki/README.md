@@ -25,7 +25,7 @@ The private IP ranges are 10/8, 172.16/12, 192.168/16 and fc00::/7.
   - `verify_publisher(certificate, at)` checks a publication-signing certificate.
   - Every CA in the chain is checked against its issuer's CRL. A CA with no CRL yet is accepted, and an out-of-date CRL still counts, because nodes can be offline for months.
   - A forged CRL makes the chain fail.
-- **`inspect(pem)`** reads a certificate's validity, its DNS and IP names, and its SPKI fingerprint (`sha256/<base64>`, what Tauri clients pin) back, so an edge knows when its leaf is due and what to put in its pairing code.
+- **`inspect(pem)`** reads back a certificate's validity, its DNS and IP names, its SPKI fingerprint (`sha256/<base64>`, what Tauri clients pin) and its public key. An edge uses it to know when its leaf is due and what to put in its pairing code; central uses the public key to encrypt a provisioning bundle to an edge (ADR 0059).
 - **Algorithms:** ECDSA P-256 with SHA-256 throughout, on ring (rcgen to issue, rustls-webpki to verify, x509-parser to read certificates back). Certificates are backdated by `BACKDATE_SECONDS` for verifiers whose clocks run behind.
 - **Not here:**
   - The keystore and HSM integration. `Authority` signs with a key in memory, which suits the root ceremony and tests. An edge keystore (#73) or central's HSM or KMS needs an rcgen `SigningKey` adapter.

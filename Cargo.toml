@@ -108,6 +108,10 @@ octofhir-fhirpath = "=0.4.57"
 opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
 opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
 opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
+# The provisioning bundle's key derivation (ADR 0059): HKDF-SHA-256 over p256's ECDH, which is
+# on sha2 0.10 (p256 0.13).
+hkdf = "0.12.4"
+sha2-010 = { package = "sha2", version = "0.10.9" }
 # The edge's private LAN addresses, for its leaf certificate.
 if-addrs = "0.15.0"
 # The edge's `_health-edge._tcp` mDNS hint for LAN clients (lan-security.md § Addressing).

@@ -138,6 +138,20 @@ impl SurrealAuthStore {
         }
     }
 
+    /// Every snapshot at `facility`, by account: what a provisioning bundle carries.
+    pub async fn snapshots_at(
+        &self,
+        facility: &str,
+    ) -> Result<Vec<(AccountId, String)>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.auth_snapshots_at(facility)
+            .await
+            .map_err(failed)?
+            .into_iter()
+            .map(|(account, jws)| Ok((AccountId(account.parse().map_err(failed)?), jws)))
+            .collect()
+    }
+
     /// Stores a signed permission snapshot (provisioning from central).
     pub async fn put_snapshot(
         &self,
