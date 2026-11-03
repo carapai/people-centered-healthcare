@@ -41,6 +41,10 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 - **Identity.** A package is identified by `name@version` and its sha-256.
 - **Transport.** Packages travel as blobs through the content-addressed store (ADR 0021).
 - **Pinned dependencies.** Authors write semver ranges. Publication resolves them and pins exact versions in `package.json` and the manifest.
+- **Configuration schemas** (decided in #86):
+  - Every `configuration/` file is JSON, and names its schema with a top-level `$schema` URI.
+  - The schemas belong to the software release, as format versions do, never to the package.
+  - Publication and every node refuse a file whose schema they do not know or that does not validate.
 
 ## Lifecycle (§45; ADR 0025)
 

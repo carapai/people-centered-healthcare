@@ -3,7 +3,9 @@
 //! unpinned dependency is rejected at publication.
 
 use health_configuration::package::{INDEX, Problem};
-use health_packages::{Digest, Error, Files, Limits, LocalSigner, Verified, publish, verify};
+use health_packages::{
+    Digest, Error, Files, Limits, LocalSigner, Schemas, Verified, publish, verify,
+};
 use health_pki::{Authority, Reason, Revocations, Trust, new_key, request};
 use health_time::{SignedDuration, Timestamp};
 
@@ -12,6 +14,34 @@ fn at(text: &str) -> Timestamp {
 }
 
 const SIGNED: &str = "2026-11-03T09:00:00Z";
+
+/// A Form Layout schema, as a release would build in.
+const LAYOUT: &str = "https://health.go.ug/schemas/form-layout/1";
+
+fn schemas() -> Schemas {
+    Schemas::platform()
+        .with(
+            LAYOUT,
+            &serde_json::json!({
+                "type": "object",
+                "required": ["$schema", "sections"],
+                "properties": {
+                    "$schema": { "const": LAYOUT },
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["title"],
+                            "properties": { "title": { "type": "string", "minLength": 1 } },
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }),
+        )
+        .expect("schema")
+}
 
 struct Pki {
     root: Authority,
@@ -72,7 +102,7 @@ fn files() -> Files {
         ),
         file(
             "configuration/layouts/anc-visit.json",
-            serde_json::json!({ "sections": [] }),
+            serde_json::json!({ "$schema": LAYOUT, "sections": [{ "title": "Visit" }] }),
         ),
         file(
             "tests/anc-visit/extraction.json",
@@ -87,6 +117,7 @@ fn check(tgz: &[u8], sig: &str, pki: &Pki) -> Result<Verified, Error> {
         sig,
         None,
         &pki.trust,
+        &schemas(),
         Limits::default(),
         at("2026-11-04T09:00:00Z"),
     )
@@ -95,12 +126,12 @@ fn check(tgz: &[u8], sig: &str, pki: &Pki) -> Result<Verified, Error> {
 #[test]
 fn a_published_package_verifies_with_its_identity() {
     let pki = pki();
-    let published = publish(&files(), &pki.signer, at(SIGNED)).expect("publishes");
+    let published = publish(&files(), &schemas(), &pki.signer, at(SIGNED)).expect("publishes");
     assert_eq!(published.id, "ug.moh.anc@1.4.0");
     assert_eq!(published.digest, Digest::of(&published.tgz));
     // Deterministic: the same files publish to the same bytes.
     assert_eq!(
-        publish(&files(), &pki.signer, at(SIGNED))
+        publish(&files(), &schemas(), &pki.signer, at(SIGNED))
             .expect("again")
             .tgz,
         published.tgz
@@ -111,6 +142,7 @@ fn a_published_package_verifies_with_its_identity() {
         &published.signature,
         Some(&published.digest),
         &pki.trust,
+        &schemas(),
         Limits::default(),
         at("2026-11-04T09:00:00Z"),
     )
@@ -140,7 +172,7 @@ fn unpinned_dependencies_are_rejected_at_publication() {
     package["dependencies"]["ug.moh.core"] = "^2.1.0".into();
     ranged.insert("package.json".into(), package.to_string().into_bytes());
     assert_eq!(
-        publish(&ranged, &pki.signer, at(SIGNED)),
+        publish(&ranged, &schemas(), &pki.signer, at(SIGNED)),
         Err(Error::NotPublishable(vec![Problem::Unpinned {
             name: "ug.moh.core".into(),
             range: "^2.1.0".into()
@@ -157,7 +189,7 @@ fn unpinned_dependencies_are_rejected_at_publication() {
         manifest.to_string().into_bytes(),
     );
     assert_eq!(
-        publish(&unpinned_manifest, &pki.signer, at(SIGNED)),
+        publish(&unpinned_manifest, &schemas(), &pki.signer, at(SIGNED)),
         Err(Error::NotPublishable(vec![Problem::UnpinnedCanonical(
             "http://health.go.ug/fhir/ValueSet/anc-visit-type".into()
         )]))
@@ -167,7 +199,7 @@ fn unpinned_dependencies_are_rejected_at_publication() {
 #[test]
 fn a_tampered_package_is_refused() {
     let pki = pki();
-    let published = publish(&files(), &pki.signer, at(SIGNED)).expect("publishes");
+    let published = publish(&files(), &schemas(), &pki.signer, at(SIGNED)).expect("publishes");
 
     // Any byte changed.
     for offset in [0, published.tgz.len() / 2, published.tgz.len() - 1] {
@@ -185,7 +217,7 @@ fn a_tampered_package_is_refused() {
     // A different package, under the first one's signature.
     let mut other = files();
     other.insert("tests/extra.json".into(), b"{}".to_vec());
-    let swapped = publish(&other, &pki.signer, at(SIGNED)).expect("publishes");
+    let swapped = publish(&other, &schemas(), &pki.signer, at(SIGNED)).expect("publishes");
     assert!(matches!(
         check(&swapped.tgz, &published.signature, &pki),
         Err(Error::Signature(_))
@@ -198,6 +230,7 @@ fn a_tampered_package_is_refused() {
             &swapped.signature,
             Some(&published.digest),
             &pki.trust,
+            &schemas(),
             Limits::default(),
             at("2026-11-04T09:00:00Z"),
         ),
@@ -239,7 +272,7 @@ fn only_the_roots_publication_signer_is_trusted() {
         )
         .expect("certificate");
     let rogue_signer = LocalSigner::from_pem(&key.serialize_pem(), rogue.pem()).expect("signer");
-    let forged = publish(&files(), &rogue_signer, at(SIGNED)).expect("publishes");
+    let forged = publish(&files(), &schemas(), &rogue_signer, at(SIGNED)).expect("publishes");
     assert!(matches!(
         check(&forged.tgz, &forged.signature, &pki),
         Err(Error::Untrusted(_))
@@ -249,7 +282,7 @@ fn only_the_roots_publication_signer_is_trusted() {
     let impostor =
         LocalSigner::from_pem(&new_key().expect("key").serialize_pem(), pki.signer_chain())
             .expect("signer");
-    let forged = publish(&files(), &impostor, at(SIGNED)).expect("publishes");
+    let forged = publish(&files(), &schemas(), &impostor, at(SIGNED)).expect("publishes");
     assert!(matches!(
         check(&forged.tgz, &forged.signature, &pki),
         Err(Error::Signature(_))
@@ -259,7 +292,7 @@ fn only_the_roots_publication_signer_is_trusted() {
 #[test]
 fn the_certificate_is_checked_when_signing_and_revocation_counts_at_any_time() {
     let mut pki = pki();
-    let published = publish(&files(), &pki.signer, at(SIGNED)).expect("publishes");
+    let published = publish(&files(), &schemas(), &pki.signer, at(SIGNED)).expect("publishes");
     // Years later, past the certificate's yearly rotation, the package still verifies.
     let later = at(SIGNED)
         .checked_add(SignedDuration::from_hours(24 * 365 * 3))
@@ -270,25 +303,33 @@ fn the_certificate_is_checked_when_signing_and_revocation_counts_at_any_time() {
             &published.signature,
             None,
             &pki.trust,
+            &schemas(),
             Limits::default(),
             later
         )
         .is_ok()
     );
     // But not if signed after the certificate expired, nor in the future.
-    let expired = publish(&files(), &pki.signer, later).expect("publishes");
+    let expired = publish(&files(), &schemas(), &pki.signer, later).expect("publishes");
     assert!(matches!(
         verify(
             &expired.tgz,
             &expired.signature,
             None,
             &pki.trust,
+            &schemas(),
             Limits::default(),
             later
         ),
         Err(Error::Untrusted(_))
     ));
-    let early = publish(&files(), &pki.signer, at("2026-11-05T09:00:00Z")).expect("publishes");
+    let early = publish(
+        &files(),
+        &schemas(),
+        &pki.signer,
+        at("2026-11-05T09:00:00Z"),
+    )
+    .expect("publishes");
     assert!(matches!(
         check(&early.tgz, &early.signature, &pki),
         Err(Error::Signature(_))
@@ -315,4 +356,71 @@ impl Pki {
     fn signer_chain(&self) -> String {
         health_packages::PublicationSigner::chain_pem(&self.signer).to_owned()
     }
+}
+
+#[test]
+fn configuration_must_validate_against_a_schema_the_release_knows() {
+    let pki = pki();
+    let with_layout = |layout: serde_json::Value| {
+        let mut files = files();
+        files.insert(
+            "configuration/layouts/anc-visit.json".into(),
+            layout.to_string().into_bytes(),
+        );
+        files
+    };
+    let refused = |files: &Files| match publish(files, &schemas(), &pki.signer, at(SIGNED)) {
+        Err(Error::Configuration { path, detail }) => Some((path, detail)),
+        _ => None,
+    };
+    let path = "configuration/layouts/anc-visit.json".to_owned();
+
+    // No $schema, one the release does not know, and one the file does not meet.
+    let (at_path, detail) =
+        refused(&with_layout(serde_json::json!({ "sections": [] }))).expect("refused");
+    assert_eq!(
+        (at_path.as_str(), detail.as_str()),
+        (path.as_str(), "names no $schema")
+    );
+    let (_, detail) = refused(&with_layout(
+        serde_json::json!({ "$schema": "https://example.org/mine", "sections": [] }),
+    ))
+    .expect("refused");
+    assert!(
+        detail.contains("not a schema this release reads"),
+        "{detail}"
+    );
+    let (_, detail) = refused(&with_layout(
+        serde_json::json!({ "$schema": LAYOUT, "sections": [{ "title": "" }], "extra": true }),
+    ))
+    .expect("refused");
+    assert!(detail.contains("/sections/0/title"), "{detail}");
+    assert!(detail.contains("extra"), "{detail}");
+
+    // Configuration is JSON.
+    let mut yaml = files();
+    yaml.insert("configuration/settings.yaml".into(), b"a: 1".to_vec());
+    let (at_path, _) = refused(&yaml).expect("refused");
+    assert_eq!(at_path, "configuration/settings.yaml");
+
+    // A release that does not know the schema refuses a package that another one published.
+    let published = publish(&files(), &schemas(), &pki.signer, at(SIGNED)).expect("publishes");
+    assert!(matches!(
+        verify(
+            &published.tgz,
+            &published.signature,
+            None,
+            &pki.trust,
+            &Schemas::platform(),
+            Limits::default(),
+            at("2026-11-04T09:00:00Z"),
+        ),
+        Err(Error::Configuration { .. })
+    ));
+
+    // An unusable schema is refused when built in.
+    assert!(matches!(
+        Schemas::platform().with("https://x", &serde_json::json!({ "type": 12 })),
+        Err(Error::Configuration { .. })
+    ));
 }
