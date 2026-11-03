@@ -3,15 +3,17 @@
 //!
 //! - [`publish`] packs a package's files into a deterministic tarball with a generated
 //!   `.index.json`, refuses it if any publication rule fails (an unpinned dependency, among
-//!   others: [`health_configuration::package`]), and signs it.
+//!   others: [`health_configuration::package`]) or any `configuration/` file does not validate
+//!   against the release's [`Schemas`], and signs it.
 //! - [`verify`] is what every node does before staging, whether the package came over sync or on
 //!   a USB stick: it checks the sha-256 the activation names, the signature against the national
-//!   root, the archive's safety, the index, and the publication rules again.
+//!   root, the archive's safety, the index, and the publication rules and schemas again.
 //!
 //! A package is identified by `name@version` and its sha-256 ([`Digest`]).
 
 mod archive;
 mod contents;
+mod schemas;
 mod signature;
 
 use std::fmt;
@@ -22,6 +24,7 @@ use health_time::Timestamp;
 use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
+pub use schemas::Schemas;
 pub use signature::{LocalSigner, PublicationSigner, TYP};
 
 /// A sha-256.
@@ -72,6 +75,14 @@ pub enum Error {
     /// `.index.json` does not list the package's artefacts.
     #[error(".index.json does not match the package's artefacts")]
     Index,
+    /// A `configuration/` file that is not JSON, names no known `$schema`, or does not validate.
+    #[error("{path}: {detail}")]
+    Configuration {
+        /// Its path under `package/`, or the schema's URI when the schema itself is unusable.
+        path: String,
+        /// Why.
+        detail: String,
+    },
     /// The package breaks publication rules.
     #[error("not publishable: {}", .0.iter().map(ToString::to_string).collect::<Vec<_>>().join("; "))]
     NotPublishable(Vec<Problem>),
@@ -105,9 +116,10 @@ pub struct Published {
 }
 
 /// Packs `files` (paths under `package/`; any `.index.json` is replaced), checks the
-/// publication rules, and signs with `signer` at `at`.
+/// publication rules and `configuration/` against `schemas`, and signs with `signer` at `at`.
 pub fn publish(
     files: &Files,
+    schemas: &Schemas,
     signer: &dyn PublicationSigner,
     at: Timestamp,
 ) -> Result<Published, Error> {
@@ -120,6 +132,7 @@ pub fn publish(
     if !problems.is_empty() {
         return Err(Error::NotPublishable(problems));
     }
+    schemas.check(&files)?;
     let tgz = archive::write(&files)?;
     let digest = Digest::of(&tgz);
     let signature = signature::sign(&digest, signer, at)?;
@@ -148,12 +161,14 @@ pub struct Verified {
 ///
 /// In order: the tarball's sha-256 is `expected` when the activation names one; the signature
 /// is the root's publication signer's over that sha-256; the archive unpacks safely within
-/// `limits`; `.index.json` lists exactly its artefacts; and it meets every publication rule.
+/// `limits`; `.index.json` lists exactly its artefacts; it meets every publication rule; and its
+/// `configuration/` validates against `schemas`.
 pub fn verify(
     tgz: &[u8],
     jws: &str,
     expected: Option<&Digest>,
     trust: &Trust,
+    schemas: &Schemas,
     limits: Limits,
     now: Timestamp,
 ) -> Result<Verified, Error> {
@@ -178,6 +193,7 @@ pub fn verify(
     if !problems.is_empty() {
         return Err(Error::NotPublishable(problems));
     }
+    schemas.check(&files)?;
     Ok(Verified {
         contents,
         files,

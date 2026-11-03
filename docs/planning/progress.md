@@ -255,3 +255,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - `verify`, which checks the expected sha-256, then the signature against the national root at the signing time with CRLs, then the archive, the index and the rules.
 
   Part 2 is JSON Schema validation of `configuration/`.
+- 2026-11-03: #86 part 1 merged (#288). Part 2, configuration schemas:
+  - **Schemas belong to the release:** `health-packages::Schemas` holds the schemas the software release reads, keyed by `$schema` URI, using `jsonschema` 0.60 with no remote resolution.
+  - **Each file names its schema:** every `configuration/` file is JSON and names its schema.
+  - **Checks:** `publish` and `verify` refuse a file with no schema, an unknown schema, or failing validation, reported by JSON pointer.
+  - **The built-in set is empty for now.** Form Layouts, override points and settings bring their schemas with their features.
+
+  This completes #86.
