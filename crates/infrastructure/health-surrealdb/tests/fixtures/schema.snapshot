@@ -128,14 +128,20 @@ DEFINE TABLE auth_phone_account TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD status ON auth_phone_account TYPE string PERMISSIONS FULL
   DEFINE FIELD verified_at ON auth_phone_account TYPE datetime PERMISSIONS FULL
   DEFINE INDEX auth_phone_account_phone ON auth_phone_account FIELDS phone UNIQUE
+DEFINE TABLE auth_pin TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD credential ON auth_pin TYPE string PERMISSIONS FULL
+  DEFINE FIELD failures ON auth_pin TYPE int PERMISSIONS FULL
 DEFINE TABLE auth_retired_refresh TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD ends_at ON auth_retired_refresh TYPE datetime PERMISSIONS FULL
   DEFINE FIELD session ON auth_retired_refresh TYPE string PERMISSIONS FULL
 DEFINE TABLE auth_session TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD `live` ON auth_session TYPE bool PERMISSIONS FULL
+  DEFINE FIELD account ON auth_session TYPE none | string PERMISSIONS FULL
   DEFINE FIELD data ON auth_session TYPE string PERMISSIONS FULL
   DEFINE FIELD ends_at ON auth_session TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD jkt ON auth_session TYPE none | string PERMISSIONS FULL
   DEFINE FIELD refresh_hash ON auth_session TYPE string PERMISSIONS FULL
+  DEFINE INDEX auth_session_device ON auth_session FIELDS account, jkt
   DEFINE INDEX auth_session_refresh ON auth_session FIELDS refresh_hash UNIQUE
 DEFINE TABLE auth_snapshot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD jws ON auth_snapshot TYPE string PERMISSIONS FULL

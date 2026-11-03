@@ -578,3 +578,70 @@ async fn a_facility_s_snapshots_are_listed_for_its_bundle() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn a_user_s_session_and_pin_on_a_device_are_found_by_both() {
+    use health_auth::{AuthStore, Session};
+    use health_identity::{Scopes, SessionState};
+    let node = node().await;
+    let account = AccountId(Uuid::now_v7());
+    let now = health_time::Timestamp::now();
+    let session = Session {
+        id: Uuid::now_v7(),
+        account,
+        client_id: "health-edge".into(),
+        scopes: Scopes::parse("openid").expect("scopes"),
+        state: SessionState::Live { auth_time: now },
+        facility: Some("ug-kla-mulago".into()),
+        jkt: Some("device-a".into()),
+        refresh_hash: "hash".into(),
+        last_active: now,
+    };
+    node.store.put_session(session.clone()).await.expect("put");
+    let found = node
+        .store
+        .device_session(account, "device-a")
+        .await
+        .expect("find");
+    assert_eq!(found.map(|s| s.id), Some(session.id));
+    assert_eq!(
+        node.store
+            .device_session(account, "device-b")
+            .await
+            .expect("find"),
+        None
+    );
+    node.store.end_session(session.id).await.expect("end");
+    assert_eq!(
+        node.store
+            .device_session(account, "device-a")
+            .await
+            .expect("find"),
+        None
+    );
+
+    assert_eq!(
+        node.store.pin(account, "device-a").await.expect("pin"),
+        None
+    );
+    node.store
+        .put_pin(account, "device-a", "sealed".into(), 2)
+        .await
+        .expect("put");
+    assert_eq!(
+        node.store.pin(account, "device-a").await.expect("pin"),
+        Some(("sealed".to_owned(), 2))
+    );
+    assert_eq!(
+        node.store.pin(account, "device-b").await.expect("pin"),
+        None
+    );
+    node.store
+        .remove_pin(account, "device-a")
+        .await
+        .expect("remove");
+    assert_eq!(
+        node.store.pin(account, "device-a").await.expect("pin"),
+        None
+    );
+}

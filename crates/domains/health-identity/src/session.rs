@@ -7,14 +7,19 @@ pub struct SessionPolicy {
     pub access_token: SignedDuration,
     /// A session is refreshable up to this long after its password login.
     pub hard_cap: SignedDuration,
+    /// Idle this long, a session locks: it issues no token until its user unlocks it with their
+    /// PIN (offline-auth.md § Tokens and sessions).
+    pub idle_lock: SignedDuration,
 }
 
 impl Default for SessionPolicy {
-    /// 15-minute access tokens; sessions end 12 hours after login.
+    /// 15-minute access tokens; sessions lock after 15 minutes idle and end 12 hours after
+    /// login.
     fn default() -> Self {
         Self {
             access_token: SignedDuration::from_mins(15),
             hard_cap: SignedDuration::from_hours(12),
+            idle_lock: SignedDuration::from_mins(15),
         }
     }
 }
@@ -45,6 +50,13 @@ impl SessionPolicy {
         }
     }
 
+    /// Whether a session last active at `last_active` is locked at `now`.
+    pub fn locked(&self, last_active: Timestamp, now: Timestamp) -> bool {
+        last_active
+            .checked_add(self.idle_lock)
+            .map_or(true, |unlocks| now >= unlocks)
+    }
+
     /// An access token issued at `now` expires at the earlier of its lifetime and the session's
     /// end, so no token outlives the 12-hour cap.
     pub fn access_expiry(&self, auth_time: Timestamp, now: Timestamp) -> Timestamp {
@@ -72,5 +84,18 @@ mod tests {
         assert!(!policy.may_refresh(SessionState::Ended, login));
         assert_eq!(policy.access_expiry(login, later(0, 0)), later(0, 15));
         assert_eq!(policy.access_expiry(login, later(11, 50)), later(12, 0));
+    }
+
+    #[test]
+    fn sessions_lock_after_fifteen_minutes_idle() {
+        let policy = SessionPolicy::default();
+        let active = Timestamp::UNIX_EPOCH;
+        let at = |m: i64| {
+            active
+                .checked_add(SignedDuration::from_mins(m))
+                .unwrap_or(active)
+        };
+        assert!(!policy.locked(active, at(14)));
+        assert!(policy.locked(active, at(15)));
     }
 }

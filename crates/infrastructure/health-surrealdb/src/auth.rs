@@ -53,6 +53,10 @@ pub struct AuthSessionRow {
     pub live: bool,
     /// When it stops being refreshable (its purge time).
     pub ends_at: Timestamp,
+    /// Its account, to find a user's session on a device.
+    pub account: String,
+    /// The device key its tokens are bound to, if any.
+    pub jkt: Option<String>,
 }
 
 /// A stored break-glass grant.
@@ -237,13 +241,16 @@ impl SurrealTx {
     ) -> Result<(), WriteError> {
         self.run(
             "CREATE type::record('auth_session', $id) CONTENT { data: $data, refresh_hash: $hash, \
-             live: <bool>$live, ends_at: <datetime>$ends } RETURN VALUE record::id(id)",
+             live: <bool>$live, ends_at: <datetime>$ends, account: $account, \
+             jkt: IF $jkt = '' THEN NONE ELSE $jkt END } RETURN VALUE record::id(id)",
             vec![
                 ("id", id.to_owned()),
                 ("data", row.data.clone()),
                 ("hash", row.refresh_hash.clone()),
                 ("live", row.live.to_string()),
                 ("ends", row.ends_at.to_string()),
+                ("account", row.account.clone()),
+                ("jkt", row.jkt.clone().unwrap_or_default()),
             ],
         )
         .await?;
@@ -254,7 +261,7 @@ impl SurrealTx {
     pub async fn auth_session(&mut self, id: &str) -> Result<Option<AuthSessionRow>, StoreError> {
         let rows = self
             .rows(
-                "SELECT VALUE [data, refresh_hash, <string>live, <string>ends_at] FROM type::record('auth_session', $id)",
+                "SELECT VALUE [data, refresh_hash, <string>live, <string>ends_at, account ?? '', jkt ?? ''] FROM type::record('auth_session', $id)",
                 vec![("id", id.to_owned())],
             )
             .await?;
@@ -269,7 +276,7 @@ impl SurrealTx {
     ) -> Result<Option<(String, AuthSessionRow, bool)>, StoreError> {
         let current = self
             .rows(
-                "SELECT VALUE [record::id(id), data, refresh_hash, <string>live, <string>ends_at] FROM auth_session \
+                "SELECT VALUE [record::id(id), data, refresh_hash, <string>live, <string>ends_at, account ?? '', jkt ?? ''] FROM auth_session \
                  WHERE refresh_hash = $hash LIMIT 1",
                 vec![("hash", hash.to_owned())],
             )
@@ -427,6 +434,75 @@ impl SurrealTx {
             .filter_map(|row| <[String; 2]>::try_from(row).ok())
             .map(|[account, jws]| (account, jws))
             .collect())
+    }
+
+    /// The ids and data of `account`'s live sessions bound to device key `jkt` (migration
+    /// `0021_pins`).
+    pub async fn device_auth_sessions(
+        &mut self,
+        account: &str,
+        jkt: &str,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [<string>record::id(id), data] FROM auth_session WHERE account = $account AND jkt = $jkt AND live = true",
+                vec![("account", account.to_owned()), ("jkt", jkt.to_owned())],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| <[String; 2]>::try_from(row).ok())
+            .map(|[id, data]| (id, data))
+            .collect())
+    }
+
+    /// `account`'s PIN on device `jkt`: its sealed hash and wrong tries.
+    pub async fn auth_pin(
+        &mut self,
+        account: &str,
+        jkt: &str,
+    ) -> Result<Option<(String, u32)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [credential, <string>failures] FROM type::record('auth_pin', [$account, $jkt])",
+                vec![("account", account.to_owned()), ("jkt", jkt.to_owned())],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| <[String; 2]>::try_from(row).ok())
+            .find_map(|[credential, failures]| Some((credential, failures.parse().ok()?))))
+    }
+
+    /// Sets `account`'s PIN on device `jkt`.
+    pub async fn put_auth_pin(
+        &mut self,
+        account: &str,
+        jkt: &str,
+        credential: &str,
+        failures: u32,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('auth_pin', [$account, $jkt]) CONTENT { credential: $credential, failures: <int>$failures } RETURN VALUE record::id(id)[0]",
+            vec![
+                ("account", account.to_owned()),
+                ("jkt", jkt.to_owned()),
+                ("credential", credential.to_owned()),
+                ("failures", failures.to_string()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Removes `account`'s PIN on device `jkt`.
+    pub async fn remove_auth_pin(&mut self, account: &str, jkt: &str) -> Result<(), WriteError> {
+        self.run(
+            "DELETE type::record('auth_pin', [$account, $jkt]) RETURN VALUE <string>record::id($before.id)[0]",
+            vec![("account", account.to_owned()), ("jkt", jkt.to_owned())],
+        )
+        .await?;
+        Ok(())
     }
 
     /// Records a break-glass grant (migration `0009_break_glass`).
@@ -675,11 +751,14 @@ impl SurrealTx {
 
 fn session_row(row: Vec<String>) -> Result<AuthSessionRow, StoreError> {
     let invalid = || StoreError::Unavailable("auth_session row has an invalid shape".into());
-    let [data, refresh_hash, live, ends_at]: [String; 4] = row.try_into().map_err(|_| invalid())?;
+    let [data, refresh_hash, live, ends_at, account, jkt]: [String; 6] =
+        row.try_into().map_err(|_| invalid())?;
     Ok(AuthSessionRow {
         data,
         refresh_hash,
         live: live == "true",
         ends_at: ends_at.parse().map_err(|_| invalid())?,
+        account,
+        jkt: (!jkt.is_empty()).then_some(jkt),
     })
 }

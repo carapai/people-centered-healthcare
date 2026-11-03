@@ -47,6 +47,10 @@ fn harness(require_dpop: bool) -> Harness {
 }
 
 fn harness_with(require_dpop: bool, devices: Option<health_auth::DeviceCheck>) -> Harness {
+    harness_configured(require_dpop, |config| config.devices = devices)
+}
+
+fn harness_configured(require_dpop: bool, configure: impl FnOnce(&mut AuthConfig)) -> Harness {
     let clock = Arc::new(FixedClock::new(
         Timestamp::from_second(1_800_000_000).expect("time"),
     ));
@@ -63,7 +67,7 @@ fn harness_with(require_dpop: bool, devices: Option<health_auth::DeviceCheck>) -
         lockout: Lockout::default(),
     });
     let mut config = AuthConfig::new(ISSUER, "central", require_dpop);
-    config.devices = devices;
+    configure(&mut config);
     config.clients.push(Client {
         id: CLIENT.into(),
         redirect_uris: vec![REDIRECT.into()],
@@ -588,4 +592,100 @@ async fn tokens_go_only_to_an_enrolled_device_s_key() {
     let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
     let (status, _) = refresh(&h, &refresh_token, &key).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+async fn set_pin(h: &Harness, access: &str, key: &SigningKey, pin: &str) -> StatusCode {
+    let request = Request::post("/auth/pin")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(header::AUTHORIZATION, format!("DPoP {access}"))
+        .header(
+            "dpop",
+            proof(key, "POST", &format!("{ISSUER}/pin"), now(h), Some(access)),
+        )
+        .body(Body::from(format!("pin={pin}")))
+        .expect("request");
+    send(&h.app, request).await.0
+}
+
+async fn unlock(h: &Harness, username: &str, pin: &str, key: &SigningKey) -> (StatusCode, Value) {
+    let dpop = Some(proof(
+        key,
+        "POST",
+        &format!("{ISSUER}/unlock"),
+        now(h),
+        None,
+    ));
+    let fields = [("username", username), ("pin", pin), ("client_id", CLIENT)];
+    let (status, _, body) = send(&h.app, form("/auth/unlock", &fields, dpop)).await;
+    (status, serde_json::from_str(&body).unwrap_or(Value::Null))
+}
+
+/// On an edge, a session idle for 15 minutes locks, and only its user's PIN on that device
+/// unlocks it; five wrong PINs end it (offline-auth.md § Tokens and sessions).
+#[tokio::test]
+async fn an_idle_session_locks_and_its_pin_on_its_device_unlocks_it() {
+    let h = harness_configured(true, |config| config.idle_lock = true);
+    let key = SigningKey::random(&mut rand_core::OsRng);
+    let code = login(&h).await;
+    let (status, body) = redeem(&h, &code, Some(&key)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let access = body["access_token"].as_str().expect("access").to_owned();
+    let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
+
+    assert_eq!(
+        set_pin(&h, &access, &key, "12345").await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        set_pin(&h, &access, &key, "042137").await,
+        StatusCode::NO_CONTENT
+    );
+
+    // Idle for 16 minutes: locked, but not ended.
+    h.clock.advance(SignedDuration::from_mins(16));
+    let (status, body) = refresh(&h, &refresh_token, &key).await;
+    assert_eq!(
+        (status, body["error"].as_str()),
+        (StatusCode::UNAUTHORIZED, Some("session_locked"))
+    );
+
+    // Not with a wrong PIN, another device's key, or another user.
+    let other = SigningKey::random(&mut rand_core::OsRng);
+    assert_eq!(
+        unlock(&h, "nakato", "000000", &key).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        unlock(&h, "nakato", "042137", &other).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        unlock(&h, "okello", "042137", &key).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+
+    // The PIN on this device resumes it, and refreshes work again.
+    let (status, body) = unlock(&h, "nakato", "042137", &key).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.get("id_token").is_none(), "a PIN is not a sign-in");
+    let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
+    let (status, body) = refresh(&h, &refresh_token, &key).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    // Five wrong PINs end the session: then even the right one does nothing.
+    for _ in 0..5 {
+        assert_eq!(
+            unlock(&h, "nakato", "999999", &key).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    assert_eq!(
+        unlock(&h, "nakato", "042137", &key).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let refresh_token = body["refresh_token"].as_str().expect("refresh").to_owned();
+    assert_eq!(
+        refresh(&h, &refresh_token, &key).await.0,
+        StatusCode::BAD_REQUEST
+    );
 }
