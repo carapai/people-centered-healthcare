@@ -4,6 +4,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
 import { edgeStatusMessages, enrollmentMessages, messages } from '../i18n/messages'
+import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
 export const Route = createFileRoute('/')({
@@ -64,6 +65,7 @@ function Home() {
               </li>
             </ul>
           </nav>
+          <SetPin />
           <button type="button" className={button} onClick={() => void platform.signIn?.signOut().then(() => session.refetch())}>
             {intl.formatMessage(messages.signOut)}
           </button>
