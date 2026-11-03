@@ -240,7 +240,15 @@ async fn links_build_one_golden_record_and_lower_trust_never_overwrites() {
         provenance
             .iter()
             .filter(|p| p["activity"]["coding"][0]["code"] == field)
-            .max_by_key(|p| p["recorded"].as_str().map(str::to_owned))
+            // Two links can land in the same instant, so the golden version they produced
+            // breaks the tie: it only grows.
+            .max_by_key(|p| {
+                let version = p["target"][0]["reference"]
+                    .as_str()
+                    .and_then(|r| r.rsplit('/').next())
+                    .and_then(|v| v.parse::<u64>().ok());
+                (p["recorded"].as_str().map(str::to_owned), version)
+            })
             .cloned()
             .expect("a Provenance for the field")
     };
