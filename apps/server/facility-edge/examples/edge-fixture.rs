@@ -73,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             phc: Credentials::hash(password).map_err(|e| e.to_string())?,
         }],
         snapshots: vec![central.sign(&snapshot, &roles)?],
+        local: health_auth::LocalConfig::default(),
     }
     .seal(
         &central,

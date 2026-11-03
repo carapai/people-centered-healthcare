@@ -66,7 +66,7 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - **What it holds:** every account with a snapshot at the facility, their signed snapshots, and each account's plain Argon2id hash.
 - **Hashes:** central's pepper key unseals each one, and the bundle encrypts it to the edge's facility intermediate, the certificate central issued it.
 - **Signature:** the bundle is signed with the snapshot key.
-- **Output:** the command prints the intermediate's SPKI pin it encrypted to. The edge imports the bundle on its console (#75).
+- **Output:** the command prints the intermediate's SPKI pin it encrypted to. The edge imports the bundle on its console (#75). The bundle also carries the access policy's `roles` and its `locally_grantable` list, the roles a facility admin may grant on an edge offline.
 
 `central-server provision snapshot-keys <out>` writes the snapshot public keys edges trust, `HEALTH_SNAPSHOT_KEYS_FILE` on an edge, as a JSON array of JWKs.
 

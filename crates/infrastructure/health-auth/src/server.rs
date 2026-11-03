@@ -989,7 +989,25 @@ impl<S: AuthStore> Inner<S> {
         if raised != floor {
             self.store.set_clock_floor(raised).await.map_err(|_| ())?;
         }
-        Ok(Some(snapshot))
+        // Offline administration (offline-auth.md; ADR 0011): local access revoked here ends at
+        // once, and unexpired local grants add their roles.
+        if self
+            .store
+            .local_revocation(account)
+            .await
+            .map_err(|_| ())?
+            .is_some()
+        {
+            return Err(());
+        }
+        let grants = self
+            .store
+            .local_grants(facility, Some(account), at)
+            .await
+            .map_err(|_| ())?;
+        Ok(Some(health_identity::snapshot::with_grants(
+            snapshot, &grants, at,
+        )))
     }
 
     /// Whether the account is active: a phone account for a patient client, a staff account

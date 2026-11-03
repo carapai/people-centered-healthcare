@@ -4,6 +4,7 @@
 //! honest when the local clock is wrong.
 
 mod clock;
+mod local;
 mod roles;
 
 use health_time::{SignedDuration, Timestamp};
@@ -12,6 +13,10 @@ use serde::{Deserialize, Serialize};
 use crate::AccountId;
 
 pub use clock::{ClockBroken, ClockFloor};
+pub use local::{
+    ADMINISTER_LOCAL, GrantRefused, LocalGrant, LocalGrantPolicy, LocalRevocation, NEVER_OFFLINE,
+    with_grants,
+};
 pub use roles::{Permission, RolePermissions, UnknownRole};
 
 /// A role held at the snapshot's facility, optionally limited to some of its locations.

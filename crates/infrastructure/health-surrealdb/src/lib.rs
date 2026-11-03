@@ -20,6 +20,7 @@ mod consent;
 mod devices;
 mod history;
 mod inbound;
+mod local;
 mod migrations;
 pub mod ownership;
 mod payments;

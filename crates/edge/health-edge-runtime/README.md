@@ -35,6 +35,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - **Routes:** `/auth`, and `/api/session` behind the device gate. Tokens are DPoP-bound, `acr` `offline-local`, and go only to enrolled devices' keys (`AuthConfig::devices`).
   - **Snapshots:** every login and refresh needs one for `HEALTH_FACILITY`, verified with central's keys from `HEALTH_SNAPSHOT_KEYS_FILE`.
   - **Bundle import:** `POST /api/admin/provision/accounts` (this machine only) imports central's bundle.
+  - **Offline administration:** `/api/access/grants` and `/api/access/revocations`, behind the device gate, for a signed-in facility admin; grants are signed with the facility intermediate's key (`local-grant+jwt`).
   - **The web client:** `runtime.json`'s `auth` names the issuer, `health-edge` and `/callback`.
   - **Without its settings or keys,** the node logs `sign-in-off`.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).

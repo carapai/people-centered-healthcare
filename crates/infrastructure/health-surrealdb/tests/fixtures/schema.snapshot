@@ -119,6 +119,17 @@ DEFINE TABLE auth_enrollment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX auth_enrollment_thumbprint ON auth_enrollment FIELDS thumbprint UNIQUE
 DEFINE TABLE auth_jti TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD until ON auth_jti TYPE datetime PERMISSIONS FULL
+DEFINE TABLE auth_local_config TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON auth_local_config TYPE string PERMISSIONS FULL
+DEFINE TABLE auth_local_grant TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD account ON auth_local_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON auth_local_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD facility ON auth_local_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD jws ON auth_local_grant TYPE string PERMISSIONS FULL
+  DEFINE FIELD not_after ON auth_local_grant TYPE datetime PERMISSIONS FULL
+  DEFINE INDEX auth_local_grant_by ON auth_local_grant FIELDS account, facility
+DEFINE TABLE auth_local_revocation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON auth_local_revocation TYPE string PERMISSIONS FULL
 DEFINE TABLE auth_otp TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD attempts ON auth_otp TYPE int PERMISSIONS FULL
   DEFINE FIELD data ON auth_otp TYPE string PERMISSIONS FULL

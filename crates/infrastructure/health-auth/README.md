@@ -105,6 +105,19 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - **What it stores:** each hash re-encrypted under the edge's pepper key. An account already here keeps its failed-login state.
   - The node's intermediate key comes from a `RecipientKey`, unsealed from the keystore on a blocking thread.
 
+## Offline administration (#75; ADR 0011)
+
+`LocalAdmin` serves a signed-in facility admin on an edge (offline-auth.md § Offline user and role administration):
+- **`GET /access/grants`** lists the facility's unexpired local grants. **`POST /access/grants`** takes `username`, `role` and `days`; the role must be on the bundle's locally grantable list and carry no never-offline permission (`health_identity::snapshot::NEVER_OFFLINE`), for 1 to 7 days, to staff already provisioned here.
+- **`GET /access/revocations`** lists local revocations. **`POST /access/revocations`** takes `username`. An admin cannot revoke their own access.
+- **Who may:** the caller's effective snapshot must give `access.administer-local` under the role mappings central provisioned in its bundle (`LocalConfig`). Otherwise 403.
+- **Signing:** each grant is signed through a `GrantSigner` with the node's key, for central to ratify once sync exists.
+- **Audit:** each grant and revocation commits with its AuditEvent (DICOM `110137`, coded `local-grant` or `local-revocation`).
+- **Taking effect:** in `current_snapshot`, so at sign-in, refresh and every request:
+  - a local revocation refuses the user at once;
+  - unexpired grants add their roles (`with_grants`), never program assignments.
+- **The bundle** carries `LocalConfig`, the role mappings and the grantable roles, and the import stores it. Central fills it from its access policy's `roles` and `locally_grantable`.
+
 ## Request subjects (ADR 0056)
 
 `Subjects` and the `subject_layer` middleware turn each resource request into the `health_access_policy::Subject` and `health_audit::Agent` request extensions that `health-fhir-server` decides and audits with. The subject is built from:

@@ -8,6 +8,9 @@
 //! - **`/api/session`**, behind the device gate: who the access token belongs to.
 //! - **`/api/admin/provision/accounts`**, for the edge's own screen: central's provisioning
 //!   bundle, imported with each hash re-encrypted under this node's pepper key.
+//! - **`/api/access/…`**, behind the device gate: offline administration by a signed-in facility
+//!   admin (`access.administer-local`): local grants, signed with the node's key, and local
+//!   revocations.
 //!
 //! It needs `HEALTH_FACILITY`, `HEALTH_SNAPSHOT_KEYS_FILE`, and the pepper and token-signing keys
 //! that `facility-edge provision request` seals in the keystore. Without any of them the node
@@ -19,8 +22,8 @@ use std::sync::Arc;
 use axum::Router;
 use health_auth::jose::EcJwk;
 use health_auth::{
-    AuthConfig, AuthServer, Client, Credentials, DeviceGate, Provisioning, RecipientKey,
-    SnapshotGate, SnapshotVerifier, SurrealAuthStore, TokenSigner,
+    AuthConfig, AuthServer, Client, Credentials, DeviceGate, GrantSigner, LocalAdmin, Provisioning,
+    RecipientKey, SnapshotGate, SnapshotVerifier, SurrealAuthStore, TokenSigner,
 };
 use health_identity::snapshot::SnapshotPolicy;
 use health_time::Clock;
@@ -146,8 +149,30 @@ pub(crate) fn routes(
         facility.clone(),
         recipient,
     );
+    // Offline administration (ADR 0011): grants are signed with the node's key, the facility
+    // intermediate's, which central trusts through the certificate it issued.
+    let grant_signer: GrantSigner = {
+        let secrets = Arc::clone(secrets);
+        Arc::new(move |claims| {
+            let pem = String::from_utf8(secret(&secrets, INTERMEDIATE_KEY)?)
+                .map_err(|_| format!("{INTERMEDIATE_KEY} is not PEM"))?;
+            let key = p256::ecdsa::SigningKey::from_pkcs8_pem(&pem)
+                .map_err(|_| format!("{INTERMEDIATE_KEY} is not a P-256 key"))?;
+            let header = serde_json::json!({
+                "alg": "ES256",
+                "typ": "local-grant+jwt",
+                "jwk": health_auth::jose::EcJwk::of(key.verifying_key()),
+            });
+            Ok(health_auth::jose::sign(&key, &header, claims))
+        })
+    };
+    let local_admin = LocalAdmin::new(server.verifier(), grant_signer, config.node_id.clone());
     Ok(Router::new()
         .nest("/auth", server.router())
-        .merge(gate.layer(Router::new().nest("/api", server.session_route())))
+        .merge(
+            gate.layer(
+                Router::new().nest("/api", server.session_route().merge(local_admin.router())),
+            ),
+        )
         .merge(admin::local_only(provisioning.router())))
 }

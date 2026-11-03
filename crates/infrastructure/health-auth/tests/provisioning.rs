@@ -81,6 +81,7 @@ impl Central {
                     .sign(&snapshot(snapshot_for, facility), &roles())
                     .expect("sign"),
             ],
+            local: health_auth::LocalConfig::default(),
         }
         .seal(&self.signer, &edge.public_key())
         .expect("seal")

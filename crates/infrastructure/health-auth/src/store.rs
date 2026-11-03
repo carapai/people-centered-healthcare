@@ -7,7 +7,7 @@ use std::future::Future;
 use std::sync::Mutex;
 
 use health_access_policy::BreakGlassEvent;
-use health_identity::snapshot::ClockFloor;
+use health_identity::snapshot::{ClockFloor, LocalGrant, LocalRevocation, RolePermissions};
 use health_identity::{
     AccountId, Device, DeviceId, EnrollmentRequest, Lockout, LoginAccount, PhoneAccount,
     PhoneNumber, Scopes, SessionState,
@@ -17,6 +17,17 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::otp::PhoneOtp;
+
+/// What central provisions for offline administration (offline-auth.md § Offline user and role
+/// administration): the country's role → permission mappings, and the roles a facility admin may
+/// grant locally.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LocalConfig {
+    /// The role → permission mappings.
+    pub roles: RolePermissions,
+    /// The locally grantable roles.
+    pub grantable: Vec<String>,
+}
 
 /// A store failure.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -329,6 +340,62 @@ pub trait AuthStore: Send + Sync {
         let _ = (before, otp);
         async { Ok(false) }
     }
+    /// The local grants at `facility` unexpired at `at`, of `account` when given (offline-auth.md
+    /// § Offline user and role administration). Only edges keep them; the default has none.
+    fn local_grants(
+        &self,
+        facility: &str,
+        account: Option<AccountId>,
+        at: Timestamp,
+    ) -> impl Future<Output = Result<Vec<LocalGrant>, StoreError>> + Send {
+        let _ = (facility, account, at);
+        async { Ok(Vec::new()) }
+    }
+    /// Stores a local grant, its JWS signed by the node's key, and its AuditEvent, together.
+    fn put_local_grant(
+        &self,
+        grant: &LocalGrant,
+        jws: &str,
+        audit: &Value,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = (grant, jws, audit);
+        async { Err(StoreError("this node keeps no local grants".into())) }
+    }
+    /// `account`'s local revocation, if any.
+    fn local_revocation(
+        &self,
+        account: AccountId,
+    ) -> impl Future<Output = Result<Option<LocalRevocation>, StoreError>> + Send {
+        let _ = account;
+        async { Ok(None) }
+    }
+    /// Every local revocation.
+    fn local_revocations(
+        &self,
+    ) -> impl Future<Output = Result<Vec<LocalRevocation>, StoreError>> + Send {
+        async { Ok(Vec::new()) }
+    }
+    /// Records a local revocation with its AuditEvent, together.
+    fn put_local_revocation(
+        &self,
+        revocation: &LocalRevocation,
+        audit: &Value,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = (revocation, audit);
+        async { Err(StoreError("this node keeps no local revocations".into())) }
+    }
+    /// The country's role mappings and locally grantable roles, as central provisioned them.
+    fn local_config(&self) -> impl Future<Output = Result<Option<LocalConfig>, StoreError>> + Send {
+        async { Ok(None) }
+    }
+    /// Replaces the local configuration.
+    fn put_local_config(
+        &self,
+        config: &LocalConfig,
+    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+        let _ = config;
+        async { Err(StoreError("this node keeps no local configuration".into())) }
+    }
     /// The persisted clock floor.
     fn clock_floor(&self) -> impl Future<Output = Result<ClockFloor, StoreError>> + Send {
         async { Ok(ClockFloor::default()) }
@@ -359,6 +426,9 @@ pub(crate) struct State {
     pub(crate) devices: HashMap<DeviceId, Device>,
     pub(crate) enrollments: HashMap<Uuid, EnrollmentRequest>,
     pins: HashMap<(AccountId, String), (String, u32)>,
+    grants: Vec<LocalGrant>,
+    revocations: HashMap<AccountId, LocalRevocation>,
+    local: Option<LocalConfig>,
 }
 
 /// An in-memory store.
@@ -692,6 +762,64 @@ impl AuthStore for MemoryStore {
             .collect();
         facilities.sort();
         Ok(facilities)
+    }
+
+    async fn local_grants(
+        &self,
+        facility: &str,
+        account: Option<AccountId>,
+        at: Timestamp,
+    ) -> Result<Vec<LocalGrant>, StoreError> {
+        Ok(self
+            .lock()
+            .grants
+            .iter()
+            .filter(|g| {
+                g.facility == facility && at < g.not_after && account.is_none_or(|a| a == g.account)
+            })
+            .cloned()
+            .collect())
+    }
+
+    async fn put_local_grant(
+        &self,
+        grant: &LocalGrant,
+        _jws: &str,
+        _audit: &Value,
+    ) -> Result<(), StoreError> {
+        self.lock().grants.push(grant.clone());
+        Ok(())
+    }
+
+    async fn local_revocation(
+        &self,
+        account: AccountId,
+    ) -> Result<Option<LocalRevocation>, StoreError> {
+        Ok(self.lock().revocations.get(&account).cloned())
+    }
+
+    async fn local_revocations(&self) -> Result<Vec<LocalRevocation>, StoreError> {
+        Ok(self.lock().revocations.values().cloned().collect())
+    }
+
+    async fn put_local_revocation(
+        &self,
+        revocation: &LocalRevocation,
+        _audit: &Value,
+    ) -> Result<(), StoreError> {
+        self.lock()
+            .revocations
+            .insert(revocation.account, revocation.clone());
+        Ok(())
+    }
+
+    async fn local_config(&self) -> Result<Option<LocalConfig>, StoreError> {
+        Ok(self.lock().local.clone())
+    }
+
+    async fn put_local_config(&self, config: &LocalConfig) -> Result<(), StoreError> {
+        self.lock().local = Some(config.clone());
+        Ok(())
     }
 
     async fn clock_floor(&self) -> Result<ClockFloor, StoreError> {

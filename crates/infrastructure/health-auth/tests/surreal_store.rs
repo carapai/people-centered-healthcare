@@ -645,3 +645,88 @@ async fn a_user_s_session_and_pin_on_a_device_are_found_by_both() {
         None
     );
 }
+
+#[tokio::test]
+async fn local_grants_revocations_and_configuration_are_kept() {
+    use health_auth::{AuthStore, LocalConfig};
+    use health_identity::snapshot::{LocalGrant, LocalRevocation};
+    use health_time::SignedDuration;
+    let node = node().await;
+    let (who, admin) = (AccountId(Uuid::now_v7()), AccountId(Uuid::now_v7()));
+    let now = health_time::Timestamp::now();
+    let grant = LocalGrant {
+        id: Uuid::now_v7(),
+        account: who,
+        facility: "KAM013".into(),
+        role: "nurse".into(),
+        granted_by: admin,
+        granted_at: now,
+        not_after: now
+            .checked_add(SignedDuration::from_hours(48))
+            .expect("time"),
+    };
+    let audit = serde_json::json!({
+        "resourceType": "AuditEvent",
+        "recorded": now.to_string(),
+        "agent": [{ "who": { "display": "admin" }, "requestor": true }],
+        "source": { "observer": { "display": "edge" } },
+        "code": { "coding": [{ "system": "urn:health:audit-event", "code": "local-grant" }] },
+    });
+    node.store
+        .put_local_grant(&grant, "jws", &audit)
+        .await
+        .expect("grant");
+    let mine = node
+        .store
+        .local_grants("KAM013", Some(who), now)
+        .await
+        .expect("grants");
+    assert_eq!(mine, vec![grant.clone()]);
+    assert!(
+        node.store
+            .local_grants("KAM013", Some(admin), now)
+            .await
+            .expect("grants")
+            .is_empty()
+    );
+    let lapsed = now
+        .checked_add(SignedDuration::from_hours(49))
+        .expect("time");
+    assert!(
+        node.store
+            .local_grants("KAM013", None, lapsed)
+            .await
+            .expect("grants")
+            .is_empty()
+    );
+
+    assert_eq!(node.store.local_revocation(who).await.expect("read"), None);
+    let revocation = LocalRevocation {
+        account: who,
+        revoked_by: admin,
+        revoked_at: now,
+    };
+    node.store
+        .put_local_revocation(&revocation, &audit)
+        .await
+        .expect("revoke");
+    assert_eq!(
+        node.store.local_revocation(who).await.expect("read"),
+        Some(revocation.clone())
+    );
+    assert_eq!(
+        node.store.local_revocations().await.expect("all"),
+        vec![revocation]
+    );
+
+    assert_eq!(node.store.local_config().await.expect("config"), None);
+    let config = LocalConfig {
+        roles: Default::default(),
+        grantable: vec!["nurse".into()],
+    };
+    node.store.put_local_config(&config).await.expect("put");
+    assert_eq!(
+        node.store.local_config().await.expect("config"),
+        Some(config)
+    );
+}

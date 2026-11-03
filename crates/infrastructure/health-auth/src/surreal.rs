@@ -17,8 +17,10 @@ use uuid::Uuid;
 
 use crate::otp::PhoneOtp;
 use crate::store::{
-    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, Session, StoreError,
+    AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, LocalConfig, Session,
+    StoreError,
 };
+use health_identity::snapshot::{LocalGrant, LocalRevocation};
 
 /// The SurrealDB [`AuthStore`].
 #[derive(Clone)]
@@ -568,6 +570,97 @@ impl AuthStore for SurrealAuthStore {
     async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {
         let mut tx = self.begin().await?;
         tx.auth_snapshot_facilities(account).await.map_err(failed)
+    }
+
+    async fn local_grants(
+        &self,
+        facility: &str,
+        account: Option<AccountId>,
+        at: Timestamp,
+    ) -> Result<Vec<LocalGrant>, StoreError> {
+        let mut tx = self.begin().await?;
+        let account = account.map(|a| a.to_string());
+        tx.local_grants(facility, account.as_deref(), at)
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|d| serde_json::from_str(d).map_err(failed))
+            .collect()
+    }
+
+    async fn put_local_grant(
+        &self,
+        grant: &LocalGrant,
+        jws: &str,
+        audit: &Value,
+    ) -> Result<(), StoreError> {
+        let data = serde_json::to_string(grant).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        tx.put_local_grant(
+            &grant.id.to_string(),
+            &grant.account.to_string(),
+            &grant.facility,
+            grant.not_after,
+            &data,
+            jws,
+        )
+        .await
+        .map_err(failed)?;
+        // The grant and its AuditEvent commit together, or neither does.
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn local_revocation(
+        &self,
+        account: AccountId,
+    ) -> Result<Option<LocalRevocation>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.local_revocation(&account.to_string())
+            .await
+            .map_err(failed)?
+            .map(|d| serde_json::from_str(&d).map_err(failed))
+            .transpose()
+    }
+
+    async fn local_revocations(&self) -> Result<Vec<LocalRevocation>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.local_revocations()
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|d| serde_json::from_str(d).map_err(failed))
+            .collect()
+    }
+
+    async fn put_local_revocation(
+        &self,
+        revocation: &LocalRevocation,
+        audit: &Value,
+    ) -> Result<(), StoreError> {
+        let data = serde_json::to_string(revocation).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        tx.put_local_revocation(&revocation.account.to_string(), &data)
+            .await
+            .map_err(failed)?;
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
+    async fn local_config(&self) -> Result<Option<LocalConfig>, StoreError> {
+        let mut tx = self.begin().await?;
+        tx.local_config()
+            .await
+            .map_err(failed)?
+            .map(|d| serde_json::from_str(&d).map_err(failed))
+            .transpose()
+    }
+
+    async fn put_local_config(&self, config: &LocalConfig) -> Result<(), StoreError> {
+        let data = serde_json::to_string(config).map_err(failed)?;
+        let mut tx = self.begin().await?;
+        tx.put_local_config(&data).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)
     }
 
     async fn clock_floor(&self) -> Result<ClockFloor, StoreError> {

@@ -1,0 +1,418 @@
+//! Offline user and role administration on an edge (offline-auth.md § Offline user and role
+//! administration; ADR 0011): routes for a signed-in facility admin whose snapshot grants
+//! `access.administer-local` under the country's role mappings, which central provisions in its
+//! bundle ([`LocalConfig`](crate::LocalConfig)).
+//!
+//! - `GET /access/grants`, `POST /access/grants` (`username`, `role`, `days`): roles granted
+//!   locally, only from the country's locally grantable list, never a role carrying a
+//!   never-offline permission, for at most 7 days. Each grant is signed with the node's key for
+//!   central to ratify, and audited.
+//! - `GET /access/revocations`, `POST /access/revocations` (`username`): local access revoked at
+//!   once: the user's tokens stop working at their next request, and they cannot sign in here.
+
+use std::sync::Arc;
+
+use axum::Router;
+use axum::extract::{OriginalUri, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::{Form, Json};
+use health_identity::AccountId;
+use health_identity::snapshot::{ADMINISTER_LOCAL, LocalGrant, LocalGrantPolicy, LocalRevocation};
+use serde::Deserialize;
+use serde_json::{Value, json};
+
+use crate::server::{AccessVerifier, Principal};
+use crate::store::AuthStore;
+
+/// Signs a local grant's claims with the node's key (its facility intermediate), for central to
+/// ratify. Blocking: it may unseal the key from the platform keystore.
+pub type GrantSigner = Arc<dyn Fn(&Value) -> Result<String, String> + Send + Sync>;
+
+/// The routes, over the authorization server's `verifier`.
+pub struct LocalAdmin<S> {
+    verifier: AccessVerifier<S>,
+    signer: GrantSigner,
+    observer: String,
+}
+
+impl<S> Clone for LocalAdmin<S> {
+    fn clone(&self) -> Self {
+        Self {
+            verifier: self.verifier.clone(),
+            signer: Arc::clone(&self.signer),
+            observer: self.observer.clone(),
+        }
+    }
+}
+
+fn error(status: StatusCode, error: &str, detail: impl Into<String>) -> Response {
+    let no_store = [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))];
+    (
+        status,
+        no_store,
+        Json(json!({ "error": error, "detail": detail.into() })),
+    )
+        .into_response()
+}
+
+/// A signed-in facility admin, and where they administer.
+struct Admin {
+    principal: Principal,
+    facility: String,
+}
+
+impl<S: AuthStore + 'static> LocalAdmin<S> {
+    /// The routes over `verifier`, signing grants with `signer`, audited as `observer`.
+    pub fn new(
+        verifier: AccessVerifier<S>,
+        signer: GrantSigner,
+        observer: impl Into<String>,
+    ) -> Self {
+        Self {
+            verifier,
+            signer,
+            observer: observer.into(),
+        }
+    }
+
+    /// `/access/grants` and `/access/revocations`; nest them where the API is.
+    pub fn router(&self) -> Router {
+        Router::new()
+            .route("/access/grants", get(grants::<S>).post(grant::<S>))
+            .route(
+                "/access/revocations",
+                get(revocations::<S>).post(revoke::<S>),
+            )
+            .with_state(self.clone())
+    }
+
+    /// The request's admin: a live token whose effective snapshot, under the provisioned role
+    /// mappings, grants `access.administer-local`.
+    async fn admin(
+        &self,
+        headers: &HeaderMap,
+        method: &str,
+        path: &str,
+    ) -> Result<Admin, Box<Response>> {
+        let uri = format!("{}{path}", self.verifier.origin());
+        let principal = self
+            .verifier
+            .verify(headers, method, &uri)
+            .await
+            .map_err(|e| Box::new(e.into_response()))?;
+        let facility = principal.facility.clone().ok_or_else(|| {
+            error(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                "the session has no facility",
+            )
+        })?;
+        let snapshot = self
+            .verifier
+            .current_snapshot(principal.account, &facility)
+            .await
+            .map_err(|e| Box::new(e.into_response()))?;
+        let config = self
+            .verifier
+            .store()
+            .local_config()
+            .await
+            .map_err(|_| {
+                error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "unavailable",
+                    "the store failed",
+                )
+            })?
+            .unwrap_or_default();
+        if !config.roles.resolve(&snapshot).contains(ADMINISTER_LOCAL) {
+            return Err(Box::new(error(
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                "offline administration needs access.administer-local",
+            )));
+        }
+        Ok(Admin {
+            principal,
+            facility,
+        })
+    }
+
+    fn audit(
+        &self,
+        code: &str,
+        action: &str,
+        admin: AccountId,
+        subject: AccountId,
+        detail: &str,
+    ) -> Value {
+        json!({
+            "resourceType": "AuditEvent",
+            "category": [{ "coding": [{ "system": "http://dicom.nema.org/resources/ontology/DCM", "code": "110137", "display": "User Security Attributes Changed" }] }],
+            "code": { "coding": [{ "system": "urn:health:audit-event", "code": code }] },
+            "action": action,
+            "severity": "notice",
+            "recorded": self.verifier.now().to_string(),
+            "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
+            "agent": [{ "who": { "display": format!("account {admin}") }, "requestor": true }],
+            "source": { "observer": { "display": self.observer } },
+            "entity": [{
+                "what": { "display": format!("account {subject}") },
+                "detail": [{ "type": { "text": "change" }, "valueString": detail }],
+            }],
+        })
+    }
+
+    async fn account(&self, username: &str) -> Result<AccountId, Box<Response>> {
+        match self
+            .verifier
+            .store()
+            .account_by_username(username.trim())
+            .await
+        {
+            Ok(Some(account)) => Ok(account.id),
+            Ok(None) => Err(Box::new(error(
+                StatusCode::NOT_FOUND,
+                "no-such-user",
+                "no account by that username",
+            ))),
+            Err(_) => Err(Box::new(error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the store failed",
+            ))),
+        }
+    }
+}
+
+fn grant_json(grant: &LocalGrant) -> Value {
+    json!({
+        "id": grant.id.to_string(),
+        "account": grant.account.to_string(),
+        "role": grant.role,
+        "granted_by": grant.granted_by.to_string(),
+        "granted_at": grant.granted_at.to_string(),
+        "not_after": grant.not_after.to_string(),
+    })
+}
+
+async fn grants<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+) -> Response {
+    let who = match admin.admin(&headers, "GET", uri.path()).await {
+        Ok(who) => who,
+        Err(refused) => return *refused,
+    };
+    match admin
+        .verifier
+        .store()
+        .local_grants(&who.facility, None, admin.verifier.now())
+        .await
+    {
+        Ok(grants) => {
+            Json(json!(grants.iter().map(grant_json).collect::<Vec<_>>())).into_response()
+        }
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "the store failed",
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct GrantForm {
+    username: String,
+    role: String,
+    days: i64,
+}
+
+async fn grant<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+    Form(form): Form<GrantForm>,
+) -> Response {
+    let who = match admin.admin(&headers, "POST", uri.path()).await {
+        Ok(who) => who,
+        Err(refused) => return *refused,
+    };
+    let account = match admin.account(&form.username).await {
+        Ok(account) => account,
+        Err(refused) => return *refused,
+    };
+    let store = admin.verifier.store();
+    // Only staff already provisioned to this facility (offline-auth.md).
+    match store.snapshot(account, &who.facility).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "not-provisioned",
+                "the user is not provisioned to this facility",
+            );
+        }
+        Err(_) => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the store failed",
+            );
+        }
+    }
+    let config = match store.local_config().await {
+        Ok(config) => config.unwrap_or_default(),
+        Err(_) => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the store failed",
+            );
+        }
+    };
+    let now = admin.verifier.now();
+    let grant = match LocalGrantPolicy::default().grant(
+        form.role.trim(),
+        &config.roles,
+        &config.grantable,
+        account,
+        &who.facility,
+        who.principal.account,
+        form.days,
+        now,
+    ) {
+        Ok(grant) => grant,
+        Err(refused) => {
+            return error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "refused",
+                refused.to_string(),
+            );
+        }
+    };
+    let claims = match serde_json::to_value(&grant) {
+        Ok(claims) => claims,
+        Err(_) => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the grant cannot be encoded",
+            );
+        }
+    };
+    let signer = Arc::clone(&admin.signer);
+    let jws = match tokio::task::spawn_blocking(move || signer(&claims)).await {
+        Ok(Ok(jws)) => jws,
+        _ => {
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "unavailable",
+                "the node's key cannot sign",
+            );
+        }
+    };
+    let audit = admin.audit(
+        "local-grant",
+        "C",
+        who.principal.account,
+        account,
+        &format!("{} until {}", grant.role, grant.not_after),
+    );
+    match store.put_local_grant(&grant, &jws, &audit).await {
+        Ok(()) => {
+            tracing::warn!(alert = "local-grant", role = %grant.role, "a role was granted offline, pending ratification");
+            (StatusCode::CREATED, Json(grant_json(&grant))).into_response()
+        }
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "the store failed",
+        ),
+    }
+}
+
+fn revocation_json(revocation: &LocalRevocation) -> Value {
+    json!({
+        "account": revocation.account.to_string(),
+        "revoked_by": revocation.revoked_by.to_string(),
+        "revoked_at": revocation.revoked_at.to_string(),
+    })
+}
+
+async fn revocations<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+) -> Response {
+    if let Err(refused) = admin.admin(&headers, "GET", uri.path()).await {
+        return *refused;
+    }
+    match admin.verifier.store().local_revocations().await {
+        Ok(all) => Json(json!(all.iter().map(revocation_json).collect::<Vec<_>>())).into_response(),
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "the store failed",
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct RevokeForm {
+    username: String,
+}
+
+async fn revoke<S: AuthStore + 'static>(
+    State(admin): State<LocalAdmin<S>>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+    Form(form): Form<RevokeForm>,
+) -> Response {
+    let who = match admin.admin(&headers, "POST", uri.path()).await {
+        Ok(who) => who,
+        Err(refused) => return *refused,
+    };
+    let account = match admin.account(&form.username).await {
+        Ok(account) => account,
+        Err(refused) => return *refused,
+    };
+    if account == who.principal.account {
+        return error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "refused",
+            "an admin cannot revoke their own access",
+        );
+    }
+    let revocation = LocalRevocation {
+        account,
+        revoked_by: who.principal.account,
+        revoked_at: admin.verifier.now(),
+    };
+    let audit = admin.audit(
+        "local-revocation",
+        "U",
+        who.principal.account,
+        account,
+        "local access revoked",
+    );
+    match admin
+        .verifier
+        .store()
+        .put_local_revocation(&revocation, &audit)
+        .await
+    {
+        Ok(()) => {
+            tracing::warn!(alert = "local-revocation", "local access was revoked");
+            (StatusCode::CREATED, Json(revocation_json(&revocation))).into_response()
+        }
+        Err(_) => error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "unavailable",
+            "the store failed",
+        ),
+    }
+}
