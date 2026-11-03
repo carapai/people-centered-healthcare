@@ -66,6 +66,10 @@ pub(crate) struct AuthFiles {
     pub(crate) payment_tills: Vec<String>,
     /// `HEALTH_CURRENCY`, default `UGX`: the ledger's functional currency.
     pub(crate) currency: String,
+    /// `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE` (#268): the facility
+    /// issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS. With them,
+    /// edges provision themselves at `/api/provisioning/nodes` with a one-time code.
+    pub(crate) issuing_ca: Option<(PathBuf, PathBuf)>,
 }
 
 /// The patient portal's client and its one-time codes (#111; ADR 0029).
@@ -142,6 +146,18 @@ impl Config {
                         })
                         .unwrap_or_default(),
                     currency: get("HEALTH_CURRENCY").unwrap_or_else(|| "UGX".to_owned()),
+                    issuing_ca: match (
+                        get("HEALTH_ISSUING_CA_CERT_FILE"),
+                        get("HEALTH_ISSUING_CA_KEY_FILE"),
+                    ) {
+                        (Some(cert), Some(key)) => Some((cert.into(), key.into())),
+                        (None, None) => None,
+                        _ => {
+                            return Err(ConfigError::Missing(
+                                "HEALTH_ISSUING_CA_CERT_FILE and HEALTH_ISSUING_CA_KEY_FILE",
+                            ));
+                        }
+                    },
                     portal: match get("HEALTH_PORTAL_REDIRECT_URIS") {
                         None => None,
                         Some(uris) => Some(PortalFiles {

@@ -6,6 +6,9 @@
 //!
 //! `central-server provision bundle …` exports a facility's provisioning bundle for one edge
 //! (ADR 0059).
+//!
+//! `central-server provision code <facility> --by <operator> …` issues a one-time code an edge
+//! provisions itself with (#268).
 
 use std::sync::Arc;
 
@@ -17,6 +20,7 @@ use health_identity::snapshot::{PermissionSnapshot, RoleAssignment, SnapshotPoli
 use health_identity::{
     AccountId, AccountStatus, Lockout, LoginAccount, PasswordPolicy, SessionPolicy,
 };
+use health_provisioning::NodeRegistry;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{SystemClock, Timestamp};
 
@@ -30,11 +34,12 @@ pub(crate) async fn run(
     match args.first().map(String::as_str) {
         Some("bundle") => return bundle(config, &args[1..]).await,
         Some("snapshot-keys") => return snapshot_keys(config, &args[1..]),
+        Some("code") => return code(config, &args[1..]).await,
         _ => {}
     }
     let [username, facility, roles] = args else {
         return Err(
-            "usage: central-server provision <username> <facility> <role>[,<role>…] | bundle <facility> <node-id> <intermediate.pem> <out> | snapshot-keys <out>".into(),
+            "usage: central-server provision <username> <facility> <role>[,<role>…] | bundle <facility> <node-id> <intermediate.pem> <out> | snapshot-keys <out> | code <facility> --by <operator> [--dns <name>]… [--exempt <reason>]".into(),
         );
     };
     let files = config
@@ -116,6 +121,14 @@ pub(crate) async fn run(
 
 /// The authorization server's store at central, migrated.
 async fn open_store(config: &Config) -> Result<SurrealAuthStore, Box<dyn std::error::Error>> {
+    Ok(SurrealAuthStore::new(
+        open_surreal(config).await?,
+        SessionPolicy::default().hard_cap,
+    ))
+}
+
+/// The database, migrated.
+async fn open_surreal(config: &Config) -> Result<SurrealStore, Box<dyn std::error::Error>> {
     let db_password = std::fs::read_to_string(&config.surrealdb_password_file)
         .map_err(|_| "cannot read HEALTH_SURREALDB_PASSWORD_FILE")?
         .trim()
@@ -134,10 +147,43 @@ async fn open_store(config: &Config) -> Result<SurrealAuthStore, Box<dyn std::er
     migrate(&connection, MIGRATIONS)
         .await
         .map_err(|_| "the database could not be migrated")?;
-    Ok(SurrealAuthStore::new(
-        SurrealStore::new(connection, Arc::new(SystemClock)),
-        SessionPolicy::default().hard_cap,
-    ))
+    Ok(SurrealStore::new(connection, Arc::new(SystemClock)))
+}
+
+/// `central-server provision code <facility> --by <operator> [--dns <name>]… [--exempt <reason>]`:
+/// a one-time code for an edge to provision itself with (#268), printed once. `--exempt` grants
+/// the node an exemption from full-disk encryption (ADR 0048), audited, with its reason.
+async fn code(config: &Config, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    const USAGE: &str = "usage: central-server provision code <facility> --by <operator> [--dns <name>]… [--exempt <reason>]";
+    let (facility, rest) = args.split_first().ok_or(USAGE)?;
+    let (mut by, mut dns, mut exempt) = (None, Vec::new(), None);
+    let mut flags = rest.iter();
+    while let Some(flag) = flags.next() {
+        let value = flags.next().ok_or(USAGE)?.clone();
+        match flag.as_str() {
+            "--by" => by = Some(value),
+            "--dns" => dns.push(value),
+            "--exempt" => exempt = Some(value),
+            _ => return Err(USAGE.into()),
+        }
+    }
+    let by = by.ok_or(USAGE)?;
+    let registry = NodeRegistry::new(
+        open_surreal(config).await?,
+        Arc::new(SystemClock),
+        "central",
+    );
+    let (text, issued) = registry.issue_code(facility, dns, exempt, &by).await?;
+    let mut out = std::io::stdout();
+    std::io::Write::write_all(
+        &mut out,
+        format!(
+            "{text}\nfor {facility}, redeemable once until {}\n",
+            issued.expires
+        )
+        .as_bytes(),
+    )?;
+    Ok(())
 }
 
 /// `central-server provision bundle <facility> <node-id> <intermediate.pem> <out>`: the

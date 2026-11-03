@@ -1,6 +1,6 @@
 //! Identity & Access rules (offline-auth.md § Credentials, § Tokens and sessions; ADR 0010).
 //!
-//! Pure policy: when an account is locked, how a LAN device enrolls and is revoked, a patient's phone account and its one-time codes, which passwords are acceptable, how long sessions and
+//! Pure policy: when an account is locked, how a LAN device enrolls and is revoked, how central provisions a node, a patient's phone account and its one-time codes, which passwords are acceptable, how long sessions and
 //! tokens live, what a SMART App Launch v2 scope grants, and the permission snapshots that carry a
 //! user's roles to an edge (ADR 0011). The protocol, hashing and storage
 //! are in `health-auth`.
@@ -8,6 +8,7 @@
 mod account;
 mod device;
 mod lockout;
+mod node;
 mod otp;
 mod password;
 mod phone;
@@ -21,6 +22,10 @@ pub use device::{
     Device, DeviceId, DeviceStatus, EnrollmentPolicy, EnrollmentRefused, EnrollmentRequest,
 };
 pub use lockout::{Locked, Lockout, LockoutPolicy};
+pub use node::{
+    CODE_LENGTH, CodeRefused, Encryption, Node, NodeId, NodeKind, NodeStatus, ProvisioningCode,
+    ProvisioningPolicy,
+};
 pub use otp::{OtpChallenge, OtpPolicy, OtpPurpose, OtpRefused};
 pub use password::{PasswordPolicy, PasswordRejected};
 pub use phone::{InvalidPhone, PhoneNumber};

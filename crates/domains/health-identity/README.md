@@ -6,6 +6,11 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
 - **`PhoneAccount`** (#111; ADR 0029): a patient's Login Account, one per verified phone number. It has no password: each sign-in is a one-time code to the phone. It reaches patient data only through a Person (`health-client-registry`), never because a Patient's phone number matches.
   - **`PhoneNumber`:** E.164. `parse` accepts what people write (`+256 772 123 456`, `00256…`, or the national `0772…` with the country code given) and refuses letters and lengths outside 8–15 digits. Stored numbers deserialize only in E.164.
   - **`OtpPolicy` / `OtpChallenge`:** six digits, valid 5 minutes, 5 tries. One code a minute and 5 an hour per phone (`may_send`). `attempt` counts every try, refuses an expired, used or spent challenge, and accepts a code once. The code is kept only as a hash that this crate never reads.
+- **Nodes** (#268; identifiers.md; ADRs 0048, 0058):
+  - **`ProvisioningPolicy`:** one-time codes of 8 Crockford base32 characters, `XXXX-XXXX`. `normalise` reads one forgivingly. A code expires after 72 hours.
+  - **`ProvisioningCode::redeemable`:** a code redeems once, before it expires, for an encrypted edge (`Encryption::Compliant`). An unencrypted edge needs an exemption granted with the code (`Encryption::Exempt { reason }`).
+  - **`NodeKind::next_short_code`:** `E1`, `E2`, … per facility, one past the highest, so a decommissioned node's code is never reused.
+  - **`Node`:** the registry's record, holding its id, facility, short code, status, encryption, intermediate serial and code.
 - **Devices** (#74; lan-security.md § Device enrollment; ADR 0009):
   - **`EnrollmentPolicy` / `EnrollmentRequest`:** a device asks to enroll with its key's RFC 7638 thumbprint and a label, and shows a 6-digit pairing code. The request expires 10 minutes after it was made.
   - **`EnrollmentRequest::approve`** gives the `Device` an admin approves: a new `DeviceId` (UUIDv7), a name and a location, both required, and who approved it and when. An expired request is refused.

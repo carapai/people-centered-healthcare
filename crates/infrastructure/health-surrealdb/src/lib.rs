@@ -22,6 +22,7 @@ mod history;
 mod inbound;
 mod local;
 mod migrations;
+mod nodes;
 pub mod ownership;
 mod payments;
 mod phone;
