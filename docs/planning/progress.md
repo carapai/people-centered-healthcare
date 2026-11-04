@@ -403,3 +403,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **The Java oracle** covers tier 3's profile cases. Tier 4 is not in it, because the Java run has no terminology server (`-tx n/a`).
 
   This completes #91.
+- 2026-11-04: #91 part 2 merged (#305), completing #91. #96, Workflow Definitions, is split: part 1 is the action contract and the definition with its publication checks (this), and part 2 runs those checks in package publication.
+  - **New shared contract crate `health-workflow-actions`:**
+    - `WorkflowAction` (id, major, permission, compensation, parameters);
+    - `ActionDescriptor` and its JSON Schema for the Studio.
+  - **`health-workflow::definition`:** `WorkflowDefinition` (statechart, typed data model, data requirements, decision tables, principal). Its `problems(catalog)` refuses:
+    - unknown actions and bad references;
+    - invalid parameters;
+    - untyped assignments;
+    - unreachable states and dead ends;
+    - malformed decision tables;
+    - unneeded principal permissions.
+  - **Decision:** actions are referenced as `<id>@<major>`.

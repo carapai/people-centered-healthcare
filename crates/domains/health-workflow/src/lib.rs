@@ -11,6 +11,7 @@
 //! workflow application to carry out in its transaction (ADR 0044), and evaluates guards through
 //! the [`Guards`] port.
 
+pub mod definition;
 mod interpreter;
 mod model;
 

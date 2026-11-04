@@ -25,6 +25,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-fhir-extraction` | crate | Pure SDC template-extraction executor and `$populate` evaluator; see [questionnaire-extraction.md](questionnaire-extraction.md) |
 | `health-sync-protocol` | crate | Wire types and the shared client and apply logic; see [synchronization.md](synchronization.md) |
 | `health-persistence` | crate | Moved here from §17 (ADR 0005): pure unit-of-work, outbox and versioning traits |
+| `health-workflow-actions` | crate | The workflow action contract (ADR 0043): `WorkflowAction`, `ActionDescriptor` and parameter schemas. It has no Bounded Context, so every context's contract crate may depend on it (#96) |
 | `health-<context>-contract` | crate per Bounded Context | Events, typed Workflow actions, context ids, cross-context query DTOs; created when the context first publishes one |
 
 ## 3 · domains (one crate per Module)

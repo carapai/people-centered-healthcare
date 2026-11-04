@@ -8,6 +8,7 @@ members = [
     "crates/contracts/health-fhir-search",
     "crates/contracts/health-fhir-validation",
     "crates/contracts/health-persistence",
+    "crates/contracts/health-workflow-actions",
     "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
     "crates/domains/health-configuration",
@@ -77,6 +78,7 @@ health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
 health-node-identity = { path = "crates/edge/health-node-identity" }
 health-configuration = { path = "crates/domains/health-configuration" }
 health-terminology = { path = "crates/domains/health-terminology" }
+health-workflow-actions = { path = "crates/contracts/health-workflow-actions" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
 health-patient-engagement = { path = "crates/domains/health-patient-engagement" }

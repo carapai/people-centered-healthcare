@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 health-time = { workspace = true }
+health-workflow-actions = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
