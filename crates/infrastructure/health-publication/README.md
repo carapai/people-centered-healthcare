@@ -11,7 +11,11 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
      - the publication rules and the release's schemas (`health_packages::check`);
      - then, against the latest published version of the package, the semver check (`health_configuration::lifecycle::semver::check`). That covers the package's own bump, and each changed artefact's bump against its content (`health_packages::bump`).
   2. **Workflow Definitions (#96):** every Library whose type is `workflow-definition` must hold, as inline `application/vnd.health.workflow+json` content, a `health_workflow::definition::WorkflowDefinition` with its Library's url and version. It must pass `problems` against the actions given to `with_actions`, so an unknown action or an invalid parameter fails validation. With no actions given, which is the case until contexts declare theirs, any definition that executes an action fails.
-  3. **Simulation:** the `Sandbox` runs the `tests/` cases. **`NoSandbox` runs none:** the simulation sandbox is #101, and until then simulation passes every package.
+  3. **Simulation:** the `Sandbox` runs the `tests/` cases.
+     - **`WorkflowSandbox`** (#101) runs every `tests/` JSON file of type `workflow-scenario` against the package's definition it names, on the same interpreter, with stubbed actions and guards (`health_workflow::simulation`).
+     - **Failures:** every scenario must pass, and one naming a definition the package does not hold fails.
+     - **Other cases:** extraction fixtures and indicator cases are not run yet.
+     - **`NoSandbox`** runs none, for tests of the other steps.
 
   A failure returns the draft to Draft, with every problem in its record.
 - **People's steps:** `review`, `approve` and `request_changes`, with the domain's separation of duties:

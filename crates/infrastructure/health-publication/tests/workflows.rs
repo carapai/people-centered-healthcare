@@ -1,6 +1,7 @@
 //! Workflow Definitions at publication (#96): a package's `WorkflowDefinitionLibrary` is checked
 //! against the actions the release knows, so an unknown action or an invalid parameter sends the
-//! draft back.
+//! draft back. Its `tests/` scenarios run in the simulation sandbox (#101), and a definition with
+//! an unreachable state cannot be published.
 
 use std::sync::Arc;
 
@@ -9,7 +10,9 @@ use base64::engine::general_purpose::STANDARD;
 use health_configuration::lifecycle::{Stage, Step};
 use health_files::FsBlobStore;
 use health_packages::Schemas;
-use health_publication::{ActionDescriptor, Files, NoSandbox, Publications};
+use health_publication::{
+    ActionDescriptor, Files, NoSandbox, Publications, Sandbox, WorkflowSandbox,
+};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::FixedClock;
 use health_workflow_actions::{Compensation, ParamKind, ParamSpec};
@@ -32,6 +35,10 @@ fn actions() -> Vec<ActionDescriptor> {
 }
 
 async fn publications() -> (Publications, tempfile::TempDir) {
+    publications_with(Arc::new(NoSandbox)).await
+}
+
+async fn publications_with(sandbox: Arc<dyn Sandbox>) -> (Publications, tempfile::TempDir) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "central".into(),
@@ -49,7 +56,7 @@ async fn publications() -> (Publications, tempfile::TempDir) {
         FsBlobStore::open(dir.path()).expect("blobs"),
         clock,
         Schemas::platform(),
-        Arc::new(NoSandbox),
+        sandbox,
         "central",
     )
     .with_actions(actions());
@@ -224,5 +231,116 @@ async fn the_content_must_be_a_definition_of_its_own_library() {
             .iter()
             .any(|p| p.contains("not a Workflow Definition")),
         "{problems:?}"
+    );
+}
+
+/// The OPD definition: triage, then consultation, then done.
+fn opd() -> Value {
+    json!({
+        "url": URL, "version": "1.0.0",
+        "statechart": { "states": [
+            { "id": "triage", "kind": "atomic",
+              "task": { "role": "nurse", "worklist": "opd-triage" },
+              "transitions": [{ "events": ["triaged"], "targets": ["consultation"] }] },
+            { "id": "consultation", "kind": "atomic",
+              "transitions": [{ "events": ["seen"], "targets": ["done"] }] },
+            { "id": "done", "kind": "final" } ] }
+    })
+}
+
+/// A `tests/` scenario: after `event`, the instance is in `state`.
+fn scenario(event: &str, state: &str) -> Vec<u8> {
+    json!({
+        "type": "workflow-scenario",
+        "name": format!("{event} leads to {state}"),
+        "definition": format!("{URL}|1.0.0"),
+        "steps": [
+            { "expect": { "configuration": ["triage"], "tasks": [{ "state": "triage", "status": "ready" }] } },
+            { "event": event, "expect": { "configuration": [state] } }
+        ]
+    })
+    .to_string()
+    .into_bytes()
+}
+
+/// Drafts and submits `files`, returning the stage reached and any simulation failures.
+async fn simulated(publications: &Publications, files: &Files, id: &str) -> (Stage, Vec<String>) {
+    publications.draft(files, "ann").await.expect("draft");
+    let lifecycle = publications.submit(id, "ann").await.expect("submit");
+    let (_, records) = publications.lifecycle(id).await.expect("records");
+    let failures = match records.last().map(|r| &r.step) {
+        Some(Step::SimulationFailed { problems }) => problems.clone(),
+        _ => Vec::new(),
+    };
+    (lifecycle.stage, failures)
+}
+
+#[tokio::test]
+async fn a_definition_with_an_unreachable_state_cannot_be_published() {
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    let mut unreachable = opd();
+    unreachable["statechart"]["states"]
+        .as_array_mut()
+        .expect("states")
+        .push(json!({ "id": "orphan", "kind": "atomic",
+                      "transitions": [{ "events": ["x"], "targets": ["done"] }] }));
+    let (stage, problems) = submit(
+        &publications,
+        &package(
+            "1.0.0",
+            &unreachable,
+            "application/vnd.health.workflow+json",
+        ),
+        "ug.moh.opd@1.0.0",
+    )
+    .await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        problems,
+        ["Library-opd-visit.json: state orphan cannot be reached"]
+    );
+}
+
+#[tokio::test]
+async fn passing_scenarios_let_the_package_through_and_a_failing_one_sends_it_back() {
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    let mut passing = package("1.0.0", &opd(), "application/vnd.health.workflow+json");
+    passing.insert(
+        "tests/opd-triaged.json".into(),
+        scenario("triaged", "consultation"),
+    );
+    // Other `tests/` files, such as extraction fixtures, are not workflow scenarios.
+    passing.insert(
+        "tests/extraction.json".into(),
+        json!({ "type": "extraction-fixture" })
+            .to_string()
+            .into_bytes(),
+    );
+    let (stage, failures) = simulated(&publications, &passing, "ug.moh.opd@1.0.0").await;
+    assert_eq!((stage, failures), (Stage::Review, Vec::new()));
+
+    let mut failing = package("1.0.1", &opd(), "application/vnd.health.workflow+json");
+    failing.insert("tests/opd-triaged.json".into(), scenario("triaged", "done"));
+    let (stage, failures) = simulated(&publications, &failing, "ug.moh.opd@1.0.1").await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        failures,
+        [
+            r#"tests/opd-triaged.json: triaged leads to done: step 2: expected configuration ["done"], got ["consultation"]"#
+        ]
+    );
+
+    let mut elsewhere = package("1.0.2", &opd(), "application/vnd.health.workflow+json");
+    let mut stray: Value =
+        serde_json::from_slice(&scenario("triaged", "consultation")).expect("json");
+    stray["definition"] = json!("https://health.go.ug/fhir/Library/anc|1.0.0");
+    elsewhere.insert("tests/anc.json".into(), stray.to_string().into_bytes());
+    let (stage, failures) = simulated(&publications, &elsewhere, "ug.moh.opd@1.0.2").await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        failures,
+        [
+            "tests/anc.json: the package holds no definition https://health.go.ug/fhir/Library/anc|1.0.0"
+        ]
     );
 }

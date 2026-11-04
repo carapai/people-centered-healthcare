@@ -112,7 +112,7 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 | `package list` | Every package not yet published |
 | `package export <id> --out <dir>` | Writes a published package's `<name>-<version>.tgz` and `.tgz.sig` |
 
-Simulation runs no `tests/` case until the sandbox (#101) exists.
+Simulation runs the package's workflow scenarios (`tests/` files of type `workflow-scenario`) in `WorkflowSandbox` (#101); any failing scenario returns the package to Draft.
 
 ## OpenAPI
 
