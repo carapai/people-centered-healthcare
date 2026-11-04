@@ -27,4 +27,9 @@ Layer: **application** (Workflow). Runs workflow instances through `health-workf
   - **claim rules:** claiming refreshes your own claim, and is refused while someone else's claim is live. Only the holder releases. Reassignment overrides, and escalation only raises priority;
   - `tasks(instance)` rebuilds an instance's Tasks, and `worklist(key)` lists the open ones most urgent first, then by arrival, with lapsed claims dropped as read;
   - permission checks are the caller's, after the policy decision point.
+- **FHIR projections** (`fhir`): in the same transaction, each projected Task is written as a FHIR **Task**, and each instance as a **RequestOrchestration** (id = instance id) whose actions are its Tasks. Both are owned by Workflow and written through the unit of work, so `/Task` and `/RequestOrchestration` read like any other resource. Details:
+  - **Task fields:** `businessStatus` is the state, `focus` the context, `requestedPerformer` the role, `input` the form and `partOf` the orchestration;
+  - **RequestOrchestration status:** `active`, `completed` in a final state, `revoked` when cancelled;
+  - **versions:** a version is written only when a projection changed;
+  - **CarePlan** belongs to Care Coordination, so program-style CarePlans will come through its typed actions.
 - **Fails closed:** sub-workflow invocations are refused until the engine supports them, and so are definitions this node does not have.
