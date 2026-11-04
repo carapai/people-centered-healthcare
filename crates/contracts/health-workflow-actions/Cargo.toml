@@ -1,0 +1,16 @@
+[package]
+name = "health-workflow-actions"
+description = "The workflow action contract (ADR 0043): what each Bounded Context's contract crate declares about the actions it accepts from workflows."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "contracts"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json = { workspace = true }

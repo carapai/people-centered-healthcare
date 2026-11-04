@@ -2790,9 +2790,17 @@ name = "health-workflow"
 version = "0.1.0"
 dependencies = [
  "health-time",
+ "health-workflow-actions",
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "health-workflow-actions"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
