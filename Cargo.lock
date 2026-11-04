@@ -2707,6 +2707,7 @@ dependencies = [
 name = "health-publication"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "health-audit",
  "health-configuration",
  "health-files",
@@ -2715,6 +2716,8 @@ dependencies = [
  "health-pki",
  "health-surrealdb",
  "health-time",
+ "health-workflow",
+ "health-workflow-actions",
  "serde",
  "serde_json",
  "sha2 0.11.1",

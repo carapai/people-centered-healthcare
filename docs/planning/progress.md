@@ -415,3 +415,8 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - malformed decision tables;
     - unneeded principal permissions.
   - **Decision:** actions are referenced as `<id>@<major>`.
+- 2026-11-04: #96 part 1 merged (#306). Part 2, the check at publication:
+  - **What is checked:** `Publications` validation reads every `workflow-definition` Library's inline `application/vnd.health.workflow+json` content. It must have its Library's url and version, and it is checked with `problems` against the actions given to `with_actions`.
+  - **Decision:** central registers no actions until contexts declare theirs, so definitions that execute actions fail closed.
+
+  This completes #96.
