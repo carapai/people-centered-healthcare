@@ -1,0 +1,23 @@
+[package]
+name = "health-pricing"
+description = "Pricing: effective-dated Price Books and Price Rules, applied through six fixed stages with every version recorded (pricing-and-insurance.md; ADR 0031)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "pricing"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
