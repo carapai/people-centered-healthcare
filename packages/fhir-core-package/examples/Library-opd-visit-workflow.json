@@ -1,0 +1,27 @@
+{
+  "resourceType": "Library",
+  "id": "opd-visit-workflow",
+  "meta": {
+    "profile": [
+      "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/WorkflowDefinitionLibrary"
+    ]
+  },
+  "type": {
+    "coding": [
+      {
+        "code": "workflow-definition",
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.workflow+json",
+      "data": "e30="
+    }
+  ],
+  "url": "https://health.go.ug/fhir/Library/opd-visit-workflow",
+  "version": "1.0.0",
+  "name": "OpdVisitWorkflow",
+  "status": "active"
+}

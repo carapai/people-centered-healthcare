@@ -466,7 +466,36 @@ fn rule_at<'a>(rule: &'a Rule, path: &str) -> Option<&'a Rule> {
 /// required slices of a sliced element along it (`code.coding:SBPCode.code` in the BP
 /// profile).
 fn expected_at(slice: &Rule, path: &str) -> Option<(Vec<Value>, bool)> {
-    expected(slice, &path_steps(path), true)
+    expected(slice, &path_steps(path), true).or_else(|| {
+        // An extension slice discriminated by `url` names its extension through its type's
+        // profile, as the HL7 snapshot generator writes it, rather than a fixed `url`.
+        (path == "url")
+            .then(|| extension_url(slice))
+            .flatten()
+            .map(|url| (vec![Value::String(url.to_owned())], true))
+    })
+}
+
+/// The canonical URL of the extension an `Extension` slice holds: its fixed `url`, or else the
+/// one profile of its type.
+fn slice_url(slice: &Rule) -> Option<&str> {
+    slice
+        .children
+        .get("url")
+        .and_then(|u| u.fixed.as_ref())
+        .and_then(Value::as_str)
+        .or_else(|| extension_url(slice))
+}
+
+/// The profile of an `Extension` slice's one type, without its version.
+fn extension_url(slice: &Rule) -> Option<&str> {
+    match slice.types.as_slice() {
+        [only] if only.code == "Extension" => match only.profiles.as_slice() {
+            [profile] => Some(unversioned(profile)),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn expected(rule: &Rule, steps: &[Step<'_>], first: bool) -> Option<(Vec<Value>, bool)> {
@@ -505,13 +534,7 @@ fn expected(rule: &Rule, steps: &[Step<'_>], first: bool) -> Option<(Vec<Value>,
             &extension
                 .slices
                 .iter()
-                .find(|(_, s)| {
-                    s.children
-                        .get("url")
-                        .and_then(|u| u.fixed.as_ref())
-                        .and_then(Value::as_str)
-                        == Some(*url)
-                })?
+                .find(|(_, s)| slice_url(s) == Some(*url))?
                 .1
         }
     };
@@ -1001,15 +1024,6 @@ impl Walker<'_> {
                             .first()
                             .or_else(|| child.slices.iter().find_map(|(_, s)| s.types.first()))
                             .map_or_else(|| "BackboneElement".to_owned(), |t| t.code.clone());
-                        let type_name = if is_resource_slot(&type_name) {
-                            value
-                                .get("resourceType")
-                                .and_then(Value::as_str)
-                                .unwrap_or("Resource")
-                                .to_owned()
-                        } else {
-                            type_name
-                        };
                         push_items(
                             value,
                             &format!("{}.{name}", item.location),
@@ -1017,6 +1031,17 @@ impl Walker<'_> {
                             &type_name,
                             &mut items,
                         );
+                        // A resource slot (`contained`, `Bundle.entry.resource`) holds whatever
+                        // each value's own `resourceType` says, one value at a time.
+                        if is_resource_slot(&type_name) {
+                            for item in &mut items {
+                                if let Some(kind) =
+                                    item.value.get("resourceType").and_then(Value::as_str)
+                                {
+                                    kind.clone_into(&mut item.type_name);
+                                }
+                            }
+                        }
                     }
                 }
             }

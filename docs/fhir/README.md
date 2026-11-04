@@ -1,6 +1,13 @@
 # FHIR profiles, extensions and implementation-guide notes
 
-This folder will hold the platform's FHIR conformance artefacts and notes: profiles, extensions, custom SearchParameters, CodeSystems for platform codes, NamingSystems, and implementation-guide pages. No artefact has been written yet. The artefacts themselves ship in signed configuration packages ([configuration.md](../architecture/configuration.md)); this folder documents them.
+This folder documents the platform's FHIR conformance artefacts: profiles, extensions, custom SearchParameters, CodeSystems for platform codes, NamingSystems, and implementation-guide pages. The artefacts themselves ship in signed configuration packages ([configuration.md](../architecture/configuration.md)). The first is the platform core package, [`packages/fhir-core-package`](../../packages/fhir-core-package/README.md) (#87).
+
+## Canonical URLs
+
+- **The platform's base** is `https://carapai.github.io/people-centered-healthcare/fhir`, chosen in #87: a base the project controls, which can later serve the artefacts' pages. Platform core artefacts and platform CodeSystems use it, e.g. `…/fhir/StructureDefinition/WorkflowDefinitionLibrary` and `…/fhir/CodeSystem/platform`.
+- **It never changes** once an artefact is published under it, so the project keeps that path even if it moves.
+- **Country artefacts** use the country's base (ADR 0049), which national governance decides.
+- **Authoring:** profiles are written in FSH, compiled by SUSHI, and given snapshots by the HL7 validator in tooling (`tools/fhir/build-core-package.sh`; ADR 0053).
 
 - **Model, validation tiers and search:** [fhir-r5-model.md](../architecture/fhir-r5-model.md) (ADRs 0015, 0016). R5 (5.0.0) only; R4 only at integration boundaries.
 - **Storage of resources and history:** [persistence.md](../architecture/persistence.md).
@@ -9,7 +16,7 @@ This folder will hold the platform's FHIR conformance artefacts and notes: profi
 
 ## Profile and extension needs already decided
 
-Canonical URLs and the exact artefact form are not fixed yet for any of these; they are to be fixed when each artefact is authored.
+Each artefact's exact form is fixed when it is authored. The ADR 0049 profiles, their extensions and the platform CodeSystem are in the core package.
 
 ### Extensions
 

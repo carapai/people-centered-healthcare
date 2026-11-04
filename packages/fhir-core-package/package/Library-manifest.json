@@ -1,0 +1,74 @@
+{
+  "resourceType": "Library",
+  "id": "manifest",
+  "url": "https://carapai.github.io/people-centered-healthcare/fhir/Library/health.platform.core-manifest",
+  "version": "0.1.0",
+  "name": "HealthPlatformCoreManifest",
+  "status": "active",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "asset-collection"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Extension|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Library|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/PlanDefinition|5.0.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-questionnaire|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-versions|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/ExtractionMappingLibrary|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/MatchingRulesLibrary|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/program-eligibility|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/program-episode-type|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/ProgramPlanDefinition|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/WorkflowDefinitionLibrary|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/ValueSet/template-modes|0.1.0"
+    }
+  ]
+}

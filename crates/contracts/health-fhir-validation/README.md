@@ -18,6 +18,8 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
 - **`OctofhirEngine`** is the default `FhirPathEngine`: the vendored, patched `octofhir-fhirpath` (third_party/, ADR 0052) over `TableModelProvider`. It runs in its own task, so a panic fails closed, and it discards `trace()` output.
 - **`ProfileSet::compile(&definitions)`** compiles StructureDefinition snapshots for tier 3 (ADR 0053; fhir-r5-model.md § Tier 3 in code). It refuses a differential-only profile and every unsupported construct with a `CompileError`, never a silent pass.
 - **`SnapshotValidator`** is the `ProfileValidator` over a `ProfileSet`: cardinality, `fixed[x]`/`pattern[x]`, types, target profiles, extension definitions and contexts, profile invariants (with a `FhirPathEngine`), and slicing with the `value`, `pattern`, `exists`, `type` and `profile` discriminators and the `closed`, `open`, `openAtEnd` and `ordered` rules.
+  - **Extension slices** discriminated by `url` may name their extension through their type's profile, as the HL7 snapshot generator writes them, rather than a fixed `url` (#87).
+  - **Resource slots** (`contained`, `Bundle.entry.resource`) type each value by its own `resourceType`, so a contained resource's extensions are checked against their definitions (#87).
 - **`skeleton(type)`** builds a minimal instance of any resource type that passes tiers 1 and 2, for tests and tooling.
 
 ## Tests
@@ -34,6 +36,11 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
   - custom profiles (`tests/fixtures/custom-profiles/`) for every slicing rule and discriminator, patterns, types, targets, extension values and contexts, and invariants;
   - compile refusals, including a differential-only profile;
   - with `HEALTH_FHIR_R5_EXAMPLES` set, every official example that claims one of the profiles.
+- `tests/core_package.rs` compiles the platform core package's committed snapshots (`packages/fhir-core-package/package/`, #87):
+  - each profile's example passes tiers 1–3;
+  - a definition without its version, a Library of another platform type or content type, and a Library without content fail;
+  - an Extraction Mapping without its target versions, a template that does not say how it governs its target, and a template without its mode fail;
+  - a program that is not a clinical protocol, or has no episode type, fails.
 - `tests/performance.rs` holds the budget (ADR 0053): with `HEALTH_FHIR_R5_EXAMPLES` set, in a release build, tiers 1–3 must take p95 ≤ 2 ms (or `HEALTH_VALIDATION_P95_MS`) over the official clinical examples, with the vital-signs profiles active.
 - `tests/java_differential.rs` compares our verdicts with the HL7 Java validator's (`tools/fhir/java-differential.sh`; fhir-r5-model.md § The HL7 Java validator differential). `examples/differential_cases.rs` writes its cases.
 - A unit test in `src/invariants.rs` evaluates every check that `HOLDS_BY_SHAPE` skips over the corpus, and each must hold.

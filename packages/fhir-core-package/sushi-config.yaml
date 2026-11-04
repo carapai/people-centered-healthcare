@@ -1,0 +1,9 @@
+# SUSHI's configuration for the platform core package (#87; ADR 0049). The canonical base is the
+# platform's own, fixed for good once published (docs/fhir/README.md § Canonical URLs).
+# tools/fhir/build-core-package.sh compiles the FSH and generates the snapshots.
+canonical: https://carapai.github.io/people-centered-healthcare/fhir
+status: active
+version: 0.1.0
+fhirVersion: 5.0.0
+FSHOnly: true
+applyExtensionMetadataToRoot: false

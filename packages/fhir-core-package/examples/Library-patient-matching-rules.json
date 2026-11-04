@@ -1,0 +1,27 @@
+{
+  "resourceType": "Library",
+  "id": "patient-matching-rules",
+  "meta": {
+    "profile": [
+      "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/MatchingRulesLibrary"
+    ]
+  },
+  "type": {
+    "coding": [
+      {
+        "code": "matching-rules",
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.matching-rules+json",
+      "data": "e30="
+    }
+  ],
+  "url": "https://health.go.ug/fhir/Library/patient-matching-rules",
+  "version": "1.0.0",
+  "name": "PatientMatchingRules",
+  "status": "active"
+}

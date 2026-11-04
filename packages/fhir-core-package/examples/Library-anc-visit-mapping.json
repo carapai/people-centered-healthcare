@@ -1,0 +1,74 @@
+{
+  "resourceType": "Library",
+  "id": "anc-visit-mapping",
+  "meta": {
+    "profile": [
+      "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/ExtractionMappingLibrary"
+    ]
+  },
+  "type": {
+    "coding": [
+      {
+        "code": "extraction-mapping",
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform"
+      }
+    ]
+  },
+  "extension": [
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-questionnaire",
+      "valueUri": "https://health.go.ug/fhir/Questionnaire/anc-visit"
+    },
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-versions",
+      "valueString": ">=1.0.0 <2.0.0"
+    }
+  ],
+  "url": "https://health.go.ug/fhir/Library/anc-visit-mapping",
+  "version": "1.0.0",
+  "name": "AncVisitMapping",
+  "status": "active",
+  "contained": [
+    {
+      "resourceType": "Observation",
+      "id": "anc-visit-bp-template",
+      "extension": [
+        {
+          "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template",
+          "extension": [
+            {
+              "url": "mode",
+              "valueCode": "managed"
+            },
+            {
+              "url": "retraction",
+              "valueCode": "entered-in-error"
+            },
+            {
+              "url": "ownerUseCase",
+              "valueString": "clinical-data.record-observation"
+            }
+          ]
+        }
+      ],
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "code": "85354-9",
+            "system": "http://loinc.org",
+            "display": "Blood pressure panel"
+          }
+        ]
+      }
+    }
+  ],
+  "relatedArtifact": [
+    {
+      "type": "composed-of",
+      "resourceReference": {
+        "reference": "#anc-visit-bp-template"
+      }
+    }
+  ]
+}

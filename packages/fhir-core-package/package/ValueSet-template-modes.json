@@ -1,0 +1,26 @@
+{
+  "resourceType": "ValueSet",
+  "status": "active",
+  "name": "TemplateModes",
+  "id": "template-modes",
+  "title": "Extraction template modes",
+  "description": "How an extraction template governs the resource it produces (ADR 0023).",
+  "version": "0.1.0",
+  "url": "https://carapai.github.io/people-centered-healthcare/fhir/ValueSet/template-modes",
+  "experimental": false,
+  "compose": {
+    "include": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "concept": [
+          {
+            "code": "managed"
+          },
+          {
+            "code": "seed"
+          }
+        ]
+      }
+    ]
+  }
+}
