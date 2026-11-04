@@ -30,7 +30,6 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
 
 ## Not yet
 
-- **`central-server` commands** for each step (#88 part 3b).
 - **Activation,** the scoped and dated record that puts a published version to use, is #89.
 
 ## Tests

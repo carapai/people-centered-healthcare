@@ -31,6 +31,8 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217) |
 | `HEALTH_ISSUING_CA_CERT_FILE`, `HEALTH_ISSUING_CA_KEY_FILE` | none | The facility issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS (#268). With them, `/api/provisioning/nodes` is served, so an edge can provision itself with a one-time code. Set both or neither |
 | `HEALTH_KMS_KEY_FILE` | none | The master key, 64 hex characters, that wraps the edges' escrowed disk recovery keys until a KMS or HSM holds it (#268). With it, `/api/provisioning/recovery` is served and `central-server recovery` reads keys out |
+| `HEALTH_BLOB_DIR` | required by `package` commands | The blob store's directory, where package tarballs are kept (#88) |
+| `HEALTH_PUBLICATION_KEY_FILE`, `HEALTH_PUBLICATION_CHAIN_FILE` | required by `package publish` | The publication-signing key (PKCS#8 PEM) and its certificate with any chain below the national root, until the key moves to the HSM or KMS |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Startup
@@ -92,6 +94,24 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - It reads the same configuration as the server, and needs the auth settings, `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE`.
 - The password comes from `HEALTH_PROVISION_PASSWORD_FILE`. It must pass the password policy and the breached-password list (15 characters, since central sign-in has no device factor).
 - The roles must be defined in the access policy.
+
+## Publishing packages
+
+`central-server package …` runs the publication lifecycle for Published Definition packages (#88; configuration.md § Lifecycle; ADR 0025), until the Clinical Metadata Studio. `<id>` is `name@version`, and `--by` names who acted. Every step is audited.
+
+| Command | What it does |
+|---|---|
+| `package draft <dir> --by <author>` | Starts or revises the draft of the package under `<dir>`, with `package.json` at its top. A published version is refused |
+| `package submit <id> --by <author>` | An author submits it. Validation (rules, schemas, the package and artefact semver checks against the latest published version) and simulation run at once; a failure returns it to Draft and prints each problem |
+| `package review <id> --by <reviewer>` | A reviewer who is not an author accepts it |
+| `package approve <id> --by <approver>` | An approver who is not an author approves it: two distinct approvers for clinical content, one for configuration |
+| `package request-changes <id> --by <person> --reason <why>` | Sends it back to Draft, clearing the review and approvals |
+| `package publish <id> --by <operator>` | Signs the approved tarball, once every approval is in |
+| `package status <id>` | Its stage, people and records, with any problems |
+| `package list` | Every package not yet published |
+| `package export <id> --out <dir>` | Writes a published package's `<name>-<version>.tgz` and `.tgz.sig` |
+
+Simulation runs no `tests/` case until the sandbox (#101) exists.
 
 ## OpenAPI
 

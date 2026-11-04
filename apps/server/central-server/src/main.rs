@@ -14,6 +14,7 @@
 mod auth;
 mod config;
 mod node;
+mod package;
 mod provision;
 mod recovery;
 
@@ -252,6 +253,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("node") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         return node::run(&config, &args).await;
+    }
+    if std::env::args().nth(1).as_deref() == Some("package") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return package::run(&config, &args).await;
     }
     if std::env::args().nth(1).as_deref() == Some("recovery") {
         let args: Vec<String> = std::env::args().skip(2).collect();
