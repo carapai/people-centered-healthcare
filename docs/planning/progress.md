@@ -301,3 +301,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **central-server:** `HEALTH_KMS_KEY_FILE`, `central-server recovery read | used`, and the hourly `recovery-key-used` alert.
 
   3b is the edge: creating recovery protectors, escrowing them, and `rotate-recovery`.
+- 2026-11-04: #268 part 3a merged (#292). Decision for 3b: on Linux, cryptsetup prompts for a secret the volume already has (systemd 255 cannot unlock with the TPM), and the install passphrase is kept.
+
+  Part 3b:
+  - **`health-node-identity::encryption::recovery`:** BitLocker-format recovery passwords, and the `RecoveryProtectors` port over `Add`/`Remove-BitLockerKeyProtector` and `cryptsetup luksAddKey`/`luksKillSlot`. The new slot is found by diffing `luksDump`.
+  - **facility-edge `recovery`:** add new keys, escrow them in one signed JWS (rolling back if central refuses), record their ids in `recovery.json`, then remove the keys escrowed before.
+    - It runs as `encryption rotate-recovery` and at the end of `provision --code`.
+    - `node.json` now records where central is.
+  - **Tests:** unit tests of the formats and parsers, and of the flow with a fake.
+  - **Not yet checked:** the platform commands, on facility hardware.

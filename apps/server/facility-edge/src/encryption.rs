@@ -6,6 +6,11 @@
 //!   service itself runs unprivileged.
 //! - `encryption check`: the provisioning gate. It prints the decision, and fails unless the
 //!   machine complies or `HEALTH_ENCRYPTION_EXEMPTION` exempts it.
+//! - `encryption rotate-recovery [--central URL] [--central-ca FILE]`: replaces the disk recovery
+//!   keys and escrows the new ones at central ([`crate::recovery`]). Run it, as root or
+//!   Administrator, after central reads a key out. On Linux cryptsetup asks for a secret the
+//!   volume already has: the key just read out will do. Central's address defaults to the one
+//!   recorded at provisioning.
 //!
 //! The running node checks every `HEALTH_ENCRYPTION_SECS`. It reads
 //! `HEALTH_ENCRYPTION_STATE_FILE` when set, and otherwise probes the host itself.
@@ -20,7 +25,7 @@ use health_node_identity::encryption::{
 };
 use health_time::Timestamp;
 
-const USAGE: &str = "usage: facility-edge encryption (probe [--out FILE] | check)";
+const USAGE: &str = "usage: facility-edge encryption (probe [--out FILE] | check | rotate-recovery [--central URL] [--central-ca FILE])";
 
 /// Runs `args` (after `encryption`); the error is printed and becomes exit code 10.
 pub(crate) fn run(config: &EdgeConfig, args: &[String]) -> Result<(), String> {
@@ -32,6 +37,35 @@ pub(crate) fn run(config: &EdgeConfig, args: &[String]) -> Result<(), String> {
             std::fs::write(&temporary, json(&read_host(config)))
                 .and_then(|()| std::fs::rename(&temporary, &out))
                 .map_err(|e| format!("cannot write {}: {e}", out.display()))
+        }
+        [cmd, rest @ ..] if cmd == "rotate-recovery" => {
+            let (mut central, mut ca) = (None, None);
+            let mut flags = rest.iter();
+            while let Some(flag) = flags.next() {
+                let value = flags.next().ok_or(USAGE)?.clone();
+                match flag.as_str() {
+                    "--central" => central = Some(value),
+                    "--central-ca" => ca = Some(PathBuf::from(value)),
+                    _ => return Err(USAGE.into()),
+                }
+            }
+            let rotated = crate::recovery::rotate_here(
+                config,
+                &health_node_identity::keystore::Keystore::system(),
+                central,
+                ca,
+            )?;
+            for key in &rotated.escrowed {
+                eprintln!(
+                    "facility-edge: {} recovery key escrowed at central ({})",
+                    key.volume.as_str(),
+                    key.device
+                );
+            }
+            for left in &rotated.left {
+                eprintln!("facility-edge: an earlier recovery key could not be removed: {left}");
+            }
+            Ok(())
         }
         [cmd] if cmd == "check" => {
             let state = read_host(config);

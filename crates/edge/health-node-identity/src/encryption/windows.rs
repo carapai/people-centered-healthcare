@@ -87,7 +87,7 @@ fn volume(v: &Value) -> Protection {
 }
 
 /// `C:` for a path on drive C.
-fn mount_point(path: &Path) -> Option<String> {
+pub(super) fn mount_point(path: &Path) -> Option<String> {
     match path.components().next()? {
         Component::Prefix(prefix) => {
             let text = prefix.as_os_str().to_str()?;

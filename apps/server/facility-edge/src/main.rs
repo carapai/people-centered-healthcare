@@ -33,6 +33,7 @@ mod backup;
 mod central;
 mod encryption;
 mod provision;
+mod recovery;
 mod service;
 mod update;
 
