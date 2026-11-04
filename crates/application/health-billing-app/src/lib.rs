@@ -14,7 +14,8 @@
 //! - **[`Billing::cancel_event`]**: when a source event is cancelled, its charges are cancelled
 //!   and each posted one reversed, once.
 //!
-//! - **Financial Gates** ([`gates`]): the gate query, settlements, deferrals and waivers.
+//! - **Financial Gates**: the gate query ([`health_billing_contract::FinancialGates`] on
+//!   [`Billing`]), [`Billing::settle`], [`Billing::defer`] and [`Billing::waive`].
 //!
 //! Coverage terms are the caller's (from coverage), each `coverage` naming its funding source.
 
