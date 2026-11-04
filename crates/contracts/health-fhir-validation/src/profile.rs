@@ -24,8 +24,9 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
+use crate::bindings::{Bindings, Membership, Strength};
 use crate::fhirpath::{FhirPathEngine, FhirPathItem};
-use crate::structure::{Issue, IssueCode, is_primitive, resolve, table};
+use crate::structure::{Issue, IssueCode, Severity, is_primitive, resolve, table};
 
 const SD: &str = "http://hl7.org/fhir/StructureDefinition/";
 
@@ -86,6 +87,8 @@ struct Rule {
     types: Vec<TypeRule>,
     fixed: Option<Value>,
     pattern: Option<Value>,
+    /// The value set a coded value is bound to, unless the binding is only an example.
+    binding: Option<(Strength, String)>,
     constraints: Vec<ProfileConstraint>,
     children: BTreeMap<String, Rule>,
     slicing: Option<Slicing>,
@@ -349,6 +352,17 @@ fn fill(rule: &mut Rule, element: &Value, url: &str) -> Result<(), String> {
             }
         }
     }
+    rule.binding = element["binding"]["valueSet"]
+        .as_str()
+        .and_then(|value_set| {
+            let strength = match element["binding"]["strength"].as_str()? {
+                "required" => Strength::Required,
+                "extensible" => Strength::Extensible,
+                "preferred" => Strength::Preferred,
+                _ => return None,
+            };
+            Some((strength, value_set.to_owned()))
+        });
     rule.constraints = element["constraint"]
         .as_array()
         .into_iter()
@@ -685,6 +699,8 @@ struct Check {
 
 struct Walker<'a> {
     set: &'a ProfileSet,
+    /// The terminology tier 4 asks; none while matching `profile` discriminators.
+    bindings: Option<&'a dyn Bindings>,
     profile: &'a str,
     issues: Vec<Issue>,
     checks: Vec<Check>,
@@ -697,12 +713,87 @@ impl Walker<'_> {
     /// an extension definition, and the same failure must not be reported twice.
     fn issue(&mut self, code: IssueCode, location: &str, message: String) {
         let issue = Issue {
+            severity: Severity::Error,
             code,
             location: location.to_owned(),
             message: format!("{message} (profile {})", self.profile),
         };
         if !self.issues.contains(&issue) {
             self.issues.push(issue);
+        }
+    }
+
+    /// Records a warning once.
+    fn warning(&mut self, code: IssueCode, location: &str, message: String) {
+        let issue = Issue {
+            severity: Severity::Warning,
+            code,
+            location: location.to_owned(),
+            message: format!("{message} (profile {})", self.profile),
+        };
+        if !self.issues.contains(&issue) {
+            self.issues.push(issue);
+        }
+    }
+
+    /// Tier 4: a coded value against its element's binding. A `code` is looked up without a
+    /// system, a `Coding` with its own, and a `CodeableConcept` passes when any of its codings
+    /// is in the value set.
+    fn binding(&mut self, rule: &Rule, item: &Item<'_>) {
+        let (Some(bindings), Some((strength, value_set))) = (self.bindings, &rule.binding) else {
+            return;
+        };
+        let membership = |coding: &Value| -> Option<Membership> {
+            let code = coding["code"].as_str()?;
+            Some(bindings.member(value_set, coding["system"].as_str(), code))
+        };
+        let answer = match item.type_name.as_str() {
+            "code" => match item.value.as_str() {
+                Some(code) => bindings.member(value_set, None, code),
+                None => return,
+            },
+            "Coding" => match membership(item.value) {
+                Some(answer) => answer,
+                None => return,
+            },
+            "CodeableConcept" => {
+                let answers: Vec<Membership> = item.value["coding"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(membership)
+                    .collect();
+                if answers.contains(&Membership::In) {
+                    Membership::In
+                } else if let Some(unknown) =
+                    answers.iter().find(|a| matches!(a, Membership::Unknown(_)))
+                {
+                    unknown.clone()
+                } else {
+                    // Only text, or codings none of which is in the value set.
+                    Membership::NotIn
+                }
+            }
+            _ => return,
+        };
+        match (strength, answer) {
+            (_, Membership::In) => {}
+            (Strength::Required, Membership::NotIn) => self.issue(
+                IssueCode::CodeInvalid,
+                &item.location,
+                format!("not a code from the required value set {value_set}"),
+            ),
+            (Strength::Required, Membership::Unknown(why)) => self.warning(
+                IssueCode::Processing,
+                &item.location,
+                format!("the required binding to {value_set} was not checked on this node: {why}"),
+            ),
+            (Strength::Extensible | Strength::Preferred, Membership::NotIn) => self.warning(
+                IssueCode::CodeInvalid,
+                &item.location,
+                format!("not a code from the value set {value_set}, which it should use"),
+            ),
+            (Strength::Extensible | Strength::Preferred, Membership::Unknown(_)) => {}
         }
     }
 
@@ -884,6 +975,7 @@ impl Walker<'_> {
         };
         let mut walker = Walker {
             set: self.set,
+            bindings: None,
             profile: &compiled.url,
             issues: Vec::new(),
             checks: Vec::new(),
@@ -937,6 +1029,7 @@ impl Walker<'_> {
             );
         }
         self.targets(rule, item);
+        self.binding(rule, item);
         if self.collect_checks {
             for c in &rule.constraints {
                 self.checks.push(Check {
@@ -1217,12 +1310,25 @@ pub trait ProfileValidator: Send + Sync {
 pub struct SnapshotValidator {
     set: Arc<ProfileSet>,
     engine: Arc<dyn FhirPathEngine>,
+    bindings: Option<Arc<dyn Bindings>>,
 }
 
 impl SnapshotValidator {
-    /// A validator over `set`, evaluating profile invariants with `engine`.
+    /// A validator over `set`, evaluating profile invariants with `engine`. Without
+    /// [`Self::with_bindings`] it checks no binding.
     pub fn new(set: Arc<ProfileSet>, engine: Arc<dyn FhirPathEngine>) -> Self {
-        Self { set, engine }
+        Self {
+            set,
+            engine,
+            bindings: None,
+        }
+    }
+
+    /// This validator, also checking bindings (tier 4) against `bindings`.
+    #[must_use]
+    pub fn with_bindings(mut self, bindings: Arc<dyn Bindings>) -> Self {
+        self.bindings = Some(bindings);
+        self
     }
 }
 
@@ -1244,6 +1350,7 @@ impl ProfileValidator for SnapshotValidator {
             for url in profiles {
                 let Some(compiled) = self.set.profiles.get(unversioned(url)) else {
                     issues.push(Issue {
+                        severity: Severity::Error,
                         code: IssueCode::Processing,
                         location: resource_type.to_owned(),
                         message: format!("profile {url} is not in the active set"),
@@ -1252,6 +1359,7 @@ impl ProfileValidator for SnapshotValidator {
                 };
                 if compiled.type_name != resource_type {
                     issues.push(Issue {
+                        severity: Severity::Error,
                         code: IssueCode::Structure,
                         location: resource_type.to_owned(),
                         message: format!(
@@ -1263,6 +1371,7 @@ impl ProfileValidator for SnapshotValidator {
                 }
                 let mut walker = Walker {
                     set: &self.set,
+                    bindings: self.bindings.as_deref(),
                     profile: &compiled.url,
                     issues: Vec::new(),
                     checks: Vec::new(),
@@ -1290,11 +1399,13 @@ impl ProfileValidator for SnapshotValidator {
                         Ok(items)
                             if matches!(items.as_slice(), [] | [FhirPathItem::Boolean(true)]) => {}
                         Ok(_) => walker.issues.push(Issue {
+                            severity: Severity::Error,
                             code: IssueCode::Invariant,
                             location: check.location.clone(),
                             message: format!("{}: {} (profile {url})", check.key, check.human),
                         }),
                         Err(failure) => walker.issues.push(Issue {
+                            severity: Severity::Error,
                             code: IssueCode::Processing,
                             location: check.location.clone(),
                             message: format!(

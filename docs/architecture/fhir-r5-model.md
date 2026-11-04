@@ -130,7 +130,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
 ### Tier 3 in code
 
-`ProfileSet::compile` turns StructureDefinition snapshots into a rule tree per profile; `SnapshotValidator` walks the raw JSON against it behind the `ProfileValidator` trait (ADR 0053). Wiring it into the write path and package activation is [Implement validation tiers 3–4 (profiles and bindings)](https://github.com/carapai/people-centered-healthcare/issues/91) (#91).
+`ProfileSet::compile` turns StructureDefinition snapshots into a rule tree per profile; `SnapshotValidator` walks the raw JSON against it behind the `ProfileValidator` trait (ADR 0053). Wiring it into the write path and package activation is [Implement validation tiers 3–4 (profiles and bindings)](https://github.com/carapai/people-centered-healthcare/issues/91) (#91). Tier 4 runs in the same walk: `SnapshotValidator::with_bindings` asks a `Bindings` port, which the node's terminology answers, whether each coded value is in its element's value set. Its issues carry a severity, so required bindings are errors and extensible or preferred ones warnings.
 
 - **Compilation refuses, never guesses.** A `CompileError` names the profile, the element and the reason for each of:
   - a profile with no snapshot (differential-only), or a derivation other than `constraint`;

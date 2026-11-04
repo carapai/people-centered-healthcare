@@ -388,3 +388,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decision:** what a node serves is set by activation (#89), which loads the active packages' terminology and calls `replace`. Until then no node wires it in.
 
   This completes #90.
+- 2026-11-04: #90 part 2b merged (#303), completing #90. #91, tiers 3–4, is split: part 1 is tier 4 in the validator (this), and part 2 wires tiers 3–4 into the write path.
+  - **The `Bindings` port** (`member(value_set, system, code)`), which the node's terminology answers.
+  - **Bindings from snapshots:** `ProfileSet` compiles each element's binding (required, extensible or preferred).
+  - **`SnapshotValidator::with_bindings`** checks `code`, `Coding` and `CodeableConcept` values:
+    - a required binding not met is a `code-invalid` error;
+    - a required binding the node cannot check offline is a warning;
+    - an extensible or preferred binding not met is a warning.
+  - **`Issue::severity`:** issues now carry it, and OperationOutcomes report it.
