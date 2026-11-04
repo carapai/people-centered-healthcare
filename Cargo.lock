@@ -2681,6 +2681,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-pricing"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "health-provisioning"
 version = "0.1.0"
 dependencies = [

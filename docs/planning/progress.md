@@ -497,3 +497,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - type-checking guards against data requirements waits for FHIRPath type inference over the data requirements, so it is not in this change.
 
   This completes #101.
+- 2026-11-04: #101 merged (#315), completing #101. #120, Price Books and staged pricing, is split: part 1 is the domain (this), part 2 stores Price Books and rules at central with their approval, as profiled ChargeItemDefinitions.
+  - **New domain crate `health-pricing`:**
+    - `PriceBook`s: scoped, effective-dated and approved, with quantity tiers;
+    - `PriceRule`s: staged, prioritised, with FHIRPath applicability through a port;
+    - `validate` refuses conflicting rules;
+    - `price` runs the six stages and records every book and rule version, and `check` is the authority's version check.
+  - **Acceptance criterion:** a fixture charge passes through all six stages.
+  - **Decisions:**
+    - rules within a stage run in ascending priority;
+    - two equally specific books pricing one item refuse the charge;
+    - deductibles and limits run down across a charge's lines;
+    - a bundle's member lines are priced at zero, referencing a bundle line priced by the rule;
+    - currency conversion is not in this part.
