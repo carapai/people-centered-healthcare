@@ -99,8 +99,12 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
     3. It escrows the passwords in one signed JWS, removing them again if central refuses.
     4. Only then does it remove the keys it escrowed before.
   - **Untouched:** the install passphrase and other keys it did not create.
+- **#268, part 4:** decommissioning.
+  - `central-server node decommission` records how a crypto-erased edge was erased, by whom and why.
+  - In one audited transaction, it revokes the node's facility intermediate in the issuing CA's revocations and destroys its escrowed recovery keys.
+  - `central-server node crl` signs the issuing CA's next CRL. This completes #268.
 - **Still to come:**
-  - decommissioning, and HSM or KMS signing for the issuing CA (#268);
+  - HSM or KMS signing for the issuing CA, and a KMS for the escrow master key (their adapters);
   - the Tauri apps' keyring key and their pinning of the intermediate's SPKI from the pairing code (with the desktop and Android builds);
   - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;

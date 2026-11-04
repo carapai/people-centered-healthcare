@@ -13,6 +13,7 @@
 
 mod auth;
 mod config;
+mod node;
 mod provision;
 mod recovery;
 
@@ -248,6 +249,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
+    if std::env::args().nth(1).as_deref() == Some("node") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return node::run(&config, &args).await;
+    }
     if std::env::args().nth(1).as_deref() == Some("recovery") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         return recovery::run(&config, &args).await;

@@ -1,5 +1,5 @@
 //! Central's node registry, provisioning codes and escrowed recovery keys (migrations
-//! `0024_nodes`, `0025_recovery_keys`), used by
+//! `0024_nodes`, `0025_recovery_keys`, `0026_node_revocations`), used by
 //! `health-provisioning`: each code and node as JSON, with the columns lookups and the unique
 //! indexes need.
 
@@ -188,5 +188,36 @@ impl SurrealTx {
             .into_iter()
             .filter_map(|r| r.into_iter().next())
             .collect())
+    }
+
+    /// Deletes every recovery key escrowed for `node`, as when it is decommissioned.
+    pub async fn delete_recovery_keys(&mut self, node: &str) -> Result<(), WriteError> {
+        self.run(
+            "DELETE node_recovery_key WHERE node = $node RETURN NONE",
+            vec![("node", node.to_owned())],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The issuing CA's revocations, as JSON, if any.
+    pub async fn node_revocations(&mut self) -> Result<Option<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM node_revocations:issuing",
+                Vec::new(),
+            )
+            .await?;
+        Ok(rows.into_iter().next().and_then(|r| r.into_iter().next()))
+    }
+
+    /// Replaces the issuing CA's revocations.
+    pub async fn put_node_revocations(&mut self, data: &str) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT node_revocations:issuing CONTENT { data: $data } RETURN VALUE record::id(id)",
+            vec![("data", data.to_owned())],
+        )
+        .await?;
+        Ok(())
     }
 }

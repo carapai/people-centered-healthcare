@@ -23,8 +23,9 @@ pub use device::{
 };
 pub use lockout::{Locked, Lockout, LockoutPolicy};
 pub use node::{
-    CODE_LENGTH, CodeRefused, ESCROW_SKEW, Encryption, EscrowRefused, Node, NodeId, NodeKind,
-    NodeStatus, ProvisioningCode, ProvisioningPolicy, RecoveryKey, RecoveryVolume, Retrieval,
+    CODE_LENGTH, CodeRefused, Decommission, DecommissionRefused, ESCROW_SKEW, Encryption, Erasure,
+    EscrowRefused, Node, NodeId, NodeKind, NodeStatus, ProvisioningCode, ProvisioningPolicy,
+    RecoveryKey, RecoveryVolume, Retrieval,
 };
 pub use otp::{OtpChallenge, OtpPolicy, OtpPurpose, OtpRefused};
 pub use password::{PasswordPolicy, PasswordRejected};
