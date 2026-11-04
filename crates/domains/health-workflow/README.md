@@ -77,3 +77,11 @@ Workflow simulation (#101): `simulate(definition, scenario)` runs a package `tes
 - **failures:** each names its scenario and step, and an unstubbed guard fails the scenario.
 
 The interpreter evaluates a transition's guard only once its event matches.
+
+## Financial Gates
+
+A `State` may name a `gate` (ADR 0033; #122).
+
+- **On entry:** the interpreter emits `Effect::EvaluateGate`. The application answers it and records `Effect::GateEvaluated`.
+- **At publication:** `problems` requires a gate state to be atomic, to have its cashier task, to move on at `gate.pass` and `gate.defer`, and not to re-enter itself on `gate.block`.
+- **In simulation:** scenarios stub gate outcomes (`gates`), and an unstubbed gate defers.

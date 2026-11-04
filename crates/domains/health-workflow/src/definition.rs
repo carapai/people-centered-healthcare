@@ -158,6 +158,12 @@ pub enum Problem {
     /// `url|version`, or a claim timeout that is not positive.
     #[error("the human task of state {0} is not well formed")]
     BadTask(String),
+    /// A gate state that is not atomic, has no cashier task, does not take both `gate.pass`
+    /// and `gate.defer` onwards, or re-enters itself on `gate.block`.
+    #[error(
+        "the gate state {0} must be atomic, have its cashier task, and move on at gate.pass and gate.defer"
+    )]
+    BadGate(String),
     /// A principal permission no action of the definition needs.
     #[error("the workflow principal declares {0}, which no action needs")]
     UnneededPermission(String),
@@ -231,6 +237,26 @@ impl WorkflowDefinition {
         self.check_reachability(&all, &mut problems);
 
         for (state, _) in &all {
+            if state.gate.is_some() {
+                let moves_on = |event: &str| {
+                    state
+                        .transitions
+                        .iter()
+                        .any(|t| !t.targets.is_empty() && t.events.iter().any(|e| e == event))
+                };
+                // Re-entering the gate on `gate.block` would ask Finance again, endlessly.
+                let loops = state.transitions.iter().any(|t| {
+                    t.events.iter().any(|e| e == "gate.block") && t.targets.contains(&state.id)
+                });
+                if state.kind != Kind::Atomic
+                    || state.task.is_none()
+                    || !moves_on("gate.pass")
+                    || !moves_on("gate.defer")
+                    || loops
+                {
+                    problems.push(Problem::BadGate(state.id.clone()));
+                }
+            }
             if let Some(task) = &state.task {
                 let malformed = state.kind != Kind::Atomic
                     || task.role.trim().is_empty()

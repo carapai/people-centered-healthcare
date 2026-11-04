@@ -13,6 +13,8 @@
 //! - whether the instance is still running.
 //!
 //! The first step may send nothing and wait for nothing: it checks the instance as started.
+//! Financial Gates are stubbed too (`gates`: URL → `pass`, `defer` or `block`); an unstubbed gate
+//! defers, as an unavailable one does in the engine.
 //! Guards are stubbed by the scenario (`guards`: expression → outcome), because guards are
 //! evaluated against clinical data the sandbox does not have; an unstubbed guard fails the
 //! scenario rather than guessing.
@@ -89,6 +91,10 @@ pub struct Scenario {
     /// The outcome of each guard the definition evaluates.
     #[serde(default)]
     pub guards: BTreeMap<String, bool>,
+    /// The outcome of each Financial Gate, by canonical URL: `pass`, `defer` or `block`. An
+    /// unstubbed gate defers, as an unavailable one does.
+    #[serde(default)]
+    pub gates: BTreeMap<String, String>,
     /// The steps.
     pub steps: Vec<Step>,
 }
@@ -125,6 +131,7 @@ struct Run<'a> {
     timers: BTreeMap<String, Pending>,
     now: Timestamp,
     ran: Vec<String>,
+    gate_outcomes: &'a BTreeMap<String, String>,
 }
 
 impl Run<'_> {
@@ -147,7 +154,11 @@ impl Run<'_> {
                 Effect::CancelTimer { id } => {
                     self.timers.remove(id);
                 }
-                Effect::StartInvoke { .. } | Effect::CancelInvoke { .. } | Effect::Completed => {}
+                Effect::StartInvoke { .. }
+                | Effect::CancelInvoke { .. }
+                | Effect::EvaluateGate { .. }
+                | Effect::GateEvaluated { .. }
+                | Effect::Completed => {}
             }
         }
         let from = std::mem::replace(&mut self.record.state, state);
@@ -172,6 +183,22 @@ impl Run<'_> {
             .step(self.record.state.clone(), &event, &self.guards)
             .map_err(|e| e.to_string())?;
         self.apply(event, state, &effects);
+        self.gates(&effects)
+    }
+
+    /// Answers the gates `effects` entered with the scenario's stubbed outcomes (an unstubbed
+    /// gate defers, as an unavailable one does), raising `gate.<outcome>`.
+    fn gates(&mut self, effects: &[Effect]) -> Result<(), String> {
+        for effect in effects {
+            if let Effect::EvaluateGate { gate, .. } = effect {
+                let outcome = self
+                    .gate_outcomes
+                    .get(gate)
+                    .cloned()
+                    .unwrap_or_else(|| "defer".to_owned());
+                self.send(&format!("gate.{outcome}"))?;
+            }
+        }
         Ok(())
     }
 
@@ -296,10 +323,15 @@ pub fn simulate(definition: &WorkflowDefinition, scenario: &Scenario) -> Vec<Str
         timers: BTreeMap::new(),
         now: Timestamp::UNIX_EPOCH,
         ran: Vec::new(),
+        gate_outcomes: &scenario.gates,
     };
     run.apply(Event::named(STARTED), state, &effects);
+    let started = run.gates(&effects);
 
     let mut failed = Vec::new();
+    if let Err(problem) = started {
+        failed.push(format!("start: {problem}"));
+    }
     for (index, step) in scenario.steps.iter().enumerate() {
         let number = index + 1;
         // A step's actions are those it ran; the first step, if it sends nothing, checks the start.

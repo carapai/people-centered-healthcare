@@ -346,3 +346,58 @@ fn human_tasks_must_be_well_formed_on_atomic_states() {
         "a final state is not a human step"
     );
 }
+
+#[test]
+fn a_gate_state_moves_on_at_pass_and_defer_and_has_a_cashier_task() {
+    let gated = |task: bool, events: &[&str]| {
+        let mut definition = definition(vec![]);
+        definition.principal.clear();
+        let queued = &mut definition.statechart.states[1];
+        queued.gate = Some("https://health.go.ug/fhir/FinancialGate/before-lab".into());
+        queued.transitions = events.iter().map(|e| to("done", e, vec![])).collect();
+        if task {
+            queued.task = Some(crate::model::HumanTask {
+                role: "cashier".into(),
+                form: None,
+                worklist: "cashier".into(),
+                priority: crate::model::Priority::Routine,
+                claim_timeout: crate::model::CLAIM_TIMEOUT,
+            });
+        }
+        definition.problems(&catalog())
+    };
+    assert_eq!(gated(true, &["gate.pass", "gate.defer"]), vec![]);
+    let bad = vec![Problem::BadGate("queued".into())];
+    assert_eq!(
+        gated(false, &["gate.pass", "gate.defer"]),
+        bad,
+        "no cashier task"
+    );
+    assert_eq!(
+        gated(true, &["gate.pass"]),
+        bad,
+        "deferred care must move on"
+    );
+
+    let mut looping = definition(vec![]);
+    looping.principal.clear();
+    let queued = &mut looping.statechart.states[1];
+    queued.gate = Some("urn:gate".into());
+    queued.task = Some(crate::model::HumanTask {
+        role: "cashier".into(),
+        form: None,
+        worklist: "cashier".into(),
+        priority: crate::model::Priority::Routine,
+        claim_timeout: crate::model::CLAIM_TIMEOUT,
+    });
+    queued.transitions = vec![
+        to("done", "gate.pass", vec![]),
+        to("done", "gate.defer", vec![]),
+        to("queued", "gate.block", vec![]),
+    ];
+    assert_eq!(
+        looping.problems(&catalog()),
+        bad,
+        "re-entering on block loops"
+    );
+}

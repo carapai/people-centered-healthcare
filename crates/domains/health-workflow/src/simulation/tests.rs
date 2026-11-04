@@ -100,3 +100,57 @@ fn unstubbed_guards_and_malformed_steps_fail() {
         ["opd: step 2: a step sends one event or waits, not both or neither"]
     );
 }
+
+fn gated() -> WorkflowDefinition {
+    serde_json::from_str(
+        r#"{
+          "url": "https://health.go.ug/fhir/Library/lab", "version": "1.0.0",
+          "statechart": { "states": [
+            { "id": "ordered", "kind": "atomic",
+              "transitions": [{ "events": ["sent"], "targets": ["payment"] }] },
+            { "id": "payment", "kind": "atomic",
+              "gate": "https://health.go.ug/fhir/FinancialGate/before-lab",
+              "task": { "role": "cashier", "worklist": "cashier" },
+              "transitions": [
+                { "events": ["gate.pass"], "targets": ["collect"] },
+                { "events": ["gate.defer"], "targets": ["collect"] }
+              ] },
+            { "id": "collect", "kind": "atomic",
+              "transitions": [{ "events": ["collected"], "targets": ["done"] }] },
+            { "id": "done", "kind": "final" }
+          ] }
+        }"#,
+    )
+    .expect("a definition")
+}
+
+fn gate_scenario(outcome: Option<&str>, expect: &str) -> Scenario {
+    let gates = outcome.map_or_else(String::new, |o| {
+        format!(r#""https://health.go.ug/fhir/FinancialGate/before-lab": "{o}""#)
+    });
+    serde_json::from_str(&format!(
+        r#"{{ "type": "workflow-scenario", "name": "lab", "definition": "https://health.go.ug/fhir/Library/lab|1.0.0",
+             "gates": {{ {gates} }}, "steps": [{expect}] }}"#
+    ))
+    .expect("a scenario")
+}
+
+#[test]
+fn a_gate_passes_defers_or_blocks_with_its_cashier_task() {
+    let through = r#"{ "event": "sent", "expect": { "configuration": ["collect"], "tasks": [] } }"#;
+    assert_eq!(
+        simulate(&gated(), &gate_scenario(Some("pass"), through)),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        simulate(&gated(), &gate_scenario(None, through)),
+        Vec::<String>::new(),
+        "an unstubbed gate defers"
+    );
+    let waits = r#"{ "event": "sent", "expect": { "configuration": ["payment"],
+                     "tasks": [{ "state": "payment", "status": "ready" }] } }"#;
+    assert_eq!(
+        simulate(&gated(), &gate_scenario(Some("block"), waits)),
+        Vec::<String>::new()
+    );
+}

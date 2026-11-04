@@ -32,4 +32,9 @@ Layer: **application** (Workflow). Runs workflow instances through `health-workf
   - **RequestOrchestration status:** `active`, `completed` in a final state, `revoked` when cancelled;
   - **versions:** a version is written only when a projection changed;
   - **CarePlan** belongs to Care Coordination, so program-style CarePlans will come through its typed actions.
+- **Financial Gates** (#122; ADR 0033; `gates`):
+  - **Asking:** entering a gate state asks Finance (`with_gates`, any `FinancialGates`), and the outcome is raised as `gate.pass`, `gate.defer` or `gate.block` in the same step. The history entry records it as `GateEvaluated`, so a gate that passes or defers is never seen waiting.
+  - **The query:** it names the context as the Account, the `patient` data field, and the `urgency` field (`routine`, `urgent`, `emergency`). Urgent and emergency care always defers.
+  - **Never blocks on failure:** with Finance unavailable, or no gate port, the gate defers. At most 8 gates are answered per step.
+  - **A block** waits in the gate state, whose task is the cashier's. `recheck_gates(event_id, instance)`, on a payment event, asks again, once per event id.
 - **Fails closed:** sub-workflow invocations are refused until the engine supports them, and so are definitions this node does not have.
