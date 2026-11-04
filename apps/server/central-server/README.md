@@ -81,6 +81,12 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - `central-server recovery used` lists the used keys.
 - No web endpoint returns a key.
 
+`central-server node decommission <node-id> --by <operator> --erased <tpm-cleared|key-slots-destroyed> --reason <why>` records a decommissioned edge (ADR 0048), once the facility has crypto-erased it by clearing its TPM or destroying its key slots.
+- In one audited transaction, its facility intermediate is revoked and its escrowed recovery keys are destroyed.
+- The node is never active again.
+
+`central-server node crl --out <file>` writes the issuing CA's next CRL, listing every decommissioned node's intermediate, for the edges. It needs the issuing CA settings.
+
 `central-server provision snapshot-keys <out>` writes the snapshot public keys edges trust, `HEALTH_SNAPSHOT_KEYS_FILE` on an edge, as a JSON array of JWKs.
 
 - It reads the same configuration as the server, and needs the auth settings, `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` and `HEALTH_ACCESS_POLICY_FILE`.

@@ -11,6 +11,7 @@ Layer: **domain** (Identity & Access). Pure rules from offline-auth.md § Creden
   - **`ProvisioningCode::redeemable`:** a code redeems once, before it expires, for an encrypted edge (`Encryption::Compliant`). An unencrypted edge needs an exemption granted with the code (`Encryption::Exempt { reason }`).
   - **`NodeKind::next_short_code`:** `E1`, `E2`, … per facility, one past the highest, so a decommissioned node's code is never reused.
   - **`Node`:** the registry's record, holding its id, facility, short code, status, encryption, intermediate serial, intermediate public key and code.
+  - **`Node::decommission`:** records how the machine was crypto-erased (`Erasure::TpmCleared` or `KeySlotsDestroyed`), by whom and why, once. A decommissioned node is never active again.
   - **`RecoveryKey::escrow`:** a volume's recovery key (`RecoveryVolume`) is escrowed only within 5 minutes of central's clock, and only if signed after the key it replaces, so a replay cannot restore a key that was read out. A key with any `Retrieval` is `used`.
 - **Devices** (#74; lan-security.md § Device enrollment; ADR 0009):
   - **`EnrollmentPolicy` / `EnrollmentRequest`:** a device asks to enroll with its key's RFC 7638 thumbprint and a label, and shows a 6-digit pairing code. The request expires 10 minutes after it was made.

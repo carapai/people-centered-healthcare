@@ -18,6 +18,10 @@
 //!   **used**, and stays an alert until the edge escrows its replacement. The edge signs each
 //!   escrow; a signing time no later than the current key's is refused, so an old escrow cannot
 //!   be replayed to bring back a key that was read out.
+//! - **Decommissioning** (ADR 0048 § Decommissioning): the machine is crypto-erased, by clearing
+//!   its TPM or destroying its key slots, and then reformatted. Central records how, by whom and
+//!   why, with the node's revocation. A decommissioned node keeps its record and short code, and
+//!   is never active again.
 
 use std::fmt;
 
@@ -244,6 +248,79 @@ pub struct Node {
     pub code: Uuid,
     /// When.
     pub provisioned_at: Timestamp,
+    /// Its decommissioning, once it is decommissioned.
+    #[serde(default)]
+    pub decommissioned: Option<Decommission>,
+}
+
+/// How a decommissioned machine's disks were made unreadable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Erasure {
+    /// The TPM was cleared, so its sealed volume keys are gone.
+    TpmCleared,
+    /// The encrypted volumes' key slots were destroyed.
+    KeySlotsDestroyed,
+}
+
+impl Erasure {
+    /// Its name: `tpm-cleared` or `key-slots-destroyed`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::TpmCleared => "tpm-cleared",
+            Self::KeySlotsDestroyed => "key-slots-destroyed",
+        }
+    }
+}
+
+/// A node's decommissioning.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Decommission {
+    /// When.
+    pub at: Timestamp,
+    /// The central operations person who recorded it.
+    pub by: String,
+    /// How its disks were erased.
+    pub erasure: Erasure,
+    /// Why.
+    pub reason: String,
+}
+
+/// Why a node was not decommissioned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum DecommissionRefused {
+    /// It already is.
+    #[error("the node is already decommissioned")]
+    Already,
+    /// No one said who, or why.
+    #[error("a decommission needs who records it and why")]
+    Incomplete,
+}
+
+impl Node {
+    /// Decommissions the node at `now`, by `by`, its disks erased by `erasure`, for `reason`.
+    pub fn decommission(
+        &mut self,
+        by: &str,
+        erasure: Erasure,
+        reason: &str,
+        now: Timestamp,
+    ) -> Result<(), DecommissionRefused> {
+        if self.status == NodeStatus::Decommissioned {
+            return Err(DecommissionRefused::Already);
+        }
+        if by.trim().is_empty() || reason.trim().is_empty() {
+            return Err(DecommissionRefused::Incomplete);
+        }
+        self.status = NodeStatus::Decommissioned;
+        self.decommissioned = Some(Decommission {
+            at: now,
+            by: by.to_owned(),
+            erasure,
+            reason: reason.to_owned(),
+        });
+        Ok(())
+    }
 }
 
 /// A volume whose recovery key is escrowed.
@@ -427,6 +504,43 @@ mod tests {
         });
         assert!(read.used());
         assert_eq!(RecoveryVolume::Data.as_str(), "data");
+    }
+
+    #[test]
+    fn a_node_is_decommissioned_once_with_who_how_and_why() {
+        let now = at("2026-11-04T09:00:00Z");
+        let mut node = Node {
+            id: NodeId(Uuid::nil()),
+            facility: "ug-kla-mulago".into(),
+            kind: NodeKind::Edge,
+            short_code: "E1".into(),
+            status: NodeStatus::Active,
+            encryption: Encryption::Compliant,
+            intermediate_serial: "01".into(),
+            intermediate_key: String::new(),
+            code: Uuid::nil(),
+            provisioned_at: now,
+            decommissioned: None,
+        };
+        assert_eq!(
+            node.decommission(" ", Erasure::TpmCleared, "replaced", now),
+            Err(DecommissionRefused::Incomplete)
+        );
+        assert_eq!(node.status, NodeStatus::Active);
+        node.decommission("ops:okello", Erasure::TpmCleared, "hardware replaced", now)
+            .expect("decommissioned");
+        assert_eq!(node.status, NodeStatus::Decommissioned);
+        assert_eq!(
+            node.decommissioned
+                .as_ref()
+                .map(|d| (d.erasure, d.by.as_str())),
+            Some((Erasure::TpmCleared, "ops:okello"))
+        );
+        assert_eq!(
+            node.decommission("ops:okello", Erasure::KeySlotsDestroyed, "again", now),
+            Err(DecommissionRefused::Already)
+        );
+        assert_eq!(Erasure::KeySlotsDestroyed.as_str(), "key-slots-destroyed");
     }
 
     #[test]

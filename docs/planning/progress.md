@@ -310,3 +310,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - `node.json` now records where central is.
   - **Tests:** unit tests of the formats and parsers, and of the flow with a fake.
   - **Not yet checked:** the platform commands, on facility hardware.
+- 2026-11-04: #268 part 3b merged (#293). Part 4, decommissioning:
+  - **Domain:** `Node::decommission`, recording the erasure (`tpm-cleared` or `key-slots-destroyed`), who and why, once.
+  - **Migration `0026_node_revocations`:** the issuing CA's revocations and CRL number.
+  - **`NodeRegistry::decommission`:** one audited transaction that revokes the intermediate and destroys the escrowed recovery keys. Afterwards the node is never active again.
+  - **`NodeRegistry::crl`.**
+  - **central-server:** `node decommission | crl`.
+
+  This completes #268. The HSM or KMS adapters for the issuing CA and the escrow master key, and CRL delivery to edges over sync, remain.

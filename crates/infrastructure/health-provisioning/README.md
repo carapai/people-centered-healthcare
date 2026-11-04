@@ -34,6 +34,12 @@ Layer: **infrastructure**. Central's node registry and edge provisioning (#268; 
   - **`recovery_router(registry, kms)`** serves `POST /provisioning/recovery`, with the JWS as the body.
     - **Success:** 204.
     - **Refusals:** 401 `unauthorized`, 409 `escrow_refused`, 400 `invalid_request`, and 503 if the store or the KMS failed.
+- **Decommissioning** (ADR 0048 § Decommissioning):
+  - **`NodeRegistry::decommission(node, by, erasure, reason)`** records a crypto-erased edge: how its disks were erased (`tpm-cleared` or `key-slots-destroyed`), who recorded it and why. In one audited transaction it also:
+    - revokes the node's facility intermediate in the issuing CA's revocations (`node_revocations`, reason cessation of operation);
+    - destroys its escrowed recovery keys.
+  - **Afterwards:** the node is never active again, so its escrows are refused and its alerts stop. A second decommission, or one without who or why, is refused.
+  - **`NodeRegistry::crl(issuer)`** signs the issuing CA's next CRL from those revocations. Each CRL takes the next number.
 - **`Issuer`** is the issuing CA's port, since its key belongs in the HSM or KMS. `health_pki::Authority` implements it with its key at hand, until the KMS adapter.
 
 ## Tests
@@ -44,6 +50,16 @@ Layer: **infrastructure**. Central's node registry and edge provisioning (#268; 
 - **Exemptions:** an exempt facility provisions unencrypted and stands in `exempt()`.
 - **Short codes** count up per facility.
 - **The route:** each answer.
+
+`tests/decommission.rs`:
+- **Before:** a node's served chain verifies under the root.
+- **The decommission:** it is refused without a reason, then recorded with who and how.
+- **Afterwards:**
+  - its recovery keys and their alert are gone;
+  - its escrow is refused;
+  - a second decommission, and an unknown node's, are refused;
+  - with the next CRL, its chain fails under the root;
+  - each CRL differs.
 
 `tests/recovery.rs`:
 - **Escrow and read-out:**

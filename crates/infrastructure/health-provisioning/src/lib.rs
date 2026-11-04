@@ -22,6 +22,12 @@
 //!   they verified the caller. A key read out is used, and stays in
 //!   [`NodeRegistry::used_recovery_keys`] for central to alert on until the edge escrows its
 //!   replacement.
+//! - **Decommissioning** (ADR 0048 § Decommissioning): [`NodeRegistry::decommission`] records the
+//!   crypto-erase, who recorded it and why. In the same transaction it revokes the node's
+//!   facility intermediate in the issuing CA's revocations, and destroys its escrowed recovery
+//!   keys, which unlock nothing once the machine is erased. The node is never active again: its
+//!   signed requests are refused and its alerts stop. [`NodeRegistry::crl`] publishes the
+//!   issuing CA's next CRL from those revocations.
 
 mod kms;
 mod routes;
@@ -31,11 +37,11 @@ use std::sync::Arc;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use health_identity::{
-    CodeRefused, Encryption, EscrowRefused, Node, NodeId, NodeKind, NodeStatus, ProvisioningCode,
-    ProvisioningPolicy, RecoveryKey, RecoveryVolume, Retrieval,
+    CodeRefused, DecommissionRefused, Encryption, Erasure, EscrowRefused, Node, NodeId, NodeKind,
+    NodeStatus, ProvisioningCode, ProvisioningPolicy, RecoveryKey, RecoveryVolume, Retrieval,
 };
 use health_persistence::{Store, Transaction};
-use health_pki::{Authority, Facility};
+use health_pki::{Authority, Facility, Reason, Revocations};
 use health_surrealdb::{SurrealStore, SurrealTx};
 use health_time::{Clock, Timestamp};
 use p256::ecdsa::signature::{Signer as _, Verifier as _};
@@ -61,6 +67,8 @@ pub trait Issuer: Send + Sync {
     ) -> Result<(String, String), String>;
     /// The issuing CA's own certificate, PEM: the rest of the chain an edge installs.
     fn certificate_pem(&self) -> String;
+    /// The issuing CA's next CRL from `revocations` at `at`, PEM; `revocations` takes its number.
+    fn crl(&self, revocations: &mut Revocations, at: Timestamp) -> Result<String, String>;
 }
 
 /// The issuing CA with its key at hand: the local adapter until the KMS one.
@@ -79,6 +87,10 @@ impl Issuer for Authority {
 
     fn certificate_pem(&self) -> String {
         Authority::certificate_pem(self)
+    }
+
+    fn crl(&self, revocations: &mut Revocations, at: Timestamp) -> Result<String, String> {
+        revocations.crl(self, at).map_err(|e| e.to_string())
     }
 }
 
@@ -106,6 +118,9 @@ pub enum Error {
     /// No such node or recovery key.
     #[error("not found: {0}")]
     NotFound(String),
+    /// A decommission refused by the rules.
+    #[error(transparent)]
+    Decommission(#[from] DecommissionRefused),
 }
 
 /// The JWS `typ` of a recovery-key escrow.
@@ -311,6 +326,7 @@ impl NodeRegistry {
             intermediate_key,
             code: stored.id,
             provisioned_at: now,
+            decommissioned: None,
         };
         stored.redeemed = Some((now, id));
         let exempt = matches!(node.encryption, Encryption::Exempt { .. });
@@ -580,5 +596,86 @@ impl NodeRegistry {
             .map(|json| serde_json::from_str(json).map_err(failed))
             .collect::<Result<_, _>>()?;
         Ok(keys.into_iter().filter(RecoveryKey::used).collect())
+    }
+
+    async fn revocations(&self, tx: &mut SurrealTx) -> Result<Revocations, Error> {
+        tx.node_revocations()
+            .await
+            .map_err(failed)?
+            .map(|json| serde_json::from_str(&json).map_err(failed))
+            .transpose()
+            .map(Option::unwrap_or_default)
+    }
+
+    /// Records `node`'s decommissioning by `by`, its disks erased by `erasure`, for `reason`:
+    /// see the module documentation.
+    pub async fn decommission(
+        &self,
+        node: NodeId,
+        by: &str,
+        erasure: Erasure,
+        reason: &str,
+    ) -> Result<Node, Error> {
+        let now = self.clock.now();
+        let mut tx = self.begin().await?;
+        let id = node.to_string();
+        let mut record = self
+            .node(&mut tx, &id)
+            .await?
+            .ok_or_else(|| Error::NotFound(format!("no node {node}")))?;
+        record.decommission(by, erasure, reason, now)?;
+        let serial = record
+            .intermediate_serial
+            .parse()
+            .map_err(|e| Error::Store(format!("the node's intermediate serial: {e}")))?;
+        let mut revocations = self.revocations(&mut tx).await?;
+        revocations.revoke(serial, Reason::CessationOfOperation, now);
+        tx.put_node_revocations(&serde_json::to_string(&revocations).map_err(failed)?)
+            .await
+            .map_err(failed)?;
+        tx.delete_recovery_keys(&id).await.map_err(failed)?;
+        tx.put_node(
+            &id,
+            &record.facility,
+            &record.short_code,
+            &record.code.to_string(),
+            &serde_json::to_string(&record).map_err(failed)?,
+        )
+        .await
+        .map_err(failed)?;
+        let audit = self.audit(
+            "node-decommissioned",
+            "warning",
+            by,
+            &format!("node {node}"),
+            &format!(
+                "{} at {} decommissioned, {}: {}; intermediate {} revoked, recovery keys destroyed",
+                record.short_code,
+                record.facility,
+                erasure.as_str(),
+                reason,
+                record.intermediate_serial
+            ),
+        );
+        health_audit::append(&mut tx, &audit)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok(record)
+    }
+
+    /// The issuing CA's next CRL, signed by `issuer`, listing every decommissioned node's
+    /// intermediate. Each takes the next number.
+    pub async fn crl(&self, issuer: &dyn Issuer) -> Result<String, Error> {
+        let mut tx = self.begin().await?;
+        let mut revocations = self.revocations(&mut tx).await?;
+        let crl = issuer
+            .crl(&mut revocations, self.clock.now())
+            .map_err(Error::Store)?;
+        tx.put_node_revocations(&serde_json::to_string(&revocations).map_err(failed)?)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok(crl)
     }
 }
