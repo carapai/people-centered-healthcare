@@ -8,6 +8,13 @@ Layer: **infrastructure**. Published Definition packages on disk and in transit 
   3. refuses it with `Error::Configuration` if any `configuration/` file fails its schema;
   4. writes a deterministic tarball;
   5. signs it.
+- **Publication in steps,** for central's lifecycle (#88):
+  - `pack(files)` packs without checking any rule, since a draft may break them until validation;
+  - `check(packed, schemas)` applies the rules and schemas;
+  - `sign(packed, schemas, signer, at)` checks again and signs;
+  - `unpack(tgz, limits)` reads back a tarball central packed.
+
+  `publish` is the three in one.
 - **`verify(tgz, signature, expected, trust, limits, now)`** is what a node does before staging, for a package from sync or from USB. In order, it checks:
   1. the tarball's sha-256 against the one the activation names;
   2. the signature;
@@ -92,7 +99,7 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
 
 ## Not yet
 
-- Storing packages as blobs, activation and staging come with the publication lifecycle (#88) and scoped activation (#89).
+- Activation and staging come with scoped activation (#89). Central stores packages as blobs through `health-publication`.
 
 ## Tests
 

@@ -1,0 +1,33 @@
+[package]
+name = "health-publication"
+description = "Central's publication lifecycle (configuration.md § Lifecycle; ADR 0025): drafts, validation, review, approvals and signed publication of Published Definition packages, audited."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-audit = { workspace = true }
+health-configuration = { workspace = true }
+health-files = { workspace = true }
+health-packages = { workspace = true }
+health-persistence = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+health-pki = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tempfile = { workspace = true }

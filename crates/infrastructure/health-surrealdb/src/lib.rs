@@ -24,6 +24,7 @@ mod local;
 mod migrations;
 mod nodes;
 pub mod ownership;
+mod packages;
 mod payments;
 mod phone;
 mod review;

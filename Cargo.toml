@@ -34,6 +34,7 @@ members = [
     "crates/infrastructure/health-packages",
     "crates/infrastructure/health-pki",
     "crates/infrastructure/health-provisioning",
+    "crates/infrastructure/health-publication",
     "crates/infrastructure/health-surrealdb",
     "crates/testing/health-persistence-memory",
     "crates/edge/health-edge-runtime",
@@ -88,6 +89,7 @@ health-persistence = { path = "crates/contracts/health-persistence" }
 health-packages = { path = "crates/infrastructure/health-packages" }
 health-pki = { path = "crates/infrastructure/health-pki" }
 health-provisioning = { path = "crates/infrastructure/health-provisioning" }
+health-publication = { path = "crates/infrastructure/health-publication" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
 health-registries-app = { path = "crates/application/health-registries-app" }
 health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
