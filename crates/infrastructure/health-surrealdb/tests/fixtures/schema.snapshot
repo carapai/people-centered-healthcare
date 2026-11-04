@@ -158,6 +158,20 @@ DEFINE TABLE auth_session TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX auth_session_refresh ON auth_session FIELDS refresh_hash UNIQUE
 DEFINE TABLE auth_snapshot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD jws ON auth_snapshot TYPE string PERMISSIONS FULL
+DEFINE TABLE billing_deferral TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD account ON billing_deferral TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON billing_deferral TYPE string PERMISSIONS FULL
+  DEFINE INDEX billing_deferral_account ON billing_deferral FIELDS account
+DEFINE TABLE billing_settlement TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD account ON billing_settlement TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON billing_settlement TYPE string PERMISSIONS FULL
+  DEFINE FIELD payment ON billing_settlement TYPE string PERMISSIONS FULL
+  DEFINE INDEX billing_settlement_account ON billing_settlement FIELDS account
+  DEFINE INDEX billing_settlement_payment ON billing_settlement FIELDS payment
+DEFINE TABLE billing_waiver TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD account ON billing_waiver TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON billing_waiver TYPE string PERMISSIONS FULL
+  DEFINE INDEX billing_waiver_account ON billing_waiver FIELDS account
 DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD count ON block_count TYPE int PERMISSIONS FULL
   DEFINE FIELD counted_at ON block_count TYPE datetime PERMISSIONS FULL

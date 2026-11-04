@@ -116,6 +116,88 @@ pub struct Waiver {
     pub at: Timestamp,
 }
 
+/// A posted payment, or part of one, settled against an Account: what the gate counts as paid.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Settlement {
+    /// The payment.
+    pub payment: String,
+    /// The Account.
+    pub account: String,
+    /// How much of the payment.
+    pub amount: Decimal,
+    /// Who settled it.
+    pub by: String,
+    /// When.
+    pub at: Timestamp,
+}
+
+impl Settlement {
+    /// Checks it is more than nothing and no more than what remains of the payment
+    /// (`unsettled`).
+    pub fn check(&self, unsettled: Decimal) -> Result<(), GateRefused> {
+        if self.by.trim().is_empty() {
+            return Err(GateRefused::Unexplained);
+        }
+        if self.amount <= Decimal::ZERO || self.amount > unsettled {
+            return Err(GateRefused::BadAmount(unsettled));
+        }
+        Ok(())
+    }
+}
+
+/// What the patient still owes on an Account: the patient share of its owed charges, less what
+/// was settled against it and waived.
+pub fn owed(
+    patient_shares: impl IntoIterator<Item = Decimal>,
+    settled: &[Settlement],
+    waived: &[Waiver],
+) -> Decimal {
+    let charged: Decimal = patient_shares.into_iter().sum();
+    let paid: Decimal = settled.iter().map(|s| s.amount).sum();
+    let written_off: Decimal = waived.iter().map(|w| w.amount).sum();
+    (charged - paid - written_off).max(Decimal::ZERO)
+}
+
+/// Deferrals, settlements and waivers, inside the unit of work's transaction (billing's driven
+/// port).
+pub trait AccountStore {
+    /// Adds a deferral.
+    fn add_deferral(
+        &mut self,
+        deferral: &Deferral,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// An Account's deferrals.
+    fn deferrals(
+        &mut self,
+        account: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Deferral>, health_persistence::StoreError>> + Send;
+    /// Adds a settlement.
+    fn add_settlement(
+        &mut self,
+        settlement: &Settlement,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// The settlements against an Account.
+    fn settlements_of_account(
+        &mut self,
+        account: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Settlement>, health_persistence::StoreError>> + Send;
+    /// The settlements of a payment, across Accounts.
+    fn settlements_of_payment(
+        &mut self,
+        payment: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Settlement>, health_persistence::StoreError>> + Send;
+    /// Adds a waiver.
+    fn add_waiver(
+        &mut self,
+        waiver: &Waiver,
+    ) -> impl std::future::Future<Output = Result<(), health_persistence::WriteError>> + Send;
+    /// An Account's waivers.
+    fn waivers(
+        &mut self,
+        account: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Waiver>, health_persistence::StoreError>> + Send;
+}
+
 /// Why a deferral or waiver is refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GateRefused {

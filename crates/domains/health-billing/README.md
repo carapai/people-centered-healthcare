@@ -23,4 +23,4 @@ Layer: **domain** (billing). Charge capture from configured triggers on clinical
   5. a recorded deferral defers;
   6. otherwise the gate blocks where it allows blocking, else defers.
 
-  `Deferral` and `Waiver` must say who and why, and a waiver can be no more than is owed. Who may waive is the caller's permission check.
+  `Deferral` and `Waiver` must say who and why, and a waiver can be no more than is owed. Who may waive is the caller's permission check. `Settlement` counts a payment, or part of one, towards an Account. `owed` is the patient share of owed charges less settlements and waivers. `AccountStore` keeps deferrals, settlements and waivers.

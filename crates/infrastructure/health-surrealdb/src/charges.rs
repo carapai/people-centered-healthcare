@@ -81,3 +81,114 @@ impl ChargeStore for SurrealTx {
         decode(rows)
     }
 }
+
+/// Deferrals, settlements and waivers (migration `0032_billing_accounts`).
+mod accounts {
+    use health_billing::{AccountStore, Deferral, Settlement, Waiver};
+    use health_persistence::{StoreError, WriteError};
+    use serde::Serialize;
+    use serde::de::DeserializeOwned;
+
+    use crate::store::SurrealTx;
+
+    fn encode<T: Serialize>(value: &T) -> Result<String, WriteError> {
+        serde_json::to_string(value)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))
+    }
+
+    fn decode<T: DeserializeOwned>(rows: Vec<Vec<String>>) -> Result<Vec<T>, StoreError> {
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|data| {
+                serde_json::from_str(&data).map_err(|_| {
+                    StoreError::Unavailable("a billing row has an invalid shape".into())
+                })
+            })
+            .collect()
+    }
+
+    impl SurrealTx {
+        async fn by_account<T: DeserializeOwned>(
+            &mut self,
+            table: &str,
+            field: &str,
+            value: &str,
+        ) -> Result<Vec<T>, StoreError> {
+            let rows = self
+                .rows(
+                    &format!("SELECT VALUE [data] FROM {table} WHERE {field} = $value ORDER BY id"),
+                    vec![("value", value.to_owned())],
+                )
+                .await?;
+            decode(rows)
+        }
+    }
+
+    impl AccountStore for SurrealTx {
+        async fn add_deferral(&mut self, deferral: &Deferral) -> Result<(), WriteError> {
+            self.run(
+                "CREATE billing_deferral CONTENT { data: $data, account: $account } \
+                 RETURN VALUE record::id(id)",
+                vec![
+                    ("data", encode(deferral)?),
+                    ("account", deferral.account.clone()),
+                ],
+            )
+            .await?;
+            Ok(())
+        }
+
+        async fn deferrals(&mut self, account: &str) -> Result<Vec<Deferral>, StoreError> {
+            self.by_account("billing_deferral", "account", account)
+                .await
+        }
+
+        async fn add_settlement(&mut self, settlement: &Settlement) -> Result<(), WriteError> {
+            self.run(
+                "CREATE billing_settlement CONTENT { data: $data, account: $account, \
+                 payment: $payment } RETURN VALUE record::id(id)",
+                vec![
+                    ("data", encode(settlement)?),
+                    ("account", settlement.account.clone()),
+                    ("payment", settlement.payment.clone()),
+                ],
+            )
+            .await?;
+            Ok(())
+        }
+
+        async fn settlements_of_account(
+            &mut self,
+            account: &str,
+        ) -> Result<Vec<Settlement>, StoreError> {
+            self.by_account("billing_settlement", "account", account)
+                .await
+        }
+
+        async fn settlements_of_payment(
+            &mut self,
+            payment: &str,
+        ) -> Result<Vec<Settlement>, StoreError> {
+            self.by_account("billing_settlement", "payment", payment)
+                .await
+        }
+
+        async fn add_waiver(&mut self, waiver: &Waiver) -> Result<(), WriteError> {
+            self.run(
+                "CREATE type::record('billing_waiver', $id) CONTENT { data: $data, \
+                 account: $account } RETURN VALUE record::id(id)",
+                vec![
+                    ("id", waiver.id.clone()),
+                    ("data", encode(waiver)?),
+                    ("account", waiver.account.clone()),
+                ],
+            )
+            .await?;
+            Ok(())
+        }
+
+        async fn waivers(&mut self, account: &str) -> Result<Vec<Waiver>, StoreError> {
+            self.by_account("billing_waiver", "account", account).await
+        }
+    }
+}

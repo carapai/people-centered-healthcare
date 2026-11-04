@@ -551,3 +551,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decisions:**
     - urgent care defers even when a preauthorization is missing;
     - a gate that does not allow blocking defers unpaid routine care rather than passing it, so the deferral is recorded.
+- 2026-11-05: #122 part 1 merged (#322). Part 2, billing's gate query:
+  - **The query:** `health-billing-app`'s `Billing` implements `FinancialGates`. What is owed is the patient share of owed charges less settlements and waivers, and recorded deferrals are read too.
+  - **Use cases:** `settle` (posted payments to Accounts, never beyond the payment), `defer`, and `waive` (posted to `waiver/patient`).
+  - **Storage:** migration `0032_billing_accounts`.
+  - **Decisions:**
+    - an unconfigured gate is unavailable, and the engine must defer on that;
+    - no preauthorization counts as approved until coverage (#125);
+    - a payment counts towards an Account only once settled against it.
