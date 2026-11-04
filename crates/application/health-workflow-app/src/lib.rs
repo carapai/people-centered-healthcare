@@ -38,6 +38,7 @@ use health_workflow::{
 use health_workflow_actions::{ActionDescriptor, Compensation};
 use uuid::Uuid;
 
+pub mod fhir;
 pub mod tasks;
 pub mod timers;
 
@@ -581,7 +582,16 @@ where
         let history = tx.instance_history(&record.id).await?;
         let tasks = project(&compiled.chart, record, &history, now);
         tx.replace_tasks(&record.id, &tasks).await?;
-        Ok(())
+        for task in &tasks {
+            fhir::put(tx, "Task", &task.id, fhir::task(task)).await?;
+        }
+        fhir::put(
+            tx,
+            "RequestOrchestration",
+            &record.id,
+            fhir::orchestration(record, &tasks),
+        )
+        .await
     }
 
     /// Carries out a step's effects in the transaction.

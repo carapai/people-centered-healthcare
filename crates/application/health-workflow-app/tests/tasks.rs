@@ -73,6 +73,11 @@ impl Actions<SurrealTx> for NoActions {
 type App = Workflows<SurrealStore, BTreeMap<String, Arc<Compiled>>, NoActions, Always>;
 
 async fn app() -> (App, Arc<FixedClock>) {
+    let (app, clock, _) = app_and_store().await;
+    (app, clock)
+}
+
+async fn app_and_store() -> (App, Arc<FixedClock>, SurrealStore) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "workflow-tasks".into(),
@@ -89,7 +94,7 @@ async fn app() -> (App, Arc<FixedClock>) {
     let definitions =
         BTreeMap::from([(OPD.to_owned(), Arc::new(Compiled::new(opd()).expect("opd")))]);
     let app = Workflows::new(
-        store,
+        store.clone(),
         definitions,
         NoActions,
         Always,
@@ -97,7 +102,7 @@ async fn app() -> (App, Arc<FixedClock>) {
         vec![],
         "KAM013",
     );
-    (app, clock)
+    (app, clock, store)
 }
 
 async fn start(app: &App, op: &str) -> String {
@@ -307,4 +312,85 @@ async fn the_stored_worklist_matches_a_rebuild_from_instance_state() {
         .filter(|t| t.status.is_open())
         .collect();
     assert_eq!(app.worklist("opd-triage").await.expect("worklist"), rebuilt);
+}
+
+async fn resource(store: &SurrealStore, kind: &str, id: &str) -> (serde_json::Value, u64) {
+    use health_persistence::{ResourceType, Store, Transaction};
+    let kind: ResourceType = kind.parse().expect("type");
+    let id = health_identifiers::ResourceId::from_uuid(id.parse().expect("uuid")).expect("id");
+    let mut tx = store.begin().await.expect("begin");
+    let head = tx.read(&kind, id).await.expect("read").expect("written");
+    let issues = health_fhir_validation::validate_structure(head.json.as_str());
+    assert!(issues.is_empty(), "{kind:?} is valid FHIR R5: {issues:?}");
+    (
+        serde_json::from_str(head.json.as_str()).expect("json"),
+        head.version.version_seq,
+    )
+}
+
+#[tokio::test]
+async fn tasks_and_the_orchestration_are_written_as_fhir_resources_only_when_they_change() {
+    let (app, _, store) = app_and_store().await;
+    let id = start(&app, "op-1").await;
+    let other = start(&app, "op-x").await;
+    let triage = app.tasks(&id).await.expect("tasks")[0].id.clone();
+
+    let (task, version) = resource(&store, "Task", &triage).await;
+    assert_eq!(task["status"], "ready");
+    assert_eq!(task["businessStatus"]["text"], "triage");
+    assert_eq!(task["intent"], "order");
+    assert_eq!(task["priority"], "routine");
+    assert_eq!(task["focus"]["reference"], "Encounter/op-1");
+    assert_eq!(task["requestedPerformer"][0]["concept"]["text"], "nurse");
+    assert_eq!(
+        task["input"][0]["valueCanonical"],
+        "https://health.go.ug/fhir/Questionnaire/triage|2.0.0"
+    );
+    assert_eq!(
+        task["partOf"][0]["reference"],
+        format!("RequestOrchestration/{id}")
+    );
+    assert_eq!(version, 1);
+
+    app.claim(&id, "triage", "Practitioner/nurse-1", "op-2")
+        .await
+        .expect("claim");
+    let (task, version) = resource(&store, "Task", &triage).await;
+    assert_eq!(task["status"], "in-progress");
+    assert_eq!(task["owner"]["reference"], "Practitioner/nurse-1");
+    assert_eq!(version, 2);
+
+    app.escalate(&other, "triage", Priority::Stat, "lead", "op-3")
+        .await
+        .expect("escalate the other instance");
+    assert_eq!(
+        resource(&store, "Task", &triage).await.1,
+        2,
+        "a Task whose projection did not change gets no new version"
+    );
+
+    let (orchestration, _) = resource(&store, "RequestOrchestration", &id).await;
+    assert_eq!(orchestration["status"], "active");
+    assert_eq!(orchestration["instantiatesUri"][0], OPD);
+    assert_eq!(orchestration["encounter"]["reference"], "Encounter/op-1");
+
+    app.command(
+        &id,
+        &Event::named("triaged"),
+        "Practitioner/nurse-1",
+        "op-4",
+    )
+    .await
+    .expect("complete triage");
+    let (task, _) = resource(&store, "Task", &triage).await;
+    assert_eq!(task["status"], "completed");
+    assert!(task.get("owner").is_none());
+    let (orchestration, _) = resource(&store, "RequestOrchestration", &id).await;
+    assert_eq!(orchestration["action"].as_array().map(Vec::len), Some(2));
+
+    app.cancel(&id, "patient left", "reception-1", "op-5")
+        .await
+        .expect("cancel");
+    let (orchestration, _) = resource(&store, "RequestOrchestration", &id).await;
+    assert_eq!(orchestration["status"], "revoked");
 }

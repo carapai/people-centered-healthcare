@@ -466,3 +466,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - reassignment overrides any claim;
     - permission checks stay with the caller (the policy decision point).
   - **Next:** part 3 writes Tasks and RequestOrchestrations as FHIR resources, and part 4 adds the client's worklist screens.
+- 2026-11-04: #99 part 2 merged (#312). Part 3, the FHIR projections:
+  - **What is written:** `health-workflow-app` writes each projected Task as a FHIR Task, and each instance as a RequestOrchestration whose actions are its Tasks. They go through the unit of work, in the transaction that changed the instance.
+  - **Versions:** a new version is written only when a projection changed. A test checks both resources pass tier 1.
+  - **Decisions:**
+    - CarePlan projections are left to Care Coordination's typed actions, because CarePlan belongs to care-plans (resource-ownership.md);
+    - a claim that lapses with no further step stays `in-progress` in the stored Task until the next step, and worklists apply the lapse as they read.
+  - **Next:** part 4 adds the client's worklist screens.

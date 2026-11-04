@@ -2813,11 +2813,14 @@ dependencies = [
 name = "health-workflow-app"
 version = "0.1.0"
 dependencies = [
+ "health-fhir-validation",
+ "health-identifiers",
  "health-persistence",
  "health-surrealdb",
  "health-time",
  "health-workflow",
  "health-workflow-actions",
+ "serde_json",
  "surrealdb",
  "thiserror",
  "tokio",
