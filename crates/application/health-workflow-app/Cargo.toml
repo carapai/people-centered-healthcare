@@ -1,0 +1,28 @@
+[package]
+name = "health-workflow-app"
+description = "The workflow application: runs workflow instances, appending their history, with user commands in one transaction and domain events through a deduplicating inbox (workflow-engine.md § Persistence and transactions; ADR 0044)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "workflow"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+health-workflow = { workspace = true }
+health-workflow-actions = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
+uuid = { workspace = true }
