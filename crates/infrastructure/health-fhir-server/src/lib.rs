@@ -67,6 +67,7 @@ mod portal;
 mod references;
 mod registry;
 mod search;
+mod terminology;
 mod transaction;
 
 use std::sync::Arc;
@@ -92,6 +93,7 @@ pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_
 pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
+pub use terminology::ActiveTerminology;
 
 /// The FHIR REST server for one node.
 #[derive(Clone)]
@@ -107,6 +109,7 @@ pub struct FhirServer {
     access: Option<access::Control>,
     registry: Option<Arc<registry::RegistrySettings>>,
     payments: Option<Arc<payments::PaymentConfig>>,
+    terminology: Option<terminology::ActiveTerminology>,
 }
 
 impl FhirServer {
@@ -129,7 +132,16 @@ impl FhirServer {
             access: None,
             registry: None,
             payments: None,
+            terminology: None,
         }
+    }
+
+    /// This server, serving the terminology operations (`ValueSet/$expand`,
+    /// `$validate-code`, `CodeSystem/$lookup`, `$subsumes`, `ConceptMap/$translate`) from
+    /// `terminology`, the node's own, with no external terminology server (#90).
+    pub fn with_terminology(mut self, terminology: ActiveTerminology) -> Self {
+        self.terminology = Some(terminology);
+        self
     }
 
     /// This server, deciding with `scope` which reference targets must resolve locally.
@@ -223,6 +235,30 @@ impl FhirServer {
                     .post(interactions::create)
                     .put(conditional::update)
                     .delete(conditional::delete),
+            )
+            .route(
+                "/ValueSet/$expand",
+                get(terminology::expand).post(terminology::expand),
+            )
+            .route(
+                "/ValueSet/$validate-code",
+                get(terminology::validate_value_set).post(terminology::validate_value_set),
+            )
+            .route(
+                "/CodeSystem/$validate-code",
+                get(terminology::validate_code_system).post(terminology::validate_code_system),
+            )
+            .route(
+                "/CodeSystem/$lookup",
+                get(terminology::lookup).post(terminology::lookup),
+            )
+            .route(
+                "/CodeSystem/$subsumes",
+                get(terminology::subsumes).post(terminology::subsumes),
+            )
+            .route(
+                "/ConceptMap/$translate",
+                get(terminology::translate).post(terminology::translate),
             )
             .route("/Patient/$match", post(registry::matches))
             .route("/Patient/$register", post(registry::register))

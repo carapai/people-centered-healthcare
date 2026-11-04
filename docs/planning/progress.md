@@ -381,3 +381,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **`health-packages::terminology::load`** reads CodeSystems, ValueSets (their `expansion` as the pinned expansion) and R5 ConceptMaps into `health-terminology`'s model.
   - **Refused:** a malformed resource or an unknown filter operator, rather than a skipped one.
   - **Tested** with the core package's `template-modes`.
+- 2026-11-04: #90 part 2a merged (#302). Part 2b, the FHIR operations:
+  - **`FhirServer::with_terminology(ActiveTerminology)`** serves `ValueSet/$expand`, `ValueSet/$validate-code`, `CodeSystem/$validate-code`, `CodeSystem/$lookup`, `CodeSystem/$subsumes` and `ConceptMap/$translate`, by GET or by a Parameters POST.
+  - **Errors:** 404 for what the node does not hold, and 422 for what cannot be answered offline.
+  - **Swapping:** `ActiveTerminology::replace` swaps the terminology served.
+  - **Decision:** what a node serves is set by activation (#89), which loads the active packages' terminology and calls `replace`. Until then no node wires it in.
+
+  This completes #90.

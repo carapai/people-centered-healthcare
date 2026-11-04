@@ -2382,6 +2382,7 @@ dependencies = [
  "health-persistence",
  "health-registries-app",
  "health-surrealdb",
+ "health-terminology",
  "health-time",
  "http-body-util",
  "jiff",

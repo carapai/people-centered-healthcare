@@ -32,6 +32,7 @@ health-payments-app = { workspace = true }
 health-persistence = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
+health-terminology = { workspace = true }
 health-time = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true }
