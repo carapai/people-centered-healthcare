@@ -8,6 +8,7 @@ The platform core package (#87; [ADR 0049](../../docs/adr/0049-engine-native-def
 | `MatchingRulesLibrary` | Matching Rules: a `Library` of type `matching-rules` with `application/vnd.health.matching-rules+json` content |
 | `WorkflowDefinitionLibrary` | A Workflow Definition: a `Library` of type `workflow-definition` with `application/vnd.health.workflow+json` content |
 | `ProgramPlanDefinition` | A program: a `clinical-protocol` `PlanDefinition` with the EpisodeOfCare type its enrolment opens (`program-episode-type`) and, optionally, its FHIRPath eligibility (`program-eligibility`) |
+| `Platform<Resource>`, 15 profiles | Locally pinned profiles of the low-maturity R5 resources the platform serves, each pinning its R5 5.0.0 definition with no constraint of its own, so a change to base FHIR never changes the platform's API. **Financial** (ADR 0030): ChargeItem, Account, Invoice, Coverage, CoverageEligibilityRequest, CoverageEligibilityResponse, Claim, ClaimResponse, ExplanationOfBenefit, PaymentReconciliation, PaymentNotice. **Inventory façades** (ADR 0034): InventoryItem, SupplyRequest, SupplyDelivery, InventoryReport |
 | `CodeSystem/platform` | The Library types (`extraction-mapping`, `matching-rules`, `workflow-definition`) and template modes (`managed`, `seed`), with `ValueSet/template-modes` |
 
 Every definition needs its `url`, `version` and `name`.
@@ -41,11 +42,10 @@ The package is published through central's lifecycle like any other (#88): `cent
 
 ## Tests
 
-- **`health-fhir-validation`'s `tests/core_package.rs`:** the snapshots compile for tier 3, each example passes, and each profile's constraints are enforced.
+- **`health-fhir-validation`'s `tests/core_package.rs`:** the snapshots compile for tier 3, with HL7's `SimpleQuantity` from the `hl7.fhir.r5.core` dependency, which R5's own snapshots name. Each example passes, and each profile's constraints are enforced. A valid resource of each pinned type passes its profile, a resource of another type does not, and R5's cardinalities still hold.
 - **`health-publication`'s `tests/core_package.rs`:** the package publishes through the lifecycle.
 
 ## Not yet
 
-- **The locally pinned financial and inventory profiles** (#87 part 2).
 - **JSON Schemas for configuration:** they ship with the software release, not this package (#86). Each one comes with the feature that reads it.
 - **Required bindings,** such as a template's mode being `managed` or `seed`. Tier 4 checks them (#91).

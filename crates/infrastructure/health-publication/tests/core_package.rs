@@ -115,5 +115,5 @@ async fn the_core_package_publishes_through_the_lifecycle() {
         .iter()
         .filter(|artefact| artefact.resource_type == "StructureDefinition")
         .count();
-    assert_eq!(profiles, 9);
+    assert_eq!(profiles, 24);
 }

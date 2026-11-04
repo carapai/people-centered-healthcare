@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use health_fhir_validation::{
-    Issue, OctofhirEngine, ProfileSet, ProfileValidator, SnapshotValidator, validate_invariants,
-    validate_value,
+    Issue, OctofhirEngine, ProfileSet, ProfileValidator, SnapshotValidator, skeleton,
+    validate_invariants, validate_value,
 };
 use serde_json::{Value, json};
 
@@ -33,7 +33,13 @@ fn validator() -> SnapshotValidator {
             definitions.push(read(&path));
         }
     }
-    assert_eq!(definitions.len(), 9, "the package's StructureDefinitions");
+    assert_eq!(definitions.len(), 24, "the package's StructureDefinitions");
+    // From its dependency hl7.fhir.r5.core, as activation (#89) will load it: R5's own
+    // snapshots name SimpleQuantity for quantities.
+    definitions
+        .push(read(&Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/fixtures/profiles/StructureDefinition-SimpleQuantity.json",
+        )));
     let set = ProfileSet::compile(&definitions).expect("the core profiles compile");
     SnapshotValidator::new(Arc::new(set), Arc::new(OctofhirEngine::new()))
 }
@@ -171,4 +177,43 @@ async fn a_program_is_a_clinical_protocol_with_its_episode_type() {
         !found.is_empty(),
         "a program without its episode type passed"
     );
+}
+
+/// The financial (ADR 0030) and inventory (ADR 0034) resources the platform pins.
+const PINNED: [&str; 15] = [
+    "ChargeItem",
+    "Account",
+    "Invoice",
+    "Coverage",
+    "CoverageEligibilityRequest",
+    "CoverageEligibilityResponse",
+    "Claim",
+    "ClaimResponse",
+    "ExplanationOfBenefit",
+    "PaymentReconciliation",
+    "PaymentNotice",
+    "InventoryItem",
+    "SupplyRequest",
+    "SupplyDelivery",
+    "InventoryReport",
+];
+
+#[tokio::test]
+async fn each_pinned_profile_accepts_a_valid_resource_of_its_type_and_no_other() {
+    for resource_type in PINNED {
+        let resource = skeleton(resource_type).expect("a skeleton");
+        let profile = format!("Platform{resource_type}");
+        let found = issues(&resource, &profile).await;
+        assert!(found.is_empty(), "{resource_type}: {found:?}");
+    }
+    let account = skeleton("Account").expect("a skeleton");
+    let found = issues(&account, "PlatformInvoice").await;
+    assert!(!found.is_empty(), "an Account passed as an Invoice");
+}
+
+#[tokio::test]
+async fn each_pinned_profile_keeps_r5_cardinalities() {
+    let mut claim = skeleton("Claim").expect("a skeleton");
+    claim.as_object_mut().expect("object").remove("status");
+    fails_at(&claim, "PlatformClaim", "Claim.status").await;
 }

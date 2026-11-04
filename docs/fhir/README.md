@@ -16,7 +16,7 @@ This folder documents the platform's FHIR conformance artefacts: profiles, exten
 
 ## Profile and extension needs already decided
 
-Each artefact's exact form is fixed when it is authored. The ADR 0049 profiles, their extensions and the platform CodeSystem are in the core package.
+Each artefact's exact form is fixed when it is authored. The core package holds the ADR 0049 profiles, their extensions, the platform CodeSystem, and the locally pinned financial and inventory profiles (`Platform<Resource>`).
 
 ### Extensions
 

@@ -16,7 +16,51 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Account|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/ChargeItem|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Claim|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/ClaimResponse|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Coverage|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/CoverageEligibilityRequest|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/CoverageEligibilityResponse|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/ExplanationOfBenefit|5.0.0"
+    },
+    {
+      "type": "depends-on",
       "resource": "http://hl7.org/fhir/StructureDefinition/Extension|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/InventoryItem|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/InventoryReport|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/Invoice|5.0.0"
     },
     {
       "type": "depends-on",
@@ -24,7 +68,23 @@
     },
     {
       "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/PaymentNotice|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/PaymentReconciliation|5.0.0"
+    },
+    {
+      "type": "depends-on",
       "resource": "http://hl7.org/fhir/StructureDefinition/PlanDefinition|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/SupplyDelivery|5.0.0"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/StructureDefinition/SupplyRequest|5.0.0"
     },
     {
       "type": "composed-of",
@@ -37,6 +97,66 @@
     {
       "type": "composed-of",
       "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/MatchingRulesLibrary|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformAccount|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformChargeItem|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformClaimResponse|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformClaim|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformCoverageEligibilityRequest|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformCoverageEligibilityResponse|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformCoverage|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformExplanationOfBenefit|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformInventoryItem|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformInventoryReport|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformInvoice|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformPaymentNotice|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformPaymentReconciliation|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformSupplyDelivery|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/PlatformSupplyRequest|0.1.0"
     },
     {
       "type": "composed-of",

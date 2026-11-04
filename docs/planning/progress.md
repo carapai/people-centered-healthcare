@@ -365,3 +365,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
       - an extension slice may name its extension by its type's profile, as HL7 snapshots do;
       - a contained resource is typed by its own `resourceType`, so its extensions are checked.
     - **Tests:** the package compiles and enforces its constraints, and publishes through the lifecycle with two approvers.
+- 2026-11-04: #87 part 1 merged (#299). The licence exception for `hl7.fhir.r5.core` (CC0-1.0, that package only) was approved by the user. Part 2, the locally pinned profiles:
+  - **15 `Platform<Resource>` profiles** in the core package, each pinning R5 5.0.0 with no constraint of its own:
+    - 11 financial (ADR 0030);
+    - 4 inventory façades (ADR 0034).
+  - **Tests:** they compile with HL7's `SimpleQuantity` from the dependency. A valid resource of each type passes, and another type does not.
+  - **Not in this package:** JSON Schemas ship with the software release (decided in #86).
+
+  This completes #87.
