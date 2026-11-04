@@ -377,3 +377,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **`Terminology`:** CodeSystems, ValueSets and ConceptMaps by URL and version, the latest by semver.
   - **The five operations:** `lookup`, `subsumes`, `expand` (pinned expansion first, otherwise the compose with the hierarchy and property filters, imports, exclusions, inactive codes, text filter and paging), `validate_code` (with displays and designations) and `translate`.
   - **Fails closed:** whatever would need another terminology server is an error, never an empty answer.
+- 2026-11-04: #90 part 1 merged (#301). Part 2 is split: 2a reads terminology from packages (this), and 2b is the FHIR operation endpoints.
+  - **`health-packages::terminology::load`** reads CodeSystems, ValueSets (their `expansion` as the pinned expansion) and R5 ConceptMaps into `health-terminology`'s model.
+  - **Refused:** a malformed resource or an unknown filter operator, rather than a skipped one.
+  - **Tested** with the core package's `template-modes`.

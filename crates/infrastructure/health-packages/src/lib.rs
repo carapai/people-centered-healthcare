@@ -19,6 +19,7 @@ pub mod bump;
 mod contents;
 mod schemas;
 mod signature;
+pub mod terminology;
 
 use std::fmt;
 
@@ -71,6 +72,14 @@ pub enum Error {
     /// A JSON file that does not read.
     #[error("{path}: {detail}")]
     Json {
+        /// Its path under `package/`.
+        path: String,
+        /// Why.
+        detail: String,
+    },
+    /// A CodeSystem, ValueSet or ConceptMap the terminology service cannot read.
+    #[error("{path}: {detail}")]
+    Terminology {
         /// Its path under `package/`.
         path: String,
         /// Why.
