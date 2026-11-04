@@ -532,3 +532,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decisions:**
     - a charge id includes the event item's key, so a multi-item dispense gives one charge per item;
     - a billed charge is not cancelled here but corrected on its Invoice.
+- 2026-11-05: #121 part 1 merged (#320). Part 2, capture in the application:
+  - **New crate `health-billing-app`:** `capture` prices an event's charges together, keeps each once by id, and posts receivables per funding source against revenue per service class. `cancel_event` reverses posted charges once.
+  - **Migration `0031_charges`** (`charge`, owned by billing).
+  - **Acceptance criterion:** a replayed event never double-charges. Tests replay it on one store and capture it on two nodes.
+  - **Free care** is priced at the reference tariff and paid wholly by its funding source.
+  - **Decisions:**
+    - an event's charges are priced in groups by funding: free care and billed;
+    - bundled charges are priced at zero with the bundle line as its own charge;
+    - coverage terms come from the caller, keyed by funding source, until coverage (#125) provides them;
+    - cancellation loads the facility's postings into the ledger to reverse safely, which needs an index once ledgers grow.
+  - **Not wired yet:** delivering clinical Modules' events to `capture` waits for the in-process event dispatch (`health-messaging`), which does not exist yet. Capture is driven directly until then.
+
+  This completes #121.

@@ -2286,6 +2286,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-billing-app"
+version = "0.1.0"
+dependencies = [
+ "health-billing",
+ "health-financial-ledger",
+ "health-persistence",
+ "health-pricing",
+ "health-surrealdb",
+ "health-time",
+ "rust_decimal",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-client-registry"
 version = "0.1.0"
 dependencies = [
@@ -2803,6 +2819,7 @@ name = "health-surrealdb"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "health-billing",
  "health-client-registry",
  "health-consent",
  "health-fhir-search",

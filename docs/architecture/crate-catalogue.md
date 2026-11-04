@@ -53,6 +53,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Crate | Notes |
 |---|---|
 | `health-<context>-app` | One per Bounded Context, e.g. `health-clinical-records-app`, `health-finance-app`; created with the context's first use case |
+| `health-billing-app` | Billing: charge capture from clinical events, priced, kept once and posted to the ledger, with reversals on cancellation (#121) |
 | `health-identity-app` | Identity & Access: the PDP applied to searches (`SubjectSearchPolicy`) |
 | `health-pricing-app` | Pricing: drafting, approving and retiring Price Books and rules at central, and pricing charges from them (ADR 0031; #120) |
 | `health-workflow-app` | Workflow: instances started, commanded, fed domain events through the inbox, and cancelled with compensation, each step one transaction with its history entry and typed actions (ADR 0044; #97) |
