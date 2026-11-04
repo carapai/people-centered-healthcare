@@ -71,6 +71,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-pki` | crate (the private PKI: each tier's issuance from requests, CRLs and chain verification; ADRs 0008, 0058) |
 | `health-provisioning` | crate (central's node registry and edge provisioning: one-time codes, node ids and short codes, the facility intermediate; #268) |
 | `health-packages` | crate (Published Definition packages: deterministic tarballs, sha-256 identity, detached publication signatures; ADR 0024) |
+| `health-publication` | crate (central's publication lifecycle: drafts, validation, review, approvals and signed publication, audited; ADR 0025; #88). The domain rules stay in `health-configuration`, as the catalogue's `health-configuration-publisher` module |
 | `health-crypto` | crate |
 | `health-sync-server` | crate |
 | `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |

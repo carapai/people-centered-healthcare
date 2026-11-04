@@ -2697,6 +2697,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-publication"
+version = "0.1.0"
+dependencies = [
+ "health-audit",
+ "health-configuration",
+ "health-files",
+ "health-packages",
+ "health-persistence",
+ "health-pki",
+ "health-surrealdb",
+ "health-time",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "surrealdb",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "health-registries-app"
 version = "0.1.0"
 dependencies = [

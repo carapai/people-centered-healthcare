@@ -332,3 +332,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **`health-packages::bump::changes(before, after)`:** every change between two versions of an artefact, with the bump it needs. Questionnaire items by `linkId`, CodeSystem concepts by `code`, ValueSet compose rules, and StructureDefinition elements by `id` follow metadata.md's table. Every other change is major.
   - **`semver::check(latest, next, content)`:** it refuses an artefact whose own new version understates those changes (`ArtefactUnderstated`).
   - **Decision:** the JSON diff sits in `health-packages`, not the domain, because `serde_json` is not on the domain allowlist. The domain keeps `ContentChange` and the decision.
+- 2026-11-04: #88 part 2 merged (#296). Part 3 is split: 3a is central's storage and use cases (this), and 3b the `central-server` commands. Part 3a:
+  - **`health-packages`:** publication in steps: `pack` (unsigned, no rules), `check`, `sign` and `unpack`. `publish` is now the three in one.
+  - **Migration `0027_package_lifecycle`** (owned by configuration) has three tables:
+    - `package_lifecycle`, changed only by compare-and-set on `revision`;
+    - `package_lifecycle_record`, appended;
+    - `published_package`, created once.
+  - **New crate `health-publication`:** `Publications` with `draft`, `submit` (validation and simulation run at once), `review`, `approve`, `request_changes` and `publish`. Every transition is audited in its transaction.
+    - Tarballs are blobs in `health-files`, and the draft's sha-256 is what is approved and signed.
+    - Validation applies the rules, the schemas, and the package and artefact semver checks against the latest published version.
+    - **Decision:** simulation runs through a `Sandbox` port; `NoSandbox` runs no case until #101.

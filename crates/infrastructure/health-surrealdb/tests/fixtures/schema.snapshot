@@ -1104,6 +1104,16 @@ DEFINE TABLE outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD op_id ON outbox TYPE string PERMISSIONS FULL
   DEFINE FIELD payload ON outbox TYPE string PERMISSIONS FULL
   DEFINE INDEX outbox_created_at ON outbox FIELDS created_at
+DEFINE TABLE package_lifecycle TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON package_lifecycle TYPE string PERMISSIONS FULL
+  DEFINE FIELD package ON package_lifecycle TYPE string PERMISSIONS FULL
+  DEFINE FIELD revision ON package_lifecycle TYPE int PERMISSIONS FULL
+  DEFINE FIELD stage ON package_lifecycle TYPE string PERMISSIONS FULL
+  DEFINE INDEX package_lifecycle_package ON package_lifecycle FIELDS package
+DEFINE TABLE package_lifecycle_record TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON package_lifecycle_record TYPE string PERMISSIONS FULL
+  DEFINE FIELD lifecycle ON package_lifecycle_record TYPE string PERMISSIONS FULL
+  DEFINE INDEX package_lifecycle_record_lifecycle ON package_lifecycle_record FIELDS lifecycle
 DEFINE TABLE patient TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON patient TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON patient TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -1249,6 +1259,10 @@ DEFINE TABLE provenance_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON provenance_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON provenance_history TYPE int PERMISSIONS FULL
   DEFINE INDEX provenance_history_last_updated ON provenance_history FIELDS last_updated, version_seq
+DEFINE TABLE published_package TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON published_package TYPE string PERMISSIONS FULL
+  DEFINE FIELD package ON published_package TYPE string PERMISSIONS FULL
+  DEFINE INDEX published_package_package ON published_package FIELDS package
 DEFINE TABLE questionnaire TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON questionnaire TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON questionnaire TYPE array<record> DEFAULT [] PERMISSIONS FULL

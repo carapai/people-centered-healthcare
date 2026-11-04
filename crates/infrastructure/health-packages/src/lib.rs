@@ -1,6 +1,9 @@
 //! Published Definition packages on disk and in transit (ADR 0024; configuration.md § Package
 //! format, § Signing).
 //!
+//! - [`pack`], [`check`] and [`sign`] are publication in steps, for central's lifecycle (#88): a
+//!   draft is packed and kept unsigned, checked at validation, and signed once approved.
+//!   [`unpack`] reads back a tarball central packed.
 //! - [`publish`] packs a package's files into a deterministic tarball with a generated
 //!   `.index.json`, refuses it if any publication rule fails (an unpinned dependency, among
 //!   others: [`health_configuration::package`]) or any `configuration/` file does not validate
@@ -116,6 +119,82 @@ pub struct Published {
     pub signature: String,
 }
 
+/// A package packed but not signed: what central keeps while it moves through the publication
+/// lifecycle (#88). Its [`Digest`] is the fingerprint reviewers and approvers act on, and the one
+/// publication signs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Packed {
+    /// `name@version`.
+    pub id: String,
+    /// What it holds.
+    pub contents: PackageContents,
+    /// Its files, with the generated `.index.json`.
+    pub files: Files,
+    /// The deterministic tarball.
+    pub tgz: Vec<u8>,
+    /// Its sha-256.
+    pub digest: Digest,
+}
+
+/// Packs `files` (paths under `package/`; any `.index.json` is replaced) into a deterministic
+/// tarball, checking no publication rule: a draft may break them until validation.
+pub fn pack(files: &Files) -> Result<Packed, Error> {
+    let mut files = files.clone();
+    files.remove(INDEX);
+    let index = contents::index(&files)?;
+    files.insert(INDEX.to_owned(), index);
+    let contents = contents::read(&files)?;
+    let tgz = archive::write(&files)?;
+    Ok(Packed {
+        id: contents.id(),
+        digest: Digest::of(&tgz),
+        contents,
+        files,
+        tgz,
+    })
+}
+
+/// Unpacks a tarball central packed itself, within `limits`. No signature or rule is checked:
+/// [`verify`] is for packages from elsewhere.
+pub fn unpack(tgz: &[u8], limits: Limits) -> Result<Packed, Error> {
+    let files = archive::read(tgz, limits)?;
+    let contents = contents::read(&files)?;
+    Ok(Packed {
+        id: contents.id(),
+        digest: Digest::of(tgz),
+        contents,
+        files,
+        tgz: tgz.to_vec(),
+    })
+}
+
+/// Refuses `packed` if any publication rule fails, or any `configuration/` file does not
+/// validate against `schemas`.
+pub fn check(packed: &Packed, schemas: &Schemas) -> Result<(), Error> {
+    let problems = packed.contents.problems_for_publication();
+    if !problems.is_empty() {
+        return Err(Error::NotPublishable(problems));
+    }
+    schemas.check(&packed.files)
+}
+
+/// Signs `packed` with `signer` at `at`, after checking it again.
+pub fn sign(
+    packed: &Packed,
+    schemas: &Schemas,
+    signer: &dyn PublicationSigner,
+    at: Timestamp,
+) -> Result<Published, Error> {
+    check(packed, schemas)?;
+    let signature = signature::sign(&packed.digest, signer, at)?;
+    Ok(Published {
+        id: packed.id.clone(),
+        tgz: packed.tgz.clone(),
+        digest: packed.digest,
+        signature,
+    })
+}
+
 /// Packs `files` (paths under `package/`; any `.index.json` is replaced), checks the
 /// publication rules and `configuration/` against `schemas`, and signs with `signer` at `at`.
 pub fn publish(
@@ -124,25 +203,7 @@ pub fn publish(
     signer: &dyn PublicationSigner,
     at: Timestamp,
 ) -> Result<Published, Error> {
-    let mut files = files.clone();
-    files.remove(INDEX);
-    let index = contents::index(&files)?;
-    files.insert(INDEX.to_owned(), index);
-    let package = contents::read(&files)?;
-    let problems = package.problems_for_publication();
-    if !problems.is_empty() {
-        return Err(Error::NotPublishable(problems));
-    }
-    schemas.check(&files)?;
-    let tgz = archive::write(&files)?;
-    let digest = Digest::of(&tgz);
-    let signature = signature::sign(&digest, signer, at)?;
-    Ok(Published {
-        id: package.id(),
-        tgz,
-        digest,
-        signature,
-    })
+    sign(&pack(files)?, schemas, signer, at)
 }
 
 /// A package that passed verification: safe to stage.
