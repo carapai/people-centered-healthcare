@@ -35,6 +35,7 @@ health-publication = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
+health-workflow = { workspace = true }
 jiff = { workspace = true }
 p256 = { workspace = true }
 serde = { workspace = true }

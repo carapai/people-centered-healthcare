@@ -82,6 +82,12 @@ impl Definitions for BTreeMap<String, Arc<Compiled>> {
     }
 }
 
+impl<D: Definitions + ?Sized> Definitions for Arc<D> {
+    fn definition(&self, definition: &str) -> Option<Arc<Compiled>> {
+        (**self).definition(definition)
+    }
+}
+
 /// One typed action to carry out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionCall {

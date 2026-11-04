@@ -34,9 +34,12 @@ health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
 health-terminology = { workspace = true }
 health-time = { workspace = true }
+health-workflow = { workspace = true }
+health-workflow-app = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }

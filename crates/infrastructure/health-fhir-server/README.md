@@ -38,6 +38,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `POST /gs1`: reads a scanned or printed DataMatrix.
   - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
   - Over `health-inventory-app`.
+- **Workflows (#99):** `with_workflows(WorkflowConfig)` and `workflow_router()`, behind `subject_layer`. Central nests it at `/api/workflow`.
+  - **Permissions:** `workflow.work` to start instances, read worklists and Tasks, claim, release and complete steps; `workflow.supervise` to reassign, escalate and cancel.
+  - **Routes:** `POST /instances`; `GET /instances/{id}/tasks`; `POST /instances/{id}/events`; `POST /instances/{id}/cancel`; `POST /instances/{id}/tasks/{state}/{claim|release|reassign|escalate}`; `GET /worklists/{key}`; `GET /definitions`. Each command carries the client's `opId`, and the signed-in account is the actor.
+  - **Events offered:** each task lists the events its state's transitions take.
+  - **Not wired yet:** guards and typed actions. `WorkflowConfig::new` refuses definitions that use them, and so does any check they fail at publication.
 - **Payments (#254):** `with_payments(PaymentConfig)` and `payments_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/payments`.
   - **Permissions:** `payments.cash` (cashiers), `payments.supervise` (variance approval, statements, voids) and `payments.refund`.
   - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.
