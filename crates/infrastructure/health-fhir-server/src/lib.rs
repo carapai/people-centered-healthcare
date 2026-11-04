@@ -64,6 +64,7 @@ mod ops;
 mod outcome;
 mod payments;
 mod portal;
+mod pricing;
 mod references;
 mod registry;
 mod search;
@@ -92,6 +93,10 @@ pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
 pub use outcome::{FhirError, operation_outcome};
 pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_PERMISSION};
+pub use pricing::{
+    APPROVE_PERMISSION as PRICING_APPROVE_PERMISSION, MANAGE_PERMISSION as PRICING_PERMISSION,
+    PricingConfig, QUOTE_PERMISSION as PRICING_QUOTE_PERMISSION,
+};
 pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
@@ -119,6 +124,7 @@ pub struct FhirServer {
     terminology: Option<terminology::ActiveTerminology>,
     profiles: Option<validation::ActiveProfiles>,
     workflows: Option<Arc<workflow::WorkflowConfig>>,
+    pricing: Option<Arc<pricing::PricingConfig>>,
 }
 
 impl FhirServer {
@@ -144,6 +150,7 @@ impl FhirServer {
             terminology: None,
             profiles: None,
             workflows: None,
+            pricing: None,
         }
     }
 

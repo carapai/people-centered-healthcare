@@ -62,6 +62,8 @@ pub(crate) struct AuthSettings {
     pub(crate) kms: Option<Arc<LocalKeyWrap>>,
     /// The workflows central runs (#99), from the development definitions file.
     pub(crate) workflows: Option<health_fhir_server::WorkflowConfig>,
+    /// Price Books and rules (#120), kept at central in the ledger's functional currency.
+    pub(crate) pricing: health_fhir_server::PricingConfig,
 }
 
 /// The patient portal's phone sign-in.
@@ -314,8 +316,16 @@ pub(crate) fn routes(
                     subject_layer,
                 )),
         );
-        let (fhir, reviews, portal, stock, payments, workflows) =
-            fhir(fhir_store, settings, policy, subjects);
+        let Routes {
+            fhir,
+            reviews,
+            portal,
+            stock,
+            payments,
+            workflows,
+            pricing,
+        } = fhir(fhir_store, settings, policy, subjects);
+        api = api.nest("/pricing", pricing);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -473,19 +483,30 @@ fn sensitive(policy: &AccessPolicy) -> Vec<(String, String)> {
         .collect()
 }
 
+/// The routes built over the FHIR server, each behind its own layer.
+struct Routes {
+    /// `/fhir`.
+    fhir: Router,
+    /// The registry review queue, with the registry.
+    reviews: Option<Router>,
+    /// The portal, with the registry.
+    portal: Option<Router>,
+    /// Stock.
+    stock: Router,
+    /// Payments, with tills.
+    payments: Option<Router>,
+    /// Workflows, with development definitions.
+    workflows: Option<Router>,
+    /// Price Books and rules.
+    pricing: Router,
+}
+
 fn fhir(
     store: SurrealStore,
     settings: &AuthSettings,
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
-) -> (
-    Router,
-    Option<Router>,
-    Option<Router>,
-    Router,
-    Option<Router>,
-    Option<Router>,
-) {
+) -> Routes {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
@@ -548,20 +569,24 @@ fn fhir(
         .workflows
         .as_ref()
         .map(|_| fhir.workflow_router().layer(layer.clone()));
+    // Price Books and rules (#120): edited and approved at central only.
+    fhir = fhir.with_pricing(settings.pricing.clone());
+    let pricing = fhir.pricing_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
         .payments
         .as_ref()
         .map(|_| fhir.payments_router().layer(layer.clone()));
-    (
-        fhir.router().layer(layer),
+    Routes {
+        fhir: fhir.router().layer(layer),
         reviews,
         portal,
         stock,
         payments,
         workflows,
-    )
+        pricing,
+    }
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -598,6 +623,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/stock/{*rest}", service.clone())
         .route_service("/api/payments/{*rest}", service.clone())
         .route_service("/api/workflow/{*rest}", service.clone())
+        .route_service("/api/pricing/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
@@ -631,6 +657,9 @@ mod tests {
             issuing_ca: None,
             kms: None,
             workflows: None,
+            pricing: health_fhir_server::PricingConfig {
+                currency: "UGX".into(),
+            },
             node_code: "C1".parse().expect("node code"),
         }
     }

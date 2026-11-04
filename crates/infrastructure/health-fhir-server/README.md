@@ -38,6 +38,15 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `POST /gs1`: reads a scanned or printed DataMatrix.
   - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
   - Over `health-inventory-app`.
+- **Pricing (#120):** `with_pricing(PricingConfig)` and `pricing_router()`, behind `subject_layer`. Central nests it at `/api/pricing`.
+  - **Permissions:**
+    - `pricing.manage` drafts and lists Price Books and rules;
+    - `pricing.approve` approves and retires them, and the author may not approve their own draft;
+    - `pricing.quote` prices a charge.
+  - **Routes:** `GET|POST /books`, `GET|POST /rules`, `POST /books/{id}/{version}/{approve|retire}`, `POST /rules/{id}/{version}/{approve|retire}`, `POST /quote`.
+  - **Quotes:**
+    - each line's applicability is evaluated with the server's FHIRPath engine, before pricing, against the FHIR resource `context` gives for that line (an empty Parameters otherwise);
+    - an expression must give a Boolean, an empty result does not apply, and anything else refuses the quote.
 - **Workflows (#99):** `with_workflows(WorkflowConfig)` and `workflow_router()`, behind `subject_layer`. Central nests it at `/api/workflow`.
   - **Permissions:** `workflow.work` to start instances, read worklists and Tasks, claim, release and complete steps; `workflow.supervise` to reassign, escalate and cancel.
   - **Routes:** `POST /instances`; `GET /instances/{id}/tasks`; `POST /instances/{id}/events`; `POST /instances/{id}/cancel`; `POST /instances/{id}/tasks/{state}/{claim|release|reassign|escalate}`; `GET /worklists/{key}`; `GET /definitions`. Each command carries the client's `opId`, and the signed-in account is the actor.

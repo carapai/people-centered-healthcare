@@ -223,6 +223,12 @@ fn auth_settings(
             .map(auth::read_kms_key)
             .transpose()?
             .map(|key| Arc::new(health_provisioning::LocalKeyWrap::new(&key))),
+        pricing: health_fhir_server::PricingConfig {
+            currency: health_financial_ledger::Currency::from_code(&files.currency)
+                .map_err(|_| "HEALTH_CURRENCY is not an ISO 4217 code")?
+                .code()
+                .to_owned(),
+        },
         workflows: files
             .dev_workflow_definitions
             .as_deref()

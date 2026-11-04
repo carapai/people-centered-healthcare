@@ -12,6 +12,9 @@
 //! - **Pricing** ([`Pricing::price`], [`Pricing::check`]): a charge priced through the six
 //!   stages from every version kept, and the authority's check of the versions a charge records.
 //!
+//! - **FHIR:** approving or retiring a version writes its ChargeItemDefinitions ([`fhir`]) in the
+//!   same transaction.
+//!
 //! Each step is one transaction. Who may draft and approve is the caller's permission check.
 
 use health_persistence::{Store, StoreError, Transaction, WriteError};
@@ -21,6 +24,8 @@ use health_pricing::{
 };
 use health_time::{Clock, Timestamp};
 use std::sync::Arc;
+
+pub mod fhir;
 
 /// Why a pricing use case failed. Nothing was kept.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -58,6 +63,7 @@ impl From<WriteError> for PricingAppError {
 pub struct Pricing<S> {
     store: S,
     clock: Arc<dyn Clock>,
+    currency: String,
 }
 
 /// The version a draft takes: the latest version while it is still a draft (replaced), else the
@@ -79,9 +85,20 @@ where
     S: Store,
     S::Tx: PricingStore,
 {
-    /// The use cases over `store`, timed by `clock`.
-    pub fn new(store: S, clock: Arc<dyn Clock>) -> Self {
-        Self { store, clock }
+    /// The use cases over `store`, timed by `clock`, in the ledger's functional `currency`.
+    pub fn new(store: S, clock: Arc<dyn Clock>, currency: &str) -> Self {
+        Self {
+            store,
+            clock,
+            currency: currency.to_owned(),
+        }
+    }
+
+    async fn project_book(&self, tx: &mut S::Tx, book: &PriceBook) -> Result<(), PricingAppError> {
+        for entry in &book.entries {
+            fhir::put(tx, fhir::entry(book, entry)).await?;
+        }
+        Ok(())
     }
 
     /// Drafts `book` by `author`: the next version, or a replacement of the latest draft.
@@ -153,6 +170,7 @@ where
             .ok_or_else(|| PricingAppError::NotFound(format!("{id}|{version}")))?;
         let approved = approve_book(book, &all, by, self.clock.now())?;
         tx.put_book(&approved).await?;
+        self.project_book(&mut tx, &approved).await?;
         tx.commit().await?;
         Ok(approved)
     }
@@ -172,6 +190,7 @@ where
             .ok_or_else(|| PricingAppError::NotFound(format!("{id}|{version}")))?;
         let approved = approve_rule(rule, &all, by, self.clock.now())?;
         tx.put_rule(&approved).await?;
+        fhir::put(&mut tx, fhir::rule(&approved, &self.currency)).await?;
         tx.commit().await?;
         Ok(approved)
     }
@@ -191,6 +210,7 @@ where
             .ok_or_else(|| PricingAppError::NotFound(format!("{id}|{version}")))?;
         let retired = retire_book(book, to, self.clock.now())?;
         tx.put_book(&retired).await?;
+        self.project_book(&mut tx, &retired).await?;
         tx.commit().await?;
         Ok(retired)
     }
@@ -210,6 +230,7 @@ where
             .ok_or_else(|| PricingAppError::NotFound(format!("{id}|{version}")))?;
         let retired = retire_rule(rule, to, self.clock.now())?;
         tx.put_rule(&retired).await?;
+        fhir::put(&mut tx, fhir::rule(&retired, &self.currency)).await?;
         tx.commit().await?;
         Ok(retired)
     }
@@ -224,7 +245,7 @@ where
     pub async fn price(
         &self,
         request: &Request,
-        applicability: &dyn Applicability,
+        applicability: &(dyn Applicability + Sync),
     ) -> Result<Priced, PricingAppError> {
         let (books, rules) = self.catalogue().await?;
         Ok(price(request, &books, &rules, applicability)?)

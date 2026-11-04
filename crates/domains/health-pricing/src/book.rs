@@ -61,10 +61,11 @@ impl Effective {
 }
 
 /// Where a book or rule is in its life.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "status")]
 pub enum Approval {
     /// Being edited.
+    #[default]
     Draft,
     /// Approved, and immutable from then on.
     Approved {
@@ -102,7 +103,8 @@ pub struct Entry {
 pub struct PriceBook {
     /// Its id.
     pub id: String,
-    /// Its version.
+    /// Its version (assigned when drafted).
+    #[serde(default)]
     pub version: u32,
     /// Where it applies.
     pub scope: Scope,
@@ -110,7 +112,8 @@ pub struct PriceBook {
     pub currency: String,
     /// When it is in effect.
     pub effective: Effective,
-    /// Its approval.
+    /// Its approval: a draft until approved.
+    #[serde(default)]
     pub approval: Approval,
     /// Who drafted it: they may not approve it.
     #[serde(default)]
@@ -164,7 +167,8 @@ pub enum Adjustment {
 pub struct PriceRule {
     /// Its id.
     pub id: String,
-    /// Its version.
+    /// Its version (assigned when drafted).
+    #[serde(default)]
     pub version: u32,
     /// Its stage.
     pub stage: Stage,
@@ -180,7 +184,8 @@ pub struct PriceRule {
     pub adjustment: Adjustment,
     /// When it is in effect.
     pub effective: Effective,
-    /// Its approval.
+    /// Its approval: a draft until approved.
+    #[serde(default)]
     pub approval: Approval,
     /// Who drafted it: they may not approve it.
     #[serde(default)]
