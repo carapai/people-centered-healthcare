@@ -217,3 +217,87 @@ async fn each_pinned_profile_keeps_r5_cardinalities() {
     claim.as_object_mut().expect("object").remove("status");
     fails_at(&claim, "PlatformClaim", "Claim.status").await;
 }
+
+/// A terminology that knows the template modes and the HL7 library types, and nothing else.
+struct Known;
+
+impl health_fhir_validation::Bindings for Known {
+    fn member(
+        &self,
+        value_set: &str,
+        _system: Option<&str>,
+        code: &str,
+    ) -> health_fhir_validation::Membership {
+        use health_fhir_validation::Membership;
+        let value_set = value_set.split('|').next().unwrap_or_default();
+        if value_set.ends_with("/ValueSet/template-modes") {
+            if ["managed", "seed"].contains(&code) {
+                Membership::In
+            } else {
+                Membership::NotIn
+            }
+        } else if value_set == "http://hl7.org/fhir/ValueSet/library-type" {
+            // The platform's own Library types are not HL7's: an extensible binding not met.
+            Membership::NotIn
+        } else {
+            Membership::Unknown(format!("{value_set} is not held"))
+        }
+    }
+}
+
+async fn tier4(resource: &Value, profile: &str) -> Vec<Issue> {
+    validator()
+        .with_bindings(Arc::new(Known))
+        .validate(resource, &[format!("{BASE}/{profile}")])
+        .await
+}
+
+#[tokio::test]
+async fn a_required_binding_not_met_is_an_error() {
+    use health_fhir_validation::{IssueCode, Severity};
+    let mapping = example("Library-anc-visit-mapping.json");
+    let errors: Vec<Issue> = tier4(&mapping, "ExtractionMappingLibrary")
+        .await
+        .into_iter()
+        .filter(|i| i.severity == Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+
+    let mut unknown_mode = mapping;
+    unknown_mode["contained"][0]["extension"][0]["extension"][0]["valueCode"] = json!("sometimes");
+    let found = tier4(&unknown_mode, "ExtractionMappingLibrary").await;
+    let invalid: Vec<&Issue> = found
+        .iter()
+        .filter(|i| i.severity == Severity::Error && i.code == IssueCode::CodeInvalid)
+        .collect();
+    assert_eq!(invalid.len(), 1, "{found:?}");
+    assert!(invalid[0].message.contains("template-modes"), "{invalid:?}");
+}
+
+#[tokio::test]
+async fn other_bindings_and_unchecked_ones_are_warnings() {
+    use health_fhir_validation::{IssueCode, Severity};
+    let found = tier4(
+        &example("Library-patient-matching-rules.json"),
+        "MatchingRulesLibrary",
+    )
+    .await;
+    assert!(
+        found.iter().all(|i| i.severity == Severity::Warning),
+        "only warnings: {found:?}"
+    );
+    // Library.type is bound extensibly to HL7's library types, which the platform's are not.
+    assert!(
+        found
+            .iter()
+            .any(|i| i.code == IssueCode::CodeInvalid && i.location == "Library.type"),
+        "{found:?}"
+    );
+    // Library.status is bound required to a value set this terminology does not hold.
+    assert!(
+        found
+            .iter()
+            .any(|i| i.code == IssueCode::Processing && i.location == "Library.status"),
+        "{found:?}"
+    );
+}

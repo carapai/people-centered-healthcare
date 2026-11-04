@@ -23,7 +23,7 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value};
 
 use crate::fhirpath::{FhirPathEngine, FhirPathItem};
-use crate::structure::{Issue, IssueCode, Table, is_primitive, resolve, table};
+use crate::structure::{Issue, IssueCode, Severity, Table, is_primitive, resolve, table};
 
 /// Invariants not evaluated, with why. Each is an engine limitation found on the official R5
 /// examples. Removing one must keep the corpus test passing.
@@ -140,6 +140,7 @@ pub async fn validate_invariants(engine: &dyn FhirPathEngine, resource: &Value) 
         let here = at.clone().unwrap_or_else(|| resource_type.clone());
         if let Some(location) = unrepresentable_decimal(&resource, &here) {
             issues.push(Issue {
+                severity: Severity::Error,
                 code: IssueCode::Processing,
                 location,
                 message: "a decimal has more than 28 significant digits, so the invariants cannot be evaluated exactly".into(),
@@ -156,11 +157,13 @@ pub async fn validate_invariants(engine: &dyn FhirPathEngine, resource: &Value) 
             match result {
                 Ok(items) if holds(&items) => {}
                 Ok(_) => issues.push(Issue {
+                    severity: Severity::Error,
                     code: IssueCode::Invariant,
                     location: check.location.clone(),
                     message: format!("{}: {}", check.key, check.human),
                 }),
                 Err(failure) => issues.push(Issue {
+                    severity: Severity::Error,
                     code: IssueCode::Processing,
                     location: check.location.clone(),
                     message: format!("{} could not be evaluated: {failure}", check.key),

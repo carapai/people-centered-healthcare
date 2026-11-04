@@ -20,6 +20,11 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
 - **`SnapshotValidator`** is the `ProfileValidator` over a `ProfileSet`: cardinality, `fixed[x]`/`pattern[x]`, types, target profiles, extension definitions and contexts, profile invariants (with a `FhirPathEngine`), and slicing with the `value`, `pattern`, `exists`, `type` and `profile` discriminators and the `closed`, `open`, `openAtEnd` and `ordered` rules.
   - **Extension slices** discriminated by `url` may name their extension through their type's profile, as the HL7 snapshot generator writes them, rather than a fixed `url` (#87).
   - **Resource slots** (`contained`, `Bundle.entry.resource`) type each value by its own `resourceType`, so a contained resource's extensions are checked against their definitions (#87).
+- **Tier 4, bindings (#91):** `SnapshotValidator::with_bindings(Arc<dyn Bindings>)` also checks each coded value against its element's binding. `Bindings::member(value_set, system, code)` is answered by the node's own terminology (#90).
+  - **What is checked:** a `code` is looked up without a system and a `Coding` with its own. A `CodeableConcept` passes when any of its codings is in the value set; text alone does not pass.
+  - **Required:** a code not in the value set is an error (`code-invalid`), and one the node cannot check offline is a warning.
+  - **Extensible and preferred:** a code not in the value set is a warning. Example bindings are not checked.
+  - **`Issue::severity`** is `Error` or `Warning`, and only errors refuse a resource.
 - **`skeleton(type)`** builds a minimal instance of any resource type that passes tiers 1 and 2, for tests and tooling.
 
 ## Tests
@@ -36,6 +41,7 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
   - custom profiles (`tests/fixtures/custom-profiles/`) for every slicing rule and discriminator, patterns, types, targets, extension values and contexts, and invariants;
   - compile refusals, including a differential-only profile;
   - with `HEALTH_FHIR_R5_EXAMPLES` set, every official example that claims one of the profiles.
+- `tests/core_package.rs` also checks tier 4 with a terminology that knows the template modes: an unknown template mode is a `code-invalid` error, the platform's Library type against HL7's extensible `library-type` is a warning, and an unheld required value set (`Library.status`) is a warning.
 - `tests/core_package.rs` compiles the platform core package's committed snapshots (`packages/fhir-core-package/package/`, #87):
   - each profile's example passes tiers 1–3;
   - a definition without its version, a Library of another platform type or content type, and a Library without content fail;

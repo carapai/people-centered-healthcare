@@ -44,7 +44,7 @@ impl FhirError {
                 .iter()
                 .map(|issue| {
                     json!({
-                        "severity": "error",
+                        "severity": issue.severity.as_str(),
                         "code": issue.code.as_str(),
                         "diagnostics": issue.message,
                         "expression": [issue.location],

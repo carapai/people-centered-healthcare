@@ -32,6 +32,8 @@ pub enum IssueCode {
     /// The resource could not be validated, e.g. a decimal beyond 28 significant digits that
     /// FHIRPath cannot evaluate exactly; it fails closed.
     Processing,
+    /// A code is not in the value set it is bound to (tier 4).
+    CodeInvalid,
 }
 
 impl IssueCode {
@@ -43,13 +45,37 @@ impl IssueCode {
             Self::Value => "value",
             Self::Invariant => "invariant",
             Self::Processing => "processing",
+            Self::CodeInvalid => "code-invalid",
         }
     }
 }
 
-/// One validation error.
+/// How serious an issue is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Severity {
+    /// The resource is refused.
+    #[default]
+    Error,
+    /// The resource is accepted, and the issue reported: an extensible or preferred binding
+    /// not met, or a required binding the node could not check offline (tier 4).
+    Warning,
+}
+
+impl Severity {
+    /// The OperationOutcome severity.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+        }
+    }
+}
+
+/// One validation issue: an error unless it says otherwise.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Issue {
+    /// How serious it is.
+    pub severity: Severity,
     /// The kind of problem.
     pub code: IssueCode,
     /// Where, as a FHIRPath expression, e.g. `Patient.name[0].given[1]`.
@@ -201,6 +227,7 @@ pub fn validate_structure(json: &str) -> Vec<Issue> {
     match serde_json::from_str::<Value>(json) {
         Ok(value) => validate_value(&value),
         Err(error) => vec![Issue {
+            severity: Severity::Error,
             code: IssueCode::Structure,
             location: String::new(),
             message: format!("not valid JSON: {error}"),
@@ -248,6 +275,7 @@ pub(crate) fn is_primitive(type_code: &str) -> bool {
 impl Walker {
     fn issue(&mut self, code: IssueCode, location: &str, message: impl Into<String>) {
         self.issues.push(Issue {
+            severity: Severity::Error,
             code,
             location: location.to_owned(),
             message: message.into(),

@@ -8,18 +8,23 @@
 //!   `octofhir-fhirpath` (ADR 0052) over a model provider built from the same element table.
 //! - **Tier 3, profiles** ([`SnapshotValidator`], behind [`ProfileValidator`]) checks a
 //!   resource against compiled StructureDefinition snapshots ([`ProfileSet`], ADR 0053).
-//! - Tier 4 (terminology) arrives with its own task.
+//! - **Tier 4, terminology:** the same walk checks each coded value against its element's
+//!   binding through the [`Bindings`] port, which the node's terminology answers. A required
+//!   binding not met is an error, an extensible or preferred one a warning
+//!   ([`Severity::Warning`]), and a required binding the node cannot check offline a warning.
 
+mod bindings;
 mod fhirpath;
 mod invariants;
 mod profile;
 mod structure;
 
+pub use bindings::{Bindings, Membership, Strength};
 pub use fhirpath::{
     FhirPathEngine, FhirPathFailure, FhirPathItem, OctofhirEngine, Results, TableModelProvider,
 };
 pub use invariants::{KNOWN_ENGINE_GAPS, validate_invariants};
 pub use profile::{CompileError, ProfileSet, ProfileValidator, SnapshotValidator};
 pub use structure::{
-    Issue, IssueCode, resource_types, skeleton, validate_structure, validate_value,
+    Issue, IssueCode, Severity, resource_types, skeleton, validate_structure, validate_value,
 };
