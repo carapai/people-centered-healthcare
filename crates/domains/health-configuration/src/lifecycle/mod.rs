@@ -140,7 +140,7 @@ pub struct Record {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Refused {
     /// Not possible from the current stage.
-    #[error("not possible while the package is in {0}")]
+    #[error("not possible at the {0} stage")]
     Stage(Stage),
     /// Who acted, a reason or a fingerprint was missing.
     #[error("who acted, and why where a reason is needed, must be given")]

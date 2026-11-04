@@ -342,3 +342,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - Tarballs are blobs in `health-files`, and the draft's sha-256 is what is approved and signed.
     - Validation applies the rules, the schemas, and the package and artefact semver checks against the latest published version.
     - **Decision:** simulation runs through a `Sandbox` port; `NoSandbox` runs no case until #101.
+- 2026-11-04: #88 part 3a merged (#297). Part 3b, `central-server package draft | submit | review | approve | request-changes | publish | status | list | export`:
+  - **Settings:** `HEALTH_BLOB_DIR`, and for publishing `HEALTH_PUBLICATION_KEY_FILE` and `HEALTH_PUBLICATION_CHAIN_FILE`.
+  - **Output:** refusals print their message.
+  - **Run by hand** against SurrealDB with a test root and publication certificate from `tools/pki`:
+    - an author is refused as reviewer;
+    - publishing without the key is refused;
+    - with one approval, a configuration package publishes and exports its tarball and signature;
+    - re-drafting it is refused;
+    - a 1.0.1 that removes a code under a patch bump of its CodeSystem returns to Draft, naming `concept[clerk] (removed, major)`.
+
+  This completes #88.
