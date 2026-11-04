@@ -12,6 +12,7 @@
 //! A package is identified by `name@version` and its sha-256 ([`Digest`]).
 
 mod archive;
+pub mod bump;
 mod contents;
 mod schemas;
 mod signature;

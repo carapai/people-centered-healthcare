@@ -12,8 +12,9 @@
 //! | A `configuration/` file is removed | major |
 //! | A `tests/` file is added, changed or removed | patch |
 //!
-//! Whether each artefact's own bump matches its content (a removed item is major, a new optional
-//! one minor, a display text a patch) is a check on the artefact itself, not on the package.
+//! Each artefact's own bump is checked too, against the [`ContentChange`]s found in its content
+//! (`health-packages`' `bump` module reads the JSON): a removed item is major, a new optional
+//! one minor, a display text a patch.
 //!
 //! Also refused, whatever the bump:
 //! - a version no newer than the latest published one;
@@ -82,6 +83,35 @@ pub struct Pinned {
     pub version: String,
     /// Its content's fingerprint.
     pub fingerprint: String,
+}
+
+/// How something changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Nature {
+    /// It is new.
+    Added,
+    /// It is gone.
+    Removed,
+    /// It means something else.
+    Changed,
+    /// It allows less.
+    Tightened,
+    /// It allows more.
+    Relaxed,
+    /// Its wording changed.
+    Reworded,
+}
+
+/// One change in an artefact, with the bump it needs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContentChange {
+    /// Where, e.g. `item[vitals/bp].type` or `element[Patient.name].min`.
+    pub at: String,
+    /// How it changed.
+    pub nature: Nature,
+    /// The bump it needs.
+    pub bump: Bump,
 }
 
 /// What the check compares: one package version.
@@ -234,6 +264,24 @@ pub enum BumpProblem {
         /// The bump the changes need.
         required: Bump,
     },
+    /// An artefact's own version understates the changes in its content.
+    #[error(
+        "{url} went from {from} to {to}, a {actual} bump, but its changes need a {required} bump"
+    )]
+    ArtefactUnderstated {
+        /// Its canonical URL.
+        url: String,
+        /// The version before.
+        from: String,
+        /// The version after.
+        to: String,
+        /// The bump taken.
+        actual: Bump,
+        /// The bump its changes need.
+        required: Bump,
+        /// Every change found, with the bump each needs.
+        changes: Vec<ContentChange>,
+    },
     /// A published `url|version` with other content.
     #[error("{0} changed without a new version")]
     Rewritten(String),
@@ -305,8 +353,63 @@ fn file_bump(path: &str, removed: bool) -> Bump {
     }
 }
 
-/// Compares `next` with `latest`, the latest version published under the same name.
-pub fn check(latest: &Release, next: &Release) -> Result<Diff, Vec<BumpProblem>> {
+/// What `required` asks of a step from `from` to `to`: under major version zero, a minor bump
+/// covers a major change.
+fn needed(from: &Version, to: &Version, required: Bump) -> Bump {
+    if required == Bump::Major && from.major == 0 && to.major == 0 {
+        Bump::Minor
+    } else {
+        required
+    }
+}
+
+/// The bump `required` would need, if going from `from` to `to` understates it. Major version
+/// zero takes a minor bump for a major change, and a pre-release-only step takes anything.
+fn understated(from: &Version, to: &Version, required: Bump) -> Option<Bump> {
+    let required = needed(from, to, required);
+    let actual = Bump::between(from, to);
+    (actual != Bump::None && actual < required).then_some(required)
+}
+
+/// Checks an artefact's own new version against what changed in its content.
+fn own_bump(
+    url: &str,
+    before: &Pinned,
+    after: &Pinned,
+    changes: &[ContentChange],
+    problems: &mut Vec<BumpProblem>,
+) {
+    let (Ok(from), Ok(to)) = (
+        before.version.parse::<Version>(),
+        after.version.parse::<Version>(),
+    ) else {
+        return;
+    };
+    let required = changes
+        .iter()
+        .map(|change| change.bump)
+        .max()
+        .unwrap_or(Bump::None);
+    if let Some(required) = understated(&from, &to, required) {
+        problems.push(BumpProblem::ArtefactUnderstated {
+            url: url.to_owned(),
+            from: before.version.clone(),
+            to: after.version.clone(),
+            actual: Bump::between(&from, &to),
+            required,
+            changes: changes.to_vec(),
+        });
+    }
+}
+
+/// Compares `next` with `latest`, the latest version published under the same name. `content`
+/// holds what changed in each artefact's content, by canonical URL, for the artefacts that took a
+/// new version.
+pub fn check(
+    latest: &Release,
+    next: &Release,
+    content: &BTreeMap<String, Vec<ContentChange>>,
+) -> Result<Diff, Vec<BumpProblem>> {
     let mut problems = Vec::new();
     let mut changes = Vec::new();
 
@@ -334,6 +437,9 @@ pub fn check(latest: &Release, next: &Release) -> Result<Diff, Vec<BumpProblem>>
             }
             Some(after) => {
                 if let Some(bump) = versioned(url, &before.version, &after.version, &mut problems) {
+                    if let Some(found) = content.get(url) {
+                        own_bump(url, before, after, found, &mut problems);
+                    }
                     let change = Change::ArtefactVersion {
                         url: url.clone(),
                         from: before.version.clone(),
@@ -403,17 +509,17 @@ pub fn check(latest: &Release, next: &Release) -> Result<Diff, Vec<BumpProblem>>
         }
     }
 
-    let mut required = changes
-        .iter()
-        .map(|(_, bump)| *bump)
-        .max()
-        .unwrap_or(Bump::None);
-    if required == Bump::Major && latest.version.major == 0 && next.version.major == 0 {
-        required = Bump::Minor;
-    }
+    let required = needed(
+        &latest.version,
+        &next.version,
+        changes
+            .iter()
+            .map(|(_, bump)| *bump)
+            .max()
+            .unwrap_or(Bump::None),
+    );
     let actual = Bump::between(&latest.version, &next.version);
-    let pre_release_only = actual == Bump::None;
-    if !pre_release_only && actual < required {
+    if let Some(required) = understated(&latest.version, &next.version, required) {
         problems.push(BumpProblem::Understated {
             latest: latest.version.clone(),
             next: next.version.clone(),

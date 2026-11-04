@@ -41,7 +41,7 @@ The publication lifecycle at central (#88; configuration.md § Lifecycle; ADR 00
 
 ### `lifecycle::semver`
 
-The semver diff check (metadata.md § Versioning). **`check(latest, next)`** compares a version with the latest one published under its name. Each artefact has its own semver, so the package's bump follows from theirs:
+The semver diff check (metadata.md § Versioning). **`check(latest, next, content)`** compares a version with the latest one published under its name. Each artefact has its own semver, so the package's bump follows from theirs:
 
 | Change | Bump at least |
 |---|---|
@@ -58,7 +58,7 @@ The semver diff check (metadata.md § Versioning). **`check(latest, next)`** com
   - an artefact or dependency version that went down, or is not exact.
 - **Major version zero and pre-releases promise nothing:** between `0.y.z` versions a minor bump covers a major change, and between versions differing only in their pre-release any change goes.
 - **`Release::of(contents, fingerprints)`** reads a release from a package's contents, leaving out the generated `package.json`, `.index.json` and manifest.
-- **Not yet:** whether each artefact's own bump matches its content (a removed item or code is major, a new optional item minor, a display text a patch).
+- **Each artefact's own bump** is checked against what changed in its content: `check` takes those `ContentChange`s by canonical URL, and refuses an artefact whose new version understates them (`ArtefactUnderstated`). `health-packages`' `bump` module finds them in the JSON, since this crate reads no JSON.
 
 ## Tests
 
