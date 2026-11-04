@@ -460,11 +460,13 @@ impl<'a, G: Guards> Run<'a, G> {
                         None => transition.events.is_empty(),
                         Some(e) => transition.events.iter().any(|d| matches(d, &e.name)),
                     };
-                    let guard_ok = transition
-                        .guard
-                        .as_deref()
-                        .is_none_or(|g| self.guards.holds(g, event, &self.data));
-                    if event_ok && guard_ok {
+                    // The guard is evaluated only for a transition its event enables.
+                    let enabled_here = event_ok
+                        && transition
+                            .guard
+                            .as_deref()
+                            .is_none_or(|g| self.guards.holds(g, event, &self.data));
+                    if enabled_here {
                         let chosen = Chosen {
                             source: node,
                             index,

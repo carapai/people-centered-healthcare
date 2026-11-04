@@ -67,3 +67,13 @@ What the engine persists (#97; ADR 0044), through the unit of work's transaction
   - **Claims and escalation** live in reserved `task.<state>.*` data-model fields (`owner_field`, `claimed_field`, `priority_field`). A claim lapses once idle for the task's timeout, and escalation only ever raises priority.
   - `worklist(tasks, key)` lists a worklist's open tasks, most urgent first, then by arrival.
   - `TaskView::as_at(now)` drops a claim that has lapsed since the task was projected. `WorkflowStore::replace_tasks` and `open_tasks` keep the projections.
+
+## `simulation`
+
+Workflow simulation (#101): `simulate(definition, scenario)` runs a package `tests/` scenario on the same interpreter, with stubbed actions (recorded, never carried out) and guards stubbed by the scenario. Details:
+
+- **steps:** each step sends an event, or waits and fires the timers that fall due, earliest first;
+- **checks:** the configuration, the actions it ran, the pending timers, the open Tasks (via `worklists::project`) and `running`;
+- **failures:** each names its scenario and step, and an unstubbed guard fails the scenario.
+
+The interpreter evaluates a transition's guard only once its event matches.

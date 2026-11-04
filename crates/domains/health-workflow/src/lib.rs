@@ -14,6 +14,7 @@
 pub mod definition;
 mod interpreter;
 mod model;
+pub mod simulation;
 mod store;
 pub mod worklists;
 

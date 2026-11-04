@@ -176,6 +176,10 @@ stateDiagram-v2
 ## Simulation and publication gates
 
 - **Simulation** runs the same Rust engine in a sandbox with **stubbed actions**. Scenarios live in the package `tests/` folder: event sequences, with the expected configurations, Tasks, actions and timers.
+  - **The format** (#101; `health_workflow::simulation`): a JSON file with `"type": "workflow-scenario"`, a `name`, the `definition` (`url|version`), `guards` (each guard expression's stubbed outcome) and `steps`.
+  - **Steps:** each step sends an `event`, or `wait`s an ISO 8601 duration, firing the timers that fall due. It then checks its `expect`: `configuration`, the `actions` it ran, the pending `timers`' events, the open `tasks` (state and status) and `running`.
+  - **The first step** may send nothing, to check the instance as started.
+  - **An unstubbed guard** fails the scenario.
 - **Publication requires:**
   1. every scenario to pass;
   2. no unreachable states and no non-final states without an exit, checked statically;

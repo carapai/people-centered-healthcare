@@ -487,3 +487,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the screen does not show a colleague's identity, since `Subject.account` is an id.
 
   This completes #99.
+- 2026-11-04: #99 part 4 merged (#314), completing #99. #101, workflow simulation and publication gates:
+  - **`health_workflow::simulation`:** `tests/` scenarios (`"type": "workflow-scenario"`) run on the interpreter with stubbed actions and guards. Steps are events or waits that fire due timers, and each checks configuration, actions run, pending timers, open Tasks and `running`.
+  - **`health-publication::WorkflowSandbox`** runs every scenario at submission. Any failure, or a scenario naming a definition the package lacks, returns the package to Draft. Central now uses it instead of `NoSandbox`.
+  - **Acceptance criterion:** the static checks from #96 refuse a definition with an unreachable state at publication, and a publication test shows it.
+  - **Fix:** the interpreter now evaluates a transition's guard only when its event matches.
+  - **Decisions:**
+    - guards are stubbed by each scenario, and an unstubbed guard fails it;
+    - type-checking guards against data requirements waits for FHIRPath type inference over the data requirements, so it is not in this change.
+
+  This completes #101.

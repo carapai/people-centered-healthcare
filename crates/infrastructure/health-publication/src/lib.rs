@@ -14,8 +14,8 @@
 //!     (`health_packages::check`), then the semver check against the latest published version
 //!     of the package: the package's bump, and each changed artefact's own bump against its
 //!     content (`health_packages::bump`);
-//!   - **simulation:** the [`Sandbox`] runs the package's `tests/` cases. [`NoSandbox`] runs none
-//!     until the simulation sandbox exists (#101).
+//!   - **simulation:** the [`Sandbox`] runs the package's `tests/` cases: [`WorkflowSandbox`]
+//!     runs its workflow scenarios (#101). [`NoSandbox`] runs none.
 //!
 //!   Either failing returns the draft to Draft, with every problem in the record.
 //! - [`Publications::review`], [`Publications::approve`] and [`Publications::request_changes`]
@@ -44,6 +44,8 @@ use sha2::Digest as _;
 use uuid::Uuid;
 
 mod workflows;
+
+pub use workflows::WorkflowSandbox;
 
 pub use health_workflow_actions::ActionDescriptor;
 
@@ -79,7 +81,7 @@ pub trait Sandbox: Send + Sync {
     fn simulate(&self, package: &Packed) -> Vec<String>;
 }
 
-/// Runs no case: the simulation sandbox is #101. Until then simulation passes every package.
+/// Runs no case, so simulation passes every package: for tests of the other steps.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoSandbox;
 

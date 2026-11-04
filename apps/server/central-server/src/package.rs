@@ -25,7 +25,7 @@ use std::sync::Arc;
 use health_configuration::lifecycle::{Lifecycle, Record, Step};
 use health_files::FsBlobStore;
 use health_packages::Schemas;
-use health_publication::{Files, LocalSigner, NoSandbox, Publications};
+use health_publication::{Files, LocalSigner, Publications, WorkflowSandbox};
 use health_time::SystemClock;
 
 use crate::config::Config;
@@ -95,7 +95,7 @@ fn publications(store: health_surrealdb::SurrealStore) -> Result<Publications, F
         blobs,
         Arc::new(SystemClock),
         Schemas::platform(),
-        Arc::new(NoSandbox),
+        Arc::new(WorkflowSandbox),
         "central",
     ))
 }
