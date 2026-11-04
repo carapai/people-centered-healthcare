@@ -353,3 +353,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a 1.0.1 that removes a code under a patch bump of its CodeSystem returns to Draft, naming `concept[clerk] (removed, major)`.
 
   This completes #88.
+- 2026-11-04: #88 part 3b merged (#298), completing #88. #87, the platform core package:
+  - **Decisions (by the user):**
+    - the platform's canonical base is `https://carapai.github.io/people-centered-healthcare/fhir`;
+    - profiles are written in FSH, compiled by SUSHI, with snapshots from the HL7 validator in tooling.
+  - **Split:** part 1 is the ADR 0049 profiles, their extensions, the platform CodeSystem and the toolchain (this); part 2 is the locally pinned financial and inventory profiles.
+  - **Part 1:**
+    - **`packages/fhir-core-package`** (`health.platform.core@0.1.0`, national core): `ExtractionMappingLibrary`, `MatchingRulesLibrary`, `WorkflowDefinitionLibrary`, `ProgramPlanDefinition`, five extensions, `CodeSystem/platform` and `ValueSet/template-modes`, with examples.
+    - **`tools/fhir/build-core-package.sh`** builds it. CI rebuilds it in the Java job and fails on drift.
+    - **Tier 3 fixes** found by the package:
+      - an extension slice may name its extension by its type's profile, as HL7 snapshots do;
+      - a contained resource is typed by its own `resourceType`, so its extensions are checked.
+    - **Tests:** the package compiles and enforces its constraints, and publishes through the lifecycle with two approvers.

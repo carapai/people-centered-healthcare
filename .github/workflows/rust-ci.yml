@@ -245,6 +245,13 @@ jobs:
           key: fhir-packages-${{ hashFiles('tools/fhir/fetch-java-validator.sh') }}
       - run: tools/fhir/fetch-r5-examples.sh
       - run: tools/fhir/java-differential.sh target/fhir/r5-examples/json
+      # The core package's committed snapshots are what its FSH generates (#87; ADR 0053).
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: tools/fhir/build-core-package.sh
+      - name: The core package matches its sources
+        run: git diff --exit-code -- packages/fhir-core-package
       # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
       # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
       # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).

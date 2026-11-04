@@ -1,0 +1,36 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "art-program",
+  "meta": {
+    "profile": [
+      "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/ProgramPlanDefinition"
+    ]
+  },
+  "type": {
+    "coding": [
+      {
+        "code": "clinical-protocol",
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type"
+      }
+    ]
+  },
+  "extension": [
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/program-episode-type",
+      "valueCodeableConcept": {
+        "text": "HIV care"
+      }
+    },
+    {
+      "valueExpression": {
+        "language": "text/fhirpath",
+        "expression": "%patient.active"
+      },
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/program-eligibility"
+    }
+  ],
+  "url": "https://health.go.ug/fhir/PlanDefinition/art-program",
+  "version": "1.0.0",
+  "name": "ArtProgram",
+  "status": "active"
+}

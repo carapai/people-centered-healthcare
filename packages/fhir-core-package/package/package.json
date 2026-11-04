@@ -1,0 +1,18 @@
+{
+  "name": "health.platform.core",
+  "version": "0.1.0",
+  "canonical": "https://carapai.github.io/people-centered-healthcare/fhir",
+  "title": "Health platform core",
+  "description": "The platform core package (ADR 0049): the engine-native Published Definition profiles, their extensions, and the platform CodeSystem.",
+  "fhirVersions": [
+    "5.0.0"
+  ],
+  "dependencies": {
+    "hl7.fhir.r5.core": "5.0.0"
+  },
+  "kind": "national-core",
+  "platform": {
+    "minSoftware": "0.1.0",
+    "formatVersion": 1
+  }
+}

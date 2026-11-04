@@ -1,0 +1,41 @@
+{
+  "resourceType": "CodeSystem",
+  "status": "active",
+  "content": "complete",
+  "name": "PlatformCodes",
+  "id": "platform",
+  "title": "Health platform codes",
+  "description": "Codes the platform's engines define: the kinds of engine-native Published Definition carried as a Library, and the modes of an extraction template.",
+  "version": "0.1.0",
+  "url": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+  "concept": [
+    {
+      "code": "extraction-mapping",
+      "display": "Extraction Mapping",
+      "definition": "A Library of SDC templates stating which answers on a form become which clinical records."
+    },
+    {
+      "code": "matching-rules",
+      "display": "Matching Rules",
+      "definition": "A Library of the rules that find candidate matches for a patient."
+    },
+    {
+      "code": "workflow-definition",
+      "display": "Workflow Definition",
+      "definition": "A Library holding an engine-native statechart: the states, steps, timers and decisions of a process."
+    },
+    {
+      "code": "managed",
+      "display": "Managed",
+      "definition": "An extracted resource the form keeps governing: re-extraction versions it, and it is retracted when its answers disappear."
+    },
+    {
+      "code": "seed",
+      "display": "Seed",
+      "definition": "An extracted resource created once from the form, which then lives a life of its own."
+    }
+  ],
+  "experimental": false,
+  "caseSensitive": true,
+  "count": 5
+}
