@@ -43,6 +43,10 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
+mod workflows;
+
+pub use health_workflow_actions::ActionDescriptor;
+
 pub use health_packages::{Files, LocalSigner};
 
 /// Why a publication step failed.
@@ -122,6 +126,7 @@ pub struct Publications {
     sandbox: Arc<dyn Sandbox>,
     limits: Limits,
     observer: String,
+    actions: Arc<Vec<ActionDescriptor>>,
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -176,7 +181,17 @@ impl Publications {
             sandbox,
             limits: Limits::default(),
             observer: observer.into(),
+            actions: Arc::new(Vec::new()),
         }
+    }
+
+    /// These publications, checking Workflow Definitions against `actions`: every workflow
+    /// action the release knows (#96). Without it, a definition that executes any action fails
+    /// validation.
+    #[must_use]
+    pub fn with_actions(mut self, actions: Vec<ActionDescriptor>) -> Self {
+        self.actions = Arc::new(actions);
+        self
     }
 
     fn audit(&self, record: &Record, detail: &str) -> Value {
@@ -345,6 +360,7 @@ impl Publications {
             }
             Err(other) => problems.push(other.to_string()),
         }
+        problems.extend(workflows::problems(packed, &self.actions));
         let name = &packed.contents.package.name;
         let latest = self
             .published(tx, name)

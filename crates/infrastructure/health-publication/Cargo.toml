@@ -13,6 +13,7 @@ layer = "infrastructure"
 workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 health-audit = { workspace = true }
 health-configuration = { workspace = true }
 health-files = { workspace = true }
@@ -20,6 +21,8 @@ health-packages = { workspace = true }
 health-persistence = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
+health-workflow = { workspace = true }
+health-workflow-actions = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

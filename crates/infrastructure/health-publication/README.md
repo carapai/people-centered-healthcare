@@ -10,7 +10,8 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
   1. **Validation:**
      - the publication rules and the release's schemas (`health_packages::check`);
      - then, against the latest published version of the package, the semver check (`health_configuration::lifecycle::semver::check`). That covers the package's own bump, and each changed artefact's bump against its content (`health_packages::bump`).
-  2. **Simulation:** the `Sandbox` runs the `tests/` cases. **`NoSandbox` runs none:** the simulation sandbox is #101, and until then simulation passes every package.
+  2. **Workflow Definitions (#96):** every Library whose type is `workflow-definition` must hold, as inline `application/vnd.health.workflow+json` content, a `health_workflow::definition::WorkflowDefinition` with its Library's url and version. It must pass `problems` against the actions given to `with_actions`, so an unknown action or an invalid parameter fails validation. With no actions given, which is the case until contexts declare theirs, any definition that executes an action fails.
+  3. **Simulation:** the `Sandbox` runs the `tests/` cases. **`NoSandbox` runs none:** the simulation sandbox is #101, and until then simulation passes every package.
 
   A failure returns the draft to Draft, with every problem in its record.
 - **People's steps:** `review`, `approve` and `request_changes`, with the domain's separation of duties:
@@ -53,3 +54,8 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
   - a form changed under its old version is refused.
 - **A stale revision** is refused by the store.
 - **Unknown packages** are not found.
+
+`tests/workflows.rs` runs a program package with a Workflow Definition against one declared action:
+- a valid definition reaches Review;
+- an unknown action, a parameter of the wrong kind, and a missing parameter each send the draft back, with the problem prefixed by its file;
+- content of another type, a definition of another version, and content that is not a definition are refused.
