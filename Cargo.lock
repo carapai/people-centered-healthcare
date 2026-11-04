@@ -2280,6 +2280,7 @@ dependencies = [
 name = "health-configuration"
 version = "0.1.0"
 dependencies = [
+ "health-time",
  "serde",
  "serde_json",
  "thiserror",
