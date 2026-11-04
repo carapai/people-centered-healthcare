@@ -16,8 +16,11 @@
 //!   it completed: a compensating action through the port, or, for actions undone by a person or
 //!   not at all, a note on the cancellation's history entry (`human-task.N`, `not-undone.N`).
 //!
+//! - **Timers** ([`Workflows::fire_due`]) fire at the instance's authority only, each once, in its
+//!   own transaction, using the node clock checked against the clock floor (see [`timers`]).
+//!
 //! Sub-workflow invocations are refused until the engine supports them, so a definition that
-//! uses one fails closed. Firing timers is #98; this records them.
+//! uses one fails closed.
 
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -31,6 +34,10 @@ use health_workflow::{
 };
 use health_workflow_actions::{ActionDescriptor, Compensation};
 use uuid::Uuid;
+
+pub mod timers;
+
+pub use timers::{Fired, SCHEDULER_INTERVAL, TimeFloor};
 
 /// Who acts for domain events and timers: the workflow principal, whose permissions are
 /// approved with the definition (ADR 0043).
@@ -135,6 +142,15 @@ pub enum WorkflowError {
     /// Another change to the instance came first; try again.
     #[error("the workflow instance changed meanwhile; try again")]
     Conflict,
+    /// The node clock reads before the last known central time: timers do not fire until it is
+    /// fixed.
+    #[error("the node clock reads {local}, before the last known central time {floor}")]
+    ClockBroken {
+        /// The node clock.
+        local: Timestamp,
+        /// The clock floor.
+        floor: Timestamp,
+    },
     /// The store failed.
     #[error("{0}")]
     Store(String),
@@ -182,6 +198,7 @@ pub struct Workflows<S, D, A, G> {
     clock: Arc<dyn Clock>,
     catalog: Vec<ActionDescriptor>,
     authority: String,
+    floor: Option<Arc<dyn TimeFloor>>,
 }
 
 impl<S, D, A, G> Workflows<S, D, A, G>
@@ -210,6 +227,7 @@ where
             clock,
             catalog,
             authority: authority.to_owned(),
+            floor: None,
         }
     }
 

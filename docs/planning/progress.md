@@ -434,3 +434,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - permission checks on actions stay with each target context's use case.
 
   This completes #97.
+- 2026-11-04: #97 part 2 merged (#309), completing #97. #98, durable timers and escalation:
+  - **`WorkflowStore::due_timers`:** the pending timers that are due, earliest first.
+  - **`Workflows::fire_due`** fires each due timer in its own transaction. The transaction re-reads the timer, marks it fired and runs its event as the workflow principal. A failure keeps the timer pending, so it fires exactly once across restarts.
+  - **Authority:** only the instance's authority fires its timers; any other node skips them.
+  - **Clock floor:** with a `TimeFloor` port, nothing fires while the node clock reads before the floor.
+  - **Escalation** is a timer transition with its typed actions.
+  - **Decisions:**
+    - on a broken clock, timers wait rather than fire by the floor's time;
+    - a timer whose state was re-entered is armed again with a new `fire_at`.
+  - **Not wired yet:** no runtime calls `fire_due` every 30 s yet. That waits for a node to run workflows, which needs activation (#89).
+
+  This completes #98.

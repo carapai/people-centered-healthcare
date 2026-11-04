@@ -55,5 +55,5 @@ What the engine persists (#97; ADR 0044), through the unit of work's transaction
 
 - **`InstanceRecord`:** the definition `url|version` (pinned), the context, the authority node, the interpreter's `Instance`, and a version. `update_instance` is a compare-and-set on the version.
 - **`HistoryEntry`:** every transition, appended once at `[instance, seq]`: the event, the from- and to-configuration, the effects, the actor, the time and the `op_id`. Its `seq` is the version the transition produced.
-- **`TimerRecord`:** a durable timer and its status (pending, fired, cancelled).
+- **`TimerRecord`:** a durable timer and its status (pending, fired, cancelled). `due_timers` lists the pending ones due, earliest first.
 - **The inbox:** `claim_event` records a domain event as processed, and is false if it already was.

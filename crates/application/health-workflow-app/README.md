@@ -10,7 +10,12 @@ Layer: **application** (Workflow). Runs workflow instances through `health-workf
 - **Replay is a no-op:** the inbox claims each event id, and each command's `op_id`, once.
 - **History** is appended at `[instance, version]`, and each change is a compare-and-set on the version, so of two concurrent steps one fails with `Conflict`.
 - **Actions** are carried out through the `Actions` port in the same transaction. Each call is keyed by the UUIDv5 of instance, microstep and index (`action_key`), and must be in the node's action catalogue.
-- **Timers** are recorded, and cancelled when their state is left. #98 fires them.
+- **Timers** are recorded, and cancelled when their state is left. `fire_due` fires them (#98):
+  - only at the instance's authority: a timer whose instance another node decides is skipped and stays pending, so a desktop in offline fallback never fires an edge-owned timer;
+  - by the node clock checked against the clock floor (`with_floor`, a `TimeFloor` port): if the clock reads before the floor, nothing fires (`ClockBroken`);
+  - each in its own transaction, which re-reads the timer, marks it fired and runs its event as the workflow principal. A failure keeps it pending, so restarts neither lose nor repeat a firing;
+  - escalation (reassign, notify, raise priority) is an ordinary timer transition with its typed actions;
+  - the runtime calls it every `SCHEDULER_INTERVAL` (30 s), at most 200 timers per run.
 - **Compensation.** `cancel` runs, newest first, the compensation of each completed action:
   - a compensating action, through the port, with the original's parameters;
   - a human task or none: noted on the cancellation's history entry as `human-task.N` or `not-undone.N`, with the reason. #99 projects the human tasks.

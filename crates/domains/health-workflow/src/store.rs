@@ -135,6 +135,13 @@ pub trait WorkflowStore {
         timer: &TimerRecord,
     ) -> impl Future<Output = Result<(), WriteError>> + Send;
 
+    /// Pending timers due at `at`, earliest first, at most `limit`.
+    fn due_timers(
+        &mut self,
+        at: Timestamp,
+        limit: u32,
+    ) -> impl Future<Output = Result<Vec<TimerRecord>, StoreError>> + Send;
+
     /// An instance's timers.
     fn timers(
         &mut self,
