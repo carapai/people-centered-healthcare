@@ -23,7 +23,10 @@ use std::future::Future;
 
 mod gate;
 
-pub use gate::{Deferral, FinancialGate, GateFacts, GateRefused, Waiver, evaluate};
+pub use gate::{
+    AccountStore, Deferral, FinancialGate, GateFacts, GateRefused, Settlement, Waiver, evaluate,
+    owed,
+};
 
 use health_identifiers::{DerivationName, derive_id};
 use health_persistence::{StoreError, WriteError};

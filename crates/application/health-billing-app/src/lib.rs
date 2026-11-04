@@ -14,9 +14,13 @@
 //! - **[`Billing::cancel_event`]**: when a source event is cancelled, its charges are cancelled
 //!   and each posted one reversed, once.
 //!
+//! - **Financial Gates** ([`gates`]): the gate query, settlements, deferrals and waivers.
+//!
 //! Coverage terms are the caller's (from coverage), each `coverage` naming its funding source.
 
 use std::collections::BTreeMap;
+
+mod gates;
 
 use health_billing::{
     Charge, ChargePrice, ChargeStatus, ChargeStore, ChargeTrigger, ClinicalEvent, Reversal,
@@ -52,6 +56,12 @@ pub enum BillingError {
     /// The ledger refused a posting.
     #[error(transparent)]
     Ledger(#[from] PostingRefused),
+    /// A deferral, settlement or waiver was refused.
+    #[error(transparent)]
+    Gate(#[from] health_billing::GateRefused),
+    /// The payment does not exist or is not posted.
+    #[error("{0} is not a posted payment")]
+    NotPayable(String),
     /// The settings are not usable.
     #[error("{0}")]
     Settings(String),
@@ -95,6 +105,7 @@ pub struct Settings {
 pub struct Billing<S> {
     store: S,
     settings: Settings,
+    gates: Vec<health_billing::FinancialGate>,
 }
 
 fn posting_id(charge: &str) -> String {
@@ -108,7 +119,11 @@ where
 {
     /// The use cases over `store` with `settings`.
     pub fn new(store: S, settings: Settings) -> Self {
-        Self { store, settings }
+        Self {
+            store,
+            settings,
+            gates: Vec::new(),
+        }
     }
 
     fn ledger(&self) -> Result<Ledger, BillingError> {

@@ -2291,7 +2291,9 @@ name = "health-billing-app"
 version = "0.1.0"
 dependencies = [
  "health-billing",
+ "health-billing-contract",
  "health-financial-ledger",
+ "health-payments",
  "health-persistence",
  "health-pricing",
  "health-surrealdb",
