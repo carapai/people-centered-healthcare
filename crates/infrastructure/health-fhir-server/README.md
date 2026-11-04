@@ -53,6 +53,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Errors:** what the node does not hold is 404. What cannot be answered offline (a filter on a code system held in part, a `regex` filter, a cycle) is 422 `not-supported`. A malformed request is 400.
   - **`ActiveTerminology::replace`** swaps the terminology served, and a request keeps the version it started with. Activation (#89) calls it when a package with terminology becomes active. Until then, no node passes one in, so the routes answer 404.
   - **Access:** the routes sit behind the same sign-in as every FHIR route, with no further permission, because terminology holds no patient data.
+- **Tiers 3–4 on writes (#91):** `with_profiles(ActiveProfiles)` validates every write after tiers 1–2: creates, updates, transaction and batch entries, and `$register`.
+  - **Which profiles:** each profile the resource claims in `meta.profile`, which must be active on the node (a profile it does not have is a `processing` error), and each profile `Profiles::required` names for its type.
+  - **Bindings** are checked through `with_terminology`'s terminology. A bare `code` is matched against the value set's expansion, and a coding with its system through `$validate-code`.
+  - **Outcomes:** errors refuse the write with a 400 OperationOutcome that lists the warnings too. Warnings alone let it through.
+  - **`ActiveProfiles::replace`** swaps the compiled set. Activation (#89) compiles the active packages' profiles once and calls it. Until then no node has active profiles, and tiers 3–4 do not run.
 
 ## Tests
 
@@ -65,6 +70,13 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+
+`tests/validation.rs` runs with the core package's profiles active and its terminology served:
+- a claimed `ExtractionMappingLibrary` is accepted, and refused with a `code-invalid` error for an unknown template mode;
+- a claimed `MatchingRulesLibrary` without content is refused;
+- a type's required profile applies without a claim;
+- a claimed profile the node does not have is refused;
+- without active profiles, nothing changes.
 
 `tests/terminology.rs` covers the terminology operations:
 - an expansion by GET, with text filter and paging;
