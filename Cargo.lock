@@ -2809,6 +2809,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-workflow-app"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "health-workflow",
+ "health-workflow-actions",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "heapless"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

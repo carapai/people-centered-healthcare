@@ -424,3 +424,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **`health-workflow::WorkflowStore`** holds `InstanceRecord` (definition `url|version`, context, authority, the interpreter's `Instance`, version), `HistoryEntry`, `TimerRecord` and the event inbox.
   - **Migration `0028_workflow`** (owned by workflow): `workflow_instance`, changed only by compare-and-set on `version`; `workflow_history`, keyed `instance|seq` with READONLY fields, so it is append-only; `workflow_timer`; and `workflow_inbox`, by event id.
   - **Decision:** each transition's history `seq` is the instance version it produced, so the history has no gaps and a concurrent step fails its compare-and-set.
+- 2026-11-04: #97 part 1 merged (#308). Part 2, the workflow application:
+  - **New crate `health-workflow-app`:** `Workflows` with `start`, `command`, `deliver` and `cancel`. Each runs its transition, typed actions (through the `Actions` port), timers and history entry in one transaction, and a failed action keeps nothing.
+  - **Replay is a no-op:** domain events are claimed in the inbox by event id, and commands by `op_id`.
+  - **Compensation:** `cancel` compensates completed actions newest first. Compensating actions go through the port; human-task and none compensations are noted on the cancellation's history entry.
+  - **Decisions:**
+    - a command that enables nothing is refused (`NotEnabled`), while such a domain event is consumed and ignored;
+    - sub-workflow invocations are refused until supported;
+    - permission checks on actions stay with each target context's use case.
+
+  This completes #97.
