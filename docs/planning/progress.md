@@ -328,4 +328,3 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Separation of duties:** revising makes you an author; no author reviews, approves or requests changes; clinical kinds need two distinct approvers and configuration kinds one.
   - **Content pinned:** only a draft changes, and publication must sign the approved fingerprint.
   - **`semver::check(latest, next)`:** the package bump follows its artefacts' own bumps, dependencies and files; a rewritten `url|version`, a downgrade, an inexact version or a version no newer is refused. Major zero and pre-releases promise nothing.
-
