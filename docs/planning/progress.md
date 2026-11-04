@@ -328,3 +328,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Separation of duties:** revising makes you an author; no author reviews, approves or requests changes; clinical kinds need two distinct approvers and configuration kinds one.
   - **Content pinned:** only a draft changes, and publication must sign the approved fingerprint.
   - **`semver::check(latest, next)`:** the package bump follows its artefacts' own bumps, dependencies and files; a rewritten `url|version`, a downgrade, an inexact version or a version no newer is refused. Major zero and pre-releases promise nothing.
+- 2026-11-04: #88 part 1 merged (#295). Part 2, the artefact-level bump rules:
+  - **`health-packages::bump::changes(before, after)`:** every change between two versions of an artefact, with the bump it needs. Questionnaire items by `linkId`, CodeSystem concepts by `code`, ValueSet compose rules, and StructureDefinition elements by `id` follow metadata.md's table. Every other change is major.
+  - **`semver::check(latest, next, content)`:** it refuses an artefact whose own new version understates those changes (`ArtefactUnderstated`).
+  - **Decision:** the JSON diff sits in `health-packages`, not the domain, because `serde_json` is not on the domain allowlist. The domain keeps `ContentChange` and the decision.

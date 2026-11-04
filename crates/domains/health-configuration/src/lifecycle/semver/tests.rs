@@ -31,7 +31,7 @@ fn release(at: &str) -> Release {
 }
 
 fn required(latest: &Release, next: &Release) -> Bump {
-    match check(latest, next) {
+    match check(latest, next, &BTreeMap::new()) {
         Ok(diff) => diff.required,
         Err(problems) => match problems.as_slice() {
             [BumpProblem::Understated { required, .. }] => *required,
@@ -62,7 +62,7 @@ fn an_understated_version_is_refused_and_an_overstated_one_passes() {
     next.artefacts
         .insert("https://x/ValueSet/signs".into(), pinned("2.0.0", "v2"));
     assert_eq!(
-        check(&latest, &next),
+        check(&latest, &next, &BTreeMap::new()),
         Err(vec![BumpProblem::Understated {
             latest: version("1.3.0"),
             next: version("1.3.1"),
@@ -71,7 +71,7 @@ fn an_understated_version_is_refused_and_an_overstated_one_passes() {
         }])
     );
     next.version = version("2.0.0");
-    let diff = check(&latest, &next).expect("major is enough");
+    let diff = check(&latest, &next, &BTreeMap::new()).expect("major is enough");
     assert_eq!((diff.required, diff.actual), (Bump::Major, Bump::Major));
 
     let mut patch_only = release("2.0.0");
@@ -79,7 +79,9 @@ fn an_understated_version_is_refused_and_an_overstated_one_passes() {
         .artefacts
         .insert("https://x/ValueSet/signs".into(), pinned("1.4.3", "v2"));
     assert_eq!(
-        check(&latest, &patch_only).expect("over-stated").required,
+        check(&latest, &patch_only, &BTreeMap::new())
+            .expect("over-stated")
+            .required,
         Bump::Patch
     );
 }
@@ -141,7 +143,7 @@ fn a_published_url_version_never_changes_content() {
         pinned("1.0.0", "q-edited"),
     );
     assert_eq!(
-        check(&latest, &next),
+        check(&latest, &next, &BTreeMap::new()),
         Err(vec![BumpProblem::Rewritten(
             "https://x/Questionnaire/anc|1.0.0".into()
         )])
@@ -152,7 +154,7 @@ fn a_published_url_version_never_changes_content() {
 fn versions_may_not_go_down_or_stand_still() {
     let latest = release("1.3.0");
     for next in ["1.3.0", "1.2.9", "1.3.0-rc.1"] {
-        let problems = check(&latest, &release(next)).expect_err(next);
+        let problems = check(&latest, &release(next), &BTreeMap::new()).expect_err(next);
         assert!(
             problems.contains(&BumpProblem::NotNewer {
                 latest: version("1.3.0"),
@@ -167,7 +169,7 @@ fn versions_may_not_go_down_or_stand_still() {
         .insert("https://x/ValueSet/signs".into(), pinned("1.4.1", "v2"));
     next.dependencies
         .insert("ug.moh.core".into(), "2.0.0".into());
-    let problems = check(&latest, &next).expect_err("downgrades");
+    let problems = check(&latest, &next, &BTreeMap::new()).expect_err("downgrades");
     assert!(problems.contains(&BumpProblem::Downgraded {
         name: "https://x/ValueSet/signs".into(),
         from: "1.4.2".into(),
@@ -188,7 +190,7 @@ fn artefact_versions_must_be_exact() {
         .insert("https://x/ValueSet/signs".into(), pinned("v2", "v2"));
     next.artefacts
         .insert("https://x/Library/new".into(), pinned("2024", "n"));
-    let problems = check(&latest, &next).expect_err("inexact");
+    let problems = check(&latest, &next, &BTreeMap::new()).expect_err("inexact");
     assert_eq!(problems.len(), 2, "{problems:?}");
     assert!(
         problems
@@ -202,15 +204,15 @@ fn major_zero_and_pre_releases_promise_nothing() {
     let mut latest = release("0.3.0");
     let mut next = release("0.4.0");
     next.artefacts.remove("https://x/ValueSet/signs");
-    let diff = check(&latest, &next).expect("a minor bump is enough under 0.y.z");
+    let diff = check(&latest, &next, &BTreeMap::new()).expect("a minor bump is enough under 0.y.z");
     assert_eq!(diff.required, Bump::Minor);
 
     next.version = version("0.3.1");
-    assert!(check(&latest, &next).is_err());
+    assert!(check(&latest, &next, &BTreeMap::new()).is_err());
 
     latest.version = version("2.0.0-rc.1");
     next.version = version("2.0.0");
-    let diff = check(&latest, &next).expect("rc to release");
+    let diff = check(&latest, &next, &BTreeMap::new()).expect("rc to release");
     assert_eq!(diff.actual, Bump::None);
 }
 
@@ -278,5 +280,44 @@ fn a_release_is_read_from_package_contents() {
             ("Bundle-example.json".into(), "b1".into()),
             ("configuration/layout.json".into(), "c1".into()),
         ])
+    );
+}
+
+#[test]
+fn an_artefacts_own_bump_is_checked_against_its_content() {
+    let url = "https://x/Questionnaire/anc";
+    let latest = release("1.3.0");
+    let mut next = release("1.4.0");
+    next.artefacts.insert(url.into(), pinned("1.1.0", "q2"));
+    let removed = ContentChange {
+        at: "item[bp]".into(),
+        nature: Nature::Removed,
+        bump: Bump::Major,
+    };
+
+    // The item is gone, but the form claims a minor bump.
+    let content = BTreeMap::from([(url.to_owned(), vec![removed.clone()])]);
+    assert_eq!(
+        check(&latest, &next, &content),
+        Err(vec![BumpProblem::ArtefactUnderstated {
+            url: url.into(),
+            from: "1.0.0".into(),
+            to: "1.1.0".into(),
+            actual: Bump::Minor,
+            required: Bump::Major,
+            changes: vec![removed],
+        }])
+    );
+
+    // A new optional item is a minor bump, and the package follows.
+    let added = ContentChange {
+        at: "item[pulse]".into(),
+        nature: Nature::Added,
+        bump: Bump::Minor,
+    };
+    let content = BTreeMap::from([(url.to_owned(), vec![added])]);
+    assert_eq!(
+        check(&latest, &next, &content).expect("minor").required,
+        Bump::Minor
     );
 }

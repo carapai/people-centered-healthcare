@@ -59,13 +59,44 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
 - **Trust:** `Trust::verify_publisher` checks the certificate at `iat`, not now. The certificate rotates yearly, and a node keeps every package it ever activated. A revoked certificate fails at any time, through the root's CRL, and an `iat` more than 5 minutes ahead is refused.
 - **`PublicationSigner`** is the signing port, because the key is held in central's HSM or KMS. `LocalSigner` holds a PKCS#8 key in memory, for tests and tooling until the KMS adapter.
 
+## Bump rules
+
+`bump::changes(before, after)` finds every change between two versions of an artefact, with the bump each needs (metadata.md § Versioning; #88). The publication lifecycle's semver check (`health_configuration::lifecycle::semver::check`) then refuses an artefact whose own new version understates them.
+
+- **Every resource:**
+  - `version`, `date`, `meta` and `text` need nothing;
+  - descriptive metadata (`name`, `title`, `status`, `publisher`, `description` and the like) needs a patch;
+  - a changed `resourceType` or `url` is major;
+  - extensions are compared by url: display-only ones (`DISPLAY_EXTENSIONS`: translations, rendering, item control, entry format) need a patch, and any other is major.
+- **Questionnaire** items, matched by `linkId` at any depth:
+  - removed is major; added is minor, or major if required;
+  - `text` and `prefix` need a patch, and `initial` a minor;
+  - `required`, `readOnly`, `repeats` and `maxLength` are major when they tighten and minor when they relax;
+  - answer options: removed is major, added minor;
+  - `type`, `answerValueSet`, `definition` (the extraction target), `code` and `enableWhen` are major.
+- **CodeSystem** concepts, by `code` at any depth:
+  - removed is major, added minor, and under another parent major;
+  - `display`, `definition` and designations need a patch, and a concept's properties a minor;
+  - property and filter definitions: removed is major, added minor.
+- **ValueSet** `compose`:
+  - `include` rules are matched by everything but their codes: removed or shrinking is major, added or growing minor;
+  - `exclude` rules work the other way round;
+  - `inactive` is minor from `false` to `true` and major otherwise, and `lockedDate` is major;
+  - a stored `expansion` needs nothing.
+- **StructureDefinition** elements, by `id`, in the differential (or the snapshot without one):
+  - documentation needs a patch;
+  - a higher `min`, lower `max`, stronger or different binding, added `fixed[x]`, `pattern[x]`, invariant, `mustSupport` or `maxLength` is major, and the reverse minor;
+  - types and profiles: removed is major, added minor;
+  - an element dropped from the differential relaxes, and one added constrains; one removed from a snapshot is major.
+- **Anything else,** including every element without a rule and every other resource type, is major when it changes, so an unclassified change never passes as a patch.
+
 ## Not yet
 
 - Storing packages as blobs, activation and staging come with the publication lifecycle (#88) and scoped activation (#89).
 
 ## Tests
 
-- **Unit:** deterministic round trips, refused paths, hostile archives (traversal, absolute paths, a file outside `package/`, symlinks, hard links, FIFOs) and limits.
+- **Unit:** the bump rules, row by row, for each resource type; deterministic round trips, refused paths, hostile archives (traversal, absolute paths, a file outside `package/`, symlinks, hard links, FIFOs) and limits.
 - **Integration (`tests/packages.rs`):** a real root and publication certificate.
   - A package publishes and verifies with its identity and index.
   - Dependency ranges and unpinned manifest canonicals are rejected at publication.
