@@ -2764,6 +2764,7 @@ dependencies = [
  "health-payments",
  "health-persistence",
  "health-time",
+ "health-workflow",
  "jiff",
  "rust_decimal",
  "serde",
@@ -2792,6 +2793,7 @@ dependencies = [
 name = "health-workflow"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "health-workflow-actions",
  "serde",

@@ -14,6 +14,8 @@
 pub mod definition;
 mod interpreter;
 mod model;
+mod store;
 
 pub use interpreter::{DefinitionError, Effect, Event, Guards, Instance, Machine, matches};
 pub use model::{Action, DataModel, Invoke, Kind, State, Statechart, Timer, Transition, Value};
+pub use store::{HistoryEntry, InstanceRecord, TimerRecord, TimerStatus, WorkflowStore};

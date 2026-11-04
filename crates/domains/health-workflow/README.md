@@ -48,3 +48,12 @@ A Workflow Definition (#96; ADRs 0042, 0043, 0049): what a `WorkflowDefinitionLi
 `definition`'s unit tests cover a valid definition; unknown actions and bad references; each parameter problem; typed assignments; unreachable states and dead ends; an ancestor's transition as a way out inside parallel regions; malformed decision tables; an unneeded principal permission; an invalid statechart; and reading a definition from its JSON.
 
 **Left out:** history states, which the model lacks; error events, since our content cannot fail; and the ECMAScript data model.
+
+## `WorkflowStore`
+
+What the engine persists (#97; ADR 0044), through the unit of work's transaction:
+
+- **`InstanceRecord`:** the definition `url|version` (pinned), the context, the authority node, the interpreter's `Instance`, and a version. `update_instance` is a compare-and-set on the version.
+- **`HistoryEntry`:** every transition, appended once at `[instance, seq]`: the event, the from- and to-configuration, the effects, the actor, the time and the `op_id`. Its `seq` is the version the transition produced.
+- **`TimerRecord`:** a durable timer and its status (pending, fired, cancelled).
+- **The inbox:** `claim_event` records a domain event as processed, and is false if it already was.

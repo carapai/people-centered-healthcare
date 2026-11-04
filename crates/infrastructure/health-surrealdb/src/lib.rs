@@ -31,6 +31,7 @@ mod review;
 pub mod search;
 mod stock;
 mod store;
+mod workflow;
 
 pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
 pub use connection::{Connection, ConnectionError, Settings, Target, connect};

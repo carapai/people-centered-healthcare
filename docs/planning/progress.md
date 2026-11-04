@@ -420,3 +420,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decision:** central registers no actions until contexts declare theirs, so definitions that execute actions fail closed.
 
   This completes #96.
+- 2026-11-04: #96 part 2 merged (#307), completing #96. #97, persisting workflow instances, is split: part 1 is the records and their store (this), and part 2 is `health-workflow-app`, which runs commands and domain events through them.
+  - **`health-workflow::WorkflowStore`** holds `InstanceRecord` (definition `url|version`, context, authority, the interpreter's `Instance`, version), `HistoryEntry`, `TimerRecord` and the event inbox.
+  - **Migration `0028_workflow`** (owned by workflow): `workflow_instance`, changed only by compare-and-set on `version`; `workflow_history`, keyed `instance|seq` with READONLY fields, so it is append-only; `workflow_timer`; and `workflow_inbox`, by event id.
+  - **Decision:** each transition's history `seq` is the instance version it produced, so the history has no gaps and a concurrent step fails its compare-and-set.
