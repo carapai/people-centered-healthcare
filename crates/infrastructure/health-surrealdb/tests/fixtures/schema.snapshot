@@ -1528,3 +1528,24 @@ DEFINE TABLE value_set_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON value_set_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON value_set_history TYPE int PERMISSIONS FULL
   DEFINE INDEX value_set_history_last_updated ON value_set_history FIELDS last_updated, version_seq
+DEFINE TABLE workflow_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON workflow_history TYPE string READONLY PERMISSIONS FULL
+  DEFINE FIELD instance ON workflow_history TYPE string READONLY PERMISSIONS FULL
+  DEFINE FIELD seq ON workflow_history TYPE int READONLY PERMISSIONS FULL
+  DEFINE INDEX workflow_history_instance ON workflow_history FIELDS instance, seq UNIQUE
+DEFINE TABLE workflow_inbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD processed_at ON workflow_inbox TYPE datetime PERMISSIONS FULL
+DEFINE TABLE workflow_instance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD context ON workflow_instance TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON workflow_instance TYPE string PERMISSIONS FULL
+  DEFINE FIELD definition ON workflow_instance TYPE string PERMISSIONS FULL
+  DEFINE FIELD running ON workflow_instance TYPE bool PERMISSIONS FULL
+  DEFINE FIELD version ON workflow_instance TYPE int PERMISSIONS FULL
+  DEFINE INDEX workflow_instance_context ON workflow_instance FIELDS context
+DEFINE TABLE workflow_timer TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON workflow_timer TYPE string PERMISSIONS FULL
+  DEFINE FIELD fire_at ON workflow_timer TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD instance ON workflow_timer TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON workflow_timer TYPE string PERMISSIONS FULL
+  DEFINE INDEX workflow_timer_due ON workflow_timer FIELDS status, fire_at
+  DEFINE INDEX workflow_timer_instance ON workflow_timer FIELDS instance
