@@ -373,3 +373,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Not in this package:** JSON Schemas ship with the software release (decided in #86).
 
   This completes #87.
+- 2026-11-04: #87 part 2 merged (#300), completing #87. #90, the terminology service, is split in two: part 1 is the domain operations (this), and part 2 is reading terminology from packages plus the FHIR operations. Part 1, the new domain crate `health-terminology`:
+  - **`Terminology`:** CodeSystems, ValueSets and ConceptMaps by URL and version, the latest by semver.
+  - **The five operations:** `lookup`, `subsumes`, `expand` (pinned expansion first, otherwise the compose with the hierarchy and property filters, imports, exclusions, inactive codes, text filter and paging), `validate_code` (with displays and designations) and `translate`.
+  - **Fails closed:** whatever would need another terminology server is an error, never an empty answer.

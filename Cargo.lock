@@ -2769,6 +2769,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-terminology"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "health-time"
 version = "0.1.0"
 dependencies = [

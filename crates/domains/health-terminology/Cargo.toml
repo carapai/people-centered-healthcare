@@ -1,0 +1,17 @@
+[package]
+name = "health-terminology"
+description = "Terminology (terminology.md): $expand, $validate-code, $lookup, $translate and $subsumes over a node's own CodeSystems, ValueSets and ConceptMaps, with no external terminology server."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "terminology-metadata"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
