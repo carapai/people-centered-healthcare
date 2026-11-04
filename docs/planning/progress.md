@@ -396,3 +396,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a required binding the node cannot check offline is a warning;
     - an extensible or preferred binding not met is a warning.
   - **`Issue::severity`:** issues now carry it, and OperationOutcomes report it.
+- 2026-11-04: #91 part 1 merged (#304). Part 2, tiers 3–4 on the write path:
+  - **`FhirServer::with_profiles(ActiveProfiles)`** validates every write after tiers 1–2 against its claimed `meta.profile`s and its type's required profiles. Bindings are answered by `ActiveTerminology`. Errors refuse the write, and warnings let it through.
+  - **Decision:** a claimed profile the node does not have is refused.
+  - **Activation (#89)** compiles and sets the active profiles; until then tiers 3–4 do not run.
+  - **The Java oracle** covers tier 3's profile cases. Tier 4 is not in it, because the Java run has no terminology server (`-tx n/a`).
+
+  This completes #91.

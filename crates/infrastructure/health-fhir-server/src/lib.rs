@@ -69,6 +69,7 @@ mod registry;
 mod search;
 mod terminology;
 mod transaction;
+mod validation;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -94,6 +95,7 @@ pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
 pub use terminology::ActiveTerminology;
+pub use validation::{ActiveProfiles, Profiles};
 
 /// The FHIR REST server for one node.
 #[derive(Clone)]
@@ -110,6 +112,7 @@ pub struct FhirServer {
     registry: Option<Arc<registry::RegistrySettings>>,
     payments: Option<Arc<payments::PaymentConfig>>,
     terminology: Option<terminology::ActiveTerminology>,
+    profiles: Option<validation::ActiveProfiles>,
 }
 
 impl FhirServer {
@@ -133,7 +136,17 @@ impl FhirServer {
             registry: None,
             payments: None,
             terminology: None,
+            profiles: None,
         }
+    }
+
+    /// This server, validating every write against tiers 3–4 (#91): the profiles each resource
+    /// claims, and those `profiles` requires of its type, with bindings checked through the
+    /// node's terminology ([`Self::with_terminology`]).
+    #[must_use]
+    pub fn with_profiles(mut self, profiles: ActiveProfiles) -> Self {
+        self.profiles = Some(profiles);
+        self
     }
 
     /// This server, serving the terminology operations (`ValueSet/$expand`,
@@ -159,14 +172,14 @@ impl FhirServer {
         self
     }
 
-    /// Tier 2: the core invariants of a resource that passed tier 1 (400 otherwise).
+    /// Tiers 2–4 of a resource that passed tier 1: the core invariants, then the active
+    /// profiles and their bindings (400 otherwise).
     async fn check_invariants(&self, resource: &serde_json::Value) -> Result<(), FhirError> {
         let found = validate_invariants(self.fhirpath.as_ref(), resource).await;
-        if found.is_empty() {
-            Ok(())
-        } else {
-            Err(FhirError::invalid_resource(&found))
+        if !found.is_empty() {
+            return Err(FhirError::invalid_resource(&found));
         }
+        validation::check(self, self.fhirpath.clone(), resource).await
     }
 
     /// This server, recording an AuditEvent for every write and every sensitive read (#66). The
