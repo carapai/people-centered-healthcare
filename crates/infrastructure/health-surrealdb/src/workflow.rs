@@ -149,6 +149,21 @@ impl WorkflowStore for SurrealTx {
         Ok(())
     }
 
+    async fn due_timers(
+        &mut self,
+        at: Timestamp,
+        limit: u32,
+    ) -> Result<Vec<TimerRecord>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM workflow_timer WHERE status = 'pending' \
+                 AND fire_at <= <datetime>$at ORDER BY fire_at, id LIMIT <int>$limit",
+                vec![("at", at.to_string()), ("limit", limit.to_string())],
+            )
+            .await?;
+        decode(rows)
+    }
+
     async fn timers(&mut self, instance: &str) -> Result<Vec<TimerRecord>, StoreError> {
         let rows = self
             .rows(

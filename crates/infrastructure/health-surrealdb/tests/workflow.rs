@@ -172,3 +172,38 @@ async fn timers_are_kept_and_change_status() {
     let mut tx = store.begin().await.expect("begin");
     assert_eq!(tx.timers("i-1").await.expect("timers"), [cancelled]);
 }
+
+#[tokio::test]
+async fn due_timers_are_the_pending_ones_whose_time_has_come() {
+    let (store, _) = store().await;
+    let timer = |instance: &str, id: &str, fire_at: &str, status| TimerRecord {
+        instance: instance.into(),
+        id: id.into(),
+        fire_at: fire_at.parse().expect("timestamp"),
+        event: "overdue".into(),
+        status,
+    };
+    let mut tx = store.begin().await.expect("begin");
+    for t in [
+        timer("i-1", "a#0", "2026-11-04T08:30:00Z", TimerStatus::Pending),
+        timer("i-2", "a#0", "2026-11-04T08:10:00Z", TimerStatus::Pending),
+        timer("i-3", "a#0", "2026-11-04T08:20:00Z", TimerStatus::Fired),
+        timer("i-4", "a#0", "2026-11-04T08:05:00Z", TimerStatus::Cancelled),
+        timer("i-5", "a#0", "2026-11-04T09:00:00Z", TimerStatus::Pending),
+    ] {
+        tx.put_timer(&t).await.expect("put");
+    }
+    tx.commit().await.expect("commit");
+
+    let now: Timestamp = "2026-11-04T08:45:00Z".parse().expect("timestamp");
+    let mut tx = store.begin().await.expect("begin");
+    let due: Vec<String> = tx
+        .due_timers(now, 10)
+        .await
+        .expect("due")
+        .into_iter()
+        .map(|t| t.instance)
+        .collect();
+    assert_eq!(due, ["i-2", "i-1"], "pending and due, earliest first");
+    assert_eq!(tx.due_timers(now, 1).await.expect("due").len(), 1);
+}
