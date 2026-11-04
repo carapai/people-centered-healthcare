@@ -38,7 +38,7 @@ Codes listed for a code system that is not held are taken as listed. That is how
 
 ## Not yet
 
-- **The FHIR operation endpoints** (#90 part 2b). `health-packages::terminology` reads packages into this model.
+- **What a node serves** is set when packages are activated (#89). `health-packages::terminology` reads them into this model, and `health-fhir-server`'s `with_terminology` serves it.
 - **Binding validation** with these operations is tier 4 (#91).
 
 ## Tests

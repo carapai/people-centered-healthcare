@@ -43,6 +43,16 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.
   - **Payments:** cash with its receipt; pending with its provider reference (a reused one is 409), with a provisional receipt until the provider confirms it; void and refund.
   - **Statements and balances:** provider statements confirm what they match. `GET /balances` covers the till, in-transit, variance and merchant accounts.
+- **Terminology (#90):** `with_terminology(ActiveTerminology)` serves the terminology operations from the node's own [`health-terminology`](../../domains/health-terminology), with no external terminology server.
+  - **Routes** (GET with a query string, or POST with a Parameters body):
+    - `ValueSet/$expand`: `url`, `valueSetVersion`, `filter`, `offset`, `count` and `activeOnly`. It returns a ValueSet with its `expansion`: `total`, `offset`, a `pinned` parameter and `contains`.
+    - `ValueSet/$validate-code` and `CodeSystem/$validate-code`: `url`, `code` with `system`, or `coding`, and `display`. They return `result`, `display` and `message`.
+    - `CodeSystem/$lookup`: `name`, `version`, `display`, `definition`, `designation`, and `property`, with `parent` and `child`.
+    - `CodeSystem/$subsumes`: `outcome`.
+    - `ConceptMap/$translate`: `sourceCode` and `sourceSystem`, or `sourceCoding`, with `url` and `targetSystem`. It returns `result` and each `match` (`relationship`, `originMap`, `concept`).
+  - **Errors:** what the node does not hold is 404. What cannot be answered offline (a filter on a code system held in part, a `regex` filter, a cycle) is 422 `not-supported`. A malformed request is 400.
+  - **`ActiveTerminology::replace`** swaps the terminology served, and a request keeps the version it started with. Activation (#89) calls it when a package with terminology becomes active. Until then, no node passes one in, so the routes answer 404.
+  - **Access:** the routes sit behind the same sign-in as every FHIR route, with no further permission, because terminology holds no patient data.
 
 ## Tests
 
@@ -55,6 +65,15 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+
+`tests/terminology.rs` covers the terminology operations:
+- an expansion by GET, with text filter and paging;
+- validation by POST with a coding, a wrong display, a code outside the value set, and validation against a code system;
+- a lookup with its parent, subsumption, and translation by POST;
+- 404 for unknown resources and codes, and for a node without terminology;
+- 422 for a `regex` filter;
+- 400 for missing or malformed parameters;
+- replacing the terminology served.
 
 `tests/facility.rs` covers the facility tag: stamped on create, refused for another facility, kept through updates, and facility-isolated searches at an edge and at central.
 
