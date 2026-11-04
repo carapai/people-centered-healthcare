@@ -453,3 +453,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - `health-worklists` starts as a module of `health-workflow`, as the crate catalogue says, not as its own crate;
     - claims and escalated priorities live in reserved `task.<state>.*` data-model fields, so projections need nothing but instance state;
     - an idle claim lapses when read, rather than through a timer.
+- 2026-11-04: #99 part 1 merged (#311). Part 2, the task commands and the worklists' read model:
+  - **`health-workflow-app`:**
+    - `claim`, `release`, `reassign` and `escalate` are workflow commands with history entries;
+    - every step rebuilds the instance's Tasks in its transaction, and states left behind lose their claims;
+    - `tasks(instance)` and `worklist(key)` read them back.
+  - **Definitions** are now `Compiled` (statechart plus machine).
+  - **Migration `0029_workflow_tasks`:** `workflow_task`, the projected Tasks by worklist, priority rank and arrival.
+  - **Decisions:**
+    - claiming refreshes your own claim and is refused while another's is live;
+    - only the holder releases;
+    - reassignment overrides any claim;
+    - permission checks stay with the caller (the policy decision point).
+  - **Next:** part 3 writes Tasks and RequestOrchestrations as FHIR resources, and part 4 adds the client's worklist screens.

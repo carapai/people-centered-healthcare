@@ -66,3 +66,4 @@ What the engine persists (#97; ADR 0044), through the unit of work's transaction
   - **Task status** uses the 12 R5 codes. An open task is `ready`, or `in-progress` while claimed. A task whose state was left is `completed`, or `cancelled` if the instance was cancelled. `businessStatus` is the state's id.
   - **Claims and escalation** live in reserved `task.<state>.*` data-model fields (`owner_field`, `claimed_field`, `priority_field`). A claim lapses once idle for the task's timeout, and escalation only ever raises priority.
   - `worklist(tasks, key)` lists a worklist's open tasks, most urgent first, then by arrival.
+  - `TaskView::as_at(now)` drops a claim that has lapsed since the task was projected. `WorkflowStore::replace_tasks` and `open_tasks` keep the projections.

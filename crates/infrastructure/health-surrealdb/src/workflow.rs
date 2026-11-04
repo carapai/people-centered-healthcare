@@ -3,6 +3,7 @@
 
 use health_persistence::{StoreError, WriteError};
 use health_time::Timestamp;
+use health_workflow::worklists::TaskView;
 use health_workflow::{HistoryEntry, InstanceRecord, TimerRecord, TimerStatus, WorkflowStore};
 use serde::de::DeserializeOwned;
 
@@ -147,6 +148,47 @@ impl WorkflowStore for SurrealTx {
         )
         .await?;
         Ok(())
+    }
+
+    async fn replace_tasks(
+        &mut self,
+        instance: &str,
+        tasks: &[TaskView],
+    ) -> Result<(), WriteError> {
+        self.run(
+            "DELETE workflow_task WHERE instance = $instance RETURN NONE",
+            vec![("instance", instance.to_owned())],
+        )
+        .await?;
+        for task in tasks {
+            self.run(
+                "CREATE type::record('workflow_task', $id) CONTENT { data: $data, \
+                 instance: $instance, worklist: $worklist, open: <bool>$open, rank: <int>$rank, \
+                 authored_on: <datetime>$authored_on } RETURN VALUE record::id(id)",
+                vec![
+                    ("id", task.id.clone()),
+                    ("data", encode(task)?),
+                    ("instance", instance.to_owned()),
+                    ("worklist", task.worklist.clone()),
+                    ("open", task.status.is_open().to_string()),
+                    ("rank", (task.priority as u8).to_string()),
+                    ("authored_on", task.authored_on.to_string()),
+                ],
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn open_tasks(&mut self, worklist: &str) -> Result<Vec<TaskView>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM workflow_task WHERE worklist = $worklist AND open = true \
+                 ORDER BY rank DESC, authored_on, id",
+                vec![("worklist", worklist.to_owned())],
+            )
+            .await?;
+        decode(rows)
     }
 
     async fn due_timers(

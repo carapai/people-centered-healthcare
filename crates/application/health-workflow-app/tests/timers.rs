@@ -10,13 +10,13 @@ use health_surrealdb::{
 };
 use health_time::{Clock, FixedClock, SignedDuration, Timestamp};
 use health_workflow::{
-    Action, DataModel, Event, Guards, Kind, Machine, State, Statechart, Timer, TimerStatus,
-    Transition, WorkflowStore,
+    Action, DataModel, Event, Guards, Kind, State, Statechart, Timer, TimerStatus, Transition,
+    WorkflowStore,
 };
 use health_workflow_actions::{ActionDescriptor, Compensation};
 use health_workflow_app::{
-    ActionCall, ActionFailed, Actions, Fired, Outcome, PRINCIPAL, TimeFloor, WorkflowError,
-    Workflows,
+    ActionCall, ActionFailed, Actions, Compiled, Fired, Outcome, PRINCIPAL, TimeFloor,
+    WorkflowError, Workflows,
 };
 
 const ESCALATE: &str = "urn:escalate|1.0.0";
@@ -103,7 +103,7 @@ impl TimeFloor for Floor {
     }
 }
 
-type App = Workflows<SurrealStore, BTreeMap<String, Arc<Machine>>, Recorded, Always>;
+type App = Workflows<SurrealStore, BTreeMap<String, Arc<Compiled>>, Recorded, Always>;
 
 struct Node {
     store: SurrealStore,
@@ -133,11 +133,11 @@ impl Node {
         let definitions = BTreeMap::from([
             (
                 ESCALATE.to_owned(),
-                Arc::new(Machine::new(&chart(&[])).expect("escalate")),
+                Arc::new(Compiled::new(chart(&[])).expect("escalate")),
             ),
             (
                 REMIND.to_owned(),
-                Arc::new(Machine::new(&chart(&["triage"])).expect("remind")),
+                Arc::new(Compiled::new(chart(&["triage"])).expect("remind")),
             ),
         ]);
         let clock: Arc<dyn Clock> = self.clock.clone();

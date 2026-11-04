@@ -19,6 +19,7 @@ use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::interpreter::{Effect, Event, Instance};
+use crate::worklists::TaskView;
 
 /// The event a start records in history.
 pub const STARTED: &str = "workflow.started";
@@ -140,6 +141,21 @@ pub trait WorkflowStore {
         &mut self,
         timer: &TimerRecord,
     ) -> impl Future<Output = Result<(), WriteError>> + Send;
+
+    /// Replaces the projected Tasks of `instance` with `tasks`: the worklists' read model,
+    /// rebuilt from instance state in the transaction that changed it.
+    fn replace_tasks(
+        &mut self,
+        instance: &str,
+        tasks: &[TaskView],
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+
+    /// The open Tasks on `worklist`, most urgent first, then by arrival, as projected (a claim
+    /// may since have lapsed: see [`TaskView::as_at`]).
+    fn open_tasks(
+        &mut self,
+        worklist: &str,
+    ) -> impl Future<Output = Result<Vec<TaskView>, StoreError>> + Send;
 
     /// Pending timers due at `at`, earliest first, at most `limit`.
     fn due_timers(

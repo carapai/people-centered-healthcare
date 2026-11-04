@@ -19,4 +19,12 @@ Layer: **application** (Workflow). Runs workflow instances through `health-workf
 - **Compensation.** `cancel` runs, newest first, the compensation of each completed action:
   - a compensating action, through the port, with the original's parameters;
   - a human task or none: noted on the cancellation's history entry as `human-task.N` or `not-undone.N`, with the reason. #99 projects the human tasks.
+- **Definitions** are `Compiled` (statechart and machine), so the application knows each state's human task.
+- **Tasks and worklists** (#99):
+  - every step rebuilds the instance's Tasks from its state and history (`health_workflow::worklists::project`) and stores them in the worklists' read model, in the same transaction;
+  - task states left behind lose their claim fields;
+  - `claim`, `release`, `reassign` and `escalate` are workflow commands. Each sets the reserved `task.<state>.*` fields and appends a history entry (`task.claimed`, `task.released`, `task.reassigned`, `task.escalated`). Completing a task is an ordinary `command`;
+  - **claim rules:** claiming refreshes your own claim, and is refused while someone else's claim is live. Only the holder releases. Reassignment overrides, and escalation only raises priority;
+  - `tasks(instance)` rebuilds an instance's Tasks, and `worklist(key)` lists the open ones most urgent first, then by arrival, with lapsed claims dropped as read;
+  - permission checks are the caller's, after the policy decision point.
 - **Fails closed:** sub-workflow invocations are refused until the engine supports them, and so are definitions this node does not have.

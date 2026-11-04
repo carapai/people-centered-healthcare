@@ -97,6 +97,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("workflow_history", "workflow"),
     ("workflow_timer", "workflow"),
     ("workflow_inbox", "workflow"),
+    ("workflow_task", "workflow"),
     ("caregiver_grant", "consent"),
     ("stock_transfer", "inventory"),
     ("stock_reconciliation", "inventory"),
