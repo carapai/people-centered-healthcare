@@ -25,6 +25,11 @@ Layer: **runtime**. A node's identity on its host, shared by the edge and the de
   - `Exempt` with the grant when an `Exemption` covers them;
   - otherwise `Refused` with the findings.
 - **`system_root()`** is `/`, or `%SystemDrive%\` on Windows.
+- **`recovery`** handles disk recovery keys (ADR 0048 § Recovery keys; #268):
+  - `new_recovery_password()` makes BitLocker's recovery-password format: 8 groups of 6 digits, each a multiple of 11 below 720,896. `valid_recovery_password` checks it.
+  - **`RecoveryProtectors`** is the port that adds a key to a volume and removes one by its id, which is not secret. **`SystemProtectors`** is the host's:
+    - **Windows:** `Add-BitLockerKeyProtector -RecoveryPasswordProtector` and `Remove-BitLockerKeyProtector`, with the key passed through the environment.
+    - **Linux:** `cryptsetup luksAddKey`, with the key in a 0600 file under `/run`, removed at once. The new slot is found by comparing the header before and after (`parse_keyslots`). `cryptsetup luksKillSlot -q` removes a slot.
 
 ## `keystore`: sealed secrets
 
@@ -46,7 +51,7 @@ Layer: **runtime**. A node's identity on its host, shared by the edge and the de
 ## Not yet
 
 - **Other node keys:** the sync mTLS node key and the edge pepper use the same keystore when their features arrive.
-- **The central side:** provisioning codes, recovery-key escrow and the decommission record are #268.
+- **The central side** (#268) is `health-provisioning`. The decommission record is still to come.
 - **Exemptions:** an exemption is configuration (`HEALTH_ENCRYPTION_EXEMPTION`). Checking it against signed country configuration comes with configuration packages.
 
 ## Tests

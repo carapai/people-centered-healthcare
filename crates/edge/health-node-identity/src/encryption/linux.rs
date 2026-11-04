@@ -106,7 +106,8 @@ pub(super) fn protection(path: &Path) -> Protection {
     }
 }
 
-fn luks(path: &Path) -> Result<Protection, String> {
+/// The LUKS device holding `path` and its version, or `None` if the path is not encrypted.
+pub(super) fn luks_device(path: &Path) -> Result<Option<(String, String)>, String> {
     let path = path.to_str().ok_or("the path is not UTF-8")?;
     let source = run(
         "findmnt",
@@ -132,7 +133,11 @@ fn luks(path: &Path) -> Result<Protection, String> {
             &device,
         ],
     )?;
-    let Some((luks, version)) = parse_lsblk(&tree)? else {
+    parse_lsblk(&tree)
+}
+
+fn luks(path: &Path) -> Result<Protection, String> {
+    let Some((luks, version)) = luks_device(path)? else {
         return Ok(Protection::Unencrypted);
     };
     if version != "2" {

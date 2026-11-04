@@ -1,5 +1,5 @@
-//! The edge's one call to central before it has an identity: redeeming its provisioning code
-//! (#268). HTTPS only. Central's certificate is verified against the operating system's trust
+//! The edge's calls to central (#268): redeeming its provisioning code, and escrowing its disk
+//! recovery keys. HTTPS only. Central's certificate is verified against the operating system's trust
 //! store, or, when the installer names one, against that CA alone (an in-country private CA).
 //! There is no bundled root store, and no way to skip verification.
 
@@ -56,6 +56,22 @@ pub(crate) fn post_json(
     body: &Value,
     ca_pem: Option<&str>,
 ) -> Result<(u16, Value), String> {
+    post(
+        url,
+        "application/json",
+        body.to_string().into_bytes(),
+        ca_pem,
+    )
+}
+
+/// POSTs `body` of `content_type` to `url`; returns the status and the JSON answer (`null` if
+/// none).
+pub(crate) fn post(
+    url: &str,
+    content_type: &str,
+    body: Vec<u8>,
+    ca_pem: Option<&str>,
+) -> Result<(u16, Value), String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -64,9 +80,9 @@ pub(crate) fn post_json(
         let client: Client<_, Full<VecDeque<u8>>> =
             Client::builder(TokioExecutor::new()).build(tls(ca_pem)?);
         let request = hyper::Request::post(url)
-            .header("content-type", "application/json")
+            .header("content-type", content_type)
             .header("accept", "application/json")
-            .body(Full::new(VecDeque::from(body.to_string().into_bytes())))
+            .body(Full::new(VecDeque::from(body)))
             .map_err(|e| format!("{url}: {e}"))?;
         let response = tokio::time::timeout(TIMEOUT, client.request(request))
             .await

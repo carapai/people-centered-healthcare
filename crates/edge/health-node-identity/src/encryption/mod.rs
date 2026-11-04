@@ -14,6 +14,7 @@
 //! before each start and the service reads its state file.
 
 mod linux;
+pub mod recovery;
 mod windows;
 
 use std::path::{Path, PathBuf};
@@ -270,7 +271,7 @@ pub fn system_root() -> PathBuf {
 }
 
 /// Runs `program` with `args`, returning its stdout if it succeeded.
-fn run(program: &str, args: &[&str]) -> Result<String, String> {
+pub(super) fn run(program: &str, args: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new(program)
         .args(args)
         .output()

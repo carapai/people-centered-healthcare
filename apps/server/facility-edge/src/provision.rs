@@ -8,8 +8,11 @@
 //!   3. The request goes to central's `POST /api/provisioning/nodes` over HTTPS, with central
 //!      verified against the system trust store, or `--central-ca` alone.
 //!   4. Central's answer is checked and installed as `install` does.
-//!   5. `node.json` records the node ID, short code and facility central gave. The node then runs
-//!      under them unless `HEALTH_NODE_ID` or `HEALTH_FACILITY` says otherwise.
+//!   5. `node.json` records the node ID, short code and facility central gave, and where central
+//!      is. The node then runs under them unless `HEALTH_NODE_ID` or `HEALTH_FACILITY` says
+//!      otherwise.
+//!   6. On an encrypted edge, the disk recovery keys are generated and escrowed at central
+//!      ([`crate::recovery`]).
 //! - `provision request --out FILE`: refuse a machine that fails the full-disk encryption gate
 //!   (exit 10) unless it is exempted, then generate the facility intermediate's key, seal it in
 //!   the keystore, and write its certificate request for central's issuing CA.
@@ -234,13 +237,40 @@ fn online(config: &EdgeConfig, keystore: &Keystore, args: &[String]) -> Result<(
     // 4. The chain, checked as `install` checks it, for the node ID central gave.
     install_pem(config, keystore, &chain, &root_pem, &node_id)?;
 
-    // 5. The identity.
+    // 5. The identity, and where central is, for escrows to come.
+    let central_ca_path = args
+        .iter()
+        .position(|a| a == "--central-ca")
+        .and_then(|i| args.get(i + 1))
+        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| PathBuf::from(p)));
     replace(
         &config.pki_dir.join(IDENTITY),
-        &serde_json::json!({ "node_id": node_id, "short_code": short_code, "facility": facility })
-            .to_string(),
+        &serde_json::json!({
+            "node_id": node_id,
+            "short_code": short_code,
+            "facility": facility,
+            "central": central,
+            "central_ca": central_ca_path,
+        })
+        .to_string(),
     )?;
     eprintln!("facility-edge: provisioned as {short_code} ({node_id}) at {facility}");
+
+    // 6. The disk recovery keys (ADR 0048), escrowed before anyone leaves the machine.
+    if encrypted {
+        let rotated = crate::recovery::rotate_here(config, keystore, None, None).map_err(|e| {
+            Failure::Failed(format!(
+                "provisioned, but the disk recovery keys were not escrowed: {e}; run \
+                 `facility-edge encryption rotate-recovery`"
+            ))
+        })?;
+        for key in &rotated.escrowed {
+            eprintln!(
+                "facility-edge: {} recovery key escrowed at central",
+                key.volume.as_str()
+            );
+        }
+    }
     Ok(())
 }
 

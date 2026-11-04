@@ -92,8 +92,15 @@ Clearing browser storage loses the key, so the device must be re-enrolled. Admin
   - Central wraps each key through a `KeyWrap` port: XChaCha20-Poly1305 under `HEALTH_KMS_KEY_FILE` until the KMS.
   - It refuses a replayed or stale escrow.
   - `central-server recovery read` is the audited phone read-out. A key read out alerts hourly until it is rotated.
+- **#268, part 3b:** the edge's recovery keys.
+  - **The flow:** `facility-edge encryption rotate-recovery`, also run at the end of `provision --code`.
+    1. It generates a BitLocker-format recovery password for each encrypted volume.
+    2. It adds it with `Add-BitLockerKeyProtector` or `cryptsetup luksAddKey`.
+    3. It escrows the passwords in one signed JWS, removing them again if central refuses.
+    4. Only then does it remove the keys it escrowed before.
+  - **Untouched:** the install passphrase and other keys it did not create.
 - **Still to come:**
-  - the edge's half of escrow and rotation, decommissioning, and HSM or KMS signing for the issuing CA (#268);
+  - decommissioning, and HSM or KMS signing for the issuing CA (#268);
   - the Tauri apps' keyring key and their pinning of the intermediate's SPKI from the pairing code (with the desktop and Android builds);
   - device registrations and revocations syncing to central;
   - CRL delivery in the sync revocation lane;

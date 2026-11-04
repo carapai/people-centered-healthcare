@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 base64 = { workspace = true }
 health-time = { workspace = true }
+rand_core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

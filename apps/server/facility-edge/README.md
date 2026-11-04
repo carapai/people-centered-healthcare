@@ -113,11 +113,23 @@ The edge's half of provisioning (lan-security.md; ADRs 0048, 0058; #268). Centra
    - Central's certificate is verified against the system trust store, or against `--central-ca` alone for an in-country private CA.
    - There is no bundled root store, and verification cannot be turned off.
 4. It installs central's chain as `provision install` does, for the node ID central minted.
-5. It writes `node.json` (node ID, short code, facility) to `HEALTH_PKI_DIR`.
+5. It writes `node.json` (node ID, short code, facility, and central's address and CA) to `HEALTH_PKI_DIR`.
    - The node runs under them unless `HEALTH_NODE_ID` or `HEALTH_FACILITY` is set.
    - `provision status` shows the short code.
+6. On an encrypted edge, it generates and escrows the disk recovery keys, as `encryption rotate-recovery` does. On Linux, cryptsetup asks for the install passphrase. If escrow fails, the node is provisioned but exits 11, saying to run `encryption rotate-recovery`.
 
 A wrong or used code exits 11. So does an unreachable or untrusted central, and the code stays redeemable.
+
+**Disk recovery keys** (ADR 0048): `facility-edge encryption rotate-recovery [--central URL] [--central-ca FILE]`, as root or Administrator. Run it after central reads a key out (`central-server recovery read`). Central's address defaults to the one in `node.json`.
+1. For the system volume, and the data directory's when it is another one, it generates a recovery password: 48 digits in 8 groups of 6, as BitLocker uses, readable over the phone.
+2. It adds the password to the volume.
+   - **Windows:** `Add-BitLockerKeyProtector`.
+   - **Linux:** `cryptsetup luksAddKey`, which asks for a secret the volume already has. That is the install passphrase, or the key just read out.
+3. It escrows them all in one JWS signed with the facility intermediate's key (`POST /api/provisioning/recovery`). If central does not take them, the new keys are removed again, so the disk never holds a key central does not.
+4. It records the new keys' ids in `recovery.json` (ids only, never a key).
+5. It removes the keys it escrowed before. Keys it did not create, such as the install passphrase, are left alone.
+
+These commands need an encrypted volume with a TPM. They are tested with a stand-in for the platform tools, and are to be confirmed on facility hardware.
 
 **By files** (no connectivity at the edge):
 
