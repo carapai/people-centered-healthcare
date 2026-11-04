@@ -1,0 +1,18 @@
+[package]
+name = "health-billing-contract"
+description = "Billing's contract: the Financial Gate query the workflow engine asks, so it never reads ledger internals (ADR 0033)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "contracts"
+context = "billing"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }

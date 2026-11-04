@@ -545,3 +545,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Not wired yet:** delivering clinical Modules' events to `capture` waits for the in-process event dispatch (`health-messaging`), which does not exist yet. Capture is driven directly until then.
 
   This completes #121.
+- 2026-11-05: #121 part 2 merged (#321), completing #121. #122, Financial Gates, is split: part 1 is the contract and the rules (this), part 2 billing's gate query over Accounts (settlements, deferrals, waivers), and part 3 gate states in the workflow engine, with a cashier Task on block.
+  - **New contract crate `health-billing-contract`:** `GateQuery`, `GateOutcome` and the `FinancialGates` port.
+  - **`health-billing::evaluate`:** the ordered gate rules. Emergency and urgent care always defers, which is the acceptance criterion and is tested for every gate shape. A preauthorization must be approved, and `Deferral` and `Waiver` records must say who and why.
+  - **Decisions:**
+    - urgent care defers even when a preauthorization is missing;
+    - a gate that does not allow blocking defers unpaid routine care rather than passing it, so the deferral is recorded.

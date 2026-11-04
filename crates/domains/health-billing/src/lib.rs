@@ -15,8 +15,15 @@
 //! - **Free care**: a trigger may name a funding source (government or donor). Its charges are
 //!   priced at the reference tariff and paid wholly by that source, so the patient share is zero
 //!   and the consumption is still recorded (§70).
+//! - **Financial Gates** ([`FinancialGate`], [`evaluate`]; ADR 0033): Finance's answer when a
+//!   workflow reaches a gate. Emergency and urgent care is never blocked; deferred charges stay
+//!   owed, and a [`Waiver`] is a separate, permitted and audited decision.
 
 use std::future::Future;
+
+mod gate;
+
+pub use gate::{Deferral, FinancialGate, GateFacts, GateRefused, Waiver, evaluate};
 
 use health_identifiers::{DerivationName, derive_id};
 use health_persistence::{StoreError, WriteError};

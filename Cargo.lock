@@ -2276,6 +2276,7 @@ dependencies = [
 name = "health-billing"
 version = "0.1.0"
 dependencies = [
+ "health-billing-contract",
  "health-identifiers",
  "health-persistence",
  "health-time",
@@ -2299,6 +2300,14 @@ dependencies = [
  "surrealdb",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "health-billing-contract"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
