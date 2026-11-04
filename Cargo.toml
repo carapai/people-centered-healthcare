@@ -4,6 +4,7 @@ members = [
     "crates/foundation/health-errors",
     "crates/foundation/health-identifiers",
     "crates/foundation/health-time",
+    "crates/contracts/health-billing-contract",
     "crates/contracts/health-fhir-models",
     "crates/contracts/health-fhir-search",
     "crates/contracts/health-fhir-validation",
@@ -85,6 +86,7 @@ health-node-identity = { path = "crates/edge/health-node-identity" }
 health-configuration = { path = "crates/domains/health-configuration" }
 health-terminology = { path = "crates/domains/health-terminology" }
 health-workflow-actions = { path = "crates/contracts/health-workflow-actions" }
+health-billing-contract = { path = "crates/contracts/health-billing-contract" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
 health-patient-engagement = { path = "crates/domains/health-patient-engagement" }

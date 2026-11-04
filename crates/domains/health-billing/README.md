@@ -15,3 +15,12 @@ Layer: **domain** (billing). Charge capture from configured triggers on clinical
   - `billed` puts it on an Invoice or Claim;
   - `cancel` makes a planned charge `not-billable`, and a billable one `entered-in-error` with a `Reversal::Post`. A billed charge is corrected on its Invoice, and cancelling twice changes nothing.
 - **`ChargeStore`:** the driven port. `add_charge` is false for a charge already kept, which is how a replay never double-charges.
+- **Financial Gates** (`FinancialGate`, `evaluate`; ADR 0033; #122). The rules, in order:
+  1. a gate not active here passes;
+  2. emergency or urgent care defers whenever anything is owed or a preauthorization is missing, so it is never blocked;
+  3. a missing preauthorization blocks where the gate allows it, else defers;
+  4. nothing owed passes;
+  5. a recorded deferral defers;
+  6. otherwise the gate blocks where it allows blocking, else defers.
+
+  `Deferral` and `Waiver` must say who and why, and a waiver can be no more than is owed. Who may waive is the caller's permission check.

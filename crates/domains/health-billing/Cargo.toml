@@ -14,6 +14,7 @@ context = "billing"
 workspace = true
 
 [dependencies]
+health-billing-contract = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }
