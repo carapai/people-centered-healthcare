@@ -15,6 +15,7 @@
 
 mod auth;
 mod blocking;
+mod charges;
 mod connection;
 mod consent;
 mod devices;

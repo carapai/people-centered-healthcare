@@ -1,0 +1,28 @@
+[package]
+name = "health-billing-app"
+description = "Charge capture at the facility authority: charges captured from clinical events, priced, kept once and posted to the ledger, with reversals on cancellation (billing-and-payments.md § Charge capture; ADRs 0030, 0031)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "billing"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-billing = { workspace = true }
+health-financial-ledger = { workspace = true }
+health-persistence = { workspace = true }
+health-pricing = { workspace = true }
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
