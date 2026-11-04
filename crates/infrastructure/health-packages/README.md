@@ -40,6 +40,15 @@ Layer: **infrastructure**. Published Definition packages on disk and in transit 
   - duplicate entries;
   - anything past the `Limits`: 50,000 entries, 512 MiB per file and 2 GiB in all by default.
 
+## Terminology
+
+`terminology::load(&mut terminology, files)` reads a package's CodeSystems, ValueSets and ConceptMaps into [`health-terminology`](../../domains/health-terminology)'s model (#90).
+
+- **A ValueSet's `expansion`** is its pinned expansion. Nested `contains` are flattened, and abstract headings without a code are skipped.
+- **A CodeSystem without `caseSensitive`** is taken as case-sensitive, the stricter reading.
+- **ConceptMaps are R5:** a group's `source` and `target` lose any `|version`, and `noMap` is a target with no code, `not-related-to`.
+- **Refused, never skipped:** a resource without its `url`, an unknown `content` or filter operator, a filter without its parts, a concept or listed code without its code, a group without its source and target, and an unknown relationship (`Error::Terminology`). Files that are not top-level JSON resources of those types are left alone.
+
 ## Configuration schemas
 
 - **The schemas belong to the software,** not the package. A schema a package brought with it would let its author pass anything.
@@ -103,7 +112,7 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
 
 ## Tests
 
-- **Unit:** the bump rules, row by row, for each resource type; deterministic round trips, refused paths, hostile archives (traversal, absolute paths, a file outside `package/`, symlinks, hard links, FIFOs) and limits.
+- **Unit:** reading terminology: a package served through every operation, including a pinned ICD-10 subset and a ConceptMap with `noMap`; each malformed case refused; the default case sensitivity; and the core package's `template-modes` expanding from its CodeSystem. Also the bump rules, row by row, for each resource type; deterministic round trips, refused paths, hostile archives (traversal, absolute paths, a file outside `package/`, symlinks, hard links, FIFOs) and limits.
 - **Integration (`tests/packages.rs`):** a real root and publication certificate.
   - A package publishes and verifies with its identity and index.
   - Dependency ranges and unpinned manifest canonicals are rejected at publication.
