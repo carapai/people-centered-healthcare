@@ -57,3 +57,12 @@ What the engine persists (#97; ADR 0044), through the unit of work's transaction
 - **`HistoryEntry`:** every transition, appended once at `[instance, seq]`: the event, the from- and to-configuration, the effects, the actor, the time and the `op_id`. Its `seq` is the version the transition produced.
 - **`TimerRecord`:** a durable timer and its status (pending, fired, cancelled). `due_timers` lists the pending ones due, earliest first.
 - **The inbox:** `claim_event` records a domain event as processed, and is false if it already was.
+
+## Human tasks and `worklists`
+
+- **`HumanTask`** on an atomic `State` marks a human step: its role or performer type, its form (a Questionnaire `url|version`), its worklist, its `Priority` (FHIR request-priority) and its claim timeout (15 minutes by default). `problems` refuses one on a state that is not atomic, with no role or worklist, a form that is not `url|version`, or a timeout that is not positive.
+- **`worklists`** is the Read Model the catalogue names `health-worklists`, a module here until it needs its own crate (#99):
+  - `project(chart, record, history, now)` rebuilds every Task of an instance from instance state alone. Each entry into a human-task state is one Task, with id `task_id(instance, state, seq)`.
+  - **Task status** uses the 12 R5 codes. An open task is `ready`, or `in-progress` while claimed. A task whose state was left is `completed`, or `cancelled` if the instance was cancelled. `businessStatus` is the state's id.
+  - **Claims and escalation** live in reserved `task.<state>.*` data-model fields (`owner_field`, `claimed_field`, `priority_field`). A claim lapses once idle for the task's timeout, and escalation only ever raises priority.
+  - `worklist(tasks, key)` lists a worklist's open tasks, most urgent first, then by arrival.

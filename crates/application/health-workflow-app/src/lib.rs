@@ -43,11 +43,7 @@ pub use timers::{Fired, SCHEDULER_INTERVAL, TimeFloor};
 /// approved with the definition (ADR 0043).
 pub const PRINCIPAL: &str = "workflow-principal";
 
-/// The name of the event a cancellation records.
-pub const CANCELLED: &str = "workflow.cancelled";
-
-/// The name of the event a start records.
-pub const STARTED: &str = "workflow.started";
+pub use health_workflow::{CANCELLED, STARTED};
 
 /// The namespace of the engine's UUIDv5s: instance ids and action keys.
 const NAMESPACE: Uuid = Uuid::from_u128(0x6f1c_2d0e_9b7a_4c51_8e3f_0a4d_5b6c_7e8f);

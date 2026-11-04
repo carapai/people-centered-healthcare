@@ -15,7 +15,8 @@
 //! [`WorkflowDefinition::problems`] is the publication gate's check, against the actions the
 //! release knows ([`ActionDescriptor`]): every action reference and its parameters valid, every
 //! assignment typed, no unreachable states, no non-final state without an exit, decision tables
-//! well formed, and no principal permission that no action needs. There is no scripting: guards
+//! well formed, human tasks only on atomic states with a role, a worklist and a `url|version`
+//! form, and no principal permission that no action needs. There is no scripting: guards
 //! and conditions are FHIRPath, evaluated through a port. Type-checking guards against the data
 //! requirements comes with workflow simulation (#101).
 
@@ -153,6 +154,10 @@ pub enum Problem {
     /// A decision table with no rows, an empty condition, or an id used twice.
     #[error("decision table {0} is not well formed")]
     BadDecisionTable(String),
+    /// A human task on a state that is not atomic, with no role or worklist, a form that is not
+    /// `url|version`, or a claim timeout that is not positive.
+    #[error("the human task of state {0} is not well formed")]
+    BadTask(String),
     /// A principal permission no action of the definition needs.
     #[error("the workflow principal declares {0}, which no action needs")]
     UnneededPermission(String),
@@ -224,6 +229,23 @@ impl WorkflowDefinition {
         }
 
         self.check_reachability(&all, &mut problems);
+
+        for (state, _) in &all {
+            if let Some(task) = &state.task {
+                let malformed = state.kind != Kind::Atomic
+                    || task.role.trim().is_empty()
+                    || task.worklist.trim().is_empty()
+                    || task.form.as_deref().is_some_and(|form| {
+                        !form
+                            .split_once('|')
+                            .is_some_and(|(u, v)| !u.is_empty() && !v.is_empty())
+                    })
+                    || task.claim_timeout <= health_time::SignedDuration::ZERO;
+                if malformed {
+                    problems.push(Problem::BadTask(state.id.clone()));
+                }
+            }
+        }
 
         let mut ids = BTreeSet::new();
         for table in &self.decision_tables {

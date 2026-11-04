@@ -20,6 +20,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::interpreter::{Effect, Event, Instance};
 
+/// The event a start records in history.
+pub const STARTED: &str = "workflow.started";
+
+/// The event a cancellation records in history.
+pub const CANCELLED: &str = "workflow.cancelled";
+
 /// A workflow instance, as stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstanceRecord {
