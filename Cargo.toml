@@ -13,6 +13,7 @@ members = [
     "crates/domains/health-client-registry",
     "crates/domains/health-configuration",
     "crates/domains/health-consent",
+    "crates/domains/health-billing",
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
     "crates/domains/health-inventory",
@@ -77,6 +78,7 @@ health-integration = { path = "crates/infrastructure/health-integration" }
 health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
+health-billing = { path = "crates/domains/health-billing" }
 health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
 health-node-identity = { path = "crates/edge/health-node-identity" }
 health-configuration = { path = "crates/domains/health-configuration" }

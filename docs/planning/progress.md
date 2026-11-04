@@ -527,3 +527,8 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the extensions have no published StructureDefinitions yet.
 
   This completes #120.
+- 2026-11-05: #120 part 3 merged (#319), completing #120. #121, charge capture, is split: part 1 is the domain (this), part 2 the application (storage, pricing at capture, ledger postings and reversals) and its replay tests.
+  - **New domain crate `health-billing`:** charge triggers (configuration), clinical events, and `capture` with deterministic ids (identifiers.md's `{source}|{rule canonical}` derivation, per event item). It also covers the charge lifecycle (planned → billable → billed; cancellation to not-billable or entered-in-error with a reversal) and free care's zero patient share.
+  - **Decisions:**
+    - a charge id includes the event item's key, so a multi-item dispense gives one charge per item;
+    - a billed charge is not cancelled here but corrected on its Invoice.

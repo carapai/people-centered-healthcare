@@ -1,0 +1,25 @@
+[package]
+name = "health-billing"
+description = "Billing: charge capture from configured triggers on clinical events, with deterministic ChargeItem ids and the charge lifecycle (billing-and-payments.md § Charge capture)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "billing"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
