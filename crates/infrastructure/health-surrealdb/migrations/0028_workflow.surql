@@ -16,7 +16,8 @@ DEFINE TABLE workflow_history SCHEMAFULL;
 DEFINE FIELD data ON workflow_history TYPE string READONLY;
 DEFINE FIELD instance ON workflow_history TYPE string READONLY;
 DEFINE FIELD seq ON workflow_history TYPE int READONLY;
-DEFINE INDEX workflow_history_instance ON workflow_history FIELDS instance, seq UNIQUE;
+DEFINE INDEX workflow_history_instance ON workflow_history FIELDS instance, seq
+  UNIQUE;
 -- `workflow_timer`: durable timers, keyed `instance|timer`. #98 fires the pending ones due.
 DEFINE TABLE workflow_timer SCHEMAFULL;
 DEFINE FIELD data ON workflow_timer TYPE string;
