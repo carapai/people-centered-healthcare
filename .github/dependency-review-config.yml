@@ -16,6 +16,9 @@ allow-licenses:
   - Zlib
   - MPL-2.0
 allow-dependencies-licenses:
+  # The FHIR R5 specification package (CC0-1.0), which FHIR packages declare as their core
+  # dependency (#87; deployment.md § Licences). CC0-1.0 stays off the general allowlist.
+  - pkg:npm/hl7.fhir.r5.core
   - pkg:cargo/surrealdb
   - pkg:cargo/surrealdb-catalog
   - pkg:cargo/surrealdb-cnf

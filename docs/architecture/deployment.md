@@ -87,6 +87,7 @@ Five workflows are in `.github/workflows/` (#47); every action is pinned to a fu
 
 - **Allowed:** MIT, Apache-2.0, BSD-2/3-Clause, ISC, Unicode-3.0, Zlib, MPL-2.0.
 - **SurrealDB's BSL 1.1:** an explicit, documented exception.
+- **The FHIR R5 specification package** (`hl7.fhir.r5.core`, CC0-1.0): an exception for that package alone, approved in #87. FHIR packages declare it as their core dependency. CC0-1.0 stays off the general allowlist.
 - **GPL and AGPL** need an ADR.
 
 ## Build matrix (§114)

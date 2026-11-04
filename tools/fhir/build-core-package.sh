@@ -88,9 +88,9 @@ jq -n --arg name "$NAME" --arg version "$VERSION" --arg canonical "$CANONICAL" '
 # Every canonical the package depends on, pinned: the base definitions its profiles and
 # extensions derive from, and its own artefacts, which it is composed of.
 depends=$(jq -r 'select(.resourceType == "StructureDefinition") | .baseDefinition' "$OUT"/*.json |
-  sort -u | sed 's/$/|5.0.0/')
+  LC_ALL=C sort -u | sed 's/$/|5.0.0/')
 composed=$(jq -r 'select(.url != null) | "\(.url)|\(.version)"' "$OUT"/StructureDefinition-*.json \
-  "$OUT"/CodeSystem-*.json "$OUT"/ValueSet-*.json | sort -u)
+  "$OUT"/CodeSystem-*.json "$OUT"/ValueSet-*.json | LC_ALL=C sort -u)
 jq -n --arg url "$CANONICAL/Library/$NAME-manifest" --arg version "$VERSION" \
   --arg depends "$depends" --arg composed "$composed" '{
   resourceType: "Library",
