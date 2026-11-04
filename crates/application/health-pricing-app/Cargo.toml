@@ -14,13 +14,18 @@ context = "pricing"
 workspace = true
 
 [dependencies]
+health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-pricing = { workspace = true }
 health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
+health-identifiers = { workspace = true }
+health-fhir-validation = { workspace = true }
 health-surrealdb = { workspace = true }
-rust_decimal = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tokio = { workspace = true }

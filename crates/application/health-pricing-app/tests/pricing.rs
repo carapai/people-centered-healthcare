@@ -26,7 +26,7 @@ async fn pricing() -> Pricing<SurrealStore> {
     .expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
     let clock: Arc<dyn Clock> = Arc::new(FixedClock::new(at("2026-11-04T09:00:00Z")));
-    Pricing::new(SurrealStore::new(connection, clock.clone()), clock)
+    Pricing::new(SurrealStore::new(connection, clock.clone()), clock, "UGX")
 }
 
 fn book(price: i64, from: &str) -> PriceBook {
@@ -213,4 +213,100 @@ async fn an_approved_rule_prices_charges_and_the_authority_checks_the_versions()
         pricing.approve_rule("night", 1, "finance-1").await,
         Err(PricingAppError::NotFound("night|1".into()))
     );
+}
+
+async fn definition(pricing_store: &SurrealStore, id: &str) -> serde_json::Value {
+    use health_persistence::{ResourceType, Store, Transaction};
+    let kind: ResourceType = "ChargeItemDefinition".parse().expect("type");
+    let id = health_identifiers::ResourceId::from_uuid(id.parse().expect("uuid")).expect("id");
+    let mut tx = pricing_store.begin().await.expect("begin");
+    let head = tx.read(&kind, id).await.expect("read").expect("projected");
+    let issues = health_fhir_validation::validate_structure(head.json.as_str());
+    assert!(issues.is_empty(), "valid FHIR R5: {issues:?}");
+    serde_json::from_str(head.json.as_str()).expect("json")
+}
+
+#[tokio::test]
+async fn approved_versions_are_projected_as_charge_item_definitions() {
+    let connection = Connection::open(&Settings {
+        target: Target::Memory,
+        namespace: "pricing-fhir".into(),
+        database: "main".into(),
+    })
+    .await
+    .expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let clock: Arc<dyn Clock> = Arc::new(FixedClock::new(at("2026-11-04T09:00:00Z")));
+    let store = SurrealStore::new(connection, clock.clone());
+    let pricing = Pricing::new(store.clone(), clock, "UGX");
+
+    let mut tiered = book(500, "2026-01-01T00:00:00Z");
+    tiered.entries[0].tiers = vec![health_pricing::Tier {
+        min: Decimal::from(10),
+        unit: Decimal::new(4005, 1),
+    }];
+    let draft = pricing.draft_book(tiered, "author-1").await.expect("draft");
+    let id = health_pricing_app::fhir::entry_id(&draft, "consult");
+    {
+        use health_persistence::{ResourceType, Store, Transaction};
+        let kind: ResourceType = "ChargeItemDefinition".parse().expect("type");
+        let rid = health_identifiers::ResourceId::from_uuid(id.parse().expect("uuid")).expect("id");
+        let mut tx = store.begin().await.expect("begin");
+        assert!(
+            tx.read(&kind, rid).await.expect("read").is_none(),
+            "drafts are not projected"
+        );
+    }
+    let approved = pricing
+        .approve_book("kam", 1, "finance-1")
+        .await
+        .expect("approve");
+    let projected = definition(&store, &id).await;
+    assert_eq!(projected["status"], "active");
+    assert_eq!(projected["version"], "1");
+    assert_eq!(projected["code"]["text"], "consult");
+    assert_eq!(
+        projected["propertyGroup"][0]["priceComponent"][0],
+        serde_json::json!({ "type": "base", "amount": { "value": 500, "currency": "UGX" } })
+    );
+    assert_eq!(
+        projected["propertyGroup"][1]["applicability"][0]["condition"]["expression"],
+        "%quantity >= 10"
+    );
+    assert_eq!(
+        projected["propertyGroup"][1]["priceComponent"][0]["amount"]["value"],
+        serde_json::json!(400.5)
+    );
+    assert_eq!(projected["extension"][0]["valueString"], "facility|KAM013");
+
+    pricing
+        .retire_book("kam", 1, at("2026-12-01T00:00:00Z"))
+        .await
+        .expect("retire");
+    assert_eq!(
+        definition(&store, &id).await["applicability"][0]["effectivePeriod"]["end"],
+        "2026-12-01T00:00:00Z"
+    );
+    assert_eq!(approved.version, 1);
+
+    pricing
+        .draft_rule(surcharge(), "author-1")
+        .await
+        .expect("draft rule");
+    let rule = pricing
+        .approve_rule("after-hours", 1, "finance-1")
+        .await
+        .expect("approve rule");
+    let projected = definition(&store, &health_pricing_app::fhir::rule_id(&rule)).await;
+    let group = &projected["propertyGroup"][0];
+    assert_eq!(
+        group["applicability"][0]["condition"]["expression"],
+        "%afterHours"
+    );
+    assert_eq!(
+        group["priceComponent"][0],
+        serde_json::json!({ "type": "surcharge", "factor": 0.2 })
+    );
+    assert_eq!(projected["extension"][0]["valueCode"], "surcharge");
+    assert_eq!(projected["extension"][1]["valueInteger"], 1);
 }

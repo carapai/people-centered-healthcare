@@ -6,6 +6,10 @@ Layer: **application** (pricing). Pricing at central, where Price Books and rule
 - **`approve_book` and `approve_rule`:** one finance approver who is not the author. The domain refuses overlapping versions of the same book or rule, malformed prices, and rules conflicting with approved ones.
 - **`retire_book` and `retire_rule`:** an approved version ends from a time not yet passed, which is the only change an approved version takes.
 - **`price` and `check`:** a charge priced through the six stages from every kept version, and the authority's check of the versions a charge records.
+- **ChargeItemDefinitions** (`fhir`): approving or retiring a version writes them in the same transaction. Drafts are not projected, and each version has its own resource.
+  - **A book entry:** its `code`, the book's `version`, R5 `applicability.effectivePeriod`, a `base` component and a property group per quantity tier.
+  - **A rule:** its applicability and one `surcharge`, `discount` or `deduction` component, as a `factor` or an `amount`.
+  - **Platform extensions:** the book's scope, and the rule's stage, priority, items and bundle.
 - **Transactions and permissions:** each step is one transaction, and who may draft and approve is the caller's permission check.
 
 ## Tests

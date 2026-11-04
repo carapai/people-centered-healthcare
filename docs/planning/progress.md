@@ -518,3 +518,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the approver may not be the author (separation of duties, as for packages);
     - a superseding version starts after the previous one is retired, rather than ending it implicitly.
   - **Next:** part 3 serves this over HTTP at central and projects approved books and rules as ChargeItemDefinitions.
+- 2026-11-04: #120 part 2 merged (#317), after CI ran out of disk (#318: the test job now frees the runner's unused toolchains and builds without debug info, which took `target/` from 43 GB to 23 GB). Part 3, pricing over HTTP and as FHIR:
+  - **ChargeItemDefinitions:** `health-pricing-app` writes them when a version is approved or retired. Each book entry and each rule gets one, carrying the R5 effective period, price components and tiers, with platform extensions for scope, stage, priority and items.
+  - **HTTP:** `health-fhir-server`'s `pricing_router` drafts, approves, retires, lists and quotes, under `pricing.manage`, `pricing.approve` and `pricing.quote`. Central mounts it at `/api/pricing` in `HEALTH_CURRENCY`.
+  - **Quotes:** applicability is evaluated with the FHIRPath engine against each line's context resource, before pricing.
+  - **Decisions:**
+    - the quote route takes its pricing context from the caller until charge capture (#121) builds it from clinical events;
+    - the extensions have no published StructureDefinitions yet.
+
+  This completes #120.

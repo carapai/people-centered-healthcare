@@ -2382,6 +2382,8 @@ dependencies = [
  "health-payments",
  "health-payments-app",
  "health-persistence",
+ "health-pricing",
+ "health-pricing-app",
  "health-registries-app",
  "health-surrealdb",
  "health-terminology",
@@ -2696,14 +2698,18 @@ dependencies = [
 name = "health-pricing-app"
 version = "0.1.0"
 dependencies = [
+ "health-fhir-validation",
+ "health-identifiers",
  "health-persistence",
  "health-pricing",
  "health-surrealdb",
  "health-time",
  "rust_decimal",
+ "serde_json",
  "surrealdb",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
