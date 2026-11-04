@@ -76,6 +76,21 @@ impl fmt::Display for Version {
     }
 }
 
+impl serde::Serialize for Version {
+    /// As written: `1.2.3-rc.1`.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Version {
+    /// Only an exact version.
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
+        text.parse().map_err(serde::de::Error::custom)
+    }
+}
+
 impl Ord for Version {
     /// Semver precedence: a pre-release sorts before its release.
     fn cmp(&self, other: &Self) -> Ordering {

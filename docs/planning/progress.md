@@ -318,3 +318,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **central-server:** `node decommission | crl`.
 
   This completes #268. The HSM or KMS adapters for the issuing CA and the escrow master key, and CRL delivery to edges over sync, remain.
+- 2026-11-04: #268 part 4 merged (#294), completing #268. Phase 5 waits on the commit-counter spike #36, so Phase 6 starts with #88 before #87, whose package must publish through the lifecycle. #88 is split in three:
+  1. the lifecycle and the package-level semver check, in the domain (this);
+  2. the artefact-level bump rules: what a Questionnaire, CodeSystem, ValueSet or profile change requires;
+  3. central's storage of lifecycles and their records, audited, with publication through `health-packages` and `central-server` commands.
+
+  Part 1, `health-configuration::lifecycle`:
+  - **`Lifecycle`:** Draft → Validation → Simulation → Review → Approval → Published, each transition returning a `Record`. Failures and requested changes return it to Draft, which clears the review and the approvals.
+  - **Separation of duties:** revising makes you an author; no author reviews, approves or requests changes; clinical kinds need two distinct approvers and configuration kinds one.
+  - **Content pinned:** only a draft changes, and publication must sign the approved fingerprint.
+  - **`semver::check(latest, next)`:** the package bump follows its artefacts' own bumps, dependencies and files; a rewritten `url|version`, a downgrade, an inexact version or a version no newer is refused. Major zero and pre-releases promise nothing.
+
