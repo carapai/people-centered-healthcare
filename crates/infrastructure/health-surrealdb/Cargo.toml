@@ -28,6 +28,7 @@ health-fhir-search = { workspace = true }
 health-identity = { workspace = true }
 health-inventory = { workspace = true }
 health-payments = { workspace = true }
+health-pricing = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }

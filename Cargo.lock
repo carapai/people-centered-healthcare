@@ -2684,11 +2684,26 @@ dependencies = [
 name = "health-pricing"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "rust_decimal",
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "health-pricing-app"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "health-pricing",
+ "health-surrealdb",
+ "health-time",
+ "rust_decimal",
+ "surrealdb",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2778,6 +2793,7 @@ dependencies = [
  "health-inventory",
  "health-payments",
  "health-persistence",
+ "health-pricing",
  "health-time",
  "health-workflow",
  "jiff",

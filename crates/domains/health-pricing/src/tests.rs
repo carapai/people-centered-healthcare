@@ -42,6 +42,7 @@ fn book(id: &str, version: u32, scope: Scope, entries: Vec<Entry>) -> PriceBook 
         currency: "UGX".into(),
         effective: since_2026(),
         approval: approved(),
+        author: "finance-author".into(),
         entries,
     }
 }
@@ -92,6 +93,7 @@ fn rule(id: &str, stage: Stage, priority: u32, adjustment: Adjustment) -> PriceR
         adjustment,
         effective: since_2026(),
         approval: approved(),
+        author: "finance-author".into(),
     }
 }
 
@@ -501,4 +503,100 @@ fn books_and_rules_round_trip_as_json() {
     let json = serde_json::to_string(&(books(), rules())).expect("json");
     let back: (Vec<PriceBook>, Vec<PriceRule>) = serde_json::from_str(&json).expect("back");
     assert_eq!(back, (books(), rules()));
+}
+
+fn draft(mut book: PriceBook) -> PriceBook {
+    book.approval = Approval::Draft;
+    book
+}
+
+#[test]
+fn a_book_is_approved_once_by_someone_else_and_never_overlaps_itself() {
+    let now = at("2026-11-04T09:00:00Z");
+    let mut next = draft(book("kam", 4, kam(), vec![entry("consult", 13_000)]));
+    assert_eq!(
+        approve_book(&next, &books(), "finance-author", now),
+        Err(LifecycleError::OwnApproval)
+    );
+    assert_eq!(
+        approve_book(&next, &books(), "finance-1", now),
+        Err(LifecycleError::Overlaps(applied("kam", 2))),
+        "version 2 is in effect from 2026 with no end"
+    );
+    next.effective = Effective {
+        from: at("2027-01-01T00:00:00Z"),
+        to: None,
+    };
+    let mut all = books();
+    all[1] = retire_book(&all[1], at("2027-01-01T00:00:00Z"), now).expect("retire v2");
+    let approved_v4 = approve_book(&next, &all, "finance-1", now).expect("approved");
+    assert!(matches!(approved_v4.approval, Approval::Approved { ref by, .. } if by == "finance-1"));
+    assert_eq!(
+        approve_book(&approved_v4, &all, "finance-2", now),
+        Err(LifecycleError::NotDraft)
+    );
+
+    let empty = draft(book("empty", 1, kam(), vec![]));
+    assert!(matches!(
+        approve_book(&empty, &[], "finance-1", now),
+        Err(LifecycleError::BadPrices(_))
+    ));
+    let twice = draft(book(
+        "twice",
+        1,
+        kam(),
+        vec![entry("consult", 1), entry("consult", 2)],
+    ));
+    assert!(matches!(
+        approve_book(&twice, &[], "finance-1", now),
+        Err(LifecycleError::BadPrices(_))
+    ));
+}
+
+#[test]
+fn retirement_never_rewrites_the_past() {
+    let now = at("2026-11-04T09:00:00Z");
+    let v2 = &books()[1];
+    assert_eq!(
+        retire_book(v2, at("2026-06-01T00:00:00Z"), now),
+        Err(LifecycleError::BadRetirement),
+        "charges already priced from it keep their price"
+    );
+    let retired = retire_book(v2, at("2026-12-01T00:00:00Z"), now).expect("retired");
+    assert_eq!(retired.effective.to, Some(at("2026-12-01T00:00:00Z")));
+    assert_eq!(
+        retire_book(&retired, at("2027-01-01T00:00:00Z"), now),
+        Err(LifecycleError::BadRetirement),
+        "an end is never pushed later"
+    );
+    assert_eq!(
+        retire_book(&draft(v2.clone()), at("2026-12-01T00:00:00Z"), now),
+        Err(LifecycleError::NotApproved)
+    );
+}
+
+#[test]
+fn a_rule_conflicting_with_an_approved_rule_is_refused() {
+    let now = at("2026-11-04T09:00:00Z");
+    let mut clash = rule(
+        "night-surcharge",
+        Stage::Surcharge,
+        1,
+        Adjustment::Percent { percent: d(10) },
+    );
+    clash.approval = Approval::Draft;
+    assert_eq!(
+        approve_rule(&clash, &rules(), "finance-1", now),
+        Err(LifecycleError::Rule(vec![RuleProblem::Conflict(
+            "after-hours".into(),
+            "night-surcharge".into()
+        )]))
+    );
+    clash.priority = 2;
+    let approved_rule = approve_rule(&clash, &rules(), "finance-1", now).expect("approved");
+    assert!(matches!(approved_rule.approval, Approval::Approved { .. }));
+    assert_eq!(
+        approve_rule(&clash, &rules(), "finance-author", now),
+        Err(LifecycleError::OwnApproval)
+    );
 }

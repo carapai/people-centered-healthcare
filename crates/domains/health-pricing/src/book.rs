@@ -112,6 +112,9 @@ pub struct PriceBook {
     pub effective: Effective,
     /// Its approval.
     pub approval: Approval,
+    /// Who drafted it: they may not approve it.
+    #[serde(default)]
+    pub author: String,
     /// Its prices.
     pub entries: Vec<Entry>,
 }
@@ -179,6 +182,9 @@ pub struct PriceRule {
     pub effective: Effective,
     /// Its approval.
     pub approval: Approval,
+    /// Who drafted it: they may not approve it.
+    #[serde(default)]
+    pub author: String,
 }
 
 impl PriceRule {

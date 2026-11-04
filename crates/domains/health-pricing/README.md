@@ -18,6 +18,7 @@ Layer: **domain** (pricing). Price Books, Price Rules and the six fixed pricing 
 - **Recorded versions:** every `Component` names the book or rule version it came from, and `Priced` lists every version used.
 - **`check(priced, service_time, books, rules)`** is the authority's check that each version was approved and in effect then. A `Mismatch` becomes a Reconciliation Record, never a silent re-price.
 - **Applicability** is evaluated through the `Applicability` port, over the pricing context (ChargeItem, encounter, program, coverages, eligibility categories) that the application builds.
+- **Lifecycle** (`approve_book`, `approve_rule`, `retire_book`, `retire_rule`): approved once by a finance approver who is not the `author`, never overlapping another approved version of itself, immutable afterwards except for retirement from a time not yet passed. `PricingStore` keeps every version.
 - **Rounding:** amounts round to the currency's minor units, half away from zero.
 
 ## Tests

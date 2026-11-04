@@ -510,3 +510,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - deductibles and limits run down across a charge's lines;
     - a bundle's member lines are priced at zero, referencing a bundle line priced by the rule;
     - currency conversion is not in this part.
+- 2026-11-04: #120 part 1 merged (#316). Part 2, Price Books and rules kept at central:
+  - **Lifecycle in `health-pricing`:** one finance approver who is not the author, no overlapping approved versions of a book or rule, and no conflicting rules. An approved version is immutable except for retirement from a time not yet passed.
+  - **`PricingStore`:** migration `0030_pricing` (`price_book`, `price_rule`, one row per version, owned by pricing).
+  - **New crate `health-pricing-app`:** drafting (the next version, or replacing the latest draft), approving, retiring, pricing and the authority's check.
+  - **Decisions:**
+    - the approver may not be the author (separation of duties, as for packages);
+    - a superseding version starts after the previous one is retired, rather than ending it implicitly.
+  - **Next:** part 3 serves this over HTTP at central and projects approved books and rules as ChargeItemDefinitions.
