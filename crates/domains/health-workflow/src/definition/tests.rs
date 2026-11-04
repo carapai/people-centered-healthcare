@@ -285,3 +285,64 @@ fn a_definition_reads_from_its_library_content() {
     let definition: WorkflowDefinition = serde_json::from_str(json).expect("reads");
     assert_eq!(definition.problems(&catalog()), vec![]);
 }
+
+#[test]
+fn human_tasks_must_be_well_formed_on_atomic_states() {
+    let task = |form: Option<&str>| crate::model::HumanTask {
+        role: "nurse".into(),
+        form: form.map(str::to_owned),
+        worklist: "opd-triage".into(),
+        priority: crate::model::Priority::Urgent,
+        claim_timeout: crate::model::CLAIM_TIMEOUT,
+    };
+    let with = |task: crate::model::HumanTask, on_done: bool| {
+        let mut definition = definition(vec![]);
+        let index = usize::from(on_done) + 1;
+        definition.statechart.states[index].task = Some(task);
+        definition
+    };
+    let open = || open(&[("service_point", text("triage"))]);
+    let mut good = with(
+        task(Some("https://health.go.ug/fhir/Questionnaire/triage|2.0.0")),
+        false,
+    );
+    good.statechart.states[0].transitions[0]
+        .actions
+        .push(open());
+    assert_eq!(good.problems(&catalog()), vec![]);
+
+    let bad = |task, on_done| {
+        let mut definition = with(task, on_done);
+        definition.statechart.states[0].transitions[0]
+            .actions
+            .push(open());
+        definition.problems(&catalog())
+    };
+    let queued = vec![Problem::BadTask("queued".into())];
+    assert_eq!(bad(task(Some("no-version")), false), queued);
+    assert_eq!(
+        bad(
+            crate::model::HumanTask {
+                worklist: " ".into(),
+                ..task(None)
+            },
+            false
+        ),
+        queued
+    );
+    assert_eq!(
+        bad(
+            crate::model::HumanTask {
+                claim_timeout: health_time::SignedDuration::ZERO,
+                ..task(None)
+            },
+            false
+        ),
+        queued
+    );
+    assert_eq!(
+        bad(task(None), true),
+        vec![Problem::BadTask("done".into())],
+        "a final state is not a human step"
+    );
+}

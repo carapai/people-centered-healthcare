@@ -102,6 +102,61 @@ pub struct Invoke {
     pub src: String,
 }
 
+/// How urgent a human task is: FHIR's request-priority codes, least urgent first.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Priority {
+    /// Normal.
+    #[default]
+    Routine,
+    /// Sooner than routine.
+    Urgent,
+    /// As soon as possible.
+    Asap,
+    /// Immediately.
+    Stat,
+}
+
+impl Priority {
+    /// The FHIR code.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Routine => "routine",
+            Self::Urgent => "urgent",
+            Self::Asap => "asap",
+            Self::Stat => "stat",
+        }
+    }
+}
+
+/// The default claim timeout: a claimed task left idle this long is back on the worklist.
+pub const CLAIM_TIMEOUT: SignedDuration = SignedDuration::from_mins(15);
+
+fn claim_timeout() -> SignedDuration {
+    CLAIM_TIMEOUT
+}
+
+/// A human step: while its state is active, a Task is on a worklist for someone to do
+/// (workflow-engine.md § Statechart model). It is projected as a FHIR Task, never written into a
+/// clinical resource's status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HumanTask {
+    /// Who does it: a role or performer type code.
+    pub role: String,
+    /// The form to fill, a Questionnaire `url|version`.
+    #[serde(default)]
+    pub form: Option<String>,
+    /// The worklist it is on, e.g. `opd-triage`.
+    pub worklist: String,
+    /// How urgent it is.
+    #[serde(default)]
+    pub priority: Priority,
+    /// How long a claim lasts without activity.
+    #[serde(default = "claim_timeout")]
+    pub claim_timeout: SignedDuration,
+}
+
 /// A state and its children.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -130,6 +185,9 @@ pub struct State {
     /// Sub-workflows invoked while it is active.
     #[serde(default)]
     pub invoke: Vec<Invoke>,
+    /// The human task it stands for, if it is a human step. Only an atomic state may have one.
+    #[serde(default)]
+    pub task: Option<HumanTask>,
 }
 
 impl State {
@@ -145,6 +203,7 @@ impl State {
             transitions: Vec::new(),
             timers: Vec::new(),
             invoke: Vec::new(),
+            task: None,
         }
     }
 }

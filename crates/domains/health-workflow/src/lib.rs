@@ -15,7 +15,13 @@ pub mod definition;
 mod interpreter;
 mod model;
 mod store;
+pub mod worklists;
 
 pub use interpreter::{DefinitionError, Effect, Event, Guards, Instance, Machine, matches};
-pub use model::{Action, DataModel, Invoke, Kind, State, Statechart, Timer, Transition, Value};
-pub use store::{HistoryEntry, InstanceRecord, TimerRecord, TimerStatus, WorkflowStore};
+pub use model::{
+    Action, CLAIM_TIMEOUT, DataModel, HumanTask, Invoke, Kind, Priority, State, Statechart, Timer,
+    Transition, Value,
+};
+pub use store::{
+    CANCELLED, HistoryEntry, InstanceRecord, STARTED, TimerRecord, TimerStatus, WorkflowStore,
+};

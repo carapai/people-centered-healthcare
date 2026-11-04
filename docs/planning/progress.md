@@ -446,3 +446,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Not wired yet:** no runtime calls `fire_due` every 30 s yet. That waits for a node to run workflows, which needs activation (#89).
 
   This completes #98.
+- 2026-11-04: #98 merged (#310), completing #98. #99, Tasks and worklists, is split: part 1 is the domain (this), part 2 the claim and escalation commands with Task, RequestOrchestration and CarePlan projections, and part 3 the client's worklist screens.
+  - **`HumanTask` on statechart states:** role, form, worklist, priority and claim timeout, checked at publication.
+  - **`health_workflow::worklists`:** `project` rebuilds Task projections from instance state alone (12 R5 status codes, `businessStatus` = state id), and `worklist` orders a worklist's open tasks by priority, then arrival.
+  - **Decisions:**
+    - `health-worklists` starts as a module of `health-workflow`, as the crate catalogue says, not as its own crate;
+    - claims and escalated priorities live in reserved `task.<state>.*` data-model fields, so projections need nothing but instance state;
+    - an idle claim lapses when read, rather than through a timer.
