@@ -188,6 +188,11 @@ pub struct State {
     /// The human task it stands for, if it is a human step. Only an atomic state may have one.
     #[serde(default)]
     pub task: Option<HumanTask>,
+    /// A Financial Gate (ADR 0033), by canonical URL: on entry, Finance's outcome is raised as
+    /// `gate.pass`, `gate.defer` or `gate.block`. A gate state is atomic, takes `gate.pass` and
+    /// `gate.defer` onwards, and its task is the cashier's while it blocks.
+    #[serde(default)]
+    pub gate: Option<String>,
 }
 
 impl State {
@@ -204,6 +209,7 @@ impl State {
             timers: Vec::new(),
             invoke: Vec::new(),
             task: None,
+            gate: None,
         }
     }
 }

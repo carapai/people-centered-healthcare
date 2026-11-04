@@ -39,9 +39,11 @@ use health_workflow_actions::{ActionDescriptor, Compensation};
 use uuid::Uuid;
 
 pub mod fhir;
+pub mod gates;
 pub mod tasks;
 pub mod timers;
 
+pub use gates::GatePort;
 pub use timers::{Fired, SCHEDULER_INTERVAL, TimeFloor};
 
 /// Who acts for domain events and timers: the workflow principal, whose permissions are
@@ -221,7 +223,7 @@ pub(crate) fn command_key(op_id: &str) -> String {
     format!("command|{op_id}")
 }
 
-fn event_key(event_id: &str) -> String {
+pub(crate) fn event_key(event_id: &str) -> String {
     format!("event|{event_id}")
 }
 
@@ -235,6 +237,7 @@ pub struct Workflows<S, D, A, G> {
     catalog: Vec<ActionDescriptor>,
     authority: String,
     floor: Option<Arc<dyn TimeFloor>>,
+    gates: Option<Arc<dyn GatePort>>,
 }
 
 impl<S, D, A, G> Workflows<S, D, A, G>
@@ -264,6 +267,7 @@ where
             catalog,
             authority: authority.to_owned(),
             floor: None,
+            gates: None,
         }
     }
 
@@ -295,6 +299,9 @@ where
             return Ok(Outcome::Replayed);
         }
         let (state, effects) = compiled.machine.start(&self.guards);
+        let (state, effects) = self
+            .settle_gates(&compiled.machine, context, state, effects)
+            .await?;
         let record = InstanceRecord {
             id: instance_id(op_id),
             definition: definition.to_owned(),
@@ -508,6 +515,9 @@ where
         let (state, effects) = compiled
             .machine
             .step(record.state.clone(), event, &self.guards)?;
+        let (state, effects) = self
+            .settle_gates(&compiled.machine, &record.context, state, effects)
+            .await?;
         if state == record.state && effects.is_empty() {
             return Ok(None);
         }
@@ -662,7 +672,7 @@ where
                 Effect::StartInvoke { .. } | Effect::CancelInvoke { .. } => {
                     return Err(WorkflowError::Unsupported("sub-workflow invocations"));
                 }
-                Effect::Completed => {}
+                Effect::EvaluateGate { .. } | Effect::GateEvaluated { .. } | Effect::Completed => {}
             }
         }
         Ok(())

@@ -81,6 +81,25 @@ pub enum Effect {
         /// The invocation id.
         id: String,
     },
+    /// Ask Finance for the outcome of a Financial Gate the instance just entered (ADR 0033);
+    /// the application raises it as `gate.pass`, `gate.defer` or `gate.block`.
+    EvaluateGate {
+        /// The gate state.
+        state: String,
+        /// The gate's canonical URL.
+        gate: String,
+    },
+    /// What Finance answered at a gate, as recorded in history.
+    GateEvaluated {
+        /// The gate state.
+        state: String,
+        /// The gate's canonical URL.
+        gate: String,
+        /// `pass`, `defer` or `block`.
+        outcome: String,
+        /// Why.
+        reason: String,
+    },
     /// The instance reached a top-level final state and is complete.
     Completed,
 }
@@ -134,6 +153,7 @@ struct Node {
     targets: Vec<Vec<usize>>,
     timers: Vec<(SignedDuration, String)>,
     invoke: Vec<(String, String)>,
+    gate: Option<String>,
 }
 
 /// A compiled statechart, ready to run instances.
@@ -181,6 +201,7 @@ impl Machine {
                 targets: Vec::new(),
                 timers: Vec::new(),
                 invoke: Vec::new(),
+                gate: None,
             }],
             by_id: BTreeMap::new(),
         };
@@ -253,6 +274,7 @@ impl Machine {
                 .iter()
                 .map(|i| (i.id.clone(), i.src.clone()))
                 .collect(),
+            gate: state.gate.clone(),
         });
         self.by_id.insert(state.id.clone(), index);
         self.nodes[parent].children.push(index);
@@ -703,6 +725,12 @@ impl<'a, G: Guards> Run<'a, G> {
                     id: format!("{}#{index}", node.id),
                     after: *after,
                     event: raised.clone(),
+                });
+            }
+            if let Some(gate) = &node.gate {
+                self.effects.push(Effect::EvaluateGate {
+                    state: node.id.clone(),
+                    gate: gate.clone(),
                 });
             }
             if node.kind == Kind::Final {

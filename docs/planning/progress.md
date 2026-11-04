@@ -559,3 +559,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - an unconfigured gate is unavailable, and the engine must defer on that;
     - no preauthorization counts as approved until coverage (#125);
     - a payment counts towards an Account only once settled against it.
+- 2026-11-05: #122 part 2 merged (#323), after a `cargo doc` failure (a link to a private module). Part 3, Financial Gates in workflows:
+  - **Gate states:** a `State` may name a `gate`. On entry the interpreter emits `EvaluateGate`, and `health-workflow-app` asks Finance through `with_gates`, raising `gate.pass`, `gate.defer` or `gate.block` in the same step, recorded as `GateEvaluated`.
+  - **The query** uses the instance's context, `patient` and `urgency` data. Urgent triage always defers, which is the acceptance criterion, tested end to end.
+  - **A block** waits with the gate state's cashier Task, and `recheck_gates` asks again on payment events.
+  - **Publication** requires gate states to be atomic, with a cashier task, moving on at pass and defer, and not re-entering on block. Scenarios stub gate outcomes.
+  - **Decisions:**
+    - an unanswered gate, or a node with no gate port, defers and never blocks;
+    - urgency is read from the `urgency` data field triage sets, with routine when absent;
+    - no runtime wires Finance's gates into a node's workflows yet: central runs development definitions and no billing.
+
+  This completes #122.
