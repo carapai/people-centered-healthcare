@@ -21,14 +21,23 @@
 //!   in effect at the service time; a mismatch becomes a Reconciliation Record, never a silent
 //!   re-price, so historical pricing is preserved.
 //!
+//! - **Their life** ([`approve_book`], [`approve_rule`], [`retire_book`], [`retire_rule`]):
+//!   approved once by a finance approver who is not the author, never overlapping another
+//!   approved version of themselves, and immutable after that except for retirement from a time
+//!   not yet passed. [`PricingStore`] keeps every version.
+//!
 //! Amounts are rounded to the currency's minor units, half away from zero.
 
 mod book;
+mod lifecycle;
 mod price;
 
 pub use book::{
     Adjustment, Approval, Effective, Entry, PriceBook, PriceRule, RuleProblem, Scope, Stage, Tier,
     validate,
+};
+pub use lifecycle::{
+    LifecycleError, PricingStore, approve_book, approve_rule, retire_book, retire_rule,
 };
 pub use price::{
     Applicability, Applied, Component, Copay, CoverageTerms, Kind, Line, Mismatch, Override,

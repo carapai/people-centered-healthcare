@@ -1,0 +1,26 @@
+[package]
+name = "health-pricing-app"
+description = "Pricing at central: drafting, approving and retiring Price Books and Price Rules, and pricing charges from them (pricing-and-insurance.md; ADR 0031)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "pricing"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-persistence = { workspace = true }
+health-pricing = { workspace = true }
+health-time = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-surrealdb = { workspace = true }
+rust_decimal = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

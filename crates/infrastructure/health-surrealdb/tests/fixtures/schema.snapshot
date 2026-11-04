@@ -1226,6 +1226,18 @@ DEFINE TABLE practitioner_role_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON practitioner_role_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON practitioner_role_history TYPE int PERMISSIONS FULL
   DEFINE INDEX practitioner_role_history_last_updated ON practitioner_role_history FIELDS last_updated, version_seq
+DEFINE TABLE price_book TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD book ON price_book TYPE string PERMISSIONS FULL
+  DEFINE FIELD data ON price_book TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON price_book TYPE string PERMISSIONS FULL
+  DEFINE FIELD version ON price_book TYPE int PERMISSIONS FULL
+  DEFINE INDEX price_book_book ON price_book FIELDS book, version
+DEFINE TABLE price_rule TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON price_rule TYPE string PERMISSIONS FULL
+  DEFINE FIELD rule ON price_rule TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON price_rule TYPE string PERMISSIONS FULL
+  DEFINE FIELD version ON price_rule TYPE int PERMISSIONS FULL
+  DEFINE INDEX price_rule_rule ON price_rule FIELDS rule, version
 DEFINE TABLE procedure TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON procedure TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON procedure TYPE array<record> DEFAULT [] PERMISSIONS FULL
