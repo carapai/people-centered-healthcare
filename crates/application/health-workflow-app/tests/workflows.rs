@@ -11,13 +11,13 @@ use health_surrealdb::{
 };
 use health_time::{Clock, FixedClock, SignedDuration, Timestamp};
 use health_workflow::{
-    Action, DataModel, Effect, Event, Guards, Invoke, Kind, Machine, State, Statechart, Timer,
-    TimerStatus, Transition, Value, WorkflowStore,
+    Action, DataModel, Effect, Event, Guards, Invoke, Kind, State, Statechart, Timer, TimerStatus,
+    Transition, Value, WorkflowStore,
 };
 use health_workflow_actions::{ActionDescriptor, Compensation, ParamKind, ParamSpec};
 use health_workflow_app::{
-    ActionCall, ActionFailed, Actions, CANCELLED, Outcome, PRINCIPAL, WorkflowError, Workflows,
-    action_key, instance_id,
+    ActionCall, ActionFailed, Actions, CANCELLED, Compiled, Outcome, PRINCIPAL, WorkflowError,
+    Workflows, action_key, instance_id,
 };
 
 const OPD: &str = "urn:opd|1.0.0";
@@ -154,7 +154,7 @@ impl Actions<SurrealTx> for Recorded {
     }
 }
 
-type App = Workflows<SurrealStore, BTreeMap<String, Arc<Machine>>, Recorded, Always>;
+type App = Workflows<SurrealStore, BTreeMap<String, Arc<Compiled>>, Recorded, Always>;
 
 async fn app() -> (App, SurrealStore, Recorded) {
     let connection = Connection::open(&Settings {
@@ -168,10 +168,10 @@ async fn app() -> (App, SurrealStore, Recorded) {
     let clock: Arc<dyn Clock> = Arc::new(FixedClock::new(at()));
     let store = SurrealStore::new(connection, clock.clone());
     let definitions = BTreeMap::from([
-        (OPD.to_owned(), Arc::new(Machine::new(&opd()).expect("opd"))),
+        (OPD.to_owned(), Arc::new(Compiled::new(opd()).expect("opd"))),
         (
             NESTED.to_owned(),
-            Arc::new(Machine::new(&nested()).expect("nested")),
+            Arc::new(Compiled::new(nested()).expect("nested")),
         ),
     ]);
     let actions = Recorded::default();

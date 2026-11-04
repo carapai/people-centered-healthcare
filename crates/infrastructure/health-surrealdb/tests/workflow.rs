@@ -207,3 +207,75 @@ async fn due_timers_are_the_pending_ones_whose_time_has_come() {
     assert_eq!(due, ["i-2", "i-1"], "pending and due, earliest first");
     assert_eq!(tx.due_timers(now, 1).await.expect("due").len(), 1);
 }
+
+#[tokio::test]
+async fn projected_tasks_are_replaced_per_instance_and_listed_by_urgency_then_arrival() {
+    use health_workflow::Priority;
+    use health_workflow::worklists::{TaskStatus, TaskView};
+
+    let (store, _) = store().await;
+    let task = |id: &str, instance: &str, priority, arrived: &str, status| TaskView {
+        id: id.into(),
+        instance: instance.into(),
+        definition: "urn:opd|1.0.0".into(),
+        context: "Encounter/e-1".into(),
+        state: "triage".into(),
+        status,
+        role: "nurse".into(),
+        form: None,
+        worklist: "opd-triage".into(),
+        priority,
+        owner: None,
+        claim_lapses: None,
+        authored_on: arrived.parse().expect("timestamp"),
+        last_modified: arrived.parse().expect("timestamp"),
+    };
+    let mut tx = store.begin().await.expect("begin");
+    tx.replace_tasks(
+        "i-1",
+        &[
+            task(
+                "a",
+                "i-1",
+                Priority::Routine,
+                "2026-11-04T08:00:00Z",
+                TaskStatus::Completed,
+            ),
+            task(
+                "b",
+                "i-1",
+                Priority::Routine,
+                "2026-11-04T08:10:00Z",
+                TaskStatus::Ready,
+            ),
+        ],
+    )
+    .await
+    .expect("replace");
+    tx.replace_tasks(
+        "i-2",
+        &[task(
+            "c",
+            "i-2",
+            Priority::Stat,
+            "2026-11-04T08:20:00Z",
+            TaskStatus::Ready,
+        )],
+    )
+    .await
+    .expect("replace");
+    tx.commit().await.expect("commit");
+
+    let ids = |tasks: Vec<TaskView>| tasks.into_iter().map(|t| t.id).collect::<Vec<_>>();
+    let mut tx = store.begin().await.expect("begin");
+    assert_eq!(
+        ids(tx.open_tasks("opd-triage").await.expect("open")),
+        ["c", "b"]
+    );
+    tx.replace_tasks("i-2", &[]).await.expect("replace");
+    tx.commit().await.expect("commit");
+
+    let mut tx = store.begin().await.expect("begin");
+    assert_eq!(ids(tx.open_tasks("opd-triage").await.expect("open")), ["b"]);
+    assert!(tx.open_tasks("opd-consult").await.expect("open").is_empty());
+}

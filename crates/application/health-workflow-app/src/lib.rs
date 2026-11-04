@@ -28,13 +28,17 @@ use std::sync::Arc;
 
 use health_persistence::{Store, StoreError, Transaction, WriteError};
 use health_time::{Clock, Timestamp};
+use health_workflow::worklists::{
+    claimed_field, human_tasks, is_task_field, owner_field, priority_field, project,
+};
 use health_workflow::{
-    DefinitionError, Effect, Event, Guards, HistoryEntry, InstanceRecord, Machine, TimerRecord,
-    TimerStatus, Value, WorkflowStore,
+    DefinitionError, Effect, Event, Guards, HistoryEntry, InstanceRecord, Machine, Statechart,
+    TimerRecord, TimerStatus, Value, WorkflowStore,
 };
 use health_workflow_actions::{ActionDescriptor, Compensation};
 use uuid::Uuid;
 
+pub mod tasks;
 pub mod timers;
 
 pub use timers::{Fired, SCHEDULER_INTERVAL, TimeFloor};
@@ -48,14 +52,31 @@ pub use health_workflow::{CANCELLED, STARTED};
 /// The namespace of the engine's UUIDv5s: instance ids and action keys.
 const NAMESPACE: Uuid = Uuid::from_u128(0x6f1c_2d0e_9b7a_4c51_8e3f_0a4d_5b6c_7e8f);
 
+/// A definition's statechart, compiled to run.
+#[derive(Debug)]
+pub struct Compiled {
+    /// The statechart: its human tasks project as Tasks.
+    pub chart: Statechart,
+    /// The compiled machine.
+    pub machine: Machine,
+}
+
+impl Compiled {
+    /// Compiles `chart`.
+    pub fn new(chart: Statechart) -> Result<Self, DefinitionError> {
+        let machine = Machine::new(&chart)?;
+        Ok(Self { chart, machine })
+    }
+}
+
 /// The compiled definitions this node runs, by `url|version`.
 pub trait Definitions: Send + Sync {
     /// The definition, if this node has it.
-    fn machine(&self, definition: &str) -> Option<Arc<Machine>>;
+    fn definition(&self, definition: &str) -> Option<Arc<Compiled>>;
 }
 
-impl Definitions for BTreeMap<String, Arc<Machine>> {
-    fn machine(&self, definition: &str) -> Option<Arc<Machine>> {
+impl Definitions for BTreeMap<String, Arc<Compiled>> {
+    fn definition(&self, definition: &str) -> Option<Arc<Compiled>> {
         self.get(definition).cloned()
     }
 }
@@ -115,6 +136,18 @@ pub enum WorkflowError {
     /// The instance has ended.
     #[error("workflow instance {0} has ended")]
     Ended(String),
+    /// The state is not active, or is not a human step.
+    #[error("there is no open task at {0}")]
+    NoTask(String),
+    /// Someone else holds the claim on the task.
+    #[error("the task is claimed by {0}")]
+    Claimed(String),
+    /// Only the claim's holder may release it.
+    #[error("{0} does not hold the claim on the task")]
+    NotOwner(String),
+    /// Escalation only raises priority.
+    #[error("{0} is not more urgent than the task already is")]
+    NotEscalation(String),
     /// The command enabled no transition from where the instance is.
     #[error("{0} is not possible from the instance's current state")]
     NotEnabled(String),
@@ -177,7 +210,7 @@ pub fn instance_id(op_id: &str) -> String {
     Uuid::new_v5(&NAMESPACE, format!("instance|{op_id}").as_bytes()).to_string()
 }
 
-fn command_key(op_id: &str) -> String {
+pub(crate) fn command_key(op_id: &str) -> String {
     format!("command|{op_id}")
 }
 
@@ -227,9 +260,9 @@ where
         }
     }
 
-    fn machine(&self, definition: &str) -> Result<Arc<Machine>, WorkflowError> {
+    fn compiled(&self, definition: &str) -> Result<Arc<Compiled>, WorkflowError> {
         self.definitions
-            .machine(definition)
+            .definition(definition)
             .ok_or_else(|| WorkflowError::UnknownDefinition(definition.to_owned()))
     }
 
@@ -248,13 +281,13 @@ where
         actor: &str,
         op_id: &str,
     ) -> Result<Outcome, WorkflowError> {
-        let machine = self.machine(definition)?;
+        let compiled = self.compiled(definition)?;
         let now = self.clock.now();
         let mut tx = self.store.begin().await?;
         if !tx.claim_event(&command_key(op_id), now).await? {
             return Ok(Outcome::Replayed);
         }
-        let (state, effects) = machine.start(&self.guards);
+        let (state, effects) = compiled.machine.start(&self.guards);
         let record = InstanceRecord {
             id: instance_id(op_id),
             definition: definition.to_owned(),
@@ -278,6 +311,7 @@ where
             op_id: op_id.to_owned(),
         })
         .await?;
+        self.project(&mut tx, &record, now).await?;
         tx.commit().await?;
         Ok(Outcome::Applied(record))
     }
@@ -445,8 +479,10 @@ where
             }
         }
 
-        self.record(&mut tx, &record, &next, event, effects, actor, op_id, now)
-            .await?;
+        self.record(
+            &mut tx, &record, &mut next, event, effects, actor, op_id, now,
+        )
+        .await?;
         tx.commit().await?;
         Ok(Outcome::Applied(next))
     }
@@ -461,12 +497,14 @@ where
         op_id: &str,
         now: Timestamp,
     ) -> Result<Option<InstanceRecord>, WorkflowError> {
-        let machine = self.machine(&record.definition)?;
-        let (state, effects) = machine.step(record.state.clone(), event, &self.guards)?;
+        let compiled = self.compiled(&record.definition)?;
+        let (state, effects) = compiled
+            .machine
+            .step(record.state.clone(), event, &self.guards)?;
         if state == record.state && effects.is_empty() {
             return Ok(None);
         }
-        let next = InstanceRecord {
+        let mut next = InstanceRecord {
             state,
             version: record.version + 1,
             ..record.clone()
@@ -475,7 +513,7 @@ where
         self.record(
             tx,
             &record,
-            &next,
+            &mut next,
             event.clone(),
             effects,
             actor,
@@ -487,19 +525,29 @@ where
     }
 
     /// Appends the history entry of `before` → `next` and stores `next`, if nothing changed the
-    /// instance meanwhile.
+    /// instance meanwhile, then rebuilds its Tasks. The claims of task states no longer active
+    /// are dropped first.
     #[allow(clippy::too_many_arguments)]
-    async fn record(
+    pub(crate) async fn record(
         &self,
         tx: &mut S::Tx,
         before: &InstanceRecord,
-        next: &InstanceRecord,
+        next: &mut InstanceRecord,
         event: Event,
         effects: Vec<Effect>,
         actor: &str,
         op_id: &str,
         now: Timestamp,
     ) -> Result<(), WorkflowError> {
+        let active = next.state.configuration.clone();
+        next.state.data.retain(|field, _| {
+            !is_task_field(field)
+                || active.iter().any(|state| {
+                    *field == owner_field(state)
+                        || *field == claimed_field(state)
+                        || *field == priority_field(state)
+                })
+        });
         tx.append_history(&HistoryEntry {
             instance: next.id.clone(),
             seq: next.version,
@@ -516,6 +564,23 @@ where
         if !tx.update_instance(next, before.version).await? {
             return Err(WorkflowError::Conflict);
         }
+        self.project(tx, next, now).await
+    }
+
+    /// Rebuilds the Tasks of `record` from its state and history, in the transaction.
+    pub(crate) async fn project(
+        &self,
+        tx: &mut S::Tx,
+        record: &InstanceRecord,
+        now: Timestamp,
+    ) -> Result<(), WorkflowError> {
+        let compiled = self.compiled(&record.definition)?;
+        if human_tasks(&compiled.chart).is_empty() {
+            return Ok(());
+        }
+        let history = tx.instance_history(&record.id).await?;
+        let tasks = project(&compiled.chart, record, &history, now);
+        tx.replace_tasks(&record.id, &tasks).await?;
         Ok(())
     }
 

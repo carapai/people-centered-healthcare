@@ -113,6 +113,10 @@ fn an_open_task_is_ready_until_claimed_and_the_claim_lapses_when_idle() {
     assert_eq!(statuses(&claimed), [("triage", "in-progress")]);
     assert_eq!(claimed[0].owner.as_deref(), Some("Practitioner/nurse-1"));
     assert_eq!(claimed[0].last_modified, at("2026-11-04T08:06:00Z"));
+    assert_eq!(claimed[0].claim_lapses, Some(at("2026-11-04T08:21:00Z")));
+    assert_eq!(claimed[0].as_at(at("2026-11-04T08:20:59Z")), claimed[0]);
+    let lapsed = claimed[0].as_at(at("2026-11-04T08:21:00Z"));
+    assert_eq!((lapsed.status, lapsed.owner), (TaskStatus::Ready, None));
 
     let idle = project(
         &chart(),
@@ -217,6 +221,7 @@ fn a_worklist_is_open_tasks_most_urgent_first_then_by_arrival() {
         worklist: worklist.into(),
         priority,
         owner: None,
+        claim_lapses: None,
         authored_on: at(arrived),
         last_modified: at(arrived),
     };

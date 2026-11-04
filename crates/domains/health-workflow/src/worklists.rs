@@ -20,13 +20,15 @@ use std::collections::BTreeMap;
 use crate::model::{HumanTask, Priority, State, Statechart, Value};
 use crate::store::{CANCELLED, HistoryEntry, InstanceRecord};
 use health_time::{SignedDuration, Timestamp};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// The namespace of Task ids.
 const NAMESPACE: Uuid = Uuid::from_u128(0x3c9e_51a2_7d04_4b8f_a6e1_92c0_d47b_15e3);
 
 /// FHIR R5 Task status: all 12 codes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum TaskStatus {
     /// Not yet actionable.
     Draft,
@@ -80,7 +82,8 @@ impl TaskStatus {
 }
 
 /// A Task projected from a workflow instance.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskView {
     /// The Task id: the UUIDv5 of instance, state and the history `seq` that entered it.
     pub id: String,
@@ -104,6 +107,8 @@ pub struct TaskView {
     pub priority: Priority,
     /// Who has claimed it, while the claim lasts (`Task.owner`).
     pub owner: Option<String>,
+    /// When the claim lapses unless the task is worked on again.
+    pub claim_lapses: Option<Timestamp>,
     /// When its state was entered (`Task.authoredOn`): its place in the worklist.
     pub authored_on: Timestamp,
     /// When it last changed (`Task.lastModified`).
@@ -213,6 +218,7 @@ pub fn project(
         worklist: task.worklist.clone(),
         priority: task.priority,
         owner: None,
+        claim_lapses: None,
         authored_on: open.at,
         last_modified: open.at,
     };
@@ -263,11 +269,29 @@ pub fn project(
         if let Some((owner, at)) = claim(record, state, task.claim_timeout, now) {
             task_view.status = TaskStatus::InProgress;
             task_view.owner = Some(owner);
+            task_view.claim_lapses = at.checked_add(task.claim_timeout).ok();
             task_view.last_modified = task_view.last_modified.max(at);
         }
         projected.push(task_view);
     }
     projected
+}
+
+impl TaskView {
+    /// The task as at `now`: a claim that has lapsed since it was projected is dropped, and the
+    /// task is back to `ready`.
+    #[must_use]
+    pub fn as_at(&self, now: Timestamp) -> Self {
+        match self.claim_lapses {
+            Some(lapses) if self.status == TaskStatus::InProgress && now >= lapses => Self {
+                status: TaskStatus::Ready,
+                owner: None,
+                claim_lapses: None,
+                ..self.clone()
+            },
+            _ => self.clone(),
+        }
+    }
 }
 
 /// The open tasks on `worklist`, most urgent first, then by arrival.

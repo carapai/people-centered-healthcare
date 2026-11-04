@@ -1542,6 +1542,15 @@ DEFINE TABLE workflow_instance TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD running ON workflow_instance TYPE bool PERMISSIONS FULL
   DEFINE FIELD version ON workflow_instance TYPE int PERMISSIONS FULL
   DEFINE INDEX workflow_instance_context ON workflow_instance FIELDS context
+DEFINE TABLE workflow_task TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD authored_on ON workflow_task TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD data ON workflow_task TYPE string PERMISSIONS FULL
+  DEFINE FIELD instance ON workflow_task TYPE string PERMISSIONS FULL
+  DEFINE FIELD open ON workflow_task TYPE bool PERMISSIONS FULL
+  DEFINE FIELD rank ON workflow_task TYPE int PERMISSIONS FULL
+  DEFINE FIELD worklist ON workflow_task TYPE string PERMISSIONS FULL
+  DEFINE INDEX workflow_task_instance ON workflow_task FIELDS instance
+  DEFINE INDEX workflow_task_worklist ON workflow_task FIELDS worklist, open
 DEFINE TABLE workflow_timer TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON workflow_timer TYPE string PERMISSIONS FULL
   DEFINE FIELD fire_at ON workflow_timer TYPE datetime PERMISSIONS FULL
