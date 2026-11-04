@@ -15,6 +15,7 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as WorklistsRouteImport } from './routes/worklists'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
 import { Route as EdgeStatusRouteImport } from './routes/edge.status'
@@ -56,6 +57,11 @@ const RegistrationRoute = RegistrationRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorklistsRoute = WorklistsRouteImport.update({
+  id: '/worklists',
+  path: '/worklists',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BreakGlassAlertsRoute = BreakGlassAlertsRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/enroll': typeof EnrollRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
+  '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/enroll': typeof EnrollRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
+  '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/enroll': typeof EnrollRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
+  '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/enroll'
     | '/registration'
     | '/sign-in'
+    | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
     | '/edge/status'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/enroll'
     | '/registration'
     | '/sign-in'
+    | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
     | '/edge/status'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/enroll'
     | '/registration'
     | '/sign-in'
+    | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
     | '/edge/status'
@@ -250,6 +262,7 @@ export interface RootRouteChildren {
   EnrollRoute: typeof EnrollRoute
   RegistrationRoute: typeof RegistrationRoute
   SignInRoute: typeof SignInRoute
+  WorklistsRoute: typeof WorklistsRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
   EdgeStatusRoute: typeof EdgeStatusRoute
@@ -306,6 +319,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/worklists': {
+      id: '/worklists'
+      path: '/worklists'
+      fullPath: '/worklists'
+      preLoaderRoute: typeof WorklistsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/break-glass/alerts': {
@@ -402,6 +422,7 @@ const rootRouteChildren: RootRouteChildren = {
   EnrollRoute: EnrollRoute,
   RegistrationRoute: RegistrationRoute,
   SignInRoute: SignInRoute,
+  WorklistsRoute: WorklistsRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
   EdgeStatusRoute: EdgeStatusRoute,

@@ -70,6 +70,7 @@ mod search;
 mod terminology;
 mod transaction;
 mod validation;
+mod workflow;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -96,6 +97,10 @@ pub use registry::REVIEW_PERMISSION;
 pub use search::CURSOR;
 pub use terminology::ActiveTerminology;
 pub use validation::{ActiveProfiles, Profiles};
+pub use workflow::{
+    SUPERVISE_PERMISSION as WORKFLOW_SUPERVISE_PERMISSION, WORK_PERMISSION as WORKFLOW_PERMISSION,
+    WorkflowConfig, WorkflowConfigError,
+};
 
 /// The FHIR REST server for one node.
 #[derive(Clone)]
@@ -113,6 +118,7 @@ pub struct FhirServer {
     payments: Option<Arc<payments::PaymentConfig>>,
     terminology: Option<terminology::ActiveTerminology>,
     profiles: Option<validation::ActiveProfiles>,
+    workflows: Option<Arc<workflow::WorkflowConfig>>,
 }
 
 impl FhirServer {
@@ -137,6 +143,7 @@ impl FhirServer {
             payments: None,
             terminology: None,
             profiles: None,
+            workflows: None,
         }
     }
 

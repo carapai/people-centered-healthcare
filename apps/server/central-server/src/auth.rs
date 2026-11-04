@@ -60,6 +60,8 @@ pub(crate) struct AuthSettings {
     pub(crate) issuing_ca: Option<Arc<health_pki::Authority>>,
     /// What wraps escrowed recovery keys (#268): the local adapter until the KMS.
     pub(crate) kms: Option<Arc<LocalKeyWrap>>,
+    /// The workflows central runs (#99), from the development definitions file.
+    pub(crate) workflows: Option<health_fhir_server::WorkflowConfig>,
 }
 
 /// The patient portal's phone sign-in.
@@ -120,6 +122,27 @@ pub(crate) fn read_policy(path: &Path) -> Result<AccessPolicy, &'static str> {
     serde_json::from_str(&text).map_err(|_| "HEALTH_ACCESS_POLICY_FILE is not a valid policy")
 }
 
+/// The development Workflow Definitions file (#99): a JSON array of definitions, each checked
+/// as at publication. A definition that fails is refused, and central does not start.
+pub(crate) fn read_workflows(
+    path: &std::path::Path,
+) -> Result<health_fhir_server::WorkflowConfig, &'static str> {
+    let text =
+        std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_DEV_WORKFLOW_DEFINITIONS")?;
+    let definitions: Vec<health_workflow::definition::WorkflowDefinition> = serde_json::from_str(
+        &text,
+    )
+    .map_err(|_| "HEALTH_DEV_WORKFLOW_DEFINITIONS is not an array of Workflow Definitions")?;
+    tracing::warn!(
+        count = definitions.len(),
+        "running Workflow Definitions from a development file, not from published packages"
+    );
+    health_fhir_server::WorkflowConfig::new(definitions, "central").map_err(|error| {
+        tracing::error!(%error, "a development Workflow Definition is refused");
+        "HEALTH_DEV_WORKFLOW_DEFINITIONS holds a definition central cannot run"
+    })
+}
+
 impl std::fmt::Debug for AuthSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuthSettings")
@@ -130,6 +153,7 @@ impl std::fmt::Debug for AuthSettings {
             .field("policy", &self.policy.is_some())
             .field("issuing_ca", &self.issuing_ca.is_some())
             .field("kms", &self.kms.is_some())
+            .field("workflows", &self.workflows.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -290,9 +314,13 @@ pub(crate) fn routes(
                     subject_layer,
                 )),
         );
-        let (fhir, reviews, portal, stock, payments) = fhir(fhir_store, settings, policy, subjects);
+        let (fhir, reviews, portal, stock, payments, workflows) =
+            fhir(fhir_store, settings, policy, subjects);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
+        }
+        if let Some(workflows) = workflows {
+            api = api.nest("/workflow", workflows);
         }
         router = router.nest("/fhir", fhir);
         // Stock (#130): receiving, stock on hand, reorder and requisitions, for staff.
@@ -456,6 +484,7 @@ fn fhir(
     Option<Router>,
     Router,
     Option<Router>,
+    Option<Router>,
 ) {
     // Facility-scope records are searched by their facility tag (ADR 0057).
     let store = store.with_registry(facility_registry());
@@ -511,13 +540,28 @@ fn fhir(
     if let Some(payments) = settings.payments.clone() {
         fhir = fhir.with_payments(payments);
     }
+    if let Some(workflows) = settings.workflows.clone() {
+        fhir = fhir.with_workflows(workflows);
+    }
+    // Workflows, tasks and worklists (#99), from the development definitions.
+    let workflows = settings
+        .workflows
+        .as_ref()
+        .map(|_| fhir.workflow_router().layer(layer.clone()));
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
         .payments
         .as_ref()
         .map(|_| fhir.payments_router().layer(layer.clone()));
-    (fhir.router().layer(layer), reviews, portal, stock, payments)
+    (
+        fhir.router().layer(layer),
+        reviews,
+        portal,
+        stock,
+        payments,
+        workflows,
+    )
 }
 
 /// `/auth`, `/api/session` and `/fhir`, forwarded (paths intact) to the routes once they are
@@ -553,6 +597,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/portal/{*rest}", service.clone())
         .route_service("/api/stock/{*rest}", service.clone())
         .route_service("/api/payments/{*rest}", service.clone())
+        .route_service("/api/workflow/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
@@ -585,6 +630,7 @@ mod tests {
             payments: None,
             issuing_ca: None,
             kms: None,
+            workflows: None,
             node_code: "C1".parse().expect("node code"),
         }
     }

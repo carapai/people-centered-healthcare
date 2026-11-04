@@ -40,10 +40,28 @@ const env = {
   HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
   // Payments at one till (#254).
   HEALTH_PAYMENT_TILLS: 'till-1',
+  // An OPD visit's triage and consultation worklists (#99), until activation brings published
+  // definitions (#89).
+  HEALTH_DEV_WORKFLOW_DEFINITIONS: file(
+    'workflow-definitions.json',
+    JSON.stringify([
+      {
+        url: 'https://health.go.ug/fhir/Library/opd-visit',
+        version: '1.0.0',
+        statechart: {
+          states: [
+            { id: 'triage', kind: 'atomic', task: { role: 'nurse', worklist: 'opd-triage' }, transitions: [{ events: ['triaged'], targets: ['consultation'] }] },
+            { id: 'consultation', kind: 'atomic', task: { role: 'clinician', worklist: 'opd-consult', priority: 'urgent' }, transitions: [{ events: ['seen'], targets: ['done'] }] },
+            { id: 'done', kind: 'final' },
+          ],
+        },
+      },
+    ]),
+  ),
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work'] },
       labels: [],
     }),
   ),

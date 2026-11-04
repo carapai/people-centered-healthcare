@@ -740,3 +740,64 @@ export const accessMessages = defineMessages<AccessValues>({
   acNoSuchUser: { id: 'app.access.noSuchUser', defaultMessage: 'there is no account with that username here', description: 'Offline administration: unknown username' },
   acTaken: { id: 'app.access.taken', defaultMessage: 'that username is already taken', description: 'Offline administration: the username exists' },
 })
+
+type WorklistValues = {
+  wlTitle: {}
+  wlLoading: {}
+  wlFailed: {}
+  wlForbidden: {}
+  wlNone: {}
+  wlStartTitle: {}
+  wlDefinition: {}
+  wlContext: {}
+  wlStart: {}
+  wlStarted: {}
+  wlStartFailed: {}
+  wlWorklist: {}
+  wlChoose: {}
+  wlEmpty: {}
+  wlColStep: {}
+  wlColAbout: {}
+  wlColPriority: {}
+  wlColArrived: {}
+  wlColStatus: {}
+  wlReady: {}
+  wlMine: {}
+  wlTaken: {}
+  wlClaim: {}
+  wlRelease: {}
+  wlComplete: { event: string }
+  wlActionFailed: { reason: string }
+  wlHint: {}
+}
+
+// The worklists' strings (features/worklists).
+export const worklistMessages = defineMessages<WorklistValues>({
+  wlTitle: { id: 'app.worklists.title', defaultMessage: 'Worklists', description: 'Worklists page heading and link' },
+  wlLoading: { id: 'app.worklists.loading', defaultMessage: 'Loading…', description: 'Worklists: loading' },
+  wlFailed: { id: 'app.worklists.failed', defaultMessage: 'The worklists could not be loaded.', description: 'Worklists: load failed' },
+  wlForbidden: { id: 'app.worklists.forbidden', defaultMessage: 'You do not have access to worklists.', description: 'Worklists: no permission' },
+  wlNone: { id: 'app.worklists.none', defaultMessage: 'No workflows run here yet.', description: 'Worklists: the node runs no definitions' },
+  wlStartTitle: { id: 'app.worklists.startTitle', defaultMessage: 'Start a workflow', description: 'Worklists: start section heading' },
+  wlDefinition: { id: 'app.worklists.definition', defaultMessage: 'Workflow', description: 'Worklists field: the definition to start' },
+  wlContext: { id: 'app.worklists.context', defaultMessage: 'About (e.g. Encounter/123)', description: 'Worklists field: the context resource' },
+  wlStart: { id: 'app.worklists.start', defaultMessage: 'Start', description: 'Worklists action: start an instance' },
+  wlStarted: { id: 'app.worklists.started', defaultMessage: 'Started.', description: 'Worklists: an instance was started' },
+  wlStartFailed: { id: 'app.worklists.startFailed', defaultMessage: 'The workflow was not started.', description: 'Worklists: start failed' },
+  wlWorklist: { id: 'app.worklists.worklist', defaultMessage: 'Worklist', description: 'Worklists field: which worklist' },
+  wlChoose: { id: 'app.worklists.choose', defaultMessage: 'Choose a worklist', description: 'Worklists: no worklist chosen' },
+  wlEmpty: { id: 'app.worklists.empty', defaultMessage: 'Nothing is waiting on this worklist.', description: 'Worklists: empty worklist' },
+  wlColStep: { id: 'app.worklists.colStep', defaultMessage: 'Step', description: 'Worklists column: the engine state' },
+  wlColAbout: { id: 'app.worklists.colAbout', defaultMessage: 'About', description: 'Worklists column: the context' },
+  wlColPriority: { id: 'app.worklists.colPriority', defaultMessage: 'Priority', description: 'Worklists column' },
+  wlColArrived: { id: 'app.worklists.colArrived', defaultMessage: 'Arrived', description: 'Worklists column: when the task arrived' },
+  wlColStatus: { id: 'app.worklists.colStatus', defaultMessage: 'Status', description: 'Worklists column' },
+  wlReady: { id: 'app.worklists.ready', defaultMessage: 'Waiting', description: 'Worklists: task status ready' },
+  wlMine: { id: 'app.worklists.mine', defaultMessage: 'You have it', description: 'Worklists: task status, claimed by the signed-in user' },
+  wlTaken: { id: 'app.worklists.taken', defaultMessage: 'Taken by a colleague', description: 'Worklists: task status, claimed by someone else' },
+  wlClaim: { id: 'app.worklists.claim', defaultMessage: 'Take this task', description: 'Worklists action: claim' },
+  wlRelease: { id: 'app.worklists.release', defaultMessage: 'Put it back', description: 'Worklists action: release a claim' },
+  wlComplete: { id: 'app.worklists.complete', defaultMessage: 'Done: {event}', description: 'Worklists action: complete the step with an event' },
+  wlActionFailed: { id: 'app.worklists.actionFailed', defaultMessage: 'That did not work: {reason}', description: 'Worklists: a command was refused' },
+  wlHint: { id: 'app.worklists.hint', defaultMessage: 'Most urgent first, then by arrival. Select a task to work on it.', description: 'Worklists: table guidance' },
+})

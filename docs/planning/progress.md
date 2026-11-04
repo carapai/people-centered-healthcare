@@ -473,3 +473,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - CarePlan projections are left to Care Coordination's typed actions, because CarePlan belongs to care-plans (resource-ownership.md);
     - a claim that lapses with no further step stays `in-progress` in the stored Task until the next step, and worklists apply the lapse as they read.
   - **Next:** part 4 adds the client's worklist screens.
+- 2026-11-04: #99 part 3 merged (#313). Part 4, workflows over HTTP and the client's worklists:
+  - **HTTP:** `health-fhir-server`'s `workflow_router` covers starting instances, events, cancelling, task commands, worklists and the definitions list. It needs `workflow.work` and `workflow.supervise`. Central mounts it at `/api/workflow`.
+  - **`HEALTH_DEV_WORKFLOW_DEFINITIONS`:** central runs Workflow Definitions from a development file until activation (#89). Each is checked as at publication. Definitions with guards or typed actions are refused, because neither is wired yet.
+  - **Client `/worklists`:**
+    - start a workflow;
+    - pick a worklist and select a task;
+    - take it, put it back, or complete its step with one of its events;
+    - claims show as "You have it" or "Taken by a colleague".
+  - **e2e:** `worklists.spec.ts` covers a visit moving from the triage worklist to the consultation worklist, with axe.
+  - **Decisions:**
+    - definitions come from a development-only file at central until #89;
+    - the screen does not show a colleague's identity, since `Subject.account` is an id.
+
+  This completes #99.

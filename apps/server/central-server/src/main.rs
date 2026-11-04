@@ -223,6 +223,11 @@ fn auth_settings(
             .map(auth::read_kms_key)
             .transpose()?
             .map(|key| Arc::new(health_provisioning::LocalKeyWrap::new(&key))),
+        workflows: files
+            .dev_workflow_definitions
+            .as_deref()
+            .map(auth::read_workflows)
+            .transpose()?,
         issuing_ca: files
             .issuing_ca
             .as_ref()
