@@ -13,6 +13,7 @@ members = [
     "crates/contracts/health-workflow-actions",
     "crates/domains/health-access-policy",
     "crates/domains/health-client-registry",
+    "crates/domains/health-clinical-documentation",
     "crates/domains/health-configuration",
     "crates/domains/health-consent",
     "crates/domains/health-billing",
@@ -80,6 +81,7 @@ health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
 health-backup = { path = "crates/infrastructure/health-backup" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
+health-clinical-documentation = { path = "crates/domains/health-clinical-documentation" }
 health-consent = { path = "crates/domains/health-consent" }
 health-edge-runtime = { path = "crates/edge/health-edge-runtime" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }

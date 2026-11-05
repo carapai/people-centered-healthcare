@@ -57,6 +57,9 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Routes:** `POST /instances`; `GET /instances/{id}/tasks`; `POST /instances/{id}/events`; `POST /instances/{id}/cancel`; `POST /instances/{id}/tasks/{state}/{claim|release|reassign|escalate}`; `GET /worklists/{key}`; `GET /definitions`. Each command carries the client's `opId`, and the signed-in account is the actor.
   - **Events offered:** each task lists the events its state's transitions take.
   - **Not wired yet:** guards and typed actions. `WorkflowConfig::new` refuses definitions that use them, and so does any check they fail at publication.
+- **Signed notes (#107):** every write that replaces, and every delete of, a Composition or DocumentReference asks `health_clinical_documentation_app::notes`. That covers plain and conditional writes, transactions and batches, and completion.
+  - A signed note changed in place, or deleted, answers 409 (`business-rule`): amend it instead.
+  - Marking it entered in error, its content unchanged, is allowed.
 - **Completion (#93):** `with_extraction()`, with `with_questionnaire_checks()`. The node's search must support Library `type`, `url` and `version`.
   - **On submission:** a `completed` or `amended` QuestionnaireResponse that records no Extraction Mapping gets the newest one for its Questionnaire version (`Library?type=extraction-mapping`).
   - **After it is written, in its transaction:**

@@ -18,6 +18,7 @@ form_urlencoded = { workspace = true }
 health-access-policy = { workspace = true }
 health-audit = { workspace = true }
 health-client-registry = { workspace = true }
+health-clinical-documentation = { workspace = true }
 health-clinical-documentation-app = { workspace = true }
 health-encounters = { workspace = true }
 health-encounters-app = { workspace = true }
