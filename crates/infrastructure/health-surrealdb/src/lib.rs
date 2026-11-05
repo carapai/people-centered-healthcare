@@ -19,6 +19,7 @@ mod charges;
 mod connection;
 mod consent;
 mod devices;
+mod encounters;
 mod history;
 mod inbound;
 mod local;

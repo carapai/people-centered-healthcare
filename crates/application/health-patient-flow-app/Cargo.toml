@@ -1,0 +1,21 @@
+[package]
+name = "health-patient-flow-app"
+description = "Patient flow at the facility authority: queue entries kept from encounter events, once each, and the queue steps (#102)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "patient-flow"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-encounters = { workspace = true }
+health-patient-flow = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+thiserror = { workspace = true }

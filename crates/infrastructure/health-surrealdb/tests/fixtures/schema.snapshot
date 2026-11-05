@@ -563,6 +563,8 @@ DEFINE TABLE encounter_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON encounter_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON encounter_history TYPE int PERMISSIONS FULL
   DEFINE INDEX encounter_history_last_updated ON encounter_history FIELDS last_updated, version_seq
+DEFINE TABLE encounter_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON encounter_state TYPE string PERMISSIONS FULL
 DEFINE TABLE endpoint TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON endpoint TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON endpoint TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -1327,6 +1329,13 @@ DEFINE TABLE questionnaire_response_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE FIELD version_id ON questionnaire_response_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON questionnaire_response_history TYPE int PERMISSIONS FULL
   DEFINE INDEX questionnaire_response_history_last_updated ON questionnaire_response_history FIELDS last_updated, version_seq
+DEFINE TABLE queue_entry TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON queue_entry TYPE string PERMISSIONS FULL
+  DEFINE FIELD encounter ON queue_entry TYPE string PERMISSIONS FULL
+  DEFINE FIELD open ON queue_entry TYPE bool PERMISSIONS FULL
+  DEFINE FIELD service_point ON queue_entry TYPE string PERMISSIONS FULL
+  DEFINE INDEX queue_entry_encounter ON queue_entry FIELDS encounter
+  DEFINE INDEX queue_entry_service_point ON queue_entry FIELDS service_point, open
 DEFINE TABLE registry_review TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD created_at ON registry_review TYPE datetime PERMISSIONS FULL
   DEFINE FIELD decided_at ON registry_review TYPE none | datetime PERMISSIONS FULL

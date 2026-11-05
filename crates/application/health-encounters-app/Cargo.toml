@@ -1,0 +1,31 @@
+[package]
+name = "health-encounters-app"
+description = "Encounters at the facility authority: check-in and the Encounter's status, each in one transaction with its guard, its FHIR Encounter and its outbox event (#102)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "encounters"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-access-policy = { workspace = true }
+health-encounters = { workspace = true }
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }
+health-patient-flow = { workspace = true }
+health-patient-flow-app = { workspace = true }
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
