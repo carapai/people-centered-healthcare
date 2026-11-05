@@ -801,3 +801,37 @@ export const worklistMessages = defineMessages<WorklistValues>({
   wlActionFailed: { id: 'app.worklists.actionFailed', defaultMessage: 'That did not work: {reason}', description: 'Worklists: a command was refused' },
   wlHint: { id: 'app.worklists.hint', defaultMessage: 'Most urgent first, then by arrival. Select a task to work on it.', description: 'Worklists: table guidance' },
 })
+
+type FormValues = {
+  fmYes: {}
+  fmNo: {}
+  fmChoose: {}
+  fmRequired: {}
+  fmAdd: { item: string }
+  fmRemove: { item: string }
+  fmCalculated: {}
+  fmNotNumber: {}
+  fmMissing: { count: number }
+  fmSubmit: {}
+  fmSave: {}
+}
+
+// The Questionnaire renderer's strings (features/forms).
+export const formMessages = defineMessages<FormValues>({
+  fmYes: { id: 'app.forms.yes', defaultMessage: 'Yes', description: 'Forms: a Boolean answer' },
+  fmNo: { id: 'app.forms.no', defaultMessage: 'No', description: 'Forms: a Boolean answer' },
+  fmChoose: { id: 'app.forms.choose', defaultMessage: 'Choose', description: 'Forms: no option chosen' },
+  fmRequired: { id: 'app.forms.required', defaultMessage: 'Required', description: 'Forms: a required question' },
+  fmAdd: { id: 'app.forms.add', defaultMessage: 'Add another: {item}', description: 'Forms: add a repeat of a group' },
+  fmRemove: { id: 'app.forms.remove', defaultMessage: 'Remove this: {item}', description: 'Forms: remove a repeat of a group' },
+  fmCalculated: { id: 'app.forms.calculated', defaultMessage: 'Calculated', description: 'Forms: a value the form calculates' },
+  fmNotNumber: { id: 'app.forms.notNumber', defaultMessage: 'Enter a number', description: 'Forms: a number answer that is not a number' },
+  fmMissing: {
+    id: 'app.forms.missing',
+    defaultMessage: '{count, plural, one {# required question is} other {# required questions are}} not answered.',
+    description: 'Forms: required questions unanswered on submit',
+  },
+  fmSubmit: { id: 'app.forms.submit', defaultMessage: 'Submit', description: 'Forms: submit the response' },
+  fmSave: { id: 'app.forms.save', defaultMessage: 'Save draft', description: 'Forms: save the response as a draft' },
+})
+

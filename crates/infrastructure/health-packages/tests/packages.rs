@@ -424,3 +424,40 @@ fn configuration_must_validate_against_a_schema_the_release_knows() {
         Err(Error::Configuration { .. })
     ));
 }
+
+#[test]
+fn the_release_reads_form_layouts() {
+    let schemas = Schemas::platform();
+    assert!(
+        schemas
+            .uris()
+            .any(|uri| uri == health_packages::FORM_LAYOUT)
+    );
+    let pki = pki();
+    let layout = |value: serde_json::Value| {
+        let mut files = files();
+        files.insert(
+            "configuration/layouts/anc-visit.json".into(),
+            value.to_string().into_bytes(),
+        );
+        publish(&files, &schemas, &pki.signer, at(SIGNED))
+    };
+    assert!(
+        layout(serde_json::json!({
+            "$schema": health_packages::FORM_LAYOUT,
+            "url": "http://health.go.ug/fhir/layout/anc-visit", "version": "1.0.0",
+            "questionnaire": "http://health.go.ug/fhir/Questionnaire/anc-visit|1.4.0",
+            "sections": [{ "title": "History", "items": ["age", "pregnant"] }],
+            "items": { "pregnant": { "widget": "radio", "hint": "As the client reports it" } }
+        }))
+        .is_ok()
+    );
+    assert!(matches!(
+        layout(serde_json::json!({
+            "$schema": health_packages::FORM_LAYOUT,
+            "url": "u", "version": "1", "questionnaire": "no-version",
+            "sections": [], "items": { "age": { "hidden": true } }
+        })),
+        Err(Error::Configuration { .. })
+    ));
+}

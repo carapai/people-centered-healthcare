@@ -16,6 +16,12 @@ use crate::archive::Files;
 /// Where configuration lives in a package.
 const FOLDER: &str = "configuration/";
 
+/// The `$schema` of a Form Layout: a Questionnaire's presentation (configuration.md).
+pub const FORM_LAYOUT: &str =
+    "https://carapai.github.io/people-centered-healthcare/fhir/schema/form-layout/1";
+
+const FORM_LAYOUT_SCHEMA: &str = include_str!("../schemas/form-layout-1.json");
+
 /// The configuration schemas a software release reads, by `$schema` URI.
 #[derive(Default)]
 pub struct Schemas {
@@ -29,11 +35,20 @@ impl std::fmt::Debug for Schemas {
 }
 
 impl Schemas {
-    /// The schemas built into this release. None yet: each arrives with the feature that reads
-    /// its configuration (Form Layouts, override points, settings). Until then, a package with
-    /// configuration is refused.
+    /// The schemas built into this release, each arriving with the feature that reads its
+    /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]). Configuration naming any other schema
+    /// (override points, settings) is refused until its feature arrives.
     pub fn platform() -> Self {
-        Self::default()
+        let mut schemas = Self::default();
+        for (uri, text) in [(FORM_LAYOUT, FORM_LAYOUT_SCHEMA)] {
+            // Built into the release and checked by its tests, so it always compiles.
+            if let Ok(schema) = serde_json::from_str::<Value>(text)
+                && let Ok(validator) = jsonschema::validator_for(&schema)
+            {
+                schemas.validators.insert(uri.to_owned(), validator);
+            }
+        }
+        schemas
     }
 
     /// With `schema` for files naming `uri`. Remote `$ref`s are not resolved, so a schema must be

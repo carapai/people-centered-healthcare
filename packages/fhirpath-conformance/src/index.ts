@@ -49,11 +49,22 @@ function normal(value: unknown): Item {
   return { text: String(value) }
 }
 
-/** Evaluates `expression` against `resource` with fhirpath.js in lossless precise mode. */
-export function evaluate(resource: unknown, expression: string): Item[] {
-  const result = fhirpath.evaluate(resource as object, expression, {}, r5, {
+/**
+ * Evaluates `expression` against `resource` with fhirpath.js in lossless precise mode, with
+ * `env` as its environment variables (`%resource`, `%context`, …). This is the configuration
+ * the client's live forms use.
+ */
+export function evaluateRaw(resource: unknown, expression: string, env: Record<string, unknown> = {}): unknown[] {
+  return fhirpath.evaluate(resource as object, expression, env, r5, {
     preciseMath: true,
     keepDecimalTypes: true,
   }) as unknown[]
-  return result.map(normal)
 }
+
+/** Evaluates `expression`, normalized to the fixtures' shape. */
+export function evaluate(resource: unknown, expression: string, env: Record<string, unknown> = {}): Item[] {
+  return evaluateRaw(resource, expression, env).map(normal)
+}
+
+/** A result item in the fixtures' shape. */
+export { normal as toItem }

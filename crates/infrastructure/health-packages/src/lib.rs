@@ -29,7 +29,7 @@ use health_time::Timestamp;
 use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
-pub use schemas::Schemas;
+pub use schemas::{FORM_LAYOUT, Schemas};
 pub use signature::{LocalSigner, PublicationSigner, TYP};
 
 /// A sha-256.

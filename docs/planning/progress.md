@@ -577,3 +577,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - numbers compare by exact text, because precise fhirpath.js returns integers as decimals;
     - the scale of arithmetic results differs between the engines and stays out of the suite;
     - fhirpath.js, `@lhncbc/ucum-lhc` and `argparse` are per-package licence exceptions, approved by the user.
+- 2026-11-05: #92 part 1 merged (#325). Part 2, the renderer:
+  - **Client `features/forms`:** `QuestionnaireRenderer` on TanStack Form, with the pure `model.ts` and `layout.ts`. It renders the answer types forms need with exact decimals, groups and repeats with stable `item.id`s. Live behaviour (enableWhen and enableWhenExpression, calculatedExpression, `questionnaire-constraint`, required questions) runs through the shared fhirpath.js configuration.
+  - **Form Layouts:** their JSON Schema is built into the release (`health-packages`, `FORM_LAYOUT`). Layouts arrange sections, widgets and hints, and can never hide a question.
+  - **Dependencies:** `@tanstack/react-form` 1.33.5 (MIT). The client uses `@health/fhirpath-conformance`'s engine configuration, which gains environment variables (`%resource`).
+  - **Decisions:**
+    - a failing enableWhenExpression leaves the question shown;
+    - a failing constraint expression counts as failing;
+    - submit is blocked while required questions or error constraints are unmet;
+    - the form holds the response as an opaque value, because TanStack Form's deep key types cannot traverse FHIR's.
+  - **Next:** part 3 adds the form screen with server-side drafts and its e2e test, and part 4 the server's re-validation of submissions.

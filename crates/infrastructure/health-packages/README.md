@@ -58,7 +58,7 @@ Layer: **infrastructure**. Published Definition packages on disk and in transit 
   - it names no `$schema`, or one this release does not know;
   - it does not validate.
 - **Across releases:** a node verifies with its own `Schemas`, so a release that does not know a schema refuses a package that needs it, just as it refuses an unknown `formatVersion`.
-- **`Schemas::platform()`** is empty for now. Form Layouts, override points and settings each bring their schema with the feature that reads them, and until then a package with configuration is refused.
+- **`Schemas::platform()`** reads Form Layouts (#92). Override points and settings each bring their schema with the feature that reads them, and until then a package with such configuration is refused.
 
 ## The signature
 
@@ -121,3 +121,4 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
   - A package signed while its certificate was valid still verifies years later, but one signed after it expired does not, and nor does one dated in the future.
   - A revoked certificate is refused.
   - A configuration file is refused when it has no `$schema`, names an unknown schema, fails validation (reported by JSON pointer), or is not JSON. A release without the schema refuses the published package, and an unusable schema is refused when built in.
+- **Configuration schemas:** `Schemas::platform()` reads Form Layouts (`FORM_LAYOUT`, `schemas/form-layout-1.json`; #92). A layout names its Questionnaire `url|version` and arranges top-level items into titled sections, with widgets and hints. The schema admits nothing that could change or hide what is asked, and other configuration stays refused until its feature arrives.
