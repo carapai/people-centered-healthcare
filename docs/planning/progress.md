@@ -677,3 +677,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - re-derivation at the authority, which needs sync;
     - type-checking expressions against answer types;
     - the `extraction` activity code and the `extraction-mapping` QuestionnaireResponse extension in the core package.
+- 2026-11-05: #93 part 3 merged (#334). #93 stays open for re-derivation at the authority, which needs sync, and two smaller items. Their follow-up issues are not filed yet: creating issues needs the maintainer's permission. #104, the consultation workspace, is split: part 1 is the patient summary (this), and part 2 the consultation screen (notes, conditions, orders through command ports, disposition) with its e2e test.
+  - **New domain crate `health-shared-record`:** the summary's rules. It keeps current allergies (high criticality first), conditions, medications, the latest reading of each vital sign, the latest visits and active programs.
+  - **New application crate `health-shared-record-app`:** the patients a golden record links, the searches per section, and FHIR R5 mapped into the summary.
+  - **`health-fhir-server`:** `GET /Patient/{id}/$summary`.
+    - Each section is a search under the clinician's own search policy, so sensitive labels and permissions are the policy decision point's.
+    - A section the clinician may not search is `null`.
+  - **Central:**
+    - `patient` on the summary's types;
+    - `_security` on every facility-scope type, Patient and those types. Without it, the policy's `_security:not` clause excluded every record for a subject with excluded labels.
+  - **Decisions:**
+    - the summary is JSON from a FHIR operation in the guarded router, not an IPS document;
+    - records linked through the golden record are included, under the same policy.

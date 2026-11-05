@@ -2487,6 +2487,7 @@ dependencies = [
  "health-pricing",
  "health-pricing-app",
  "health-registries-app",
+ "health-shared-record-app",
  "health-surrealdb",
  "health-terminology",
  "health-time",
@@ -2911,6 +2912,21 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "health-shared-record"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "health-shared-record-app"
+version = "0.1.0"
+dependencies = [
+ "health-shared-record",
+ "serde_json",
 ]
 
 [[package]]

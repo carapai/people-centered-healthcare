@@ -447,12 +447,24 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
+/// Each patient summary section's type, and the element naming its patient (#104).
+const SUMMARY_PATIENT_PATHS: [(&str, &str); 6] = [
+    ("AllergyIntolerance", "patient"),
+    ("Condition", "subject"),
+    ("MedicationRequest", "subject"),
+    ("Observation", "subject"),
+    ("Encounter", "subject"),
+    ("EpisodeOfCare", "patient"),
+];
+
 /// The search parameters central supports:
-/// - `_tag` on every facility-scope type (ADR 0057);
+/// - `_tag` on every facility-scope type (ADR 0057), and `_security` on them, Patient and the
+///   summary's types, which the search policy excludes labelled records by;
 /// - Questionnaire `status`, `url` and `version`, and QuestionnaireResponse `status`, for forms
 ///   and their re-validation (#92);
 /// - Library `type`, `url` and `version`, which completion finds Extraction Mappings by (#93);
-/// - Patient `family` and `given`, which reception finds a patient by (#102).
+/// - Patient `family` and `given`, which reception finds a patient by (#102);
+/// - `patient` on the types the patient summary is drawn from (#104).
 ///
 /// Activation (#89) replaces this with the SearchParameters of the published packages a node has
 /// active.
@@ -467,7 +479,14 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "expression": expression,
         })
     };
-    let definitions = [
+    let mut definitions = vec![
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Resource-security",
+            "_security",
+            "Resource",
+            "token",
+            "Resource.meta.security",
+        ),
         definition(
             "http://hl7.org/fhir/SearchParameter/Resource-tag",
             "_tag",
@@ -539,11 +558,31 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "Patient.name.given",
         ),
     ];
+    // The patient a patient summary section is searched by (#104).
+    for (base, path) in SUMMARY_PATIENT_PATHS {
+        let mut patient = definition(
+            &format!("http://hl7.org/fhir/SearchParameter/{base}-patient"),
+            "patient",
+            base,
+            "reference",
+            &format!("{base}.{path}"),
+        );
+        patient["target"] = serde_json::json!(["Patient"]);
+        definitions.push(patient);
+    }
     let catalog = health_fhir_search::Catalog::from_definitions(definitions.iter());
     let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
+    let mut labelled: Vec<&str> = health_access_policy::FACILITY_SCOPE_TYPES.to_vec();
+    labelled.extend(SUMMARY_PATIENT_PATHS.iter().map(|(t, _)| *t));
+    labelled.push("Patient");
+    labelled.sort_unstable();
+    labelled.dedup();
     let supported = health_access_policy::FACILITY_SCOPE_TYPES
         .iter()
         .map(|t| (*t, "_tag"))
+        // Labels: the search policy leaves out what a subject may not see by `_security:not`.
+        .chain(labelled.into_iter().map(|t| (t, "_security")))
+        .chain(SUMMARY_PATIENT_PATHS.iter().map(|(t, _)| (*t, "patient")))
         .chain([
             ("Questionnaire", "status"),
             ("Questionnaire", "url"),
