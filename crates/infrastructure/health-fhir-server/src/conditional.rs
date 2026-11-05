@@ -64,7 +64,7 @@ pub(crate) async fn update(
         .await?;
         let (version, stored) =
             ops::write(&mut tx, &resource_type, plan.id, &json, plan.precondition).await?;
-        references::check_written(&server, &mut tx, &stored).await?;
+        crate::ops::after_write(&server, &mut tx, &stored).await?;
         tx.commit().await?;
         let written = Written {
             created: plan.creates(),

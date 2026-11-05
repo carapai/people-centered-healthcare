@@ -27,6 +27,7 @@ members = [
     "crates/domains/health-workflow",
     "crates/domains/health-terminology",
     "crates/application/health-billing-app",
+    "crates/application/health-clinical-documentation-app",
     "crates/application/health-encounters-app",
     "crates/application/health-identity-app",
     "crates/application/health-patient-flow-app",
@@ -106,6 +107,7 @@ health-inventory-app = { path = "crates/application/health-inventory-app" }
 health-patient-engagement-app = { path = "crates/application/health-patient-engagement-app" }
 health-payments-app = { path = "crates/application/health-payments-app" }
 health-billing-app = { path = "crates/application/health-billing-app" }
+health-clinical-documentation-app = { path = "crates/application/health-clinical-documentation-app" }
 health-encounters-app = { path = "crates/application/health-encounters-app" }
 health-patient-flow-app = { path = "crates/application/health-patient-flow-app" }
 health-pricing-app = { path = "crates/application/health-pricing-app" }

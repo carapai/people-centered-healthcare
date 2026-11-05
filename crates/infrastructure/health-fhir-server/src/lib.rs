@@ -55,6 +55,7 @@ mod access;
 mod audit;
 mod bundle;
 mod capability;
+mod completion;
 mod conditional;
 mod history;
 mod http;
@@ -132,6 +133,7 @@ pub struct FhirServer {
     workflows: Option<Arc<workflow::WorkflowConfig>>,
     pricing: Option<Arc<pricing::PricingConfig>>,
     questionnaire_checks: bool,
+    extraction: bool,
 }
 
 impl FhirServer {
@@ -159,6 +161,7 @@ impl FhirServer {
             workflows: None,
             pricing: None,
             questionnaire_checks: false,
+            extraction: false,
         }
     }
 

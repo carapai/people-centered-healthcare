@@ -25,6 +25,7 @@ Layer: **contracts** (clinical-documentation). SDC template extraction of Questi
   - every resource is tagged `urn:health:extraction` with its mode;
   - an Observation or DocumentReference gets `derivedFrom` the response.
 - **`bundle(plan)`:** the plan as a transaction Bundle of `PUT`s, as SDC's `$extract` returns it. It serves the dry run and fixtures.
+- **Where it runs:** `health-clinical-documentation-app` decides what a completion writes, and `health-fhir-server`'s `with_extraction` runs it on the write path.
 - **Not here yet:**
   - the mapping's publication gates: expressions that parse and type-check, Owner opt-in, fixtures, and `round(n)` on arithmetic;
   - `$populate`.

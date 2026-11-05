@@ -1,0 +1,25 @@
+[package]
+name = "health-clinical-documentation-app"
+description = "Completing a QuestionnaireResponse (#93; ADR 0022, 0023): the mapping that applies, the Owners that accept each extracted resource, managed and seed targets with retraction, and the run's Provenance."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "clinical-documentation"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-configuration = { workspace = true }
+health-fhir-extraction = { workspace = true }
+health-identifiers = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

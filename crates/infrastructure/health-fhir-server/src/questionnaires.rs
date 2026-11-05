@@ -67,7 +67,11 @@ pub(crate) async fn checked(server: &FhirServer, value: Value) -> Result<Option<
     match health_fhir_validation::check_response(server.fhirpath.as_ref(), &definition, &value)
         .await
     {
-        Ok((stored, _warnings)) => Ok(Some(stored)),
+        Ok((mut stored, _warnings)) => {
+            // The mapping it is extracted with, recorded on it (#93).
+            crate::completion::choose(server, &mut stored).await?;
+            Ok(Some(stored))
+        }
         Err(found) => Err(FhirError::invalid_resource(&found)),
     }
 }
