@@ -1,0 +1,46 @@
+{
+  "group": "forms",
+  "description": "What live forms evaluate: a QuestionnaireResponse's answers, read for enableWhenExpression, calculatedExpression and answer constraints.",
+  "resource": {
+    "resourceType": "QuestionnaireResponse",
+    "id": "anc-1",
+    "status": "in-progress",
+    "item": [
+      { "linkId": "age", "answer": [{ "valueInteger": 17 }] },
+      { "linkId": "weight", "answer": [{ "valueDecimal": 61.50 }] },
+      { "linkId": "height", "answer": [{ "valueDecimal": 1.640 }] },
+      { "linkId": "pregnant", "answer": [{ "valueBoolean": true }] },
+      { "linkId": "lmp", "answer": [{ "valueDate": "2026-07-01" }] },
+      { "linkId": "danger-signs", "answer": [
+        { "valueCoding": { "system": "urn:signs", "code": "bleeding", "display": "Vaginal bleeding" } },
+        { "valueCoding": { "system": "urn:signs", "code": "fits", "display": "Convulsions" } }
+      ] },
+      { "linkId": "name", "answer": [{ "valueString": "Grace Nakato" }] }
+    ]
+  },
+  "cases": [
+    { "name": "an integer answer", "expression": "QuestionnaireResponse.item.where(linkId = 'age').answer.value", "expected": [{ "number": "17" }] },
+    { "name": "a decimal answer keeps its scale", "expression": "QuestionnaireResponse.item.where(linkId = 'weight').answer.value", "expected": [{ "number": "61.50" }] },
+    { "name": "a decimal answer keeps trailing zeros", "expression": "QuestionnaireResponse.item.where(linkId = 'height').answer.value", "expected": [{ "number": "1.640" }] },
+    { "name": "enableWhen: under 18", "expression": "QuestionnaireResponse.item.where(linkId = 'age').answer.value < 18", "expected": [{ "boolean": true }] },
+    { "name": "enableWhen: a Boolean answer", "expression": "QuestionnaireResponse.item.where(linkId = 'pregnant').answer.value = true", "expected": [{ "boolean": true }] },
+    { "name": "enableWhen: any danger sign", "expression": "QuestionnaireResponse.item.where(linkId = 'danger-signs').answer.exists()", "expected": [{ "boolean": true }] },
+    { "name": "enableWhen: a coded answer", "expression": "QuestionnaireResponse.item.where(linkId = 'danger-signs').answer.value.where(code = 'fits').exists()", "expected": [{ "boolean": true }] },
+    { "name": "an unanswered item is empty", "expression": "QuestionnaireResponse.item.where(linkId = 'parity').answer.value", "expected": [] },
+    { "name": "an unanswered item does not exist", "expression": "QuestionnaireResponse.item.where(linkId = 'parity').answer.exists()", "expected": [{ "boolean": false }] },
+    { "name": "how many answers", "expression": "QuestionnaireResponse.item.where(linkId = 'danger-signs').answer.count()", "expected": [{ "number": "2" }] },
+    { "name": "the codes of the answers", "expression": "QuestionnaireResponse.item.where(linkId = 'danger-signs').answer.value.code", "expected": [{ "text": "bleeding" }, { "text": "fits" }] },
+    { "name": "the first answer's display", "expression": "QuestionnaireResponse.item.where(linkId = 'danger-signs').answer.value.first().display", "expected": [{ "text": "Vaginal bleeding" }] },
+    { "name": "a date answer", "expression": "QuestionnaireResponse.item.where(linkId = 'lmp').answer.value", "expected": [{ "text": "2026-07-01" }] },
+    { "name": "a date comparison", "expression": "QuestionnaireResponse.item.where(linkId = 'lmp').answer.value > @2026-01-01", "expected": [{ "boolean": true }] },
+    { "name": "a string answer", "expression": "QuestionnaireResponse.item.where(linkId = 'name').answer.value", "expected": [{ "text": "Grace Nakato" }] },
+    { "name": "a string's start", "expression": "QuestionnaireResponse.item.where(linkId = 'name').answer.value.startsWith('Grace')", "expected": [{ "boolean": true }] },
+    { "name": "a string's length", "expression": "QuestionnaireResponse.item.where(linkId = 'name').answer.value.length()", "expected": [{ "number": "12" }] },
+    { "name": "iif on an answer", "expression": "iif(QuestionnaireResponse.item.where(linkId = 'age').answer.value < 18, 'adolescent', 'adult')", "expected": [{ "text": "adolescent" }] },
+    { "name": "a constraint: and", "expression": "QuestionnaireResponse.item.where(linkId = 'pregnant').answer.value and QuestionnaireResponse.item.where(linkId = 'age').answer.value >= 15", "expected": [{ "boolean": true }] },
+    { "name": "a constraint: or", "expression": "QuestionnaireResponse.item.where(linkId = 'age').answer.value > 49 or QuestionnaireResponse.item.where(linkId = 'pregnant').answer.value", "expected": [{ "boolean": true }] },
+    { "name": "a constraint: not", "expression": "(QuestionnaireResponse.item.where(linkId = 'age').answer.value < 18).not()", "expected": [{ "boolean": false }] },
+    { "name": "a constraint: implies", "expression": "QuestionnaireResponse.item.where(linkId = 'pregnant').answer.value implies QuestionnaireResponse.item.where(linkId = 'lmp').answer.exists()", "expected": [{ "boolean": true }] },
+    { "name": "the response's status", "expression": "QuestionnaireResponse.status", "expected": [{ "text": "in-progress" }] }
+  ]
+}
