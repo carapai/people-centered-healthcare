@@ -859,3 +859,56 @@ export const formMessages = defineMessages<FormValues>({
   fmConflict: { id: 'app.forms.conflict', defaultMessage: 'Someone saved this response elsewhere. Open the latest draft to continue.', description: 'Forms: the draft changed on another device' },
 })
 
+type ReceptionValues = {
+  rcTitle: {}
+  rcFamily: {}
+  rcGiven: {}
+  rcFind: {}
+  rcNoneFound: {}
+  rcChoose: { name: string }
+  rcChosen: { name: string }
+  rcServicePoint: {}
+  rcEmergency: {}
+  rcCheckIn: {}
+  rcCheckedIn: { name: string; servicePoint: string }
+  rcFailed: { reason: string }
+  rcQueuesTitle: {}
+  rcQueueEmpty: {}
+  rcWaiting: {}
+  rcCalled: {}
+  rcInService: {}
+  rcCall: { name: string }
+  rcServe: { name: string }
+  rcFinish: { name: string }
+  rcLeft: { name: string }
+  rcEmergencyTag: {}
+  rcArrived: { time: string }
+}
+
+// Reception and queues' strings (features/reception).
+export const receptionMessages = defineMessages<ReceptionValues>({
+  rcTitle: { id: 'app.reception.title', defaultMessage: 'Reception', description: 'Reception page heading and link' },
+  rcFamily: { id: 'app.reception.family', defaultMessage: 'Family name', description: 'Reception field' },
+  rcGiven: { id: 'app.reception.given', defaultMessage: 'Given names', description: 'Reception field' },
+  rcFind: { id: 'app.reception.find', defaultMessage: 'Find the patient', description: 'Reception action: search patients' },
+  rcNoneFound: { id: 'app.reception.noneFound', defaultMessage: 'No patient matches. Register them first.', description: 'Reception: no search results' },
+  rcChoose: { id: 'app.reception.choose', defaultMessage: 'Choose {name}', description: 'Reception action: pick a patient from the results' },
+  rcChosen: { id: 'app.reception.chosen', defaultMessage: 'Patient: {name}', description: 'Reception: the chosen patient' },
+  rcServicePoint: { id: 'app.reception.servicePoint', defaultMessage: 'Service point', description: 'Reception field: where the patient goes' },
+  rcEmergency: { id: 'app.reception.emergency', defaultMessage: 'Emergency', description: 'Reception field: the patient is an emergency' },
+  rcCheckIn: { id: 'app.reception.checkIn', defaultMessage: 'Check in', description: 'Reception action' },
+  rcCheckedIn: { id: 'app.reception.checkedIn', defaultMessage: '{name} is checked in at {servicePoint}.', description: 'Reception: checked in' },
+  rcFailed: { id: 'app.reception.failed', defaultMessage: 'That did not work: {reason}', description: 'Reception: a request was refused' },
+  rcQueuesTitle: { id: 'app.reception.queuesTitle', defaultMessage: 'Queues', description: 'Queues page heading and link' },
+  rcQueueEmpty: { id: 'app.reception.queueEmpty', defaultMessage: 'Nobody is waiting here.', description: 'Queues: empty queue' },
+  rcWaiting: { id: 'app.reception.waiting', defaultMessage: 'Waiting', description: 'Queues: entry status' },
+  rcCalled: { id: 'app.reception.called', defaultMessage: 'Called', description: 'Queues: entry status' },
+  rcInService: { id: 'app.reception.inService', defaultMessage: 'Being seen', description: 'Queues: entry status' },
+  rcCall: { id: 'app.reception.call', defaultMessage: 'Call {name}', description: 'Queues action' },
+  rcServe: { id: 'app.reception.serve', defaultMessage: 'Start seeing {name}', description: 'Queues action' },
+  rcFinish: { id: 'app.reception.finish', defaultMessage: 'Done with {name}', description: 'Queues action' },
+  rcLeft: { id: 'app.reception.left', defaultMessage: '{name} left', description: 'Queues action: left without being seen' },
+  rcEmergencyTag: { id: 'app.reception.emergencyTag', defaultMessage: 'Emergency', description: 'Queues: an emergency entry' },
+  rcArrived: { id: 'app.reception.arrived', defaultMessage: 'Arrived {time}', description: 'Queues: when the patient arrived' },
+})
+

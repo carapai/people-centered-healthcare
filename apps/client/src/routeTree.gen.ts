@@ -23,6 +23,8 @@ import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
+import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
+import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
 import { Route as StockIndexRouteImport } from './routes/stock.index'
 import { Route as StockReceiveRouteImport } from './routes/stock.receive'
@@ -100,6 +102,16 @@ const PortalCallbackRoute = PortalCallbackRouteImport.update({
   path: '/portal/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReceptionIndexRoute = ReceptionIndexRouteImport.update({
+  id: '/reception/',
+  path: '/reception/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceptionQueuesRoute = ReceptionQueuesRouteImport.update({
+  id: '/reception/queues',
+  path: '/reception/queues',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegistryReviewsRoute = RegistryReviewsRouteImport.update({
   id: '/registry/reviews',
   path: '/registry/reviews',
@@ -145,11 +157,13 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
+  '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
   '/till/': typeof TillIndexRoute
 }
@@ -167,11 +181,13 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal': typeof PortalIndexRoute
+  '/reception': typeof ReceptionIndexRoute
   '/stock': typeof StockIndexRoute
   '/till': typeof TillIndexRoute
 }
@@ -190,11 +206,13 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
+  '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
   '/till/': typeof TillIndexRoute
 }
@@ -214,11 +232,13 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/reception/queues'
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
     | '/portal/'
+    | '/reception/'
     | '/stock/'
     | '/till/'
   fileRoutesByTo: FileRoutesByTo
@@ -236,11 +256,13 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/reception/queues'
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
     | '/portal'
+    | '/reception'
     | '/stock'
     | '/till'
   id:
@@ -258,11 +280,13 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/reception/queues'
     | '/registry/reviews'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
     | '/portal/'
+    | '/reception/'
     | '/stock/'
     | '/till/'
   fileRoutesById: FileRoutesById
@@ -281,11 +305,13 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
+  ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
   PortalIndexRoute: typeof PortalIndexRoute
+  ReceptionIndexRoute: typeof ReceptionIndexRoute
   StockIndexRoute: typeof StockIndexRoute
   TillIndexRoute: typeof TillIndexRoute
 }
@@ -390,6 +416,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reception/': {
+      id: '/reception/'
+      path: '/reception'
+      fullPath: '/reception/'
+      preLoaderRoute: typeof ReceptionIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reception/queues': {
+      id: '/reception/queues'
+      path: '/reception/queues'
+      fullPath: '/reception/queues'
+      preLoaderRoute: typeof ReceptionQueuesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/registry/reviews': {
       id: '/registry/reviews'
       path: '/registry/reviews'
@@ -449,11 +489,13 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
+  ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
   TillSuperviseRoute: TillSuperviseRoute,
   PortalIndexRoute: PortalIndexRoute,
+  ReceptionIndexRoute: ReceptionIndexRoute,
   StockIndexRoute: StockIndexRoute,
   TillIndexRoute: TillIndexRoute,
 }

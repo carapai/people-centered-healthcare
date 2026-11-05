@@ -66,6 +66,7 @@ mod payments;
 mod portal;
 mod pricing;
 mod questionnaires;
+mod reception;
 mod references;
 mod registry;
 mod search;
@@ -97,6 +98,10 @@ pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_
 pub use pricing::{
     APPROVE_PERMISSION as PRICING_APPROVE_PERMISSION, MANAGE_PERMISSION as PRICING_PERMISSION,
     PricingConfig, QUOTE_PERMISSION as PRICING_QUOTE_PERMISSION,
+};
+pub use reception::{
+    CHECK_IN_PERMISSION, MANAGE_PERMISSION as ENCOUNTERS_MANAGE_PERMISSION, QUEUE_VIEW_PERMISSION,
+    QUEUE_WORK_PERMISSION,
 };
 pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;

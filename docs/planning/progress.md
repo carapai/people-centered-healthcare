@@ -627,3 +627,18 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - an emergency-class Encounter is queued as an emergency;
     - an ended Encounter closes its entries as done if the patient was called, else left.
   - **Next:** part 3 adds the reception and queue screens and the e2e test.
+- 2026-11-05: #102 part 2 merged (#330). Part 3, reception and queues over HTTP and on screen:
+  - **`health-fhir-server`'s `reception_router()`:**
+    - check-in, Encounter moves and status, the queue of a service point, and the queue steps;
+    - behind `encounters.checkin`, `encounters.manage`, `queues.view` and `queues.work`, for the session's facility;
+    - central mounts it at `/api/reception`.
+  - **Patient-flow:** each encounters step is followed into patient-flow in the same request, until in-process event dispatch (`health-messaging`) delivers the outbox events.
+  - **Central's search:** Patient `family` and `given`, which reception finds a patient by.
+  - **The client:** `/reception` (find a registered patient, then check them in at a service point) and `/reception/queues` (call, see, finish, or mark that the patient left).
+  - **Tests:** HTTP tests for permissions, UUIDv7 ids, unknown patients and facility isolation, and `reception.spec.ts`. In it, a clerk registers and checks a patient in, the patient appears in the triage queue, and a nurse calls and sees them.
+  - **Decisions:**
+    - service points are named per facility, until facility configuration lists them;
+    - reception lists only patients with an MRN, never the client registry's golden records.
+
+  This completes #102.
+
