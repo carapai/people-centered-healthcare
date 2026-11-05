@@ -62,6 +62,7 @@ mod history;
 mod http;
 mod interactions;
 mod inventory;
+mod notes;
 mod ops;
 mod outcome;
 mod payments;

@@ -30,6 +30,8 @@ Layer: **application** (clinical-documentation). Completing a QuestionnaireRespo
   - `check_delete(current)` refuses deleting a signed note.
 
   `health-fhir-server` applies both on every write, and the Authority Node will apply them to versions arriving by sync.
+  - `fhir(note, facility)` and `note(composition)` map a note to its Composition and back. Sections are in the narrative, and the signature is an `attester` (mode `legal`). An amendment carries `relatesTo` (`replaces` or `appends`).
+  - `provenance(id, act, target, source, by, at)` builds the Provenance of a signature (activity `LA`, legally authenticated) or of an amendment (activity `UPDATE`, with the original's version as the `revision` entity).
 - **Consultation notes** are saved final, and signed by their author as they are saved (`attester`, mode `legal`).
 
 Tests: `tests/notes.rs`, `tests/consultation.rs`, and `tests/completion.rs` (Owner opt-ins, version ranges, the choice of mapping, recording it, managed and seed reconciliation with retraction, and the Provenance), over the extractor's ANC fixtures.

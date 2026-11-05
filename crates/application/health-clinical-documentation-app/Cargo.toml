@@ -24,5 +24,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+health-time = { workspace = true }
 health-fhir-validation = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

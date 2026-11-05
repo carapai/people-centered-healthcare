@@ -53,3 +53,55 @@ export async function dispose(transport: Transport, encounter: string, to: { com
 }
 
 export const summaryKey = (patient: string) => ['consultation', 'summary', patient] as const
+
+// Clinical notes (#107): `/api/notes`. Signed notes are never edited; they are amended.
+
+export type NoteKind = 'progress' | 'consultation' | 'admission' | 'procedure' | 'discharge' | 'letter'
+
+/** Each kind's sections, as the node starts them (`health-clinical-documentation`). */
+export const NOTE_SECTIONS: Record<NoteKind, string[]> = {
+  progress: ['Subjective', 'Objective', 'Assessment', 'Plan'],
+  consultation: ['Note'],
+  admission: ['History', 'Examination', 'Assessment', 'Plan'],
+  procedure: ['Note'],
+  discharge: ['Course', 'Condition at discharge', 'Follow-up'],
+  letter: ['Note'],
+}
+
+export interface NoteSection {
+  title: string
+  text: string
+}
+
+export interface ClinicalNote {
+  id: string
+  kind: NoteKind
+  patient: string
+  author: string
+  date: string
+  status: 'preliminary' | 'final' | 'amended' | 'appended' | 'corrected' | 'cancelled' | 'entered-in-error'
+  sections: NoteSection[]
+  signed: { by: string; at: string } | null
+  relatesTo: { relation: 'replaces' | 'appends'; note: string } | null
+}
+
+async function notesCall<T>(transport: Transport, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  const response = await transport.request({ method, path: `/notes${path}`, ...(body === undefined ? {} : { body }) })
+  if (response.status !== 200 && response.status !== 201) {
+    const reason = response.body as { error?: unknown } | undefined
+    throw new ConsultationError(response.status, typeof reason?.error === 'string' ? reason.error : '')
+  }
+  return response.body as T
+}
+
+export const notesKey = (patient: string) => ['consultation', 'notes', patient] as const
+
+export const listNotes = (transport: Transport, patient: string) => notesCall<ClinicalNote[]>(transport, 'GET', `/patients/${encodeURIComponent(patient)}/notes`)
+
+export const draftNote = (transport: Transport, note: { id: string; kind: NoteKind; patient: string; encounter: string; sections: NoteSection[] }) =>
+  notesCall<ClinicalNote>(transport, 'POST', '/notes', note)
+
+export const signNote = (transport: Transport, id: string) => notesCall<ClinicalNote>(transport, 'POST', `/notes/${encodeURIComponent(id)}/sign`)
+
+export const amendNote = (transport: Transport, original: string, amendment: { id: string; relation: 'replaces' | 'appends'; sections: NoteSection[] }) =>
+  notesCall<ClinicalNote>(transport, 'POST', `/notes/${encodeURIComponent(original)}/amend`, amendment)

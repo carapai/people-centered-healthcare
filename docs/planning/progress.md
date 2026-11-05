@@ -748,3 +748,19 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a note is signed when its status is `final`, `amended`, `appended` or `corrected`;
     - even an identical rewrite of a signed note is refused, since only entered-in-error passes;
     - the Authority Node applies the same check when sync arrives.
+- 2026-11-05: #107 part 1 merged (#340). Part 2, the notes API and screen:
+  - **`health-clinical-documentation-app::notes`:**
+    - notes mapped to their Compositions and back (sections in the narrative, the signature as `attester`, amendments with `relatesTo`);
+    - the Provenance of a signature (`LA`) or an amendment (`UPDATE`, the original's version as `revision`).
+  - **`health-fhir-server`'s `notes_router()`:**
+    - draft, edit, cancel, sign, amend, and a patient's notes;
+    - behind `consultation.document`, at the session's facility;
+    - central mounts it at `/api/notes`, and searches Composition by `patient`.
+  - **The client:** the consultation workspace's notes panel. A note is written in its kind's sections (SOAP for progress notes), saved as a draft or signed. A signed note is amended, never edited, and the amendment shows that it amends an earlier note.
+  - **Tests:** mapping and Provenance tests; HTTP tests (draft, edit, sign, refused edits, amendment with its Provenance, facility and permission checks); and `consultation.spec.ts`, which signs a SOAP note and amends it.
+  - **Decisions:**
+    - an amendment is signed as it is made;
+    - the signer is the account until Practitioner records exist;
+    - DocumentReference letters with attachments come with document uploads.
+
+  This completes #107.

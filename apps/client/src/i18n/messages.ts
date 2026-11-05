@@ -926,9 +926,22 @@ type ConsultationValues = {
   csVisits: {}
   csNotShown: {}
   csNoneRecorded: {}
-  csNote: {}
-  csSaveNote: {}
-  csNoteSaved: {}
+  csNotes: {}
+  csNoteKind: {}
+  csKind: { kind: string }
+  csSaveDraft: {}
+  csSign: {}
+  csSignDraft: { kind: string }
+  csAmend: { kind: string }
+  csSignAmendment: {}
+  csDraftSaved: {}
+  csNoteSigned: {}
+  csAmendmentSigned: {}
+  csNoNotes: {}
+  csStatus: { status: string }
+  csSignedBy: { name: string; date: string }
+  csAmends: {}
+  csAmending: { kind: string }
   csDiagnosis: {}
   csProvisional: {}
   csAddDiagnosis: {}
@@ -964,9 +977,32 @@ export const consultationMessages = defineMessages<ConsultationValues>({
   csVisits: { id: 'app.consultation.visits', defaultMessage: 'Recent visits', description: 'Summary section' },
   csNotShown: { id: 'app.consultation.notShown', defaultMessage: 'Not available to you.', description: 'Summary: a section the user may not see' },
   csNoneRecorded: { id: 'app.consultation.noneRecorded', defaultMessage: 'None recorded.', description: 'Summary: an empty section' },
-  csNote: { id: 'app.consultation.note', defaultMessage: 'Note', description: 'Consultation field: the clinical note' },
-  csSaveNote: { id: 'app.consultation.saveNote', defaultMessage: 'Save note', description: 'Consultation action' },
-  csNoteSaved: { id: 'app.consultation.noteSaved', defaultMessage: 'Note saved.', description: 'Consultation: note saved' },
+  csNotes: { id: 'app.consultation.notes', defaultMessage: 'Notes', description: 'Consultation: the notes heading' },
+  csNoteKind: { id: 'app.consultation.noteKind', defaultMessage: 'Kind of note', description: 'Consultation field' },
+  csKind: {
+    id: 'app.consultation.kind',
+    defaultMessage:
+      '{kind, select, progress {Progress note (SOAP)} consultation {Consultation note} admission {Admission note} procedure {Procedure note} discharge {Discharge summary} letter {Letter} other {Note}}',
+    description: 'A kind of clinical note',
+  },
+  csSaveDraft: { id: 'app.consultation.saveDraft', defaultMessage: 'Save draft', description: 'Consultation action: save the note unsigned' },
+  csSign: { id: 'app.consultation.sign', defaultMessage: 'Sign', description: 'Consultation action: sign the note being written' },
+  csSignDraft: { id: 'app.consultation.signDraft', defaultMessage: 'Sign the draft {kind}', description: 'Consultation action: sign a saved draft' },
+  csAmend: { id: 'app.consultation.amend', defaultMessage: 'Amend the {kind}', description: 'Consultation action: amend a signed note' },
+  csSignAmendment: { id: 'app.consultation.signAmendment', defaultMessage: 'Sign amendment', description: 'Consultation action' },
+  csDraftSaved: { id: 'app.consultation.draftSaved', defaultMessage: 'Draft saved.', description: 'Consultation: draft saved' },
+  csNoteSigned: { id: 'app.consultation.noteSigned', defaultMessage: 'Note signed.', description: 'Consultation: note signed' },
+  csAmendmentSigned: { id: 'app.consultation.amendmentSigned', defaultMessage: 'Amendment signed.', description: 'Consultation: amendment signed' },
+  csNoNotes: { id: 'app.consultation.noNotes', defaultMessage: 'No notes here yet.', description: 'Consultation: no notes' },
+  csStatus: {
+    id: 'app.consultation.status',
+    defaultMessage:
+      '{status, select, preliminary {Draft} final {Signed} amended {Amendment, signed} appended {Addendum, signed} corrected {Correction, signed} cancelled {Withdrawn} enteredinerror {Entered in error} other {Unknown}}',
+    description: 'A note status (its FHIR code without hyphens)',
+  },
+  csSignedBy: { id: 'app.consultation.signedBy', defaultMessage: 'Signed by {name}, {date}', description: 'Consultation: who signed a note' },
+  csAmends: { id: 'app.consultation.amends', defaultMessage: 'Amends an earlier note', description: 'Consultation: an amendment' },
+  csAmending: { id: 'app.consultation.amending', defaultMessage: 'Amending the {kind}', description: 'Consultation: the amendment editor heading' },
   csDiagnosis: { id: 'app.consultation.diagnosis', defaultMessage: 'Diagnosis', description: 'Consultation field' },
   csProvisional: { id: 'app.consultation.provisional', defaultMessage: 'Provisional', description: 'Consultation field: the diagnosis is not confirmed' },
   csAddDiagnosis: { id: 'app.consultation.addDiagnosis', defaultMessage: 'Add diagnosis', description: 'Consultation action' },
