@@ -43,8 +43,10 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
+mod extraction;
 mod workflows;
 
+pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
 pub use workflows::WorkflowSandbox;
 
 pub use health_workflow_actions::ActionDescriptor;
@@ -363,6 +365,7 @@ impl Publications {
             Err(other) => problems.push(other.to_string()),
         }
         problems.extend(workflows::problems(packed, &self.actions));
+        problems.extend(extraction::problems(packed).await);
         let name = &packed.contents.package.name;
         let latest = self
             .published(tx, name)

@@ -356,3 +356,74 @@ async fn drafts_and_unmapped_questionnaires_produce_nothing() {
     assert!(stored.get("extension").is_none());
     assert_eq!(get(&app, "/Observation").await.1["entry"], Value::Null);
 }
+
+#[tokio::test]
+async fn the_dry_run_shows_what_would_be_written_and_keeps_nothing() {
+    let app = app().await;
+    let (status, bundle) = send(
+        &app,
+        "POST",
+        "/QuestionnaireResponse/$extract",
+        &response().to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{bundle}");
+    assert_eq!(bundle["type"], "transaction");
+    let entries = bundle["entry"].as_array().cloned().unwrap_or_default();
+    assert_eq!(entries.len(), 3);
+    assert_eq!(
+        entries[0]["resource"]["valueQuantity"]["value"].to_string(),
+        "61.50"
+    );
+    assert_eq!(entries[0]["request"]["method"], "PUT");
+    assert_eq!(
+        get(&app, "/Observation").await.1["entry"],
+        Value::Null,
+        "nothing is kept"
+    );
+    assert_eq!(
+        get(&app, &format!("/QuestionnaireResponse/{RESPONSE}"))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+
+    // As Parameters, and without an id: the preview gives it one.
+    let mut anonymous = response();
+    anonymous.as_object_mut().expect("object").remove("id");
+    let parameters = json!({ "resourceType": "Parameters", "parameter": [{ "name": "questionnaire-response", "resource": anonymous }] });
+    let (status, bundle) = send(
+        &app,
+        "POST",
+        "/QuestionnaireResponse/$extract",
+        &parameters.to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{bundle}");
+    assert_eq!(bundle["entry"].as_array().map(Vec::len), Some(3));
+
+    // No mapping for that Questionnaire version: nothing would be written, a Bundle without entries.
+    let mut unmapped = response();
+    unmapped["questionnaire"] = json!("https://health.go.ug/fhir/Questionnaire/anc-visit|2.0.0");
+    let (status, bundle) = send(
+        &app,
+        "POST",
+        "/QuestionnaireResponse/$extract",
+        &unmapped.to_string(),
+    )
+    .await;
+    assert_eq!(
+        (status, bundle["entry"].as_array().map(Vec::len)),
+        (StatusCode::OK, None)
+    );
+
+    // Something that is not a response.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/QuestionnaireResponse/$extract",
+        &json!({ "resourceType": "Patient" }).to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

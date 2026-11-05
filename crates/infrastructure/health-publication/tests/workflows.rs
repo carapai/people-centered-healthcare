@@ -309,12 +309,10 @@ async fn passing_scenarios_let_the_package_through_and_a_failing_one_sends_it_ba
         "tests/opd-triaged.json".into(),
         scenario("triaged", "consultation"),
     );
-    // Other `tests/` files, such as extraction fixtures, are not workflow scenarios.
+    // Other `tests/` files, such as indicator cases, are not workflow scenarios.
     passing.insert(
-        "tests/extraction.json".into(),
-        json!({ "type": "extraction-fixture" })
-            .to_string()
-            .into_bytes(),
+        "tests/indicator.json".into(),
+        json!({ "type": "indicator-case" }).to_string().into_bytes(),
     );
     let (stage, failures) = simulated(&publications, &passing, "ug.moh.opd@1.0.0").await;
     assert_eq!((stage, failures), (Stage::Review, Vec::new()));

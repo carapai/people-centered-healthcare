@@ -67,6 +67,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - a seed resource an amendment would change is left as it is, and `clinical-documentation.source-form-amended.v1` goes on the outbox;
     - the Provenance gets a new version.
   - **All or nothing:** any failure fails the write, and the response stays as it was.
+  - **`POST /QuestionnaireResponse/$extract`:** the dry run (SDC).
+    - The body is a response, or Parameters with one as `questionnaire-response`. It needs the QuestionnaireResponse search permission.
+    - The answer is the transaction Bundle the response would write: its recorded mapping, else the one chosen.
+    - Nothing is kept. A response without an id gets one for the preview, and one with no mapping gives a Bundle without entries.
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.

@@ -11,10 +11,18 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
      - the publication rules and the release's schemas (`health_packages::check`);
      - then, against the latest published version of the package, the semver check (`health_configuration::lifecycle::semver::check`). That covers the package's own bump, and each changed artefact's bump against its content (`health_packages::bump`).
   2. **Workflow Definitions (#96):** every Library whose type is `workflow-definition` must hold, as inline `application/vnd.health.workflow+json` content, a `health_workflow::definition::WorkflowDefinition` with its Library's url and version. It must pass `problems` against the actions given to `with_actions`, so an unknown action or an invalid parameter fails validation. With no actions given, which is the case until contexts declare theirs, any definition that executes an action fails.
-  3. **Simulation:** the `Sandbox` runs the `tests/` cases.
+  3. **Extraction Mappings (#93):** every Library whose type is `extraction-mapping` must:
+     - be a usable mapping (`health_fhir_extraction::Mapping`), every expression of which evaluates;
+     - name, in each template, an Owner use case that accepts its resource type (`health_clinical_documentation_app::OPT_INS`);
+     - name only items of the package's Questionnaire versions in its range;
+     - round the whole result of every value expression that computes (ADR 0052);
+     - ship at least one `tests/` fixture of type `extraction-fixture` (`mapping` `url|version`, `response`, `expected`), each giving exactly its expected Bundle.
+
+     A fixture naming a mapping the package does not hold fails.
+  4. **Simulation:** the `Sandbox` runs the `tests/` cases.
      - **`WorkflowSandbox`** (#101) runs every `tests/` JSON file of type `workflow-scenario` against the package's definition it names, on the same interpreter, with stubbed actions and guards (`health_workflow::simulation`).
      - **Failures:** every scenario must pass, and one naming a definition the package does not hold fails.
-     - **Other cases:** extraction fixtures and indicator cases are not run yet.
+     - **Other cases:** indicator cases are not run yet.
      - **`NoSandbox`** runs none, for tests of the other steps.
 
   A failure returns the draft to Draft, with every problem in its record.
