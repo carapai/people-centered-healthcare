@@ -447,28 +447,63 @@ fn recount_hourly(store: SurrealStore) {
 
 /// The search parameters central always supports: `_tag` on every facility-scope type, which
 /// facility isolation searches with (ADR 0057). The rest come with the configuration package.
-fn facility_registry() -> health_fhir_search::Registry {
-    let tag = serde_json::json!({
-        "resourceType": "SearchParameter",
-        "url": "http://hl7.org/fhir/SearchParameter/Resource-tag",
-        "code": "_tag",
-        "base": ["Resource"],
-        "type": "token",
-        "expression": "Resource.meta.tag",
-    });
-    let catalog = health_fhir_search::Catalog::from_definitions(std::iter::once(&tag));
+/// The search parameters central supports: `_tag` on every facility-scope type (ADR 0057), and
+/// the status searches the forms screen needs (#92). Activation (#89) replaces this with the
+/// SearchParameters of the published packages a node has active.
+pub(crate) fn search_registry() -> health_fhir_search::Registry {
+    let definition = |url: &str, code: &str, base: &str, kind: &str, expression: &str| {
+        serde_json::json!({
+            "resourceType": "SearchParameter",
+            "url": url,
+            "code": code,
+            "base": [base],
+            "type": kind,
+            "expression": expression,
+        })
+    };
+    let definitions = [
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Resource-tag",
+            "_tag",
+            "Resource",
+            "token",
+            "Resource.meta.tag",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Questionnaire-status",
+            "status",
+            "Questionnaire",
+            "token",
+            "Questionnaire.status",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/QuestionnaireResponse-status",
+            "status",
+            "QuestionnaireResponse",
+            "token",
+            "QuestionnaireResponse.status",
+        ),
+    ];
+    let catalog = health_fhir_search::Catalog::from_definitions(definitions.iter());
     let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
-    for resource_type in health_access_policy::FACILITY_SCOPE_TYPES {
+    let supported = health_access_policy::FACILITY_SCOPE_TYPES
+        .iter()
+        .map(|t| (*t, "_tag"))
+        .chain([
+            ("Questionnaire", "status"),
+            ("QuestionnaireResponse", "status"),
+        ]);
+    for (resource_type, code) in supported {
         if registry
             .support(
                 &catalog,
                 resource_type,
-                "_tag",
+                code,
                 health_fhir_search::ParamState::Active,
             )
             .is_err()
         {
-            tracing::warn!(resource_type, "no _tag index for a facility-scope type");
+            tracing::warn!(resource_type, code, "a search parameter is not supported");
         }
     }
     registry
@@ -508,7 +543,7 @@ fn fhir(
     subjects: Subjects<SurrealAuthStore>,
 ) -> Routes {
     // Facility-scope records are searched by their facility tag (ADR 0057).
-    let store = store.with_registry(facility_registry());
+    let store = store.with_registry(search_registry());
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
     let store = match registry_rules(settings) {
         Some((config, rules)) => {
@@ -1594,7 +1629,7 @@ mod tests {
             })
             .collect();
         assert!(failed.is_empty(), "{failed:?}");
-        let _ = facility_registry();
+        let _ = search_registry();
     }
 
     #[test]

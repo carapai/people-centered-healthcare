@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 
 import { fhirClient } from './fhir'
+import { formsCommands } from './forms'
 import { registriesCommands } from './registries'
 import { parseJson, stringifyJson } from './json'
 import { operationClient } from './operations'
@@ -56,6 +57,7 @@ export function tauriPlatform(): Platform {
     transport: ipcTransport,
     fhir: fhirClient(ipcTransport),
     registries: registriesCommands(ipcTransport),
+    forms: formsCommands(ipcTransport),
     operations: operationClient(ipcTransport),
     // The local desktop session is carried by the Rust side; ending it still clears the cache.
     session: memorySession(),

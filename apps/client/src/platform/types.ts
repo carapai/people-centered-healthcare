@@ -3,6 +3,7 @@
 
 import type { DeviceKeys } from './device'
 import type { FhirClient } from './fhir'
+import type { FormsCommands } from './forms'
 import type { OperationClient } from './operations'
 import type { RegistriesCommands } from './registries'
 import type { SignIn } from './sign-in'
@@ -89,6 +90,8 @@ export interface Platform {
   operations: OperationClient
   /** The Registries Bounded Context's commands (registration). */
   registries: RegistriesCommands
+  /** Forms' commands: QuestionnaireResponse drafts and submissions (#92). */
+  forms: FormsCommands
   session: SessionPort
   /** Sign-in against the node's authorization server, when runtime.json configures one. */
   signIn?: SignIn

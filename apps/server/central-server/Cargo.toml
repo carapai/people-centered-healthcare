@@ -23,11 +23,13 @@ health-client-registry = { workspace = true }
 health-configuration = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
+health-fhir-validation = { workspace = true }
 health-files = { workspace = true }
 health-http = { workspace = true }
 health-identifiers = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-persistence = { workspace = true }
 health-packages = { workspace = true }
 health-pki = { workspace = true }
 health-provisioning = { workspace = true }

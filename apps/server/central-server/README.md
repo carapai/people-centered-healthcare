@@ -27,6 +27,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_PORTAL_CLIENT_ID` | `health-portal` | The patient portal's client |
 | `HEALTH_PORTAL_COUNTRY_CODE` | `256` | The country code of national phone numbers (`0772…`) |
 | `HEALTH_DEV_OTP_OUTBOX` | required with the portal | **Development and e2e only.** A file each one-time code is appended to (`{phone} {code}`); nothing reaches a phone. It is the only sender until an SMS provider is chosen ([#235](https://github.com/carapai/people-centered-healthcare/issues/235)), and central logs a warning while it is in use |
+| `HEALTH_DEV_FHIR_SEED` | none | **Development and e2e only** (#92). A FHIR Bundle of definitional resources (Questionnaires, value sets, code systems, Libraries, plan and activity definitions), each with a UUID id and passing tier 1, written once at startup. A resource already stored is left as it is, and central logs a warning while the seed is in use. Activation ([#89](https://github.com/carapai/people-centered-healthcare/issues/89)) replaces it |
 | `HEALTH_DEV_WORKFLOW_DEFINITIONS` | none | **Development and e2e only** (#99). A JSON file holding an array of Workflow Definitions that central runs at `/api/workflow`. Each is checked as at publication, and one that uses guards or typed actions (not wired yet) is refused, so central does not start. Central logs a warning while it is in use. Activation ([#89](https://github.com/carapai/people-centered-healthcare/issues/89)) replaces it with published packages |
 | `HEALTH_PAYMENT_TILLS` | none | The tills, comma-separated (#254). With them and the access policy, `/api/payments` takes payments and runs cashier shifts |
 | `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217). Price Books and rules (#120), served at `/api/pricing` with the access policy, are in this currency |
@@ -117,3 +118,5 @@ Simulation runs the package's workflow scenarios (`tests/` files of type `workfl
 ## OpenAPI
 
 `central-server openapi` prints central's OpenAPI document (the system routes and `GET /api/session`) and exits, without reading any configuration. The FHIR API is described by its CapabilityStatement. `tools/codegen` generates `@health/api-client` from it (`bun run generate`).
+
+Central's FHIR search supports `_tag` on every facility-scope type, and `status` on Questionnaire and QuestionnaireResponse for the forms screen (#92). Activation (#89) replaces these with the SearchParameters of the active packages.

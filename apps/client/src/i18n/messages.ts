@@ -814,6 +814,18 @@ type FormValues = {
   fmMissing: { count: number }
   fmSubmit: {}
   fmSave: {}
+  fmTitle: {}
+  fmLoading: {}
+  fmFailed: {}
+  fmNone: {}
+  fmChooseForm: {}
+  fmOpen: {}
+  fmDrafts: {}
+  fmContinue: { saved: string }
+  fmSaved: {}
+  fmSubmitted: {}
+  fmSaveFailed: {}
+  fmConflict: {}
 }
 
 // The Questionnaire renderer's strings (features/forms).
@@ -833,5 +845,17 @@ export const formMessages = defineMessages<FormValues>({
   },
   fmSubmit: { id: 'app.forms.submit', defaultMessage: 'Submit', description: 'Forms: submit the response' },
   fmSave: { id: 'app.forms.save', defaultMessage: 'Save draft', description: 'Forms: save the response as a draft' },
+  fmTitle: { id: 'app.forms.title', defaultMessage: 'Forms', description: 'Forms page heading and link' },
+  fmLoading: { id: 'app.forms.loading', defaultMessage: 'Loading…', description: 'Forms: loading' },
+  fmFailed: { id: 'app.forms.failed', defaultMessage: 'The forms could not be loaded.', description: 'Forms: load failed' },
+  fmNone: { id: 'app.forms.none', defaultMessage: 'No forms are available here yet.', description: 'Forms: no Questionnaires' },
+  fmChooseForm: { id: 'app.forms.chooseForm', defaultMessage: 'Form', description: 'Forms field: which Questionnaire' },
+  fmOpen: { id: 'app.forms.open', defaultMessage: 'Start a new response', description: 'Forms action: open a new response' },
+  fmDrafts: { id: 'app.forms.drafts', defaultMessage: 'Drafts', description: 'Forms: saved drafts heading' },
+  fmContinue: { id: 'app.forms.continue', defaultMessage: 'Continue the draft saved {saved}', description: 'Forms action: continue a saved draft' },
+  fmSaved: { id: 'app.forms.saved', defaultMessage: 'Draft saved.', description: 'Forms: a draft was saved' },
+  fmSubmitted: { id: 'app.forms.submitted', defaultMessage: 'Submitted.', description: 'Forms: the response was submitted' },
+  fmSaveFailed: { id: 'app.forms.saveFailed', defaultMessage: 'The response was not saved. The server checked it and refused it.', description: 'Forms: save or submit refused' },
+  fmConflict: { id: 'app.forms.conflict', defaultMessage: 'Someone saved this response elsewhere. Open the latest draft to continue.', description: 'Forms: the draft changed on another device' },
 })
 

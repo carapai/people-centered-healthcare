@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccessRouteImport } from './routes/access'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as EnrollRouteImport } from './routes/enroll'
+import { Route as FormsRouteImport } from './routes/forms'
 import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as WorklistsRouteImport } from './routes/worklists'
@@ -47,6 +48,11 @@ const CallbackRoute = CallbackRouteImport.update({
 const EnrollRoute = EnrollRouteImport.update({
   id: '/enroll',
   path: '/enroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormsRoute = FormsRouteImport.update({
+  id: '/forms',
+  path: '/forms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegistrationRoute = RegistrationRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/access': typeof AccessRoute
   '/callback': typeof CallbackRoute
   '/enroll': typeof EnrollRoute
+  '/forms': typeof FormsRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/access': typeof AccessRoute
   '/callback': typeof CallbackRoute
   '/enroll': typeof EnrollRoute
+  '/forms': typeof FormsRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/access': typeof AccessRoute
   '/callback': typeof CallbackRoute
   '/enroll': typeof EnrollRoute
+  '/forms': typeof FormsRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/callback'
     | '/enroll'
+    | '/forms'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/callback'
     | '/enroll'
+    | '/forms'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/callback'
     | '/enroll'
+    | '/forms'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   AccessRoute: typeof AccessRoute
   CallbackRoute: typeof CallbackRoute
   EnrollRoute: typeof EnrollRoute
+  FormsRoute: typeof FormsRoute
   RegistrationRoute: typeof RegistrationRoute
   SignInRoute: typeof SignInRoute
   WorklistsRoute: typeof WorklistsRoute
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/enroll'
       fullPath: '/enroll'
       preLoaderRoute: typeof EnrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forms': {
+      id: '/forms'
+      path: '/forms'
+      fullPath: '/forms'
+      preLoaderRoute: typeof FormsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/registration': {
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccessRoute: AccessRoute,
   CallbackRoute: CallbackRoute,
   EnrollRoute: EnrollRoute,
+  FormsRoute: FormsRoute,
   RegistrationRoute: RegistrationRoute,
   SignInRoute: SignInRoute,
   WorklistsRoute: WorklistsRoute,

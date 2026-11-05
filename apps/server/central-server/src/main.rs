@@ -17,6 +17,7 @@ mod node;
 mod package;
 mod provision;
 mod recovery;
+mod seed;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -25,7 +26,8 @@ use std::time::Duration;
 
 use health_http::{Readiness, ReadinessCheck, app, document};
 use health_observability::TelemetryConfig;
-use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
+use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
+use health_time::SystemClock;
 use tokio::sync::OnceCell;
 
 use crate::config::Config;
@@ -76,6 +78,15 @@ async fn open_database(
         };
         match opened {
             Ok(connection) => {
+                if let Some(path) = &config.dev_fhir_seed {
+                    // With central's search registry, so seeded resources are indexed.
+                    let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock))
+                        .with_registry(auth::search_registry());
+                    match seed::run(&store, path).await {
+                        Ok(added) => tracing::info!(added, "development FHIR seed written"),
+                        Err(reason) => tracing::error!(error.kind = reason, "seed refused"),
+                    }
+                }
                 if let Some((settings, ready)) = &auth {
                     match auth::routes(connection.clone(), settings) {
                         Ok(router) => {

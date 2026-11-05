@@ -587,3 +587,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - submit is blocked while required questions or error constraints are unmet;
     - the form holds the response as an opaque value, because TanStack Form's deep key types cannot traverse FHIR's.
   - **Next:** part 3 adds the form screen with server-side drafts and its e2e test, and part 4 the server's re-validation of submissions.
+- 2026-11-05: #92 part 2 merged (#326). Part 3, the forms screen with server-side drafts:
+  - **Client `/forms`:** pick a Questionnaire, start or continue a draft, and fill it in the renderer.
+    - drafts are saved through a new `forms` command port on the platform: a `PUT` with a UUIDv7 id from the new `newResourceId`, and `If-Match` after the first save;
+    - a submit stores the response `completed`.
+  - **Central, both development-only:**
+    - `HEALTH_DEV_FHIR_SEED` writes definitional resources, such as Questionnaires, once at startup, indexed;
+    - the search registry adds `status` on Questionnaire and QuestionnaireResponse.
+  - **e2e:** `forms.spec.ts` covers live behaviour in the browser, the required block, a draft saved, continued and submitted, with axe.
+  - **Decisions:**
+    - a seed holds definitional resource types only, and leaves stored ones alone;
+    - drafts are filtered to their form on the client until canonical searches come with activation (#89);
+    - client-created resource ids are UUIDv7, as ADR 0013 requires (`crypto.randomUUID` is v4).
+  - **Next:** part 4, the server's re-validation of submissions against their Questionnaire.
