@@ -185,6 +185,15 @@ pub enum Relation {
     Appends,
 }
 
+/// The note an amendment or addendum relates to, and how.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RelatesTo {
+    /// How.
+    pub relation: Relation,
+    /// The original note's id.
+    pub note: String,
+}
+
 /// A note.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,7 +217,7 @@ pub struct Note {
     /// Who signed it, once signed.
     pub signed: Option<Signature>,
     /// The note it amends or appends to, and how.
-    pub relates_to: Option<(Relation, String)>,
+    pub relates_to: Option<RelatesTo>,
 }
 
 fn written(sections: &[Section]) -> bool {
@@ -269,10 +278,10 @@ impl Note {
     /// The draft signed by `by`: `final`, or `amended` / `appended` for an amendment or addendum.
     pub fn sign(&self, by: &str, at: Timestamp) -> Result<Self, NoteRefused> {
         self.open()?;
-        let status = match self.relates_to {
+        let status = match self.relates_to.as_ref().map(|r| r.relation) {
             None => NoteStatus::Final,
-            Some((Relation::Replaces, _)) => NoteStatus::Amended,
-            Some((Relation::Appends, _)) => NoteStatus::Appended,
+            Some(Relation::Replaces) => NoteStatus::Amended,
+            Some(Relation::Appends) => NoteStatus::Appended,
         };
         Ok(Self {
             status,
@@ -300,7 +309,10 @@ impl Note {
         let draft = Self {
             id: id.to_owned(),
             author: by.to_owned(),
-            relates_to: Some((relation, self.id.clone())),
+            relates_to: Some(RelatesTo {
+                relation,
+                note: self.id.clone(),
+            }),
             ..Self::draft(
                 id,
                 self.kind,

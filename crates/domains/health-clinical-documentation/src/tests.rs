@@ -106,7 +106,10 @@ fn a_signed_note_changes_only_by_amendment_or_addendum() {
     assert_eq!(amendment.status, NoteStatus::Amended);
     assert_eq!(
         amendment.relates_to,
-        Some((Relation::Replaces, "n1".into()))
+        Some(RelatesTo {
+            relation: Relation::Replaces,
+            note: "n1".into()
+        })
     );
     assert_eq!(
         (

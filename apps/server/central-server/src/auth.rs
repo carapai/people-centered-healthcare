@@ -327,11 +327,13 @@ pub(crate) fn routes(
             reception,
             consultation,
             programs,
+            notes,
         } = fhir(fhir_store, settings, policy, subjects);
         api = api.nest("/pricing", pricing);
         api = api.nest("/reception", reception);
         api = api.nest("/consultation", consultation);
         api = api.nest("/programs", programs);
+        api = api.nest("/notes", notes);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -451,14 +453,17 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
-/// Each patient summary section's type, and the element naming its patient (#104).
-const SUMMARY_PATIENT_PATHS: [(&str, &str); 6] = [
+/// Each patient summary section's type, and the notes' (#107), with the element naming its
+/// patient (#104).
+const SUMMARY_PATIENT_PATHS: [(&str, &str); 7] = [
     ("AllergyIntolerance", "patient"),
     ("Condition", "subject"),
     ("MedicationRequest", "subject"),
     ("Observation", "subject"),
     ("Encounter", "subject"),
     ("EpisodeOfCare", "patient"),
+    // A patient's notes (#107).
+    ("Composition", "subject"),
 ];
 
 /// The search parameters central supports:
@@ -652,6 +657,7 @@ struct Routes {
     reception: Router,
     consultation: Router,
     programs: Router,
+    notes: Router,
 }
 
 fn fhir(
@@ -732,6 +738,7 @@ fn fhir(
     let reception = fhir.reception_router().layer(layer.clone());
     let consultation = fhir.consultation_router().layer(layer.clone());
     let programs = fhir.programs_router().layer(layer.clone());
+    let notes = fhir.notes_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
@@ -749,6 +756,7 @@ fn fhir(
         reception,
         consultation,
         programs,
+        notes,
     }
 }
 
@@ -790,6 +798,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/reception/{*rest}", service.clone())
         .route_service("/api/consultation/{*rest}", service.clone())
         .route_service("/api/programs/{*rest}", service.clone())
+        .route_service("/api/notes/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

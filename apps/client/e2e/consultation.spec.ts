@@ -3,8 +3,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { noViolations, press, signIn, type } from './helpers'
 import { USERS } from './users'
 
-// #104: a clinician completes a consultation from one page: the patient's summary, a note, a
-// diagnosis, a test order and a prescription, then completes the visit. Keyboard only, with axe.
+// #104, #107: a clinician completes a consultation from one page: the patient's summary, a signed
+// and amended note, a diagnosis, a test order and a prescription, then completes the visit. Keyboard only, with axe.
 
 /** Registers a patient with a name unique to this run and checks them in at consultation. */
 async function checkedIn(page: Page): Promise<string> {
@@ -44,9 +44,21 @@ test('a clinician completes a consultation without leaving the page', async ({ p
   await expect(conditions.getByText('None recorded.')).toBeVisible()
   await noViolations(clinician)
 
-  await type(clinician, 'Note', 'Fever and headache for three days.')
-  await press(clinician, 'Save note')
-  await expect(clinician.getByRole('status').filter({ hasText: 'Note saved.' })).toBeVisible()
+  // A SOAP note, signed; then amended, never edited (#107).
+  await type(clinician, 'Subjective', 'Fever and headache for three days.')
+  await type(clinician, 'Plan', 'RDT, then treat.')
+  await press(clinician, /^Sign$/)
+  await expect(clinician.getByRole('status').filter({ hasText: 'Note signed.' })).toBeVisible()
+  const notes = clinician.getByRole('list', { name: 'Notes' })
+  await expect(notes.getByText('Progress note (SOAP) · Signed')).toBeVisible()
+  await press(clinician, 'Amend the Progress note (SOAP)')
+  await expect(clinician.getByRole('status').filter({ hasText: 'Amending the Progress note (SOAP)' })).toBeVisible()
+  await clinician.getByLabel('Plan').fill('Admit for IV artesunate.')
+  await press(clinician, 'Sign amendment')
+  await expect(clinician.getByRole('status').filter({ hasText: 'Amendment signed.' })).toBeVisible()
+  await expect(notes.getByText('Progress note (SOAP) · Amendment, signed')).toBeVisible()
+  await expect(notes.getByText('Amends an earlier note')).toBeVisible()
+  await expect(notes.getByText('RDT, then treat.')).toBeVisible()
 
   await type(clinician, 'Diagnosis', 'Malaria')
   await press(clinician, 'Add diagnosis')

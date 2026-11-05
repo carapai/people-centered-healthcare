@@ -9,7 +9,21 @@ import type { PatientSummary } from '../../platform/fhir'
 import { newResourceId } from '../../platform/ids'
 import { SERVICE_POINTS, patientName, queueKey, queueQuery, step, type QueueEntry } from '../reception/api'
 import { button, control, field } from '../reception/styles'
-import { ConsultationError, dispose, record, summaryKey, type Command } from './api'
+import {
+  ConsultationError,
+  NOTE_SECTIONS,
+  amendNote,
+  dispose,
+  draftNote,
+  listNotes,
+  notesKey,
+  record,
+  signNote,
+  summaryKey,
+  type ClinicalNote,
+  type Command,
+  type NoteKind,
+} from './api'
 
 const section = css({ display: 'flex', flexDirection: 'column', gap: '2', borderTop: '1px solid', borderColor: 'border', pt: '3' })
 const heading = css({ fontSize: 'lg', fontWeight: 'semibold' })
@@ -22,7 +36,7 @@ interface Open {
 
 /**
  * The consultation (#104; clinical-workspaces.md): the patients waiting at consultation, and for
- * the one being seen, everything on one page: the shared record's summary, the note, diagnoses,
+ * the one being seen, everything on one page: the shared record's summary, notes, diagnoses,
  * test orders, prescriptions and where the patient goes next. Every write is a command the node
  * checks; nothing is assembled here.
  */
@@ -156,16 +170,159 @@ const form = (onSubmit: () => void, children: ReactNode) => (
   </form>
 )
 
+/** The note being written: a new one, or an amendment of a signed one. */
+type Editing = { kind: NoteKind; amends?: ClinicalNote; texts: string[] }
+
+const KINDS: NoteKind[] = ['progress', 'consultation', 'admission', 'procedure', 'discharge', 'letter']
+
+/** A new note of `kind`, its sections empty. */
+const fresh = (kind: NoteKind): Editing => ({ kind, texts: NOTE_SECTIONS[kind].map(() => '') })
+
+/**
+ * The patient's notes (#107): written in sections, saved as drafts or signed. A signed note is
+ * never edited; it is amended, and the amendment relates to it.
+ */
+function NotesPanel({ patient, encounter }: { patient: string; encounter: string }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const queryClient = useQueryClient()
+  const kindId = useId()
+  const notes = useQuery({ queryKey: notesKey(patient), queryFn: () => listNotes(platform.transport, patient) })
+  const [editing, setEditing] = useState<Editing>({ kind: 'progress', texts: NOTE_SECTIONS.progress.map(() => '') })
+  const [done, setDone] = useState('')
+  const refresh = () => queryClient.invalidateQueries({ queryKey: notesKey(patient) })
+  const titles = editing.amends?.sections.map((s) => s.title) ?? NOTE_SECTIONS[editing.kind]
+  const sections = titles.map((title, i) => ({ title, text: editing.texts[i] ?? '' }))
+  const empty = sections.every((s) => s.text.trim() === '')
+  const kindName = (kind: NoteKind) => intl.formatMessage(m.csKind, { kind })
+
+  const write = useMutation({
+    mutationFn: async (how: 'draft' | 'sign') => {
+      if (editing.amends !== undefined) {
+        await amendNote(platform.transport, editing.amends.id, { id: newResourceId(), relation: 'replaces', sections })
+        return m.csAmendmentSigned
+      }
+      const drafted = await draftNote(platform.transport, { id: newResourceId(), kind: editing.kind, patient: `Patient/${patient}`, encounter: `Encounter/${encounter}`, sections })
+      if (how === 'sign') await signNote(platform.transport, drafted.id)
+      return how === 'sign' ? m.csNoteSigned : m.csDraftSaved
+    },
+    onSuccess: (message) => {
+      setDone(intl.formatMessage(message))
+      setEditing(fresh('progress'))
+    },
+    onSettled: refresh,
+  })
+  const sign = useMutation({
+    mutationFn: (id: string) => signNote(platform.transport, id),
+    onSuccess: () => setDone(intl.formatMessage(m.csNoteSigned)),
+    onSettled: refresh,
+  })
+  const failure = write.error ?? sign.error
+  const reason = failure instanceof ConsultationError ? failure.reason || String(failure.status) : ''
+
+  return (
+    <section aria-labelledby={`${kindId}-notes`} className={section}>
+      <h2 id={`${kindId}-notes`} className={heading}>
+        {intl.formatMessage(m.csNotes)}
+      </h2>
+      {form(
+        () => write.mutate('sign'),
+        <>
+          {editing.amends === undefined ? (
+            <div className={field}>
+              <label htmlFor={kindId}>{intl.formatMessage(m.csNoteKind)}</label>
+              <select id={kindId} value={editing.kind} onChange={(e) => setEditing(fresh(e.target.value as NoteKind))} className={control}>
+                {KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {kindName(k)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <p role="status">{intl.formatMessage(m.csAmending, { kind: kindName(editing.amends.kind) })}</p>
+          )}
+          {sections.map((s, i) => (
+            <SectionField
+              key={`${editing.kind}-${s.title}`}
+              title={s.title}
+              value={s.text}
+              onChange={(text) => setEditing({ ...editing, texts: titles.map((_, j) => (j === i ? text : (editing.texts[j] ?? ''))) })}
+            />
+          ))}
+          <div className={css({ display: 'flex', gap: '2' })}>
+            {editing.amends === undefined ? (
+              <button type="button" className={button} disabled={write.isPending || empty} onClick={() => write.mutate('draft')}>
+                {intl.formatMessage(m.csSaveDraft)}
+              </button>
+            ) : null}
+            <button type="submit" className={button} disabled={write.isPending || empty}>
+              {intl.formatMessage(editing.amends === undefined ? m.csSign : m.csSignAmendment)}
+            </button>
+          </div>
+        </>,
+      )}
+      {done !== '' && failure === null ? <p role="status">{done}</p> : null}
+      {failure !== null ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(m.csFailed, { reason })}
+        </p>
+      ) : null}
+      {notes.data?.length === 0 ? <p>{intl.formatMessage(m.csNoNotes)}</p> : null}
+      <ul aria-label={intl.formatMessage(m.csNotes)} className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+        {(notes.data ?? []).map((note) => (
+          <li key={note.id} className={css({ borderLeft: '3px solid', borderColor: 'border', pl: '3' })}>
+            <p className={css({ fontWeight: 'semibold' })}>
+              {kindName(note.kind)} · {intl.formatMessage(m.csStatus, { status: note.status.replaceAll('-', '') })}
+            </p>
+            {note.signed === null ? null : (
+              <p>{intl.formatMessage(m.csSignedBy, { name: note.signed.by, date: intl.formatDate(new Date(note.signed.at), { dateStyle: 'medium', timeStyle: 'short' }) })}</p>
+            )}
+            {note.relatesTo === null ? null : <p>{intl.formatMessage(m.csAmends)}</p>}
+            <dl>
+              {note.sections.map((s) => (
+                <div key={s.title}>
+                  <dt className={css({ fontWeight: 'semibold' })}>{s.title}</dt>
+                  <dd className={css({ whiteSpace: 'pre-wrap' })}>{s.text}</dd>
+                </div>
+              ))}
+            </dl>
+            {note.status === 'preliminary' ? (
+              <button type="button" className={button} disabled={sign.isPending} onClick={() => sign.mutate(note.id)}>
+                {intl.formatMessage(m.csSignDraft, { kind: kindName(note.kind) })}
+              </button>
+            ) : null}
+            {note.signed !== null && note.status !== 'entered-in-error' ? (
+              <button type="button" className={button} onClick={() => setEditing({ kind: note.kind, amends: note, texts: note.sections.map((s) => s.text) })}>
+                {intl.formatMessage(m.csAmend, { kind: kindName(note.kind) })}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function SectionField({ title, value, onChange }: { title: string; value: string; onChange: (text: string) => void }) {
+  const id = useId()
+  return (
+    <div className={field}>
+      <label htmlFor={id}>{title}</label>
+      <textarea id={id} rows={2} value={value} onChange={(e) => onChange(e.target.value)} className={control} />
+    </div>
+  )
+}
+
 function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
-  const ids = { note: useId(), diagnosis: useId(), provisional: useId(), test: useId(), medicine: useId(), dosage: useId(), next: useId() }
+  const ids = { diagnosis: useId(), provisional: useId(), test: useId(), medicine: useId(), dosage: useId(), next: useId() }
   const encounter = open.entry.encounter.replace(/^Encounter\//, '')
   const patient = open.entry.patient.replace(/^Patient\//, '')
   const summary = useQuery({ queryKey: summaryKey(patient), queryFn: ({ signal }) => platform.fhir.summary(patient, { signal }) })
 
-  const [text, setText] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
   const [provisional, setProvisional] = useState(false)
   const [test, setTest] = useState('')
@@ -174,7 +331,6 @@ function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
   const [next, setNext] = useState<string>(SERVICE_POINTS.find((s) => s !== 'consultation') ?? 'pharmacy')
   const [last, setLast] = useState({ diagnosis: '', test: '', medicine: '' })
 
-  const note = useCommand(encounter, patient)
   const diagnose = useCommand(encounter, patient)
   const order = useCommand(encounter, patient)
   const prescribe = useCommand(encounter, patient)
@@ -188,23 +344,7 @@ function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
       <h1 className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>{intl.formatMessage(m.csWith, { name: open.name })}</h1>
       <Summary summary={summary.data} />
 
-      <section className={section}>
-        {form(
-          () => note.mutate({ what: 'notes', body: { id: newResourceId(), text } }, { onSuccess: () => setText('') }),
-          <>
-            <div className={field}>
-              <label htmlFor={ids.note}>{intl.formatMessage(m.csNote)}</label>
-              <textarea id={ids.note} rows={4} value={text} onChange={(e) => setText(e.target.value)} className={control} />
-            </div>
-            <div>
-              <button type="submit" className={button} disabled={note.isPending || text.trim() === ''}>
-                {intl.formatMessage(m.csSaveNote)}
-              </button>
-            </div>
-            <Outcome mutation={note} done={intl.formatMessage(m.csNoteSaved)} />
-          </>,
-        )}
-      </section>
+      <NotesPanel patient={patient} encounter={encounter} />
 
       <section className={section}>
         {form(

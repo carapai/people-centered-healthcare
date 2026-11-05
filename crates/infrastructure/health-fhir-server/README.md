@@ -60,6 +60,14 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Signed notes (#107):** every write that replaces, and every delete of, a Composition or DocumentReference asks `health_clinical_documentation_app::notes`. That covers plain and conditional writes, transactions and batches, and completion.
   - A signed note changed in place, or deleted, answers 409 (`business-rule`): amend it instead.
   - Marking it entered in error, its content unchanged, is allowed.
+- **Clinical notes (#107):** `notes_router()`, behind `subject_layer`, with `consultation.document`, for the session's facility. Central nests it at `/api/notes`.
+  - **Routes:**
+    - `POST /notes` `{id, kind, patient, encounter?, sections}`: a draft;
+    - `POST /notes/{id}/edit` and `/cancel`: drafts only;
+    - `POST /notes/{id}/sign`: signed, with a Provenance;
+    - `POST /notes/{id}/amend` `{id, relation, sections}`: a new signed note relating to the original, with a Provenance naming the original's version;
+    - `GET /patients/{id}/notes`: the patient's notes here, latest first.
+  - **The original** is never edited. Changing a signed note answers 409.
 - **Completion (#93):** `with_extraction()`, with `with_questionnaire_checks()`. The node's search must support Library `type`, `url` and `version`.
   - **On submission:** a `completed` or `amended` QuestionnaireResponse that records no Extraction Mapping gets the newest one for its Questionnaire version (`Library?type=extraction-mapping`).
   - **After it is written, in its transaction:**
