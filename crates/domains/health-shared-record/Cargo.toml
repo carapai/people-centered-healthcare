@@ -1,0 +1,17 @@
+[package]
+name = "health-shared-record"
+description = "The shared record's patient summary (clinical-workspaces.md; #104): which allergies, conditions, medications, vitals, visits and programs a clinician sees first, and in what order."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "shared-record"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }

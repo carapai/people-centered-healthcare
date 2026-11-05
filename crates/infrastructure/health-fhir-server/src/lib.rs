@@ -71,6 +71,7 @@ mod reception;
 mod references;
 mod registry;
 mod search;
+mod summary;
 mod terminology;
 mod transaction;
 mod validation;
@@ -311,6 +312,7 @@ impl FhirServer {
             .route("/Patient/$match", post(registry::matches))
             .route("/Patient/$register", post(registry::register))
             .route("/Patient/$merge", post(registry::merge))
+            .route("/Patient/{id}/$summary", get(summary::patient_summary))
             .route("/Patient/{id}/$link", post(registry::link))
             .route("/Patient/{id}/$unlink", post(registry::unlink))
             .route("/{type}/_search", post(search::post))

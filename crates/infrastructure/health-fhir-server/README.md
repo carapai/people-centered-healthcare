@@ -71,6 +71,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - The body is a response, or Parameters with one as `questionnaire-response`. It needs the QuestionnaireResponse search permission.
     - The answer is the transaction Bundle the response would write: its recorded mapping, else the one chosen.
     - Nothing is kept. A response without an id gets one for the preview, and one with no mapping gives a Bundle without entries.
+- **The patient summary (#104):** `GET /Patient/{id}/$summary` answers JSON, the shared record's read model (`health-shared-record-app`): `allergies`, `conditions`, `medications`, `vitals`, `visits` and `programs`.
+  - The patient must be readable by the clinician; otherwise the answer is 404, as for a read.
+  - The records are the patient's, plus, through the golden record, the same person's other patient records.
+  - Each section is a search per patient (`{type}?patient=`) under the clinician's own search policy. A sensitive record the clinician may not see is never found, and a section the clinician may not search is `null`.
+  - The records read are audited as a search's are.
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.
