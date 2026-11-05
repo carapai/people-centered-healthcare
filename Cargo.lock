@@ -2324,10 +2324,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-clinical-documentation"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "health-clinical-documentation-app"
 version = "0.1.0"
 dependencies = [
  "health-access-policy",
+ "health-clinical-documentation",
  "health-configuration",
  "health-fhir-extraction",
  "health-fhir-validation",
@@ -2467,6 +2477,7 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-client-registry",
+ "health-clinical-documentation",
  "health-clinical-documentation-app",
  "health-encounters",
  "health-encounters-app",

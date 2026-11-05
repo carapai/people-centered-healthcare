@@ -254,6 +254,13 @@ pub(crate) async fn write(
         // The version replaced must be updatable too: another facility's record stays theirs.
         access::permitted(Decide::Update, &head.json)?;
     }
+    if let Some(head) = &replaced {
+        // A signed note is never changed in place (#107).
+        signed_note(health_clinical_documentation_app::notes::check_replace(
+            &parse(&head.json),
+            &parse(json),
+        ))?;
+    }
     // A facility-scope record names its facility, which never changes (ADR 0057).
     let json = &access::stamp(
         resource_type.as_str(),
@@ -300,6 +307,9 @@ pub(crate) async fn delete(
         return Ok(None);
     }
     access::permitted(Decide::Delete, &head.json)?;
+    signed_note(health_clinical_documentation_app::notes::check_delete(
+        &parse(&head.json),
+    ))?;
     let version = tx.delete(resource_type, id, OpId::new(), expected).await?;
     audit::written(tx, Interaction::Delete, &head.json).await?;
     Ok(Some(version))
@@ -317,6 +327,9 @@ pub(crate) async fn conditional_delete(
     match matches(server, tx, condition).await? {
         Some(matched) => {
             access::permitted(Decide::Delete, &matched.json)?;
+            signed_note(health_clinical_documentation_app::notes::check_delete(
+                &parse(&matched.json),
+            ))?;
             let version = tx
                 .delete(resource_type, matched.id, OpId::new(), expected)
                 .await?;
@@ -336,4 +349,17 @@ pub(crate) async fn after_write(
 ) -> Result<(), Attempt> {
     crate::completion::complete(server, tx, stored).await?;
     crate::references::check_written(server, tx, stored).await
+}
+
+fn parse(json: &RawJson) -> serde_json::Value {
+    serde_json::from_str(json.as_str()).unwrap_or(serde_json::Value::Null)
+}
+
+/// A signed note's refusal, as the write's answer: 409, the version stands.
+fn signed_note(
+    checked: Result<(), health_clinical_documentation::NoteRefused>,
+) -> Result<(), FhirError> {
+    checked.map_err(|refused| {
+        FhirError::new(StatusCode::CONFLICT, "business-rule", refused.to_string())
+    })
 }

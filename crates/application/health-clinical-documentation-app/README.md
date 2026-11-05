@@ -25,4 +25,11 @@ Layer: **application** (clinical-documentation). Completing a QuestionnaireRespo
 
   Blank text, concepts or dosages are refused, as is a code without its system.
 
-Tests: `tests/consultation.rs`, and `tests/completion.rs` (Owner opt-ins, version ranges, the choice of mapping, recording it, managed and seed reconciliation with retraction, and the Provenance), over the extractor's ANC fixtures.
+- **`notes`** (#107): the signed-note rule on FHIR resources. A note's status is a Composition's `status` or a DocumentReference's `docStatus`.
+  - `check_replace(current, next)` refuses an in-place change to a signed note, unless it marks the note entered in error with its content unchanged (`meta` and the status aside).
+  - `check_delete(current)` refuses deleting a signed note.
+
+  `health-fhir-server` applies both on every write, and the Authority Node will apply them to versions arriving by sync.
+- **Consultation notes** are saved final, and signed by their author as they are saved (`attester`, mode `legal`).
+
+Tests: `tests/notes.rs`, `tests/consultation.rs`, and `tests/completion.rs` (Owner opt-ins, version ranges, the choice of mapping, recording it, managed and seed reconciliation with retraction, and the Provenance), over the extractor's ANC fixtures.

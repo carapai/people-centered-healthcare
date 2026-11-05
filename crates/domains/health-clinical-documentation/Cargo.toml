@@ -1,0 +1,19 @@
+[package]
+name = "health-clinical-documentation"
+description = "Clinical notes (clinical-workspaces.md; synchronization.md; #107): the kinds of note, the draft, signed and amended lifecycle, and signed notes immutable, changed only by amendments that relate to the original."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "clinical-documentation"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

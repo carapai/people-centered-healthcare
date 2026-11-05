@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 health-access-policy = { workspace = true }
+health-clinical-documentation = { workspace = true }
 health-configuration = { workspace = true }
 health-fhir-extraction = { workspace = true }
 health-identifiers = { workspace = true }

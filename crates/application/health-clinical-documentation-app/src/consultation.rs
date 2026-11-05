@@ -2,8 +2,8 @@
 //! records in an Encounter, as small commands the node turns into FHIR R5. The UI never assembles
 //! the resources. Each builder takes the Encounter it belongs to and checks the command:
 //!
-//! - [`note`]: a consultation note, a final Composition (LOINC 11488-4) whose narrative is the
-//!   text, escaped;
+//! - [`note`]: a consultation note, a final Composition (LOINC 11488-4) signed by its author,
+//!   whose narrative is the text, escaped;
 //! - [`diagnosis`]: an encounter-diagnosis Condition, active and confirmed (or provisional);
 //! - [`service_order`]: a ServiceRequest (a test or procedure) to order;
 //! - [`prescription`]: a MedicationRequest to order, with its dosage as written.
@@ -110,6 +110,12 @@ pub fn note(id: &str, context: &Context, text: &str) -> Result<Value, CommandRef
         "encounter": { "reference": context.encounter },
         "date": context.at,
         "author": [{ "display": context.author }],
+        // Saved final, so signed by its author as it is saved (#107).
+        "attester": [{
+            "mode": { "coding": [{ "system": "http://hl7.org/fhir/composition-attestation-mode", "code": "legal" }] },
+            "time": context.at,
+            "party": { "display": context.author }
+        }],
         "title": "Consultation note",
         "section": [{ "title": "Note", "text": narrative(text.trim()) }]
     });

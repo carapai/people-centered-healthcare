@@ -736,3 +736,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Programs** now list their forms (`composed-of` Questionnaires).
 
   This completes #116. Enrolment screens wait for the program designer UX (program-designer.md, fog).
+- 2026-11-05: #116 part 3 merged (#339), completing #116. #107, clinical documentation with signing and amendments, is split: part 1 is signed notes made immutable (this), and part 2 the notes API (draft, edit, sign, amend, each signature and amendment with its Provenance) and the notes screen.
+  - **New domain crate `health-clinical-documentation`:**
+    - note kinds with their LOINC types and sections;
+    - the draft, signed and amended lifecycle, with amendments and addenda relating to the original;
+    - `may_replace` and `may_delete`.
+  - **`health-clinical-documentation-app::notes`:** the rule on FHIR Compositions and DocumentReferences.
+  - **`health-fhir-server`:** every replace and delete of a note asks it. A signed note edited in place or deleted answers 409; marking it entered in error with its content unchanged is allowed.
+  - **Consultation notes** are signed by their author as they are saved.
+  - **Decisions:**
+    - a note is signed when its status is `final`, `amended`, `appended` or `corrected`;
+    - even an identical rewrite of a signed note is refused, since only entered-in-error passes;
+    - the Authority Node applies the same check when sync arrives.

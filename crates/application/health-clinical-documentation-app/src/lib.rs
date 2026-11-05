@@ -17,6 +17,7 @@
 //!   the mapping. The last run's targets are read back from it.
 
 pub mod consultation;
+pub mod notes;
 
 use std::collections::BTreeMap;
 
