@@ -326,10 +326,12 @@ pub(crate) fn routes(
             pricing,
             reception,
             consultation,
+            programs,
         } = fhir(fhir_store, settings, policy, subjects);
         api = api.nest("/pricing", pricing);
         api = api.nest("/reception", reception);
         api = api.nest("/consultation", consultation);
+        api = api.nest("/programs", programs);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -466,7 +468,8 @@ const SUMMARY_PATIENT_PATHS: [(&str, &str); 6] = [
 ///   and their re-validation (#92);
 /// - Library `type`, `url` and `version`, which completion finds Extraction Mappings by (#93);
 /// - Patient `family` and `given`, which reception finds a patient by (#102);
-/// - `patient` on the types the patient summary is drawn from (#104).
+/// - `patient` on the types the patient summary is drawn from (#104);
+/// - PlanDefinition `type`, which the programs are found by (#116).
 ///
 /// Activation (#89) replaces this with the SearchParameters of the published packages a node has
 /// active.
@@ -523,6 +526,13 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "QuestionnaireResponse",
             "token",
             "QuestionnaireResponse.status",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/PlanDefinition-type",
+            "type",
+            "PlanDefinition",
+            "token",
+            "PlanDefinition.type",
         ),
         definition(
             "http://hl7.org/fhir/SearchParameter/Library-type",
@@ -590,6 +600,7 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             ("Questionnaire", "url"),
             ("Questionnaire", "version"),
             ("QuestionnaireResponse", "status"),
+            ("PlanDefinition", "type"),
             ("Library", "type"),
             ("Library", "url"),
             ("Library", "version"),
@@ -640,6 +651,7 @@ struct Routes {
     /// Reception and queues.
     reception: Router,
     consultation: Router,
+    programs: Router,
 }
 
 fn fhir(
@@ -719,6 +731,7 @@ fn fhir(
     // Check-in, Encounters and patient-flow queues (#102), for the session's facility.
     let reception = fhir.reception_router().layer(layer.clone());
     let consultation = fhir.consultation_router().layer(layer.clone());
+    let programs = fhir.programs_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
@@ -735,6 +748,7 @@ fn fhir(
         pricing,
         reception,
         consultation,
+        programs,
     }
 }
 
@@ -775,6 +789,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/pricing/{*rest}", service.clone())
         .route_service("/api/reception/{*rest}", service.clone())
         .route_service("/api/consultation/{*rest}", service.clone())
+        .route_service("/api/programs/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

@@ -67,6 +67,7 @@ mod outcome;
 mod payments;
 mod portal;
 mod pricing;
+mod programs;
 mod questionnaires;
 mod reception;
 mod references;
@@ -102,6 +103,10 @@ pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_
 pub use pricing::{
     APPROVE_PERMISSION as PRICING_APPROVE_PERMISSION, MANAGE_PERMISSION as PRICING_PERMISSION,
     PricingConfig, QUOTE_PERMISSION as PRICING_QUOTE_PERMISSION,
+};
+pub use programs::{
+    ENROL_PERMISSION as PROGRAMS_ENROL_PERMISSION, MANAGE_PERMISSION as PROGRAMS_MANAGE_PERMISSION,
+    VIEW_PERMISSION as PROGRAMS_VIEW_PERMISSION,
 };
 pub use reception::{
     CHECK_IN_PERMISSION, MANAGE_PERMISSION as ENCOUNTERS_MANAGE_PERMISSION, QUEUE_VIEW_PERMISSION,

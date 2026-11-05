@@ -2488,6 +2488,8 @@ dependencies = [
  "health-persistence",
  "health-pricing",
  "health-pricing-app",
+ "health-programs",
+ "health-programs-app",
  "health-registries-app",
  "health-shared-record-app",
  "health-surrealdb",
