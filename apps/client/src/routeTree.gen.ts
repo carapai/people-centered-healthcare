@@ -15,6 +15,7 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as ConsultationRouteImport } from './routes/consultation'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as FormsRouteImport } from './routes/forms'
+import { Route as PharmacyRouteImport } from './routes/pharmacy'
 import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as WorklistsRouteImport } from './routes/worklists'
@@ -61,6 +62,11 @@ const EnrollRoute = EnrollRouteImport.update({
 const FormsRoute = FormsRouteImport.update({
   id: '/forms',
   path: '/forms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PharmacyRoute = PharmacyRouteImport.update({
+  id: '/pharmacy',
+  path: '/pharmacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegistrationRoute = RegistrationRouteImport.update({
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
@@ -234,6 +243,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/pharmacy'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -259,6 +269,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/pharmacy'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/pharmacy'
     | '/registration'
     | '/sign-in'
     | '/worklists'
@@ -310,6 +322,7 @@ export interface RootRouteChildren {
   ConsultationRoute: typeof ConsultationRoute
   EnrollRoute: typeof EnrollRoute
   FormsRoute: typeof FormsRoute
+  PharmacyRoute: typeof PharmacyRoute
   RegistrationRoute: typeof RegistrationRoute
   SignInRoute: typeof SignInRoute
   WorklistsRoute: typeof WorklistsRoute
@@ -371,6 +384,13 @@ declare module '@tanstack/react-router' {
       path: '/forms'
       fullPath: '/forms'
       preLoaderRoute: typeof FormsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pharmacy': {
+      id: '/pharmacy'
+      path: '/pharmacy'
+      fullPath: '/pharmacy'
+      preLoaderRoute: typeof PharmacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/registration': {
@@ -502,6 +522,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConsultationRoute: ConsultationRoute,
   EnrollRoute: EnrollRoute,
   FormsRoute: FormsRoute,
+  PharmacyRoute: PharmacyRoute,
   RegistrationRoute: RegistrationRoute,
   SignInRoute: SignInRoute,
   WorklistsRoute: WorklistsRoute,

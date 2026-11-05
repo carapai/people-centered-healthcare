@@ -420,7 +420,40 @@ function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
                 {intl.formatMessage(m.csPrescribe)}
               </button>
             </div>
-            <Outcome mutation={prescribe} done={intl.formatMessage(m.csPrescribed, { name: last.medicine.trim() })} />
+            {prescribe.error instanceof ConsultationError && prescribe.error.warnings.length > 0 && prescribe.variables !== undefined ? (
+              <div role="alert" className={css({ display: 'flex', flexDirection: 'column', gap: '2', color: 'danger.text' })}>
+                <p>{intl.formatMessage(m.csWarnings)}</p>
+                <ul>
+                  {prescribe.error.warnings.map((w) => (
+                    <li key={`${w.code}-${w.message}`}>{w.message}</li>
+                  ))}
+                </ul>
+                <div>
+                  <button
+                    type="button"
+                    className={button}
+                    onClick={() => {
+                      const command = prescribe.variables
+                      if (command?.what === 'orders' && command.body.kind === 'medication') {
+                        prescribe.mutate(
+                          { what: 'orders', body: { ...command.body, acknowledge: true } },
+                          {
+                            onSuccess: () => {
+                              setMedicine('')
+                              setDosage('')
+                            },
+                          },
+                        )
+                      }
+                    }}
+                  >
+                    {intl.formatMessage(m.csPrescribeAnyway)}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <Outcome mutation={prescribe} done={intl.formatMessage(m.csPrescribed, { name: last.medicine.trim() })} />
+            )}
           </>,
         )}
       </section>

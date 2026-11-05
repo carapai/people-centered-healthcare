@@ -60,6 +60,13 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Signed notes (#107):** every write that replaces, and every delete of, a Composition or DocumentReference asks `health_clinical_documentation_app::notes`. That covers plain and conditional writes, transactions and batches, and completion.
   - A signed note changed in place, or deleted, answers 409 (`business-rule`): amend it instead.
   - Marking it entered in error, its content unchanged, is allowed.
+- **Prescribing and the pharmacy worklist (#108):** prescriptions are the medications module's (`health-medications-app`), and none moves stock.
+  - **Prescribing:** the consultation's medication orders gather the patient's open prescriptions and allergies for the clinical safety checks.
+    - Unacknowledged warnings answer 409 with `warnings`, and nothing is written.
+    - The order sent again with `acknowledge: true` is written.
+  - **`pharmacy_router()`,** for the session's facility (central nests it at `/api/pharmacy`):
+    - `GET /worklist` with `pharmacy.view`: the facility's open prescriptions, oldest first;
+    - `POST /prescriptions/{id}/status` with `medications.prescribe`.
 - **Clinical notes (#107):** `notes_router()`, behind `subject_layer`, with `consultation.document`, for the session's facility. Central nests it at `/api/notes`.
   - **Routes:**
     - `POST /notes` `{id, kind, patient, encounter?, sections}`: a draft;
@@ -92,7 +99,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - `POST /encounters/{id}/notes` `{id, text}`: a Composition;
     - `POST /encounters/{id}/diagnoses` `{id, concept, provisional?}`: a Condition;
     - `POST /encounters/{id}/orders` `{id, kind: "service", concept, note?}`: a ServiceRequest;
-    - `POST /encounters/{id}/orders` `{id, kind: "medication", concept, dosage}`: a MedicationRequest.
+    - `POST /encounters/{id}/orders` `{id, kind: "medication", concept, dosage, days?, acknowledge?}`: a prescription, through the medications module (#108).
   - **Permissions:** `consultation.document` for notes and diagnoses, `orders.request` for tests and procedures, `medications.prescribe` for prescriptions.
   - **The visit:** it must be in progress at the session's facility (404 for another facility's, 409 when not in progress).
   - **Retries:** ids are the client's UUIDv7s, so a retried command answers what it wrote (200).

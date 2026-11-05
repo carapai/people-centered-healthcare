@@ -8,8 +8,9 @@
 //!   [`DOCUMENT_PERMISSION`]: a Condition;
 //! - `POST /encounters/{id}/orders` `{id, kind: "service", concept, note?}` needs
 //!   [`ORDER_PERMISSION`]: a ServiceRequest;
-//! - `POST /encounters/{id}/orders` `{id, kind: "medication", concept, dosage}` needs
-//!   [`PRESCRIBE_PERMISSION`]: a MedicationRequest.
+//! - `POST /encounters/{id}/orders` `{id, kind: "medication", concept, dosage, days?,
+//!   acknowledge?}` needs [`PRESCRIBE_PERMISSION`]: a prescription, through the medications
+//!   module and its clinical safety checks (`crate::pharmacy`).
 //!
 //! The Encounter must be in progress at the session's facility (404 for another facility's,
 //! 409 for one not in progress). Ids are the client's UUIDv7s: a retried command answers the
@@ -22,7 +23,7 @@ use axum::routing::post;
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
 use health_clinical_documentation_app::consultation::{
-    CommandRefused, Concept, Context, diagnosis, note, prescription, service_order,
+    CommandRefused, Concept, Context, diagnosis, note, service_order,
 };
 use health_encounters::EncounterStatus;
 use health_encounters_app::{Encounters, EncountersError};
@@ -213,6 +214,10 @@ enum OrderBody {
         id: String,
         concept: Concept,
         dosage: String,
+        #[serde(default)]
+        days: Option<u32>,
+        #[serde(default)]
+        acknowledge: bool,
     },
 }
 
@@ -229,19 +234,24 @@ async fn add_order(
     let subject = or_return!(staff(subject, permission));
     or_return!(client_id(id));
     let context = or_return!(context(&server, &subject, &encounter).await);
-    let built = match &body {
+    match &body {
         OrderBody::Service { id, concept, note } => {
-            service_order(id, &context, concept, note.as_deref())
+            match service_order(id, &context, concept, note.as_deref()) {
+                Ok(resource) => write(&server, resource).await,
+                Err(error) => command_refused(&error),
+            }
         }
+        // A prescription is the medications module's (#108).
         OrderBody::Medication {
             id,
             concept,
             dosage,
-        } => prescription(id, &context, concept, dosage),
-    };
-    match built {
-        Ok(resource) => write(&server, resource).await,
-        Err(error) => command_refused(&error),
+            days,
+            acknowledge,
+        } => {
+            crate::pharmacy::prescribe(&server, &context, id, concept, dosage, *days, *acknowledge)
+                .await
+        }
     }
 }
 

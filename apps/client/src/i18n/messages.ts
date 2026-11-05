@@ -953,6 +953,8 @@ type ConsultationValues = {
   csDosage: {}
   csPrescribe: {}
   csPrescribed: { name: string }
+  csWarnings: {}
+  csPrescribeAnyway: {}
   csSendTo: {}
   csSend: {}
   csComplete: {}
@@ -1014,6 +1016,8 @@ export const consultationMessages = defineMessages<ConsultationValues>({
   csDosage: { id: 'app.consultation.dosage', defaultMessage: 'Dosage', description: 'Consultation field' },
   csPrescribe: { id: 'app.consultation.prescribe', defaultMessage: 'Prescribe', description: 'Consultation action' },
   csPrescribed: { id: 'app.consultation.prescribed', defaultMessage: 'Prescribed: {name}.', description: 'Consultation: medicine prescribed' },
+  csWarnings: { id: 'app.consultation.warnings', defaultMessage: 'Check before prescribing:', description: 'Consultation: clinical safety warnings heading' },
+  csPrescribeAnyway: { id: 'app.consultation.prescribeAnyway', defaultMessage: 'I have checked: prescribe anyway', description: 'Consultation action: acknowledge the safety warnings and prescribe' },
   csSendTo: { id: 'app.consultation.sendTo', defaultMessage: 'Send the patient to', description: 'Consultation field: the next service point' },
   csSend: { id: 'app.consultation.send', defaultMessage: 'Send', description: 'Consultation action: move the patient' },
   csComplete: { id: 'app.consultation.complete', defaultMessage: 'Complete the visit', description: 'Consultation action' },
@@ -1021,4 +1025,25 @@ export const consultationMessages = defineMessages<ConsultationValues>({
   csCompleted: { id: 'app.consultation.completed', defaultMessage: 'The visit is complete.', description: 'Consultation: visit completed' },
   csBack: { id: 'app.consultation.back', defaultMessage: 'Back to the queue', description: 'Consultation action' },
   csFailed: { id: 'app.consultation.failed', defaultMessage: 'That did not work: {reason}', description: 'Consultation: a command was refused' },
+})
+
+type PharmacyValues = {
+  phTitle: {}
+  phWorklist: {}
+  phEmpty: {}
+  phFailed: {}
+  phPrescription: { medicine: string; dosage: string }
+  phDays: { days: number }
+  phBy: { name: string; time: string }
+}
+
+// The pharmacy's strings (features/pharmacy).
+export const pharmacyMessages = defineMessages<PharmacyValues>({
+  phTitle: { id: 'app.pharmacy.title', defaultMessage: 'Pharmacy', description: 'Pharmacy page heading and link' },
+  phWorklist: { id: 'app.pharmacy.worklist', defaultMessage: 'Prescriptions to dispense', description: 'Pharmacy: the worklist heading' },
+  phEmpty: { id: 'app.pharmacy.empty', defaultMessage: 'No prescriptions are waiting.', description: 'Pharmacy: empty worklist' },
+  phFailed: { id: 'app.pharmacy.failed', defaultMessage: 'The worklist could not be loaded.', description: 'Pharmacy: the worklist failed' },
+  phPrescription: { id: 'app.pharmacy.prescription', defaultMessage: '{medicine}: {dosage}', description: 'Pharmacy: a prescription' },
+  phDays: { id: 'app.pharmacy.days', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'Pharmacy: the course length' },
+  phBy: { id: 'app.pharmacy.by', defaultMessage: 'Prescribed by {name}, {time}', description: 'Pharmacy: who prescribed and when' },
 })

@@ -2490,6 +2490,8 @@ dependencies = [
  "health-identity-app",
  "health-inventory",
  "health-inventory-app",
+ "health-medications",
+ "health-medications-app",
  "health-packages",
  "health-patient-engagement",
  "health-patient-engagement-app",
@@ -2659,6 +2661,32 @@ dependencies = [
  "health-surrealdb",
  "health-time",
  "rust_decimal",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "health-medications"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-medications-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-medications",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
  "serde_json",
  "surrealdb",
  "thiserror",

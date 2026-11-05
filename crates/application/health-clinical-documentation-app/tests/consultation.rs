@@ -1,8 +1,8 @@
-//! The consultation's commands (#104): notes, diagnoses, test orders and prescriptions as valid
+//! The consultation's commands (#104): notes, diagnoses and test orders as valid
 //! FHIR R5, in their Encounter, tagged with its facility; incomplete commands are refused.
 
 use health_clinical_documentation_app::consultation::{
-    CommandRefused, Concept, Context, diagnosis, note, prescription, service_order,
+    CommandRefused, Concept, Context, diagnosis, note, service_order,
 };
 use health_fhir_validation::validate_structure;
 use serde_json::{Value, json};
@@ -121,29 +121,4 @@ fn orders_name_what_is_ordered() {
     assert_eq!(test["note"][0]["text"], "urgent");
     let plain = service_order(ID, &context(), &malaria(), Some("")).expect("order");
     assert!(plain.get("note").is_none());
-
-    let artemether = Concept {
-        display: "Artemether/lumefantrine 20/120 mg".into(),
-        ..Concept::default()
-    };
-    let request = prescription(
-        ID,
-        &context(),
-        &artemether,
-        "4 tablets twice daily for 3 days",
-    )
-    .expect("prescription");
-    valid(&request);
-    assert_eq!(
-        request["medication"]["concept"]["text"],
-        "Artemether/lumefantrine 20/120 mg"
-    );
-    assert_eq!(
-        request["dosageInstruction"][0]["text"],
-        "4 tablets twice daily for 3 days"
-    );
-    assert_eq!(
-        prescription(ID, &context(), &artemether, " "),
-        Err(CommandRefused::Missing("the dosage"))
-    );
 }

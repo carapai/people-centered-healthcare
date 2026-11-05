@@ -324,7 +324,11 @@ pub(crate) fn episode_of(resource: &Value) -> Option<Value> {
 }
 
 /// The resources a search finds, or none when the node cannot search that way.
-async fn found(server: &FhirServer, resource_type: &str, params: &[(&str, &str)]) -> Vec<Value> {
+pub(crate) async fn found(
+    server: &FhirServer,
+    resource_type: &str,
+    params: &[(&str, &str)],
+) -> Vec<Value> {
     let params: Vec<(String, String)> = params
         .iter()
         .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))

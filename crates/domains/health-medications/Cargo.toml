@@ -1,0 +1,19 @@
+[package]
+name = "health-medications"
+description = "Prescribing (inventory-and-procurement.md § Dispensing; #108): prescriptions and their lifecycle, clinical safety checks the prescriber acknowledges, and the pharmacy worklist. A prescription never touches stock."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "medications"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
