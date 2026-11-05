@@ -1,0 +1,25 @@
+{
+  "resourceType": "QuestionnaireResponse",
+  "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000c1",
+  "questionnaire": "https://health.go.ug/fhir/Questionnaire/anc-visit|1.4.0",
+  "status": "completed",
+  "subject": { "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa" },
+  "encounter": { "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201" },
+  "authored": "2026-11-05T09:30:00Z",
+  "item": [
+    { "linkId": "vitals", "item": [
+      { "linkId": "weight", "answer": [{ "valueDecimal": 61.50 }] },
+      { "linkId": "weight-note", "answer": [{ "valueString": "after meal" }, { "valueString": "shoes on" }] }
+    ] },
+    { "linkId": "medications", "item": [
+      { "linkId": "medication", "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000d1", "item": [
+        { "linkId": "drug", "answer": [{ "valueCoding": { "system": "http://snomed.info/sct", "code": "387517004", "display": "Paracetamol" } }] },
+        { "linkId": "instructions", "answer": [{ "valueString": "1 g every 8 hours" }] }
+      ] },
+      { "linkId": "medication", "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000d2", "item": [
+        { "linkId": "drug", "answer": [{ "valueCoding": { "system": "http://snomed.info/sct", "code": "63718003", "display": "Ferrous sulfate" } }] }
+      ] }
+    ] },
+    { "linkId": "danger-signs", "answer": [{ "valueBoolean": false }] }
+  ]
+}
