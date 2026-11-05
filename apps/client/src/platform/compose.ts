@@ -2,6 +2,7 @@ import { bearerAuth, dpopAuth, dpopProof } from './auth'
 import { type DeviceKeys, deviceKeys, indexedDbKeyStorage } from './device'
 import { sseEventSource } from './events'
 import { fhirClient } from './fhir'
+import { formsCommands } from './forms'
 import { registriesCommands } from './registries'
 import { httpTransport } from './http'
 import { operationClient } from './operations'
@@ -112,6 +113,7 @@ export function httpPlatform(
     fhir: fhirClient(fhirTransport, fhirPath),
     operations: operationClient(transport),
     registries: registriesCommands(fhirTransport, fhirPath, ninSystem),
+    forms: formsCommands(fhirTransport, fhirPath),
     session,
     // An edge's tokens are bound to the device's key (DPoP) and issued only to an enrolled device.
     ...(signInConfig === undefined

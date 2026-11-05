@@ -40,6 +40,42 @@ const env = {
   HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
   // Payments at one till (#254).
   HEALTH_PAYMENT_TILLS: 'till-1',
+  // The ANC visit form (#92), until activation brings published Questionnaires (#89).
+  HEALTH_DEV_FHIR_SEED: file(
+    'fhir-seed.json',
+    JSON.stringify({
+      resourceType: 'Bundle',
+      type: 'collection',
+      entry: [
+        {
+          resource: {
+            resourceType: 'Questionnaire',
+            id: '0190f1a2-7c3d-7e4f-8a5b-6c7d8e9f0a1b',
+            url: 'https://health.go.ug/fhir/Questionnaire/anc-visit',
+            version: '2.0.0',
+            title: 'ANC visit',
+            status: 'active',
+            item: [
+              { linkId: 'age', text: 'Age', type: 'integer', required: true },
+              {
+                linkId: 'adolescent-counselling',
+                text: 'Adolescent counselling given',
+                type: 'boolean',
+                extension: [
+                  {
+                    url: 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-enableWhenExpression',
+                    valueExpression: { language: 'text/fhirpath', expression: "%resource.item.where(linkId = 'age').answer.value < 18" },
+                  },
+                ],
+              },
+              { linkId: 'pregnant', text: 'Pregnant', type: 'boolean' },
+              { linkId: 'lmp', text: 'Last menstrual period', type: 'date', required: true, enableWhen: [{ question: 'pregnant', operator: '=', answerBoolean: true }] },
+            ],
+          },
+        },
+      ],
+    }),
+  ),
   // An OPD visit's triage and consultation worklists (#99), until activation brings published
   // definitions (#89).
   HEALTH_DEV_WORKFLOW_DEFINITIONS: file(
@@ -61,7 +97,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus'] },
       labels: [],
     }),
   ),

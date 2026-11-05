@@ -154,3 +154,13 @@ describe('the questionnaire renderer model', () => {
     expect(addRepeat(anc, response, 'age')).toBe(response)
   })
 })
+
+describe('new resource ids', () => {
+  test('are UUIDv7s carrying the time', async () => {
+    const { newResourceId } = await import('../src/platform/ids')
+    const minted = newResourceId(Date.UTC(2026, 10, 5, 8, 0, 0))
+    expect(minted).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(Number.parseInt(minted.replaceAll('-', '').slice(0, 12), 16)).toBe(Date.UTC(2026, 10, 5, 8, 0, 0))
+    expect(newResourceId()).not.toBe(newResourceId())
+  })
+})

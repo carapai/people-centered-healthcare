@@ -26,6 +26,10 @@ pub(crate) struct Config {
     pub(crate) log: String,
     /// The authorization server, when `HEALTH_AUTH_ISSUER` is set.
     pub(crate) auth: Option<AuthFiles>,
+    /// `HEALTH_DEV_FHIR_SEED` (#92): a FHIR Bundle of definitional resources (Questionnaires)
+    /// written once at startup, for development and e2e only. Activation (#89) replaces it with
+    /// the published packages a node has active.
+    pub(crate) dev_fhir_seed: Option<PathBuf>,
 }
 
 /// Where the authorization server's settings and secrets are.
@@ -124,6 +128,7 @@ impl Config {
             database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".to_owned()),
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
             log: get("HEALTH_LOG").unwrap_or_else(|| "info".to_owned()),
+            dev_fhir_seed: get("HEALTH_DEV_FHIR_SEED").map(PathBuf::from),
             auth: match get("HEALTH_AUTH_ISSUER") {
                 None => None,
                 Some(issuer) => Some(AuthFiles {
