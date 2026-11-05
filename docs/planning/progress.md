@@ -641,4 +641,3 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - reception lists only patients with an MRN, never the client registry's golden records.
 
   This completes #102.
-
