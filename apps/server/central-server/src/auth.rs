@@ -324,8 +324,10 @@ pub(crate) fn routes(
             payments,
             workflows,
             pricing,
+            reception,
         } = fhir(fhir_store, settings, policy, subjects);
         api = api.nest("/pricing", pricing);
+        api = api.nest("/reception", reception);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -445,11 +447,10 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
-/// The search parameters central always supports: `_tag` on every facility-scope type, which
-/// facility isolation searches with (ADR 0057). The rest come with the configuration package.
-/// The search parameters central supports: `_tag` on every facility-scope type (ADR 0057), and
-/// the searches forms need (#92): Questionnaire `status`, `url` and `version` (to re-validate
-/// submissions), and QuestionnaireResponse `status`. Activation (#89) replaces this with the
+/// The search parameters central supports: `_tag` on every facility-scope type (ADR 0057), the
+/// searches forms need (#92): Questionnaire `status`, `url` and `version` (to re-validate
+/// submissions), and QuestionnaireResponse `status`, and Patient `family` and `given`, which
+/// reception finds a patient by (#102). Activation (#89) replaces this with the
 /// SearchParameters of the published packages a node has active.
 pub(crate) fn search_registry() -> health_fhir_search::Registry {
     let definition = |url: &str, code: &str, base: &str, kind: &str, expression: &str| {
@@ -498,6 +499,20 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "token",
             "QuestionnaireResponse.status",
         ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/individual-family",
+            "family",
+            "Patient",
+            "string",
+            "Patient.name.family",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/individual-given",
+            "given",
+            "Patient",
+            "string",
+            "Patient.name.given",
+        ),
     ];
     let catalog = health_fhir_search::Catalog::from_definitions(definitions.iter());
     let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
@@ -509,6 +524,8 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             ("Questionnaire", "url"),
             ("Questionnaire", "version"),
             ("QuestionnaireResponse", "status"),
+            ("Patient", "family"),
+            ("Patient", "given"),
         ]);
     for (resource_type, code) in supported {
         if registry
@@ -551,6 +568,8 @@ struct Routes {
     workflows: Option<Router>,
     /// Price Books and rules.
     pricing: Router,
+    /// Reception and queues.
+    reception: Router,
 }
 
 fn fhir(
@@ -626,6 +645,8 @@ fn fhir(
     // Price Books and rules (#120): edited and approved at central only.
     fhir = fhir.with_pricing(settings.pricing.clone());
     let pricing = fhir.pricing_router().layer(layer.clone());
+    // Check-in, Encounters and patient-flow queues (#102), for the session's facility.
+    let reception = fhir.reception_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
@@ -640,6 +661,7 @@ fn fhir(
         payments,
         workflows,
         pricing,
+        reception,
     }
 }
 
@@ -678,6 +700,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/payments/{*rest}", service.clone())
         .route_service("/api/workflow/{*rest}", service.clone())
         .route_service("/api/pricing/{*rest}", service.clone())
+        .route_service("/api/reception/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

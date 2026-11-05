@@ -57,6 +57,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Routes:** `POST /instances`; `GET /instances/{id}/tasks`; `POST /instances/{id}/events`; `POST /instances/{id}/cancel`; `POST /instances/{id}/tasks/{state}/{claim|release|reassign|escalate}`; `GET /worklists/{key}`; `GET /definitions`. Each command carries the client's `opId`, and the signed-in account is the actor.
   - **Events offered:** each task lists the events its state's transitions take.
   - **Not wired yet:** guards and typed actions. `WorkflowConfig::new` refuses definitions that use them, and so does any check they fail at publication.
+- **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
+  - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
+  - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.
+  - **Facilities:** service points are named per facility (`KAM013/triage`), so one facility never sees or steps another's queue.
+  - **Patient-flow:** each encounters step is followed into the queues at once, until in-process event dispatch delivers the outbox events. A retried follow-up changes nothing.
 - **Payments (#254):** `with_payments(PaymentConfig)` and `payments_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/payments`.
   - **Permissions:** `payments.cash` (cashiers), `payments.supervise` (variance approval, statements, voids) and `payments.refund`.
   - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.

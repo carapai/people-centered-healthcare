@@ -138,6 +138,14 @@ where
         Ok(queue(&open, service_point).into_iter().cloned().collect())
     }
 
+    /// One entry.
+    pub async fn entry(&self, id: &str) -> Result<QueueEntry, FlowError> {
+        let mut tx = self.store.begin().await?;
+        tx.entry(id)
+            .await?
+            .ok_or_else(|| FlowError::NotFound(id.to_owned()))
+    }
+
     /// Takes `step` on entry `id` at `at`.
     pub async fn step(
         &self,

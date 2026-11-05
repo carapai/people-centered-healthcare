@@ -13,6 +13,7 @@ ignore = [
     { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
     { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained, via surrealmx in the in-memory engine used only by tests" },
+    { id = "RUSTSEC-2026-0441", reason = "pin-utils unmaintained (no vulnerability), via wasmtimer in SurrealDB; nothing to upgrade to yet" },
 ]
 
 [licenses]

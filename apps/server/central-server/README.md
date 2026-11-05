@@ -119,4 +119,4 @@ Simulation runs the package's workflow scenarios (`tests/` files of type `workfl
 
 `central-server openapi` prints central's OpenAPI document (the system routes and `GET /api/session`) and exits, without reading any configuration. The FHIR API is described by its CapabilityStatement. `tools/codegen` generates `@health/api-client` from it (`bun run generate`).
 
-Central's FHIR search supports `_tag` on every facility-scope type, and `status` on Questionnaire and QuestionnaireResponse for the forms screen (#92). Activation (#89) replaces these with the SearchParameters of the active packages.
+Central's FHIR search supports `_tag` on every facility-scope type, `status` on Questionnaire and QuestionnaireResponse for the forms screen (#92), and `family` and `given` on Patient, which reception finds a patient by (#102). Activation (#89) replaces these with the SearchParameters of the active packages.
