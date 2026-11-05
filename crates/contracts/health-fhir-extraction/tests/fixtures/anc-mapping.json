@@ -1,0 +1,80 @@
+{
+  "resourceType": "Library",
+  "url": "https://health.go.ug/fhir/Library/anc-visit-mapping",
+  "version": "1.0.0",
+  "name": "AncVisitMapping",
+  "status": "active",
+  "type": { "coding": [{ "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform", "code": "extraction-mapping" }] },
+  "extension": [
+    { "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-questionnaire", "valueUri": "https://health.go.ug/fhir/Questionnaire/anc-visit" },
+    { "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-versions", "valueString": ">=1.0.0 <2.0.0" }
+  ],
+  "relatedArtifact": [
+    { "type": "composed-of", "resourceReference": { "reference": "#weight" } },
+    { "type": "composed-of", "resourceReference": { "reference": "#medication" } },
+    { "type": "composed-of", "resourceReference": { "reference": "#danger-signs" } }
+  ],
+  "contained": [
+    {
+      "resourceType": "Observation",
+      "id": "weight",
+      "extension": [
+        { "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template", "extension": [
+          { "url": "mode", "valueCode": "managed" },
+          { "url": "retraction", "valueCode": "entered-in-error" },
+          { "url": "ownerUseCase", "valueString": "clinical-data.record-observation" }
+        ] },
+        { "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractContext", "valueString": "item.where(linkId = 'vitals').item.where(linkId = 'weight' and answer.exists())" }
+      ],
+      "status": "final",
+      "code": { "coding": [{ "system": "http://loinc.org", "code": "29463-7", "display": "Body weight" }] },
+      "subject": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "%resource.subject" }] },
+      "encounter": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "%resource.encounter" }] },
+      "_effectiveDateTime": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "%resource.authored" }] },
+      "valueQuantity": {
+        "_value": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "answer.value" }] },
+        "unit": "kg",
+        "system": "http://unitsofmeasure.org",
+        "code": "kg"
+      },
+      "note": [{
+        "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractContext", "valueString": "%resource.item.where(linkId = 'vitals').item.where(linkId = 'weight-note').answer" }],
+        "_text": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "value" }] }
+      }]
+    },
+    {
+      "resourceType": "MedicationRequest",
+      "id": "medication",
+      "extension": [
+        { "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template", "extension": [
+          { "url": "mode", "valueCode": "seed" },
+          { "url": "ownerUseCase", "valueString": "medications.prescribe" }
+        ] },
+        { "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractContext", "valueString": "item.where(linkId = 'medications').item.where(linkId = 'medication')" }
+      ],
+      "status": "active",
+      "intent": "order",
+      "medication": { "concept": { "coding": [{
+        "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "item.where(linkId = 'drug').answer.value" }]
+      }] } },
+      "subject": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "%resource.subject" }] },
+      "dosageInstruction": [{
+        "_text": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "item.where(linkId = 'instructions').answer.value" }] }
+      }]
+    },
+    {
+      "resourceType": "Condition",
+      "id": "danger-signs",
+      "extension": [
+        { "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template", "extension": [
+          { "url": "mode", "valueCode": "seed" },
+          { "url": "ownerUseCase", "valueString": "clinical-data.record-condition" }
+        ] },
+        { "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractContext", "valueString": "item.where(linkId = 'danger-signs' and answer.value = true)" }
+      ],
+      "clinicalStatus": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/condition-clinical", "code": "active" }] },
+      "code": { "text": "Danger signs in pregnancy" },
+      "subject": { "extension": [{ "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractValue", "valueString": "%resource.subject" }] }
+    }
+  ]
+}

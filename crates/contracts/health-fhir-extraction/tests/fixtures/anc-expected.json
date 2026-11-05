@@ -1,0 +1,136 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:860bd199-8761-57c4-b917-683e6ec4a63c",
+      "resource": {
+        "resourceType": "Observation",
+        "valueQuantity": {
+          "value": 61.50,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        },
+        "note": [
+          {
+            "text": "after meal"
+          },
+          {
+            "text": "shoes on"
+          }
+        ],
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7",
+              "display": "Body weight"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "encounter": {
+          "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201"
+        },
+        "effectiveDateTime": "2026-11-05T09:30:00+00:00",
+        "id": "860bd199-8761-57c4-b917-683e6ec4a63c",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:health:extraction",
+              "code": "managed"
+            }
+          ]
+        },
+        "derivedFrom": [
+          {
+            "reference": "QuestionnaireResponse/0190f1a2-7c3d-7e4f-8a5b-0000000000c1"
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Observation/860bd199-8761-57c4-b917-683e6ec4a63c"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:35ff45cf-5d13-5e82-a61c-6a9085625ab1",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "dosageInstruction": [
+          {
+            "text": "1 g every 8 hours"
+          }
+        ],
+        "status": "active",
+        "intent": "order",
+        "medication": {
+          "concept": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "387517004",
+                "display": "Paracetamol"
+              }
+            ]
+          }
+        },
+        "id": "35ff45cf-5d13-5e82-a61c-6a9085625ab1",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:health:extraction",
+              "code": "seed"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "MedicationRequest/35ff45cf-5d13-5e82-a61c-6a9085625ab1"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:b9125f59-f0f2-53a3-8b99-c52e5dab7ed7",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "status": "active",
+        "intent": "order",
+        "medication": {
+          "concept": {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "63718003",
+                "display": "Ferrous sulfate"
+              }
+            ]
+          }
+        },
+        "id": "b9125f59-f0f2-53a3-8b99-c52e5dab7ed7",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:health:extraction",
+              "code": "seed"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "MedicationRequest/b9125f59-f0f2-53a3-8b99-c52e5dab7ed7"
+      }
+    }
+  ]
+}

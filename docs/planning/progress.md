@@ -641,3 +641,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - reception lists only patients with an MRN, never the client registry's golden records.
 
   This completes #102.
+- 2026-11-05: #102 part 3 merged (#331), completing #102; RUSTSEC-2026-0441 (`pin-utils` unmaintained, via SurrealDB) is ignored in `deny.toml`. #93, extraction and CompleteQuestionnaireResponse, is split: part 1 is the pure extractor (this), part 2 the `CompleteQuestionnaireResponse` use case (Owners, managed and seed targets, retraction, Provenance, one transaction) and the dry-run `$extract`, and part 3 the mapping's publication gates.
+  - **New contracts crate `health-fhir-extraction`** (context clinical-documentation):
+    - `Mapping::from_library` reads an `ExtractionMappingLibrary`;
+    - `extract` evaluates SDC `templateExtractContext` and `templateExtractValue` into a plan of resources with derived ids, mode tags and `derivedFrom`;
+    - `bundle` gives the plan as `$extract`'s transaction Bundle.
+  - **Decisions:**
+    - expressions are composed from the response root (`(context)[i].select(value)`), so `%resource` is always the response;
+    - a template without an item context is keyed by its own id;
+    - extracted resources are tagged `urn:health:extraction` with their mode, one tag rather than `extracted` plus the mode;
+    - dateTimes come back from the engine normalized (`Z` as `+00:00`), the same instant on every node.

@@ -2413,6 +2413,17 @@ name = "health-errors"
 version = "0.1.0"
 
 [[package]]
+name = "health-fhir-extraction"
+version = "0.1.0"
+dependencies = [
+ "health-fhir-validation",
+ "health-identifiers",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-fhir-models"
 version = "0.1.0"
 dependencies = [

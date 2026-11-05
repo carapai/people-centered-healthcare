@@ -7,6 +7,7 @@ members = [
     "crates/contracts/health-billing-contract",
     "crates/contracts/health-fhir-models",
     "crates/contracts/health-fhir-search",
+    "crates/contracts/health-fhir-extraction",
     "crates/contracts/health-fhir-validation",
     "crates/contracts/health-persistence",
     "crates/contracts/health-workflow-actions",
@@ -81,6 +82,7 @@ health-fhir-models = { path = "crates/contracts/health-fhir-models" }
 health-fhir-search = { path = "crates/contracts/health-fhir-search" }
 health-http = { path = "crates/infrastructure/health-http" }
 health-integration = { path = "crates/infrastructure/health-integration" }
+health-fhir-extraction = { path = "crates/contracts/health-fhir-extraction" }
 health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
