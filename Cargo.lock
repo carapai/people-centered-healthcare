@@ -2453,6 +2453,7 @@ dependencies = [
  "health-fhir-models",
  "octofhir-fhirpath",
  "regex",
+ "rust_decimal",
  "serde_json",
  "thiserror",
  "tokio",

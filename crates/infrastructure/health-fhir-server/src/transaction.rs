@@ -686,17 +686,24 @@ pub(crate) async fn post(
     let ret = prefer(&headers).0;
     let outcomes = match kind {
         "transaction" => {
-            let requests = entries
+            let mut requests = entries
                 .iter()
                 .enumerate()
                 .map(|(i, e)| parse_request(&server, i, e).map_err(|err| entry_error(i, err)))
                 .collect::<Result<Vec<_>, _>>()?;
-            for request in &requests {
+            for request in &mut requests {
                 if let Some(resource) = &request.resource {
                     server
                         .check_invariants(resource)
                         .await
                         .map_err(|e| entry_error(request.index, e))?;
+                    // A submitted QuestionnaireResponse is re-validated here too (#92).
+                    if let Some(stored) = crate::questionnaires::checked(&server, resource.clone())
+                        .await
+                        .map_err(|e| entry_error(request.index, e))?
+                    {
+                        request.resource = Some(stored);
+                    }
                 }
             }
             check_unique(&requests)?;
@@ -706,9 +713,19 @@ pub(crate) async fn post(
             let mut outcomes = Vec::with_capacity(entries.len());
             for (i, entry) in entries.iter().enumerate() {
                 let outcome = match parse_request(&server, i, entry) {
-                    Ok(request) => {
-                        let invariants = match &request.resource {
-                            Some(resource) => server.check_invariants(resource).await,
+                    Ok(mut request) => {
+                        let invariants = match request.resource.clone() {
+                            Some(resource) => match server.check_invariants(&resource).await {
+                                // A submitted QuestionnaireResponse is re-validated here too (#92).
+                                Ok(()) => crate::questionnaires::checked(&server, resource)
+                                    .await
+                                    .map(|stored| {
+                                        if let Some(stored) = stored {
+                                            request.resource = Some(stored);
+                                        }
+                                    }),
+                                Err(error) => Err(error),
+                            },
                             None => Ok(()),
                         };
                         match invariants {

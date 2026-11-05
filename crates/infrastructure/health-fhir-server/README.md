@@ -38,6 +38,11 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `POST /gs1`: reads a scanned or printed DataMatrix.
   - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
   - Over `health-inventory-app`.
+- **Questionnaire submissions (#92):** with `with_questionnaire_checks()`, a QuestionnaireResponse written `completed` or `amended` is re-validated against its Questionnaire (`health_fhir_validation::check_response`).
+  - **Finding the Questionnaire:** by `Questionnaire?url=&version=`. If the node does not have it, the submission is refused (422).
+  - **What is stored:** the re-validated response, with the server's calculated values.
+  - **Where it applies:** plain writes, and each entry of transaction and batch Bundles. Drafts are stored as they are.
+  - **Central** turns it on, and supports those searches.
 - **Pricing (#120):** `with_pricing(PricingConfig)` and `pricing_router()`, behind `subject_layer`. Central nests it at `/api/pricing`.
   - **Permissions:**
     - `pricing.manage` drafts and lists Price Books and rules;
