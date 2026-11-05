@@ -44,6 +44,28 @@ export interface FhirClient {
   extract(response: QuestionnaireResponse, options?: RequestOptions): Promise<Bundle>
   /** `Questionnaire/$populate` with SDC's input parameters: the prefilled response. */
   populate(input: Parameters, options?: RequestOptions): Promise<QuestionnaireResponse>
+  /** `Patient/{id}/$summary`: the shared record's patient summary (#104). */
+  summary(patientId: string, options?: RequestOptions): Promise<PatientSummary>
+}
+
+/** A coded concept in the patient summary. */
+export interface SummaryCoded {
+  text: string
+  system?: string
+  code?: string
+}
+
+/**
+ * The shared record's patient summary (`health-shared-record`). A section the user may not see is
+ * `null`, not empty.
+ */
+export interface PatientSummary {
+  allergies: { reference: string; substance: SummaryCoded; criticality?: string; clinicalStatus?: string; recorded?: string }[] | null
+  conditions: { reference: string; code: SummaryCoded; clinicalStatus?: string; verification?: string; onset?: string }[] | null
+  medications: { reference: string; medication: SummaryCoded; status: string; dosage?: string; authored?: string }[] | null
+  vitals: { reference: string; code: SummaryCoded; value?: string; unit?: string; status: string; effective?: string }[] | null
+  visits: { reference: string; status: string; class?: string; start?: string; location?: string }[] | null
+  programs: { reference: string; kind: SummaryCoded; status: string; start?: string }[] | null
 }
 
 /** A response other than the expected resource. `outcome` is the server's OperationOutcome, if any. */
@@ -115,6 +137,18 @@ export function fhirClient(transport: Transport, base = '/fhir'): FhirClient {
         signal: options?.signal,
       })
       return outParameter<QuestionnaireResponse>(result, 'response', 'QuestionnaireResponse')
+    },
+    async summary(patientId, options) {
+      // Plain JSON, not a resource: a read model.
+      const response = await transport.request({
+        method: 'GET',
+        path: `${base}/Patient/${segment(patientId)}/$summary`,
+        headers: { accept: 'application/json' },
+        ...(options?.signal === undefined ? {} : { signal: options.signal }),
+      })
+      const body = response.body as { resourceType?: unknown } | undefined
+      if (response.status === 200 && typeof body === 'object' && body !== null && body.resourceType === undefined) return body as PatientSummary
+      throw new FhirError(response.status, body?.resourceType === 'OperationOutcome' ? (body as OperationOutcome) : undefined)
     },
   }
 }

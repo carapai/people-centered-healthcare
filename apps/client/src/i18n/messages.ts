@@ -912,3 +912,77 @@ export const receptionMessages = defineMessages<ReceptionValues>({
   rcArrived: { id: 'app.reception.arrived', defaultMessage: 'Arrived {time}', description: 'Queues: when the patient arrived' },
 })
 
+type ConsultationValues = {
+  csTitle: {}
+  csWaiting: {}
+  csNoneWaiting: {}
+  csSee: { name: string }
+  csWith: { name: string }
+  csSummary: {}
+  csAllergies: {}
+  csConditions: {}
+  csMedications: {}
+  csVitals: {}
+  csVisits: {}
+  csNotShown: {}
+  csNoneRecorded: {}
+  csNote: {}
+  csSaveNote: {}
+  csNoteSaved: {}
+  csDiagnosis: {}
+  csProvisional: {}
+  csAddDiagnosis: {}
+  csDiagnosisAdded: { name: string }
+  csTest: {}
+  csOrderTest: {}
+  csTestOrdered: { name: string }
+  csMedicine: {}
+  csDosage: {}
+  csPrescribe: {}
+  csPrescribed: { name: string }
+  csSendTo: {}
+  csSend: {}
+  csComplete: {}
+  csSent: { servicePoint: string }
+  csCompleted: {}
+  csBack: {}
+  csFailed: { reason: string }
+}
+
+// The consultation's strings (features/consultation).
+export const consultationMessages = defineMessages<ConsultationValues>({
+  csTitle: { id: 'app.consultation.title', defaultMessage: 'Consultation', description: 'Consultation page heading and link' },
+  csWaiting: { id: 'app.consultation.waiting', defaultMessage: 'Waiting for consultation', description: 'Consultation: the queue heading' },
+  csNoneWaiting: { id: 'app.consultation.noneWaiting', defaultMessage: 'Nobody is waiting for consultation.', description: 'Consultation: empty queue' },
+  csSee: { id: 'app.consultation.see', defaultMessage: 'See {name}', description: 'Consultation action: open the patient' },
+  csWith: { id: 'app.consultation.with', defaultMessage: 'Consultation: {name}', description: 'Consultation: the workspace heading' },
+  csSummary: { id: 'app.consultation.summary', defaultMessage: 'Summary', description: 'Consultation: the patient summary heading' },
+  csAllergies: { id: 'app.consultation.allergies', defaultMessage: 'Allergies', description: 'Summary section' },
+  csConditions: { id: 'app.consultation.conditions', defaultMessage: 'Conditions', description: 'Summary section' },
+  csMedications: { id: 'app.consultation.medications', defaultMessage: 'Medications', description: 'Summary section' },
+  csVitals: { id: 'app.consultation.vitals', defaultMessage: 'Vital signs', description: 'Summary section' },
+  csVisits: { id: 'app.consultation.visits', defaultMessage: 'Recent visits', description: 'Summary section' },
+  csNotShown: { id: 'app.consultation.notShown', defaultMessage: 'Not available to you.', description: 'Summary: a section the user may not see' },
+  csNoneRecorded: { id: 'app.consultation.noneRecorded', defaultMessage: 'None recorded.', description: 'Summary: an empty section' },
+  csNote: { id: 'app.consultation.note', defaultMessage: 'Note', description: 'Consultation field: the clinical note' },
+  csSaveNote: { id: 'app.consultation.saveNote', defaultMessage: 'Save note', description: 'Consultation action' },
+  csNoteSaved: { id: 'app.consultation.noteSaved', defaultMessage: 'Note saved.', description: 'Consultation: note saved' },
+  csDiagnosis: { id: 'app.consultation.diagnosis', defaultMessage: 'Diagnosis', description: 'Consultation field' },
+  csProvisional: { id: 'app.consultation.provisional', defaultMessage: 'Provisional', description: 'Consultation field: the diagnosis is not confirmed' },
+  csAddDiagnosis: { id: 'app.consultation.addDiagnosis', defaultMessage: 'Add diagnosis', description: 'Consultation action' },
+  csDiagnosisAdded: { id: 'app.consultation.diagnosisAdded', defaultMessage: 'Diagnosis added: {name}.', description: 'Consultation: diagnosis recorded' },
+  csTest: { id: 'app.consultation.test', defaultMessage: 'Test or procedure', description: 'Consultation field' },
+  csOrderTest: { id: 'app.consultation.orderTest', defaultMessage: 'Order', description: 'Consultation action: order a test or procedure' },
+  csTestOrdered: { id: 'app.consultation.testOrdered', defaultMessage: 'Ordered: {name}.', description: 'Consultation: test ordered' },
+  csMedicine: { id: 'app.consultation.medicine', defaultMessage: 'Medicine', description: 'Consultation field' },
+  csDosage: { id: 'app.consultation.dosage', defaultMessage: 'Dosage', description: 'Consultation field' },
+  csPrescribe: { id: 'app.consultation.prescribe', defaultMessage: 'Prescribe', description: 'Consultation action' },
+  csPrescribed: { id: 'app.consultation.prescribed', defaultMessage: 'Prescribed: {name}.', description: 'Consultation: medicine prescribed' },
+  csSendTo: { id: 'app.consultation.sendTo', defaultMessage: 'Send the patient to', description: 'Consultation field: the next service point' },
+  csSend: { id: 'app.consultation.send', defaultMessage: 'Send', description: 'Consultation action: move the patient' },
+  csComplete: { id: 'app.consultation.complete', defaultMessage: 'Complete the visit', description: 'Consultation action' },
+  csSent: { id: 'app.consultation.sent', defaultMessage: 'Sent to {servicePoint}.', description: 'Consultation: patient moved' },
+  csCompleted: { id: 'app.consultation.completed', defaultMessage: 'The visit is complete.', description: 'Consultation: visit completed' },
+  csBack: { id: 'app.consultation.back', defaultMessage: 'Back to the queue', description: 'Consultation action' },
+  csFailed: { id: 'app.consultation.failed', defaultMessage: 'That did not work: {reason}', description: 'Consultation: a command was refused' },
+})

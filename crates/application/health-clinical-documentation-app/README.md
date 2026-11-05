@@ -17,4 +17,12 @@ Layer: **application** (clinical-documentation). Completing a QuestionnaireRespo
   - A seed target is created once. An amendment that would change it gives a `Review` step instead.
 - **`provenance`:** one Provenance per response, its id derived from the response (`provenance_id`), with a new version per run. It names every target version, the response version (`source`), the mapping (`instantiates`), the response's author and the extractor. `targets` reads the last run's targets back from it.
 
-Tests: `tests/completion.rs` (Owner opt-ins, version ranges, the choice of mapping, recording it, managed and seed reconciliation with retraction, and the Provenance), over the extractor's ANC fixtures.
+- **`consultation`** (#104): the consultation's commands as FHIR R5, each in its Encounter and tagged with its facility, with the client's UUIDv7 id. The UI never assembles them.
+  - `note`: a final Composition, its text escaped into the narrative;
+  - `diagnosis`: an encounter-diagnosis Condition, confirmed or provisional;
+  - `service_order`: a ServiceRequest;
+  - `prescription`: a MedicationRequest with its dosage as written.
+
+  Blank text, concepts or dosages are refused, as is a code without its system.
+
+Tests: `tests/consultation.rs`, and `tests/completion.rs` (Owner opt-ins, version ranges, the choice of mapping, recording it, managed and seed reconciliation with retraction, and the Provenance), over the extractor's ANC fixtures.

@@ -2327,10 +2327,12 @@ dependencies = [
 name = "health-clinical-documentation-app"
 version = "0.1.0"
 dependencies = [
+ "health-access-policy",
  "health-configuration",
  "health-fhir-extraction",
  "health-fhir-validation",
  "health-identifiers",
+ "serde",
  "serde_json",
  "thiserror",
  "tokio",
