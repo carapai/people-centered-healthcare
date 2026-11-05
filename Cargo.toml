@@ -15,10 +15,12 @@ members = [
     "crates/domains/health-configuration",
     "crates/domains/health-consent",
     "crates/domains/health-billing",
+    "crates/domains/health-encounters",
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
     "crates/domains/health-inventory",
     "crates/domains/health-patient-engagement",
+    "crates/domains/health-patient-flow",
     "crates/domains/health-payments",
     "crates/domains/health-pricing",
     "crates/domains/health-workflow",
@@ -81,7 +83,9 @@ health-fhir-validation = { path = "crates/contracts/health-fhir-validation" }
 health-files = { path = "crates/infrastructure/health-files" }
 health-identifiers = { path = "crates/foundation/health-identifiers" }
 health-billing = { path = "crates/domains/health-billing" }
+health-encounters = { path = "crates/domains/health-encounters" }
 health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
+health-patient-flow = { path = "crates/domains/health-patient-flow" }
 health-node-identity = { path = "crates/edge/health-node-identity" }
 health-configuration = { path = "crates/domains/health-configuration" }
 health-terminology = { path = "crates/domains/health-terminology" }

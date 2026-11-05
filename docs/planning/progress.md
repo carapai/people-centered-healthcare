@@ -609,3 +609,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - misplaced or mistyped answers are refused before any expression reads them.
 
   This completes #92.
+- 2026-11-05: #92 part 4 merged (#328), completing #92. #102, Encounters and patient-flow queues, is split: part 1 is the two domains (this), part 2 the application and storage (check-in in one transaction with its guard, the FHIR Encounter, queue entries from encounter events), and part 3 the reception and queue screens with the e2e test.
+  - **New domain crate `health-encounters`:** check-in starts an `in-progress` Encounter at a service point. A guard key keeps one open Encounter per patient per service point, and the R5 lifecycle and moves between service points emit `EncounterEvent`s.
+  - **New domain crate `health-patient-flow`:** queue entries joined from encounter events with derived ids (a replay queues no one twice). The queue is ordered emergency, urgent, routine, then by arrival. Steps run call, serve, finish, recall and leave.
+  - **Decisions:**
+    - the queue never touches the Encounter's status, which only encounters changes;
+    - moving to another service point is an Encounter event that patient-flow follows.
