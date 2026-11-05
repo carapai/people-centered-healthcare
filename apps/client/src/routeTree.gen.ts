@@ -15,6 +15,7 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as ConsultationRouteImport } from './routes/consultation'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as FormsRouteImport } from './routes/forms'
+import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LaboratoryRouteImport } from './routes/laboratory'
 import { Route as PharmacyRouteImport } from './routes/pharmacy'
 import { Route as RegistrationRouteImport } from './routes/registration'
@@ -35,6 +36,7 @@ import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
 import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
+import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +66,11 @@ const EnrollRoute = EnrollRouteImport.update({
 const FormsRoute = FormsRouteImport.update({
   id: '/forms',
   path: '/forms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxRoute = InboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LaboratoryRoute = LaboratoryRouteImport.update({
@@ -166,6 +173,11 @@ const TillSuperviseRoute = TillSuperviseRouteImport.update({
   path: '/till/supervise',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecordsTypeIdRoute = RecordsTypeIdRouteImport.update({
+  id: '/records/$type/$id',
+  path: '/records/$type/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -174,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
@@ -194,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
   '/till/': typeof TillIndexRoute
+  '/records/$type/$id': typeof RecordsTypeIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -202,6 +216,7 @@ export interface FileRoutesByTo {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
@@ -222,6 +237,7 @@ export interface FileRoutesByTo {
   '/reception': typeof ReceptionIndexRoute
   '/stock': typeof StockIndexRoute
   '/till': typeof TillIndexRoute
+  '/records/$type/$id': typeof RecordsTypeIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -231,6 +247,7 @@ export interface FileRoutesById {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
@@ -251,6 +268,7 @@ export interface FileRoutesById {
   '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
   '/till/': typeof TillIndexRoute
+  '/records/$type/$id': typeof RecordsTypeIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -261,6 +279,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/inbox'
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
@@ -281,6 +300,7 @@ export interface FileRouteTypes {
     | '/reception/'
     | '/stock/'
     | '/till/'
+    | '/records/$type/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -289,6 +309,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/inbox'
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
@@ -309,6 +330,7 @@ export interface FileRouteTypes {
     | '/reception'
     | '/stock'
     | '/till'
+    | '/records/$type/$id'
   id:
     | '__root__'
     | '/'
@@ -317,6 +339,7 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/inbox'
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
@@ -337,6 +360,7 @@ export interface FileRouteTypes {
     | '/reception/'
     | '/stock/'
     | '/till/'
+    | '/records/$type/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -346,6 +370,7 @@ export interface RootRouteChildren {
   ConsultationRoute: typeof ConsultationRoute
   EnrollRoute: typeof EnrollRoute
   FormsRoute: typeof FormsRoute
+  InboxRoute: typeof InboxRoute
   LaboratoryRoute: typeof LaboratoryRoute
   PharmacyRoute: typeof PharmacyRoute
   RegistrationRoute: typeof RegistrationRoute
@@ -366,6 +391,7 @@ export interface RootRouteChildren {
   ReceptionIndexRoute: typeof ReceptionIndexRoute
   StockIndexRoute: typeof StockIndexRoute
   TillIndexRoute: typeof TillIndexRoute
+  RecordsTypeIdRoute: typeof RecordsTypeIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -410,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/forms'
       fullPath: '/forms'
       preLoaderRoute: typeof FormsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox': {
+      id: '/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof InboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/laboratory': {
@@ -552,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TillSuperviseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/records/$type/$id': {
+      id: '/records/$type/$id'
+      path: '/records/$type/$id'
+      fullPath: '/records/$type/$id'
+      preLoaderRoute: typeof RecordsTypeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -562,6 +602,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConsultationRoute: ConsultationRoute,
   EnrollRoute: EnrollRoute,
   FormsRoute: FormsRoute,
+  InboxRoute: InboxRoute,
   LaboratoryRoute: LaboratoryRoute,
   PharmacyRoute: PharmacyRoute,
   RegistrationRoute: RegistrationRoute,
@@ -582,6 +623,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReceptionIndexRoute: ReceptionIndexRoute,
   StockIndexRoute: StockIndexRoute,
   TillIndexRoute: TillIndexRoute,
+  RecordsTypeIdRoute: RecordsTypeIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

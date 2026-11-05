@@ -60,6 +60,12 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Signed notes (#107):** every write that replaces, and every delete of, a Composition or DocumentReference asks `health_clinical_documentation_app::notes`. That covers plain and conditional writes, transactions and batches, and completion.
   - A signed note changed in place, or deleted, answers 409 (`business-rule`): amend it instead.
   - Marking it entered in error, its content unchanged, is allowed.
+- **The clinical inbox (#110):** `inbox_router()`, behind `subject_layer`. Central nests it at `/api/inbox`. `GET /` gives the signed-in clinician's items at their facility, urgent first, then newest. Each names its authoritative resource (`reference`):
+  - **verified results** (with `results.review`): the `clinician-results` worklist's tests, linking their DiagnosticReport, at `stat` when critical;
+  - **outstanding documentation:** the clinician's own unsigned notes (Compositions);
+  - **patient requests** (with `medications.prescribe` or `orders.request`): `intent=proposal` MedicationRequests and ServiceRequests.
+
+  Each item passes the policy decision point (`access::may_read`): one whose resource the clinician may not read is left out. Referrals and approvals join as their modules arrive.
 - **The laboratory (#109):** `laboratory_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/laboratory`.
   - **Orders:** a consultation test order (`laboratory`, the default) starts the laboratory test (`health-laboratory-app`) and the lab Workflow Definition (`LAB_WORKFLOW`, the `ug.moh.lab` reference package) about `ServiceRequest/{id}`. Each step is delivered to that instance as its event (`workflow::deliver_for`), so the test moves along the worklists: `lab-collect`, `lab-result`, `lab-verify`, then `clinician-results` (at `stat` for a critical result).
   - **Routes:**

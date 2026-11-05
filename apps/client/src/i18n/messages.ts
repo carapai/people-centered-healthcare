@@ -1124,3 +1124,38 @@ export const labMessages = defineMessages<LabValues>({
   rsFor: { id: 'app.results.for', defaultMessage: '{test} for {name}', description: 'Results: a test and its patient' },
 })
 
+type InboxValues = {
+  ibTitle: {}
+  ibEmpty: {}
+  ibFailed: {}
+  ibKind: { kind: string }
+  ibUrgent: {}
+  ibFor: { title: string; name: string }
+  ibOpen: { title: string }
+  ibNotFound: {}
+  ibWhat: {}
+  ibStatus: {}
+  ibWhen: {}
+  ibRaw: {}
+}
+
+// The clinical inbox's and the record view's strings (features/inbox, features/records).
+export const inboxMessages = defineMessages<InboxValues>({
+  ibTitle: { id: 'app.inbox.title', defaultMessage: 'Inbox', description: 'Inbox page heading and link' },
+  ibEmpty: { id: 'app.inbox.empty', defaultMessage: 'Nothing is waiting for you.', description: 'Inbox: empty' },
+  ibFailed: { id: 'app.inbox.failed', defaultMessage: 'The inbox could not be loaded.', description: 'Inbox: failed' },
+  ibKind: {
+    id: 'app.inbox.kind',
+    defaultMessage: '{kind, select, result {Result to review} documentation {Note to finish} request {Patient request} other {Item}}',
+    description: 'The kind of an inbox item',
+  },
+  ibUrgent: { id: 'app.inbox.urgent', defaultMessage: 'Urgent', description: 'Inbox: an urgent item' },
+  ibFor: { id: 'app.inbox.for', defaultMessage: '{title} for {name}', description: 'Inbox: an item and its patient' },
+  ibOpen: { id: 'app.inbox.open', defaultMessage: 'Open {title}', description: 'Inbox action: open the authoritative resource' },
+  ibNotFound: { id: 'app.inbox.notFound', defaultMessage: 'This record is not available to you.', description: 'Record: not found or not permitted' },
+  ibWhat: { id: 'app.inbox.what', defaultMessage: 'What', description: 'Record field label' },
+  ibStatus: { id: 'app.inbox.status', defaultMessage: 'Status', description: 'Record field label' },
+  ibWhen: { id: 'app.inbox.when', defaultMessage: 'When', description: 'Record field label' },
+  ibRaw: { id: 'app.inbox.raw', defaultMessage: 'The full record', description: 'Record: the raw resource' },
+})
+

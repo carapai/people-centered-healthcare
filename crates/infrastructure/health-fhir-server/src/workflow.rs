@@ -549,3 +549,22 @@ pub(crate) async fn deliver_for(
         Err(error) => Err(error.to_string()),
     }
 }
+
+/// The open tasks of worklist `key`, for another module's read model (#110); none when the node
+/// runs no workflows.
+pub(crate) async fn worklist_for(server: &FhirServer, key: &str) -> Vec<TaskView> {
+    let Some(config) = server.workflows.clone() else {
+        return Vec::new();
+    };
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let service = Workflows::new(
+        server.store.clone(),
+        config.definitions.clone(),
+        NoActions,
+        NoGuards,
+        clock,
+        Vec::new(),
+        &config.authority,
+    );
+    service.worklist(key).await.unwrap_or_default()
+}

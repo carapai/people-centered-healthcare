@@ -816,3 +816,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - point-of-care laboratory results from forms were opted in with #93 (`laboratory.record-point-of-care`).
 
   This completes #109.
+- 2026-11-05: #109 part 2 merged (#344), completing #109. #110, care plans and the clinical inbox, is split: part 1 is the inbox (this), and part 2 the CarePlan basics.
+  - **`health-fhir-server`'s `inbox_router()`** (central: `/api/inbox`):
+    - verified results (critical first), the clinician's unsigned notes, and patients' requests;
+    - each item names its authoritative resource;
+    - each is filtered by the policy decision point as a read of that resource (`access::may_read`).
+  - **The client:**
+    - `/inbox`;
+    - `/records/$type/$id`, the authoritative resource each item opens, read through the FHIR API.
+  - **Tests:** HTTP tests (the three kinds, references that resolve, the PDP leaving out an unreadable result, other facilities, sign-in) and `laboratory.spec.ts`, now through the inbox to the DiagnosticReport.
+  - **Decisions:**
+    - the inbox is composed in `health-fhir-server` from the worklists, laboratory, notes and requests, as a read model across modules;
+    - referrals and approvals join when their modules exist.

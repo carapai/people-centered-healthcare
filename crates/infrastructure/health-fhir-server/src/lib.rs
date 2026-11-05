@@ -60,6 +60,7 @@ mod conditional;
 mod consultation;
 mod history;
 mod http;
+mod inbox;
 mod interactions;
 mod inventory;
 mod lab;
