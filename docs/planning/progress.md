@@ -570,3 +570,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - no runtime wires Finance's gates into a node's workflows yet: central runs development definitions and no billing.
 
   This completes #122.
+- 2026-11-05: #122 part 3 merged (#324), completing #122. #92, the Questionnaire renderer, is split: part 1 is the shared FHIRPath conformance suite (this). Later parts are the renderer on TanStack Form with Form Layouts and fhirpath.js live behaviour, server-side drafts with stable repeat `item.id`s, and server re-validation of submissions.
+  - **New package `packages/fhirpath-conformance`:** fixtures for live forms (QuestionnaireResponse answers for enableWhen, calculated values and constraints) and decimal arithmetic.
+  - **Two runners:** fhirpath.js in lossless precise mode in the package's tests, and the server's octofhir-fhirpath in `health-fhir-validation/tests/fhirpath_conformance.rs`. 36 cases pass in both engines, which is the acceptance criterion. frontend-ci and rust-ci run them.
+  - **Decisions:**
+    - numbers compare by exact text, because precise fhirpath.js returns integers as decimals;
+    - the scale of arithmetic results differs between the engines and stays out of the suite;
+    - fhirpath.js, `@lhncbc/ucum-lhc` and `argparse` are per-package licence exceptions, approved by the user.

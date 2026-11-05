@@ -43,6 +43,10 @@ jobs:
       - run: bun run lint
       # Platform-layer unit tests: transports, DPoP, FhirClient, events, Query wiring.
       - run: bun run test
+      # The shared FHIRPath conformance suite on fhirpath.js (#92; ADRs 0038, 0054); the same
+      # fixtures run on the server's engine in rust-ci.
+      - run: bun run check
+        working-directory: packages/fhirpath-conformance
       - run: bun run build
       # No @tauri-apps or devtools code in the web bundle.
       - run: bun run scan

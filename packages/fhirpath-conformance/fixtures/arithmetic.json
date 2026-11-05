@@ -1,0 +1,29 @@
+{
+  "group": "arithmetic",
+  "description": "calculatedExpression arithmetic, decimal-exact in both engines (ADR 0052, ADR 0054).",
+  "resource": {
+    "resourceType": "Observation",
+    "id": "vitals",
+    "status": "final",
+    "code": { "text": "vitals" },
+    "component": [
+      { "code": { "text": "weight" }, "valueQuantity": { "value": 61.50, "unit": "kg" } },
+      { "code": { "text": "dose" }, "valueQuantity": { "value": 0.010, "unit": "mg" } }
+    ]
+  },
+  "cases": [
+    { "name": "integer addition", "expression": "2 + 3", "expected": [{ "number": "5" }] },
+    { "name": "integer multiplication", "expression": "4 * 6", "expected": [{ "number": "24" }] },
+    { "name": "integer division", "expression": "7 div 2", "expected": [{ "number": "3" }] },
+    { "name": "modulo", "expression": "7 mod 3", "expected": [{ "number": "1" }] },
+    { "name": "decimal addition", "expression": "0.1 + 0.2", "expected": [{ "number": "0.3" }] },
+    { "name": "decimal equality is exact", "expression": "0.1 + 0.2 = 0.3", "expected": [{ "boolean": true }] },
+    { "name": "a component's decimal", "expression": "Observation.component.where(code.text = 'weight').value.value", "expected": [{ "number": "61.50" }] },
+    { "name": "a small decimal keeps its zeros", "expression": "Observation.component.where(code.text = 'dose').value.value", "expected": [{ "number": "0.010" }] },
+    { "name": "a quantity's unit", "expression": "Observation.component.where(code.text = 'weight').value.unit", "expected": [{ "text": "kg" }] },
+    { "name": "a comparison with a decimal", "expression": "Observation.component.where(code.text = 'weight').value.value > 60", "expected": [{ "boolean": true }] },
+    { "name": "how many components", "expression": "Observation.component.count()", "expected": [{ "number": "2" }] },
+    { "name": "string concatenation", "expression": "'blood ' + 'pressure'", "expected": [{ "text": "blood pressure" }] },
+    { "name": "empty propagates", "expression": "Observation.valueQuantity.value + 1", "expected": [] }
+  ]
+}
