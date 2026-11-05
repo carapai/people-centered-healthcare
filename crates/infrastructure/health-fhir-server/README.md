@@ -60,6 +60,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
 - **Signed notes (#107):** every write that replaces, and every delete of, a Composition or DocumentReference asks `health_clinical_documentation_app::notes`. That covers plain and conditional writes, transactions and batches, and completion.
   - A signed note changed in place, or deleted, answers 409 (`business-rule`): amend it instead.
   - Marking it entered in error, its content unchanged, is allowed.
+- **Care plans (#110):** `care_plans_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/care-plans`.
+  - `POST /plans` (a draft);
+  - `POST /plans/{id}/status`, `/addresses` and `/activities` (only the patient's own records here), with `careplans.manage`;
+  - `GET /patients/{id}/plans`, with `careplans.view` or `careplans.manage`.
 - **The clinical inbox (#110):** `inbox_router()`, behind `subject_layer`. Central nests it at `/api/inbox`. `GET /` gives the signed-in clinician's items at their facility, urgent first, then newest. Each names its authoritative resource (`reference`):
   - **verified results** (with `results.review`): the `clinician-results` worklist's tests, linking their DiagnosticReport, at `stat` when critical;
   - **outstanding documentation:** the clinician's own unsigned notes (Compositions);

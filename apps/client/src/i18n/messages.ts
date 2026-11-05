@@ -954,6 +954,16 @@ type ConsultationValues = {
   csPrescribe: {}
   csPrescribed: { name: string }
   csWarnings: {}
+  cpTitle: {}
+  cpName: {}
+  cpStart: {}
+  cpStarted: {}
+  cpNone: {}
+  cpStatus: { status: string }
+  cpAddTo: { title: string }
+  cpAdd: {}
+  cpAdded: {}
+  cpAddresses: { what: string }
   csPrescribeAnyway: {}
   csSendTo: {}
   csSend: {}
@@ -1016,6 +1026,20 @@ export const consultationMessages = defineMessages<ConsultationValues>({
   csDosage: { id: 'app.consultation.dosage', defaultMessage: 'Dosage', description: 'Consultation field' },
   csPrescribe: { id: 'app.consultation.prescribe', defaultMessage: 'Prescribe', description: 'Consultation action' },
   csPrescribed: { id: 'app.consultation.prescribed', defaultMessage: 'Prescribed: {name}.', description: 'Consultation: medicine prescribed' },
+  cpTitle: { id: 'app.consultation.carePlans', defaultMessage: 'Care plans', description: 'Consultation: the care plans heading' },
+  cpName: { id: 'app.consultation.carePlanName', defaultMessage: 'Care plan title', description: 'Consultation field' },
+  cpStart: { id: 'app.consultation.startCarePlan', defaultMessage: 'Start care plan', description: 'Consultation action' },
+  cpStarted: { id: 'app.consultation.carePlanStarted', defaultMessage: 'Care plan started.', description: 'Consultation: a care plan started' },
+  cpNone: { id: 'app.consultation.noCarePlans', defaultMessage: 'No care plans yet.', description: 'Consultation: no care plans' },
+  cpStatus: {
+    id: 'app.consultation.carePlanStatus',
+    defaultMessage: '{status, select, draft {Draft} active {Active} onhold {On hold} revoked {Revoked} completed {Completed} enteredinerror {Entered in error} other {Unknown}}',
+    description: 'A care plan status (its code without hyphens)',
+  },
+  cpAddTo: { id: 'app.consultation.addTo', defaultMessage: 'Add to {title}', description: 'Consultation field: what to add to a care plan' },
+  cpAdd: { id: 'app.consultation.addToPlan', defaultMessage: 'Add to plan', description: 'Consultation action' },
+  cpAdded: { id: 'app.consultation.addedToPlan', defaultMessage: 'Added to the care plan.', description: 'Consultation: added to a care plan' },
+  cpAddresses: { id: 'app.consultation.addresses', defaultMessage: 'For: {what}', description: 'Consultation: what a care plan addresses' },
   csWarnings: { id: 'app.consultation.warnings', defaultMessage: 'Check before prescribing:', description: 'Consultation: clinical safety warnings heading' },
   csPrescribeAnyway: { id: 'app.consultation.prescribeAnyway', defaultMessage: 'I have checked: prescribe anyway', description: 'Consultation action: acknowledge the safety warnings and prescribe' },
   csSendTo: { id: 'app.consultation.sendTo', defaultMessage: 'Send the patient to', description: 'Consultation field: the next service point' },

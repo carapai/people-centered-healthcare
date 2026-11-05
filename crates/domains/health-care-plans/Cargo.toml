@@ -1,0 +1,19 @@
+[package]
+name = "health-care-plans"
+description = "Care plans (resource-ownership.md; #110): a patient's plan, the conditions it addresses and its activities, the patient's own requests, through the R5 CarePlan lifecycle."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "care-plans"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

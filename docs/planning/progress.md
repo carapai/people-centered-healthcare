@@ -828,3 +828,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decisions:**
     - the inbox is composed in `health-fhir-server` from the worklists, laboratory, notes and requests, as a read model across modules;
     - referrals and approvals join when their modules exist.
+- 2026-11-05: #110 part 1 merged (#345). Part 2, the CarePlan basics:
+  - **New domain crate `health-care-plans`:**
+    - a plan's R5 lifecycle;
+    - the Conditions it addresses;
+    - its activities as the patient's own requests (R5 `plannedActivityReference`).
+  - **New application crate `health-care-plans-app`:** the CarePlan as the module's record, each change with its outbox event, and only the patient's own records at the facility linked.
+  - **`health-fhir-server`'s `care_plans_router()`** (central: `/api/care-plans`).
+  - **The client:** the consultation's care plan panel. A plan is started, then the patient's prescriptions and diagnoses are added to it.
+  - **Tests:** domain, app and HTTP tests, and `consultation.spec.ts`, which starts a plan and adds the prescription. The consultation and laboratory specs now allow 90 s, since several people sign in.
+  - **Decisions:**
+    - activities reference requests, as R5 does;
+    - goals and care teams wait for their screens.
+
+  This completes #110.

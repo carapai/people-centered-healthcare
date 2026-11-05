@@ -55,6 +55,7 @@ mod access;
 mod audit;
 mod bundle;
 mod capability;
+mod care_plans;
 mod completion;
 mod conditional;
 mod consultation;
@@ -99,6 +100,10 @@ use health_time::Timestamp;
 
 pub use access::{FacilityTag, NoFacilityScope, RecordFacility};
 pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_statement};
+pub use care_plans::{
+    MANAGE_PERMISSION as CARE_PLANS_MANAGE_PERMISSION,
+    VIEW_PERMISSION as CARE_PLANS_VIEW_PERMISSION,
+};
 pub use consultation::{DOCUMENT_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;

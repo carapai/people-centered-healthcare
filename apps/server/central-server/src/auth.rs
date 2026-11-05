@@ -331,6 +331,7 @@ pub(crate) fn routes(
             pharmacy,
             laboratory,
             inbox,
+            care_plans,
         } = fhir(fhir_store, settings, policy, subjects);
         api = api.nest("/pricing", pricing);
         api = api.nest("/reception", reception);
@@ -340,6 +341,7 @@ pub(crate) fn routes(
         api = api.nest("/pharmacy", pharmacy);
         api = api.nest("/laboratory", laboratory);
         api = api.nest("/inbox", inbox);
+        api = api.nest("/care-plans", care_plans);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -667,6 +669,7 @@ struct Routes {
     pharmacy: Router,
     laboratory: Router,
     inbox: Router,
+    care_plans: Router,
 }
 
 fn fhir(
@@ -751,6 +754,7 @@ fn fhir(
     let pharmacy = fhir.pharmacy_router().layer(layer.clone());
     let laboratory = fhir.laboratory_router().layer(layer.clone());
     let inbox = fhir.inbox_router().layer(layer.clone());
+    let care_plans = fhir.care_plans_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
@@ -772,6 +776,7 @@ fn fhir(
         pharmacy,
         laboratory,
         inbox,
+        care_plans,
     }
 }
 
@@ -818,6 +823,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/laboratory/{*rest}", service.clone())
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
+        .route_service("/api/care-plans/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
