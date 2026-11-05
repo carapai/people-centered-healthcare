@@ -448,7 +448,8 @@ fn recount_hourly(store: SurrealStore) {
 /// The search parameters central always supports: `_tag` on every facility-scope type, which
 /// facility isolation searches with (ADR 0057). The rest come with the configuration package.
 /// The search parameters central supports: `_tag` on every facility-scope type (ADR 0057), and
-/// the status searches the forms screen needs (#92). Activation (#89) replaces this with the
+/// the searches forms need (#92): Questionnaire `status`, `url` and `version` (to re-validate
+/// submissions), and QuestionnaireResponse `status`. Activation (#89) replaces this with the
 /// SearchParameters of the published packages a node has active.
 pub(crate) fn search_registry() -> health_fhir_search::Registry {
     let definition = |url: &str, code: &str, base: &str, kind: &str, expression: &str| {
@@ -477,6 +478,20 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "Questionnaire.status",
         ),
         definition(
+            "http://hl7.org/fhir/SearchParameter/Questionnaire-url",
+            "url",
+            "Questionnaire",
+            "uri",
+            "Questionnaire.url",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Questionnaire-version",
+            "version",
+            "Questionnaire",
+            "token",
+            "Questionnaire.version",
+        ),
+        definition(
             "http://hl7.org/fhir/SearchParameter/QuestionnaireResponse-status",
             "status",
             "QuestionnaireResponse",
@@ -491,6 +506,8 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
         .map(|t| (*t, "_tag"))
         .chain([
             ("Questionnaire", "status"),
+            ("Questionnaire", "url"),
+            ("Questionnaire", "version"),
             ("QuestionnaireResponse", "status"),
         ]);
     for (resource_type, code) in supported {
@@ -574,7 +591,9 @@ fn fhir(
             Pdp::new(rules).with_scope(NodeScope::Central),
             Arc::new(FacilityTag),
         )
-        .with_audit(Auditor::new("central", sensitive(policy)));
+        .with_audit(Auditor::new("central", sensitive(policy)))
+        // Submitted QuestionnaireResponses are re-validated against their Questionnaire (#92).
+        .with_questionnaire_checks();
     if let Some(rules) = registry_rules(settings) {
         fhir = fhir
             .with_client_registry(rules.0, rules.1)

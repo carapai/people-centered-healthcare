@@ -20,11 +20,10 @@ The shared Questionnaire renderer (client-application.md § Forms; ADRs 0038, 00
 - **`layout.ts`** handles Form Layouts (`$schema` `…/schema/form-layout/1`, keyed to a Questionnaire `url|version`):
   - titled sections of top-level items, with widgets and hints per question;
   - a layout never hides a question: items it does not place show after its sections, and a widget is used only where it fits the question's type.
-- **Previews only:** everything the browser computes is a preview. The server re-validates every submission and recomputes calculated values (ADR 0052). fhirpath.js keeps values exact but not the scale of arithmetic results (`61.6` where the server gives `61.60`).
+- **Previews only:** everything the browser computes is a preview. The server re-validates every submission against its Questionnaire, refusing what the screen should have stopped, and stores its own calculated values (ADR 0052; `health-fhir-server`'s questionnaire checks). fhirpath.js keeps values exact but not the scale of arithmetic results (`61.6` where the server gives `61.60`).
 - **Not yet:**
   - opening a form from an encounter or task, with its subject;
   - Form Layouts from the active configuration (the screen renders without one until activation, #89);
-  - the server's re-validation against the Questionnaire;
   - `answerValueSet`, attachments, quantities and population.
 
 ## Tests

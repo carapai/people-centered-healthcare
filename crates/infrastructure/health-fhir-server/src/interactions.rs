@@ -124,6 +124,10 @@ pub(crate) async fn body(
     }
     server.check_invariants(&value).await?;
     let id = object.get("id").and_then(Value::as_str).map(str::to_owned);
+    // A submitted QuestionnaireResponse is stored as the server re-validated it (#92).
+    if let Some(stored) = crate::questionnaires::checked(server, value.clone()).await? {
+        return Ok((RawJson::from_validated(stored.to_string()), id));
+    }
     Ok((RawJson::from_validated(text), id))
 }
 

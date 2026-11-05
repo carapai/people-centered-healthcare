@@ -65,6 +65,7 @@ mod outcome;
 mod payments;
 mod portal;
 mod pricing;
+mod questionnaires;
 mod references;
 mod registry;
 mod search;
@@ -125,6 +126,7 @@ pub struct FhirServer {
     profiles: Option<validation::ActiveProfiles>,
     workflows: Option<Arc<workflow::WorkflowConfig>>,
     pricing: Option<Arc<pricing::PricingConfig>>,
+    questionnaire_checks: bool,
 }
 
 impl FhirServer {
@@ -151,6 +153,7 @@ impl FhirServer {
             profiles: None,
             workflows: None,
             pricing: None,
+            questionnaire_checks: false,
         }
     }
 
@@ -194,6 +197,15 @@ impl FhirServer {
             return Err(FhirError::invalid_resource(&found));
         }
         validation::check(self, self.fhirpath.clone(), resource).await
+    }
+
+    /// This server, re-validating every submitted QuestionnaireResponse against its
+    /// Questionnaire and storing the server's calculated values (#92; ADRs 0038, 0052). The node's
+    /// search must support Questionnaire `url` and `version`.
+    #[must_use]
+    pub fn with_questionnaire_checks(mut self) -> Self {
+        self.questionnaire_checks = true;
+        self
     }
 
     /// This server, recording an AuditEvent for every write and every sensitive read (#66). The

@@ -50,3 +50,16 @@ Layer: **contracts**. FHIR R5 validation (ADR 0016; fhir-r5-model.md § Validati
 - `tests/performance.rs` holds the budget (ADR 0053): with `HEALTH_FHIR_R5_EXAMPLES` set, in a release build, tiers 1–3 must take p95 ≤ 2 ms (or `HEALTH_VALIDATION_P95_MS`) over the official clinical examples, with the vital-signs profiles active.
 - `tests/java_differential.rs` compares our verdicts with the HL7 Java validator's (`tools/fhir/java-differential.sh`; fhir-r5-model.md § The HL7 Java validator differential). `examples/differential_cases.rs` writes its cases.
 - A unit test in `src/invariants.rs` evaluates every check that `HOLDS_BY_SHAPE` skips over the corpus, and each must hold.
+
+## Questionnaire responses
+
+`check_response(engine, questionnaire, response)` (#92; ADRs 0038, 0052) is the server's re-validation of a QuestionnaireResponse against its Questionnaire, with the same FHIRPath semantics the shared conformance suite pins. It refuses a response when:
+
+- an item names an unknown `linkId`;
+- an answer is of the wrong type, or a coding is outside the item's `answerOption`s;
+- a non-repeating item has several answers;
+- a disabled item, by `enableWhen` or `enableWhenExpression`, is answered;
+- a required, enabled item is unanswered once the response is `completed` or `amended`;
+- an error `questionnaire-constraint` fails, or an expression fails to evaluate.
+
+Misplaced and mistyped answers are refused before any expression reads them. Warnings are returned. Every `calculatedExpression` is then recomputed, and the server's value is put in the response, so it wins.

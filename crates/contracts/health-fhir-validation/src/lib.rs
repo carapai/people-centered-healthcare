@@ -17,6 +17,7 @@ mod bindings;
 mod fhirpath;
 mod invariants;
 mod profile;
+mod questionnaire;
 mod structure;
 
 pub use bindings::{Bindings, Membership, Strength};
@@ -25,6 +26,7 @@ pub use fhirpath::{
 };
 pub use invariants::{KNOWN_ENGINE_GAPS, validate_invariants};
 pub use profile::{CompileError, ProfileSet, ProfileValidator, SnapshotValidator};
+pub use questionnaire::check_response;
 pub use structure::{
     Issue, IssueCode, Severity, resource_types, skeleton, validate_structure, validate_value,
 };

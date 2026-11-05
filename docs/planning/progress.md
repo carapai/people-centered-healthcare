@@ -600,3 +600,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - drafts are filtered to their form on the client until canonical searches come with activation (#89);
     - client-created resource ids are UUIDv7, as ADR 0013 requires (`crypto.randomUUID` is v4).
   - **Next:** part 4, the server's re-validation of submissions against their Questionnaire.
+- 2026-11-05: #92 part 3 merged (#327). Part 4, the server's re-validation:
+  - **`health_fhir_validation::check_response`:** it refuses unknown linkIds, wrong answer types or options, too many answers, answers to disabled questions, unanswered required questions on completion, and failing error constraints. It then recomputes `calculatedExpression` values with the server's engine, and the server's value is stored (ADR 0052).
+  - **The write path:** `health-fhir-server`'s `with_questionnaire_checks` runs it on every `completed` or `amended` QuestionnaireResponse, in plain writes and in transaction and batch entries. It finds the Questionnaire by `url` and `version`, and refuses the submission if the Questionnaire is unknown. Central turns it on.
+  - **Tests:** unit and HTTP tests, a transaction that cannot bypass the check, and `forms.spec.ts`, which now submits through it.
+  - **Decisions:**
+    - drafts are stored without the check;
+    - misplaced or mistyped answers are refused before any expression reads them.
+
+  This completes #92.
