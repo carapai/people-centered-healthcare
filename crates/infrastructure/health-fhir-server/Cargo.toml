@@ -38,6 +38,8 @@ health-payments-app = { workspace = true }
 health-persistence = { workspace = true }
 health-pricing = { workspace = true }
 health-pricing-app = { workspace = true }
+health-programs = { workspace = true }
+health-programs-app = { workspace = true }
 health-registries-app = { workspace = true }
 health-shared-record-app = { workspace = true }
 health-surrealdb = { workspace = true }

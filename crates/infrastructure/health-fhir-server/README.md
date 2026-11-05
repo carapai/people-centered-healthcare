@@ -85,6 +85,13 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Permissions:** `consultation.document` for notes and diagnoses, `orders.request` for tests and procedures, `medications.prescribe` for prescriptions.
   - **The visit:** it must be in progress at the session's facility (404 for another facility's, 409 when not in progress).
   - **Retries:** ids are the client's UUIDv7s, so a retried command answers what it wrote (200).
+- **Programs (#116):** `programs_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/programs`. The definitions are the node's ProgramPlanDefinitions (`PlanDefinition?type=clinical-protocol`).
+  - **Permissions:** `programs.view` to list definitions and a patient's enrolments; `programs.enrol` to enrol; `programs.manage` to change an enrolment's status or transfer it.
+  - **Routes:** `GET /definitions`; `POST /enrolments` `{id, patient, program, transferredFrom?}`; `GET /patients/{id}/enrolments`; `POST /enrolments/{id}/status` `{status}`; `POST /enrolments/{id}/transfer` `{facility}`.
+  - **Enrolment:**
+    - the program decides eligibility (422 when not eligible), and the patient may be in several programs at once (409 when already in this one);
+    - the program's Workflow Definitions the node runs start with the episode as their context (`EpisodeOfCare/{id}`), once each;
+    - another facility's enrolment is not found.
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.

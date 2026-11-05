@@ -465,3 +465,52 @@ impl FhirServer {
             .with_state(self.clone())
     }
 }
+
+/// Starts the Workflow Definition `canonical` (`url|version`, or `url` for the newest version
+/// the node runs) about `context`, for another module's use case such as a program enrolment
+/// (#116). `None` when the node does not run that definition; replaying `op_id` changes nothing.
+pub(crate) async fn start_for(
+    server: &FhirServer,
+    canonical: &str,
+    context: &str,
+    actor: &str,
+    op_id: &str,
+) -> Result<Option<String>, String> {
+    let Some(config) = server.workflows.clone() else {
+        return Ok(None);
+    };
+    let key = if config.definitions.contains_key(canonical) {
+        Some(canonical.to_owned())
+    } else {
+        let prefix = format!("{canonical}|");
+        config
+            .definitions
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .max_by_key(|k| {
+                k[prefix.len()..]
+                    .split('.')
+                    .map(|p| p.parse::<u64>().unwrap_or(0))
+                    .collect::<Vec<_>>()
+            })
+            .cloned()
+    };
+    let Some(key) = key else {
+        return Ok(None);
+    };
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let service = Workflows::new(
+        server.store.clone(),
+        config.definitions.clone(),
+        NoActions,
+        NoGuards,
+        clock,
+        Vec::new(),
+        &config.authority,
+    );
+    service
+        .start(&key, context, actor, op_id)
+        .await
+        .map(|_| Some(key))
+        .map_err(|e| e.to_string())
+}

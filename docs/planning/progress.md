@@ -719,3 +719,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the EpisodeOfCare is the module's record, read back from its extensions; there is no separate table;
     - `%patient` in eligibility is the Patient as the evaluation root;
     - the platform extensions on EpisodeOfCare are to be added to the core package with #93's.
+- 2026-11-05: #116 part 1 merged (#337). Part 2, the program API:
+  - **`health-fhir-server`'s `programs_router()`:**
+    - program definitions, enrolment, a patient's enrolments, status and transfer;
+    - behind `programs.view`, `programs.enrol` and `programs.manage`, at the session's facility;
+    - central mounts it at `/api/programs`, and searches PlanDefinition by `type`.
+  - **Workflows:** enrolment starts the program's Workflow Definitions about the episode (`EpisodeOfCare/{id}`), each once.
+  - **Tests:** ART and TB enrolled concurrently with ART's workflow task on its worklist; eligibility, permissions, facilities, status, and the transfer hand-over to another facility.
+  - **Next:** part 3, the `workflow-episodeOfCare` context on form completion, and regimens from approved sources at publication.
