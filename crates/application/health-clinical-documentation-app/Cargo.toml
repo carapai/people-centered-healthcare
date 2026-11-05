@@ -14,9 +14,11 @@ context = "clinical-documentation"
 workspace = true
 
 [dependencies]
+health-access-policy = { workspace = true }
 health-configuration = { workspace = true }
 health-fhir-extraction = { workspace = true }
 health-identifiers = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 

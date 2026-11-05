@@ -16,6 +16,8 @@
 //!   from the response), naming every version written or retracted, the response version and
 //!   the mapping. The last run's targets are read back from it.
 
+pub mod consultation;
+
 use std::collections::BTreeMap;
 
 use health_configuration::package::Version;

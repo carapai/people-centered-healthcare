@@ -689,3 +689,19 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decisions:**
     - the summary is JSON from a FHIR operation in the guarded router, not an IPS document;
     - records linked through the golden record are included, under the same policy.
+- 2026-11-05: #104 part 1 merged (#335). Part 2, the consultation screen:
+  - **`health-clinical-documentation-app::consultation`:** notes (Composition), diagnoses (Condition), test orders (ServiceRequest) and prescriptions (MedicationRequest), built from commands.
+  - **`health-fhir-server`'s `consultation_router()`:**
+    - the commands, behind `consultation.document`, `orders.request` and `medications.prescribe`;
+    - each in an Encounter in progress at the session's facility;
+    - central mounts it at `/api/consultation`.
+  - **The client:**
+    - `/consultation` lists who waits at consultation, and seeing a patient calls and serves their queue entry;
+    - the workspace is one page: the summary (`Patient/$summary` through the FHIR port's new `summary`), the note, diagnoses, test orders, prescriptions, and sending the patient on or completing the visit through reception's Encounter routes.
+  - **Tests:** builder and HTTP tests, and `consultation.spec.ts`. In it, a clerk checks a patient in at consultation, and a clinician records a note, a diagnosis, a test and a prescription, sees them in the summary, and completes the visit, keyboard only with axe.
+  - **Decisions:**
+    - orders are commands to the node, not resources assembled in the UI;
+    - the order types' own Owners (orders, laboratory, medications) take over these commands when their contexts exist;
+    - the author is the account until Practitioner records exist.
+
+  This completes #104.

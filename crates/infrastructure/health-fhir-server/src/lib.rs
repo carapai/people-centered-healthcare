@@ -57,6 +57,7 @@ mod bundle;
 mod capability;
 mod completion;
 mod conditional;
+mod consultation;
 mod history;
 mod http;
 mod interactions;
@@ -93,6 +94,7 @@ use health_time::Timestamp;
 
 pub use access::{FacilityTag, NoFacilityScope, RecordFacility};
 pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_statement};
+pub use consultation::{DOCUMENT_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
 pub use outcome::{FhirError, operation_outcome};

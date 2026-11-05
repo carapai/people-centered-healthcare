@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { accessMessages, edgeStatusMessages, enrollmentMessages, formMessages, messages, receptionMessages, worklistMessages } from '../i18n/messages'
+import { accessMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, messages, receptionMessages, worklistMessages } from '../i18n/messages'
 import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
@@ -74,6 +74,9 @@ function Home() {
               </li>
               <li>
                 <Link to="/reception/queues">{intl.formatMessage(receptionMessages.rcQueuesTitle)}</Link>
+              </li>
+              <li>
+                <Link to="/consultation">{intl.formatMessage(consultationMessages.csTitle)}</Link>
               </li>
               {/* Offline administration lives on the edge (offline-auth.md); it answers non-admins 403. */}
               {platform.device === undefined ? null : (

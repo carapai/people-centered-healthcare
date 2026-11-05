@@ -76,6 +76,15 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - The records are the patient's, plus, through the golden record, the same person's other patient records.
   - Each section is a search per patient (`{type}?patient=`) under the clinician's own search policy. A sensitive record the clinician may not see is never found, and a section the clinician may not search is `null`.
   - The records read are audited as a search's are.
+- **The consultation's commands (#104):** `consultation_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/consultation`.
+  - **Commands:** the client sends commands, and the node builds each resource (`health_clinical_documentation_app::consultation`) and writes it with tiers 1–2 and reference checks:
+    - `POST /encounters/{id}/notes` `{id, text}`: a Composition;
+    - `POST /encounters/{id}/diagnoses` `{id, concept, provisional?}`: a Condition;
+    - `POST /encounters/{id}/orders` `{id, kind: "service", concept, note?}`: a ServiceRequest;
+    - `POST /encounters/{id}/orders` `{id, kind: "medication", concept, dosage}`: a MedicationRequest.
+  - **Permissions:** `consultation.document` for notes and diagnoses, `orders.request` for tests and procedures, `medications.prescribe` for prescriptions.
+  - **The visit:** it must be in progress at the session's facility (404 for another facility's, 409 when not in progress).
+  - **Retries:** ids are the client's UUIDv7s, so a retried command answers what it wrote (200).
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.
