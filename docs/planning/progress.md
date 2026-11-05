@@ -615,3 +615,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Decisions:**
     - the queue never touches the Encounter's status, which only encounters changes;
     - moving to another service point is an Encounter event that patient-flow follows.
+- 2026-11-05: #102 part 1 merged (#329). Part 2, the application and storage:
+  - **`health-encounters-app`:** check-in, transitions and moves, each in one transaction with:
+    - the open-encounter guard (claimed, released when the Encounter ends or moves);
+    - the FHIR R5 Encounter, facility-tagged;
+    - the outbox event.
+  - **`health-patient-flow-app`:** `follow` keeps queue entries from encounter events, once each. It also provides `queue` and the steps.
+  - **Migration `0033_encounters_and_queues`:** `encounter_state` (encounters) and `queue_entry` (patient-flow).
+  - **Decisions:**
+    - the module keeps its Encounter in `encounter_state`, and the FHIR Encounter is its projection;
+    - an emergency-class Encounter is queued as an emergency;
+    - an ended Encounter closes its entries as done if the patient was called, else left.
+  - **Next:** part 3 adds the reception and queue screens and the e2e test.
