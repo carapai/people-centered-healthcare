@@ -15,4 +15,6 @@ export const USERS = {
   nurse: { username: 'e2e-nurse', password: 'amber falcon ladder twelve', roles: 'nurse' },
   clinician: { username: 'e2e-clinician', password: 'velvet otter compass thirty', roles: 'clinician' },
   pharmacist: { username: 'e2e-pharmacist', password: 'linen badger orchard sixty', roles: 'pharmacist' },
+  labtech: { username: 'e2e-labtech', password: 'quartz heron lantern eighty', roles: 'labtech' },
+  verifier: { username: 'e2e-verifier', password: 'cobalt tapir meadow ninety', roles: 'labtech' },
 } as const

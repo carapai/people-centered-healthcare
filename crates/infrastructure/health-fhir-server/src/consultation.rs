@@ -201,6 +201,10 @@ async fn add_diagnosis(
     }
 }
 
+fn laboratory() -> bool {
+    true
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 enum OrderBody {
@@ -209,6 +213,9 @@ enum OrderBody {
         concept: Concept,
         #[serde(default)]
         note: Option<String>,
+        /// A laboratory test, which laboratory follows (#109); the default.
+        #[serde(default = "laboratory")]
+        laboratory: bool,
     },
     Medication {
         id: String,
@@ -235,12 +242,21 @@ async fn add_order(
     or_return!(client_id(id));
     let context = or_return!(context(&server, &subject, &encounter).await);
     match &body {
-        OrderBody::Service { id, concept, note } => {
-            match service_order(id, &context, concept, note.as_deref()) {
-                Ok(resource) => write(&server, resource).await,
-                Err(error) => command_refused(&error),
+        OrderBody::Service {
+            id,
+            concept,
+            note,
+            laboratory,
+        } => match service_order(id, &context, concept, note.as_deref(), *laboratory) {
+            Ok(resource) => {
+                let response = write(&server, resource).await;
+                if *laboratory && response.status() == StatusCode::CREATED {
+                    crate::lab::follow(&server, &context, id, concept).await;
+                }
+                response
             }
-        }
+            Err(error) => command_refused(&error),
+        },
         // A prescription is the medications module's (#108).
         OrderBody::Medication {
             id,

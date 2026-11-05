@@ -20,7 +20,7 @@ Layer: **application** (clinical-documentation). Completing a QuestionnaireRespo
 - **`consultation`** (#104): the consultation's commands as FHIR R5, each in its Encounter and tagged with its facility, with the client's UUIDv7 id. The UI never assembles them.
   - `note`: a final Composition, its text escaped into the narrative;
   - `diagnosis`: an encounter-diagnosis Condition, confirmed or provisional;
-  - `service_order`: a ServiceRequest.
+  - `service_order`: a ServiceRequest; a `laboratory` one carries that category (SNOMED 108252007), and laboratory follows it (#109).
 
   Prescriptions are the medications module's (`health-medications-app`, #108).
 

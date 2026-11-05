@@ -153,12 +153,13 @@ pub fn diagnosis(
     Ok(condition)
 }
 
-/// A test or procedure to order.
+/// A test or procedure to order; a `laboratory` one has that category, which laboratory follows.
 pub fn service_order(
     id: &str,
     context: &Context,
     concept: &Concept,
     note: Option<&str>,
+    laboratory: bool,
 ) -> Result<Value, CommandRefused> {
     let mut order = base("ServiceRequest", id, context);
     let mut fields = json!({
@@ -172,6 +173,9 @@ pub fn service_order(
     });
     if let Some(note) = note.map(str::trim).filter(|n| !n.is_empty()) {
         fields["note"] = json!([{ "text": note }]);
+    }
+    if laboratory {
+        fields["category"] = json!([{ "coding": [{ "system": "http://snomed.info/sct", "code": "108252007", "display": "Laboratory procedure" }] }]);
     }
     merge(&mut order, fields);
     Ok(order)

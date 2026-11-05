@@ -15,8 +15,10 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as ConsultationRouteImport } from './routes/consultation'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as FormsRouteImport } from './routes/forms'
+import { Route as LaboratoryRouteImport } from './routes/laboratory'
 import { Route as PharmacyRouteImport } from './routes/pharmacy'
 import { Route as RegistrationRouteImport } from './routes/registration'
+import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as WorklistsRouteImport } from './routes/worklists'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
@@ -64,6 +66,11 @@ const FormsRoute = FormsRouteImport.update({
   path: '/forms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LaboratoryRoute = LaboratoryRouteImport.update({
+  id: '/laboratory',
+  path: '/laboratory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PharmacyRoute = PharmacyRouteImport.update({
   id: '/pharmacy',
   path: '/pharmacy',
@@ -72,6 +79,11 @@ const PharmacyRoute = PharmacyRouteImport.update({
 const RegistrationRoute = RegistrationRouteImport.update({
   id: '/registration',
   path: '/registration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResultsRoute = ResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -162,8 +174,10 @@ export interface FileRoutesByFullPath {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
@@ -188,8 +202,10 @@ export interface FileRoutesByTo {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
@@ -215,8 +231,10 @@ export interface FileRoutesById {
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
   '/forms': typeof FormsRoute
+  '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
@@ -243,8 +261,10 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/results'
     | '/sign-in'
     | '/worklists'
     | '/break-glass/alerts'
@@ -269,8 +289,10 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/results'
     | '/sign-in'
     | '/worklists'
     | '/break-glass/alerts'
@@ -295,8 +317,10 @@ export interface FileRouteTypes {
     | '/consultation'
     | '/enroll'
     | '/forms'
+    | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/results'
     | '/sign-in'
     | '/worklists'
     | '/break-glass/alerts'
@@ -322,8 +346,10 @@ export interface RootRouteChildren {
   ConsultationRoute: typeof ConsultationRoute
   EnrollRoute: typeof EnrollRoute
   FormsRoute: typeof FormsRoute
+  LaboratoryRoute: typeof LaboratoryRoute
   PharmacyRoute: typeof PharmacyRoute
   RegistrationRoute: typeof RegistrationRoute
+  ResultsRoute: typeof ResultsRoute
   SignInRoute: typeof SignInRoute
   WorklistsRoute: typeof WorklistsRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
@@ -386,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/laboratory': {
+      id: '/laboratory'
+      path: '/laboratory'
+      fullPath: '/laboratory'
+      preLoaderRoute: typeof LaboratoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pharmacy': {
       id: '/pharmacy'
       path: '/pharmacy'
@@ -398,6 +431,13 @@ declare module '@tanstack/react-router' {
       path: '/registration'
       fullPath: '/registration'
       preLoaderRoute: typeof RegistrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/results': {
+      id: '/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof ResultsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -522,8 +562,10 @@ const rootRouteChildren: RootRouteChildren = {
   ConsultationRoute: ConsultationRoute,
   EnrollRoute: EnrollRoute,
   FormsRoute: FormsRoute,
+  LaboratoryRoute: LaboratoryRoute,
   PharmacyRoute: PharmacyRoute,
   RegistrationRoute: RegistrationRoute,
+  ResultsRoute: ResultsRoute,
   SignInRoute: SignInRoute,
   WorklistsRoute: WorklistsRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,

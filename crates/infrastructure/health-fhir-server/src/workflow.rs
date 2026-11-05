@@ -514,3 +514,38 @@ pub(crate) async fn start_for(
         .map(|_| Some(key))
         .map_err(|e| e.to_string())
 }
+
+/// Delivers another module's event `name` to the instance started by `start_op_id`, once per
+/// `event_id` (#109). `false` when the node runs no workflows or no such instance exists.
+pub(crate) async fn deliver_for(
+    server: &FhirServer,
+    start_op_id: &str,
+    name: &str,
+    event_id: &str,
+) -> Result<bool, String> {
+    let Some(config) = server.workflows.clone() else {
+        return Ok(false);
+    };
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let service = Workflows::new(
+        server.store.clone(),
+        config.definitions.clone(),
+        NoActions,
+        NoGuards,
+        clock,
+        Vec::new(),
+        &config.authority,
+    );
+    match service
+        .deliver(
+            event_id,
+            &health_workflow_app::instance_id(start_op_id),
+            &Event::named(name),
+        )
+        .await
+    {
+        Ok(_) => Ok(true),
+        Err(health_workflow_app::WorkflowError::NotFound(_)) => Ok(false),
+        Err(error) => Err(error.to_string()),
+    }
+}

@@ -2490,6 +2490,8 @@ dependencies = [
  "health-identity-app",
  "health-inventory",
  "health-inventory-app",
+ "health-laboratory",
+ "health-laboratory-app",
  "health-medications",
  "health-medications-app",
  "health-packages",
