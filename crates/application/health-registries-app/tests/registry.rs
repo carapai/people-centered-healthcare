@@ -241,12 +241,12 @@ async fn links_build_one_golden_record_and_lower_trust_never_overwrites() {
             .iter()
             .filter(|p| p["activity"]["coding"][0]["code"] == field)
             // Two links can land in the same instant, so the golden version they produced
-            // breaks the tie: it only grows.
+            // breaks the tie: version ids are UUIDv7s, whose text grows with time.
             .max_by_key(|p| {
                 let version = p["target"][0]["reference"]
                     .as_str()
                     .and_then(|r| r.rsplit('/').next())
-                    .and_then(|v| v.parse::<u64>().ok());
+                    .map(str::to_owned);
                 (p["recorded"].as_str().map(str::to_owned), version)
             })
             .cloned()
