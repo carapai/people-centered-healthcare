@@ -291,6 +291,20 @@ pub(crate) fn permitted(interaction: Interaction, json: &RawJson) -> Result<(), 
     }
 }
 
+/// Whether `subject` may read `json`, decided by the node's policy decision point as a read is
+/// (#110). Without access control, everything is readable.
+pub(crate) fn may_read(server: &FhirServer, subject: &Subject, json: &Value) -> bool {
+    let Some(control) = server.access.clone() else {
+        return true;
+    };
+    let guard = Guard {
+        control,
+        subject: subject.clone(),
+        now: Timestamp::now(),
+    };
+    matches!(decide(&guard, Interaction::Read, json), Decision::Permit(_))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

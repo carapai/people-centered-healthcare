@@ -3,7 +3,8 @@ import { expect, test, type Browser, type Page } from '@playwright/test'
 import { noViolations, press, signIn, type } from './helpers'
 import { USERS } from './users'
 
-// #109: a laboratory test from the consultation's order to the clinician's review. The result
+// #109, #110: a laboratory test from the consultation's order to the clinician's review, through
+// the inbox. The result
 // reaches the clinician only once someone other than who entered it verifies it, and a critical
 // result arrives marked urgent. Keyboard only, with axe on each screen.
 
@@ -43,6 +44,8 @@ async function worklist(page: Page, list: string) {
 }
 
 test('a result reaches the clinician only once a second person verifies it', async ({ page, browser, baseURL }) => {
+  // Four people, each signing in: longer than the default.
+  test.setTimeout(90_000)
   const name = await checkedIn(page)
 
   // The clinician orders a haemoglobin.
@@ -52,6 +55,10 @@ test('a result reaches the clinician only once a second person verifies it', asy
   await type(clinician.page, 'Test or procedure', 'Haemoglobin')
   await press(clinician.page, 'Order')
   await expect(clinician.page.getByRole('status').filter({ hasText: 'Ordered: Haemoglobin.' })).toBeVisible()
+  // An unsigned note, for the inbox (#110).
+  await type(clinician.page, 'Subjective', 'Tired for two weeks.')
+  await press(clinician.page, 'Save draft')
+  await expect(clinician.page.getByRole('status').filter({ hasText: 'Draft saved.' })).toBeVisible()
   await clinician.page.goBack()
   await press(clinician.page, 'Results to review', 'link')
   await expect(clinician.page.getByText(`Haemoglobin for ${name}`)).toHaveCount(0)
@@ -93,8 +100,21 @@ test('a result reaches the clinician only once a second person verifies it', asy
   await expect(verifier.page.getByRole('status').filter({ hasText: 'Verified and released to the clinician.' })).toBeVisible()
   await verifier.context.close()
 
-  // Now the clinician sees it, urgently, and reviews it.
+  // The inbox links the result and the unsigned note to their records (#110).
   await clinician.page.goBack()
+  await press(clinician.page, 'Inbox', 'link')
+  const inboxResult = clinician.page.getByRole('listitem').filter({ hasText: `Haemoglobin for ${name}` })
+  await expect(inboxResult.getByText('Urgent')).toBeVisible()
+  await expect(clinician.page.getByRole('listitem').filter({ hasText: `Progress note for ${name}` }).getByText('Note to finish')).toBeVisible()
+  await noViolations(clinician.page)
+  await inboxResult.getByRole('link', { name: 'Open Haemoglobin' }).focus()
+  await clinician.page.keyboard.press('Enter')
+  await expect(clinician.page.getByRole('heading', { name: 'DiagnosticReport', level: 1 })).toBeVisible()
+  await expect(clinician.page.getByText('final', { exact: true })).toBeVisible()
+  await clinician.page.goBack()
+  await clinician.page.goBack()
+
+  // Now the clinician sees it, urgently, and reviews it.
   await press(clinician.page, 'Results to review', 'link')
   const result = clinician.page.getByRole('listitem').filter({ hasText: `Haemoglobin for ${name}` })
   await expect(result.getByText('Urgent: critical result')).toBeVisible()
