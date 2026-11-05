@@ -2379,6 +2379,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-encounters"
+version = "0.1.0"
+dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "health-errors"
 version = "0.1.0"
 
@@ -2656,6 +2667,17 @@ dependencies = [
  "surrealdb",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "health-patient-flow"
+version = "0.1.0"
+dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
