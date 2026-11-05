@@ -1,0 +1,24 @@
+{
+  "resourceType": "Library",
+  "id": "lab-test",
+  "status": "active",
+  "url": "https://carapai.github.io/people-centered-healthcare/fhir/Library/lab-test",
+  "version": "1.0.0",
+  "name": "LabTest",
+  "title": "Laboratory test",
+  "description": "A laboratory test from its order to the clinician's review (#109): collect, result and verify on the lab worklists; verified results released to the clinician's results worklist, a critical one at stat priority.",
+  "type": {
+    "coding": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.workflow+json",
+      "data": "eyJ1cmwiOiJodHRwczovL2NhcmFwYWkuZ2l0aHViLmlvL3Blb3BsZS1jZW50ZXJlZC1oZWFsdGhjYXJlL2ZoaXIvTGlicmFyeS9sYWItdGVzdCIsInZlcnNpb24iOiIxLjAuMCIsInN0YXRlY2hhcnQiOnsic3RhdGVzIjpbeyJpZCI6ImNvbGxlY3QiLCJraW5kIjoiYXRvbWljIiwidGFzayI6eyJyb2xlIjoibGFib3JhdG9yeSIsIndvcmtsaXN0IjoibGFiLWNvbGxlY3QifSwidHJhbnNpdGlvbnMiOlt7ImV2ZW50cyI6WyJsYWJvcmF0b3J5LmNvbGxlY3RlZCJdLCJ0YXJnZXRzIjpbInJlc3VsdCJdfSx7ImV2ZW50cyI6WyJsYWJvcmF0b3J5LmNsb3NlZCJdLCJ0YXJnZXRzIjpbImNsb3NlZCJdfV19LHsiaWQiOiJyZXN1bHQiLCJraW5kIjoiYXRvbWljIiwidGFzayI6eyJyb2xlIjoibGFib3JhdG9yeSIsIndvcmtsaXN0IjoibGFiLXJlc3VsdCJ9LCJ0cmFuc2l0aW9ucyI6W3siZXZlbnRzIjpbImxhYm9yYXRvcnkucmVzdWx0ZWQiXSwidGFyZ2V0cyI6WyJ2ZXJpZnkiXX0seyJldmVudHMiOlsibGFib3JhdG9yeS5jbG9zZWQiXSwidGFyZ2V0cyI6WyJjbG9zZWQiXX1dfSx7ImlkIjoidmVyaWZ5Iiwia2luZCI6ImF0b21pYyIsInRhc2siOnsicm9sZSI6ImxhYm9yYXRvcnkiLCJ3b3JrbGlzdCI6ImxhYi12ZXJpZnkifSwidHJhbnNpdGlvbnMiOlt7ImV2ZW50cyI6WyJsYWJvcmF0b3J5LnZlcmlmaWVkIl0sInRhcmdldHMiOlsicmV2aWV3Il19LHsiZXZlbnRzIjpbImxhYm9yYXRvcnkudmVyaWZpZWQtY3JpdGljYWwiXSwidGFyZ2V0cyI6WyJyZXZpZXctY3JpdGljYWwiXX1dfSx7ImlkIjoicmV2aWV3Iiwia2luZCI6ImF0b21pYyIsInRhc2siOnsicm9sZSI6ImNsaW5pY2lhbiIsIndvcmtsaXN0IjoiY2xpbmljaWFuLXJlc3VsdHMifSwidHJhbnNpdGlvbnMiOlt7ImV2ZW50cyI6WyJsYWJvcmF0b3J5LnJldmlld2VkIl0sInRhcmdldHMiOlsiZG9uZSJdfV19LHsiaWQiOiJyZXZpZXctY3JpdGljYWwiLCJraW5kIjoiYXRvbWljIiwidGFzayI6eyJyb2xlIjoiY2xpbmljaWFuIiwid29ya2xpc3QiOiJjbGluaWNpYW4tcmVzdWx0cyIsInByaW9yaXR5Ijoic3RhdCJ9LCJ0cmFuc2l0aW9ucyI6W3siZXZlbnRzIjpbImxhYm9yYXRvcnkucmV2aWV3ZWQiXSwidGFyZ2V0cyI6WyJkb25lIl19XX0seyJpZCI6ImRvbmUiLCJraW5kIjoiZmluYWwifSx7ImlkIjoiY2xvc2VkIiwia2luZCI6ImZpbmFsIn1dfX0="
+    }
+  ]
+}

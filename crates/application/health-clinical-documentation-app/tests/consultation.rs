@@ -110,6 +110,7 @@ fn orders_name_what_is_ordered() {
             ..Concept::default()
         },
         Some(" urgent "),
+        true,
     )
     .expect("order");
     valid(&test);
@@ -119,6 +120,8 @@ fn orders_name_what_is_ordered() {
     );
     assert_eq!(test["code"]["concept"]["text"], "Malaria RDT");
     assert_eq!(test["note"][0]["text"], "urgent");
-    let plain = service_order(ID, &context(), &malaria(), Some("")).expect("order");
+    assert_eq!(test["category"][0]["coding"][0]["code"], "108252007");
+    let plain = service_order(ID, &context(), &malaria(), Some(""), false).expect("order");
+    assert!(plain.get("category").is_none(), "not a laboratory order");
     assert!(plain.get("note").is_none());
 }

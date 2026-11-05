@@ -1,0 +1,49 @@
+{
+  "url": "https://carapai.github.io/people-centered-healthcare/fhir/Library/lab-test",
+  "version": "1.0.0",
+  "statechart": {
+    "states": [
+      {
+        "id": "collect",
+        "kind": "atomic",
+        "task": { "role": "laboratory", "worklist": "lab-collect" },
+        "transitions": [
+          { "events": ["laboratory.collected"], "targets": ["result"] },
+          { "events": ["laboratory.closed"], "targets": ["closed"] }
+        ]
+      },
+      {
+        "id": "result",
+        "kind": "atomic",
+        "task": { "role": "laboratory", "worklist": "lab-result" },
+        "transitions": [
+          { "events": ["laboratory.resulted"], "targets": ["verify"] },
+          { "events": ["laboratory.closed"], "targets": ["closed"] }
+        ]
+      },
+      {
+        "id": "verify",
+        "kind": "atomic",
+        "task": { "role": "laboratory", "worklist": "lab-verify" },
+        "transitions": [
+          { "events": ["laboratory.verified"], "targets": ["review"] },
+          { "events": ["laboratory.verified-critical"], "targets": ["review-critical"] }
+        ]
+      },
+      {
+        "id": "review",
+        "kind": "atomic",
+        "task": { "role": "clinician", "worklist": "clinician-results" },
+        "transitions": [{ "events": ["laboratory.reviewed"], "targets": ["done"] }]
+      },
+      {
+        "id": "review-critical",
+        "kind": "atomic",
+        "task": { "role": "clinician", "worklist": "clinician-results", "priority": "stat" },
+        "transitions": [{ "events": ["laboratory.reviewed"], "targets": ["done"] }]
+      },
+      { "id": "done", "kind": "final" },
+      { "id": "closed", "kind": "final" }
+    ]
+  }
+}

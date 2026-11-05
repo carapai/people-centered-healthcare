@@ -62,6 +62,7 @@ mod history;
 mod http;
 mod interactions;
 mod inventory;
+mod lab;
 mod notes;
 mod ops;
 mod outcome;
@@ -100,6 +101,10 @@ pub use capability::{AUDIT_EVENT_INTERACTIONS, TYPE_INTERACTIONS, capability_sta
 pub use consultation::{DOCUMENT_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
+pub use lab::{
+    LAB_WORKFLOW, REVIEW_PERMISSION as RESULTS_REVIEW_PERMISSION,
+    VERIFY_PERMISSION as LAB_VERIFY_PERMISSION, WORK_PERMISSION as LAB_WORK_PERMISSION,
+};
 pub use outcome::{FhirError, operation_outcome};
 pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_PERMISSION};
 pub use pharmacy::VIEW_PERMISSION as PHARMACY_VIEW_PERMISSION;

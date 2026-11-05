@@ -1047,3 +1047,80 @@ export const pharmacyMessages = defineMessages<PharmacyValues>({
   phDays: { id: 'app.pharmacy.days', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'Pharmacy: the course length' },
   phBy: { id: 'app.pharmacy.by', defaultMessage: 'Prescribed by {name}, {time}', description: 'Pharmacy: who prescribed and when' },
 })
+
+type LabValues = {
+  lbTitle: {}
+  lbWorklist: {}
+  lbList: { list: string }
+  lbNone: {}
+  lbOpen: { test: string; name: string }
+  lbSpecimen: {}
+  lbCollect: {}
+  lbCollected: {}
+  lbValue: {}
+  lbUnit: {}
+  lbReferenceLow: {}
+  lbReferenceHigh: {}
+  lbCriticalLow: {}
+  lbCriticalHigh: {}
+  lbSaveResults: {}
+  lbResulted: {}
+  lbRejectReason: {}
+  lbReject: {}
+  lbRejected: {}
+  lbVerify: {}
+  lbVerified: {}
+  lbFlag: { flag: string }
+  lbResult: { name: string; value: string; flag: string }
+  lbFailed: { reason: string }
+  rsTitle: {}
+  rsNone: {}
+  rsUrgent: {}
+  rsReview: { test: string }
+  rsReviewed: {}
+  rsFor: { test: string; name: string }
+}
+
+// The laboratory's and the clinician's results' strings (features/laboratory).
+export const labMessages = defineMessages<LabValues>({
+  lbTitle: { id: 'app.lab.title', defaultMessage: 'Laboratory', description: 'Laboratory page heading and link' },
+  lbWorklist: { id: 'app.lab.worklist', defaultMessage: 'Worklist', description: 'Laboratory field: which worklist' },
+  lbList: {
+    id: 'app.lab.list',
+    defaultMessage: '{list, select, labcollect {Specimens to collect} labresult {Results to enter} labverify {Results to verify} other {Worklist}}',
+    description: 'A laboratory worklist (its key without hyphens)',
+  },
+  lbNone: { id: 'app.lab.none', defaultMessage: 'Nothing is waiting here.', description: 'Laboratory: an empty worklist' },
+  lbOpen: { id: 'app.lab.open', defaultMessage: 'Open {test} for {name}', description: 'Laboratory action: open a test' },
+  lbSpecimen: { id: 'app.lab.specimen', defaultMessage: 'Specimen', description: 'Laboratory field: what was collected' },
+  lbCollect: { id: 'app.lab.collect', defaultMessage: 'Record collection', description: 'Laboratory action' },
+  lbCollected: { id: 'app.lab.collected', defaultMessage: 'Collection recorded.', description: 'Laboratory: specimen collected' },
+  lbValue: { id: 'app.lab.value', defaultMessage: 'Value', description: 'Laboratory field: the result' },
+  lbUnit: { id: 'app.lab.unit', defaultMessage: 'Unit', description: 'Laboratory field' },
+  lbReferenceLow: { id: 'app.lab.referenceLow', defaultMessage: 'Reference range, low', description: 'Laboratory field' },
+  lbReferenceHigh: { id: 'app.lab.referenceHigh', defaultMessage: 'Reference range, high', description: 'Laboratory field' },
+  lbCriticalLow: { id: 'app.lab.criticalLow', defaultMessage: 'Critical below', description: 'Laboratory field' },
+  lbCriticalHigh: { id: 'app.lab.criticalHigh', defaultMessage: 'Critical above', description: 'Laboratory field' },
+  lbSaveResults: { id: 'app.lab.saveResults', defaultMessage: 'Save results', description: 'Laboratory action' },
+  lbResulted: { id: 'app.lab.resulted', defaultMessage: 'Results saved; they wait for verification.', description: 'Laboratory: results entered' },
+  lbRejectReason: { id: 'app.lab.rejectReason', defaultMessage: 'Why the specimen is rejected', description: 'Laboratory field' },
+  lbReject: { id: 'app.lab.reject', defaultMessage: 'Reject specimen', description: 'Laboratory action' },
+  lbRejected: { id: 'app.lab.rejected', defaultMessage: 'Specimen rejected.', description: 'Laboratory: specimen rejected' },
+  lbVerify: { id: 'app.lab.verify', defaultMessage: 'Verify results', description: 'Laboratory action' },
+  lbVerified: { id: 'app.lab.verified', defaultMessage: 'Verified and released to the clinician.', description: 'Laboratory: results verified' },
+  lbFlag: {
+    id: 'app.lab.flag',
+    defaultMessage:
+      '{flag, select, normal {Normal} low {Low} high {High} criticallow {Critically low} criticalhigh {Critically high} abnormal {Abnormal} critical {Critical} other {Unknown}}',
+    description: 'A result flag (its code without hyphens)',
+  },
+  lbResult: { id: 'app.lab.result', defaultMessage: '{name}: {value} ({flag})', description: 'A laboratory result' },
+  lbFailed: { id: 'app.lab.failed', defaultMessage: 'That did not work: {reason}', description: 'Laboratory: a step was refused' },
+  rsTitle: { id: 'app.results.title', defaultMessage: 'Results to review', description: 'Results page heading and link' },
+  rsNone: { id: 'app.results.none', defaultMessage: 'No results to review.', description: 'Results: none waiting' },
+  rsUrgent: { id: 'app.results.urgent', defaultMessage: 'Urgent: critical result', description: 'Results: a critical result' },
+  rsReview: { id: 'app.results.review', defaultMessage: 'Mark {test} reviewed', description: 'Results action' },
+  rsReviewed: { id: 'app.results.reviewed', defaultMessage: 'Marked reviewed.', description: 'Results: reviewed' },
+  rsFor: { id: 'app.results.for', defaultMessage: '{test} for {name}', description: 'Results: a test and its patient' },
+})
+

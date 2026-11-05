@@ -1,0 +1,58 @@
+{
+  "type": "workflow-scenario",
+  "name": "a verified result goes to the clinician, then is reviewed",
+  "definition": "https://carapai.github.io/people-centered-healthcare/fhir/Library/lab-test|1.0.0",
+  "steps": [
+    {
+      "expect": {
+        "configuration": [
+          "collect"
+        ],
+        "tasks": [
+          {
+            "state": "collect",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    {
+      "event": "laboratory.collected",
+      "expect": {
+        "configuration": [
+          "result"
+        ]
+      }
+    },
+    {
+      "event": "laboratory.resulted",
+      "expect": {
+        "configuration": [
+          "verify"
+        ]
+      }
+    },
+    {
+      "event": "laboratory.verified",
+      "expect": {
+        "configuration": [
+          "review"
+        ],
+        "tasks": [
+          {
+            "state": "review",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    {
+      "event": "laboratory.reviewed",
+      "expect": {
+        "configuration": [
+          "done"
+        ]
+      }
+    }
+  ]
+}

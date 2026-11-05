@@ -1,0 +1,23 @@
+{
+  "type": "workflow-scenario",
+  "name": "a rejected specimen closes the test",
+  "definition": "https://carapai.github.io/people-centered-healthcare/fhir/Library/lab-test|1.0.0",
+  "steps": [
+    {
+      "event": "laboratory.collected",
+      "expect": {
+        "configuration": [
+          "result"
+        ]
+      }
+    },
+    {
+      "event": "laboratory.closed",
+      "expect": {
+        "configuration": [
+          "closed"
+        ]
+      }
+    }
+  ]
+}

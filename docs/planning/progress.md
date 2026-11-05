@@ -797,3 +797,22 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the module keeps the test in `lab_test`, and the FHIR resources are its projections;
     - Observations stay `preliminary` until verified;
     - a dropped result is entered in error, never deleted.
+- 2026-11-05: #109 part 1 merged (#343). Part 2, the lab workflow and screens:
+  - **The `ug.moh.lab` reference package** (`packages/reference-packages/lab/`): the lab Workflow Definition and its scenarios.
+    - Collect, result and verify run on the lab worklists. Verified results go to `clinician-results`, at `stat` priority when critical.
+    - `health-publication`'s `tests/reference_packages.rs` checks that the package publishes and holds its readable source.
+  - **`health-fhir-server`:**
+    - a consultation laboratory order starts the test and its workflow;
+    - `laboratory_router()` drives each step and delivers it to the workflow (`deliver_for`);
+    - a clinician sees no results until they are verified;
+    - central mounts it at `/api/laboratory`, and its dev workflow definitions include the lab's.
+  - **The client:**
+    - `/laboratory`: the lab worklists, to collect, enter results, reject and verify;
+    - `/results`: the clinician's verified results, critical ones urgent, to mark reviewed.
+  - **Tests:** HTTP tests (the full flow through the worklists, release only after a second person verifies, stat priority for a critical result, permissions, facilities, cancellation, non-laboratory orders) and `laboratory.spec.ts`.
+  - **Decisions:**
+    - consultation test orders are laboratory orders by default;
+    - the clinician's results worklist is the workflow's `clinician-results` until the clinical inbox (#110) gathers it;
+    - point-of-care laboratory results from forms were opted in with #93 (`laboratory.record-point-of-care`).
+
+  This completes #109.
