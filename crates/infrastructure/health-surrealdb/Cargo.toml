@@ -24,6 +24,7 @@ futures-util = { workspace = true }
 health-billing = { workspace = true }
 health-client-registry = { workspace = true }
 health-encounters = { workspace = true }
+health-laboratory = { workspace = true }
 health-consent = { workspace = true }
 health-financial-ledger = { workspace = true }
 health-fhir-search = { workspace = true }

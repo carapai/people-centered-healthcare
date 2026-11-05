@@ -890,6 +890,11 @@ DEFINE TABLE invoice_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON invoice_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON invoice_history TYPE int PERMISSIONS FULL
   DEFINE INDEX invoice_history_last_updated ON invoice_history FIELDS last_updated, version_seq
+DEFINE TABLE lab_test TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON lab_test TYPE string PERMISSIONS FULL
+  DEFINE FIELD patient ON lab_test TYPE string PERMISSIONS FULL
+  DEFINE FIELD stage ON lab_test TYPE string PERMISSIONS FULL
+  DEFINE INDEX lab_test_patient ON lab_test FIELDS patient
 DEFINE TABLE ledger_posting TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD at ON ledger_posting TYPE datetime PERMISSIONS FULL
   DEFINE FIELD data ON ledger_posting TYPE string PERMISSIONS FULL

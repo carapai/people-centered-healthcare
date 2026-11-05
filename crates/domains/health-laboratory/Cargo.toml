@@ -1,0 +1,21 @@
+[package]
+name = "health-laboratory"
+description = "The laboratory workflow (resource-ownership.md; #109): a test from its order through specimen collection, results, verification by a second person and clinician review, with results flagged against their reference and critical ranges."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "laboratory"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

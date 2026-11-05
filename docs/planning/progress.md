@@ -785,3 +785,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - dispensing (reservations, FEFO, MedicationDispense) is the inventory dispensing task.
 
   This completes #108.
+- 2026-11-05: #108 merged (#342). #109, the laboratory workflow, is split: part 1 is the domain, storage and the use cases (this), and part 2 the lab Workflow Definition (reference package), the HTTP routes and worklists, the lab screens and the e2e test.
+  - **New domain crate `health-laboratory`:**
+    - a test from its order to its review, with specimen rejection, cancellation and corrections before verification;
+    - results flagged against reference and critical ranges in exact decimals;
+    - verification by a second person;
+    - results released only once verified, with a critical result marked on `laboratory.verified.v1`.
+  - **New application crate `health-laboratory-app`:** each step in one transaction with the Specimen, the laboratory Observations and the DiagnosticReport, and the event.
+  - **Migration `0034_lab_tests`:** `lab_test`, owned by laboratory.
+  - **Decisions:**
+    - the module keeps the test in `lab_test`, and the FHIR resources are its projections;
+    - Observations stay `preliminary` until verified;
+    - a dropped result is entered in error, never deleted.
