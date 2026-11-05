@@ -651,3 +651,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a template without an item context is keyed by its own id;
     - extracted resources are tagged `urn:health:extraction` with their mode, one tag rather than `extracted` plus the mode;
     - dateTimes come back from the engine normalized (`Z` as `+00:00`), the same instant on every node.
+- 2026-11-05: #93 part 1 merged (#332). Part 2, completing a QuestionnaireResponse:
+  - **New application crate `health-clinical-documentation-app`:**
+    - `choose` picks the newest mapping whose version range takes the Questionnaire's version, and `record_mapping` records it on the response;
+    - `admit` checks each Owner's opt-in (laboratory takes point-of-care results only);
+    - `reconcile` writes managed targets when new or changed, retracts those that disappear, creates seed targets once and gives a review step for a changed seed;
+    - `provenance` builds one Provenance per response, versioned per run.
+  - **`health-fhir-server`'s `with_extraction()`:** completion on the write path, in the response's transaction. Each extracted resource goes through the write path, and a refused extraction keeps nothing.
+  - **Central:** turns extraction on, and searches Library by `type`, `url` and `version`.
+  - **Decisions:**
+    - the last run's targets come from the response's Provenance, whose id is derived from the response, so no new table is needed;
+    - a seed target an amendment would change raises `clinical-documentation.source-form-amended.v1` on the outbox, for the review queue to follow;
+    - the Owners' opt-ins live in the application crate until the Owners' crates exist;
+    - extracted resources are validated at tiers 1–2 like any write.
+  - **Next:** part 3, the mapping's publication gates, and the dry-run `$extract`.

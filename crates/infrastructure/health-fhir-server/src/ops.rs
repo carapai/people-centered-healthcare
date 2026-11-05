@@ -326,3 +326,14 @@ pub(crate) async fn conditional_delete(
         None => Ok(None),
     }
 }
+
+/// What follows every write of a resource version, in its transaction: a submitted
+/// QuestionnaireResponse's completion (#93), then the reference checks.
+pub(crate) async fn after_write(
+    server: &crate::FhirServer,
+    tx: &mut SurrealTx,
+    stored: &RawJson,
+) -> Result<(), Attempt> {
+    crate::completion::complete(server, tx, stored).await?;
+    crate::references::check_written(server, tx, stored).await
+}

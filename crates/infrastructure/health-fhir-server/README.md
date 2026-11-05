@@ -57,6 +57,16 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Routes:** `POST /instances`; `GET /instances/{id}/tasks`; `POST /instances/{id}/events`; `POST /instances/{id}/cancel`; `POST /instances/{id}/tasks/{state}/{claim|release|reassign|escalate}`; `GET /worklists/{key}`; `GET /definitions`. Each command carries the client's `opId`, and the signed-in account is the actor.
   - **Events offered:** each task lists the events its state's transitions take.
   - **Not wired yet:** guards and typed actions. `WorkflowConfig::new` refuses definitions that use them, and so does any check they fail at publication.
+- **Completion (#93):** `with_extraction()`, with `with_questionnaire_checks()`. The node's search must support Library `type`, `url` and `version`.
+  - **On submission:** a `completed` or `amended` QuestionnaireResponse that records no Extraction Mapping gets the newest one for its Questionnaire version (`Library?type=extraction-mapping`).
+  - **After it is written, in its transaction:**
+    - extraction with the recorded mapping;
+    - each planned resource accepted by its Owner's use case;
+    - the plan reconciled with the last run, read from the response's Provenance;
+    - each written or retracted resource goes through the write path (tiers 1–2, facility stamp, audit, reference checks);
+    - a seed resource an amendment would change is left as it is, and `clinical-documentation.source-form-amended.v1` goes on the outbox;
+    - the Provenance gets a new version.
+  - **All or nothing:** any failure fails the write, and the response stays as it was.
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.

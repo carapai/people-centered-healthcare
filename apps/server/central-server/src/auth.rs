@@ -447,11 +447,15 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
-/// The search parameters central supports: `_tag` on every facility-scope type (ADR 0057), the
-/// searches forms need (#92): Questionnaire `status`, `url` and `version` (to re-validate
-/// submissions), and QuestionnaireResponse `status`, and Patient `family` and `given`, which
-/// reception finds a patient by (#102). Activation (#89) replaces this with the
-/// SearchParameters of the published packages a node has active.
+/// The search parameters central supports:
+/// - `_tag` on every facility-scope type (ADR 0057);
+/// - Questionnaire `status`, `url` and `version`, and QuestionnaireResponse `status`, for forms
+///   and their re-validation (#92);
+/// - Library `type`, `url` and `version`, which completion finds Extraction Mappings by (#93);
+/// - Patient `family` and `given`, which reception finds a patient by (#102).
+///
+/// Activation (#89) replaces this with the SearchParameters of the published packages a node has
+/// active.
 pub(crate) fn search_registry() -> health_fhir_search::Registry {
     let definition = |url: &str, code: &str, base: &str, kind: &str, expression: &str| {
         serde_json::json!({
@@ -500,6 +504,27 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             "QuestionnaireResponse.status",
         ),
         definition(
+            "http://hl7.org/fhir/SearchParameter/Library-type",
+            "type",
+            "Library",
+            "token",
+            "Library.type",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Library-url",
+            "url",
+            "Library",
+            "uri",
+            "Library.url",
+        ),
+        definition(
+            "http://hl7.org/fhir/SearchParameter/Library-version",
+            "version",
+            "Library",
+            "token",
+            "Library.version",
+        ),
+        definition(
             "http://hl7.org/fhir/SearchParameter/individual-family",
             "family",
             "Patient",
@@ -524,6 +549,9 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             ("Questionnaire", "url"),
             ("Questionnaire", "version"),
             ("QuestionnaireResponse", "status"),
+            ("Library", "type"),
+            ("Library", "url"),
+            ("Library", "version"),
             ("Patient", "family"),
             ("Patient", "given"),
         ]);
@@ -612,7 +640,8 @@ fn fhir(
         )
         .with_audit(Auditor::new("central", sensitive(policy)))
         // Submitted QuestionnaireResponses are re-validated against their Questionnaire (#92).
-        .with_questionnaire_checks();
+        .with_questionnaire_checks()
+        .with_extraction();
     if let Some(rules) = registry_rules(settings) {
         fhir = fhir
             .with_client_registry(rules.0, rules.1)

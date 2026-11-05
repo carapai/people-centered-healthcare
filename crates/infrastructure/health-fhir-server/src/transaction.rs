@@ -119,7 +119,7 @@ impl Outcome {
         if self.written
             && let Some(stored) = &self.resource
         {
-            references::check_written(server, tx, stored).await?;
+            crate::ops::after_write(server, tx, stored).await?;
         }
         if let Some((resource_type, id)) = &self.deleted {
             references::check_deletable(tx, resource_type, *id).await?;

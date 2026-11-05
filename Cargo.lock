@@ -2324,6 +2324,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-clinical-documentation-app"
+version = "0.1.0"
+dependencies = [
+ "health-configuration",
+ "health-fhir-extraction",
+ "health-fhir-validation",
+ "health-identifiers",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-configuration"
 version = "0.1.0"
 dependencies = [
@@ -2452,8 +2465,10 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-client-registry",
+ "health-clinical-documentation-app",
  "health-encounters",
  "health-encounters-app",
+ "health-fhir-extraction",
  "health-fhir-search",
  "health-fhir-validation",
  "health-financial-ledger",
