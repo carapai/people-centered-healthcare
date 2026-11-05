@@ -22,6 +22,7 @@ mod devices;
 mod encounters;
 mod history;
 mod inbound;
+mod laboratory;
 mod local;
 mod migrations;
 mod nodes;

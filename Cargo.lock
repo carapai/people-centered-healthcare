@@ -2668,6 +2668,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-laboratory"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "health-time",
+ "rust_decimal",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-laboratory-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-laboratory",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-medications"
 version = "0.1.0"
 dependencies = [
@@ -3015,6 +3043,7 @@ dependencies = [
  "health-identifiers",
  "health-identity",
  "health-inventory",
+ "health-laboratory",
  "health-patient-flow",
  "health-payments",
  "health-persistence",

@@ -108,6 +108,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("charge", "billing"),
     ("encounter_state", "encounters"),
     ("queue_entry", "patient-flow"),
+    ("lab_test", "laboratory"),
     ("billing_deferral", "billing"),
     ("billing_settlement", "billing"),
     ("billing_waiver", "billing"),

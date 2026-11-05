@@ -1,0 +1,29 @@
+[package]
+name = "health-laboratory-app"
+description = "The laboratory workflow at the facility authority (#109): each step of a test in one transaction with its FHIR Specimen, laboratory Observations and DiagnosticReport, and its outbox event."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "laboratory"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-access-policy = { workspace = true }
+health-identifiers = { workspace = true }
+health-laboratory = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
