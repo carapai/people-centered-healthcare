@@ -1,0 +1,19 @@
+[package]
+name = "health-programs"
+description = "Programs (program-designer.md; #116): program definitions, enrolment into EpisodesOfCare, concurrent programs, the episode lifecycle and the transfer hand-over, and regimens only from approved sources."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "programs"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

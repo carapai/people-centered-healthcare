@@ -2841,6 +2841,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-programs"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-programs-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-programs",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-provisioning"
 version = "0.1.0"
 dependencies = [

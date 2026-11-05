@@ -705,3 +705,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the author is the account until Practitioner records exist.
 
   This completes #104.
+- 2026-11-05: #104 part 2 merged (#336), completing #104. #116, program definitions and enrolment, is split: part 1 is the domain and the use cases (this), and part 2 the program API, starting the program's workflows, the `workflow-episodeOfCare` context on completion, and regimens from approved sources at publication.
+  - **New domain crate `health-programs`:**
+    - enrolment into an `active` episode;
+    - one open episode per patient per program, with programs running concurrently;
+    - the R5 EpisodeOfCare lifecycle;
+    - the transfer hand-over (finished here, naming the new facility; continued there);
+    - `unapproved_regimens`.
+  - **New application crate `health-programs-app`:**
+    - ProgramPlanDefinitions read, with eligibility in FHIRPath;
+    - enrolment, status and transfer, each in one transaction with the guard, the FHIR EpisodeOfCare and the outbox event.
+  - **Decisions:**
+    - the EpisodeOfCare is the module's record, read back from its extensions; there is no separate table;
+    - `%patient` in eligibility is the Patient as the evaluation root;
+    - the platform extensions on EpisodeOfCare are to be added to the core package with #93's.
