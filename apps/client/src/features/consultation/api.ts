@@ -15,13 +15,15 @@ export type Command =
   | { what: 'notes'; body: { id: string; text: string } }
   | { what: 'diagnoses'; body: { id: string; concept: Concept; provisional: boolean } }
   | { what: 'orders'; body: { id: string; kind: 'service'; concept: Concept; note?: string } }
-  | { what: 'orders'; body: { id: string; kind: 'medication'; concept: Concept; dosage: string } }
+  | { what: 'orders'; body: { id: string; kind: 'medication'; concept: Concept; dosage: string; days?: number; acknowledge?: boolean } }
 
 /** A command the node refused, with its status and reason. */
 export class ConsultationError extends Error {
   constructor(
     readonly status: number,
     readonly reason: string,
+    /** Clinical safety warnings the prescriber must acknowledge (409), if any. */
+    readonly warnings: { code: string; message: string }[] = [],
   ) {
     super(`consultation command failed: ${status}`)
     this.name = 'ConsultationError'
@@ -36,8 +38,9 @@ export async function record(transport: Transport, encounter: string, command: C
     body: command.body,
   })
   if (response.status !== 201 && response.status !== 200) {
-    const body = response.body as { error?: unknown } | undefined
-    throw new ConsultationError(response.status, typeof body?.error === 'string' ? body.error : '')
+    const body = response.body as { error?: unknown; warnings?: unknown } | undefined
+    const warnings = Array.isArray(body?.warnings) ? (body.warnings as { code: string; message: string }[]) : []
+    throw new ConsultationError(response.status, typeof body?.error === 'string' ? body.error : '', warnings)
   }
 }
 

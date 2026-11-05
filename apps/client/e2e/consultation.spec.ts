@@ -4,7 +4,8 @@ import { noViolations, press, signIn, type } from './helpers'
 import { USERS } from './users'
 
 // #104, #107: a clinician completes a consultation from one page: the patient's summary, a signed
-// and amended note, a diagnosis, a test order and a prescription, then completes the visit. Keyboard only, with axe.
+// and amended note, a diagnosis, a test order and a prescription, then completes the visit; the
+// prescription is then on the pharmacy worklist (#108). Keyboard only, with axe.
 
 /** Registers a patient with a name unique to this run and checks them in at consultation. */
 async function checkedIn(page: Page): Promise<string> {
@@ -81,4 +82,14 @@ test('a clinician completes a consultation without leaving the page', async ({ p
   await press(clinician, 'Back to the queue')
   await expect(clinician.getByRole('button', { name: `See ${name}` })).toHaveCount(0)
   await context.close()
+
+  // The prescription is on the pharmacy worklist (#108); dispensing starts there.
+  const pharmacy = await browser.newContext({ baseURL })
+  const pharmacist = await pharmacy.newPage()
+  await signIn(pharmacist, USERS.pharmacist)
+  await press(pharmacist, 'Pharmacy', 'link')
+  const prescription = pharmacist.getByRole('list', { name: 'Prescriptions to dispense' }).getByRole('listitem').filter({ hasText: name })
+  await expect(prescription.getByText('Artemether/lumefantrine 20/120 mg: 4 tablets twice daily for 3 days')).toBeVisible()
+  await noViolations(pharmacist)
+  await pharmacy.close()
 })

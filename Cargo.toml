@@ -21,6 +21,7 @@ members = [
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
     "crates/domains/health-inventory",
+    "crates/domains/health-medications",
     "crates/domains/health-patient-engagement",
     "crates/domains/health-patient-flow",
     "crates/domains/health-payments",
@@ -35,6 +36,7 @@ members = [
     "crates/application/health-identity-app",
     "crates/application/health-patient-flow-app",
     "crates/application/health-inventory-app",
+    "crates/application/health-medications-app",
     "crates/application/health-patient-engagement-app",
     "crates/application/health-payments-app",
     "crates/application/health-pricing-app",
@@ -106,12 +108,14 @@ health-workflow-actions = { path = "crates/contracts/health-workflow-actions" }
 health-billing-contract = { path = "crates/contracts/health-billing-contract" }
 health-identity = { path = "crates/domains/health-identity" }
 health-inventory = { path = "crates/domains/health-inventory" }
+health-medications = { path = "crates/domains/health-medications" }
 health-patient-engagement = { path = "crates/domains/health-patient-engagement" }
 health-payments = { path = "crates/domains/health-payments" }
 health-pricing = { path = "crates/domains/health-pricing" }
 health-workflow = { path = "crates/domains/health-workflow" }
 health-identity-app = { path = "crates/application/health-identity-app" }
 health-inventory-app = { path = "crates/application/health-inventory-app" }
+health-medications-app = { path = "crates/application/health-medications-app" }
 health-patient-engagement-app = { path = "crates/application/health-patient-engagement-app" }
 health-payments-app = { path = "crates/application/health-payments-app" }
 health-billing-app = { path = "crates/application/health-billing-app" }

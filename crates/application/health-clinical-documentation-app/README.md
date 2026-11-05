@@ -20,10 +20,11 @@ Layer: **application** (clinical-documentation). Completing a QuestionnaireRespo
 - **`consultation`** (#104): the consultation's commands as FHIR R5, each in its Encounter and tagged with its facility, with the client's UUIDv7 id. The UI never assembles them.
   - `note`: a final Composition, its text escaped into the narrative;
   - `diagnosis`: an encounter-diagnosis Condition, confirmed or provisional;
-  - `service_order`: a ServiceRequest;
-  - `prescription`: a MedicationRequest with its dosage as written.
+  - `service_order`: a ServiceRequest.
 
-  Blank text, concepts or dosages are refused, as is a code without its system.
+  Prescriptions are the medications module's (`health-medications-app`, #108).
+
+  Blank text or concepts are refused, as is a code without its system.
 
 - **`notes`** (#107): the signed-note rule on FHIR resources. A note's status is a Composition's `status` or a DocumentReference's `docStatus`.
   - `check_replace(current, next)` refuses an in-place change to a signed note, unless it marks the note entered in error with its content unchanged (`meta` and the status aside).

@@ -764,3 +764,24 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - DocumentReference letters with attachments come with document uploads.
 
   This completes #107.
+- 2026-11-05: #107 part 2 merged (#341), completing #107; it also fixed a flaky registry test, whose same-instant tie-break had parsed UUIDv7 version ids as integers. #108, prescribing:
+  - **New domain crate `health-medications`:**
+    - prescriptions, with no stock effect;
+    - the R5 lifecycle;
+    - the clinical safety checks hook, with `BasicChecks` (duplicate therapy, allergy by name), whose warnings the prescriber acknowledges;
+    - the pharmacy worklist.
+  - **New application crate `health-medications-app`:** MedicationRequests both ways; prescribing after the checks, each with its outbox event; and status changes.
+  - **`health-fhir-server`:**
+    - the consultation's prescriptions go through medications (409 with the warnings until acknowledged);
+    - `pharmacy_router()` gives the worklist and status changes, mounted by central at `/api/pharmacy`.
+  - **The client:**
+    - `/pharmacy` shows the worklist;
+    - the consultation lists safety warnings and prescribes once the prescriber acknowledges them;
+    - a pharmacist e2e user.
+  - **Tests:** domain and app tests; HTTP tests (on the worklist and stock on hand unchanged; the allergy and duplicate warnings acknowledged; status, facilities and permissions); `consultation.spec.ts` checks the pharmacist's worklist.
+  - **Decisions:**
+    - `clinical-documentation-app` no longer builds MedicationRequests, since they are medications';
+    - safety warnings are advisory but must be acknowledged;
+    - dispensing (reservations, FEFO, MedicationDispense) is the inventory dispensing task.
+
+  This completes #108.

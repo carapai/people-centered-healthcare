@@ -5,8 +5,9 @@
 //! - [`note`]: a consultation note, a final Composition (LOINC 11488-4) signed by its author,
 //!   whose narrative is the text, escaped;
 //! - [`diagnosis`]: an encounter-diagnosis Condition, active and confirmed (or provisional);
-//! - [`service_order`]: a ServiceRequest (a test or procedure) to order;
-//! - [`prescription`]: a MedicationRequest to order, with its dosage as written.
+//! - [`service_order`]: a ServiceRequest (a test or procedure) to order.
+//!
+//! Prescriptions are the medications module's (`health-medications-app`, #108).
 //!
 //! Every resource names the patient and the Encounter, and is tagged with the Encounter's
 //! facility (ADR 0057). Its id is the client's UUIDv7 (ADR 0013), so a retried command writes the
@@ -174,31 +175,6 @@ pub fn service_order(
     }
     merge(&mut order, fields);
     Ok(order)
-}
-
-/// A medication to order, with its dosage as written.
-pub fn prescription(
-    id: &str,
-    context: &Context,
-    concept: &Concept,
-    dosage: &str,
-) -> Result<Value, CommandRefused> {
-    if dosage.trim().is_empty() {
-        return Err(CommandRefused::Missing("the dosage"));
-    }
-    let mut request = base("MedicationRequest", id, context);
-    let fields = json!({
-        "status": "active",
-        "intent": "order",
-        "medication": { "concept": concept.concept()? },
-        "subject": { "reference": context.patient },
-        "encounter": { "reference": context.encounter },
-        "authoredOn": context.at,
-        "requester": { "display": context.author },
-        "dosageInstruction": [{ "text": dosage.trim() }]
-    });
-    merge(&mut request, fields);
-    Ok(request)
 }
 
 fn merge(into: &mut Value, fields: Value) {

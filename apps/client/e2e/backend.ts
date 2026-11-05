@@ -97,7 +97,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work'], clinician: ['Patient.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work'], clinician: ['Patient.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe'], pharmacist: ['Patient.rs', 'pharmacy.view'] },
       labels: [],
     }),
   ),

@@ -14,4 +14,5 @@ export const USERS = {
   supervisor: { username: 'e2e-supervisor', password: 'granite willow pocket eleven', roles: 'supervisor' },
   nurse: { username: 'e2e-nurse', password: 'amber falcon ladder twelve', roles: 'nurse' },
   clinician: { username: 'e2e-clinician', password: 'velvet otter compass thirty', roles: 'clinician' },
+  pharmacist: { username: 'e2e-pharmacist', password: 'linen badger orchard sixty', roles: 'pharmacist' },
 } as const

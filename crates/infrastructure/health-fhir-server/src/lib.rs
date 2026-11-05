@@ -66,6 +66,7 @@ mod notes;
 mod ops;
 mod outcome;
 mod payments;
+mod pharmacy;
 mod portal;
 mod pricing;
 mod programs;
@@ -101,6 +102,7 @@ pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
 pub use outcome::{FhirError, operation_outcome};
 pub use payments::{CASH_PERMISSION, PaymentConfig, REFUND_PERMISSION, SUPERVISE_PERMISSION};
+pub use pharmacy::VIEW_PERMISSION as PHARMACY_VIEW_PERMISSION;
 pub use pricing::{
     APPROVE_PERMISSION as PRICING_APPROVE_PERMISSION, MANAGE_PERMISSION as PRICING_PERMISSION,
     PricingConfig, QUOTE_PERMISSION as PRICING_QUOTE_PERMISSION,
