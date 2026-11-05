@@ -36,6 +36,8 @@ use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 use health_identifiers::{DerivationName, ResourceId, derive_id};
 use serde_json::{Map, Value, json};
 
+pub mod gates;
+
 /// SDC's `templateExtractContext` extension.
 pub const TEMPLATE_EXTRACT_CONTEXT: &str =
     "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-templateExtractContext";
@@ -357,27 +359,68 @@ impl Mapping {
 
     /// Every FHIRPath expression of the mapping, for the publication checks.
     pub fn expressions(&self) -> Vec<String> {
-        fn walk(value: &Value, out: &mut Vec<String>) {
+        self.expressions_by_template()
+            .into_iter()
+            .map(|e| e.expression)
+            .collect()
+    }
+
+    /// Every FHIRPath expression of the mapping, with its template and kind.
+    pub fn expressions_by_template(&self) -> Vec<Expression> {
+        fn walk(template: &str, value: &Value, out: &mut Vec<Expression>) {
             match value {
                 Value::Object(object) => {
-                    for url in [TEMPLATE_EXTRACT_CONTEXT, TEMPLATE_EXTRACT_VALUE] {
+                    for (url, kind) in [
+                        (TEMPLATE_EXTRACT_CONTEXT, ExpressionKind::Context),
+                        (TEMPLATE_EXTRACT_VALUE, ExpressionKind::Value),
+                    ] {
                         if let Some(found) = expression_of(value, url) {
-                            out.push(found);
+                            out.push(Expression {
+                                template: template.to_owned(),
+                                kind,
+                                expression: found,
+                            });
                         }
                     }
-                    object.values().for_each(|v| walk(v, out));
+                    object.values().for_each(|v| walk(template, v, out));
                 }
-                Value::Array(list) => list.iter().for_each(|v| walk(v, out)),
+                Value::Array(list) => list.iter().for_each(|v| walk(template, v, out)),
                 _ => {}
             }
         }
         let mut out = Vec::new();
         for template in &self.templates {
-            out.extend(template.context.clone());
-            walk(&template.body, &mut out);
+            if let Some(context) = &template.context {
+                out.push(Expression {
+                    template: template.id.clone(),
+                    kind: ExpressionKind::Context,
+                    expression: context.clone(),
+                });
+            }
+            walk(&template.id, &template.body, &mut out);
         }
         out
     }
+}
+
+/// What an expression of a mapping does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpressionKind {
+    /// A `templateExtractContext`: what a resource or element repeats over.
+    Context,
+    /// A `templateExtractValue`: the value written.
+    Value,
+}
+
+/// An expression of a mapping.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Expression {
+    /// Its template.
+    pub template: String,
+    /// What it does.
+    pub kind: ExpressionKind,
+    /// The FHIRPath.
+    pub expression: String,
 }
 
 /// A response item: its linkId path and repeat key.
@@ -732,5 +775,10 @@ pub fn bundle(plan: &[Planned]) -> Value {
             })
         })
         .collect();
-    json!({ "resourceType": "Bundle", "type": "transaction", "entry": entries })
+    let mut bundle = json!({ "resourceType": "Bundle", "type": "transaction" });
+    // FHIR has no empty arrays: a plan that writes nothing is a Bundle without entries.
+    if !entries.is_empty() {
+        bundle["entry"] = Value::Array(entries);
+    }
+    bundle
 }

@@ -26,13 +26,19 @@ Layer: **contracts** (clinical-documentation). SDC template extraction of Questi
   - an Observation or DocumentReference gets `derivedFrom` the response.
 - **`bundle(plan)`:** the plan as a transaction Bundle of `PUT`s, as SDC's `$extract` returns it. It serves the dry run and fixtures.
 - **Where it runs:** `health-clinical-documentation-app` decides what a completion writes, and `health-fhir-server`'s `with_extraction` runs it on the write path.
+- **`gates`** (questionnaire-extraction.md § Publication gates), which publication runs:
+  - `unparsable`: every expression evaluates;
+  - `unknown_items`: every `linkId = '…'` an expression names is an item of the target Questionnaire;
+  - `unrounded`: a value expression that does arithmetic (`+ - * /`, `div`, `mod`) or calls `sqrt`, `ln`, `log`, `exp` or `power` ends in `.round(n)` of its whole result (ADR 0052). Contexts write nothing and are exempt.
+  - `fixture`: a response gives exactly its expected Bundle (a different scale is a different value), and every output passes tier 1.
 - **Not here yet:**
-  - the mapping's publication gates: expressions that parse and type-check, Owner opt-in, fixtures, and `round(n)` on arithmetic;
-  - `$populate`.
+  - type-checking expressions against the Questionnaire's answer types;
+  - `$populate`;
+  - re-derivation at the authority, which needs sync.
 
   `%questionnaire` is not offered: the engine binds `%resource` to the evaluation root only.
 
-Tests: `tests/extraction.rs` covers:
+Tests: `tests/gates.rs` covers each gate. `tests/extraction.rs` covers:
 - a fixture ANC mapping and response that give exactly `fixtures/anc-expected.json`;
 - ids stable across amendments, removed repeats and mapping versions;
 - answers that decide what is produced;

@@ -15,7 +15,10 @@ workspace = true
 [dependencies]
 base64 = { workspace = true }
 health-audit = { workspace = true }
+health-clinical-documentation-app = { workspace = true }
 health-configuration = { workspace = true }
+health-fhir-extraction = { workspace = true }
+health-fhir-validation = { workspace = true }
 health-files = { workspace = true }
 health-packages = { workspace = true }
 health-persistence = { workspace = true }

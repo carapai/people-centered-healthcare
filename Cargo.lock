@@ -2870,7 +2870,10 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "health-audit",
+ "health-clinical-documentation-app",
  "health-configuration",
+ "health-fhir-extraction",
+ "health-fhir-validation",
  "health-files",
  "health-packages",
  "health-persistence",

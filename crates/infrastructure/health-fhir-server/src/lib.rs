@@ -307,6 +307,7 @@ impl FhirServer {
                 "/ConceptMap/$translate",
                 get(terminology::translate).post(terminology::translate),
             )
+            .route("/QuestionnaireResponse/$extract", post(completion::dry_run))
             .route("/Patient/$match", post(registry::matches))
             .route("/Patient/$register", post(registry::register))
             .route("/Patient/$merge", post(registry::merge))

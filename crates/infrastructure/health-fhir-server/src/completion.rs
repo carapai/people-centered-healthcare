@@ -281,3 +281,87 @@ impl FhirServer {
         self
     }
 }
+
+/// `POST /QuestionnaireResponse/$extract` (SDC): the dry run. The body is a QuestionnaireResponse,
+/// or Parameters with it as `questionnaire-response`. The answer is the transaction Bundle the
+/// response would write, with nothing persisted. A response without an id is given one for the
+/// preview, and one whose Questionnaire has no mapping gives an empty Bundle.
+pub(crate) async fn dry_run(
+    axum::extract::State(server): axum::extract::State<FhirServer>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<axum::response::Response, FhirError> {
+    if !server.extraction {
+        return Err(FhirError::not_found(
+            "extraction is not enabled on this node",
+        ));
+    }
+    // The same permission as a QuestionnaireResponse search.
+    crate::access::search_policy(&server, "QuestionnaireResponse", None)?;
+    crate::http::require_json_body(&headers)?;
+    let value: Value = serde_json::from_slice(&body)
+        .map_err(|e| FhirError::bad_request(format!("the body is not JSON: {e}")))?;
+    let mut response = if value["resourceType"] == "Parameters" {
+        value["parameter"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|p| p["name"] == "questionnaire-response")
+            .map(|p| p["resource"].clone())
+            .unwrap_or(Value::Null)
+    } else {
+        value
+    };
+    if response["resourceType"] != "QuestionnaireResponse" {
+        return Err(FhirError::bad_request(
+            "the body is a QuestionnaireResponse, or Parameters with one as questionnaire-response",
+        ));
+    }
+    let found = health_fhir_validation::validate_value(&response);
+    if !found.is_empty() {
+        return Err(FhirError::invalid_resource(&found));
+    }
+    if response["id"]
+        .as_str()
+        .and_then(|id| id.parse::<ResourceId>().ok())
+        .is_none()
+    {
+        response["id"] = json!(ResourceId::new().to_string());
+    }
+    let mut tx = server.store.begin().await?;
+    let mapping = match recorded_mapping(&response).map(str::to_owned) {
+        Some(canonical) => {
+            let (url, version) = canonical
+                .split_once('|')
+                .unwrap_or((canonical.as_str(), ""));
+            mappings(&server, &mut tx, &[("url", url), ("version", version)])
+                .await?
+                .into_iter()
+                .next()
+                .ok_or_else(|| {
+                    refused(format!(
+                        "the Extraction Mapping {canonical} is not known here"
+                    ))
+                })?
+        }
+        None => {
+            let questionnaire = response["questionnaire"].as_str().unwrap_or_default();
+            let found = mappings(&server, &mut tx, &[("type", "extraction-mapping")]).await?;
+            match choose_mapping(&found, questionnaire) {
+                Some(mapping) => mapping.clone(),
+                None => {
+                    let empty = health_fhir_extraction::bundle(&[]);
+                    return Ok(crate::http::fhir_json(StatusCode::OK, empty.to_string()));
+                }
+            }
+        }
+    };
+    let plan = extract(server.fhirpath.as_ref(), &response, &mapping)
+        .await
+        .map_err(|e| refused(e.to_string()))?;
+    for planned in &plan {
+        admit(planned).map_err(|e| refused(e.to_string()))?;
+    }
+    let bundle = health_fhir_extraction::bundle(&plan);
+    Ok(crate::http::fhir_json(StatusCode::OK, bundle.to_string()))
+}

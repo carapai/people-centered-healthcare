@@ -665,3 +665,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the Owners' opt-ins live in the application crate until the Owners' crates exist;
     - extracted resources are validated at tiers 1–2 like any write.
   - **Next:** part 3, the mapping's publication gates, and the dry-run `$extract`.
+- 2026-11-05: #93 part 2 merged (#333). Part 3, the mapping's publication gates and the dry run:
+  - **`health-fhir-extraction::gates`:**
+    - expressions that evaluate;
+    - linkIds the target Questionnaire has;
+    - `round(n)` around the whole result of a value expression that computes (ADR 0052);
+    - fixtures that give exactly their expected Bundle, with valid outputs.
+  - **`health-publication`:** runs the gates at validation, with the Owners' opt-ins. A mapping needs at least one `tests/` fixture of type `extraction-fixture`.
+  - **`health-fhir-server`:** `POST /QuestionnaireResponse/$extract`, the dry run, which keeps nothing.
+  - **Still open on #93:**
+    - re-derivation at the authority, which needs sync;
+    - type-checking expressions against answer types;
+    - the `extraction` activity code and the `extraction-mapping` QuestionnaireResponse extension in the core package.

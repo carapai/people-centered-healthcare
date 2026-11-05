@@ -309,10 +309,10 @@ async fn passing_scenarios_let_the_package_through_and_a_failing_one_sends_it_ba
         "tests/opd-triaged.json".into(),
         scenario("triaged", "consultation"),
     );
-    // Other `tests/` files, such as extraction fixtures, are not workflow scenarios.
+    // Other `tests/` files, such as indicator cases, are not workflow scenarios.
     passing.insert(
-        "tests/extraction.json".into(),
-        json!({ "type": "extraction-fixture" })
+        "tests/indicator.json".into(),
+        json!({ "type": "indicator-case" })
             .to_string()
             .into_bytes(),
     );
