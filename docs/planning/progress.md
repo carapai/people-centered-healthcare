@@ -719,4 +719,3 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - the EpisodeOfCare is the module's record, read back from its extensions; there is no separate table;
     - `%patient` in eligibility is the Patient as the evaluation root;
     - the platform extensions on EpisodeOfCare are to be added to the core package with #93's.
-
