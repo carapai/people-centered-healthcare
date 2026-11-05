@@ -44,6 +44,8 @@ pub struct Program {
     pub workflows: Vec<String>,
     /// The regimens (ActivityDefinition canonicals) it uses.
     pub regimens: Vec<String>,
+    /// Its forms (Questionnaire canonicals): a response to one records the patient's episode.
+    pub questionnaires: Vec<String>,
     /// The approved protocol sources it cites.
     pub sources: Vec<String>,
 }

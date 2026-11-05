@@ -6,7 +6,7 @@ Layer: **application** (programs). Programs at the facility authority (#116).
   - its type must be `clinical-protocol`;
   - `program-episode-type` gives the EpisodeOfCare type, and `program-eligibility` the eligibility;
   - `citation`, `documentation` and `justification` artifacts are the approved protocol sources;
-  - `composed-of` artifacts name its regimens (`ActivityDefinition`) and Workflow Definitions (`Library`).
+  - `composed-of` artifacts name its regimens (`ActivityDefinition`), Workflow Definitions (`Library`) and forms (`Questionnaire`).
 - **`eligible(engine, program, patient)`:** the eligibility FHIRPath over the patient, with `%patient` as the Patient.
   - Only a single `true` is eligible.
   - Nothing is not eligible.

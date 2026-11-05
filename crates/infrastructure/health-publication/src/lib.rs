@@ -44,6 +44,7 @@ use sha2::Digest as _;
 use uuid::Uuid;
 
 mod extraction;
+mod programs;
 mod workflows;
 
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
@@ -366,6 +367,7 @@ impl Publications {
         }
         problems.extend(workflows::problems(packed, &self.actions));
         problems.extend(extraction::problems(packed).await);
+        problems.extend(programs::problems(packed));
         let name = &packed.contents.package.name;
         let latest = self
             .published(tx, name)

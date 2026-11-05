@@ -309,3 +309,101 @@ impl FhirServer {
             .with_state(self.clone())
     }
 }
+
+/// The R5 core extension naming the EpisodeOfCare a record belongs to.
+pub(crate) const WORKFLOW_EPISODE: &str =
+    "http://hl7.org/fhir/StructureDefinition/workflow-episodeOfCare";
+
+/// The EpisodeOfCare a record names with [`WORKFLOW_EPISODE`], if any.
+pub(crate) fn episode_of(resource: &Value) -> Option<Value> {
+    resource["extension"]
+        .as_array()?
+        .iter()
+        .find(|e| e["url"] == WORKFLOW_EPISODE)
+        .cloned()
+}
+
+/// The resources a search finds, or none when the node cannot search that way.
+async fn found(server: &FhirServer, resource_type: &str, params: &[(&str, &str)]) -> Vec<Value> {
+    let params: Vec<(String, String)> = params
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+        .chain([("_count".to_owned(), "1000".to_owned())])
+        .collect();
+    let registry = server.store.registry();
+    let Ok(query) = parse_query(&registry, resource_type, &params, Handling::Strict) else {
+        return Vec::new();
+    };
+    let Ok(mut tx) = server.store.begin().await else {
+        return Vec::new();
+    };
+    tx.search(&query, &Unrestricted, None)
+        .await
+        .map(|page| {
+            page.resources
+                .iter()
+                .filter_map(|r| serde_json::from_str(r.json.as_str()).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Program context on a submitted QuestionnaireResponse (questionnaire-extraction.md § Program
+/// context): when its form belongs to programs (their definitions list it), the patient's one
+/// open episode of those programs here is recorded on it with `workflow-episodeOfCare`. With
+/// several, the clinician chooses (422 until the response names one); with none, nothing is
+/// recorded. A response that already names its episode keeps it.
+pub(crate) async fn episode_context(
+    server: &FhirServer,
+    response: &mut Value,
+) -> Result<(), crate::outcome::FhirError> {
+    if episode_of(response).is_some() {
+        return Ok(());
+    }
+    let (Some(form), Some(patient)) = (
+        response["questionnaire"]
+            .as_str()
+            .map(|q| q.split('|').next().unwrap_or(q).to_owned()),
+        response["subject"]["reference"].as_str().map(str::to_owned),
+    ) else {
+        return Ok(());
+    };
+    let programs: Vec<String> = found(server, "PlanDefinition", &[("type", "clinical-protocol")])
+        .await
+        .iter()
+        .filter_map(|plan| program(plan).ok())
+        .filter(|p| {
+            p.questionnaires
+                .iter()
+                .any(|q| q.split('|').next().unwrap_or(q) == form)
+        })
+        .map(|p| p.url)
+        .collect();
+    if programs.is_empty() {
+        return Ok(());
+    }
+    let facility = crate::access::session_facility();
+    let open: Vec<Episode> = found(server, "EpisodeOfCare", &[("patient", &patient)])
+        .await
+        .iter()
+        .filter_map(episode)
+        .filter(|e| e.status.is_open() && programs.contains(&e.program))
+        .filter(|e| facility.as_ref().is_none_or(|f| *f == e.facility))
+        .collect();
+    match open.as_slice() {
+        [] => Ok(()),
+        [one] => {
+            let named = json!({ "url": WORKFLOW_EPISODE, "valueReference": { "reference": format!("EpisodeOfCare/{}", one.id) } });
+            match response["extension"].as_array_mut() {
+                Some(list) => list.push(named),
+                None => response["extension"] = json!([named]),
+            }
+            Ok(())
+        }
+        _ => Err(crate::outcome::FhirError::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "processing",
+            "the patient has several open episodes of this form's programs: name one with workflow-episodeOfCare",
+        )),
+    }
+}
