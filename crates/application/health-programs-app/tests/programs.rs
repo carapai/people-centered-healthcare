@@ -41,7 +41,8 @@ fn plan(name: &str, episode_type: &str, eligibility: Option<&str>) -> Value {
             { "type": "citation", "resource": "https://health.go.ug/protocols/consolidated-2024" },
             { "type": "documentation", "document": { "url": "https://health.go.ug/protocols/handbook.pdf" } },
             { "type": "composed-of", "resource": format!("https://health.go.ug/fhir/ActivityDefinition/{name}-first-line") },
-            { "type": "composed-of", "resource": format!("https://health.go.ug/fhir/Library/{name}-visit") }
+            { "type": "composed-of", "resource": format!("https://health.go.ug/fhir/Library/{name}-visit") },
+            { "type": "composed-of", "resource": format!("https://health.go.ug/fhir/Questionnaire/{name}-visit|1.0.0") }
         ]
     });
     if let Some(expression) = eligibility {

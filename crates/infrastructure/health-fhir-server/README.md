@@ -92,6 +92,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - the program decides eligibility (422 when not eligible), and the patient may be in several programs at once (409 when already in this one);
     - the program's Workflow Definitions the node runs start with the episode as their context (`EpisodeOfCare/{id}`), once each;
     - another facility's enrolment is not found.
+  - **Program context on forms:** a submitted QuestionnaireResponse whose form a program lists (its `composed-of` Questionnaires) records the patient's open episode of that program at the session's facility with `workflow-episodeOfCare` (questionnaire-extraction.md § Program context).
+    - With several open episodes, the clinician names one: 422 until the response does.
+    - With none, nothing is recorded.
+    - Every resource extracted from the response records the same episode.
 - **Reception and queues (#102):** `reception_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/reception`.
   - **Permissions:** `encounters.checkin` to check patients in; `encounters.manage` to move and end Encounters; `queues.view` to see queues; `queues.work` to call and serve patients.
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.

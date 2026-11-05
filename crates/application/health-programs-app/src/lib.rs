@@ -4,7 +4,7 @@
 //!   - the EpisodeOfCare type (`program-episode-type`) and eligibility (`program-eligibility`);
 //!   - its `relatedArtifact`s: `citation`, `documentation` and `justification` entries are the
 //!     approved protocol sources, and `composed-of` entries name its regimens
-//!     (`ActivityDefinition`s) and Workflow Definitions (`Library`s).
+//!     (`ActivityDefinition`s), Workflow Definitions (`Library`s) and forms (`Questionnaire`s).
 //! - **Eligibility** ([`eligible`]): the FHIRPath over the patient, `%patient` being the
 //!   Patient; true only for a single `true`.
 //! - **Episodes** ([`Programs`]): enrolment, status and transfer, each one transaction holding
@@ -141,6 +141,7 @@ pub fn program(plan: &Value) -> Result<Program, ProgramError> {
         eligibility,
         workflows: Vec::new(),
         regimens: Vec::new(),
+        questionnaires: Vec::new(),
         sources: Vec::new(),
     };
     for artifact in plan["relatedArtifact"].as_array().into_iter().flatten() {
@@ -157,6 +158,7 @@ pub fn program(plan: &Value) -> Result<Program, ProgramError> {
             Some("composed-of") => match named {
                 Some(r) if r.contains("/ActivityDefinition/") => program.regimens.push(r),
                 Some(r) if r.contains("/Library/") => program.workflows.push(r),
+                Some(r) if r.contains("/Questionnaire/") => program.questionnaires.push(r),
                 _ => {}
             },
             _ => {}

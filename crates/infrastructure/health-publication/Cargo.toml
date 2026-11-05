@@ -22,6 +22,8 @@ health-fhir-validation = { workspace = true }
 health-files = { workspace = true }
 health-packages = { workspace = true }
 health-persistence = { workspace = true }
+health-programs = { workspace = true }
+health-programs-app = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
 health-workflow = { workspace = true }

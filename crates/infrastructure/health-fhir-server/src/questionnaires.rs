@@ -70,6 +70,8 @@ pub(crate) async fn checked(server: &FhirServer, value: Value) -> Result<Option<
         Ok((mut stored, _warnings)) => {
             // The mapping it is extracted with, recorded on it (#93).
             crate::completion::choose(server, &mut stored).await?;
+            // The program episode it belongs to (#116).
+            crate::programs::episode_context(server, &mut stored).await?;
             Ok(Some(stored))
         }
         Err(found) => Err(FhirError::invalid_resource(&found)),

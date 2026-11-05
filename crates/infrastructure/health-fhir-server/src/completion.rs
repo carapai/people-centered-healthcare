@@ -178,6 +178,16 @@ pub(crate) async fn complete(
     for planned in &plan {
         admit(planned).map_err(|e| Attempt::Fail(refused(e.to_string())))?;
     }
+    // What the response records of its program episode, every extracted resource records too.
+    let mut plan = plan;
+    if let Some(named) = crate::programs::episode_of(&response) {
+        for planned in &mut plan {
+            match planned.resource["extension"].as_array_mut() {
+                Some(list) => list.push(named.clone()),
+                None => planned.resource["extension"] = json!([named.clone()]),
+            }
+        }
+    }
 
     // The last run's targets, from the response's Provenance, and every resource's head.
     let provenance_kind = kind("Provenance")?;

@@ -160,6 +160,11 @@ fn current() -> Option<Guard> {
     GUARD.try_with(Clone::clone).ok()
 }
 
+/// The facility of the request's subject, when access control is on.
+pub(crate) fn session_facility() -> Option<String> {
+    current().map(|guard| guard.subject.facility)
+}
+
 /// The patient a search is confined to: `patient=` or a `subject=` naming a Patient, with one
 /// value.
 pub(crate) fn search_patient(pairs: &[(String, String)]) -> Option<String> {

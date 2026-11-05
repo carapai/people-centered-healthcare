@@ -727,3 +727,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Workflows:** enrolment starts the program's Workflow Definitions about the episode (`EpisodeOfCare/{id}`), each once.
   - **Tests:** ART and TB enrolled concurrently with ART's workflow task on its worklist; eligibility, permissions, facilities, status, and the transfer hand-over to another facility.
   - **Next:** part 3, the `workflow-episodeOfCare` context on form completion, and regimens from approved sources at publication.
+- 2026-11-05: #116 part 2 merged (#338). Part 3, program context and approved regimens:
+  - **Program context on completion:**
+    - a submitted response to a form a program lists records the patient's open episode of that program here with `workflow-episodeOfCare`;
+    - with several open episodes, the clinician names one (422 until then);
+    - every extracted resource records the same episode.
+  - **Publication:** a ProgramPlanDefinition must be a usable program, and every regimen the package holds must cite one of its approved protocol sources.
+  - **Programs** now list their forms (`composed-of` Questionnaires).
+
+  This completes #116. Enrolment screens wait for the program designer UX (program-designer.md, fog).

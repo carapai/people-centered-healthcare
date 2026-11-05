@@ -19,7 +19,8 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
      - ship at least one `tests/` fixture of type `extraction-fixture` (`mapping` `url|version`, `response`, `expected`), each giving exactly its expected Bundle.
 
      A fixture naming a mapping the package does not hold fails.
-  4. **Simulation:** the `Sandbox` runs the `tests/` cases.
+  4. **Program definitions (#116):** every PlanDefinition of type `clinical-protocol` must be a usable program definition (`health_programs_app::program`). Every regimen it names that the package holds (an `ActivityDefinition`) must cite one of the program's approved protocol sources, through a `citation`, `documentation`, `justification` or `derived-from` artifact. A regimen from a dependency was checked when that dependency was published.
+  5. **Simulation:** the `Sandbox` runs the `tests/` cases.
      - **`WorkflowSandbox`** (#101) runs every `tests/` JSON file of type `workflow-scenario` against the package's definition it names, on the same interpreter, with stubbed actions and guards (`health_workflow::simulation`).
      - **Failures:** every scenario must pass, and one naming a definition the package does not hold fails.
      - **Other cases:** indicator cases are not run yet.

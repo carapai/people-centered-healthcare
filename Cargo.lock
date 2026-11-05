@@ -2909,6 +2909,8 @@ dependencies = [
  "health-packages",
  "health-persistence",
  "health-pki",
+ "health-programs",
+ "health-programs-app",
  "health-surrealdb",
  "health-time",
  "health-workflow",

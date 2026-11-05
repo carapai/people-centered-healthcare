@@ -16,6 +16,7 @@ fn art() -> Program {
         eligibility: Some("%patient.active".into()),
         workflows: vec![],
         regimens: vec!["https://health.go.ug/fhir/ActivityDefinition/tdf-3tc-dtg".into()],
+        questionnaires: vec![],
         sources: vec!["https://health.go.ug/protocols/consolidated-hiv-2024".into()],
     }
 }
