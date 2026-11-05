@@ -25,6 +25,7 @@ members = [
     "crates/domains/health-payments",
     "crates/domains/health-pricing",
     "crates/domains/health-workflow",
+    "crates/domains/health-programs",
     "crates/domains/health-shared-record",
     "crates/domains/health-terminology",
     "crates/application/health-billing-app",
@@ -37,6 +38,7 @@ members = [
     "crates/application/health-payments-app",
     "crates/application/health-pricing-app",
     "crates/application/health-workflow-app",
+    "crates/application/health-programs-app",
     "crates/application/health-registries-app",
     "crates/application/health-shared-record-app",
     "crates/infrastructure/health-audit",
@@ -95,6 +97,7 @@ health-financial-ledger = { path = "crates/domains/health-financial-ledger" }
 health-patient-flow = { path = "crates/domains/health-patient-flow" }
 health-node-identity = { path = "crates/edge/health-node-identity" }
 health-configuration = { path = "crates/domains/health-configuration" }
+health-programs = { path = "crates/domains/health-programs" }
 health-shared-record = { path = "crates/domains/health-shared-record" }
 health-terminology = { path = "crates/domains/health-terminology" }
 health-workflow-actions = { path = "crates/contracts/health-workflow-actions" }
@@ -122,6 +125,7 @@ health-pki = { path = "crates/infrastructure/health-pki" }
 health-provisioning = { path = "crates/infrastructure/health-provisioning" }
 health-publication = { path = "crates/infrastructure/health-publication" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
+health-programs-app = { path = "crates/application/health-programs-app" }
 health-registries-app = { path = "crates/application/health-registries-app" }
 health-shared-record-app = { path = "crates/application/health-shared-record-app" }
 health-surrealdb = { path = "crates/infrastructure/health-surrealdb" }
