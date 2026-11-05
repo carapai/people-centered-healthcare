@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/form-layout/1",
+  "title": "Form Layout",
+  "description": "Presentation for one Questionnaire url|version (configuration.md, §42): titled sections of its top-level items, and per-item widgets and hints. It never changes what is asked; items it does not place are shown after its sections.",
+  "type": "object",
+  "required": ["$schema", "url", "version", "questionnaire", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/form-layout/1" },
+    "url": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "questionnaire": { "type": "string", "pattern": "^[^|]+\\|[^|]+$" },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "items"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "items": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "items": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "widget": { "enum": ["input", "textarea", "radio", "select", "checkbox"] },
+          "hint": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
