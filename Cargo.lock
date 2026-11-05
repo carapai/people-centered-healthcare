@@ -2315,6 +2315,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-care-plans"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-care-plans-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-care-plans",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "health-client-registry"
 version = "0.1.0"
 dependencies = [
@@ -2477,6 +2503,8 @@ dependencies = [
  "form_urlencoded",
  "health-access-policy",
  "health-audit",
+ "health-care-plans",
+ "health-care-plans-app",
  "health-client-registry",
  "health-clinical-documentation",
  "health-clinical-documentation-app",

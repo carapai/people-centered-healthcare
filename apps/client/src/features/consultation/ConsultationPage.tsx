@@ -13,6 +13,10 @@ import {
   ConsultationError,
   NOTE_SECTIONS,
   amendNote,
+  linkToPlan,
+  listPlans,
+  plansKey,
+  startPlan,
   dispose,
   draftNote,
   listNotes,
@@ -314,6 +318,114 @@ function SectionField({ title, value, onChange }: { title: string; value: string
   )
 }
 
+/**
+ * The patient's care plans (#110): start one, then add the patient's prescriptions and orders as
+ * its activities and their diagnoses as what it addresses.
+ */
+function CarePlansPanel({ patient, summary }: { patient: string; summary: PatientSummary | undefined }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const queryClient = useQueryClient()
+  const ids = { title: useId(), add: useId() }
+  const plans = useQuery({ queryKey: plansKey(patient), queryFn: () => listPlans(platform.transport, patient) })
+  const [title, setTitle] = useState('')
+  const [chosen, setChosen] = useState<Record<string, string>>({})
+  const [done, setDone] = useState('')
+  const refresh = () => queryClient.invalidateQueries({ queryKey: plansKey(patient) })
+  const start = useMutation({
+    mutationFn: () => startPlan(platform.transport, newResourceId(), `Patient/${patient}`, title.trim()),
+    onSuccess: () => {
+      setTitle('')
+      setDone(intl.formatMessage(m.cpStarted))
+    },
+    onSettled: refresh,
+  })
+  const link = useMutation({
+    mutationFn: ({ plan, reference }: { plan: string; reference: string }) => linkToPlan(platform.transport, plan, reference),
+    onSuccess: () => setDone(intl.formatMessage(m.cpAdded)),
+    onSettled: refresh,
+  })
+  // What may be added: the patient's prescriptions and diagnoses, as the summary names them.
+  const choices = [
+    ...(summary?.medications ?? []).map((d) => ({ reference: d.reference, text: d.medication.text })),
+    ...(summary?.conditions ?? []).map((c) => ({ reference: c.reference, text: c.code.text })),
+  ]
+  const named = (reference: string) => choices.find((c) => c.reference === reference)?.text ?? reference
+  const failure = start.error ?? link.error
+  return (
+    <section aria-labelledby={`${ids.title}-plans`} className={section}>
+      <h2 id={`${ids.title}-plans`} className={heading}>
+        {intl.formatMessage(m.cpTitle)}
+      </h2>
+      {form(
+        () => start.mutate(),
+        <>
+          <div className={field}>
+            <label htmlFor={ids.title}>{intl.formatMessage(m.cpName)}</label>
+            <input id={ids.title} value={title} onChange={(e) => setTitle(e.target.value)} className={control} />
+          </div>
+          <div>
+            <button type="submit" className={button} disabled={start.isPending || title.trim() === ''}>
+              {intl.formatMessage(m.cpStart)}
+            </button>
+          </div>
+        </>,
+      )}
+      {done !== '' && failure === null ? <p role="status">{done}</p> : null}
+      {failure !== null ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(m.csFailed, { reason: failure instanceof ConsultationError ? failure.reason || String(failure.status) : '' })}
+        </p>
+      ) : null}
+      {plans.data?.length === 0 ? <p>{intl.formatMessage(m.cpNone)}</p> : null}
+      <ul aria-label={intl.formatMessage(m.cpTitle)} className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+        {(plans.data ?? []).map((plan) => (
+          <li key={plan.id} className={css({ borderLeft: '3px solid', borderColor: 'border', pl: '3' })}>
+            <p className={css({ fontWeight: 'semibold' })}>
+              {plan.title} · {intl.formatMessage(m.cpStatus, { status: plan.status.replaceAll('-', '') })}
+            </p>
+            {plan.addresses.map((c) => (
+              <p key={c}>{intl.formatMessage(m.cpAddresses, { what: named(c) })}</p>
+            ))}
+            <ul>
+              {plan.activities.map((a) => (
+                <li key={a}>{named(a)}</li>
+              ))}
+            </ul>
+            {plan.status === 'active' && choices.length > 0 ? (
+              <div className={css({ display: 'flex', gap: '2', alignItems: 'end', flexWrap: 'wrap' })}>
+                <div className={field}>
+                  <label htmlFor={`${ids.add}-${plan.id}`}>{intl.formatMessage(m.cpAddTo, { title: plan.title })}</label>
+                  <select
+                    id={`${ids.add}-${plan.id}`}
+                    value={chosen[plan.id] ?? choices[0]?.reference ?? ''}
+                    onChange={(e) => setChosen({ ...chosen, [plan.id]: e.target.value })}
+                    className={control}
+                  >
+                    {choices.map((c) => (
+                      <option key={c.reference} value={c.reference}>
+                        {c.text}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className={button}
+                  disabled={link.isPending}
+                  onClick={() => link.mutate({ plan: plan.id, reference: chosen[plan.id] ?? choices[0]?.reference ?? '' })}
+                >
+                  {intl.formatMessage(m.cpAdd)}
+                </button>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
   const intl = useIntl()
   const platform = usePlatform()
@@ -345,6 +457,8 @@ function Workspace({ open, onClose }: { open: Open; onClose: () => void }) {
       <Summary summary={summary.data} />
 
       <NotesPanel patient={patient} encounter={encounter} />
+
+      <CarePlansPanel patient={patient} summary={summary.data} />
 
       <section className={section}>
         {form(

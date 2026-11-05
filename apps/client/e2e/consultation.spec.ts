@@ -33,6 +33,8 @@ async function checkedIn(page: Page): Promise<string> {
 }
 
 test('a clinician completes a consultation without leaving the page', async ({ page, browser, baseURL }) => {
+  // A whole consultation and the pharmacist after it: longer than the default.
+  test.setTimeout(90_000)
   const name = await checkedIn(page)
 
   const context = await browser.newContext({ baseURL })
@@ -47,14 +49,14 @@ test('a clinician completes a consultation without leaving the page', async ({ p
 
   // A SOAP note, signed; then amended, never edited (#107).
   await type(clinician, 'Subjective', 'Fever and headache for three days.')
-  await type(clinician, 'Plan', 'RDT, then treat.')
+  await type(clinician, /^Plan$/, 'RDT, then treat.')
   await press(clinician, /^Sign$/)
   await expect(clinician.getByRole('status').filter({ hasText: 'Note signed.' })).toBeVisible()
   const notes = clinician.getByRole('list', { name: 'Notes' })
   await expect(notes.getByText('Progress note (SOAP) · Signed')).toBeVisible()
   await press(clinician, 'Amend the Progress note (SOAP)')
   await expect(clinician.getByRole('status').filter({ hasText: 'Amending the Progress note (SOAP)' })).toBeVisible()
-  await clinician.getByLabel('Plan').fill('Admit for IV artesunate.')
+  await clinician.getByLabel('Plan', { exact: true }).fill('Admit for IV artesunate.')
   await press(clinician, 'Sign amendment')
   await expect(clinician.getByRole('status').filter({ hasText: 'Amendment signed.' })).toBeVisible()
   await expect(notes.getByText('Progress note (SOAP) · Amendment, signed')).toBeVisible()
@@ -75,6 +77,17 @@ test('a clinician completes a consultation without leaving the page', async ({ p
   await press(clinician, 'Prescribe')
   await expect(clinician.getByRole('status').filter({ hasText: 'Prescribed: Artemether/lumefantrine 20/120 mg.' })).toBeVisible()
   await expect(clinician.getByRole('region', { name: 'Medications' }).getByText('Artemether/lumefantrine 20/120 mg · 4 tablets twice daily for 3 days')).toBeVisible()
+
+  // A care plan, with the prescription as its activity (#110).
+  await type(clinician, 'Care plan title', 'Malaria treatment')
+  await press(clinician, 'Start care plan')
+  await expect(clinician.getByRole('status').filter({ hasText: 'Care plan started.' })).toBeVisible()
+  await clinician.getByLabel('Add to Malaria treatment').selectOption({ label: 'Artemether/lumefantrine 20/120 mg' })
+  await press(clinician, 'Add to plan')
+  await expect(clinician.getByRole('status').filter({ hasText: 'Added to the care plan.' })).toBeVisible()
+  const plans = clinician.getByRole('list', { name: 'Care plans' })
+  await expect(plans.getByText('Malaria treatment · Active')).toBeVisible()
+  await expect(plans.getByRole('listitem').filter({ hasText: /^Artemether\/lumefantrine 20\/120 mg$/ })).toBeVisible()
   await noViolations(clinician)
 
   await press(clinician, 'Complete the visit')

@@ -108,3 +108,39 @@ export const signNote = (transport: Transport, id: string) => notesCall<Clinical
 
 export const amendNote = (transport: Transport, original: string, amendment: { id: string; relation: 'replaces' | 'appends'; sections: NoteSection[] }) =>
   notesCall<ClinicalNote>(transport, 'POST', `/notes/${encodeURIComponent(original)}/amend`, amendment)
+
+// Care plans (#110): `/api/care-plans`. Only the patient's own records here are linked.
+
+export interface CarePlan {
+  id: string
+  title: string
+  status: 'draft' | 'active' | 'on-hold' | 'revoked' | 'completed' | 'entered-in-error'
+  addresses: string[]
+  activities: string[]
+}
+
+async function plansCall<T>(transport: Transport, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  const response = await transport.request({ method, path: `/care-plans${path}`, ...(body === undefined ? {} : { body }) })
+  if (response.status !== 200 && response.status !== 201) {
+    const reason = response.body as { error?: unknown } | undefined
+    throw new ConsultationError(response.status, typeof reason?.error === 'string' ? reason.error : '')
+  }
+  return response.body as T
+}
+
+export const plansKey = (patient: string) => ['consultation', 'care-plans', patient] as const
+
+export const listPlans = (transport: Transport, patient: string) => plansCall<CarePlan[]>(transport, 'GET', `/patients/${encodeURIComponent(patient)}/plans`)
+
+/** Starts a plan: drafted, then made active. */
+export async function startPlan(transport: Transport, id: string, patient: string, title: string): Promise<CarePlan> {
+  await plansCall(transport, 'POST', '/plans', { id, patient, title })
+  return plansCall(transport, 'POST', `/plans/${encodeURIComponent(id)}/status`, { status: 'active' })
+}
+
+/** Links one of the patient's records: a Condition the plan addresses, or a request it plans. */
+export function linkToPlan(transport: Transport, plan: string, reference: string): Promise<CarePlan> {
+  return reference.startsWith('Condition/')
+    ? plansCall(transport, 'POST', `/plans/${encodeURIComponent(plan)}/addresses`, { condition: reference })
+    : plansCall(transport, 'POST', `/plans/${encodeURIComponent(plan)}/activities`, { request: reference })
+}

@@ -1,0 +1,29 @@
+[package]
+name = "health-care-plans-app"
+description = "Care plans at the facility authority (#110): the FHIR R5 CarePlan as the module's record, each change in one transaction with its outbox event, and its activities and conditions only the patient's own."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "care-plans"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-access-policy = { workspace = true }
+health-care-plans = { workspace = true }
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
