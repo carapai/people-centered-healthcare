@@ -21,6 +21,8 @@ Layer: **domain** (pricing). Price Books, Price Rules and the six fixed pricing 
 - **Lifecycle** (`approve_book`, `approve_rule`, `retire_book`, `retire_rule`): approved once by a finance approver who is not the `author`, never overlapping another approved version of itself, immutable afterwards except for retirement from a time not yet passed. `PricingStore` keeps every version.
 - **Rounding:** amounts round to the currency's minor units, half away from zero.
 
+- **`PricedLine::deductibles`** (#125): what each coverage's deductible took of the line, so central's accumulators can follow it.
+
 ## Tests
 
 `src/tests.rs`: a charge through all six stages (book precedence, tiers, a surcharge, a bundle, a discount, two coverages with a deductible, copay, limits and an exclusion, a subsidy and an override), then the book rules, waivers, overrides, applicability failures, rule conflicts, the authority's check, and JSON round trips.

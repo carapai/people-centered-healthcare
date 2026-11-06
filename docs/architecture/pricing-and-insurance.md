@@ -70,6 +70,7 @@ flowchart LR
 - **Kept at central.** Deductible and limit counters are kept per Coverage across facilities.
 - **Offline.** A facility uses its last cached accumulator snapshot and marks the stage-4 split as an **estimate**.
 - **Correction.** At claim time, central recomputes the split. A difference becomes a Reconciliation Record, and patient-share corrections become adjustment postings.
+- **Code** (#125): `health-coverage` (`BenefitPlan`, `Coverage`, `Accumulator`, `terms`, `check` over the `Payer` port, `corrections`) and `health-coverage-app` (`pricing_terms`, `settle_claim`). `health-pricing`'s lines record each coverage's deductible.
 
 ## Eligibility, preauthorization and claims
 

@@ -18,6 +18,7 @@ members = [
     "crates/domains/health-clinical-documentation",
     "crates/domains/health-configuration",
     "crates/domains/health-consent",
+    "crates/domains/health-coverage",
     "crates/domains/health-billing",
     "crates/domains/health-encounters",
     "crates/domains/health-financial-ledger",
@@ -36,6 +37,7 @@ members = [
     "crates/application/health-billing-app",
     "crates/application/health-care-journeys-app",
     "crates/application/health-care-plans-app",
+    "crates/application/health-coverage-app",
     "crates/application/health-clinical-documentation-app",
     "crates/application/health-encounters-app",
     "crates/application/health-identity-app",
@@ -93,6 +95,7 @@ health-care-plans = { path = "crates/domains/health-care-plans" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
 health-clinical-documentation = { path = "crates/domains/health-clinical-documentation" }
 health-consent = { path = "crates/domains/health-consent" }
+health-coverage = { path = "crates/domains/health-coverage" }
 health-edge-runtime = { path = "crates/edge/health-edge-runtime" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }
@@ -131,6 +134,7 @@ health-payments-app = { path = "crates/application/health-payments-app" }
 health-billing-app = { path = "crates/application/health-billing-app" }
 health-care-journeys-app = { path = "crates/application/health-care-journeys-app" }
 health-care-plans-app = { path = "crates/application/health-care-plans-app" }
+health-coverage-app = { path = "crates/application/health-coverage-app" }
 health-clinical-documentation-app = { path = "crates/application/health-clinical-documentation-app" }
 health-encounters-app = { path = "crates/application/health-encounters-app" }
 health-patient-flow-app = { path = "crates/application/health-patient-flow-app" }

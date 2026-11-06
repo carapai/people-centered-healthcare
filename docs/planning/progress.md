@@ -891,3 +891,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Client:** each worklist prescription has Prepare (store, stock product, quantity), then Hand over or Cancel.
   - **e2e:** `dispensing.spec.ts` checks that stock moves only when the dispense is handed over.
   - **Decisions:** the pharmacist names the stock product, since there is no product registry yet. Billing's capture of the charge from `inventory.dispensed.v1` waits for in-process event dispatch.
+
+- **#125 part 1: coverage, Benefit Plans, eligibility and accumulators.**
+  - **Domain:** `health-coverage` holds Benefit Plans, Coverages in force in order, and yearly accumulators.
+    - Terms are final only from central's own accumulators; from a snapshot, or with none, they are estimates.
+    - Eligibility goes through the `Payer` port. Offline it is pending verification, with the cached answer's age.
+    - Split corrections are computed per line and coverage.
+  - **Application:** `health-coverage-app`'s `pricing_terms` builds pricing's stage-4 terms. `settle_claim` re-prices estimated charges in service order from central's accumulators and returns the corrections and the accumulators after.
+  - **Pricing:** lines record each coverage's deductible.
+  - **Next:** storage of coverages and accumulators at central, snapshot sync, posting the corrections, claims, payer adapters and the HTTP API.
