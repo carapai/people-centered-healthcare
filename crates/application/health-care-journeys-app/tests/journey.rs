@@ -78,7 +78,7 @@ type Shape<'a> = (Option<&'a str>, Vec<(Stage, &'a str, bool)>);
 #[test]
 fn programs_hold_their_steps_and_tasks_say_what_waits() {
     let built = read(&resources());
-    let shape: Vec<Shape> = built
+    let shape: Vec<Shape<'_>> = built
         .stretches
         .iter()
         .map(|s| {

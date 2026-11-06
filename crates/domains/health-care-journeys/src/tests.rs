@@ -100,7 +100,10 @@ fn inputs() -> (Vec<Program>, Vec<Step>, Vec<Work>) {
     )
 }
 
-fn shape(journey: &Journey) -> Vec<(Option<&str>, Vec<(&str, bool)>)> {
+/// A stretch's program and its steps, each with whether it waits.
+type Shape<'a> = (Option<&'a str>, Vec<(&'a str, bool)>);
+
+fn shape(journey: &Journey) -> Vec<Shape<'_>> {
     journey
         .stretches
         .iter()
