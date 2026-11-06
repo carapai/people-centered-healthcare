@@ -1,7 +1,9 @@
-//! Remittance postings (pricing-and-insurance.md § Eligibility, preauthorization and claims;
-//! #126): what a payer paid against a claim settles its receivable.
+//! Remittance and shortfall postings (pricing-and-insurance.md § Eligibility, preauthorization
+//! and claims; #126): what a payer paid against a claim settles its receivable, and **what it
+//! did not pay, the patient pays**: each shortfall moves from the coverage's receivable to the
+//! patient's.
 
-use health_coverage::claims::Remittance;
+use health_coverage::claims::{Remittance, Settled};
 use health_financial_ledger::{Currency, Dimensions, IN_TRANSIT, Line, Money, Posting, Side};
 
 /// The posting of `remittance` for the claim of `coverage` at `facility`: payments in transit
@@ -46,3 +48,61 @@ pub fn remittance_posting(
         reverses: None,
     }
 }
+
+/// The posting that moves `settled`'s shortfalls (denied, or approved below what was claimed) from
+/// the coverage's receivable to the patient's, at `at`. `None` when the payer paid every item in
+/// full. One line pair per item, each naming its charge.
+#[must_use]
+pub fn shortfall_posting(
+    settled: &Settled,
+    facility: &str,
+    currency: Currency,
+    at: health_time::Timestamp,
+) -> Option<Posting> {
+    let coverage = &settled.claim.coverage;
+    let mut lines = Vec::new();
+    for short in settled
+        .shortfalls
+        .iter()
+        .filter(|s| s.amount > rust_decimal::Decimal::ZERO)
+    {
+        let amount = Money::rounded(short.amount, currency);
+        let dimensions = |funding: &str| Dimensions {
+            facility: facility.to_owned(),
+            funding_source: Some(funding.to_owned()),
+            encounter: Some(settled.claim.account.clone()),
+            service: Some(short.charge.clone()),
+            ..Dimensions::default()
+        };
+        lines.push(Line {
+            account: format!("receivable/{PATIENT}"),
+            side: Side::Debit,
+            amount,
+            dimensions: dimensions(PATIENT),
+            original: None,
+        });
+        lines.push(Line {
+            account: format!("receivable/{coverage}"),
+            side: Side::Credit,
+            amount,
+            dimensions: dimensions(coverage),
+            original: None,
+        });
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    Some(Posting {
+        id: format!("shortfall-{}", settled.claim.id),
+        at,
+        description: format!(
+            "Shortfall of claim {} ({}) to the patient",
+            settled.claim.id, settled.claim.payer
+        ),
+        lines,
+        reverses: None,
+    })
+}
+
+/// The patient as a funding source, as billing names it.
+const PATIENT: &str = "patient";

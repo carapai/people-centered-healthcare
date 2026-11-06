@@ -11,7 +11,7 @@
 //!   runs the accumulators on, so the next charge sees it. A charge already taken in is skipped.
 //! - **[`Coverages`]**: the same over a store at central, with eligibility kept per coverage.
 //! - **[`remittance_posting`]** (#126): what a payer paid against a claim, against its
-//!   receivable.
+//!   receivable; [`shortfall_posting`]: what it did not pay, moved to the patient.
 
 use std::collections::BTreeMap;
 
@@ -19,7 +19,7 @@ mod central;
 mod remittance;
 
 pub use central::{CentralError, Claim, Coverages};
-pub use remittance::remittance_posting;
+pub use remittance::{remittance_posting, shortfall_posting};
 
 use health_coverage::{
     Accumulator, Basis, BenefitPlan, Copay, Correction, Coverage, Snapshot, Split, Terms,
