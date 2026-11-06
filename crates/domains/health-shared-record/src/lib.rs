@@ -15,8 +15,12 @@
 //! - **programs:** the active and waitlisted EpisodesOfCare.
 //!
 //! Dates are FHIR `date` or `dateTime` text in UTC, so their text orders them.
+//!
+//! [`timeline`] is the longitudinal timeline (#115), a fold over resource versions.
 
 use serde::Serialize;
+
+pub mod timeline;
 
 /// How many visits the summary shows.
 pub const VISITS: usize = 10;

@@ -10,6 +10,8 @@
 //!   section needs (an Observation that is not a vital sign, a MedicationRequest without a status)
 //!   is left out.
 
+pub mod timeline;
+
 use health_shared_record::{
     Allergy, Coded, Condition, Medication, Program, Record, Summary, Visit, Vital, summarize,
 };

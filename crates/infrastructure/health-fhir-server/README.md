@@ -112,6 +112,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - The records are the patient's, plus, through the golden record, the same person's other patient records.
   - Each section is a search per patient (`{type}?patient=`) under the clinician's own search policy. A sensitive record the clinician may not see is never found, and a section the clinician may not search is `null`.
   - The records read are audited as a search's are.
+- **The patient timeline (#115):** `GET /Patient/{id}/$timeline` answers JSON `{entries, unseen}`, the newest first (`health-shared-record-app::timeline`).
+  - It covers the same people as the summary: the patient, plus the golden record's linked records at any facility.
+  - Each type is searched under the reader's own policy, so the PDP decides every entry at read time. `unseen` lists the types the reader may not search.
+  - Each entry names its authoritative resource, its `meta.versionId` and its facility. The timeline is rebuilt on every read and written nowhere.
 - **The consultation's commands (#104):** `consultation_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/consultation`.
   - **Commands:** the client sends commands, and the node builds each resource (`health_clinical_documentation_app::consultation`) and writes it with tiers 1–2 and reference checks:
     - `POST /encounters/{id}/notes` `{id, text}`: a Composition;
@@ -179,6 +183,8 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+
+`tests/timeline.rs`: the timeline draws on linked records the reader may see (labels, unseen types, 404); entries name their owner's current version; reading writes nothing, so a rebuild is identical; a result entered in error leaves it.
 
 `tests/requests.rs`:
 - no patient request becomes an order until staff accept it;
