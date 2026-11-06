@@ -23,6 +23,7 @@ fn request(id: &str, what: Medicine, when: &str) -> Prescribe {
         days: Some(3),
         prescriber: "clinician-1".into(),
         at: at(when),
+        based_on: None,
     }
 }
 

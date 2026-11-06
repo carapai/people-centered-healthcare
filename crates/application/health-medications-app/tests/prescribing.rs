@@ -46,6 +46,7 @@ fn request(n: u32, medicine: &str) -> Prescribe {
         days: Some(3),
         prescriber: "clinician-1".into(),
         at: at("2026-11-05T10:00:00Z"),
+        based_on: None,
     }
 }
 

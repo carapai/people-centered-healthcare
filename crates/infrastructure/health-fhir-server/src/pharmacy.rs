@@ -77,6 +77,7 @@ pub(crate) async fn prescribe(
         days,
         prescriber: context.author.clone(),
         at,
+        based_on: None,
     };
     // What the safety checks know: the patient's prescriptions and allergies.
     let mut known = found(

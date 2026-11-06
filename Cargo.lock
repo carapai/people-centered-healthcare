@@ -2809,6 +2809,7 @@ dependencies = [
 name = "health-patient-engagement-app"
 version = "0.1.0"
 dependencies = [
+ "health-access-policy",
  "health-client-registry",
  "health-identifiers",
  "health-patient-engagement",
