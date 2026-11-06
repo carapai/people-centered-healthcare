@@ -8,9 +8,14 @@
 //!   its own accumulators. A charge priced as an estimate is priced again with central's terms,
 //!   and every line whose split differs gives a [`Correction`]: a Reconciliation Record and a
 //!   patient-share adjustment posting. Each charge's use (deductible taken, coverage paid) then
-//!   runs the accumulators on, so the next charge sees it.
+//!   runs the accumulators on, so the next charge sees it. A charge already taken in is skipped.
+//! - **[`Coverages`]**: the same over a store at central, with eligibility kept per coverage.
 
 use std::collections::BTreeMap;
+
+mod central;
+
+pub use central::{CentralError, Claim, Coverages};
 
 use health_coverage::{
     Accumulator, Basis, BenefitPlan, Copay, Correction, Coverage, Snapshot, Split, Terms,
@@ -155,6 +160,23 @@ pub fn settle_claim(
     let mut found = Vec::new();
     let mut repriced = Vec::new();
     for charge in ordered {
+        let year = year(&charge.request);
+        // Taken in before (a settlement replayed): nothing to correct or consume again.
+        let covered: Vec<&String> = charge
+            .priced
+            .lines
+            .iter()
+            .flat_map(|l| l.payer_shares.iter().map(|(c, _)| c))
+            .collect();
+        if !covered.is_empty()
+            && covered.iter().all(|c| {
+                accumulators
+                    .get(&((*c).clone(), year))
+                    .is_some_and(|a| a.has(&charge.charge))
+            })
+        {
+            continue;
+        }
         let estimated = charge.priced.lines.iter().any(|l| l.estimate);
         let used = if estimated {
             let request = Request {
@@ -175,7 +197,6 @@ pub fn settle_claim(
         } else {
             charge.priced.clone()
         };
-        let year = year(&charge.request);
         for line in &used.lines {
             for (coverage, paid) in &line.payer_shares {
                 let deductible = line
@@ -187,6 +208,13 @@ pub fn settle_claim(
                     .entry((coverage.clone(), year))
                     .or_insert_with(|| Accumulator::new(coverage, year))
                     .consume(deductible, *paid);
+            }
+        }
+        for line in &used.lines {
+            for (coverage, _) in &line.payer_shares {
+                if let Some(accumulator) = accumulators.get_mut(&(coverage.clone(), year)) {
+                    accumulator.took(&charge.charge);
+                }
             }
         }
     }

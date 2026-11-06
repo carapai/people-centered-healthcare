@@ -11,6 +11,7 @@ Layer: **domain** (coverage). Coverage (pricing-and-insurance.md § Records, § 
 - **Eligibility:**
   - `check(payer, coverage, day, cached, now)` asks the payer through the **`Payer` port**. There is one adapter per payer in `health-integration`.
   - If the payer cannot be reached, the cached answer stands, marked `PendingVerification`; `Eligibility::age` is its age.
+- **`CoverageStore`:** the port for central's accumulators (keyed by coverage and year) and each coverage's latest eligibility. An accumulator remembers the charges it took in.
 - **`corrections(estimated, actual)`:** the difference in each line's split, by coverage. Each is a Reconciliation Record and a patient-share adjustment.
 
 Tests: coverages in force and in order, central's terms final and a facility's estimated, offline eligibility, and corrections.

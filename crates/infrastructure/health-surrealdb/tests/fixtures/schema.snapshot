@@ -436,6 +436,10 @@ DEFINE TABLE coverage TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD last_updated ON coverage TYPE datetime PERMISSIONS FULL
   DEFINE FIELD version_id ON coverage TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON coverage TYPE int PERMISSIONS FULL
+DEFINE TABLE coverage_accumulator TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON coverage_accumulator TYPE string PERMISSIONS FULL
+DEFINE TABLE coverage_eligibility TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON coverage_eligibility TYPE string PERMISSIONS FULL
 DEFINE TABLE coverage_eligibility_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON coverage_eligibility_request TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON coverage_eligibility_request TYPE array<record> DEFAULT [] PERMISSIONS FULL

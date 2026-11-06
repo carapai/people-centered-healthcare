@@ -13,9 +13,13 @@
 //! - **Correction at claim time** ([`corrections`]): central re-prices the estimated charges with
 //!   its own accumulators, and each difference in a line's split is a [`Correction`]: a
 //!   Reconciliation Record, and an adjustment of the patient's share.
+//! - **[`CoverageStore`]**: the persistence port, central's accumulators and each coverage's
+//!   cached eligibility, inside a store transaction.
 
+use std::collections::BTreeSet;
 use std::future::Future;
 
+use health_persistence::{StoreError, WriteError};
 use health_time::{SignedDuration, Timestamp};
 use jiff::civil::Date;
 use rust_decimal::Decimal;
@@ -113,6 +117,9 @@ pub struct Accumulator {
     pub deductible_used: Decimal,
     /// What the coverage has paid.
     pub paid: Decimal,
+    /// The charges taken in, so a settlement replayed takes none in twice.
+    #[serde(default)]
+    pub charges: BTreeSet<String>,
 }
 
 impl Accumulator {
@@ -124,6 +131,7 @@ impl Accumulator {
             year,
             deductible_used: Decimal::ZERO,
             paid: Decimal::ZERO,
+            charges: BTreeSet::new(),
         }
     }
 
@@ -141,6 +149,17 @@ impl Accumulator {
     pub fn consume(&mut self, deductible: Decimal, paid: Decimal) {
         self.deductible_used += deductible;
         self.paid += paid;
+    }
+
+    /// Whether `charge` has been taken in.
+    #[must_use]
+    pub fn has(&self, charge: &str) -> bool {
+        self.charges.contains(charge)
+    }
+
+    /// Records that `charge` has been taken in.
+    pub fn took(&mut self, charge: &str) {
+        self.charges.insert(charge.to_owned());
     }
 }
 
@@ -342,6 +361,32 @@ pub fn corrections(estimated: &[Split], actual: &[Split]) -> Vec<Correction> {
         }
     }
     found
+}
+
+/// Coverage's persistence port, implemented by the store's transaction.
+pub trait CoverageStore {
+    /// Central's accumulator of `coverage` for `year`, if it has one.
+    fn accumulator(
+        &mut self,
+        coverage: &str,
+        year: i16,
+    ) -> impl Future<Output = Result<Option<Accumulator>, StoreError>> + Send;
+    /// Writes an accumulator: the guard of its coverage and year, so two settlements of the
+    /// same coverage conflict and one is rerun.
+    fn put_accumulator(
+        &mut self,
+        accumulator: &Accumulator,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// The eligibility last held for `coverage`.
+    fn eligibility(
+        &mut self,
+        coverage: &str,
+    ) -> impl Future<Output = Result<Option<Eligibility>, StoreError>> + Send;
+    /// Keeps `eligibility` as the coverage's latest.
+    fn put_eligibility(
+        &mut self,
+        eligibility: &Eligibility,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
 }
 
 #[cfg(test)]

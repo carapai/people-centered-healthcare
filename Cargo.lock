@@ -2415,6 +2415,7 @@ dependencies = [
 name = "health-coverage"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "health-time",
  "jiff",
  "rust_decimal",
@@ -2427,11 +2428,15 @@ name = "health-coverage-app"
 version = "0.1.0"
 dependencies = [
  "health-coverage",
+ "health-persistence",
  "health-pricing",
+ "health-surrealdb",
  "health-time",
  "jiff",
  "rust_decimal",
+ "surrealdb",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3111,6 +3116,7 @@ dependencies = [
  "health-billing",
  "health-client-registry",
  "health-consent",
+ "health-coverage",
  "health-encounters",
  "health-fhir-search",
  "health-financial-ledger",

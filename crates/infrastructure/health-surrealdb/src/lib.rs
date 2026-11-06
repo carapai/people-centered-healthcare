@@ -18,6 +18,7 @@ mod blocking;
 mod charges;
 mod connection;
 mod consent;
+mod coverage;
 mod devices;
 mod encounters;
 mod history;
