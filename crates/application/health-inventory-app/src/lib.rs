@@ -30,7 +30,7 @@ mod transfers;
 mod valuation;
 
 pub use counts::{Cause, inventory_report};
-pub use dispensing::{Completion, DISPENSED_EVENT, PatientReturn, Preparation};
+pub use dispensing::{Completion, DISPENSED_EVENT, PatientReturn, Preparation, Record};
 pub use receiving::{OnHand, supply_requests};
 pub use transfers::Sender;
 pub use valuation::{StoreValuation, inventory_postings};

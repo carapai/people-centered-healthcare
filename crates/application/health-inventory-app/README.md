@@ -24,7 +24,8 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - **Dispensing** (#128; ADR 0035). **Stock moves only when a dispense is completed.**
   - **`prepare(preparation, eligibility, rule)`:** one transaction. It reserves stock for a MedicationDispense by first expiry, or by the pharmacist's choice with a reason. Only stock the patient is eligible for is taken, and only batches in date past the course plus the buffer. Each reservation is written with its unit's balance record, so two preparations of the last packs conflict and the rerun is refused. Preparing the same dispense again returns its live reservations.
   - **`complete_dispense(completion)`:** one transaction. Each amount given becomes a dispense movement, decided by the store's policy and drawn from the dispense's own reservation, and the reservations are consumed. A partial dispense releases the rest. The transaction also writes `inventory.dispensed.v1`, the charge trigger. A lapsed reservation is `Lapsed`, and the dispense must be prepared again.
-  - **`cancel_dispense(dispense, at)`:** releases the reservations, and nothing moves.
+  - **`cancel_dispense(dispense, at, record)`:** releases the reservations, and nothing moves.
+  - **`Record`:** each step may also write a FHIR resource (the MedicationDispense) in its own transaction, over the head it reads there, so the dispense and the stock always agree.
   - **`return_to_quarantine(return)`:** a patient's return, as a return movement into the batch's quarantine unit.
   - **Live reservations only:** every movement's decision, and `available(key, at)`, count only live reservations, so a lapsed one frees its stock at once.
 - **`balance(key)`** and **`nightly_check()`:** the check rebuilds each balance from its movements and reports any drift.
@@ -69,5 +70,5 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
 - the change log and outbox for sync (#135);
-- the pharmacy's dispense screens and HTTP routes, and the charge from `inventory.dispensed.v1` (#128 part 2);
+- capturing the charge from `inventory.dispensed.v1`, which waits for in-process event dispatch to deliver outbox events to billing;
 - the HTTP API.

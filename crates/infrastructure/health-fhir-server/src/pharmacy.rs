@@ -9,6 +9,7 @@
 //! - `GET /worklist` needs [`VIEW_PERMISSION`]: the facility's open prescriptions, oldest first.
 //! - `POST /prescriptions/{id}/status` `{status}` needs `medications.prescribe`: hold, resume,
 //!   stop, cancel or complete a prescription of this facility.
+//! - Dispensing (#128): preparing, completing and cancelling a dispense (see `dispensing`).
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -175,6 +176,7 @@ impl FhirServer {
         Router::new()
             .route("/worklist", get(worklist_route))
             .route("/prescriptions/{id}/status", post(status))
+            .merge(crate::dispensing::routes())
             .with_state(self.clone())
     }
 }

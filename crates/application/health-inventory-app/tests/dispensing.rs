@@ -89,6 +89,7 @@ fn preparation(dispense: &str, quantity: i64, programs: &[&str], at: Timestamp) 
         },
         choice: None,
         at,
+        record: None,
     }
 }
 
@@ -104,6 +105,7 @@ fn completion(dispense: &str, given: &[(&str, i64)], at: Timestamp) -> Completio
         actor: "pharmacist".into(),
         node: "E1".into(),
         at,
+        record: None,
     }
 }
 
@@ -226,7 +228,7 @@ async fn a_cancelled_or_lapsed_preparation_moves_nothing_and_frees_its_stock() {
         .expect("prepared");
     assert_eq!(
         inventory
-            .cancel_dispense("MedicationDispense/d1", at)
+            .cancel_dispense("MedicationDispense/d1", at, None)
             .await
             .expect("cancelled"),
         1
