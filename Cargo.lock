@@ -2693,6 +2693,7 @@ version = "0.1.0"
 dependencies = [
  "health-persistence",
  "health-time",
+ "jiff",
  "rust_decimal",
  "serde",
  "thiserror",
@@ -2703,10 +2704,12 @@ name = "health-inventory-app"
 version = "0.1.0"
 dependencies = [
  "health-financial-ledger",
+ "health-identifiers",
  "health-inventory",
  "health-persistence",
  "health-surrealdb",
  "health-time",
+ "jiff",
  "rust_decimal",
  "serde_json",
  "surrealdb",

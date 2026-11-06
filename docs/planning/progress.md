@@ -875,3 +875,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **HTTP:** `GET /Patient/{id}/$journey` shares the timeline's linked records and PDP-at-read-time searches. A withheld program's steps fall outside any program.
   - **Decision:** `health-care-journeys` is its own crate, as #115 names, not a module inside `health-patient-engagement`. The crate catalogue is updated.
   - **Not yet:** the timeline and journey UX (fog), and registration, follow-up and communication steps.
+
+- **#128 part 1: reservations, FEFO and dispensing (inventory).** Stock moves only on a completed dispense.
+  - **Domain:** `health-inventory::dispensing`:
+    - reservations with lifetimes: 4 h for a dispense or kit, 72 h for a transfer pick; only live ones count;
+    - FEFO with funding-source eligibility and an expiry buffer, and overrides that need a reason but never reach ineligible stock;
+    - substitution approvals, partial settlement, and returns to quarantine.
+  - **Application:** `prepare`, `complete_dispense` (dispense movements plus `inventory.dispensed.v1`, the charge trigger, in one transaction), `cancel_dispense` and `return_to_quarantine`. Every movement now counts only live reservations.
+  - **Storage:** migration `0035_stock_reservations`.
+  - **Tests:** six concurrent preparations of the last packs, and exactly one wins.
+  - **Next (part 2):** the pharmacy's dispense routes and screens, the MedicationDispense, the charge from the event, and the e2e.

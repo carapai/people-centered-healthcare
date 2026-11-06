@@ -7,8 +7,13 @@
 //! - **[`Inventory::change_status`]** moves stock between statuses (usable → quarantine) in one
 //!   transaction: out of one Stock Unit and into the other.
 //! - **[`Inventory::nightly_check`]** rebuilds each balance from the ledger and reports drift.
+//! - **Dispensing** (#128): [`Inventory::prepare`] reserves, [`Inventory::complete_dispense`]
+//!   moves stock, [`Inventory::cancel_dispense`] releases, and
+//!   [`Inventory::return_to_quarantine`] takes a return. Only live reservations hold stock, in
+//!   every movement's decision.
 
 use health_inventory::counts::CountRefused;
+use health_inventory::dispensing::{DispenseRefused, SelectRefused};
 use health_inventory::receiving::ReceivingRefused;
 use health_inventory::reconciliation::{Discrepancy, ReconciliationRecord, ResolveRefused};
 use health_inventory::transfers::TransferRefused;
@@ -19,11 +24,13 @@ use health_inventory::{
 use health_persistence::{Store, StoreError, Transaction, WriteError};
 
 mod counts;
+mod dispensing;
 mod receiving;
 mod transfers;
 mod valuation;
 
 pub use counts::{Cause, inventory_report};
+pub use dispensing::{Completion, DISPENSED_EVENT, PatientReturn, Preparation};
 pub use receiving::{OnHand, supply_requests};
 pub use transfers::Sender;
 pub use valuation::{StoreValuation, inventory_postings};
@@ -52,7 +59,16 @@ pub enum InventoryError {
     /// A count that resolves a flagged negative balance needs its root cause (GSDP §13.2).
     #[error("reconciliation record {0} needs its root cause")]
     CauseRequired(String),
-    /// No such transfer or Reconciliation Record.
+    /// No batch could be chosen for a dispense.
+    #[error(transparent)]
+    Select(#[from] SelectRefused),
+    /// A dispense could not be settled against its reservations.
+    #[error(transparent)]
+    Dispense(#[from] DispenseRefused),
+    /// A reservation lapsed before the dispense was completed: prepare it again.
+    #[error("reservation {0} has lapsed; prepare the dispense again")]
+    Lapsed(String),
+    /// No such transfer, Reconciliation Record or prepared dispense.
     #[error("{0} is not known")]
     NotFound(String),
     /// The store failed.
@@ -137,7 +153,8 @@ where
         origin: Origin,
     ) -> Result<Decision, Attempt> {
         let key = movement.unit.key();
-        let balance = tx.stock_balance(&key).await?.unwrap_or_default();
+        // Only live reservations hold stock (ADR 0035).
+        let (balance, _) = dispensing::live_balance(tx, &key, movement.recorded_at, None).await?;
         let decision = self.policy.decide(balance, movement, origin)?;
         let recorded = Movement {
             emergency: decision.emergency,

@@ -21,6 +21,12 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
   - **Write-offs, adjustments, count variances and reversals:** against stock adjustments.
   - **No posting:** transfers within the facility and status changes.
   - **Off by default:** a facility enables it through `ChartTemplate::inventory`, which adds the accounts. The financial ledger has no storage yet, so the postings are produced, not persisted.
+- **Dispensing** (#128; ADR 0035). **Stock moves only when a dispense is completed.**
+  - **`prepare(preparation, eligibility, rule)`:** one transaction. It reserves stock for a MedicationDispense by first expiry, or by the pharmacist's choice with a reason. Only stock the patient is eligible for is taken, and only batches in date past the course plus the buffer. Each reservation is written with its unit's balance record, so two preparations of the last packs conflict and the rerun is refused. Preparing the same dispense again returns its live reservations.
+  - **`complete_dispense(completion)`:** one transaction. Each amount given becomes a dispense movement, decided by the store's policy and drawn from the dispense's own reservation, and the reservations are consumed. A partial dispense releases the rest. The transaction also writes `inventory.dispensed.v1`, the charge trigger. A lapsed reservation is `Lapsed`, and the dispense must be prepared again.
+  - **`cancel_dispense(dispense, at)`:** releases the reservations, and nothing moves.
+  - **`return_to_quarantine(return)`:** a patient's return, as a return movement into the batch's quarantine unit.
+  - **Live reservations only:** every movement's decision, and `available(key, at)`, count only live reservations, so a lapsed one frees its stock at once.
 - **`balance(key)`** and **`nightly_check()`:** the check rebuilds each balance from its movements and reports any drift.
 
 ## Tests
@@ -46,6 +52,13 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - a ward requisition is approved, then fulfilled by a transfer;
 - reorder suggestions follow the last month's consumption.
 
+`tests/dispensing.rs`, over SurrealDB:
+- stock moves only on a completed dispense, partial completion releases the rest, and there is no drift;
+- a cancelled or lapsed preparation moves nothing and frees its stock;
+- six concurrent preparations of the last packs: exactly one reserves them;
+- donor stock is reserved only for enrolled patients, not even by a pharmacist's choice;
+- reserved stock is not issued elsewhere, and a return goes to quarantine.
+
 `tests/valuation.rs`, over SurrealDB:
 - weighted average and FIFO totals rebuilt from the ledger;
 - the postings balance, the inventory account equals the valuation, and consignment stock posts nothing.
@@ -56,5 +69,5 @@ Layer: **application** (inventory). Recording stock movements over any `health_p
 - upward requisitions through procurement adapters at central, and advance shipping notices (`health-integration`);
 - central matching of inter-facility dispatches with receipts (#247, with sync);
 - the change log and outbox for sync (#135);
-- reservations and FEFO (#128);
+- the pharmacy's dispense screens and HTTP routes, and the charge from `inventory.dispensed.v1` (#128 part 2);
 - the HTTP API.

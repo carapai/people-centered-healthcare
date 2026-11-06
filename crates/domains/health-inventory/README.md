@@ -34,9 +34,21 @@ Layer: **domain** (inventory). The stock ledger: Stock Units, movements and the 
   - **Costs:** the cost comes from each receipt, and donor-funded stock is received at the donor-declared price. An increase without a cost (a transfer-in, a return, a positive count) comes in at the current cost.
   - **Consignment** stock carries no value.
   - **What it returns:** the quantity, value, unit cost, layers, and every movement with its cost (`Costed`).
-- **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, goods received notes, requisitions, the units of a store, and Reconciliation Records, inside a store transaction.
+- **Dispensing** (`dispensing`, #128; ADR 0035):
+  - **`Reservation`:** stock held for a dispense (4 h), a transfer pick (72 h) or a procedure kit (4 h). It is held, then released or consumed. `reserved(reservations, at)` counts only live ones, so a lapsed reservation frees its stock.
+  - **`fefo(candidates, need, eligibility, rule)`:** the batches to take, across several if one is short.
+    - Only usable units of the product are candidates.
+    - `Eligibility` lets a funding source's stock go only to patients in its program, for example donor ART stock only to enrolled patients.
+    - A batch must be in date after the course ends plus `BatchRule::buffer_days`.
+    - The earliest expiry wins, then the smallest quantity.
+  - **`chosen`:** a pharmacist's own batches. A choice other than first expiry needs a reason, and it can never reach ineligible or expiring stock.
+  - **`may_substitute`:** generic equivalence is allowed, a brand or pack substitution needs a pharmacist, and a therapeutic one needs the prescriber.
+  - **`settle(held, given)`:** completes a dispense against its reservations, in full or in part. `returned(unit)` is a return's quarantine unit.
+- **The `StockStore` port:** a unit's balance record and its movements, transfers, counts, goods received notes, requisitions, the units of a store, Reconciliation Records, and reservations (held on a unit, or made for a dispense), inside a store transaction.
 
 ## Tests
+
+`dispensing` unit tests cover first expiry with the buffer, donor eligibility, quarantined and other products, overrides needing a reason, reservation lifetimes, partial completion and substitution approvals.
 
 `tests/valuation.rs` covers weighted average and FIFO, rebuilding in any order, consignment, costless increases, and stock issued below nothing.
 

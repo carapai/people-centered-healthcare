@@ -1,6 +1,8 @@
-//! Stock (migration `0011_stock`): `health_inventory::StockStore` over the transaction.
+//! Stock (migration `0011_stock`, reservations `0035_stock_reservations`):
+//! `health_inventory::StockStore` over the transaction.
 
 use health_inventory::counts::StockCount;
+use health_inventory::dispensing::{Reservation, ReservationState};
 use health_inventory::receiving::{GoodsReceived, Requisition};
 use health_inventory::reconciliation::ReconciliationRecord;
 use health_inventory::transfers::Transfer;
@@ -277,6 +279,56 @@ impl StockStore for SurrealTx {
             .rows(
                 "SELECT VALUE [data] FROM stock_requisition ORDER BY id",
                 vec![],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .collect()
+    }
+
+    async fn put_reservation(&mut self, reservation: &Reservation) -> Result<(), WriteError> {
+        let data = serde_json::to_string(reservation)
+            .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+        let state = match reservation.state {
+            ReservationState::Held => "held",
+            ReservationState::Released => "released",
+            ReservationState::Consumed => "consumed",
+        };
+        self.run(
+            "UPSERT type::record('stock_reservation', $id) CONTENT { data: $data, \
+             unit_key: $unit_key, reference: $reference, state: $state } RETURN VALUE record::id(id)",
+            vec![
+                ("id", reservation.id.clone()),
+                ("data", data),
+                ("unit_key", reservation.unit.key()),
+                ("reference", reservation.reference.clone()),
+                ("state", state.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn held_reservations(&mut self, key: &str) -> Result<Vec<Reservation>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM stock_reservation \
+                 WHERE unit_key = $key AND state = 'held' ORDER BY id",
+                vec![("key", key.to_owned())],
+            )
+            .await?;
+        rows.into_iter()
+            .filter_map(|r| r.into_iter().next())
+            .map(|data| serde_json::from_str(&data).map_err(|_| invalid()))
+            .collect()
+    }
+
+    async fn reservations_for(&mut self, reference: &str) -> Result<Vec<Reservation>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM stock_reservation WHERE reference = $reference ORDER BY id",
+                vec![("reference", reference.to_owned())],
             )
             .await?;
         rows.into_iter()
