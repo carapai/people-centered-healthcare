@@ -1,14 +1,13 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
-import { noViolations, press, signIn, type } from './helpers'
+import { noViolations, press, signIn, type, unique } from './helpers'
 import { USERS } from './users'
 
 // #102: a receptionist checks a registered patient in, and the patient appears in the triage
 // queue, where a nurse calls and sees them. Keyboard only, with axe on each screen.
 test('a receptionist checks a patient in and the patient appears in the triage queue', async ({ page, browser, baseURL }) => {
   // Unique to this run: the backend's database outlives a run.
-  const run = String(Date.now()).slice(-8)
-  const family = `Auma${[...run].map((d) => String.fromCodePoint(97 + Number(d))).join('')}`
+  const { family, digits: run } = unique()
   const name = `Rose ${family}`
   await signIn(page, USERS.clerk)
   await press(page, 'Register a patient', 'link')
@@ -37,9 +36,10 @@ test('a receptionist checks a patient in and the patient appears in the triage q
   // Back home in the app: the session lives in memory, so a reload would end it.
   await page.goBack()
   await press(page, 'Queues', 'link')
-  const triage = page.getByRole('list', { name: 'triage' })
-  await expect(triage.getByText(name, { exact: true })).toBeVisible()
-  await expect(triage.getByText('Waiting', { exact: true })).toBeVisible()
+  // Earlier runs leave their patients in the queue, so look only at this one's entry.
+  const entry = (p: Page) => p.getByRole('list', { name: 'triage' }).getByRole('listitem').filter({ hasText: name })
+  await expect(entry(page).getByText(name, { exact: true })).toBeVisible()
+  await expect(entry(page).getByText('Waiting', { exact: true })).toBeVisible()
   await noViolations(page)
 
   // A nurse calls and sees her.
@@ -48,8 +48,8 @@ test('a receptionist checks a patient in and the patient appears in the triage q
   await signIn(nurse, USERS.nurse)
   await press(nurse, 'Queues', 'link')
   await press(nurse, `Call ${name}`)
-  await expect(nurse.getByRole('list', { name: 'triage' }).getByText('Called', { exact: true })).toBeVisible()
+  await expect(entry(nurse).getByText('Called', { exact: true })).toBeVisible()
   await press(nurse, `Start seeing ${name}`)
-  await expect(nurse.getByRole('list', { name: 'triage' }).getByText('Being seen', { exact: true })).toBeVisible()
+  await expect(entry(nurse).getByText('Being seen', { exact: true })).toBeVisible()
   await context.close()
 })

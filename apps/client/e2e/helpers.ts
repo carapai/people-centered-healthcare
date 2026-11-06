@@ -64,3 +64,15 @@ export async function signInByPhone(page: Page, national: string, e164: string, 
   await press(page, 'Sign in')
   await page.waitForURL(/\/portal\/?$/)
 }
+
+/**
+ * A family name and digits unique to this run. Names are random letters throughout, not a shared
+ * prefix with a counter, so repeated runs don't register near-duplicates the registry would offer
+ * as matches.
+ */
+export function unique(): { family: string; digits: string } {
+  const bytes = crypto.getRandomValues(new Uint8Array(18))
+  const letters = [...bytes.subarray(0, 10)].map((b) => String.fromCodePoint(97 + (b % 26))).join('')
+  const digits = [...bytes.subarray(10)].map((b) => String(b % 10)).join('')
+  return { family: letters.charAt(0).toUpperCase() + letters.slice(1), digits }
+}

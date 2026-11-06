@@ -12,6 +12,12 @@ Layer: **application** (Patient Engagement). Self-registration (#111; patient-id
   - **`StaffDecision::Link { patient, document }`:** only to one of the request's candidates, and only with the ID document the reviewer checked in person. That verification raises the request to `level3`, and the Person links to the existing Patient at `level3`, so the account sees released records.
   - **`StaffDecision::Create`:** a new self-registered Patient from the submitted answers, linked at `level1`.
   - The Task, the Person and the queue item change in one transaction. A decision another reviewer made first is `AlreadyDecided`, and changes nothing.
+- **`requests::PatientRequests`** (#114): the proposals a patient makes from the portal. Nothing here writes an order or a booking.
+  - **`submit`:** only for a Patient the account is linked to. A refill names one of that patient's prescriptions and goes to its facility; a care or appointment request names the facility. Each proposal is tagged `patient-reported`.
+  - **`withdraw`** (the patient) and **`decline`** (staff, with a reason): only while pending.
+  - **`accepted`:** closes the proposal after staff have written its order or booking.
+  - **`pending`:** a pending request at the staff member's facility, loaded for them to accept.
+  - **`view`:** the request a proposal holds, if it is a patient's.
 - **`status(account)`:** the account's request, its Patient and its `PortalAccess`.
 - **One request and one Person per account.** Their ids, and the new Patient's, are derived from the account (UUIDv5), so a retry never duplicates them. A second submission is `AlreadySubmitted`.
 - **The FHIR forms:**
@@ -33,5 +39,7 @@ Layer: **application** (Patient Engagement). Self-registration (#111; patient-id
 - a reviewer links only a candidate, and only with an in-person check, which gives `level3` access;
 - a reviewer may create a new Patient instead;
 - a decision another reviewer made first changes nothing.
+
+`tests/requests.rs`: proposals only for a linked patient and their own prescription, and withdrawing, declining or accepting only while pending.
 
 **Not here yet:** the portal screens, central wiring and e2e (#111 part 3).
