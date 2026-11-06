@@ -847,4 +847,3 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Cause:** every clone of the SDK handle attaches a server session. Every `Connection` or `SurrealStore` clone held one for good, and each transaction opened another. Together they passed SurrealDB's 256 sessions per WebSocket.
   - **Fix:** `Connection` shares one session across its clones. Transactions borrow pooled sessions, at most 128 at once, and wait beyond that.
   - **Test:** `tests/remote_concurrency.rs`, 320 concurrent transactions, now runs in the e2e job against the real server.
-
