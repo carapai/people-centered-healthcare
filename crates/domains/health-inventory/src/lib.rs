@@ -14,6 +14,7 @@
 //!   nightly drift check.
 
 pub mod counts;
+pub mod dispensing;
 pub mod receiving;
 pub mod reconciliation;
 pub mod transfers;
@@ -466,4 +467,20 @@ pub trait StockStore {
     fn open_reconciliations(
         &mut self,
     ) -> impl Future<Output = Result<Vec<reconciliation::ReconciliationRecord>, StoreError>> + Send;
+    /// Adds or replaces a reservation (#128).
+    fn put_reservation(
+        &mut self,
+        reservation: &dispensing::Reservation,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// The reservations still held on the unit with `key` (live or lapsed: the caller checks
+    /// [`dispensing::Reservation::live`]).
+    fn held_reservations(
+        &mut self,
+        key: &str,
+    ) -> impl Future<Output = Result<Vec<dispensing::Reservation>, StoreError>> + Send;
+    /// The reservations made for `reference`, e.g. `MedicationDispense/{id}`, in any state.
+    fn reservations_for(
+        &mut self,
+        reference: &str,
+    ) -> impl Future<Output = Result<Vec<dispensing::Reservation>, StoreError>> + Send;
 }

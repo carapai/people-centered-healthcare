@@ -1499,6 +1499,13 @@ DEFINE TABLE stock_reconciliation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX stock_reconciliation_open ON stock_reconciliation FIELDS resolved, opened_at
 DEFINE TABLE stock_requisition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON stock_requisition TYPE string PERMISSIONS FULL
+DEFINE TABLE stock_reservation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON stock_reservation TYPE string PERMISSIONS FULL
+  DEFINE FIELD reference ON stock_reservation TYPE string PERMISSIONS FULL
+  DEFINE FIELD state ON stock_reservation TYPE string PERMISSIONS FULL
+  DEFINE FIELD unit_key ON stock_reservation TYPE string PERMISSIONS FULL
+  DEFINE INDEX stock_reservation_reference ON stock_reservation FIELDS reference
+  DEFINE INDEX stock_reservation_unit ON stock_reservation FIELDS unit_key, state
 DEFINE TABLE stock_transfer TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON stock_transfer TYPE string PERMISSIONS FULL
 DEFINE TABLE structure_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE

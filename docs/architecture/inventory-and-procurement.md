@@ -109,6 +109,8 @@ sequenceDiagram
 
   Every substitution is recorded on the MedicationDispense.
 
+- **Code** (#128): `health-inventory::dispensing` (`Reservation`, `fefo`, `chosen`, `Eligibility`, `may_substitute`, `settle`, `returned`), with `Inventory::prepare`, `complete_dispense`, `cancel_dispense` and `return_to_quarantine`, and migration `0035_stock_reservations`. Every movement's decision counts only live reservations.
+
 ## Dispensing and other consumption (§73)
 
 ```mermaid

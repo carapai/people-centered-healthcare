@@ -16,6 +16,7 @@ workspace = true
 [dependencies]
 health-persistence = { workspace = true }
 health-time = { workspace = true }
+jiff = { workspace = true }
 rust_decimal = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
