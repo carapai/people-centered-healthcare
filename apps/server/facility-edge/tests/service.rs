@@ -126,7 +126,7 @@ async fn an_old_binary_refuses_a_store_a_newer_one_migrated() {
     // A newer release migrated this store one step past this binary.
     {
         let connection = Connection::open(&Settings {
-            target: Target::RocksDb {
+            target: Target::SurrealKv {
                 path: store.clone(),
             },
             namespace: "ug".into(),

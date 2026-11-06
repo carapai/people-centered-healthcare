@@ -1,11 +1,13 @@
 # health-surrealdb
 
-Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0007, 0017 and 0018.
+Layer: **infrastructure**. SurrealDB `=4.0.0` (ADR 0060). Implements persistence.md, ADRs 0007, 0017, 0018 and 0060.
 
 - **`Connection::open(&Settings)`** opens one of three targets:
-  - `Target::RocksDb { path }`: embedded, always `?sync=every`. Edge and desktop; feature `embedded`.
+  - `Target::SurrealKv { path }`: embedded SurrealKV, always `?sync=every`. Edge and desktop; feature `embedded`.
   - `Target::Remote { endpoint, … }`: a server over WebSocket, with root sign-in. Central; feature `remote`.
   - `Target::Memory`: tests; feature `memory`, or as a dev-dependency.
+
+  - **`THREAD_STACK`** (10 MiB): the thread stack every runtime that runs SurrealDB 4 needs.
 
   It then selects one namespace per tenant and the node's database. `Debug` never prints credentials.
 - **Sessions.** Clones of a `Connection` share one session. Each transaction runs in a session borrowed from a pool. The SDK's `begin` takes a cloned handle, and every clone attaches a server session. SurrealDB refuses more than `SURREAL_WEBSOCKET_MAX_ATTACHED_SESSIONS` (256) on one WebSocket, with "Method not allowed". So the pool reuses sessions after commit or cancel and holds at most `MAX_CONCURRENT_TRANSACTIONS` (128); past that, `begin` waits. `tests/remote_concurrency.rs` runs 320 transactions at once against a real server (CI e2e job).
@@ -48,7 +50,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 - **Provenance** (migration `0019_provenance`): `provenance`, whose `owner` the store sets to the Owner of the target's head in the same transaction, refusing a missing or unknown target; `provenance_of_owner` lists a node's Provenance for sync (#196).
 - **`ownership`** is the ownership registry: one default Owner per head table, plus category partitions (resource-ownership.md § In code).
 - **`migrate(&Connection, MIGRATIONS)`** creates the `_migration` ledger, refuses modified, unknown or out-of-order migrations before changing anything, and then applies each pending migration in its own transaction with its ledger row.
-- **Closing:** SDK 3.3.5 has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.
+- **Closing:** the SDK has no awaitable close. An embedded datastore shuts down in the background after its last handle drops, so reopening the same RocksDB directory in the same process must wait for its lock. A node opens its database once per process.
 - **Block cache:** set `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` (bytes) in the service environment. Whether the embedded engine honours it is not yet verified.
 
 ## Tests
@@ -56,7 +58,7 @@ Layer: **infrastructure**. SurrealDB `=3.3.5`. Implements persistence.md, ADRs 0
 | Command | Covers |
 |---|---|
 | `cargo test -p health-surrealdb` | Runner semantics, the schema snapshot (`UPDATE_SCHEMA_SNAPSHOT=1` rewrites it), the folder-versus-list check, the repository contract (`tests/store.rs`), search and its `EXPLAIN` plans (`tests/search.rs`), the blocking index (`tests/blocking.rs`) and the ownership architecture test (`tests/ownership.rs`), all on the memory engine |
-| `cargo test -p health-surrealdb --features embedded` | RocksDB open, migrate, write, reopen |
+| `cargo test -p health-surrealdb --features embedded` | SurrealKV open, migrate, write, reopen |
 | `HEALTH_TEST_SURREALDB_WS=ws://… cargo test -p health-surrealdb --features remote` | The same migrations against `surreal start --user root --pass root` |
 
 CI (#47) also runs `surreal validate` and `surql-fmt --check` over `migrations/`.

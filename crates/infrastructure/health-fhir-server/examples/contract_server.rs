@@ -66,8 +66,16 @@ async fn node(name: &str) -> Result<(TcpListener, Router, String), Failure> {
     Ok((listener, router, base))
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Failure> {
+fn main() -> Result<(), Failure> {
+    // SurrealDB 4 needs a larger stack than Tokio's default (`health_surrealdb::THREAD_STACK`).
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(health_surrealdb::THREAD_STACK)
+        .build()?
+        .block_on(run())
+}
+
+async fn run() -> Result<(), Failure> {
     let (central, central_router, central_base) = node("central").await?;
     let (edge, edge_router, edge_base) = node("edge").await?;
     let line = json!({ "central": central_base, "edge": edge_base }).to_string() + "\n";

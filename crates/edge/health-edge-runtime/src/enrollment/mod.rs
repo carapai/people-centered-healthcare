@@ -118,7 +118,7 @@ mod tests {
         );
         let dir = tempfile::tempdir().expect("dir");
         let connection = Connection::open(&Settings {
-            target: Target::RocksDb {
+            target: Target::SurrealKv {
                 path: dir.path().join("store"),
             },
             namespace: "ug".into(),

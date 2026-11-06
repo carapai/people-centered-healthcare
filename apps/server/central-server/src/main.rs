@@ -263,8 +263,16 @@ fn auth_settings(
     })
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // SurrealDB 4 needs a larger stack than Tokio's default (see `THREAD_STACK`).
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(health_surrealdb::THREAD_STACK)
+        .build()?
+        .block_on(run())
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("openapi") {
         let mut json = openapi().to_pretty_json()?;
         json.push('\n');

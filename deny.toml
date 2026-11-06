@@ -5,13 +5,11 @@ all-features = true
 
 [advisories]
 yanked = "deny"
-# Transitive through SurrealDB 3.3.5, with no semver-compatible fix. Each is reviewed on every
+# Transitive through SurrealDB 4.0.0, with no semver-compatible fix. Each is reviewed on every
 # SurrealDB bump and removed as soon as the bump clears it (reviewed in #55).
 ignore = [
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 via jsonwebtoken in SurrealDB's own JWT access methods, which we do not use; fix needs 0.7" },
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack via jsonwebtoken in SurrealDB's JWT access methods, which we do not use; no fixed release" },
-    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
-    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39 via object_store for SurrealDB buckets, which we do not use; fix needs 0.41" },
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained, via surrealmx in the in-memory engine used only by tests" },
     { id = "RUSTSEC-2026-0441", reason = "pin-utils unmaintained (no vulnerability), via wasmtimer in SurrealDB; nothing to upgrade to yet" },
 ]
@@ -70,6 +68,21 @@ license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
 
 [[licenses.clarify]]
 crate = "surrealdb-core"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-kvs-surrealkv"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-parser-next"
+expression = "BUSL-1.1"
+license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.clarify]]
+crate = "surrealdb-stored-derive"
 expression = "BUSL-1.1"
 license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
 
@@ -172,6 +185,30 @@ license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
 crate = "surrealdb-types-derive"
 expression = "BUSL-1.1"
 license-files = [{ path = "LICENSE", hash = 0xbb1191d7 }]
+
+[[licenses.exceptions]]
+crate = "surrealdb-kvs-surrealkv"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-parser-next"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "surrealdb-stored-derive"
+allow = ["BUSL-1.1"]
+
+# Boost Software License 1.0, approved 2026-11-06 for this crate only: OSI-approved and
+# permissive, for xxhash-rust, which SurrealKV (the embedded engine, ADR 0060) uses.
+[[licenses.exceptions]]
+crate = "xxhash-rust"
+allow = ["BSL-1.0"]
+
+# Community Data License Agreement, Permissive 2.0, approved 2026-11-06 for this crate only: the
+# bundled root-certificate data SurrealDB 4 brings in through reqwest (ADR 0060).
+[[licenses.exceptions]]
+crate = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
 
 [[licenses.exceptions]]
 crate = "surrealdb"

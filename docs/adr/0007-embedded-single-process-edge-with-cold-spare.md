@@ -12,3 +12,5 @@ Each facility runs exactly one Facility Edge Node in v1. It is a single `facilit
 - The recovery point objective at the facility is bounded by the hourly backup, apart from what has already synced to central. Recovery takes under an hour if a spare machine is ready.
 - Schema migrations and backups run inside the edge process. External tools must never open the data directory while the node runs.
 - A power-cut validation spike on Windows NTFS and Linux ext4 must pass before edge storage is implemented.
+
+> **Amended by [ADR 0060](0060-surrealdb-4-with-embedded-surrealkv.md):** the embedded engine is SurrealKV (`sync=every`) on SurrealDB 4, not RocksDB.

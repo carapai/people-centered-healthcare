@@ -46,11 +46,11 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - name: Install SurrealDB 3.3.5 (the pinned server version)
+      - name: Install SurrealDB 4.0.0 (the pinned server version)
         run: |
           curl --fail --silent --show-error --location --output surreal.tgz \
-            https://download.surrealdb.com/v3.3.5/surreal-v3.3.5.linux-amd64.tgz
-          echo "8f3bc163405085343fc6db9746a8e0cd55503c939802ad2b35a466675a9c09cf  surreal.tgz" | sha256sum --check
+            https://download.surrealdb.com/v4.0.0/surreal-v4.0.0.linux-amd64.tgz
+          echo "e910760179b9f13d0773ce98ac50f9a537051156365239284c2dc687adf3049d  surreal.tgz" | sha256sum --check
           tar -xzf surreal.tgz
           ./surreal version
       - run: cargo build --locked -p central-server
