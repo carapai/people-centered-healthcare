@@ -868,3 +868,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **HTTP:** `GET /Patient/{id}/$timeline` covers the golden record's linked records, with the PDP deciding each type at read time. Entries name their owner's current version, and the timeline writes nothing.
   - **Central:** indexes `patient` on DiagnosticReport and Task.
   - **Next (part 2):** the care journey (`health-care-journeys`).
+
+- **#115 part 2: the Care Journey.** This completes #115.
+  - **Domain:** `health-care-journeys`, a pure projection. Care is grouped by program (EpisodeOfCare), with care outside any program last. Steps are visits, appointments, orders, referrals, results and prescriptions. A step waits only while a Task on it is open (ADR 0042), and the journey is the same whatever the input order.
+  - **Application:** `health-care-journeys-app` maps seven types. A referral is a SNOMED CT `3457005`-categorised ServiceRequest.
+  - **HTTP:** `GET /Patient/{id}/$journey` shares the timeline's linked records and PDP-at-read-time searches. A withheld program's steps fall outside any program.
+  - **Decision:** `health-care-journeys` is its own crate, as #115 names, not a module inside `health-patient-engagement`. The crate catalogue is updated.
+  - **Not yet:** the timeline and journey UX (fog), and registration, follow-up and communication steps.

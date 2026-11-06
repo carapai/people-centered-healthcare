@@ -2315,6 +2315,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-care-journeys"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "health-care-journeys-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-care-journeys",
+ "serde_json",
+]
+
+[[package]]
 name = "health-care-plans"
 version = "0.1.0"
 dependencies = [
@@ -2503,6 +2519,7 @@ dependencies = [
  "form_urlencoded",
  "health-access-policy",
  "health-audit",
+ "health-care-journeys-app",
  "health-care-plans",
  "health-care-plans-app",
  "health-client-registry",

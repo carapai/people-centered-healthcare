@@ -43,7 +43,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Supply Chain | `health-inventory`, `health-procurement` | — |
 | Identity & Access | `health-identity`, `health-access-policy` (the PDP's rules), `health-consent`, `health-audit-domain` | — |
 | Workflow | `health-workflow`, `health-decision-support` | `health-worklists` (Read Model) → `health-workflow` |
-| Patient Engagement | `health-patient-requests`, `health-patient-engagement` | `health-patient-access` → `health-patient-engagement`; `health-care-journeys` (Read Model) → `health-patient-engagement` |
+| Patient Engagement | `health-patient-requests`, `health-patient-engagement`, `health-care-journeys` (Read Model; #115) | `health-patient-access` → `health-patient-engagement` |
 | Analytics | `health-analytics`, `health-reporting` | — |
 | Platform | `health-communications`, `health-administration` | — |
 

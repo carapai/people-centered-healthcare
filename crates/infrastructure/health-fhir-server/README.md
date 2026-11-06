@@ -116,6 +116,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - It covers the same people as the summary: the patient, plus the golden record's linked records at any facility.
   - Each type is searched under the reader's own policy, so the PDP decides every entry at read time. `unseen` lists the types the reader may not search.
   - Each entry names its authoritative resource, its `meta.versionId` and its facility. The timeline is rebuilt on every read and written nowhere.
+- **The Care Journey (#115):** `GET /Patient/{id}/$journey` answers JSON `{stretches, waiting, unseen}` (`health-care-journeys-app`).
+  - It covers the same people and authorization as the timeline: the PDP decides every record at read time.
+  - A step in a program the reader may not see falls under care outside any program.
+  - What waits comes from Tasks. Each step names its authoritative resource, version and facility, and the journey is written nowhere.
 - **The consultation's commands (#104):** `consultation_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/consultation`.
   - **Commands:** the client sends commands, and the node builds each resource (`health_clinical_documentation_app::consultation`) and writes it with tiers 1–2 and reference checks:
     - `POST /encounters/{id}/notes` `{id, text}`: a Composition;
@@ -185,6 +189,8 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
 
 `tests/timeline.rs`: the timeline draws on linked records the reader may see (labels, unseen types, 404); entries name their owner's current version; reading writes nothing, so a rebuild is identical; a result entered in error leaves it.
+
+`tests/journey.rs`: the journey arranges linked care the reader may see by program (a withheld program, waiting from a Task, unseen types, 404); steps name their owner's current version; a rebuild is identical.
 
 `tests/requests.rs`:
 - no patient request becomes an order until staff accept it;
