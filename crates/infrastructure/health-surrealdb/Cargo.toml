@@ -44,7 +44,7 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 surrealdb = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 jiff = { workspace = true }
