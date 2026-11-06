@@ -81,6 +81,7 @@ mod requests;
 mod search;
 mod summary;
 mod terminology;
+mod timeline;
 mod transaction;
 mod validation;
 mod workflow;
@@ -336,6 +337,7 @@ impl FhirServer {
             .route("/Patient/$register", post(registry::register))
             .route("/Patient/$merge", post(registry::merge))
             .route("/Patient/{id}/$summary", get(summary::patient_summary))
+            .route("/Patient/{id}/$timeline", get(timeline::patient_timeline))
             .route("/Patient/{id}/$link", post(registry::link))
             .route("/Patient/{id}/$unlink", post(registry::unlink))
             .route("/{type}/_search", post(search::post))

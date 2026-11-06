@@ -463,9 +463,9 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
-/// Each patient summary section's type, the notes' (#107) and the requests' (#114), with the
-/// element naming its patient (#104).
-const SUMMARY_PATIENT_PATHS: [(&str, &str); 9] = [
+/// Each patient summary section's type (#104), the notes' (#107), the requests' (#114) and the
+/// rest of the timeline's (#115), with the element naming its patient.
+const SUMMARY_PATIENT_PATHS: [(&str, &str); 11] = [
     ("AllergyIntolerance", "patient"),
     ("Condition", "subject"),
     ("MedicationRequest", "subject"),
@@ -477,6 +477,9 @@ const SUMMARY_PATIENT_PATHS: [(&str, &str); 9] = [
     // A patient's requests (#114).
     ("ServiceRequest", "subject"),
     ("Appointment", "subject"),
+    // The rest of the timeline (#115).
+    ("DiagnosticReport", "subject"),
+    ("Task", "for"),
 ];
 
 /// The search parameters central supports:

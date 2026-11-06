@@ -861,3 +861,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Inbox:** appointment proposals now go to whoever has `appointments.book`.
   - **e2e:** `requests.spec.ts` checks that no patient request becomes an order without staff action.
   - **Decision:** the patient types the facility code, since there is no facility directory yet.
+
+- **#115 part 1: the patient timeline.**
+  - **Domain:** `health-shared-record::timeline`, a fold over resource versions: newer versions replace older ones, removals are remembered, and the order is deterministic. Kept from events in any order, it equals a rebuild (200 shuffles).
+  - **Application:** `health-shared-record-app::timeline` maps nine types. Errors, drafts and unverified results stay off.
+  - **HTTP:** `GET /Patient/{id}/$timeline` covers the golden record's linked records, with the PDP deciding each type at read time. Entries name their owner's current version, and the timeline writes nothing.
+  - **Central:** indexes `patient` on DiagnosticReport and Task.
+  - **Next (part 2):** the care journey (`health-care-journeys`).

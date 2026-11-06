@@ -17,7 +17,7 @@ use axum::response::{IntoResponse, Response};
 use health_audit::Interaction;
 use health_fhir_search::{Handling, parse_query};
 use health_identifiers::ResourceId;
-use health_persistence::{ResourceType, Store, StoredResource, Transaction};
+use health_persistence::{RawJson, ResourceType, Store, StoredResource, Transaction};
 use health_shared_record_app::{Found, SECTIONS, golden_of, linked, summary};
 use serde_json::Value;
 
@@ -37,14 +37,14 @@ async fn head(
     Ok(tx.read(&kind, id).await?.filter(|h| !h.version.deleted))
 }
 
-/// `GET /Patient/{id}/$summary`.
-pub(crate) async fn patient_summary(
-    State(server): State<FhirServer>,
-    Path(id): Path<String>,
-) -> Result<Response, FhirError> {
+/// The patient records that make up `id`'s read models: `Patient/{id}` (readable by the reader,
+/// else 404, as a read), then, through its golden record, the same person's other records.
+pub(crate) async fn people(
+    tx: &mut health_surrealdb::SurrealTx,
+    id: &str,
+) -> Result<Vec<String>, FhirError> {
     let not_found = || FhirError::not_found(format!("Patient/{id} is not known"));
-    let mut tx = server.store.begin().await?;
-    let stored = head(&mut tx, &format!("Patient/{id}"))
+    let stored = head(tx, &format!("Patient/{id}"))
         .await?
         .ok_or_else(not_found)?;
     access::readable(&stored.json, not_found)?;
@@ -52,27 +52,37 @@ pub(crate) async fn patient_summary(
         .map_err(|e| FhirError::bad_request(format!("stored JSON: {e}")))?;
     // The golden record is read for its links only.
     let golden = match golden_of(&patient) {
-        Some(reference) => head(&mut tx, &reference)
+        Some(reference) => head(tx, &reference)
             .await?
             .and_then(|g| serde_json::from_str::<Value>(g.json.as_str()).ok()),
         None => None,
     };
-    let patients = linked(&patient, golden.as_ref());
+    Ok(linked(&patient, golden.as_ref()))
+}
 
+/// Each type's records of `patients` (`{type}?patient=`), under the reader's own search policy:
+/// `None` for a type the reader may not search, or the node cannot. `read` collects what was read,
+/// for the audit.
+pub(crate) async fn searched(
+    server: &FhirServer,
+    tx: &mut health_surrealdb::SurrealTx,
+    patients: &[String],
+    types: &[&str],
+    read: &mut Vec<RawJson>,
+) -> Result<Vec<Option<Vec<Value>>>, FhirError> {
     let registry = server.store.registry();
-    let mut found: Found = Default::default();
-    let mut read = Vec::new();
-    for (section, resource_type) in found.iter_mut().zip(SECTIONS) {
+    let mut sections = Vec::new();
+    for resource_type in types {
         let mut all = Vec::new();
         let mut seen = true;
-        for reference in &patients {
+        for reference in patients {
             let params = vec![
                 ("patient".to_owned(), reference.clone()),
                 ("_count".to_owned(), "1000".to_owned()),
             ];
             let (Ok(query), Ok(policy)) = (
                 parse_query(&registry, resource_type, &params, Handling::Strict),
-                access::search_policy(&server, resource_type, Some(reference.clone())),
+                access::search_policy(server, resource_type, Some(reference.clone())),
             ) else {
                 seen = false;
                 break;
@@ -85,14 +95,39 @@ pub(crate) async fn patient_summary(
                 read.push(resource.json);
             }
         }
-        *section = seen.then_some(all);
+        sections.push(seen.then_some(all));
     }
+    Ok(sections)
+}
+
+/// Audits `read` as a search's reads, and commits if the audit wrote anything.
+pub(crate) async fn audited(
+    mut tx: health_surrealdb::SurrealTx,
+    read: &[RawJson],
+) -> Result<(), FhirError> {
     if audit::read(&mut tx, Interaction::Search, read.iter())
         .await
         .map_err(audit::failed)?
     {
         tx.commit().await?;
     }
+    Ok(())
+}
+
+/// `GET /Patient/{id}/$summary`.
+pub(crate) async fn patient_summary(
+    State(server): State<FhirServer>,
+    Path(id): Path<String>,
+) -> Result<Response, FhirError> {
+    let mut tx = server.store.begin().await?;
+    let patients = people(&mut tx, &id).await?;
+    let mut read = Vec::new();
+    let sections = searched(&server, &mut tx, &patients, &SECTIONS, &mut read).await?;
+    let mut found: Found = Default::default();
+    for (slot, section) in found.iter_mut().zip(sections) {
+        *slot = section;
+    }
+    audited(tx, &read).await?;
     let body = serde_json::to_value(summary(&found))
         .map_err(|e| FhirError::bad_request(format!("summary: {e}")))?;
     Ok((StatusCode::OK, axum::Json(body)).into_response())

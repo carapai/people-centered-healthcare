@@ -9,5 +9,10 @@ Layer: **domain** (shared-record). The shared record's patient summary (clinical
   - **Vitals:** the latest reading of each code, leaving out cancelled and entered-in-error readings.
   - **Visits:** the latest `VISITS` (10) Encounters, leaving out those entered in error.
   - **Programs:** active and waitlisted EpisodesOfCare.
+- **`timeline`** (#115; care-journeys.md): the longitudinal timeline, a read model that owns nothing.
+  - An `Entry` names its authoritative resource and version, kind, time, title, status, episode and facility.
+  - `Timeline` is a fold over resource versions. `apply` takes a version from an event, and `rebuild` takes the current versions.
+  - A version older than the one held changes nothing, and one that leaves the timeline (`Change::Gone`) is remembered, so an older version can't bring it back. Kept from events in any order, or rebuilt, it is the same timeline.
+  - `entries()` orders newest first, then by reference.
 - **An unseen section:** a section the clinician may not search at all is `None` (`null` in JSON), not empty.
 - **Dates** are FHIR `date` or `dateTime` text in UTC, so their text orders them.
