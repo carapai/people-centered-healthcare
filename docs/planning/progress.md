@@ -914,3 +914,5 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Tests:** the contract tests against mocks found decimals sent as JSON strings; they are now numbers.
   - **Decisions needed:** who bears a shortfall or denial (a write-off, or a transfer to the patient). Binding a real payer's HTTP transport waits for a payer to be onboarded.
   - **Not yet:** assembling claims from billing's stored charges, keeping claims, and ExplanationOfBenefit.
+
+- **#126 follow-up: shortfalls go to the patient** (decided 2026-11-06). `shortfall_posting` moves each denied or under-approved amount from the coverage's receivable to the patient's. In the test, the payer pays 60 000 of 72 000, and the patient's 28 000 becomes 40 000.

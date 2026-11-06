@@ -17,12 +17,12 @@ Layer: **application** (coverage). Coverage for pricing and claims (#125).
   - **`snapshot(coverage, year, now)`:** what a facility caches to price estimates.
   - **`check_eligibility(payer, coverage, day, now)`:** asks the payer and keeps the answer. Offline, the kept answer stands, pending verification.
 - **`remittance_posting(remittance, coverage, facility, currency)`** (#126): payments in transit debited, `receivable/{coverage}` (which billing debits with each payer share) credited.
+- **`shortfall_posting(settled, facility, currency, at)`:** **the patient pays what the payer did not** (decided 2026-11-06). Each shortfall moves from `receivable/{coverage}` to `receivable/patient`, one line pair per charge. It gives `None` when the claim was paid in full.
 - **Not yet:**
   - syncing snapshots to facilities, and reading Coverages and Benefit Plans from FHIR Coverage and InsurancePlan, which needs the pinned local profile (ADR 0030);
   - posting the corrections (Reconciliation Records and adjustment postings, billing);
   - assembling claims from billing's stored charges, keeping claims, and ExplanationOfBenefit;
-  - who bears a shortfall or denial (a write-off, or a transfer to the patient), a policy to decide;
   - payer adapters (`health-integration`);
   - the HTTP API.
 
-Tests: `tests/remittance.rs` checks that a remittance clears the receivable through the ledger, once. `tests/central.rs` over SurrealDB covers a settlement kept and never taken in twice, concurrent settlements of one coverage all counting, and eligibility kept and pending offline. `tests/coverage.rs` covers an offline estimate corrected at claim time, central's own splits being final while running the accumulators on, and coverages in force needing their plans.
+Tests: `tests/remittance.rs` checks, through the ledger, that a remittance clears the receivable once and that the patient then owes the shortfall. `tests/central.rs` over SurrealDB covers a settlement kept and never taken in twice, concurrent settlements of one coverage all counting, and eligibility kept and pending offline. `tests/coverage.rs` covers an offline estimate corrected at claim time, central's own splits being final while running the accumulators on, and coverages in force needing their plans.
