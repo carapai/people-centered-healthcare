@@ -5,8 +5,10 @@
 //! - **Results** (with [`crate::RESULTS_REVIEW_PERMISSION`]): verified laboratory results on the
 //!   `clinician-results` worklist, linking their DiagnosticReport; `stat` when critical.
 //! - **Outstanding documentation:** the clinician's own unsigned notes (preliminary Compositions).
-//! - **Patient requests** (with `medications.prescribe` or `orders.request`): proposals from the
-//!   portal (`intent=proposal` MedicationRequests and ServiceRequests).
+//! - **Patient requests:** proposals from the portal (#114), to whoever may act on them:
+//!   refills (`intent=proposal` MedicationRequests) with `medications.prescribe`, care
+//!   (`intent=proposal` ServiceRequests) with `orders.request`, and appointments (`proposed`) with
+//!   `appointments.book`.
 //!
 //! Every item passes the policy decision point: one whose resource the clinician may not read is
 //! left out, as a read would be refused. Referrals and approvals join as their modules arrive.
@@ -112,22 +114,35 @@ async fn documentation(server: &FhirServer, subject: &Subject, tag: &str) -> Vec
         .collect()
 }
 
-async fn requests(server: &FhirServer, tag: &str) -> Vec<Item> {
+/// Whether `r` is a patient's proposal still waiting for staff.
+fn pending_proposal(r: &Value) -> bool {
+    if r["resourceType"] == "Appointment" {
+        r["status"] == "proposed"
+    } else {
+        r["intent"] == "proposal" && matches!(r["status"].as_str(), Some("active" | "draft"))
+    }
+}
+
+/// What a proposal asks for, as a person reads it.
+fn asked(proposal: &Value) -> Option<&str> {
+    let concept = match proposal["resourceType"].as_str() {
+        Some("MedicationRequest") => &proposal["medication"]["concept"],
+        Some("ServiceRequest") => &proposal["code"]["concept"],
+        _ => return proposal["description"].as_str(),
+    };
+    concept["text"]
+        .as_str()
+        .or_else(|| concept["coding"][0]["display"].as_str())
+}
+
+async fn requests(server: &FhirServer, tag: &str, types: &[&str]) -> Vec<Item> {
     let mut items = Vec::new();
-    for resource_type in ["MedicationRequest", "ServiceRequest"] {
+    for resource_type in types {
         for proposal in found(server, resource_type, &[("_tag", tag)])
             .await
             .iter()
-            .filter(|r| {
-                r["intent"] == "proposal"
-                    && matches!(r["status"].as_str(), Some("active" | "draft"))
-            })
+            .filter(|r| pending_proposal(r))
         {
-            let concept = if resource_type == "MedicationRequest" {
-                &proposal["medication"]["concept"]
-            } else {
-                &proposal["code"]["concept"]
-            };
             let (Some(patient), Some(id)) = (
                 proposal["subject"]["reference"].as_str(),
                 proposal["id"].as_str(),
@@ -136,16 +151,13 @@ async fn requests(server: &FhirServer, tag: &str) -> Vec<Item> {
             };
             items.push(Item {
                 kind: "request",
-                title: concept["text"]
-                    .as_str()
-                    .or_else(|| concept["coding"][0]["display"].as_str())
-                    .unwrap_or(resource_type)
-                    .to_owned(),
+                title: asked(proposal).unwrap_or(resource_type).to_owned(),
                 patient: patient.to_owned(),
                 reference: format!("{resource_type}/{id}"),
                 priority: "routine",
                 since: proposal["authoredOn"]
                     .as_str()
+                    .or_else(|| proposal["created"].as_str())
                     .unwrap_or_default()
                     .to_owned(),
             });
@@ -164,15 +176,20 @@ async fn inbox(State(server): State<FhirServer>, subject: Option<Extension<Subje
         items.extend(results(&server, &subject).await);
     }
     items.extend(documentation(&server, &subject, &tag).await);
-    if subject
-        .permissions
-        .has(crate::consultation::PRESCRIBE_PERMISSION)
-        || subject
-            .permissions
-            .has(crate::consultation::ORDER_PERMISSION)
-    {
-        items.extend(requests(&server, &tag).await);
-    }
+    // Patients' requests, to whoever may act on them.
+    let types: Vec<&str> = [
+        (
+            crate::consultation::PRESCRIBE_PERMISSION,
+            "MedicationRequest",
+        ),
+        (crate::consultation::ORDER_PERMISSION, "ServiceRequest"),
+        (crate::requests::BOOK_PERMISSION, "Appointment"),
+    ]
+    .into_iter()
+    .filter(|(permission, _)| subject.permissions.has(permission))
+    .map(|(_, resource_type)| resource_type)
+    .collect();
+    items.extend(requests(&server, &tag, &types).await);
     // The policy decision point decides each item as it would a read of its resource.
     let mut readable = Vec::new();
     for item in items {

@@ -146,6 +146,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Staff:** `requests_router()`, behind `subject_layer`, at their facility. Central nests it at `/api/requests`.
     - `POST /{type}/{id}/accept`: a refill is prescribed through medications and its safety checks (`medications.prescribe`), a care request becomes an order (`orders.request`), and an appointment is booked `{start, end}` (`appointments.book`). The order names the proposal in `basedOn`, has an id derived from it (so a retry writes it once), and closes it.
     - `POST /{type}/{id}/decline` `{reason}` needs any of those permissions.
+  - **Inbox:** each pending proposal is listed to whoever may act on it: refills with `medications.prescribe`, care with `orders.request`, and appointments with `appointments.book`.
 - **Payments (#254):** `with_payments(PaymentConfig)` and `payments_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/payments`.
   - **Permissions:** `payments.cash` (cashiers), `payments.supervise` (variance approval, statements, voids) and `payments.refund`.
   - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.

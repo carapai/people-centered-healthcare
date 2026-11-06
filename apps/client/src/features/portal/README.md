@@ -9,11 +9,13 @@ The patient portal (patient-portal.md; ADR 0029; #111), at `/portal`, central on
   - waiting for review, with **Check again**;
   - registered, seeing only what the patient submitted;
   - linked to their health record (`level3`, after an in-person ID check).
+- **Your requests** (#114): once registration is complete, the patient's requests and the form to make one (`features/requests`).
 - **People you care for** (#113): a caregiver's dependents, until when, and a note when a young person's sensitive records stay private to them, with a refresh button.
 - **On the server:** `/api/portal/registration` (`health-fhir-server`'s `portal_router`) decides everything. The screen enforces nothing.
-- **Not yet:** the portal's own UX (fog in patient-portal.md), requests, appointments and records.
+- **Not yet:** the portal's own UX (fog in patient-portal.md), a list of appointments, and records.
 
 ## Tests
 
 - `test/portal.test.ts`: the API, the answers as a QuestionnaireResponse, and the portal's separate session.
 - `e2e/portal.spec.ts`: phone sign-in through the development code outbox, a new patient registering, and a lookalike linked by a reviewer after an in-person check, with axe on each screen.
+- `e2e/requests.spec.ts`: a patient's request from the portal, accepted by a clinician (see `features/requests`).

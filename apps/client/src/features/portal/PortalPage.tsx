@@ -7,6 +7,7 @@ import { useIntl } from 'react-intl'
 import { messages } from '../../i18n/messages'
 import type { Portal } from '../../platform/types'
 import { dependentsQuery, type Dependent } from '../caregivers/api'
+import { MyRequests } from '../requests/MyRequests'
 import { REGISTRATION, canSubmit, registrationQuery, submitRegistration, type Answers, type Registration } from './api'
 
 const button = css({
@@ -116,6 +117,9 @@ export function PortalPage({ portal }: { portal: Portal }) {
           ) : null}
         </form>
       )}
+      {signedIn && registration.data?.status === 'completed' && registration.data.patient !== null ? (
+        <MyRequests transport={portal.transport} patient={registration.data.patient.startsWith('Patient/') ? registration.data.patient : `Patient/${registration.data.patient}`} full={registration.data.access === 'records'} />
+      ) : null}
       {signedIn && dependents.data !== undefined && dependents.data.length > 0 ? <Dependents list={dependents.data} /> : null}
       {signedIn ? (
         <button type="button" className={button} disabled={dependents.isFetching} onClick={() => void dependents.refetch()}>

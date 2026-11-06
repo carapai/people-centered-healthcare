@@ -854,3 +854,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Where:** `health-patient-engagement` `requests` (domain), `health-patient-engagement-app` `requests`, and fhir-server `requests.rs` (portal `/requests`, `/prescriptions`; staff `/api/requests`).
   - **Also:** the e2e specs now use random patient names, so repeats don't register near-duplicates the registry offers as matches. The reception spec looks only at its own queue entry.
   - **Next (part 2):** the portal screens, staff accept and decline in the inbox, and the e2e test.
+
+- **#114 part 2: the requests screens.** This completes #114.
+  - **Portal:** "Your requests" lists the patient's requests and their state. Patients ask for care or an appointment at a facility, or with `level3` access a refill, and may withdraw a pending request.
+  - **Staff:** the record page an inbox item opens has accept (an appointment needs its time; a refill's safety warnings are acknowledged) and decline with a reason.
+  - **Inbox:** appointment proposals now go to whoever has `appointments.book`.
+  - **e2e:** `requests.spec.ts` checks that no patient request becomes an order without staff action.
+  - **Decision:** the patient types the facility code, since there is no facility directory yet.
