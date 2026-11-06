@@ -15,10 +15,14 @@ workspace = true
 
 [dependencies]
 health-coverage = { workspace = true }
+health-persistence = { workspace = true }
 health-pricing = { workspace = true }
+health-time = { workspace = true }
 jiff = { workspace = true }
 rust_decimal = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-health-time = { workspace = true }
+health-surrealdb = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }

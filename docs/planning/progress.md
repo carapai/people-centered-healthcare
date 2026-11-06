@@ -900,3 +900,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Application:** `health-coverage-app`'s `pricing_terms` builds pricing's stage-4 terms. `settle_claim` re-prices estimated charges in service order from central's accumulators and returns the corrections and the accumulators after.
   - **Pricing:** lines record each coverage's deductible.
   - **Next:** storage of coverages and accumulators at central, snapshot sync, posting the corrections, claims, payer adapters and the HTTP API.
+
+- **#125 part 2: coverage storage at central.** This completes #125's scope; claims and payer adapters are #126.
+  - **Storage:** migration `0036_coverage` holds central's accumulators per coverage and year, which guard each settlement, and each coverage's latest eligibility, behind `CoverageStore`.
+  - **Use cases:** `Coverages::settle` is one transaction, rerun on conflict, and never takes a charge in twice. `snapshot` is what a facility caches. `check_eligibility` keeps the payer's answer, which stands pending verification offline.
+  - **Tests:** four concurrent settlements of one coverage: the deductible is taken once, and every payment counts.
+  - **Waiting:** FHIR Coverage and InsurancePlan mapping needs the pinned local profile (ADR 0030). Snapshot sync waits for sync.
