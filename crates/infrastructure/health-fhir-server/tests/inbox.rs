@@ -11,9 +11,9 @@ use axum::{Extension, Router};
 use health_access_policy::{FACILITY_TAG_SYSTEM, Pdp, Permissions, Subject};
 use health_fhir_search::{Catalog, ParamState, Registry, Unrestricted};
 use health_fhir_server::{
-    CHECK_IN_PERMISSION, DOCUMENT_PERMISSION, FacilityTag, FhirServer, LAB_VERIFY_PERMISSION,
-    LAB_WORK_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION, RESULTS_REVIEW_PERMISSION,
-    WorkflowConfig,
+    APPOINTMENTS_BOOK_PERMISSION, CHECK_IN_PERMISSION, DOCUMENT_PERMISSION, FacilityTag,
+    FhirServer, LAB_VERIFY_PERMISSION, LAB_WORK_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION,
+    RESULTS_REVIEW_PERMISSION, WorkflowConfig,
 };
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::SystemClock;
@@ -32,7 +32,12 @@ fn registry() -> Registry {
     ];
     let catalog = Catalog::from_definitions(definitions.iter());
     let mut registry = Registry::new(jiff::tz::Offset::UTC);
-    for base in ["Composition", "MedicationRequest", "ServiceRequest"] {
+    for base in [
+        "Appointment",
+        "Composition",
+        "MedicationRequest",
+        "ServiceRequest",
+    ] {
         registry
             .support(&catalog, base, "_tag", ParamState::Active)
             .expect("_tag");
@@ -248,6 +253,16 @@ async fn setup(server: &FhirServer) {
         "subject": { "reference": format!("Patient/{PATIENT}") }, "authoredOn": "2026-11-05T08:00:00Z"
     }))
     .await;
+    let visit = "0190f1a2-7c3d-7e4f-8a5b-000000000e02";
+    put(server, &format!("/Appointment/{visit}"), json!({
+        "resourceType": "Appointment", "id": visit, "status": "proposed",
+        "meta": { "tag": [{ "system": FACILITY_TAG_SYSTEM, "code": "KAM013" }] },
+        "description": "Diabetes review",
+        "subject": { "reference": format!("Patient/{PATIENT}") },
+        "participant": [{ "actor": { "reference": format!("Patient/{PATIENT}") }, "status": "accepted" }],
+        "created": "2026-11-05T09:00:00Z"
+    }))
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -311,6 +326,32 @@ async fn the_inbox_links_each_item_to_its_authoritative_resource() {
         "my draft, not my signed note nor a colleague's draft"
     );
     assert_eq!(items[2]["title"], "Metformin 500 mg");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn appointment_requests_go_to_whoever_books() {
+    let (setup_server, server) = servers().await;
+    setup(&setup_server).await;
+    let booker = server.inbox_router().layer(subject(
+        "booker-1",
+        "KAM013",
+        &["*.rs", APPOINTMENTS_BOOK_PERMISSION],
+    ));
+    let (_, inbox) = call(&booker, Method::GET, "/", None).await;
+    let items = inbox.as_array().cloned().unwrap_or_default();
+    assert_eq!(items.len(), 1, "only the appointment request: {inbox}");
+    assert_eq!(
+        (
+            items[0]["kind"].as_str(),
+            items[0]["title"].as_str(),
+            items[0]["reference"].as_str()
+        ),
+        (
+            Some("request"),
+            Some("Diabetes review"),
+            Some("Appointment/0190f1a2-7c3d-7e4f-8a5b-000000000e02")
+        )
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

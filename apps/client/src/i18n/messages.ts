@@ -1183,3 +1183,88 @@ export const inboxMessages = defineMessages<InboxValues>({
   ibRaw: { id: 'app.inbox.raw', defaultMessage: 'The full record', description: 'Record: the raw resource' },
 })
 
+
+type RequestValues = {
+  rqTitle: {}
+  rqNone: {}
+  rqLoadFailed: {}
+  rqRefresh: {}
+  rqKind: { kind: string }
+  rqState: { state: string }
+  rqReasonGiven: { reason: string }
+  rqWithdraw: { title: string }
+  rqAsk: {}
+  rqWhatKind: {}
+  rqPrescription: {}
+  rqNoPrescriptions: {}
+  rqWhat: {}
+  rqFor: {}
+  rqFacility: {}
+  rqFacilityHint: {}
+  rqPreferred: {}
+  rqNote: {}
+  rqSend: {}
+  rqSent: {}
+  rqFailed: { reason: string }
+  rqStaffTitle: {}
+  rqStart: {}
+  rqEnd: {}
+  rqAccept: {}
+  rqWarnings: {}
+  rqAcceptAnyway: {}
+  rqDeclineReason: {}
+  rqDecline: {}
+  rqAccepted: {}
+  rqDeclined: {}
+}
+
+// Patients' requests (#114): the portal's, and staff's accept and decline (features/requests).
+export const requestMessages = defineMessages<RequestValues>({
+  rqTitle: { id: 'app.requests.title', defaultMessage: 'Your requests', description: 'Portal: heading of the patient’s requests' },
+  rqNone: { id: 'app.requests.none', defaultMessage: 'You have not asked for anything yet.', description: 'Portal: no requests' },
+  rqLoadFailed: { id: 'app.requests.loadFailed', defaultMessage: 'Your requests could not be loaded.', description: 'Portal: requests failed to load' },
+  rqRefresh: { id: 'app.requests.refresh', defaultMessage: 'Check for updates', description: 'Portal action: reload the patient’s requests' },
+  rqKind: {
+    id: 'app.requests.kind',
+    defaultMessage: '{kind, select, refill {Prescription refill} care {Test or other care} appointment {Appointment} other {Request}}',
+    description: 'The kind of a patient request',
+  },
+  rqState: {
+    id: 'app.requests.state',
+    defaultMessage: '{state, select, pending {Waiting for staff} accepted {Accepted} other {Closed}}',
+    description: 'Where a patient request is',
+  },
+  rqReasonGiven: { id: 'app.requests.reasonGiven', defaultMessage: 'Reason: {reason}', description: 'Why a request was declined or withdrawn' },
+  rqWithdraw: { id: 'app.requests.withdraw', defaultMessage: 'Withdraw {title}', description: 'Portal action: withdraw a pending request' },
+  rqAsk: { id: 'app.requests.ask', defaultMessage: 'Ask for something', description: 'Portal: heading of the request form' },
+  rqWhatKind: { id: 'app.requests.whatKind', defaultMessage: 'What do you need?', description: 'Portal: the kind of request' },
+  rqPrescription: { id: 'app.requests.prescription', defaultMessage: 'Prescription to refill', description: 'Portal: the prescription to refill' },
+  rqNoPrescriptions: {
+    id: 'app.requests.noPrescriptions',
+    defaultMessage: 'There is no prescription you can ask a refill of.',
+    description: 'Portal: no refillable prescriptions',
+  },
+  rqWhat: { id: 'app.requests.what', defaultMessage: 'What you need', description: 'Portal: what test or care is asked for' },
+  rqFor: { id: 'app.requests.for', defaultMessage: 'What the appointment is for', description: 'Portal: an appointment’s reason' },
+  rqFacility: { id: 'app.requests.facility', defaultMessage: 'Facility code', description: 'Portal: the facility asked' },
+  rqFacilityHint: {
+    id: 'app.requests.facilityHint',
+    defaultMessage: 'The code on your clinic card, such as KAM013.',
+    description: 'Portal: hint for the facility code',
+  },
+  rqPreferred: { id: 'app.requests.preferred', defaultMessage: 'Preferred day (optional)', description: 'Portal: an appointment’s preferred day' },
+  rqNote: { id: 'app.requests.note', defaultMessage: 'Anything else (optional)', description: 'Portal: a note with the request' },
+  rqSend: { id: 'app.requests.send', defaultMessage: 'Send request', description: 'Portal action: send a request' },
+  rqSent: { id: 'app.requests.sent', defaultMessage: 'Your request was sent. Staff will look at it.', description: 'Portal: a request was sent' },
+  rqFailed: { id: 'app.requests.failed', defaultMessage: 'That did not work. {reason}', description: 'A request action failed, with the server’s reason' },
+  rqStaffTitle: { id: 'app.requests.staffTitle', defaultMessage: 'Patient request', description: 'Record: heading of the accept and decline controls' },
+  rqStart: { id: 'app.requests.start', defaultMessage: 'Appointment starts', description: 'Record: a booking’s start' },
+  rqEnd: { id: 'app.requests.end', defaultMessage: 'Appointment ends', description: 'Record: a booking’s end' },
+  rqAccept: { id: 'app.requests.accept', defaultMessage: 'Accept', description: 'Record action: accept a patient request' },
+  rqWarnings: { id: 'app.requests.warnings', defaultMessage: 'Safety warnings to acknowledge:', description: 'Record: the safety warnings of a refill' },
+  rqAcceptAnyway: { id: 'app.requests.acceptAnyway', defaultMessage: 'Accept despite the warnings', description: 'Record action: accept, acknowledging warnings' },
+  rqDeclineReason: { id: 'app.requests.declineReason', defaultMessage: 'Reason for declining', description: 'Record: why a request is declined' },
+  rqDecline: { id: 'app.requests.decline', defaultMessage: 'Decline', description: 'Record action: decline a patient request' },
+  rqAccepted: { id: 'app.requests.accepted', defaultMessage: 'Request accepted.', description: 'Record: a request was accepted' },
+  rqDeclined: { id: 'app.requests.declined', defaultMessage: 'Request declined.', description: 'Record: a request was declined' },
+})
