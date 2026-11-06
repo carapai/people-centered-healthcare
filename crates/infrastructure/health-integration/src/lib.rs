@@ -12,6 +12,10 @@
 //! and purge is audited in the same transaction. Entries are purged when their integration's
 //! retention ends (90 days by default). At rest they are protected like the rest of the node's
 //! data: full-disk encryption and encrypted backups (security.md).
+//!
+//! [`payers`] holds the outbound payer adapters (#126).
+
+pub mod payers;
 
 use std::future::Future;
 use std::sync::Arc;

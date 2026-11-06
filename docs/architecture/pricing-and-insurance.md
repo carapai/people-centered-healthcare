@@ -96,3 +96,4 @@ sequenceDiagram
 - **Preauthorization** is a Claim with `use=preauthorization`. A financial gate can require an approved preauthorization (billing-and-payments.md).
 - **Denials** are a ClaimResponse outcome. **Appeals** are resubmissions referencing the original.
 - **Government and donor funding** are funding sources with their own "payer" records. Their claims are reports or exports, not payer adjudication.
+- **Code** (#126): `health-coverage::claims` (assembly, adjudication, appeals, `ClaimPayer`), `health-integration::payers` (`FhirPayer` over a `PayerTransport`, `ExportPayer`), and `health-coverage-app::remittance_posting`.

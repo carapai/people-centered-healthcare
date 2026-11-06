@@ -11,7 +11,14 @@ Layer: **domain** (coverage). Coverage (pricing-and-insurance.md § Records, § 
 - **Eligibility:**
   - `check(payer, coverage, day, cached, now)` asks the payer through the **`Payer` port**. There is one adapter per payer in `health-integration`.
   - If the payer cannot be reached, the cached answer stands, marked `PendingVerification`; `Eligibility::age` is its age.
+- **Claims** (`claims`, #126). No national payer or claim format is assumed.
+  - **`assemble(ClaimFor, charges, at)`:** a claim (or preauthorization) per coverage, of the charges it pays part of, in service order. Each item claims the coverage's share.
+  - **`Claim::submitted`** records the payer's reference.
+  - **`Claim::adjudicate(Adjudication)`** settles the claim: approved, partial or denied. It returns what was approved and each item's `Shortfall` with the payer's reason. An adjudication approving more than was claimed is refused.
+  - **`Claim::appeal`** is a new draft of what was not paid, naming the original.
+  - **`Remittance`** is what the payer paid.
+  - **`ClaimPayer`** is the port the adapters in `health-integration` implement.
 - **`CoverageStore`:** the port for central's accumulators (keyed by coverage and year) and each coverage's latest eligibility. An accumulator remembers the charges it took in.
 - **`corrections(estimated, actual)`:** the difference in each line's split, by coverage. Each is a Reconciliation Record and a patient-share adjustment.
 
-Tests: coverages in force and in order, central's terms final and a facility's estimated, offline eligibility, and corrections.
+Tests: claim assembly, adjudication in full, in part and denied, appeals, coverages in force and in order, central's terms final and a facility's estimated, offline eligibility, and corrections.

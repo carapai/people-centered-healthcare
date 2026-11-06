@@ -48,3 +48,21 @@ The `inbound` table (`health-surrealdb` migration `0005_inbound`) is owned by th
 - a dead letter replays with a correction, and a resolved entry cannot be replayed twice;
 - discard;
 - per-integration retention, with the purge audited.
+
+## Payer adapters (#126)
+
+`payers` implements `health-coverage`'s `Payer` and `ClaimPayer` ports. No national payer or claim format is assumed.
+
+- **`FhirPayer`:** for a payer that speaks FHIR R5, over a `PayerTransport` (the payer's HTTP API, bound to an HTTP client when a payer is onboarded).
+  - **Eligibility:** a `CoverageEligibilityRequest`, answered by `insurance.inforce`.
+  - **Claims:** a `Claim` is POSTed. An appeal names the original in `related`, and decimals are JSON numbers.
+  - **Responses:** the `ClaimResponse` is read back by `request`. Item `benefit` adjudication gives the approved amounts, `outcome: error` is a denial, and `queued` means not yet adjudicated.
+  - **Errors:** an unreachable payer is `PayerError::Unreachable`, so eligibility falls back to pending verification. A non-2xx answer is `Refused` with the payer's diagnostics.
+- **`ExportPayer`:** for government and donor funding, whose claims are reports. Each claim is written to an `Export` as CSV, and its adjudication is recorded by hand.
+
+`tests/payers.rs` holds the **contract tests against mocks**:
+- approval in full, in part and denied;
+- queued, unreachable and refused;
+- the Claim and an appeal are structurally valid R5;
+- eligibility, including the offline fallback;
+- the export.
