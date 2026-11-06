@@ -32,6 +32,7 @@ import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
 import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
 import { Route as StockIndexRouteImport } from './routes/stock.index'
+import { Route as StockProductsRouteImport } from './routes/stock.products'
 import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
 import { Route as TillIndexRouteImport } from './routes/till.index'
@@ -153,6 +154,11 @@ const StockIndexRoute = StockIndexRouteImport.update({
   path: '/stock/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StockProductsRoute = StockProductsRouteImport.update({
+  id: '/stock/products',
+  path: '/stock/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StockReceiveRoute = StockReceiveRouteImport.update({
   id: '/stock/receive',
   path: '/stock/receive',
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
+  '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
+    | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
+    | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
+    | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
     | '/till/supervise'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   PortalCallbackRoute: typeof PortalCallbackRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
+  StockProductsRoute: typeof StockProductsRoute
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
@@ -557,6 +570,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StockIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/stock/products': {
+      id: '/stock/products'
+      path: '/stock/products'
+      fullPath: '/stock/products'
+      preLoaderRoute: typeof StockProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stock/receive': {
       id: '/stock/receive'
       path: '/stock/receive'
@@ -616,6 +636,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortalCallbackRoute: PortalCallbackRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
+  StockProductsRoute: StockProductsRoute,
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
   TillSuperviseRoute: TillSuperviseRoute,

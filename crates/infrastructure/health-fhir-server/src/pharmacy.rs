@@ -6,7 +6,8 @@
 //!   ([`prescribe`]): the patient's open prescriptions and current allergies go to the clinical
 //!   safety checks first. Unacknowledged warnings answer 409 with `warnings`, and nothing is
 //!   written; the prescriber sends the order again with `acknowledge: true`.
-//! - `GET /worklist` needs [`VIEW_PERMISSION`]: the facility's open prescriptions, oldest first.
+//! - `GET /worklist` needs [`VIEW_PERMISSION`]: the facility's open prescriptions, oldest first,
+//!   each with the stock `product` it resolves to in the product master.
 //! - `POST /prescriptions/{id}/status` `{status}` needs `medications.prescribe`: hold, resume,
 //!   stop, cancel or complete a prescription of this facility.
 //! - Dispensing (#128): preparing, completing and cancelling a dispense (see `dispensing`).
@@ -131,7 +132,15 @@ async fn worklist_route(
     };
     let tag = format!("{FACILITY_TAG_SYSTEM}|{}", subject.facility);
     let requests = found(&server, "MedicationRequest", &[("_tag", &tag)]).await;
-    Json(worklist(&requests, &subject.facility)).into_response()
+    let mut entries = Vec::new();
+    for prescription in worklist(&requests, &subject.facility) {
+        // The stock product it is dispensed as, from the product master (#128 follow-up).
+        let product = crate::dispensing::product_for(&server, &prescription.medicine).await;
+        let mut entry = serde_json::to_value(&prescription).unwrap_or_default();
+        entry["product"] = serde_json::to_value(&product).unwrap_or_default();
+        entries.push(entry);
+    }
+    Json(entries).into_response()
 }
 
 #[derive(Deserialize)]

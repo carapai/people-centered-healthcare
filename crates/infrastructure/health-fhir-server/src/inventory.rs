@@ -9,7 +9,10 @@
 //! - `GET /requisitions?store=`: the requisitions a store asked for or was asked, newest first;
 //! - `POST /requisitions`, `POST /requisitions/{id}/decision`: a ward's requisition, and the
 //!   pharmacy's approval or refusal;
-//! - `POST /requisitions/{id}/fulfil`: the batches picked, dispatched as a transfer to the ward.
+//! - `POST /requisitions/{id}/fulfil`: the batches picked, dispatched as a transfer to the ward;
+//! - `GET /products`, `POST /products` `{id?, code, name, baseUnit, packSizes, synonyms?,
+//!   medicines?, gtin?, active?}`: the product master (#128 follow-up), each product a Medication,
+//!   its code unique and unchanging.
 
 use std::str::FromStr;
 
@@ -417,6 +420,111 @@ impl FhirServer {
             .route("/requisitions", get(requisitions).post(requisition))
             .route("/requisitions/{id}/decision", post(decide))
             .route("/requisitions/{id}/fulfil", post(fulfil))
+            .route("/products", get(list_products).post(save_product))
             .with_state(self.clone())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProductBody {
+    id: Option<String>,
+    code: String,
+    name: String,
+    base_unit: String,
+    #[serde(default)]
+    pack_sizes: Vec<u32>,
+    #[serde(default)]
+    synonyms: Vec<String>,
+    #[serde(default)]
+    medicines: Vec<health_product_registry::Coding>,
+    #[serde(default)]
+    gtin: Option<String>,
+    #[serde(default = "active")]
+    active: bool,
+}
+
+fn active() -> bool {
+    true
+}
+
+fn product_json(id: &str, product: &health_product_registry::Product) -> Value {
+    json!({
+        "id": id, "code": product.code, "name": product.name, "baseUnit": product.base_unit,
+        "packSizes": product.pack_sizes, "synonyms": product.synonyms, "medicines": product.medicines,
+        "gtin": product.gtin, "active": product.active,
+    })
+}
+
+async fn list_products(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+) -> Response {
+    if let Err(response) = staff(subject) {
+        return *response;
+    }
+    let mut list: Vec<Value> = crate::programs::found(&server, "Medication", &[])
+        .await
+        .iter()
+        .filter_map(|m| {
+            let product = health_product_registry_app::product(m)?;
+            Some(product_json(m["id"].as_str()?, &product))
+        })
+        .collect();
+    list.sort_by(|a, b| a["code"].as_str().cmp(&b["code"].as_str()));
+    Json(list).into_response()
+}
+
+async fn save_product(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Json(body): Json<ProductBody>,
+) -> Response {
+    if let Err(response) = staff(subject) {
+        return *response;
+    }
+    let id = match body
+        .id
+        .as_deref()
+        .map(str::parse::<health_identifiers::ResourceId>)
+    {
+        Some(Ok(id)) => id,
+        Some(Err(_)) => return refused(StatusCode::BAD_REQUEST, "the id is a UUIDv7 (ADR 0013)"),
+        None => health_identifiers::ResourceId::new(),
+    };
+    let product = health_product_registry::Product {
+        code: body.code.trim().to_owned(),
+        name: body.name.trim().to_owned(),
+        gtin: body
+            .gtin
+            .map(|g| g.trim().to_owned())
+            .filter(|g| !g.is_empty()),
+        base_unit: body.base_unit.trim().to_owned(),
+        pack_sizes: body.pack_sizes,
+        medicines: body.medicines,
+        synonyms: body
+            .synonyms
+            .iter()
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect(),
+        active: body.active,
+    };
+    match health_product_registry_app::Products::new(server.store.clone())
+        .save(id, &product)
+        .await
+    {
+        Ok(()) => (
+            StatusCode::CREATED,
+            Json(product_json(&id.to_string(), &product)),
+        )
+            .into_response(),
+        Err(health_product_registry_app::ProductError::Store(_)) => {
+            refused(StatusCode::SERVICE_UNAVAILABLE, "try again")
+        }
+        Err(error @ health_product_registry_app::ProductError::Conflict) => {
+            refused(StatusCode::CONFLICT, &error.to_string())
+        }
+        Err(error) => refused(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string()),
     }
 }

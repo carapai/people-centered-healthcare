@@ -2578,6 +2578,8 @@ dependencies = [
  "health-persistence",
  "health-pricing",
  "health-pricing-app",
+ "health-product-registry",
+ "health-product-registry-app",
  "health-programs",
  "health-programs-app",
  "health-registries-app",
@@ -2990,6 +2992,30 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "health-product-registry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "health-product-registry-app"
+version = "0.1.0"
+dependencies = [
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-product-registry",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

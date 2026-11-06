@@ -1,0 +1,18 @@
+[package]
+name = "health-product-registry"
+description = "The product master (resource-ownership.md: product-registry; inventory-and-procurement.md § Records): each stock product's identity, GTIN, base unit and pack sizes, and the medicines it fills, so a prescription resolves to the stock product dispensed."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "product-registry"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }

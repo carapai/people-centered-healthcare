@@ -89,6 +89,9 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - `POST /prescriptions/{id}/prepare` `{dispense, store, product, quantity, batches?, reason?}` reserves stock for one of the facility's active prescriptions. Batches are chosen by first expiry, or by the pharmacist's `batches` with a `reason`. The patient's active programs (EpisodeOfCare type codes) decide donor eligibility under `with_dispensing(Dispensing)`, which defaults to no rules and a 30-day buffer. The `preparation` MedicationDispense is written in the same transaction.
     - `POST /dispenses/{id}/complete` `{given?}` hands over in full, or by reservation in part. The dispense movements, `inventory.dispensed.v1` and the `completed` MedicationDispense are one transaction.
     - `POST /dispenses/{id}/cancel` frees the reservations, and the dispense is `cancelled`. `GET /dispenses/{id}` gives its reservations.
+  - **The product master (#128 follow-up):**
+    - Each worklist entry carries the stock `product` its medicine resolves to (`health-product-registry::resolve`), by code, then by name.
+    - `prepare` without a `product` uses it. An ambiguous or unknown medicine is refused (422) for the pharmacist to name one.
 - **Clinical notes (#107):** `notes_router()`, behind `subject_layer`, with `consultation.document`, for the session's facility. Central nests it at `/api/notes`.
   - **Routes:**
     - `POST /notes` `{id, kind, patient, encounter?, sections}`: a draft;

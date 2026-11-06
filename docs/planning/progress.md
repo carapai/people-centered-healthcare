@@ -914,3 +914,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Tests:** the contract tests against mocks found decimals sent as JSON strings; they are now numbers.
   - **Decisions needed:** who bears a shortfall or denial (a write-off, or a transfer to the patient). Binding a real payer's HTTP transport waits for a payer to be onboarded.
   - **Not yet:** assembling claims from billing's stored charges, keeping claims, and ExplanationOfBenefit.
+
+- **Product master (#128 follow-up; decided 2026-11-06).**
+  - **Domain:** `health-product-registry`: `Product` (code, name, GTIN with check digit, base unit, pack sizes, medicine codings, synonyms) and `resolve`, which matches by code, then by name or synonym, and reports when it is ambiguous or unknown.
+  - **Application:** `health-product-registry-app` stores products as FHIR Medication. `Products::save` keeps a code unique (by guard) and unchanging.
+  - **HTTP:** `/api/stock/products`. The pharmacy worklist resolves each prescription's product, and prepare uses it when none is named.
+  - **Client:** Products page under Stock. The pharmacist's product field is now filled in from the product master.
+  - **e2e:** `dispensing.spec.ts` adds the product on the Products page, and checks that it is filled in.

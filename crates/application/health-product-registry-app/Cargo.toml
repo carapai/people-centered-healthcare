@@ -1,0 +1,28 @@
+[package]
+name = "health-product-registry-app"
+description = "The product master as FHIR R5 Medication resources (#128 follow-up): each stock product's code, GTIN, base unit, pack sizes, medicine codes and synonyms, read and written."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "product-registry"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-product-registry = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+health-fhir-validation = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+surrealdb = { workspace = true, features = ["kv-mem"] }
+tokio = { workspace = true }
