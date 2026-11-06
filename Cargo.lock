@@ -2428,6 +2428,7 @@ name = "health-coverage-app"
 version = "0.1.0"
 dependencies = [
  "health-coverage",
+ "health-financial-ledger",
  "health-persistence",
  "health-pricing",
  "health-surrealdb",
@@ -2699,6 +2700,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "health-audit",
+ "health-coverage",
  "health-fhir-search",
  "health-fhir-server",
  "health-fhir-validation",
@@ -2707,6 +2709,7 @@ dependencies = [
  "health-time",
  "http-body-util",
  "jiff",
+ "rust_decimal",
  "serde_json",
  "surrealdb",
  "thiserror",

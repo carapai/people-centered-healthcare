@@ -15,6 +15,7 @@ workspace = true
 
 [dependencies]
 health-coverage = { workspace = true }
+health-financial-ledger = { workspace = true }
 health-persistence = { workspace = true }
 health-pricing = { workspace = true }
 health-time = { workspace = true }

@@ -906,3 +906,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Use cases:** `Coverages::settle` is one transaction, rerun on conflict, and never takes a charge in twice. `snapshot` is what a facility caches. `check_eligibility` keeps the payer's answer, which stands pending verification offline.
   - **Tests:** four concurrent settlements of one coverage: the deductible is taken once, and every payment counts.
   - **Waiting:** FHIR Coverage and InsurancePlan mapping needs the pinned local profile (ADR 0030). Snapshot sync waits for sync.
+
+- **#126: claims and payer adapters.**
+  - **Domain:** `health-coverage::claims` assembles claims per coverage in service order. It adjudicates them (approved, partial or denied, with each shortfall and the payer's reason), makes appeals that name the original, and defines the `ClaimPayer` port.
+  - **Adapters:** `health-integration::payers` has `FhirPayer` (Claim, ClaimResponse and CoverageEligibilityRequest over a `PayerTransport`) and `ExportPayer` (CSV reports for government and donor funding). There is no NHIS assumption.
+  - **Postings:** `health-coverage-app::remittance_posting` clears the coverage's receivable.
+  - **Tests:** the contract tests against mocks found decimals sent as JSON strings; they are now numbers.
+  - **Decisions needed:** who bears a shortfall or denial (a write-off, or a transfer to the patient). Binding a real payer's HTTP transport waits for a payer to be onboarded.
+  - **Not yet:** assembling claims from billing's stored charges, keeping claims, and ExplanationOfBenefit.

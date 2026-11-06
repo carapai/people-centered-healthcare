@@ -13,8 +13,12 @@
 //! - **Correction at claim time** ([`corrections`]): central re-prices the estimated charges with
 //!   its own accumulators, and each difference in a line's split is a [`Correction`]: a
 //!   Reconciliation Record, and an adjustment of the patient's share.
+//! - **[`claims`]** (#126): claim assembly, adjudication, appeals and remittance, and the
+//!   [`claims::ClaimPayer`] port.
 //! - **[`CoverageStore`]**: the persistence port, central's accumulators and each coverage's
 //!   cached eligibility, inside a store transaction.
+
+pub mod claims;
 
 use std::collections::BTreeSet;
 use std::future::Future;
