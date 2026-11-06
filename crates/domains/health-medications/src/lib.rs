@@ -114,6 +114,9 @@ pub struct Prescription {
     pub prescriber: String,
     /// When.
     pub authored: Timestamp,
+    /// The request it fulfils, such as a patient's refill proposal (#114).
+    #[serde(default)]
+    pub based_on: Option<String>,
 }
 
 /// What a prescription names.
@@ -137,6 +140,8 @@ pub struct Prescribe {
     pub prescriber: String,
     /// When.
     pub at: Timestamp,
+    /// The request it fulfils, if any.
+    pub based_on: Option<String>,
 }
 
 /// What happened to a prescription, on the outbox.
@@ -225,6 +230,7 @@ pub fn prescribe(
         status: PrescriptionStatus::Active,
         prescriber: request.prescriber.clone(),
         authored: request.at,
+        based_on: request.based_on.clone(),
     };
     let event = MedicationEvent::Prescribed {
         prescription: prescription.id.clone(),

@@ -77,6 +77,7 @@ mod questionnaires;
 mod reception;
 mod references;
 mod registry;
+mod requests;
 mod search;
 mod summary;
 mod terminology;
@@ -128,6 +129,7 @@ pub use reception::{
 };
 pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
+pub use requests::BOOK_PERMISSION as APPOINTMENTS_BOOK_PERMISSION;
 pub use search::CURSOR;
 pub use terminology::ActiveTerminology;
 pub use validation::{ActiveProfiles, Profiles};

@@ -847,3 +847,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Cause:** every clone of the SDK handle attaches a server session. Every `Connection` or `SurrealStore` clone held one for good, and each transaction opened another. Together they passed SurrealDB's 256 sessions per WebSocket.
   - **Fix:** `Connection` shares one session across its clones. Transactions borrow pooled sessions, at most 128 at once, and wait beyond that.
   - **Test:** `tests/remote_concurrency.rs`, 320 concurrent transactions, now runs in the e2e job against the real server.
+
+- **#114 part 1: patient requests.** A patient's request is a proposal, never an order (§60).
+  - **Proposals:** a refill (MedicationRequest `intent=proposal`), a test or other care (ServiceRequest `intent=proposal`), or an appointment (Appointment `proposed`). Each is tagged `patient-reported`, and only for a Patient the account is linked to.
+  - **Staff:** accepting writes the prescription (through medications' safety checks), the order or the booking `basedOn` the proposal, and closes it. Declining needs a reason. The patient may withdraw while it is pending.
+  - **Where:** `health-patient-engagement` `requests` (domain), `health-patient-engagement-app` `requests`, and fhir-server `requests.rs` (portal `/requests`, `/prescriptions`; staff `/api/requests`).
+  - **Also:** the e2e specs now use random patient names, so repeats don't register near-duplicates the registry offers as matches. The reception spec looks only at its own queue entry.
+  - **Next (part 2):** the portal screens, staff accept and decline in the inbox, and the e2e test.

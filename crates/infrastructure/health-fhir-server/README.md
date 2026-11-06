@@ -137,6 +137,15 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **Routes:** `POST /check-in` `{id, patient, servicePoint, class?}` (the id a client UUIDv7, the patient one that exists); `POST /encounters/{id}/move` `{servicePoint}`; `POST /encounters/{id}/status` `{status}`; `GET /queues/{servicePoint}`; `POST /queue/{entry}/{call|serve|recall|finish|leave}`.
   - **Facilities:** service points are named per facility (`KAM013/triage`), so one facility never sees or steps another's queue.
   - **Patient-flow:** each encounters step is followed into the queues at once, until in-process event dispatch delivers the outbox events. A retried follow-up changes nothing.
+- **Patient requests (#114; §60):** a request never becomes an order without staff action.
+  - **Patients:** `patient_requests_router()`, behind `health_auth::patient_layer`, is merged into the portal API.
+    - `GET /requests` lists their requests.
+    - `GET /prescriptions` lists the prescriptions they may ask a refill of (`level3` only).
+    - `POST /requests` makes a refill, care or appointment proposal.
+    - `POST /requests/{type}/{id}/withdraw` withdraws one while it is pending.
+  - **Staff:** `requests_router()`, behind `subject_layer`, at their facility. Central nests it at `/api/requests`.
+    - `POST /{type}/{id}/accept`: a refill is prescribed through medications and its safety checks (`medications.prescribe`), a care request becomes an order (`orders.request`), and an appointment is booked `{start, end}` (`appointments.book`). The order names the proposal in `basedOn`, has an id derived from it (so a retry writes it once), and closes it.
+    - `POST /{type}/{id}/decline` `{reason}` needs any of those permissions.
 - **Payments (#254):** `with_payments(PaymentConfig)` and `payments_router()`, behind `subject_layer`, for the session's facility. Central nests it at `/api/payments`.
   - **Permissions:** `payments.cash` (cashiers), `payments.supervise` (variance approval, statements, voids) and `payments.refund`.
   - **Shifts:** open, look up the open shift of a till, view with its payments, close, approve.
@@ -169,6 +178,10 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `examples/contract_server.rs` serves this API for the client's contract suite (`apps/client`, `bun run test:contract`). It runs two nodes, "central" and "edge", each on its own memory database and ephemeral local port. It prints their FHIR base URLs as one JSON line. It has no authentication and is only for development and CI.
 
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
+
+`tests/requests.rs`:
+- no patient request becomes an order until staff accept it;
+- requests are the patient's own, and are declined or withdrawn only while pending.
 
 `tests/validation.rs` runs with the core package's profiles active and its terminology served:
 - a claimed `ExtractionMappingLibrary` is accepted, and refused with a `code-invalid` error for an unknown template mode;

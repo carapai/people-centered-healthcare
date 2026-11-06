@@ -10,10 +10,17 @@ Layer: **domain** (Patient Engagement). Patient access starts here as a module (
     - anything else, including a certain match below `level3`, goes to staff review.
   - **Review:** a reviewer may link only once the holder is at `level3`, or create a new Patient.
   - **`complete`** accepts only the outcome of the decided route.
+- **`requests`** (#114; MASTER_PROMPT §60): a patient's request is a proposal, never an order.
+  - `RequestKind` names the three proposals: a refill (MedicationRequest `intent=proposal`), a test or other care (ServiceRequest `intent=proposal`), or an appointment (Appointment `proposed`).
+  - `RequestState` reads the proposal's status: pending, accepted, declined or withdrawn.
+  - `may_close` allows withdrawing, declining or accepting only while pending.
+  - `decline_reason` requires a reason.
 - The client registry's `Assurance` is mirrored here as this crate's own (no domain→domain edges, ADR 0006); the application layer maps between them.
 
 ## Tests
 
 `tests/registration.rs`: the routes, a phone account with a certain match going to review rather than a link, review needing `level3` to link, and steps in order.
+
+`requests` unit tests: each kind's proposal and closing statuses, and closing only from pending.
 
 **Not here yet:** the use cases, persistence and HTTP (#111 part 2), and the portal screens and e2e (part 3).

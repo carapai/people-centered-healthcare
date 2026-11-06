@@ -84,6 +84,9 @@ pub fn fhir(prescription: &Prescription) -> Value {
     if let Some(encounter) = &prescription.encounter {
         request["encounter"] = json!({ "reference": encounter });
     }
+    if let Some(based_on) = &prescription.based_on {
+        request["basedOn"] = json!([{ "reference": based_on }]);
+    }
     if let Some(days) = prescription.days {
         request["dispenseRequest"] = json!({ "expectedSupplyDuration": {
             "value": days, "unit": "days", "system": "http://unitsofmeasure.org", "code": "d"
@@ -120,6 +123,7 @@ pub fn prescription(resource: &Value) -> Option<Prescription> {
         status: PrescriptionStatus::from_code(resource["status"].as_str()?)?,
         prescriber: text(&resource["requester"]["display"]).unwrap_or_default(),
         authored: resource["authoredOn"].as_str()?.parse().ok()?,
+        based_on: text(&resource["basedOn"][0]["reference"]),
     })
 }
 

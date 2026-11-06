@@ -15,7 +15,7 @@ use crate::EngagementError;
 pub const QUESTIONNAIRE: &str = "urn:health:questionnaire/self-registration";
 
 /// Where a record came from; `patient-reported` marks what a patient submitted (ADR 0029).
-const ORIGIN_TAG: &str = "urn:health:origin";
+pub(crate) const ORIGIN_TAG: &str = "urn:health:origin";
 /// The Registration Request's §59 state, on its Task.
 const STATUS_SYSTEM: &str = "urn:health:registration-status";
 /// The Login Account a Person belongs to.

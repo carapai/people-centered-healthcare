@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
-import { noViolations, press, signIn, type } from './helpers'
+import { noViolations, press, signIn, type, unique } from './helpers'
 import { USERS } from './users'
 
 // #109, #110: a laboratory test from the consultation's order to the clinician's review, through
@@ -10,8 +10,7 @@ import { USERS } from './users'
 
 /** Registers a patient with a name unique to this run and checks them in at consultation. */
 async function checkedIn(page: Page): Promise<string> {
-  const run = String(Date.now()).slice(-8)
-  const family = `Lab${[...run].map((d) => String.fromCodePoint(97 + Number(d))).join('')}`
+  const { family, digits: run } = unique()
   await signIn(page, USERS.clerk)
   await press(page, 'Register a patient', 'link')
   await type(page, /Family name/, family)

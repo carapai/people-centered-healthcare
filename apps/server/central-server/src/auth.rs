@@ -332,6 +332,7 @@ pub(crate) fn routes(
             laboratory,
             inbox,
             care_plans,
+            requests,
         } = fhir(fhir_store, settings, policy, subjects);
         api = api.nest("/pricing", pricing);
         api = api.nest("/reception", reception);
@@ -342,6 +343,7 @@ pub(crate) fn routes(
         api = api.nest("/laboratory", laboratory);
         api = api.nest("/inbox", inbox);
         api = api.nest("/care-plans", care_plans);
+        api = api.nest("/requests", requests);
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -461,9 +463,9 @@ fn recount_hourly(store: SurrealStore) {
     });
 }
 
-/// Each patient summary section's type, and the notes' (#107), with the element naming its
-/// patient (#104).
-const SUMMARY_PATIENT_PATHS: [(&str, &str); 7] = [
+/// Each patient summary section's type, the notes' (#107) and the requests' (#114), with the
+/// element naming its patient (#104).
+const SUMMARY_PATIENT_PATHS: [(&str, &str); 9] = [
     ("AllergyIntolerance", "patient"),
     ("Condition", "subject"),
     ("MedicationRequest", "subject"),
@@ -472,6 +474,9 @@ const SUMMARY_PATIENT_PATHS: [(&str, &str); 7] = [
     ("EpisodeOfCare", "patient"),
     // A patient's notes (#107).
     ("Composition", "subject"),
+    // A patient's requests (#114).
+    ("ServiceRequest", "subject"),
+    ("Appointment", "subject"),
 ];
 
 /// The search parameters central supports:
@@ -670,6 +675,7 @@ struct Routes {
     laboratory: Router,
     inbox: Router,
     care_plans: Router,
+    requests: Router,
 }
 
 fn fhir(
@@ -731,7 +737,9 @@ fn fhir(
     let reviews =
         registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
     // The portal, with the registry; its patients pass `patient_layer`, not the subject layer.
-    let portal = registry_rules(settings).map(|_| fhir.portal_router());
+    // The patient's requests (#114) are the portal's too.
+    let portal = registry_rules(settings)
+        .map(|_| fhir.portal_router().merge(fhir.patient_requests_router()));
     if let Some(payments) = settings.payments.clone() {
         fhir = fhir.with_payments(payments);
     }
@@ -755,6 +763,7 @@ fn fhir(
     let laboratory = fhir.laboratory_router().layer(layer.clone());
     let inbox = fhir.inbox_router().layer(layer.clone());
     let care_plans = fhir.care_plans_router().layer(layer.clone());
+    let requests = fhir.requests_router().layer(layer.clone());
     let stock = fhir.inventory_router().layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
@@ -777,6 +786,7 @@ fn fhir(
         laboratory,
         inbox,
         care_plans,
+        requests,
     }
 }
 
@@ -824,6 +834,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
         .route_service("/api/care-plans/{*rest}", service.clone())
+        .route_service("/api/requests/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

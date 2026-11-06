@@ -15,6 +15,7 @@
 //! [`PatientRegistry`] port (contexts compose in the runtime, ADR 0006).
 
 mod fhir;
+pub mod requests;
 
 use std::future::Future;
 
@@ -166,6 +167,11 @@ const TASK_RULE: &str = "urn:health:rule/registration-request";
 const RESPONSE_RULE: &str = "urn:health:rule/registration-response";
 const PERSON_RULE: &str = "urn:health:rule/account-person";
 const PATIENT_RULE: &str = "urn:health:rule/self-registered-patient";
+
+/// The Person id of phone account `account`.
+pub fn account_person(account: &str) -> ResourceId {
+    derived(account, PERSON_RULE)
+}
 
 fn derived(account: &str, rule: &str) -> ResourceId {
     derive_id(&DerivationName::rule(account, rule))
