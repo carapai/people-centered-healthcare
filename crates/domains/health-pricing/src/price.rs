@@ -152,6 +152,9 @@ pub struct PricedLine {
     pub gross: Decimal,
     /// What each coverage pays (stage 4).
     pub payer_shares: Vec<(String, Decimal)>,
+    /// What each coverage's deductible took of the line (stage 4), for its accumulator (#125).
+    #[serde(default)]
+    pub deductibles: Vec<(String, Decimal)>,
     /// What the patient pays, after stages 5 and 6.
     pub patient_share: Decimal,
     /// The bundle line it is priced in, if bundled.
@@ -352,6 +355,7 @@ impl<'a> Pricer<'a> {
                 }],
                 gross: price,
                 payer_shares: Vec::new(),
+                deductibles: Vec::new(),
                 patient_share: Decimal::ZERO,
                 bundled_in: None,
                 estimate: false,
@@ -385,6 +389,7 @@ impl<'a> Pricer<'a> {
             self.left[index] = (deductible_left - deductible, limit_left.map(|l| l - pays));
             line.estimate |= terms.estimate;
             line.payer_shares.push((terms.coverage.clone(), pays));
+            line.deductibles.push((terms.coverage.clone(), deductible));
             remaining -= pays;
         }
         line.patient_share = remaining;
@@ -469,6 +474,7 @@ pub fn price(
             }],
             gross: base,
             payer_shares: Vec::new(),
+            deductibles: Vec::new(),
             patient_share: Decimal::ZERO,
             bundled_in: None,
             estimate: false,

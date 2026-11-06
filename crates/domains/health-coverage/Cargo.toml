@@ -1,0 +1,21 @@
+[package]
+name = "health-coverage"
+description = "Coverage (pricing-and-insurance.md; #125): Coverages and Benefit Plans, eligibility through the payer port with offline pending verification, and the accumulators kept at central, estimated offline and corrected at claim time."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "coverage"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+jiff = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
