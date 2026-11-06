@@ -1,0 +1,19 @@
+[package]
+name = "health-care-journeys-app"
+description = "The Care Journey from FHIR R5 resources (#115): programs from EpisodeOfCare, steps from visits, appointments, orders, referrals, results and prescriptions, and what waits from Tasks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "care-journeys"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-access-policy = { workspace = true }
+health-care-journeys = { workspace = true }
+serde_json = { workspace = true }

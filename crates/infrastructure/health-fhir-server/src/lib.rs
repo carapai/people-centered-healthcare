@@ -64,6 +64,7 @@ mod http;
 mod inbox;
 mod interactions;
 mod inventory;
+mod journey;
 mod lab;
 mod notes;
 mod ops;
@@ -338,6 +339,7 @@ impl FhirServer {
             .route("/Patient/$merge", post(registry::merge))
             .route("/Patient/{id}/$summary", get(summary::patient_summary))
             .route("/Patient/{id}/$timeline", get(timeline::patient_timeline))
+            .route("/Patient/{id}/$journey", get(journey::patient_journey))
             .route("/Patient/{id}/$link", post(registry::link))
             .route("/Patient/{id}/$unlink", post(registry::unlink))
             .route("/{type}/_search", post(search::post))

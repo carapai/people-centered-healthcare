@@ -12,6 +12,7 @@ members = [
     "crates/contracts/health-persistence",
     "crates/contracts/health-workflow-actions",
     "crates/domains/health-access-policy",
+    "crates/domains/health-care-journeys",
     "crates/domains/health-care-plans",
     "crates/domains/health-client-registry",
     "crates/domains/health-clinical-documentation",
@@ -33,6 +34,7 @@ members = [
     "crates/domains/health-shared-record",
     "crates/domains/health-terminology",
     "crates/application/health-billing-app",
+    "crates/application/health-care-journeys-app",
     "crates/application/health-care-plans-app",
     "crates/application/health-clinical-documentation-app",
     "crates/application/health-encounters-app",
@@ -86,6 +88,7 @@ health-access-policy = { path = "crates/domains/health-access-policy" }
 health-audit = { path = "crates/infrastructure/health-audit" }
 health-auth = { path = "crates/infrastructure/health-auth" }
 health-backup = { path = "crates/infrastructure/health-backup" }
+health-care-journeys = { path = "crates/domains/health-care-journeys" }
 health-care-plans = { path = "crates/domains/health-care-plans" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
 health-clinical-documentation = { path = "crates/domains/health-clinical-documentation" }
@@ -126,6 +129,7 @@ health-medications-app = { path = "crates/application/health-medications-app" }
 health-patient-engagement-app = { path = "crates/application/health-patient-engagement-app" }
 health-payments-app = { path = "crates/application/health-payments-app" }
 health-billing-app = { path = "crates/application/health-billing-app" }
+health-care-journeys-app = { path = "crates/application/health-care-journeys-app" }
 health-care-plans-app = { path = "crates/application/health-care-plans-app" }
 health-clinical-documentation-app = { path = "crates/application/health-clinical-documentation-app" }
 health-encounters-app = { path = "crates/application/health-encounters-app" }

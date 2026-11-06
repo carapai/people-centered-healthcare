@@ -1,0 +1,17 @@
+[package]
+name = "health-care-journeys"
+description = "The Care Journey (care-journeys.md; MASTER_PROMPT §61; #115): a patient-centred, rebuildable projection of the person's care, by program, with what waits on workflow."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "care-journeys"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
