@@ -54,6 +54,17 @@ jobs:
           tar -xzf surreal.tgz
           ./surreal version
       - run: cargo build --locked -p central-server
+      # The remote engine against the real server, including many transactions at once (the
+      # per-connection session cap behind intermittent 401s).
+      - name: Remote engine tests
+        run: |
+          ./surreal start --log warn --bind 127.0.0.1:18100 --user root --pass root memory &
+          server=$!
+          for _ in $(seq 50); do curl --silent --fail http://127.0.0.1:18100/health && break; sleep 0.2; done
+          cargo test --locked -p health-surrealdb --features remote --test engines --test remote_concurrency
+          kill "$server"
+        env:
+          HEALTH_TEST_SURREALDB_WS: ws://127.0.0.1:18100
       - run: bun install --frozen-lockfile
       - run: bunx --bun playwright install --with-deps chromium
         working-directory: apps/client

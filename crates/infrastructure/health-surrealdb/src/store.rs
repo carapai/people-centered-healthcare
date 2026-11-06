@@ -25,6 +25,7 @@ use surrealdb::engine::any::Any;
 use surrealdb::method::Transaction as SurrealTransaction;
 use surrealdb::types::SurrealValue;
 
+use crate::connection::Lease;
 use crate::search::sql::Sql;
 use crate::search::write::replace_entries;
 use crate::{Connection, ownership};
@@ -112,15 +113,11 @@ impl Store for SurrealStore {
     type Tx = SurrealTx;
 
     async fn begin(&self) -> Result<SurrealTx, StoreError> {
-        let tx = self
-            .connection
-            .db()
-            .clone()
-            .begin()
-            .await
-            .map_err(unavailable)?;
+        let (db, lease) = self.connection.session().await;
+        let tx = db.begin().await.map_err(unavailable)?;
         Ok(SurrealTx {
             tx: Some(tx),
+            lease: Some(lease),
             clock: Arc::clone(&self.clock),
             registry: self.registry(),
             blocking: self.blocking.clone(),
@@ -131,6 +128,7 @@ impl Store for SurrealStore {
 /// A unit of work over one SurrealDB transaction. Dropping it without committing cancels it.
 pub struct SurrealTx {
     tx: Option<SurrealTransaction<Any>>,
+    lease: Option<Lease>,
     clock: Arc<dyn Clock>,
     registry: Arc<Registry>,
     blocking: Option<Arc<dyn DerivedKeys>>,
@@ -141,8 +139,11 @@ impl Drop for SurrealTx {
         if let Some(tx) = self.tx.take()
             && let Ok(runtime) = tokio::runtime::Handle::try_current()
         {
+            let lease = self.lease.take();
             runtime.spawn(async move {
-                let _ = tx.cancel().await;
+                if let (Ok(db), Some(lease)) = (tx.cancel().await, lease) {
+                    lease.give_back(db);
+                }
             });
         }
     }
@@ -609,6 +610,10 @@ impl Transaction for SurrealTx {
             .tx
             .take()
             .ok_or_else(|| StoreError::Unavailable("transaction already finished".into()))?;
-        tx.commit().await.map(|_| ()).map_err(write_error)
+        let db = tx.commit().await.map_err(write_error)?;
+        if let Some(lease) = self.lease.take() {
+            lease.give_back(db);
+        }
+        Ok(())
     }
 }

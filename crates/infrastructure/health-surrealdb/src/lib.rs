@@ -38,7 +38,9 @@ mod store;
 mod workflow;
 
 pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
-pub use connection::{Connection, ConnectionError, Settings, Target, connect};
+pub use connection::{
+    Connection, ConnectionError, MAX_CONCURRENT_TRANSACTIONS, Settings, Target, connect,
+};
 pub use devices::DeviceRow;
 pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};
