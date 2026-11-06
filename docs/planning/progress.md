@@ -885,3 +885,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Storage:** migration `0035_stock_reservations`.
   - **Tests:** six concurrent preparations of the last packs, and exactly one wins.
   - **Next (part 2):** the pharmacy's dispense routes and screens, the MedicationDispense, the charge from the event, and the e2e.
+
+- **#128 part 2: dispensing at the pharmacy.** This completes #128.
+  - **HTTP:** `/api/pharmacy` gains `prepare`, `complete` and `cancel`, with `pharmacy.dispense`. The MedicationDispense (`preparation`, `completed`, `cancelled`) is written in the same transaction as the reservations or the movements. Donor eligibility comes from the patient's active programs under `with_dispensing`.
+  - **Client:** each worklist prescription has Prepare (store, stock product, quantity), then Hand over or Cancel.
+  - **e2e:** `dispensing.spec.ts` checks that stock moves only when the dispense is handed over.
+  - **Decisions:** the pharmacist names the stock product, since there is no product registry yet. Billing's capture of the charge from `inventory.dispensed.v1` waits for in-process event dispatch.

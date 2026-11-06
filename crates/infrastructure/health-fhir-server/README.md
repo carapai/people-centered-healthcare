@@ -85,6 +85,10 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - **`pharmacy_router()`,** for the session's facility (central nests it at `/api/pharmacy`):
     - `GET /worklist` with `pharmacy.view`: the facility's open prescriptions, oldest first;
     - `POST /prescriptions/{id}/status` with `medications.prescribe`.
+  - **Dispensing (#128; ADR 0035)**, with `pharmacy.dispense`. **Stock moves only when a dispense is completed.**
+    - `POST /prescriptions/{id}/prepare` `{dispense, store, product, quantity, batches?, reason?}` reserves stock for one of the facility's active prescriptions. Batches are chosen by first expiry, or by the pharmacist's `batches` with a `reason`. The patient's active programs (EpisodeOfCare type codes) decide donor eligibility under `with_dispensing(Dispensing)`, which defaults to no rules and a 30-day buffer. The `preparation` MedicationDispense is written in the same transaction.
+    - `POST /dispenses/{id}/complete` `{given?}` hands over in full, or by reservation in part. The dispense movements, `inventory.dispensed.v1` and the `completed` MedicationDispense are one transaction.
+    - `POST /dispenses/{id}/cancel` frees the reservations, and the dispense is `cancelled`. `GET /dispenses/{id}` gives its reservations.
 - **Clinical notes (#107):** `notes_router()`, behind `subject_layer`, with `consultation.document`, for the session's facility. Central nests it at `/api/notes`.
   - **Routes:**
     - `POST /notes` `{id, kind, patient, encounter?, sections}`: a draft;
@@ -189,6 +193,8 @@ All of it runs on the SurrealDB memory engine through `oneshot`.
 `tests/registry.rs` covers the registry operations: `$register` (no duplicate without confirmation, sequential MRNs, too little to match on, 403); `$match` ranking, label filtering, 403 and 401; a previewed then approved same-facility merge, a refused cross-facility one, link and unlink audited with survivorship review queued, and reviewers only.
 
 `tests/timeline.rs`: the timeline draws on linked records the reader may see (labels, unseen types, 404); entries name their owner's current version; reading writes nothing, so a rebuild is identical; a result entered in error leaves it.
+
+`tests/dispensing.rs`: stock moves only when the dispense is completed (preparing reserves by first expiry and writes the MedicationDispense); partial and cancelled dispenses; donor stock only for enrolled patients; only a pharmacist of the facility.
 
 `tests/journey.rs`: the journey arranges linked care the reader may see by program (a withheld program, waiting from a Task, unseen types, 404); steps name their owner's current version; a rebuild is identical.
 

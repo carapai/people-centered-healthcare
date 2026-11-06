@@ -20,13 +20,16 @@
 
 use std::collections::BTreeMap;
 
-use health_identifiers::OpId;
+use health_identifiers::{OpId, ResourceId};
 use health_inventory::dispensing::{
     BatchRule, Candidate, Eligibility, Need, Pick, Purpose, Reservation, ReservationState, chosen,
     fefo, reserved, returned, settle,
 };
 use health_inventory::{Balance, Movement, MovementKind, Origin, StockStore, StockUnit};
-use health_persistence::{OutboxEntry, OutboxPayload, RawJson, Store, Transaction};
+use health_persistence::{
+    OutboxEntry, OutboxPayload, Precondition, RawJson, ResourceType, Store, Transaction,
+    WriteError, WriteRequest,
+};
 use health_time::Timestamp;
 use serde_json::json;
 
@@ -34,6 +37,41 @@ use crate::{ATTEMPTS, Attempt, Inventory, InventoryError};
 
 /// The name of the event a completed dispense writes: billing's charge trigger.
 pub const DISPENSED_EVENT: &str = "inventory.dispensed.v1";
+
+/// A FHIR resource a dispensing step writes in its own transaction: the MedicationDispense, so
+/// it and the stock always agree (ADR 0035).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Record {
+    /// Its type.
+    pub resource_type: ResourceType,
+    /// Its id.
+    pub id: ResourceId,
+    /// Its validated JSON.
+    pub json: RawJson,
+}
+
+/// Writes `record` over its current head, read in this transaction: a create when there is none,
+/// else an update `If-Match` that head, so a concurrent change conflicts and the step reruns.
+async fn write_record<T: Transaction>(tx: &mut T, record: &Record) -> Result<(), Attempt> {
+    let head = tx.read(&record.resource_type, record.id).await?;
+    let precondition = match head {
+        Some(head) if !head.version.deleted => Precondition::IfMatch(head.version.version_id),
+        _ => Precondition::MustNotExist,
+    };
+    tx.write(WriteRequest {
+        resource_type: record.resource_type.clone(),
+        id: record.id,
+        json: record.json.clone(),
+        op_id: OpId::new(),
+        precondition,
+    })
+    .await
+    .map(|_| ())
+    .map_err(|error| match error {
+        WriteError::PreconditionFailed { .. } => Attempt::Conflict,
+        other => Attempt::from(other),
+    })
+}
 
 /// A dispense to prepare.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +86,8 @@ pub struct Preparation {
     pub choice: Option<(Vec<Pick>, String)>,
     /// When.
     pub at: Timestamp,
+    /// The MedicationDispense being prepared, written with the reservations.
+    pub record: Option<Record>,
 }
 
 /// A dispense being completed.
@@ -67,6 +107,8 @@ pub struct Completion {
     pub node: String,
     /// When.
     pub at: Timestamp,
+    /// The completed MedicationDispense, written with the movements.
+    pub record: Option<Record>,
 }
 
 /// A patient's return.
@@ -120,6 +162,12 @@ where
             Err(Attempt::Fail(error)) => Err(error),
             Err(Attempt::Conflict) => Err(InventoryError::Busy),
         }
+    }
+
+    /// The reservations made for `dispense` (`MedicationDispense/{id}`), in any state.
+    pub async fn reservations(&self, dispense: &str) -> Result<Vec<Reservation>, InventoryError> {
+        let mut tx = self.store.begin().await?;
+        Ok(tx.reservations_for(dispense).await?)
     }
 
     /// Reserves stock for `preparation`, by first expiry with `eligibility` and `rule`.
@@ -200,6 +248,9 @@ where
             )
             .await?;
             made.push(reservation);
+        }
+        if let Some(record) = &preparation.record {
+            write_record(tx, record).await?;
         }
         Ok(made)
     }
@@ -302,18 +353,23 @@ where
         })
         .await
         .map_err(Attempt::from)?;
+        if let Some(record) = &completion.record {
+            write_record(tx, record).await?;
+        }
         Ok(movements)
     }
 
     /// Releases the reservations of a dispense that will not be completed. Nothing moves.
+    /// `record` is the cancelled MedicationDispense, written in the same transaction.
     pub async fn cancel_dispense(
         &self,
         dispense: &str,
         at: Timestamp,
+        record: Option<&Record>,
     ) -> Result<usize, InventoryError> {
         for _ in 0..ATTEMPTS {
             let mut tx = self.store.begin().await?;
-            let attempt = Self::release(&mut tx, dispense, at).await;
+            let attempt = Self::release(&mut tx, dispense, at, record).await;
             if let Some(done) = Self::settle(tx, attempt).await {
                 return done;
             }
@@ -321,7 +377,12 @@ where
         Err(InventoryError::Busy)
     }
 
-    async fn release(tx: &mut S::Tx, dispense: &str, at: Timestamp) -> Result<usize, Attempt> {
+    async fn release(
+        tx: &mut S::Tx,
+        dispense: &str,
+        at: Timestamp,
+        record: Option<&Record>,
+    ) -> Result<usize, Attempt> {
         let held: Vec<Reservation> = tx
             .reservations_for(dispense)
             .await?
@@ -337,6 +398,9 @@ where
             })
             .await?;
             tx.put_stock_balance(&reservation.unit, &balance).await?;
+        }
+        if let Some(record) = record {
+            write_record(tx, record).await?;
         }
         Ok(held.len())
     }

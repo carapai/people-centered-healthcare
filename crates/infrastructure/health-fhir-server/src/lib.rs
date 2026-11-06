@@ -59,6 +59,7 @@ mod care_plans;
 mod completion;
 mod conditional;
 mod consultation;
+mod dispensing;
 mod history;
 mod http;
 mod inbox;
@@ -108,6 +109,7 @@ pub use care_plans::{
     VIEW_PERMISSION as CARE_PLANS_VIEW_PERMISSION,
 };
 pub use consultation::{DOCUMENT_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION};
+pub use dispensing::{DISPENSE_PERMISSION, Dispensing};
 pub use http::{FHIR_JSON, etag, http_date};
 pub use inventory::STOCK_PERMISSION;
 pub use lab::{
@@ -158,6 +160,7 @@ pub struct FhirServer {
     profiles: Option<validation::ActiveProfiles>,
     workflows: Option<Arc<workflow::WorkflowConfig>>,
     pricing: Option<Arc<pricing::PricingConfig>>,
+    dispensing: Arc<dispensing::Dispensing>,
     questionnaire_checks: bool,
     extraction: bool,
 }
@@ -186,9 +189,19 @@ impl FhirServer {
             profiles: None,
             workflows: None,
             pricing: None,
+            dispensing: Arc::new(dispensing::Dispensing::default()),
             questionnaire_checks: false,
             extraction: false,
         }
+    }
+
+    /// This server, dispensing under `rules`: which funding sources' stock goes only to patients
+    /// in their program, and how far past the course a batch must last (#128). Without it, no
+    /// funding source is restricted and the buffer is 30 days.
+    #[must_use]
+    pub fn with_dispensing(mut self, rules: Dispensing) -> Self {
+        self.dispensing = Arc::new(rules);
+        self
     }
 
     /// This server, validating every write against tiers 3–4 (#91): the profiles each resource

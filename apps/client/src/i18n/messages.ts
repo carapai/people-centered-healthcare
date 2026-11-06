@@ -1059,6 +1059,18 @@ type PharmacyValues = {
   phPrescription: { medicine: string; dosage: string }
   phDays: { days: number }
   phBy: { name: string; time: string }
+  phDispense: { medicine: string; name: string }
+  phStore: {}
+  phProduct: {}
+  phQuantity: {}
+  phPrepare: {}
+  phPrepared: {}
+  phReserved: { batch: string; expiry: string; quantity: number }
+  phHandOver: {}
+  phHandedOver: {}
+  phCancel: {}
+  phCancelled: {}
+  phDispenseFailed: { reason: string }
 }
 
 // The pharmacy's strings (features/pharmacy).
@@ -1070,6 +1082,22 @@ export const pharmacyMessages = defineMessages<PharmacyValues>({
   phPrescription: { id: 'app.pharmacy.prescription', defaultMessage: '{medicine}: {dosage}', description: 'Pharmacy: a prescription' },
   phDays: { id: 'app.pharmacy.days', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'Pharmacy: the course length' },
   phBy: { id: 'app.pharmacy.by', defaultMessage: 'Prescribed by {name}, {time}', description: 'Pharmacy: who prescribed and when' },
+  phDispense: { id: 'app.pharmacy.dispense', defaultMessage: 'Dispense {medicine} for {name}', description: 'Pharmacy: label of a prescription’s dispense' },
+  phStore: { id: 'app.pharmacy.store', defaultMessage: 'Store', description: 'Pharmacy: the store dispensed from' },
+  phProduct: { id: 'app.pharmacy.product', defaultMessage: 'Stock product', description: 'Pharmacy: the stock product given' },
+  phQuantity: { id: 'app.pharmacy.quantity', defaultMessage: 'Quantity (base units)', description: 'Pharmacy: how much to dispense' },
+  phPrepare: { id: 'app.pharmacy.prepare', defaultMessage: 'Prepare', description: 'Pharmacy action: reserve stock for a dispense' },
+  phPrepared: {
+    id: 'app.pharmacy.prepared',
+    defaultMessage: 'Prepared. The stock is reserved; nothing has moved yet.',
+    description: 'Pharmacy: a dispense was prepared',
+  },
+  phReserved: { id: 'app.pharmacy.reserved', defaultMessage: 'Batch {batch}, expires {expiry}: {quantity, number}', description: 'Pharmacy: a reserved batch' },
+  phHandOver: { id: 'app.pharmacy.handOver', defaultMessage: 'Hand over', description: 'Pharmacy action: complete a dispense' },
+  phHandedOver: { id: 'app.pharmacy.handedOver', defaultMessage: 'Handed over. The stock is dispensed.', description: 'Pharmacy: a dispense was completed' },
+  phCancel: { id: 'app.pharmacy.cancel', defaultMessage: 'Cancel the dispense', description: 'Pharmacy action: cancel a prepared dispense' },
+  phCancelled: { id: 'app.pharmacy.cancelled', defaultMessage: 'Cancelled. The reserved stock is free again.', description: 'Pharmacy: a dispense was cancelled' },
+  phDispenseFailed: { id: 'app.pharmacy.dispenseFailed', defaultMessage: 'That did not work. {reason}', description: 'Pharmacy: a dispense step failed' },
 })
 
 type LabValues = {
