@@ -9,7 +9,8 @@ The platform core package (#87; [ADR 0049](../../docs/adr/0049-engine-native-def
 | `WorkflowDefinitionLibrary` | A Workflow Definition: a `Library` of type `workflow-definition` with `application/vnd.health.workflow+json` content |
 | `ProgramPlanDefinition` | A program: a `clinical-protocol` `PlanDefinition` with the EpisodeOfCare type its enrolment opens (`program-episode-type`) and, optionally, its FHIRPath eligibility (`program-eligibility`) |
 | `Platform<Resource>`, 15 profiles | Locally pinned profiles of the low-maturity R5 resources the platform serves, each pinning its R5 5.0.0 definition with no constraint of its own, so a change to base FHIR never changes the platform's API. **Financial** (ADR 0030): ChargeItem, Account, Invoice, Coverage, CoverageEligibilityRequest, CoverageEligibilityResponse, Claim, ClaimResponse, ExplanationOfBenefit, PaymentReconciliation, PaymentNotice. **Inventory façades** (ADR 0034): InventoryItem, SupplyRequest, SupplyDelivery, InventoryReport |
-| `CodeSystem/platform` | The Library types (`extraction-mapping`, `matching-rules`, `workflow-definition`) and template modes (`managed`, `seed`), with `ValueSet/template-modes` |
+| Module extensions, 9 | Extensions the platform's modules write on the resources they own. **QuestionnaireResponse:** `extraction-mapping`, the mapping a completion used (#93). **EpisodeOfCare** (#116): `episode-program`, `episode-enrolled-by`, `episode-transferred-from`, `episode-transferred-to`. **CarePlan:** `care-plan-author`. **Medication**, a stock product: `product-base-unit`, `product-pack-size`, `product-synonym` |
+| `CodeSystem/platform` | The Library types (`extraction-mapping`, `matching-rules`, `workflow-definition`), template modes (`managed`, `seed`), with `ValueSet/template-modes`, and the Provenance activity `extraction` of an extraction run |
 
 Every definition needs its `url`, `version` and `name`.
 

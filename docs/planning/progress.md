@@ -929,3 +929,5 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **HTTP:** `/api/stock/products`. The pharmacy worklist resolves each prescription's product, and prepare uses it when none is named.
   - **Client:** Products page under Stock. The pharmacist's product field is now filled in from the product master.
   - **e2e:** `dispensing.spec.ts` adds the product on the Products page, and checks that it is filled in.
+
+- **The core package defines the modules' own extensions (#93 follow-up).** Nine extensions were in use with no definition: `extraction-mapping` on QuestionnaireResponse (#93), the four `episode-*` extensions on EpisodeOfCare (#116), `care-plan-author` on CarePlan, and the three `product-*` extensions on Medication. `CodeSystem/platform` gains `extraction`, the Provenance activity of an extraction run. The package stays 0.1.0, since it is not yet published. Still open on #93: re-derivation at the authority, which needs sync, and type-checking expressions against answer types.
