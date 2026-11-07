@@ -151,4 +151,6 @@ A mapping can be published only if:
 4. every output validates against its declared profile (ADR 0016 tiers);
 5. every value expression that does arithmetic or calls a floating-point function wraps its result in an explicit `round(n)` (ADR 0052).
 
+The type check runs the mapping on a response that answers every item of each Questionnaire version in its range once, with a value of the item's type (its first `answerOption` when it has them). That response must extract, and every output must pass tier 1. An answer written into an element of another type is refused even where no fixture covers it, such as a string into a decimal or a Coding into a primitive.
+
 Decimal results keep their source scale when written, and the server recomputes every `calculatedExpression` on submit. If the server's value differs from the browser's, the server's value is stored (ADR 0052).

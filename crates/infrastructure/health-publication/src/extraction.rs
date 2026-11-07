@@ -11,7 +11,9 @@
 
 use health_clinical_documentation_app::{OPT_INS, in_range};
 use health_fhir_extraction::Mapping;
-use health_fhir_extraction::gates::{Fixture, fixture, unknown_items, unparsable, unrounded};
+use health_fhir_extraction::gates::{
+    Fixture, fixture, mistyped, unknown_items, unparsable, unrounded,
+};
 use health_fhir_validation::OctofhirEngine;
 use health_packages::Packed;
 use serde_json::Value;
@@ -114,6 +116,7 @@ pub(crate) async fn problems(packed: &Packed) -> Vec<String> {
                 && in_range(&mapping.versions, version)
             {
                 found.extend(unknown_items(mapping, questionnaire));
+                found.extend(mistyped(&engine, mapping, questionnaire).await);
             }
         }
         let canonical = mapping.canonical();

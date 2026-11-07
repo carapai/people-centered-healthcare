@@ -183,6 +183,16 @@ async fn each_gate_sends_the_draft_back() {
     )
     .await;
 
+    // An expression that does not type-check: the weight item's answer is now a string, which
+    // the mapping writes into a decimal.
+    let mut retyped = questionnaire();
+    retyped["item"][0]["item"][0]["type"] = json!("string");
+    refused(
+        &package("1.0.0", &mapping(), &retyped, Some(&fixture())),
+        "answered with its type, Observation.valueQuantity.value",
+    )
+    .await;
+
     // A fixture that does not give its Bundle.
     let mut wrong = fixture();
     wrong["expected"]["entry"][0]["resource"]["valueQuantity"]["value"] = parse("61.5");

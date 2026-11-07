@@ -5,6 +5,9 @@
 //! - [`unparsable`]: every expression parses and evaluates;
 //! - [`unknown_items`]: every `linkId` an expression names is an item of the target
 //!   Questionnaire;
+//! - [`mistyped`]: the expressions type-check against the Questionnaire's items. A response
+//!   answering every item with a value of its type ([`sample_response`]) must extract, and each
+//!   output must pass tier 1, so an answer written where its type does not fit is refused;
 //! - [`unrounded`]: a value expression that does arithmetic or calls a floating-point function
 //!   wraps its whole result in `round(n)`;
 //! - [`fixture`]: a fixture response gives exactly its expected Bundle, and every output passes
@@ -189,6 +192,121 @@ pub fn unknown_items(mapping: &Mapping, questionnaire: &Value) -> Vec<String> {
         }
     }
     problems.dedup();
+    problems
+}
+
+/// The answer `item` gets in [`sample_response`]: its first `answerOption`, or a value of its
+/// type, distinct per type so that one type written into an element of another fails tier 1.
+/// Groups, display items and unknown types get none.
+fn sample_answer(item: &Value) -> Option<Value> {
+    if let Some(option) = item["answerOption"].as_array().and_then(|o| o.first()) {
+        let chosen = option
+            .as_object()?
+            .iter()
+            .find(|(key, _)| key.starts_with("value"))?;
+        return Some(json!({ chosen.0.clone(): chosen.1.clone() }));
+    }
+    let (key, value) = match item["type"].as_str()? {
+        "boolean" => ("valueBoolean", json!(true)),
+        "decimal" => (
+            "valueDecimal",
+            Value::Number(serde_json::from_str("1.5").ok()?),
+        ),
+        "integer" => ("valueInteger", json!(1)),
+        "date" => ("valueDate", json!("2026-01-01")),
+        "dateTime" => ("valueDateTime", json!("2026-01-01T09:30:00Z")),
+        "time" => ("valueTime", json!("09:30:00")),
+        "string" | "text" => ("valueString", json!("sample")),
+        "url" => ("valueUri", json!("https://example.org/sample")),
+        "coding" => (
+            "valueCoding",
+            json!({ "system": "https://example.org/sample", "code": "sample", "display": "Sample" }),
+        ),
+        "attachment" => (
+            "valueAttachment",
+            json!({ "contentType": "text/plain", "data": "c2FtcGxl" }),
+        ),
+        "reference" => ("valueReference", json!({ "reference": "Patient/sample" })),
+        "quantity" => (
+            "valueQuantity",
+            json!({ "value": Value::Number(serde_json::from_str("1.5").ok()?), "unit": "kg" }),
+        ),
+        _ => return None,
+    };
+    Some(json!({ key: value }))
+}
+
+fn sample_items(items: &Value) -> Vec<Value> {
+    items
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let link = item["linkId"].as_str()?;
+            let children = sample_items(&item["item"]);
+            let mut out = json!({ "linkId": link });
+            match sample_answer(item) {
+                Some(mut answer) => {
+                    if !children.is_empty() {
+                        answer["item"] = json!(children);
+                    }
+                    out["answer"] = json!([answer]);
+                }
+                None if !children.is_empty() => out["item"] = json!(children),
+                None if item["type"] == "group" => {}
+                None => return None,
+            }
+            Some(out)
+        })
+        .collect()
+}
+
+/// A completed response to `questionnaire` that answers every item once, with a value of the
+/// item's type (its first `answerOption` when it has them; booleans `true`). Children of a
+/// question are answered under its answer, as R5 has them.
+#[must_use]
+pub fn sample_response(questionnaire: &Value) -> Value {
+    let url = questionnaire["url"].as_str().unwrap_or_default();
+    let version = questionnaire["version"].as_str().unwrap_or_default();
+    json!({
+        "resourceType": "QuestionnaireResponse",
+        "id": "00000000-0000-7000-8000-000000000000",
+        "questionnaire": format!("{url}|{version}"),
+        "status": "completed",
+        "subject": { "reference": "Patient/00000000-0000-7000-8000-000000000001" },
+        "encounter": { "reference": "Encounter/00000000-0000-7000-8000-000000000002" },
+        "authored": "2026-01-01T09:30:00Z",
+        "item": sample_items(&questionnaire["item"])
+    })
+}
+
+/// Where the mapping's expressions do not type-check against `questionnaire`'s items: the
+/// [`sample_response`] does not extract, or an output fails tier 1 (an answer's type written
+/// where it does not fit, such as a string into a decimal or a Coding into a primitive).
+pub async fn mistyped(
+    engine: &dyn FhirPathEngine,
+    mapping: &Mapping,
+    questionnaire: &Value,
+) -> Vec<String> {
+    let version = questionnaire["version"].as_str().unwrap_or("?");
+    let response = sample_response(questionnaire);
+    let plan = match extract(engine, &response, mapping).await {
+        Ok(plan) => plan,
+        Err(error) => {
+            return vec![format!(
+                "answering every item of version {version} of the Questionnaire with its type, the response does not extract: {error}"
+            )];
+        }
+    };
+    let mut problems = Vec::new();
+    for planned in &plan {
+        for issue in validate_structure(&planned.resource.to_string()) {
+            problems.push(format!(
+                "template {}: with every item of version {version} of the Questionnaire answered with its type, {}: {}",
+                planned.template, issue.location, issue.message
+            ));
+        }
+    }
     problems
 }
 

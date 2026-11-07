@@ -931,3 +931,5 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **e2e:** `dispensing.spec.ts` adds the product on the Products page, and checks that it is filled in.
 
 - **The core package defines the modules' own extensions (#93 follow-up).** Nine extensions were in use with no definition: `extraction-mapping` on QuestionnaireResponse (#93), the four `episode-*` extensions on EpisodeOfCare (#116), `care-plan-author` on CarePlan, and the three `product-*` extensions on Medication. `CodeSystem/platform` gains `extraction`, the Provenance activity of an extraction run. The package stays 0.1.0, since it is not yet published. Still open on #93: re-derivation at the authority, which needs sync, and type-checking expressions against answer types.
+
+- **#93: expressions type-check against the Questionnaire's items.** `health-fhir-extraction::gates::mistyped` runs the mapping on `sample_response`, which answers every item with a value of its type, and passes every output through tier 1. Publication runs it for each Questionnaire version in the mapping's range. #93's only open item is now re-derivation at the authority, which needs sync (#81).
