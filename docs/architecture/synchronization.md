@@ -81,7 +81,11 @@ Every item on the wire, in either direction:
     - It answers `reseed_required` to a cursor from another node or epoch.
   - **Applying a pull:** `SurrealReplica` applies a group and its checkpoint (`sync_checkpoint`) in one transaction, through `Replica::advance` when the response read past items the node was not sent.
   - **Applied versions:** a version received by sync keeps its `op_id` and the `lastUpdated` its origin stamped. It is logged with its origin node (`change_log.origin`) and never queued back toward the peer it came from.
-  - **`SyncScope::Facility`:** facility-scope records tagged with the node's facility (ADR 0057), plus every record that is not facility-scope.
+  - **`SyncScope::Facility`**, from the data authority matrix (write-authority.md):
+    - **Both ways:** facility-scope records tagged with the node's facility (ADR 0057).
+    - **Up:** the global types a facility creates (`UP_GLOBAL`): provisional Patients, Consents, AuditEvents, Provenance, its Locations and Devices, and requests.
+    - **Down:** the global replicas (`DOWN_GLOBAL`): registries and golden records, definitions and terminology, price masters, coverage and consent.
+    - **Never:** another facility's records, and central's own audit.
   - **Not yet:**
     - priority lanes, which need a cursor per lane;
     - golden-record narrowing of Patients;

@@ -10,8 +10,8 @@ use health_persistence::{
     Precondition, RawJson, ResourceType, Store, Transaction, VersionMeta, WriteRequest,
 };
 use health_surrealdb::{
-    Connection, MIGRATIONS, Settings, SurrealAuthority, SurrealReplica, SurrealStore, SyncScope,
-    Target, migrate,
+    Connection, DOWN_GLOBAL, MIGRATIONS, Settings, SurrealAuthority, SurrealReplica, SurrealStore,
+    SyncScope, Target, UP_GLOBAL, migrate,
 };
 use health_sync_protocol::{Lane, Outcome, PullRequest, PullResponse, Reason, apply_pull, receive};
 use health_time::{FixedClock, Timestamp};
@@ -312,6 +312,43 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
     drop(tx);
     // Nothing more moves until the conflict is resolved at central.
     assert_eq!(sync(&edge, &central).await, Round::default());
+}
+
+#[test]
+fn the_scope_lists_are_sorted_for_lookup() {
+    for list in [UP_GLOBAL, DOWN_GLOBAL] {
+        assert!(list.windows(2).all(|w| w[0] < w[1]), "{list:?}");
+    }
+}
+
+#[tokio::test]
+async fn central_audit_never_goes_down_and_registries_never_go_up() {
+    let (central, edge) = pair().await;
+    let audit = ResourceId::new();
+    let event = json!({"resourceType": "AuditEvent", "recorded": "2026-11-08T08:00:00Z"});
+    write(&central, audit, &event, Precondition::MustNotExist).await;
+    let practitioner = ResourceId::new();
+    let staff = json!({"resourceType": "Practitioner", "name": [{"text": "Dr Okello"}]});
+    write(&central, practitioner, &staff, Precondition::MustNotExist).await;
+    let forged = ResourceId::new();
+    let fake = json!({"resourceType": "Organization", "name": "Not central's"});
+    write(&edge, forged, &fake, Precondition::MustNotExist).await;
+
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(
+            round.outcomes.as_slice(),
+            [Outcome::Rejected {
+                reason: Reason::Unauthorized,
+                ..
+            }]
+        ),
+        "{:?}",
+        round.outcomes
+    );
+    assert!(head(&edge, "Practitioner", practitioner).await.is_some());
+    assert!(head(&edge, "AuditEvent", audit).await.is_none());
+    assert!(head(&central, "Organization", forged).await.is_none());
 }
 
 #[tokio::test]

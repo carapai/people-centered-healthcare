@@ -5,7 +5,7 @@
 //!   builds their [`Item`]s from history; [`SurrealStore::record_push`] acknowledges what the
 //!   upstream answered and keeps its conflicts and rejections as unaccepted candidates.
 //! - **Receiving a push.** [`SurrealAuthority`] is the [`Authority`]: per group it checks the Sync
-//!   Scope, fast-forwards versions that build on the head, opens a Conflict Record for any that
+//!   Scope (what the peer may send up), fast-forwards versions that build on the head, opens a Conflict Record for any that
 //!   do not, and writes a receipt per item, all in one transaction.
 //! - **Serving a pull.** [`SurrealStore::pull`] reads whole transactions after a cursor, in the
 //!   peer's Sync Scope, leaving out what the peer sent itself.
@@ -31,25 +31,81 @@ use crate::change_log::{Change, Source};
 use crate::search::sql::{Bind, Sql};
 use crate::store::{SurrealTx, table, unavailable, write_error};
 
-/// Which records a peer may send and receive (synchronization.md § Pull and Sync Scope; ADR 0057).
+/// Which records a peer may send and receive (synchronization.md § Pull and Sync Scope;
+/// write-authority.md § Data authority matrix; ADR 0057).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncScope {
-    /// A Facility Edge Node or standalone desktop: the facility-scope records tagged with its
-    /// facility, and every record that is not facility-scope.
+    /// A Facility Edge Node or standalone desktop. It sends up its facility's records and the
+    /// global records a facility may create ([`UP_GLOBAL`]). It receives its facility's records
+    /// and the global replicas ([`DOWN_GLOBAL`]). Nothing else crosses: another facility's records
+    /// never, and central's own audit never.
     Facility(String),
-    /// Every record.
+    /// Every record, both ways.
     All,
 }
 
+/// The global (not facility-scope) types a facility creates and sends up, sorted: provisional
+/// Patients and their relations, captured Consents, audit, provenance, its own Locations and
+/// devices, and requests for central to act on.
+pub const UP_GLOBAL: &[&str] = &[
+    "AuditEvent",
+    "CommunicationRequest",
+    "Consent",
+    "CoverageEligibilityRequest",
+    "Device",
+    "Location",
+    "Patient",
+    "Person",
+    "Provenance",
+    "RelatedPerson",
+];
+
+/// The global types central sends down as replicas, sorted: registries and golden records,
+/// definitions and terminology, price masters, coverage and consent.
+pub const DOWN_GLOBAL: &[&str] = &[
+    "ActivityDefinition",
+    "ChargeItemDefinition",
+    "CodeSystem",
+    "ConceptMap",
+    "Consent",
+    "Coverage",
+    "Device",
+    "HealthcareService",
+    "InventoryItem",
+    "Library",
+    "Location",
+    "Medication",
+    "Organization",
+    "Patient",
+    "Person",
+    "PlanDefinition",
+    "Practitioner",
+    "PractitionerRole",
+    "Questionnaire",
+    "RelatedPerson",
+    "SearchParameter",
+    "StructureDefinition",
+    "ValueSet",
+];
+
 impl SyncScope {
-    /// Whether a version of `resource_type` with this body is in scope.
-    pub fn admits(&self, resource_type: &str, body: &Value) -> bool {
+    /// Whether the peer may send up a version of `resource_type` with this body.
+    pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
+        self.admits(resource_type, body, UP_GLOBAL)
+    }
+
+    /// Whether the peer is sent a version of `resource_type` with this body.
+    pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
+        self.admits(resource_type, body, DOWN_GLOBAL)
+    }
+
+    fn admits(&self, resource_type: &str, body: &Value, global: &[&str]) -> bool {
         match self {
             SyncScope::All => true,
-            SyncScope::Facility(facility) => {
-                !is_facility_scope(resource_type)
-                    || facility_of(body).is_some_and(|tagged| tagged == facility)
+            SyncScope::Facility(facility) if is_facility_scope(resource_type) => {
+                facility_of(body).is_some_and(|tagged| tagged == facility)
             }
+            SyncScope::Facility(_) => global.binary_search(&resource_type).is_ok(),
         }
     }
 }
@@ -309,7 +365,7 @@ impl SurrealStore {
                 continue;
             }
             let item = self.item(change, node).await?;
-            if scope.admits(&item.resource_type, &item.body) {
+            if scope.admits_down(&item.resource_type, &item.body) {
                 pulled.push(Pulled {
                     seq: change.seq,
                     item,
@@ -524,7 +580,7 @@ impl SurrealAuthority<'_> {
         if let Some(item) = group
             .items
             .iter()
-            .find(|i| !self.scope.admits(&i.resource_type, &i.body))
+            .find(|i| !self.scope.admits_up(&i.resource_type, &i.body))
         {
             return Ok(rejected(
                 Reason::Unauthorized,
