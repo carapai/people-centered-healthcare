@@ -922,3 +922,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Stack:** SurrealDB 4 recurses, so the edge, backup and central runtimes use 10 MiB stacks (`THREAD_STACK`), and tests use `RUST_MIN_STACK` in `.cargo/config.toml`. The first test run overflowed the default stack.
   - **CI:** CI pins the 4.0.0 server by its published SHA-256. All 37 `.surql` files validate on it.
   - **Next:** spike #34 (power loss) now covers SurrealKV, and the 3.3.5 measurements are to be taken again.
+
+- **Product master (#128 follow-up; decided 2026-11-06).**
+  - **Domain:** `health-product-registry`: `Product` (code, name, GTIN with check digit, base unit, pack sizes, medicine codings, synonyms) and `resolve`, which matches by code, then by name or synonym, and reports when it is ambiguous or unknown.
+  - **Application:** `health-product-registry-app` stores products as FHIR Medication. `Products::save` keeps a code unique (by guard) and unchanging.
+  - **HTTP:** `/api/stock/products`. The pharmacy worklist resolves each prescription's product, and prepare uses it when none is named.
+  - **Client:** Products page under Stock. The pharmacist's product field is now filled in from the product master.
+  - **e2e:** `dispensing.spec.ts` adds the product on the Products page, and checks that it is filled in.

@@ -14,6 +14,8 @@ Stock for staff with `stock.manage` (inventory-and-procurement.md; #130).
 - **On the server:** `/api/stock` (`health-fhir-server`'s `inventory_router`) checks and records everything.
 - **Not yet:** receiving the transfer at the ward (counting it in), and FEFO picking (#128).
 
+- **`ProductsPage`** (#128 follow-up), at `/stock/products`: the product master. It lists each stock product with its base unit and other names, and adds one (code, name, base unit, pack size, other names). A product's code never changes, and a duplicate is refused.
+
 ## Tests
 
 - `test/stock.test.ts`: the API and line completeness.

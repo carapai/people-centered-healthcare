@@ -4,7 +4,8 @@ import { newPage, noViolations, press, signIn, type, unique } from './helpers'
 import { USERS } from './users'
 
 // #128 (ADR 0035): stock moves only when a dispense is completed. A prescription and a prepared
-// dispense leave stock on hand as it was; handing it over moves it. Keyboard only, with axe.
+// dispense leave stock on hand as it was; handing it over moves it. The product master names the
+// stock product the prescription is dispensed as. Keyboard only, with axe.
 
 /** The on-hand row of `product` in the pharmacy store, freshly loaded from the home page. */
 async function onHand(page: Page, product: string) {
@@ -18,7 +19,8 @@ test('stock moves only when the dispense is handed over', async ({ page, browser
   test.setTimeout(120_000)
   const { family, digits } = unique()
   const product = `al-20-120-${family.toLowerCase()}`
-  const medicine = 'Artemether/lumefantrine 20/120 mg'
+  // A name of its own: repeated runs add products, and two of one name would be ambiguous.
+  const medicine = `Artemether/lumefantrine 20/120 mg ${family}`
 
   // The storekeeper receives 48 of a product unique to this run.
   const store = await newPage(browser)
@@ -35,6 +37,16 @@ test('stock moves only when the dispense is handed over', async ({ page, browser
   await press(store, 'Receive')
   await expect(store.getByRole('status').filter({ hasText: 'Received.' })).toBeVisible()
   await expect(await onHand(store, product)).toContainText('48')
+
+  // The product master: the product, by the name it is prescribed by.
+  await press(store, 'Products', 'link')
+  await type(store, 'Product code', product)
+  await type(store, /^Name$/, medicine)
+  await type(store, /Counted in/, 'tablet')
+  await type(store, 'Pack size', '12')
+  await noViolations(store)
+  await press(store, 'Save product')
+  await expect(store.getByRole('status').filter({ hasText: `Saved ${medicine}.` })).toBeVisible()
 
   // A patient is checked in, and the clinician prescribes.
   await signIn(page, USERS.clerk)
@@ -70,7 +82,8 @@ test('stock moves only when the dispense is handed over', async ({ page, browser
   await press(pharmacist, 'Pharmacy', 'link')
   const entry = pharmacist.getByRole('list', { name: 'Prescriptions to dispense' }).getByRole('listitem').filter({ hasText: name })
   const panel = entry.getByRole('region', { name: `Dispense ${medicine} for ${name}` })
-  await panel.getByLabel('Stock product').fill(product)
+  // The product master names the stock product.
+  await expect(panel.getByLabel('Stock product')).toHaveValue(product)
   await panel.getByLabel('Quantity (base units)').fill('24')
   await noViolations(pharmacist)
   await panel.getByRole('button', { name: 'Prepare' }).click()

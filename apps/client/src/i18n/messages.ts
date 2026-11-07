@@ -1296,3 +1296,52 @@ export const requestMessages = defineMessages<RequestValues>({
   rqAccepted: { id: 'app.requests.accepted', defaultMessage: 'Request accepted.', description: 'Record: a request was accepted' },
   rqDeclined: { id: 'app.requests.declined', defaultMessage: 'Request declined.', description: 'Record: a request was declined' },
 })
+
+type ProductValues = {
+  pdTitle: {}
+  pdIntro: {}
+  pdNone: {}
+  pdFailed: {}
+  pdListed: { name: string; code: string; unit: string }
+  pdSynonyms: { names: string }
+  pdAdd: {}
+  pdCode: {}
+  pdCodeHint: {}
+  pdName: {}
+  pdBaseUnit: {}
+  pdPackSize: {}
+  pdSynonymsField: {}
+  pdSynonymsHint: {}
+  pdSave: {}
+  pdSaved: { name: string }
+  pdSaveFailed: { reason: string }
+}
+
+// The product master (#128 follow-up): stock products and the medicines they fill (features/stock).
+export const productMessages = defineMessages<ProductValues>({
+  pdTitle: { id: 'app.products.title', defaultMessage: 'Products', description: 'Products page heading and link' },
+  pdIntro: {
+    id: 'app.products.intro',
+    defaultMessage: 'Each stock product, and the medicine names it is prescribed by. The pharmacy uses them to know what to dispense.',
+    description: 'Products: what the page is for',
+  },
+  pdNone: { id: 'app.products.none', defaultMessage: 'No products yet.', description: 'Products: empty' },
+  pdFailed: { id: 'app.products.failed', defaultMessage: 'The products could not be loaded.', description: 'Products: failed to load' },
+  pdListed: { id: 'app.products.listed', defaultMessage: '{name} ({code}), counted in {unit}', description: 'Products: one product' },
+  pdSynonyms: { id: 'app.products.synonyms', defaultMessage: 'Also prescribed as: {names}', description: 'Products: other names' },
+  pdAdd: { id: 'app.products.add', defaultMessage: 'Add a product', description: 'Products: heading of the form' },
+  pdCode: { id: 'app.products.code', defaultMessage: 'Product code', description: 'Products: the stock code' },
+  pdCodeHint: {
+    id: 'app.products.codeHint',
+    defaultMessage: 'Lowercase letters, digits and dashes, as on stock received. It never changes.',
+    description: 'Products: hint for the code',
+  },
+  pdName: { id: 'app.products.name', defaultMessage: 'Name', description: 'Products: the name, as prescribed' },
+  pdBaseUnit: { id: 'app.products.baseUnit', defaultMessage: 'Counted in (tablet, capsule, ml)', description: 'Products: the base unit' },
+  pdPackSize: { id: 'app.products.packSize', defaultMessage: 'Pack size', description: 'Products: a pack size in base units' },
+  pdSynonymsField: { id: 'app.products.synonymsField', defaultMessage: 'Other names (optional)', description: 'Products: other names field' },
+  pdSynonymsHint: { id: 'app.products.synonymsHint', defaultMessage: 'Separate names with commas.', description: 'Products: hint for other names' },
+  pdSave: { id: 'app.products.save', defaultMessage: 'Save product', description: 'Products action: save' },
+  pdSaved: { id: 'app.products.saved', defaultMessage: 'Saved {name}.', description: 'Products: saved' },
+  pdSaveFailed: { id: 'app.products.saveFailed', defaultMessage: 'That did not work. {reason}', description: 'Products: save failed' },
+})

@@ -6,7 +6,9 @@
 //!   reserves stock for one of this facility's active prescriptions, by first expiry (or the
 //!   pharmacist's `batches`, `[{unit, quantity}]`, with a `reason`). Only stock the patient is
 //!   eligible for is taken (their active programs, under [`Dispensing::eligibility`]), and only
-//!   batches in date past the course plus [`Dispensing::rule`]'s buffer. The MedicationDispense
+//!   batches in date past the course plus [`Dispensing::rule`]'s buffer. Without a `product`, the
+//!   product master's for the prescribed medicine is used (by its code, else by name); an
+//!   ambiguous or unknown medicine is refused for the pharmacist to name one. The MedicationDispense
 //!   (`preparation`) is written in the same transaction. Nothing moves.
 //! - `POST /dispenses/{id}/complete` `{given?}`: hands over, in full or (with `given`, by
 //!   reservation) in part. The dispense movements, the `inventory.dispensed.v1` charge trigger
@@ -29,6 +31,7 @@ use health_inventory::dispensing::{BatchRule, Eligibility, Need, Pick, Reservati
 use health_inventory_app::{Completion, Inventory, InventoryError, Preparation, Record};
 use health_medications_app::prescription;
 use health_persistence::{RawJson, ResourceType, Store, Transaction};
+use health_product_registry::{Coding, Medicine, Resolution, resolve};
 use health_time::{SignedDuration, Timestamp};
 use jiff::tz::TimeZone;
 use serde::Deserialize;
@@ -111,6 +114,29 @@ fn reservation_json(r: &Reservation) -> Value {
     })
 }
 
+/// The stock product a prescription's medicine is dispensed as, from the product master (#128
+/// follow-up).
+pub(crate) async fn product_for(
+    server: &FhirServer,
+    medicine: &health_medications::Medicine,
+) -> Resolution {
+    let catalogue = health_product_registry_app::products(&found(server, "Medication", &[]).await);
+    let coding = match (&medicine.system, &medicine.code) {
+        (Some(system), Some(code)) => Some(Coding {
+            system: system.clone(),
+            code: code.clone(),
+        }),
+        _ => None,
+    };
+    resolve(
+        &catalogue,
+        &Medicine {
+            text: medicine.text.clone(),
+            coding,
+        },
+    )
+}
+
 /// The patient's active programs, by their EpisodeOfCare's type code.
 async fn programs(server: &FhirServer, patient: &str) -> Vec<String> {
     found(server, "EpisodeOfCare", &[("patient", patient)])
@@ -135,7 +161,9 @@ struct Batch {
 struct PrepareBody {
     dispense: String,
     store: String,
-    product: String,
+    /// The stock product; when none is given, the product master's for the medicine.
+    #[serde(default)]
+    product: Option<String>,
     quantity: i64,
     #[serde(default)]
     batches: Option<Vec<Batch>>,
@@ -184,8 +212,31 @@ async fn prepare(
         .max(now)
         .to_zoned(TimeZone::UTC)
         .date();
+    let chosen = body
+        .product
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty());
+    let product = match chosen {
+        Some(product) => product.to_owned(),
+        None => match product_for(&server, &rx.medicine).await {
+            Resolution::ByCode { product } | Resolution::ByName { product } => product,
+            Resolution::Ambiguous { products } => {
+                return refused(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    &format!("choose the stock product: {}", products.join(", ")),
+                );
+            }
+            Resolution::Unknown => {
+                return refused(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "no stock product is known for this medicine: name one",
+                );
+            }
+        },
+    };
     let need = Need {
-        product: body.product.trim().to_owned(),
+        product,
         quantity: body.quantity,
         course_ends,
         programs: programs(&server, &rx.patient).await,

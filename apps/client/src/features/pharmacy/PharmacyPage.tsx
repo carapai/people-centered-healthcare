@@ -17,6 +17,8 @@ interface Prescription {
   id: string
   patient: string
   medicine: { text: string; code?: string | null }
+  /** The stock product it resolves to in the product master. */
+  product?: { kind: 'by-code' | 'by-name'; product: string } | { kind: 'ambiguous'; products: string[] } | { kind: 'unknown' }
   dosage: string
   days: number | null
   prescriber: string
@@ -40,7 +42,8 @@ function Dispense({ prescription, name }: { prescription: Prescription; name: st
   const platform = usePlatform()
   const queryClient = useQueryClient()
   const ids = { store: useId(), product: useId(), quantity: useId() }
-  const [form, setForm] = useState({ store: DEFAULT_STORE, product: prescription.medicine.code ?? '', quantity: '' })
+  const resolved = prescription.product !== undefined && 'product' in prescription.product ? prescription.product.product : undefined
+  const [form, setForm] = useState({ store: DEFAULT_STORE, product: resolved ?? prescription.medicine.code ?? '', quantity: '' })
   const [dispense, setDispense] = useState<{ id: string; held: Reserved[] } | undefined>()
   const [done, setDone] = useState('')
   const set = (key: keyof typeof form) => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value })

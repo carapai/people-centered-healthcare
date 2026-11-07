@@ -490,3 +490,61 @@ async fn only_a_pharmacist_of_this_facility_dispenses() {
     );
     assert_eq!(quantities(&server).await, [("SOON usable".to_owned(), 24)]);
 }
+
+#[tokio::test]
+async fn the_product_master_names_the_stock_product_dispensed() {
+    let server = server("dispense-products").await;
+    let rx = stocked(
+        &server,
+        json!([line("SOON", "2027-06-30", "government", 24)]),
+        "Artemether / Lumefantrine 20/120mg",
+    )
+    .await;
+    let pharmacy = pharmacist(&server);
+    // No product in the master yet: the pharmacist must name one.
+    let (status, refused) = call(
+        &pharmacy,
+        Method::POST,
+        &format!("/prescriptions/{rx}/prepare"),
+        Some(json!({ "dispense": DISPENSE, "store": "Location/pharmacy", "quantity": 6 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+
+    // Central's product master: the stock product, by its name.
+    let stock = server
+        .inventory_router()
+        .layer(subject("KAM013", &[STOCK_PERMISSION]));
+    let product = json!({ "code": "artemether-lumefantrine", "name": "Artemether/lumefantrine 20/120 mg",
+        "baseUnit": "tablet", "packSizes": [24], "synonyms": ["Coartem"] });
+    let (status, saved) = call(&stock, Method::POST, "/products", Some(product.clone())).await;
+    assert_eq!(status, StatusCode::CREATED, "{saved}");
+    let (status, taken) = call(&stock, Method::POST, "/products", Some(product)).await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "the code is taken: {taken}"
+    );
+    let (_, listed) = call(&stock, Method::GET, "/products", None).await;
+    assert_eq!(listed.as_array().map(Vec::len), Some(1), "{listed}");
+    assert_eq!(listed[0]["synonyms"], json!(["Coartem"]));
+
+    let viewer = server
+        .pharmacy_router()
+        .layer(subject("KAM013", &["pharmacy.view"]));
+    let (_, worklist) = call(&viewer, Method::GET, "/worklist", None).await;
+    assert_eq!(
+        worklist[0]["product"],
+        json!({ "kind": "by-name", "product": "artemether-lumefantrine" }),
+        "{worklist}"
+    );
+    let (status, prepared) = call(
+        &pharmacy,
+        Method::POST,
+        &format!("/prescriptions/{rx}/prepare"),
+        Some(json!({ "dispense": DISPENSE, "store": "Location/pharmacy", "quantity": 6 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{prepared}");
+    assert_eq!(prepared["reservations"][0]["batch"], "SOON");
+}
