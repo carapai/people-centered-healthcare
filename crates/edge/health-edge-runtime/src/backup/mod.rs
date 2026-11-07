@@ -381,7 +381,7 @@ pub async fn open_store(
     database: &str,
 ) -> Result<Connection, BackupError> {
     Connection::open(&Settings {
-        target: Target::RocksDb {
+        target: Target::SurrealKv {
             path: path.to_path_buf(),
         },
         namespace: namespace.to_owned(),

@@ -51,3 +51,11 @@ allow-dependencies-licenses:
   - pkg:cargo/surrealdb-syn
   - pkg:cargo/surrealdb-types
   - pkg:cargo/surrealdb-types-derive
+  # SurrealDB 4's new crates, under the same BSL 1.1 exception (ADR 0060).
+  - pkg:cargo/surrealdb-kvs-surrealkv
+  - pkg:cargo/surrealdb-parser-next
+  - pkg:cargo/surrealdb-stored-derive
+  # xxhash-rust, used by SurrealKV: BSL-1.0 (Boost), approved for this crate only (ADR 0060).
+  - pkg:cargo/xxhash-rust
+  # tokio-tungstenite-wasm is MIT, but declares it as a license-file that GitHub cannot classify.
+  - pkg:cargo/tokio-tungstenite-wasm

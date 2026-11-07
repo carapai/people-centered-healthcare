@@ -110,6 +110,7 @@ fn block_on(
 ) -> u8 {
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
+        .thread_stack_size(health_surrealdb::THREAD_STACK)
         .build()
     {
         Ok(runtime) => runtime,

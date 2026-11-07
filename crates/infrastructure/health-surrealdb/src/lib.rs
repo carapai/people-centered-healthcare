@@ -39,6 +39,11 @@ mod store;
 mod workflow;
 
 pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
+/// The thread stack every runtime that runs SurrealDB needs: SurrealDB 4 parses and executes
+/// SurrealQL by plain recursion (it dropped `reblessive`, RUSTSEC-2026-0454), so the default
+/// 2 MiB stack overflows on deep statements. SurrealDB recommends 10 MiB (ADR 0060).
+pub const THREAD_STACK: usize = 10 * 1024 * 1024;
+
 pub use connection::{
     Connection, ConnectionError, MAX_CONCURRENT_TRANSACTIONS, Settings, Target, connect,
 };

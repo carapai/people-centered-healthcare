@@ -15,7 +15,7 @@ workspace = true
 [features]
 # Adapters are chosen per runtime (dependency-rules.md rule 6): the edge and desktop embed RocksDB,
 # central connects to a server, and tests use the in-memory engine.
-embedded = ["surrealdb/kv-rocksdb"]
+embedded = ["surrealdb/kv-surrealkv"]
 remote = ["surrealdb/protocol-ws", "surrealdb/rustls"]
 memory = ["surrealdb/kv-mem"]
 

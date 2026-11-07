@@ -47,6 +47,7 @@ pub(crate) fn run(config: &EdgeConfig, args: &[String]) -> Result<(), String> {
     let now = health_time::Timestamp::now();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
+        .thread_stack_size(health_surrealdb::THREAD_STACK)
         .build()
         .map_err(|_| "cannot start the async runtime")?;
     let fail = |e: health_backup::BackupError| e.to_string();

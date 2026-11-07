@@ -13,8 +13,8 @@ LAN discovery and TLS trust are in [lan-security.md](lan-security.md). Staff aut
 
 - There is one OS service running one binary, `facility-edge` (a runtime crate over `health-edge-runtime`; see [crate-catalogue.md](crate-catalogue.md)). It has a `--service` mode and a foreground mode for development.
 - It hosts the Deployable contents from [resource-ownership.md](resource-ownership.md): the operational contexts, plus read-only Registries and Terminology & Metadata.
-- **SurrealDB is embedded** (`kv-rocksdb`, version pinned exactly per the SurrealDB research). The process owns the data directory alone. There is one shared `Surreal` handle per process, and no external tool opens the directory while the node runs.
-- **Durability:** `sync=every` is mandatory, and `never` is rejected at startup. The RocksDB block cache is capped explicitly (default about 25% of RAM) rather than auto-sized.
+- **SurrealDB is embedded** (`kv-surrealkv` on SurrealDB 4.0.0, version pinned exactly; ADR 0060). The process owns the data directory alone. There is one shared `Surreal` handle per process, and no external tool opens the directory while the node runs.
+- **Durability:** `sync=every` is mandatory, and `never` is rejected at startup. SurrealKV's cache and memtable sizes are datastore options, to be set from the edge hardware spikes (ADR 0060).
 - **Background work runs as supervised Tokio tasks in the same process:**
   - outbox dispatcher;
   - sync uploader and downloader;

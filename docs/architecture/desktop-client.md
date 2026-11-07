@@ -28,7 +28,7 @@ flowchart LR
   W[Webview<br/>React app] -- invoke envelope --> CORE
   subgraph CORE [Tauri core process]
     R[Axum router via tower oneshot] --> APP[Application crates<br/>same as edge]
-    APP --> DB[(Embedded SurrealDB<br/>RocksDB, sync=every)]
+    APP --> DB[(Embedded SurrealDB<br/>SurrealKV, sync=every)]
     APP --> BL[(Blob store)]
     SY[health-desktop-runtime sync module] --> DB
     AU[health-auth] --> KS[OS keystore]
@@ -40,7 +40,7 @@ flowchart LR
 
 - **Lifetime.** Services and sync run while the app runs. In mode B, closing the window minimizes it to the tray, and starting at login is optional. The desktop never installs an OS service; a facility that needs always-on uses a Facility Edge Node.
 - **Commands.** All commands are `async`. Large payloads use raw IPC bodies, and progress streams use `Channel`.
-- **Single instance.** The single-instance plugin prevents a second app instance, and the RocksDB `LOCK` backs it up.
+- **Single instance.** The single-instance plugin prevents a second app instance, and the engine's lock on its data directory backs it up.
 
 ## Online and offline under an edge
 
@@ -61,7 +61,7 @@ stateDiagram-v2
 ## Storage and backup (ADR 0040)
 
 - **Data directory:** per machine (`%ProgramData%\<app>` on Windows, `/var/lib/<app>` on Linux), shared by every user's sessions on that PC.
-- **Engine:** embedded SurrealDB on RocksDB with `sync=every`, plus the content-addressed blob store (ADR 0021).
+- **Engine:** embedded SurrealDB 4 on SurrealKV with `sync=every` (ADR 0060), plus the content-addressed blob store (ADR 0021).
 - **Encryption at rest.** SurrealDB has no native encryption at rest. Provisioning checks for **OS full-disk encryption** (BitLocker or LUKS), and country configuration decides whether its absence warns or blocks.
 - **Backups:**
 

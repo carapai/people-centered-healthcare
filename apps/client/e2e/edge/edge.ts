@@ -74,7 +74,8 @@ export async function startEdge(options: { signIn?: boolean } = {}): Promise<Edg
     if (child.exitCode === null) child.kill('SIGTERM')
     await exited
   }
-  const deadline = Date.now() + 120_000
+  // A fresh store's first start runs every migration, over a minute on macOS (ADR 0060).
+  const deadline = Date.now() + 300_000
   for (;;) {
     if (child.exitCode !== null) throw new Error(`facility-edge exited with ${child.exitCode}`)
     const ready = await fetch(`${origin}/ready`).then((r) => r.ok, () => false)

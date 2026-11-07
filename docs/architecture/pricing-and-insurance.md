@@ -95,5 +95,6 @@ sequenceDiagram
 - **Payer adapters.** The payer port is defined in the `coverage` domain crate (dependency-rules.md: driven ports belong to the Module), and there is one adapter per payer in `health-integration`. It uses FHIR Claim where the payer supports it, and an export format or portal file otherwise. No national payer or claim format is assumed; Uganda's NHIS is not in force.
 - **Preauthorization** is a Claim with `use=preauthorization`. A financial gate can require an approved preauthorization (billing-and-payments.md).
 - **Denials** are a ClaimResponse outcome. **Appeals** are resubmissions referencing the original.
+- **Shortfalls** (decided 2026-11-06): what a payer denies or approves below the claim, **the patient pays**. Each shortfall moves from the coverage's receivable to the patient's. An appeal that succeeds is paid by the payer, and the patient's share is then adjusted.
 - **Government and donor funding** are funding sources with their own "payer" records. Their claims are reports or exports, not payer adjudication.
 - **Code** (#126): `health-coverage::claims` (assembly, adjudication, appeals, `ClaimPayer`), `health-integration::payers` (`FhirPayer` over a `PayerTransport`, `ExportPayer`), and `health-coverage-app::remittance_posting`.
