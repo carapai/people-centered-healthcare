@@ -206,6 +206,8 @@ impl Compatibility {
 /// The upstream's answer to a [`Hello`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Welcome {
+    /// The upstream: whose log the peer pulls, and the peer its outbox is queued for.
+    pub node: NodeId,
     /// Whether the session goes ahead.
     pub verdict: Verdict,
     /// The version of the peer's Sync Scope definition.

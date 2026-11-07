@@ -80,7 +80,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-packages` | crate (Published Definition packages: deterministic tarballs, sha-256 identity, detached publication signatures; ADR 0024) |
 | `health-publication` | crate (central's publication lifecycle: drafts, validation, review, approvals and signed publication, audited; ADR 0025; #88). The domain rules stay in `health-configuration`, as the catalogue's `health-configuration-publisher` module |
 | `health-crypto` | crate |
-| `health-sync-server` | crate |
+| `health-sync-server` | crate (the `/sync/v1` endpoints: handshake, push, pull and cursor hints, each request signed by the calling node; ADR 0062; #81) |
 | `health-integration` | crate (DHIS2, OpenMRS/UgandaEMR, lab, insurer, payment-gateway adapters; the inbound pipeline with the Inbound Dead Letter and quarantine) |
 
 ## 6 · runtime

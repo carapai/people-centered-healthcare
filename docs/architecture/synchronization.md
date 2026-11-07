@@ -10,9 +10,9 @@ Status: **accepted** (ADRs 0019, 0020, 0021). Produced while resolving the Wayfi
 
 ```mermaid
 flowchart LR
-  C[Central] <-- "sync/v1 over mTLS" --> E[Facility Edge Node]
+  C[Central] <-- "sync/v1, node-signed (ADR 0062)" --> E[Facility Edge Node]
   E <-- "sync/v1 over LAN TLS + DPoP" --> D1[Tauri desktop]
-  C <-- "sync/v1 over mTLS" --> D2[Standalone Tauri desktop<br/>mode B]
+  C <-- "sync/v1, node-signed (ADR 0062)" --> D2[Standalone Tauri desktop<br/>mode B]
   B[LAN browsers] -- "FHIR REST / app API only" --> E
 ```
 
@@ -91,7 +91,15 @@ Every item on the wire, in either direction:
     - golden-record narrowing of Patients;
     - ledger operations, which are refused as `invalid` for now;
     - HLC and package fields from the writer;
-    - the transport: the `/sync/v1` endpoints and the edge's sync task.
+    - the edge's sync task.
+- **In code (#81, transport).** `health-sync-server` ([README](../../crates/infrastructure/health-sync-server/README.md)), mounted by `central-server` when it provisions nodes:
+  - **Endpoints:** `POST /sync/v1/hello`, `push` (NDJSON) and `pull`, and a `GET /sync/v1/events` stream of cursor hints.
+  - **Authentication:** every request is signed by the calling node (ADR 0062) and checked by `NodeRegistry::authenticate_sync`. The registry's facility sets the node's Sync Scope.
+  - **Verdicts:** the handshake's verdict is kept per node (`sync_peer`, migration `0039_sync_peers`).
+    - A quarantined node's pushes are held in `sync_quarantine` and answered `quarantined`, and it is sent nothing.
+    - A refused node gets 403.
+  - **Central's node id** is kept in its store (`sync_state:node.node`), and `Welcome` carries it to the peer.
+  - **Not yet:** zstd bodies.
 
 ## Session
 

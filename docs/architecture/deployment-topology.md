@@ -20,8 +20,8 @@ flowchart TB
   subgraph Web[Mode A]
     W[Browsers on any network]
   end
-  E1 <-- sync/v1 over mTLS --> C
-  D2 <-- sync/v1 over mTLS --> C
+  E1 <-- sync/v1, node-signed --> C
+  D2 <-- sync/v1, node-signed --> C
   W -- HTTPS, central OIDC --> C
 ```
 
@@ -34,8 +34,8 @@ flowchart TB
 | Mode | Client → server | Transport and trust | Data held by the client | Sources |
 |---|---|---|---|---|
 | A: central web | Browser → central | HTTPS with a public certificate; central OIDC tokens in memory | None persistent (ADR 0037) | [client-application.md](client-application.md) |
-| B: standalone desktop | Desktop → central | sync/v1 over mTLS with a node certificate issued at provisioning | Full facility scope in an embedded database | [desktop-client.md](desktop-client.md) |
-| C: edge ↔ central | Edge → central | sync/v1 over mTLS; edge node certificate | The facility's records (authoritative) | [facility-edge.md](facility-edge.md), [synchronization.md](synchronization.md) |
+| B: standalone desktop | Desktop → central | sync/v1 over TLS, each request signed with the key issued at provisioning (ADR 0062) | Full facility scope in an embedded database | [desktop-client.md](desktop-client.md) |
+| C: edge ↔ central | Edge → central | sync/v1 over TLS, each request signed with the facility-intermediate key (ADR 0062) | The facility's records (authoritative) | [facility-edge.md](facility-edge.md), [synchronization.md](synchronization.md) |
 | D: LAN browser | Browser → edge | HTTPS on the LAN, certificate chained to the private national root installed at enrollment; DPoP-bound tokens with a non-extractable WebCrypto key | None persistent; app-shell service worker only | [lan-security.md](lan-security.md), [offline-auth.md](offline-auth.md) |
 | D: LAN Tauri | Desktop → edge | HTTPS, pinning the facility intermediate and node id; DPoP; sync/v1 | Sync Scope (service points, worklists, leases, plus 90 days) | [lan-security.md](lan-security.md), [desktop-client.md](desktop-client.md) |
 
@@ -77,7 +77,7 @@ flowchart LR
   UI -- DPoP / OIDC / IPC session --> API
   API --> DB
   API --> KS
-  API -- sync/v1 mTLS --> CAPI
+  API -- sync/v1 node-signed --> CAPI
   CAPI --> EXT
 ```
 

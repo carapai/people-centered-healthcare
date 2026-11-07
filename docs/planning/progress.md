@@ -956,3 +956,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - central's own audit never goes down, and a registry record never goes up (the scope follows the data authority matrix's directions).
   - **Protocol change:** `Replica::advance` saves the cursor when a response read past items the node was not sent.
   - **Decided (2026-11-08, product owner):** an edge authenticates its sync requests with a JWS from its facility-intermediate key, verified against the node registry, rather than mTLS. ADR 0062 comes with the transport.
+- **#81, part 2: the `/sync/v1` endpoints at central (2026-11-08, ADR 0062).**
+  - **What:** `health-sync-server` provides the endpoints, with handshake, push, pull and cursor hints. Each request is signed by the calling node and checked by `NodeRegistry::authenticate_sync` against the node's key on record, its status, a 5-minute clock window, and the request's method, path and body.
+  - **Tested over HTTP in process:**
+    - an unsigned request, one signed for another request, or one signed off-clock is refused;
+    - a node is held to its handshake;
+    - a compatible edge pushes (a resend is answered from receipts) and pulls in its facility scope;
+    - an out-of-range edge's pushes are quarantined and it is sent nothing.
+  - **Next:** the edge's sync task.

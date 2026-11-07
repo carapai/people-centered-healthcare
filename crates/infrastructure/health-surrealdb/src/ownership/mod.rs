@@ -55,6 +55,8 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "sync_conflict",
     "sync_checkpoint",
     "sync_item_state",
+    "sync_peer",
+    "sync_quarantine",
     "idx_token",
     "idx_string",
     "idx_date",

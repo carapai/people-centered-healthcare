@@ -39,9 +39,9 @@ flowchart TB
   STAFF -- Tauri --> D
   PAT -- portal --> C
   ADM -- Studios, administration --> C
-  E <-- sync/v1, mTLS --> C
+  E <-- sync/v1, node-signed --> C
   D <-- sync/v1 --> E
-  D <-- sync/v1, mTLS (mode B) --> C
+  D <-- sync/v1, node-signed (mode B) --> C
   C --> NIRA & MOMO & PAYER & DHIS2 & SUP & SMS
 ```
 
@@ -153,6 +153,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0059](../adr/0059-password-hashes-encrypted-at-rest-and-to-the-edge.md) | Password hashes are plain Argon2id, encrypted at rest under each node's keystore pepper key, and encrypted to the edge in its provisioning bundle |
 | [0060](../adr/0060-surrealdb-4-with-embedded-surrealkv.md) | SurrealDB 4 on every node, with SurrealKV (`sync=every`) as the embedded engine, after RUSTSEC-2026-0454 |
 | [0061](../adr/0061-change-log-seq-taken-under-a-commit-lock.md) | The change log's `seq` is taken under an in-process commit lock, not a counter record written in every transaction (amends 0019) |
+| [0062](../adr/0062-nodes-sign-their-sync-requests.md) | Nodes sign each sync request with their facility-intermediate key, checked against the node registry, in place of mTLS (settles 0058's open point) |
 
 ## Still open
 
