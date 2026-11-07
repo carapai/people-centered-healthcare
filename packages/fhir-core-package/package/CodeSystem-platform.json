@@ -5,7 +5,7 @@
   "name": "PlatformCodes",
   "id": "platform",
   "title": "Health platform codes",
-  "description": "Codes the platform's engines define: the kinds of engine-native Published Definition carried as a Library, and the modes of an extraction template.",
+  "description": "Codes the platform's engines define: the kinds of engine-native Published Definition carried as a Library, the modes of an extraction template, and the Provenance activity of an extraction run.",
   "version": "0.1.0",
   "url": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
   "concept": [
@@ -33,9 +33,14 @@
       "code": "seed",
       "display": "Seed",
       "definition": "An extracted resource created once from the form, which then lives a life of its own."
+    },
+    {
+      "code": "extraction",
+      "display": "Extraction",
+      "definition": "A Provenance activity: the resources were extracted from a completed QuestionnaireResponse by an Extraction Mapping."
     }
   ],
   "experimental": false,
   "caseSensitive": true,
-  "count": 5
+  "count": 6
 }

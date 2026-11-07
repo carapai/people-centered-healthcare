@@ -33,7 +33,7 @@ fn validator() -> SnapshotValidator {
             definitions.push(read(&path));
         }
     }
-    assert_eq!(definitions.len(), 24, "the package's StructureDefinitions");
+    assert_eq!(definitions.len(), 33, "the package's StructureDefinitions");
     // From its dependency hl7.fhir.r5.core, as activation (#89) will load it: R5's own
     // snapshots name SimpleQuantity for quantities.
     definitions
