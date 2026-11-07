@@ -17,12 +17,10 @@ pub const MAX_CONCURRENT_TRANSACTIONS: usize = 128;
 /// Where the node's database lives.
 #[derive(Clone)]
 pub enum Target {
-    /// Embedded RocksDB in this process (Facility Edge Node, standalone desktop). Always opened
-    /// with `sync=every`, so a commit is on disk before it is acknowledged.
-    ///
-    /// The RocksDB block cache is capped through the service environment
-    /// (`SURREAL_ROCKSDB_BLOCK_CACHE_SIZE`, in bytes), set by the edge and desktop installers.
-    RocksDb {
+    /// Embedded SurrealKV in this process (Facility Edge Node, standalone desktop; ADR 0060).
+    /// Always opened with `sync=every`, so a commit's write-ahead log is on disk before it is
+    /// acknowledged.
+    SurrealKv {
         /// The data directory.
         path: PathBuf,
     },
@@ -43,7 +41,7 @@ impl fmt::Debug for Target {
     // Never prints credentials.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RocksDb { path } => f.debug_struct("RocksDb").field("path", path).finish(),
+            Self::SurrealKv { path } => f.debug_struct("SurrealKv").field("path", path).finish(),
             Self::Remote { endpoint, .. } => f
                 .debug_struct("Remote")
                 .field("endpoint", endpoint)
@@ -57,7 +55,7 @@ impl Target {
     /// The engine address passed to the SDK.
     pub fn address(&self) -> String {
         match self {
-            Self::RocksDb { path } => format!("rocksdb://{}?sync=every", path.display()),
+            Self::SurrealKv { path } => format!("surrealkv://{}?sync=every", path.display()),
             Self::Remote { endpoint, .. } => endpoint.clone(),
             Self::Memory => "mem://".to_owned(),
         }
@@ -122,7 +120,7 @@ impl Connection {
     /// Opens the database and selects the namespace and database.
     pub async fn open(settings: &Settings) -> Result<Self, ConnectionError> {
         let engine_enabled = match &settings.target {
-            Target::RocksDb { .. } => cfg!(feature = "embedded").then_some(()).ok_or("RocksDB"),
+            Target::SurrealKv { .. } => cfg!(feature = "embedded").then_some(()).ok_or("SurrealKV"),
             Target::Remote { .. } => cfg!(feature = "remote").then_some(()).ok_or("remote"),
             Target::Memory => Ok(()),
         };

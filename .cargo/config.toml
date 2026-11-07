@@ -1,0 +1,5 @@
+# SurrealDB 4 parses and executes SurrealQL by plain recursion (ADR 0060), so every thread that
+# runs it needs more than the default 2 MiB stack. Production runtimes set it themselves
+# (`health_surrealdb::THREAD_STACK`); this covers test threads and Tokio's default threads in tests.
+[env]
+RUST_MIN_STACK = "10485760"

@@ -2,7 +2,7 @@
 
 Layer: **runtime**. The Facility Edge Node's composition root (ADR 0007, [facility-edge.md](../../../docs/architecture/facility-edge.md)): one OS service, one process, embedding SurrealDB. [`health-edge-runtime`](../../../crates/edge/health-edge-runtime/README.md) runs the node.
 
-Deploying an edge to a facility waits for the power-loss spike, [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34) (#34). The binary is built on the embedded adapter now. If the spike fails, only the engine settings change.
+Deploying an edge to a facility waits for the power-loss spike, [Does embedded SurrealDB RocksDB survive hard power loss on facility hardware?](https://github.com/carapai/people-centered-healthcare/issues/34) (#34), which now applies to SurrealKV, the embedded engine since ADR 0060. The binary is built on the embedded adapter now. If the spike fails, only the engine settings change.
 
 ## Modes
 
@@ -47,7 +47,6 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_FACILITY` | none | The facility this edge serves. With `HEALTH_SNAPSHOT_KEYS_FILE`, the node serves staff sign-in (#75) |
 | `HEALTH_SNAPSHOT_KEYS_FILE` | none | Central's snapshot public keys, a JSON array of JWKs (`central-server provision snapshot-keys`) |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
-| `SURREAL_ROCKSDB_BLOCK_CACHE_SIZE` | set by the installer | The RocksDB block cache cap, in bytes (about 25% of RAM) |
 
 ## Web app
 

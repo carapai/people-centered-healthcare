@@ -21,8 +21,6 @@ async function signIn(page: Page, username: string, password: string) {
 }
 
 test('an admin creates an account for new staff, who set their own password, and revokes it', async ({ browser }) => {
-  // An edge, three sign-ins and a password change: well over the default 30 seconds.
-  test.setTimeout(240_000)
   const edge = await startEdge({ signIn: true })
   try {
     // The edge's own screen imports central's bundle and enrolls a device.

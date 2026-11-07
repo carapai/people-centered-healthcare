@@ -146,7 +146,7 @@ async fn a_failed_migration_is_rolled_back_by_the_next_start() {
     // fail (the same refusal as a broken migration).
     {
         let connection = Connection::open(&Settings {
-            target: Target::RocksDb {
+            target: Target::SurrealKv {
                 path: edge.store.clone(),
             },
             namespace: "ug".into(),

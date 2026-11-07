@@ -12,9 +12,9 @@ A validated schema sketch is in [persistence-sketch.surql](persistence-sketch.su
 
 | Runtime | Process | Engine | Durability |
 |---|---|---|---|
-| Facility Edge Node | Embedded in `facility-edge` (ADR 0007) | RocksDB (`kv-rocksdb`) | `sync=every` |
-| Standalone Tauri desktop | Embedded in-process, one shared handle | RocksDB | `sync=every` |
-| Central | Separate `surreal start rocksdb://…` server, single node, on localhost or a private network | RocksDB | `sync=every` |
+| Facility Edge Node | Embedded in `facility-edge` (ADR 0007) | SurrealKV (`kv-surrealkv`; ADR 0060) | `sync=every` |
+| Standalone Tauri desktop | Embedded in-process, one shared handle | SurrealKV (ADR 0060) | `sync=every` |
+| Central | Separate `surreal start` server (4.0.0), single node, on localhost or a private network | The server's storage engine | `sync=every` |
 
 - **Version pinning:** every runtime uses one exact SurrealDB **3.3.x** version (SDK and server), upgraded together and only deliberately, with the FHIR query regression suite as the gate.
 - **SurrealKV** is revisited only once upstream recommends it and it has some release history.
@@ -124,7 +124,7 @@ sequenceDiagram
   - **Preconditions** are checked against the head read inside the transaction.
   - **Conflicts.** A concurrent commit to the same head, guard or counter fails the later commit, which surfaces as `WriteError::Conflict`. The rerun then sees the winner and gets 412.
   - **Guard records** (`guard`) and **counters** (`counter`, advanced by `SequenceState::next`) are records in that same transaction, never read-then-check.
-  - **Measured on 3.3.5.** 8 concurrent writers on one counter minted 200 values with no duplicates or gaps, but retried about 1,200 conflicts, roughly 6 per value. That exceeds `RetryPolicy`'s default of 4 attempts. One hot counter per facility is fine at clinic rates; a hotter one would need sharding or a longer retry budget.
+  - **Measured on 3.3.5**, to be measured again on 4.0.0 (ADR 0060). 8 concurrent writers on one counter minted 200 values with no duplicates or gaps, but retried about 1,200 conflicts, roughly 6 per value. That exceeds `RetryPolicy`'s default of 4 attempts. One hot counter per facility is fine at clinic rates; a hotter one would need sharding or a longer retry budget.
   - **Tables.** Migration `0001_resource_tables` creates head and history tables for the 84 resource types in the ownership registry (`health-surrealdb::ownership`), plus `guard`, `counter` and `outbox`. Not yet included: `facility`, `authority_node`, `security_labels`, `index_keys` and hot projections, which arrive with search (#57) and authorization.
 - **`If-Match` is required** on updates from our clients. Creates use `PUT [type]/[client-uuid]` (update-as-create, `updateCreate=true`). `POST` create works for external clients, and the server then mints a UUIDv7.
 - **Concurrent writers.** Two writers of the same resource both write its head record, so SurrealDB snapshot isolation reports a retryable conflict.
@@ -214,7 +214,8 @@ We write our own migrations runner as a module of `health-surrealdb`. SurrealKit
   - **Per-migration transaction.** Each pending migration runs in one transaction with its ledger row, so a failing migration applies nothing.
   - **Layout.** Files live in `crates/infrastructure/health-surrealdb/migrations/NNNN_name.surql` and are listed in `MIGRATIONS`. A test checks the folder and the list match.
   - **Snapshot.** The schema after migrating a fresh database is compared with `tests/fixtures/schema.snapshot`.
-- **Engines.** `Target::RocksDb` always opens `rocksdb://<path>?sync=every`. `Target::Remote` is central's server over WebSocket, with root sign-in. `Target::Memory` is for tests. Features `embedded`, `remote` and `memory` choose what is compiled in.
-- **Block cache.** The RocksDB block cache is capped through the service environment (`SURREAL_ROCKSDB_BLOCK_CACHE_SIZE`); SDK 3.3.5 reads RocksDB tuning from its config map, not the connection string. Whether the embedded engine honours the variable is unverified, and is to be measured with the edge hardware spikes.
+- **Engines** (SurrealDB 4.0.0; ADR 0060). `Target::SurrealKv` always opens `surrealkv://<path>?sync=every`. `Target::Remote` is central's server over WebSocket, with root sign-in. `Target::Memory` is for tests. Features `embedded`, `remote` and `memory` choose what is compiled in.
+- **Cache and memtable.** SurrealKV's block cache and memtable sizes are datastore options (`surrealkv_block_cache_capacity`, `surrealkv_max_memtable_size`), to be set from the edge hardware spikes (#36). The RocksDB block cache variable no longer applies (ADR 0060).
+- **Stack size.** SurrealDB 4 recurses, so every runtime that runs it uses 10 MiB thread stacks (`health_surrealdb::THREAD_STACK`), and tests get the same through `RUST_MIN_STACK` (ADR 0060).
 - **Reindexing** is a separate resumable job, never a migration.
 - **Testing.** Every migration also runs on the export → import round-trip fixture ([backup-and-recovery.md](backup-and-recovery.md)).

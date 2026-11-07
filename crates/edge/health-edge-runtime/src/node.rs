@@ -119,7 +119,7 @@ async fn extending<T>(manager: &dyn ServiceManager, work: impl Future<Output = T
 /// process exits and the service manager restarts it.
 async fn open(config: &EdgeConfig) -> Result<Connection, EdgeError> {
     let settings = Settings {
-        target: Target::RocksDb {
+        target: Target::SurrealKv {
             path: config.data_dir.clone(),
         },
         namespace: config.tenant.clone(),

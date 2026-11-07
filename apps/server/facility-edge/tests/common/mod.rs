@@ -8,7 +8,10 @@ use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
-pub const STARTUP: Duration = Duration::from_secs(60);
+/// How long a node may take to become ready. A fresh store applies every migration on its first
+/// start, and on SurrealKV with `sync=every` (ADR 0060) the first, which defines every resource
+/// table, takes most of a minute in a debug build.
+pub const STARTUP: Duration = Duration::from_secs(180);
 
 pub fn free_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
