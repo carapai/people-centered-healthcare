@@ -168,6 +168,30 @@
     },
     {
       "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/care-plan-author|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/episode-enrolled-by|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/episode-program|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/episode-transferred-from|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/episode-transferred-to|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-mapping|0.1.0"
+    },
+    {
+      "type": "composed-of",
       "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-target-questionnaire|0.1.0"
     },
     {
@@ -177,6 +201,18 @@
     {
       "type": "composed-of",
       "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/extraction-template|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-base-unit|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-pack-size|0.1.0"
+    },
+    {
+      "type": "composed-of",
+      "resource": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-synonym|0.1.0"
     },
     {
       "type": "composed-of",
