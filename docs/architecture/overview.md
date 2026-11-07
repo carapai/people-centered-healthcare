@@ -152,6 +152,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0058](../adr/0058-online-issuing-ca-under-the-offline-root.md) | Facility intermediates come from an online, name-constrained issuing CA under the offline national root |
 | [0059](../adr/0059-password-hashes-encrypted-at-rest-and-to-the-edge.md) | Password hashes are plain Argon2id, encrypted at rest under each node's keystore pepper key, and encrypted to the edge in its provisioning bundle |
 | [0060](../adr/0060-surrealdb-4-with-embedded-surrealkv.md) | SurrealDB 4 on every node, with SurrealKV (`sync=every`) as the embedded engine, after RUSTSEC-2026-0454 |
+| [0061](../adr/0061-change-log-seq-taken-under-a-commit-lock.md) | The change log's `seq` is taken under an in-process commit lock, not a counter record written in every transaction (amends 0019) |
 
 ## Still open
 

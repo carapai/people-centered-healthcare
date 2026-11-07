@@ -82,7 +82,7 @@ BEGIN TRANSACTION;
     last_updated: time::now(),
     deleted: false,
   };
--- (change-log and outbox rows are written here too; shape decided by the sync protocol ticket)
+-- (change-log and sync outbox rows are written here too, under the commit lock: migration 0037, ADR 0061)
   FOR $k IN ($head.index_keys ?? []) {
     DELETE $k;
   };

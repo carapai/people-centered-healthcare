@@ -96,6 +96,8 @@ struct Inner {
     db: Surreal<Any>,
     idle: Mutex<Vec<Surreal<Any>>>,
     permits: Arc<Semaphore>,
+    /// Held by a transaction from taking its change log `seq`s through its commit.
+    commit: tokio::sync::Mutex<()>,
 }
 
 /// A transaction's hold on a pooled session; dropping it frees the slot.
@@ -144,6 +146,7 @@ impl Connection {
                 db,
                 idle: Mutex::new(Vec::new()),
                 permits: Arc::new(Semaphore::new(MAX_CONCURRENT_TRANSACTIONS)),
+                commit: tokio::sync::Mutex::new(()),
             }),
         })
     }
@@ -151,6 +154,13 @@ impl Connection {
     /// The SDK handle, for this crate's repositories and migrations.
     pub(crate) fn db(&self) -> &Surreal<Any> {
         &self.inner.db
+    }
+
+    /// The node's commit lock (ADR 0019 amendment): a transaction that appends to the change
+    /// log holds it from taking its `seq`s until its commit returns, so `seq` order is commit
+    /// order. One process writes each database, so an in-process lock covers every writer.
+    pub(crate) async fn commit_lock(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.inner.commit.lock().await
     }
 
     /// A session for one transaction: an idle one, or a new clone while under the cap; waits
