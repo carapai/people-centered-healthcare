@@ -23,6 +23,13 @@ health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
 health-pki = { workspace = true }
+health-identifiers = { workspace = true }
+health-provisioning = { workspace = true }
+health-sync-protocol = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true }
+hyper-util = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
 if-addrs = { workspace = true }
@@ -31,6 +38,7 @@ p256 = { workspace = true, features = ["pkcs8", "pem"] }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -44,3 +52,9 @@ tracing = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = { workspace = true }
+
+[dev-dependencies]
+health-persistence = { workspace = true }
+health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
+health-sync-server = { workspace = true }
+rcgen = { workspace = true }

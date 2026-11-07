@@ -145,23 +145,29 @@ async fn each_upstream_gets_an_outbox_row_until_it_acknowledges() {
     }
 
     let seqs = |changes: Vec<Change>| changes.iter().map(|c| c.seq).collect::<Vec<_>>();
-    // Only what was committed after the peer was added is queued for it.
+    // A new peer is queued the whole log, including what was written before it was added.
     assert_eq!(
         seqs(store.pending_for("central", 10).await.expect("pending")),
-        vec![2, 3, 4]
+        vec![1, 2, 3, 4]
     );
     assert_eq!(
         seqs(store.pending_for("central", 2).await.expect("pending")),
-        vec![2, 3]
+        vec![1, 2]
     );
     store.acknowledge("central", 3).await.expect("ack");
     assert_eq!(
         seqs(store.pending_for("central", 10).await.expect("pending")),
         vec![4]
     );
+    // Adding it again queues nothing again.
+    store.add_upstream("central").await.expect("again");
+    assert_eq!(
+        seqs(store.pending_for("central", 10).await.expect("pending")),
+        vec![4]
+    );
     assert_eq!(
         seqs(store.pending_for("edge-b", 10).await.expect("pending")),
-        vec![2, 3, 4],
+        vec![1, 2, 3, 4],
         "each peer has its own queue"
     );
     assert_eq!(

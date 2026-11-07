@@ -325,6 +325,34 @@ pub async fn run(
             "no HEALTH_BACKUP_DIR: this node takes no backups"
         ),
     }
+    // Sync with central (#81), once provisioned: `node.json` names central, and the facility
+    // intermediate's key signs every request (ADR 0062).
+    match (
+        crate::sync::Upstream::from_identity(&config.pki_dir),
+        secrets.as_ref().and_then(sync_key),
+        store.0.get(),
+    ) {
+        (Some(upstream), Some(key), Some(connection)) => {
+            let fhir = health_surrealdb::SurrealStore::new(
+                connection.clone(),
+                Arc::new(health_time::SystemClock),
+            );
+            match crate::sync::Sync::new(fhir, upstream, key) {
+                Ok(sync) => {
+                    let every = config.sync_interval;
+                    supervisor.spawn("sync", move || sync.clone().run(every));
+                }
+                Err(error) => {
+                    tracing::warn!(alert = "sync-off", %error, "cannot sync with central");
+                }
+            }
+        }
+        (None, _, _) => tracing::info!("not provisioned yet: no sync with central"),
+        _ => tracing::warn!(
+            alert = "sync-off",
+            "the facility intermediate's key is not available: no sync with central"
+        ),
+    }
     if let (Some(ups), Some(power)) = (&config.ups, &monitor.power) {
         let (ups, poll, low) = (ups.clone(), config.ups_poll, Arc::clone(&low_battery));
         let power = Arc::clone(power);
@@ -459,4 +487,11 @@ pub fn shutdown_signal() -> impl Future<Output = ()> + Send + 'static {
             }
         }
     }
+}
+
+/// The facility intermediate's key, unsealed, to sign sync requests with (ADR 0062).
+fn sync_key(secrets: &Secrets) -> Option<p256::ecdsa::SigningKey> {
+    use p256::pkcs8::DecodePrivateKey as _;
+    let pem = secrets(INTERMEDIATE_KEY).ok()??;
+    p256::ecdsa::SigningKey::from_pkcs8_pem(std::str::from_utf8(&pem).ok()?).ok()
 }

@@ -38,6 +38,11 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - **Offline administration:** `/api/access/grants` and `/api/access/revocations`, behind the device gate, for a signed-in facility admin; grants are signed with the facility intermediate's key (`local-grant+jwt`).
   - **The web client:** `runtime.json`'s `auth` names the issuer, `health-edge` and `/callback`.
   - **Without its settings or keys,** the node logs `sign-in-off`.
+- **`sync`:** sync with central (#81, [synchronization.md](../../../docs/architecture/synchronization.md); ADR 0062), once `node.json` names central.
+  - **A round:** a handshake, then the outbox pushed in batches of whole transactions, then pulls until caught up. Every request is signed with the facility intermediate's key, over HTTPS verified against central's CA.
+  - **Backlog:** when central first becomes the upstream, everything already on the log is queued for it.
+  - **Wake-up:** central's `cursor` hint on `/sync/v1/events`, or the poll every `HEALTH_SYNC_INTERVAL_SECS`, doubled with jitter up to 30 min while central is unreachable (`sync-failing`).
+  - **A quarantined node** still pushes, and central holds its pushes for review (`sync-quarantined`). It pulls nothing.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.
   - **Retention:** the 48 newest, and the newest of each of the last 14 days (UTC). Pruning also removes unfinished backups and blobs that no kept backup refers to.

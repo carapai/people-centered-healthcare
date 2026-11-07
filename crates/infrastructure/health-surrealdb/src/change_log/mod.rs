@@ -181,11 +181,27 @@ impl SurrealStore {
         Ok(changes)
     }
 
-    /// Adds an upstream peer: every version committed from now on is queued for it.
+    /// Adds an upstream peer. Added for the first time, it is queued every version already on
+    /// the log, except those received from it, so nothing written before the node first reached
+    /// it is left behind; from then on every committed version is queued for it. Adding it again
+    /// changes nothing.
     pub async fn add_upstream(&self, peer: &str) -> Result<(), StoreError> {
         self.connection
             .db()
-            .query("UPSERT type::record('sync_upstream', $peer) SET added_at = time::now()")
+            .query(
+                "BEGIN; \
+                 LET $new = array::len((SELECT id FROM type::record('sync_upstream', $peer))) = 0; \
+                 IF $new { \
+                   FOR $entry IN (SELECT record::id(id) AS seq, tx_id, resource_type, resource_id \
+                                  FROM change_log WHERE origin != $peer) { \
+                     CREATE type::record('sync_outbox', [$peer, $entry.seq]) \
+                       SET tx_id = $entry.tx_id, \
+                           resource = string::concat($entry.resource_type, '/', $entry.resource_id); \
+                   }; \
+                   CREATE type::record('sync_upstream', $peer) SET added_at = time::now(); \
+                 }; \
+                 COMMIT;",
+            )
             .bind(("peer", peer.to_owned()))
             .await
             .and_then(surrealdb::IndexedResults::check)

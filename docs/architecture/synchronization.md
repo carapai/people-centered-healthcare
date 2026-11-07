@@ -91,7 +91,10 @@ Every item on the wire, in either direction:
     - golden-record narrowing of Patients;
     - ledger operations, which are refused as `invalid` for now;
     - HLC and package fields from the writer;
-    - the edge's sync task.
+    - the edge's sync task (below).
+- **In code (#81, edge).** The `sync` task in `health-edge-runtime` ([README](../../crates/edge/health-edge-runtime/README.md)) runs the session above against central.
+  - **Wake-up:** central's hints, with polling every `HEALTH_SYNC_INTERVAL_SECS` and backoff while offline.
+  - **Backlog:** adding an upstream queues the whole existing log for it, so writes from before the first contact are never left behind.
 - **In code (#81, transport).** `health-sync-server` ([README](../../crates/infrastructure/health-sync-server/README.md)), mounted by `central-server` when it provisions nodes:
   - **Endpoints:** `POST /sync/v1/hello`, `push` (NDJSON) and `pull`, and a `GET /sync/v1/events` stream of cursor hints.
   - **Authentication:** every request is signed by the calling node (ADR 0062) and checked by `NodeRegistry::authenticate_sync`. The registry's facility sets the node's Sync Scope.

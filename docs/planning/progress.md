@@ -963,4 +963,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a node is held to its handshake;
     - a compatible edge pushes (a resend is answered from receipts) and pulls in its facility scope;
     - an out-of-range edge's pushes are quarantined and it is sent nothing.
-  - **Next:** the edge's sync task.
+- **#81, part 3: the edge's sync task (2026-11-08).**
+  - **What:** `health-edge-runtime::sync` runs handshake, push and pull rounds against central over HTTPS, signed per ADR 0062. It wakes on central's cursor hint or every `HEALTH_SYNC_INTERVAL_SECS` (backoff to 30 min while offline). `add_upstream` now queues the existing log for a new upstream.
+  - **Tested** in process, over TLS against the real `/sync/v1` endpoints: what the edge wrote before first reaching central, and while central was unreachable, goes up; central's patient comes down; and the next round moves nothing.
+  - **Still open for #81:**
+    - priority lanes;
+    - golden-record narrowing;
+    - ledger operations on the log;
+    - zstd;
+    - a multi-node simulation with partitions in nightly CI (testing.md).
