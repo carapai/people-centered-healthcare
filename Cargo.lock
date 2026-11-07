@@ -3082,7 +3082,7 @@ name = "health-product-registry"
 version = "0.1.0"
 dependencies = [
  "serde",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3097,7 +3097,7 @@ dependencies = [
  "health-time",
  "serde_json",
  "surrealdb",
- "thiserror",
+ "thiserror 2.0.21",
  "tokio",
 ]
 
