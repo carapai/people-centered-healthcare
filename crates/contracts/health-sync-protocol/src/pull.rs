@@ -112,6 +112,10 @@ pub trait Replica: Send + Sync {
         decisions: &[ApplyDecision],
         checkpoint: &Cursor,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// Advances the checkpoint to `checkpoint` alone, when the response read past items the
+    /// node was not sent (out of its scope, or its own).
+    fn advance(&self, checkpoint: &Cursor) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 /// What a pull applied.
@@ -155,6 +159,7 @@ pub async fn apply_pull<R: Replica>(
         groups: 0,
         candidates_kept: Vec::new(),
     };
+    let mut last_checkpoint = None;
     for group in &groups {
         let mut decisions = Vec::with_capacity(group.items.len());
         for item in &group.items {
@@ -179,6 +184,10 @@ pub async fn apply_pull<R: Replica>(
             .await
             .map_err(PullError::Store)?;
         applied.groups += 1;
+        last_checkpoint = Some(checkpoint.seq);
+    }
+    if last_checkpoint != Some(cursor.seq) {
+        replica.advance(&cursor).await.map_err(PullError::Store)?;
     }
     Ok(applied)
 }

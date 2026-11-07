@@ -124,6 +124,7 @@ impl Store for SurrealStore {
             blocking: self.blocking.clone(),
             tx_id: OpId::new(),
             changes: Vec::new(),
+            source: None,
         })
     }
 }
@@ -140,6 +141,8 @@ pub struct SurrealTx {
     tx_id: OpId,
     /// The versions written so far, appended to the change log on commit.
     changes: Vec<crate::change_log::Pending>,
+    /// Set when this transaction applies versions received by sync: where they came from.
+    source: Option<crate::change_log::Source>,
 }
 
 impl Drop for SurrealTx {
@@ -283,7 +286,10 @@ impl SurrealTx {
         .transpose()
     }
 
-    async fn put(
+    /// Writes a version after `previous_seq`. `last_updated` is the local clock unless the
+    /// version was received by sync, which keeps the time its origin stamped.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn put(
         &mut self,
         resource_type: &ResourceType,
         id: ResourceId,
@@ -291,9 +297,10 @@ impl SurrealTx {
         json: &RawJson,
         previous_seq: u64,
         deleted: bool,
+        last_updated: Option<Timestamp>,
     ) -> Result<VersionMeta, WriteError> {
         let table = table(resource_type)?;
-        let last_updated = self.clock.now();
+        let last_updated = last_updated.unwrap_or_else(|| self.clock.now());
         let stamped = stamp_meta(json, resource_type, id, op_id, last_updated)?;
         // A Provenance belongs to its target's Owner (resource-ownership.md rule 7), read in
         // this transaction so the target's category decides it.
@@ -374,6 +381,7 @@ impl SurrealTx {
             version_seq: i64::try_from(version_seq)
                 .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?,
             deleted,
+            origin: self.source.as_ref().map(|s| s.origin.clone()),
         });
         Ok(VersionMeta {
             version_id: op_id,
@@ -385,6 +393,12 @@ impl SurrealTx {
 }
 
 impl SurrealTx {
+    /// Marks this transaction as applying versions received by sync from `source.peer`: they
+    /// are logged with their origin node and are not queued back toward that peer.
+    pub(crate) fn received_from(&mut self, source: crate::change_log::Source) {
+        self.source = Some(source);
+    }
+
     /// Up to `limit` live resources whose current version references `resource_type/id`, not
     /// counting the resource itself or AuditEvents (persistence.md § Reference integrity). A
     /// record-id range over `idx_ref_in`.
@@ -500,6 +514,7 @@ impl Transaction for SurrealTx {
             &request.json,
             previous,
             false,
+            None,
         )
         .await
     }
@@ -530,6 +545,7 @@ impl Transaction for SurrealTx {
             &head.json,
             head.version.version_seq,
             true,
+            None,
         )
         .await
     }
@@ -634,7 +650,8 @@ impl Transaction for SurrealTx {
             let held = self.connection.commit_lock().await;
             let appended = async {
                 let last = crate::change_log::last_seq(&self.connection).await?;
-                crate::change_log::append(&tx, self.tx_id, last, &self.changes).await
+                let skip = self.source.as_ref().map(|s| s.peer.as_str());
+                crate::change_log::append(&tx, self.tx_id, last, &self.changes, skip).await
             };
             if let Err(error) = appended.await {
                 self.tx = Some(tx);

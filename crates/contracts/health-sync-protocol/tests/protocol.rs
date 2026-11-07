@@ -373,6 +373,11 @@ impl Replica for Edge {
         self.checkpoints.lock().expect("lock").push(checkpoint.seq);
         Ok(())
     }
+
+    async fn advance(&self, checkpoint: &Cursor) -> Result<(), ()> {
+        self.checkpoints.lock().expect("lock").push(checkpoint.seq);
+        Ok(())
+    }
 }
 
 #[test]
@@ -412,6 +417,18 @@ fn a_pull_applies_one_group_at_a_time_with_its_checkpoint() {
     assert_eq!(applied.cursor, cursor);
     assert_eq!(applied.candidates_kept, vec![candidate]);
     assert_eq!(*edge.checkpoints.lock().expect("lock"), vec![12, 13]);
+
+    // A response that read past items the node was not sent still moves its checkpoint.
+    let skipped = PullResponse::Items {
+        items: Vec::new(),
+        cursor: Cursor {
+            seq: 20,
+            ..cursor.clone()
+        },
+        more: false,
+    };
+    pollster::block_on(apply_pull(&edge, skipped)).expect("ok");
+    assert_eq!(*edge.checkpoints.lock().expect("lock"), vec![12, 13, 20]);
 
     let reseed = pollster::block_on(apply_pull(&edge, PullResponse::ReseedRequired));
     assert!(matches!(reseed, Err(PullError::ReseedRequired)));

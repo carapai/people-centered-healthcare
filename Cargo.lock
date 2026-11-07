@@ -3225,6 +3225,7 @@ name = "health-surrealdb"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "health-access-policy",
  "health-billing",
  "health-client-registry",
  "health-consent",
@@ -3240,6 +3241,7 @@ dependencies = [
  "health-payments",
  "health-persistence",
  "health-pricing",
+ "health-sync-protocol",
  "health-time",
  "health-workflow",
  "jiff",
