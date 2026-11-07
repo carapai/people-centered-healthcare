@@ -939,3 +939,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **`seq` is taken under an in-process commit lock** held through the commit, in place of ADR 0019's counter record. Measured with 8 concurrent writers: the counter record caused 791 conflict retries for 200 writes; the lock caused none. A stress test tails the log during concurrent writes and finds no skipped or repeated `seq`.
   - **Epoch:** `sync_state:node`, replaced by `new_epoch` on backup restore.
   - **Not yet:** ledger operations on the log (#80); delivery (#81).
+- **#80: the sync/v1 protocol contract (2026-11-07).** New contracts crate `health-sync-protocol`, with no I/O.
+  - **Envelope** `Item`: `kind` (version or op), `op_id`, `tx_id`, the subject, provenance, `Hlc`, `content_hash` (sha-256 of canonical JSON: sorted keys, no whitespace), packages, snapshot, flags, blobs and body. Bodies are NDJSON. zstd is left to the transport (#81).
+  - **Handshake:** a different protocol major is refused; software outside N-1, or an unapproved package, is quarantined. `expected_cursor` drops a checkpoint from another epoch.
+  - **Push:** items grouped by `tx_id`; batches of at most 500 items or 4 MiB, a group never split.
+  - **Receiver** `receive` over an `Authority` port: a retried group is answered from its receipts and applied once; an `op_id` reused with another hash is rejected `op_id_reused`; a malformed or partly known group is rejected without applying.
+  - **Pull:** `decide` never applies an item twice and keeps an unaccepted local candidate under a pulled head; `apply_pull` over a `Replica` port applies one group per transaction with its checkpoint.
+  - **Item states** as in synchronization.md.
+  - **Not yet:** the adapters (the `Authority` and `Replica` ports over `health-surrealdb`), the HTTP endpoints, and ledger operations on the change log, all with #81.
