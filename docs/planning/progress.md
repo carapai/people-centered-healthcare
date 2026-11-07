@@ -929,3 +929,5 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **HTTP:** `/api/stock/products`. The pharmacy worklist resolves each prescription's product, and prepare uses it when none is named.
   - **Client:** Products page under Stock. The pharmacist's product field is now filled in from the product master.
   - **e2e:** `dispensing.spec.ts` adds the product on the Products page, and checks that it is filled in.
+
+- **#93: expressions type-check against the Questionnaire's items.** `health-fhir-extraction::gates::mistyped` runs the mapping on `sample_response`, which answers every item with a value of its type, and passes every output through tier 1. Publication runs it for each Questionnaire version in the mapping's range. #93's only open item is now re-derivation at the authority, which needs sync (#81).

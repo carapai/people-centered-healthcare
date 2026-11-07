@@ -1,8 +1,11 @@
 //! The publication gates of an Extraction Mapping (#93): expressions that evaluate, linkIds the
-//! Questionnaire has, rounded arithmetic (ADR 0052), and fixtures that give exactly their Bundle.
+//! Questionnaire has, expressions that type-check against its items, rounded arithmetic
+//! (ADR 0052), and fixtures that give exactly their Bundle.
 
 use health_fhir_extraction::Mapping;
-use health_fhir_extraction::gates::{Fixture, fixture, unknown_items, unparsable, unrounded};
+use health_fhir_extraction::gates::{
+    Fixture, fixture, mistyped, sample_response, unknown_items, unparsable, unrounded,
+};
 use health_fhir_validation::OctofhirEngine;
 use serde_json::{Value, json};
 
@@ -183,6 +186,90 @@ async fn a_fixture_that_does_not_give_its_bundle_fails() {
     .await;
     assert!(
         found.iter().any(|p| p.contains("not valid FHIR")),
+        "{found:?}"
+    );
+}
+
+/// The fixture mapping's Questionnaire, with each item's type.
+fn typed_questionnaire() -> Value {
+    json!({
+        "resourceType": "Questionnaire", "url": "https://health.go.ug/fhir/Questionnaire/anc-visit", "version": "1.4.0",
+        "item": [
+            { "linkId": "vitals", "type": "group", "item": [
+                { "linkId": "weight", "type": "decimal" },
+                { "linkId": "weight-note", "type": "string", "repeats": true }
+            ] },
+            { "linkId": "medications", "type": "group", "item": [
+                { "linkId": "medication", "type": "group", "repeats": true, "item": [
+                    { "linkId": "drug", "type": "coding" },
+                    { "linkId": "instructions", "type": "text" }
+                ] }
+            ] },
+            { "linkId": "danger-signs", "type": "boolean" },
+            { "linkId": "note", "type": "display" }
+        ]
+    })
+}
+
+#[test]
+fn the_sample_response_answers_every_question_with_its_type() {
+    let response = sample_response(&typed_questionnaire());
+    assert_eq!(
+        response["questionnaire"],
+        "https://health.go.ug/fhir/Questionnaire/anc-visit|1.4.0"
+    );
+    let vitals = &response["item"][0]["item"];
+    assert_eq!(vitals[0]["answer"][0]["valueDecimal"].to_string(), "1.5");
+    assert_eq!(vitals[1]["answer"][0]["valueString"], "sample");
+    let medication = &response["item"][1]["item"][0]["item"];
+    assert_eq!(medication[0]["answer"][0]["valueCoding"]["code"], "sample");
+    assert_eq!(response["item"][2]["answer"][0]["valueBoolean"], true);
+    assert_eq!(
+        response["item"].as_array().map(Vec::len),
+        Some(3),
+        "display items get no answer"
+    );
+
+    let mut chosen = typed_questionnaire();
+    chosen["item"][2] = json!({ "linkId": "danger-signs", "type": "coding",
+        "answerOption": [{ "valueCoding": { "system": "http://snomed.info/sct", "code": "1" } }] });
+    let response = sample_response(&chosen);
+    assert_eq!(response["item"][2]["answer"][0]["valueCoding"]["code"], "1");
+}
+
+#[tokio::test]
+async fn the_fixture_mapping_type_checks_against_its_questionnaire() {
+    let mapping = Mapping::from_library(&library()).expect("mapping");
+    assert_eq!(
+        mistyped(&OctofhirEngine::new(), &mapping, &typed_questionnaire()).await,
+        Vec::<String>::new()
+    );
+}
+
+#[tokio::test]
+async fn an_answer_of_the_wrong_type_for_its_element_is_named() {
+    let mapping = Mapping::from_library(&library()).expect("mapping");
+    let engine = OctofhirEngine::new();
+
+    // A string answer written into the weight's decimal.
+    let mut questionnaire = typed_questionnaire();
+    questionnaire["item"][0]["item"][0]["type"] = json!("string");
+    let found = mistyped(&engine, &mapping, &questionnaire).await;
+    assert!(
+        found
+            .iter()
+            .any(|p| p.starts_with("template weight:") && p.contains("valueQuantity.value")),
+        "{found:?}"
+    );
+
+    // A Coding answer written into the dosage instruction's text, a primitive.
+    let mut questionnaire = typed_questionnaire();
+    questionnaire["item"][1]["item"][0]["item"][1]["type"] = json!("coding");
+    let found = mistyped(&engine, &mapping, &questionnaire).await;
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains("does not extract")
+            && found[0].contains("a primitive set to a complex value"),
         "{found:?}"
     );
 }
