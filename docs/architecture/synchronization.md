@@ -58,7 +58,17 @@ Every item on the wire, in either direction:
   - **`sync_upstream`** lists the upstream peers. **`sync_outbox`** rows are keyed `[peer, seq]` and are removed by `acknowledge`.
   - **`sync_state:node`** holds the epoch. Backup restore calls `new_epoch`.
   - **Reads:** `SurrealStore::cursor`, `changes_after` and `pending_for`.
-  - **Not yet on the log:** ledger operations (`kind: op`), which arrive with the envelope (#80).
+  - **Not yet on the log:** ledger operations (`kind: op`); the stock, charge and payment adapters write them with #81.
+- **In code (#80).** `health-sync-protocol` (contracts) holds the wire types and both sides' rules, with no I/O ([README](../../crates/contracts/health-sync-protocol/README.md)):
+  - the envelope `Item` and its `ContentHash`;
+  - the handshake verdict;
+  - push grouping and batching;
+  - `receive` over the `Authority` port (receipts, `op_id_reused`);
+  - `decide` and `apply_pull` over the `Replica` port;
+  - `ItemState`;
+  - the HLC.
+
+  zstd compression and the `/sync/v1` endpoints belong to the transport (#81).
 
 ## Session
 
