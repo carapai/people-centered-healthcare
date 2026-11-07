@@ -22,7 +22,8 @@ DEFINE FIELD received_at ON sync_receipt TYPE datetime;
 DEFINE TABLE sync_conflict SCHEMAFULL;
 DEFINE FIELD peer ON sync_conflict TYPE string;
 DEFINE FIELD items ON sync_conflict TYPE string;
-DEFINE FIELD status ON sync_conflict TYPE string ASSERT $value IN ['open', 'resolved', 'superseded'];
+DEFINE FIELD status ON sync_conflict TYPE string
+  ASSERT $value IN ['open', 'resolved', 'superseded'];
 DEFINE FIELD opened_at ON sync_conflict TYPE datetime;
 
 DEFINE TABLE sync_checkpoint SCHEMAFULL;
@@ -32,6 +33,7 @@ DEFINE FIELD seq ON sync_checkpoint TYPE int;
 DEFINE TABLE sync_item_state SCHEMAFULL;
 DEFINE FIELD resource_type ON sync_item_state TYPE string;
 DEFINE FIELD resource_id ON sync_item_state TYPE string;
-DEFINE FIELD state ON sync_item_state TYPE string ASSERT $value IN ['conflict', 'rejected'];
+DEFINE FIELD state ON sync_item_state TYPE string
+  ASSERT $value IN ['conflict', 'rejected'];
 DEFINE FIELD outcome ON sync_item_state TYPE string;
 DEFINE INDEX sync_item_state_resource ON sync_item_state FIELDS resource_type, resource_id;
