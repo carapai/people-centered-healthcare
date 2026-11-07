@@ -933,3 +933,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
 - **The core package defines the modules' own extensions (#93 follow-up).** Nine extensions were in use with no definition: `extraction-mapping` on QuestionnaireResponse (#93), the four `episode-*` extensions on EpisodeOfCare (#116), `care-plan-author` on CarePlan, and the three `product-*` extensions on Medication. `CodeSystem/platform` gains `extraction`, the Provenance activity of an extraction run. The package stays 0.1.0, since it is not yet published. Still open on #93: re-derivation at the authority, which needs sync, and type-checking expressions against answer types.
 
 - **#93: expressions type-check against the Questionnaire's items.** `health-fhir-extraction::gates::mistyped` runs the mapping on `sample_response`, which answers every item with a value of its type, and passes every output through tier 1. Publication runs it for each Questionnaire version in the mapping's range. #93's only open item is now re-derivation at the authority, which needs sync (#81).
+
+- **#79: the change log, commit order and outbox (decided 2026-11-07, ADR 0061).** Started before spike #36, at the product owner's choice.
+  - **Every commit that wrote versions** appends them to `change_log` (keyed by `seq`, sharing a `tx_id`) and adds one `sync_outbox` row per upstream peer, in the write transaction. Migration `0037_change_log`.
+  - **`seq` is taken under an in-process commit lock** held through the commit, in place of ADR 0019's counter record. Measured with 8 concurrent writers: the counter record caused 791 conflict retries for 200 writes; the lock caused none. A stress test tails the log during concurrent writes and finds no skipped or repeated `seq`.
+  - **Epoch:** `sync_state:node`, replaced by `new_epoch` on backup restore.
+  - **Not yet:** ledger operations on the log (#80); delivery (#81).

@@ -116,22 +116,30 @@ impl Store for SurrealStore {
         let (db, lease) = self.connection.session().await;
         let tx = db.begin().await.map_err(unavailable)?;
         Ok(SurrealTx {
+            connection: self.connection.clone(),
             tx: Some(tx),
             lease: Some(lease),
             clock: Arc::clone(&self.clock),
             registry: self.registry(),
             blocking: self.blocking.clone(),
+            tx_id: OpId::new(),
+            changes: Vec::new(),
         })
     }
 }
 
 /// A unit of work over one SurrealDB transaction. Dropping it without committing cancels it.
 pub struct SurrealTx {
+    connection: Connection,
     tx: Option<SurrealTransaction<Any>>,
     lease: Option<Lease>,
     clock: Arc<dyn Clock>,
     registry: Arc<Registry>,
     blocking: Option<Arc<dyn DerivedKeys>>,
+    /// This transaction's id on the change log.
+    tx_id: OpId,
+    /// The versions written so far, appended to the change log on commit.
+    changes: Vec<crate::change_log::Pending>,
 }
 
 impl Drop for SurrealTx {
@@ -359,6 +367,14 @@ impl SurrealTx {
              version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text}{owner_field} }}"
         ));
         sql.run(self.tx()?).await.map_err(write_error)?;
+        self.changes.push(crate::change_log::Pending {
+            op_id,
+            resource_type: resource_type.as_str().to_owned(),
+            resource_id: id_text,
+            version_seq: i64::try_from(version_seq)
+                .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?,
+            deleted,
+        });
         Ok(VersionMeta {
             version_id: op_id,
             version_seq,
@@ -610,6 +626,22 @@ impl Transaction for SurrealTx {
             .tx
             .take()
             .ok_or_else(|| StoreError::Unavailable("transaction already finished".into()))?;
+        // Versions written: take their seqs and commit under the node's commit lock, so no
+        // lower seq can commit after a higher one is visible (ADR 0019 amendment).
+        let _held = if self.changes.is_empty() {
+            None
+        } else {
+            let held = self.connection.commit_lock().await;
+            let appended = async {
+                let last = crate::change_log::last_seq(&self.connection).await?;
+                crate::change_log::append(&tx, self.tx_id, last, &self.changes).await
+            };
+            if let Err(error) = appended.await {
+                self.tx = Some(tx);
+                return Err(error);
+            }
+            Some(held)
+        };
         let db = tx.commit().await.map_err(write_error)?;
         if let Some(lease) = self.lease.take() {
             lease.give_back(db);

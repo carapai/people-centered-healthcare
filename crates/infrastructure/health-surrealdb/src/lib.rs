@@ -10,11 +10,14 @@
 //!   transactions: heads, history, guards, counters, the outbox and search index entries.
 //! - [`SurrealTx::version`] and [`SurrealTx::history`] read stored versions for `vread` and
 //!   `_history`.
+//! - [`SurrealStore::cursor`], [`SurrealStore::changes_after`] and [`SurrealStore::pending_for`]
+//!   read the sync change log every write appends to (ADR 0019); [`new_epoch`] follows a restore.
 //! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
 mod auth;
 mod blocking;
+mod change_log;
 mod charges;
 mod connection;
 mod consent;
@@ -44,6 +47,7 @@ pub use auth::{AuthSessionRow, BreakGlassReviewRow, BreakGlassRow};
 /// 2 MiB stack overflows on deep statements. SurrealDB recommends 10 MiB (ADR 0060).
 pub const THREAD_STACK: usize = 10 * 1024 * 1024;
 
+pub use change_log::{Change, Cursor, new_epoch};
 pub use connection::{
     Connection, ConnectionError, MAX_CONCURRENT_TRANSACTIONS, Settings, Target, connect,
 };

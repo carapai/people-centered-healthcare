@@ -18,7 +18,7 @@
 //! - **Verified after writing:** [`verify`] checks every checksum and decrypts every file; a
 //!   corrupt or wrong-key backup is refused, never restored.
 //! - **Restore** imports into an empty database in memory (the decrypted export never touches
-//!   disk) and puts the blobs back into the node's store.
+//!   disk), gives the node a new sync epoch, and puts the blobs back into the node's store.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -266,6 +266,11 @@ pub async fn restore(
     let text = String::from_utf8(export)
         .map_err(|_| BackupError::Corrupt("export is not UTF-8".into()))?;
     db.import_sql(&text)
+        .await
+        .map_err(|e| BackupError::Database(e.to_string()))?;
+    // The restored node's change log may be behind what its peers have seen: a new epoch makes
+    // them discard their cursors instead of misreading a seq that went back (ADR 0019).
+    health_surrealdb::new_epoch(db)
         .await
         .map_err(|e| BackupError::Database(e.to_string()))?;
     if let Some(store) = blobs {

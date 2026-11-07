@@ -48,11 +48,17 @@ Every item on the wire, in either direction:
   - local writes;
   - versions accepted from downstream;
   - versions applied from upstream.
-- **`seq`.** Each entry gets the next value of a single counter record written in that same transaction. Writers that race on the counter conflict and retry, so `seq` order is commit order, and a reader can never skip a change that commits late.
+- **`seq`.** Each entry gets the next `seq` after the last committed one, taken under the node's commit lock, which is held until the transaction commits (ADR 0061). Writers queue on the lock, so `seq` order is commit order, and a reader can never skip a change that commits late.
 - **Outbox.** One row per upstream peer, written in the same transaction as the change.
 - **Cursor.** An opaque `(node_id, epoch, seq)`:
   - **Epoch.** A node's `epoch` changes when it is restored from backup or re-seeded. A peer that sees a new epoch discards its cursor and asks for a delta from its own last checkpoint, so a `seq` that went backwards is never misread.
   - **Checkpoints.** Each peer and direction keeps its checkpoint on **both** sides. An interrupted run resumes from the last acknowledged batch.
+- **In code (#79).** `health-surrealdb` (migration `0037_change_log`, `src/change_log/`):
+  - **`change_log`** is keyed by `seq` and records the version's `tx_id`, `op_id`, type, id, `version_seq` and tombstone flag. The body is read from history.
+  - **`sync_upstream`** lists the upstream peers. **`sync_outbox`** rows are keyed `[peer, seq]` and are removed by `acknowledge`.
+  - **`sync_state:node`** holds the epoch. Backup restore calls `new_epoch`.
+  - **Reads:** `SurrealStore::cursor`, `changes_after` and `pending_for`.
+  - **Not yet on the log:** ledger operations (`kind: op`), which arrive with the envelope (#80).
 
 ## Session
 

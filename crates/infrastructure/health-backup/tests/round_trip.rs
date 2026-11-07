@@ -39,13 +39,15 @@ fn key(byte: u8) -> BackupKey {
 
 /// A database with every kind of record a node keeps: versions and history, a tombstone,
 /// search and reference index entries, blocking rows and counts, the migration ledger, the
-/// outbox's tables, the inbound queue and the registry review queue.
+/// outbox's tables, the sync change log and outbox, the inbound queue and the registry review queue.
 async fn representative() -> Connection {
     let db = connection("source").await;
     migrate(&db, MIGRATIONS).await.expect("migrate");
     let store = SurrealStore::new(db.clone(), Arc::new(SystemClock))
         .with_registry(Registry::new(jiff::tz::Offset::UTC))
         .with_blocking(Arc::new(ByFamily));
+    // Unsent sync work is kept: the change log and central's outbox rows.
+    store.add_upstream("central").await.expect("upstream");
     let write = |id: ResourceId, json: Value, precondition: Precondition| {
         let store = store.clone();
         async move {
@@ -165,9 +167,25 @@ async fn the_round_trip_preserves_every_record_and_blob() {
         .await
         .expect("restore");
 
-    let (before, after) = (contents(&source).await, contents(&target).await);
+    let (mut before, mut after) = (contents(&source).await, contents(&target).await);
     assert!(before.len() > 20, "{} tables", before.len());
-    assert_eq!(before, after, "every table, row for row");
+    // The one difference: the restored node has a new sync epoch (ADR 0019).
+    let state = |tables: &mut Vec<(String, String)>| {
+        let at = tables
+            .iter()
+            .position(|(t, _)| t == "sync_state")
+            .expect("sync_state");
+        tables.remove(at).1
+    };
+    let (state_before, state_after) = (state(&mut before), state(&mut after));
+    assert_ne!(state_before, state_after, "the epoch changed");
+    assert!(
+        before
+            .iter()
+            .any(|(t, rows)| t == "change_log" && rows.contains("version_seq")),
+        "the change log, and so the seq, is kept"
+    );
+    assert_eq!(before, after, "every other table, row for row");
     // The decimal kept its text, and the restored node is fully migrated.
     assert!(after.iter().any(|(_, rows)| rows.contains("12.30")));
     assert!(
