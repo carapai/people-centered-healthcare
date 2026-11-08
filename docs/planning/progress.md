@@ -963,6 +963,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - a node is held to its handshake;
     - a compatible edge pushes (a resend is answered from receipts) and pulls in its facility scope;
     - an out-of-range edge's pushes are quarantined and it is sent nothing.
+- **#82, part 1: Conflict Records and signed notes (2026-11-08).** Stacked on #366.
+  - **Conflict Records** keep both branches (the candidate group as pushed), with the class and policy of synchronization.md's table.
+  - **Signed notes:** a signed Composition or DocumentReference edited in place by sync is rejected (`signed_version_edited`), while marking it entered-in-error as it was is accepted.
+  - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
+  - **Ageing:** central alerts hourly on records open for more than 7 days.
+  - **Next:** the review queue's API and screen, with the conflict-resolution permission.
 - **#81, part 3: the edge's sync task (2026-11-08).**
   - **What:** `health-edge-runtime::sync` runs handshake, push and pull rounds against central over HTTPS, signed per ADR 0062. It wakes on central's cursor hint or every `HEALTH_SYNC_INTERVAL_SECS` (backoff to 30 min while offline). `add_upstream` now queues the existing log for a new upstream.
   - **Tested** in process, over TLS against the real `/sync/v1` endpoints: what the edge wrote before first reaching central, and while central was unreachable, goes up; central's patient comes down; and the next round moves nothing.

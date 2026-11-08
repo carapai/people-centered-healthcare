@@ -1570,10 +1570,17 @@ DEFINE TABLE sync_checkpoint TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD epoch ON sync_checkpoint TYPE string PERMISSIONS FULL
   DEFINE FIELD seq ON sync_checkpoint TYPE int PERMISSIONS FULL
 DEFINE TABLE sync_conflict TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD candidates ON sync_conflict TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD class ON sync_conflict TYPE none | string PERMISSIONS FULL
   DEFINE FIELD items ON sync_conflict TYPE string PERMISSIONS FULL
   DEFINE FIELD opened_at ON sync_conflict TYPE datetime PERMISSIONS FULL
   DEFINE FIELD peer ON sync_conflict TYPE string PERMISSIONS FULL
+  DEFINE FIELD policy ON sync_conflict TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD resolution ON sync_conflict TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD resolved_at ON sync_conflict TYPE none | datetime PERMISSIONS FULL
+  DEFINE FIELD resolved_by ON sync_conflict TYPE none | string PERMISSIONS FULL
   DEFINE FIELD status ON sync_conflict TYPE string ASSERT $value INSIDE ['open', 'resolved', 'superseded'] PERMISSIONS FULL
+  DEFINE INDEX sync_conflict_status ON sync_conflict FIELDS status, opened_at
 DEFINE TABLE sync_item_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD outcome ON sync_item_state TYPE string PERMISSIONS FULL
   DEFINE FIELD resource_id ON sync_item_state TYPE string PERMISSIONS FULL

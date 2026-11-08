@@ -232,6 +232,15 @@ stateDiagram-v2
 - **Resolution.** It is resolved at the record's Authority Node by a role with the conflict-resolution permission. The resolver writes a new version on top of the head, and that version syncs like any other.
 - **Notification.** The originating node learns of the conflict through the pull feed (item status and Conflict Record id). Its user sees "your edit is under review".
 - **Review queue.** There is one queue per Authority Node, filterable by class, facility and age. An alert fires when a conflict has been open for more than **7 days**.
+- **In code (#82, part 1).** `health-surrealdb`, migration `0040_sync_conflicts`:
+  - **Contents:** a Conflict Record keeps the pushed group as sent (the candidate branch), each conflicting version's parent and the head it met, and the class and policy from the table above (`class_of`).
+  - **Signed notes:** an edit or delete of a signed Composition or DocumentReference is rejected at the receiver with `signed_version_edited`. It is checked against the version the candidate was written on, by clinical-documentation's own rule.
+  - **Store operations:** `open_conflicts` (oldest first, optionally only those opened before a time), `conflict`, and `resolve_conflict`. A resolution writes a new version on top of the head, which syncs like any other, or keeps the head, and records the resolver, the time and the resulting version.
+  - **Ageing:** central raises `sync-conflicts-ageing` hourly while a record has been open for more than 7 days.
+  - **Not yet:**
+    - the review queue's API and screen, which need the conflict-resolution permission;
+    - the commuting workflow transitions (auto-resolution 2);
+    - clearing the originating node's `conflict` item state when the resolution arrives.
 
 ## Provisional states
 
