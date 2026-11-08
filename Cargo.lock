@@ -3310,6 +3310,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-sync-sim"
+version = "0.1.0"
+dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-surrealdb",
+ "health-sync-protocol",
+ "health-time",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "health-terminology"
 version = "0.1.0"
 dependencies = [

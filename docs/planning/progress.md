@@ -969,6 +969,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#85: the multi-node sync simulation (2026-11-08).**
+  - **Harness:** `crates/testing/health-sync-sim` gives central, edge and desktop each their own clock, minutes apart. Links can be cut, and rounds use the real protocol, including re-seeding. A restore is an epoch change.
+  - **Clinical scenario (§117)**, on every PR: a visit recorded at a desktop through internet and LAN outages, an outage past the horizon (the edge re-seeds), and central's restore (everyone below re-seeds). All three nodes end with the same records, nothing is lost or refused, and nothing moves on another pass.
+  - **Week of clinics** (nightly in `e2e.yml`): daily partitions, and two concurrent edits that end as Conflict Records.
 - **#84, part 1: attachments follow their records (2026-11-08).**
   - **Reference format:** a blob is referenced as `Attachment.url` `urn:health:blob:sha256:<hex>`, with `size` and `contentType`, and items list their blobs.
   - **Upload:** accepted records queue their blobs for the upstream. The edge uploads each in 1 MiB chunks from the offset central reports, so an interrupted upload resumes; an out-of-order chunk gets 409 with the resume point.
