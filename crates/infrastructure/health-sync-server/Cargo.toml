@@ -14,6 +14,10 @@ workspace = true
 
 [dependencies]
 axum = { workspace = true }
+health-access-policy = { workspace = true }
+health-audit = { workspace = true }
+health-persistence = { workspace = true }
+health-time = { workspace = true }
 futures-util = { workspace = true }
 health-identifiers = { workspace = true }
 health-provisioning = { workspace = true }
@@ -25,9 +29,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 health-identity = { workspace = true }
-health-persistence = { workspace = true }
 health-pki = { workspace = true }
-health-time = { workspace = true }
 http-body-util = { workspace = true }
 p256 = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }

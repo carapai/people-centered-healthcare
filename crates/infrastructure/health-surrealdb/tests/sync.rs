@@ -344,6 +344,7 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
                 id,
                 json: RawJson::from_validated(patient("Chris Okello").to_string()),
             },
+            None,
         )
         .await
         .expect("resolve");

@@ -319,6 +319,19 @@ pub(crate) fn routes(
                     subject_layer,
                 )),
         );
+        // The Conflict Record review queue (#82), for staff with the conflict-resolution
+        // permission.
+        api = api.nest(
+            "/sync/conflicts",
+            health_sync_server::review_router(
+                fhir_store.clone(),
+                Auditor::new("central", sensitive(policy)),
+            )
+            .layer(axum::middleware::from_fn_with_state(
+                subjects.clone(),
+                subject_layer,
+            )),
+        );
         let Routes {
             fhir,
             reviews,
@@ -881,6 +894,8 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/inbox/{*rest}", service.clone())
         .route_service("/api/care-plans/{*rest}", service.clone())
         .route_service("/api/requests/{*rest}", service.clone())
+        .route_service("/api/sync/conflicts", service.clone())
+        .route_service("/api/sync/conflicts/{*rest}", service.clone())
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())

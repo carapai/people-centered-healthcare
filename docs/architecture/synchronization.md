@@ -237,8 +237,13 @@ stateDiagram-v2
   - **Signed notes:** an edit or delete of a signed Composition or DocumentReference is rejected at the receiver with `signed_version_edited`. It is checked against the version the candidate was written on, by clinical-documentation's own rule.
   - **Store operations:** `open_conflicts` (oldest first, optionally only those opened before a time), `conflict`, and `resolve_conflict`. A resolution writes a new version on top of the head, which syncs like any other, or keeps the head, and records the resolver, the time and the resulting version.
   - **Ageing:** central raises `sync-conflicts-ageing` hourly while a record has been open for more than 7 days.
+  - **Review over HTTP (#82, part 2):** `/api/sync/conflicts` at central, for staff whose roles grant `sync.resolve-conflicts` (`health-sync-server::review_router`).
+    - `GET /` lists the open records, oldest first, each flagged `overdue` after 7 days.
+    - `GET /{id}` shows both branches: the candidate as pushed, and the current head of each conflicting record.
+    - `POST /{id}` takes `keep-head`, or `write` with the corrected resource.
+    - The decision and its AuditEvent are committed in one transaction.
   - **Not yet:**
-    - the review queue's API and screen, which need the conflict-resolution permission;
+    - the review queue's screen in the web client;
     - the commuting workflow transitions (auto-resolution 2);
     - clearing the originating node's `conflict` item state when the resolution arrives.
 
