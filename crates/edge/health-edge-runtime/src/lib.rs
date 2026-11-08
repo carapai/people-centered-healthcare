@@ -30,6 +30,7 @@ mod enrollment;
 mod node;
 mod notify;
 mod supervisor;
+pub mod sync;
 mod tls;
 pub mod update;
 mod ups;

@@ -35,6 +35,8 @@ health-pki = { workspace = true }
 health-provisioning = { workspace = true }
 health-publication = { workspace = true }
 health-registries-app = { workspace = true }
+health-sync-protocol = { workspace = true }
+health-sync-server = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
 health-workflow = { workspace = true }

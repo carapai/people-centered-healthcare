@@ -32,3 +32,5 @@ We chose this because provisioning has to be immediate, without waiting for a ce
 - **Chains.** An edge serves the leaf, its facility intermediate and the issuing CA. Tauri pins stay on the facility intermediate (ADR 0008).
 - **Facility DNS names** must fall under one of the issuing CA's configured suffixes. Adding a suffix means issuing a new issuing CA.
 - **Sync mTLS node certificates** are not decided here.
+
+  > Settled by ADR 0062: nodes sign their sync requests with the facility-intermediate key; there are no sync client certificates.

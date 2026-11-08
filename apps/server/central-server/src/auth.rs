@@ -263,8 +263,11 @@ pub(crate) fn routes(
     // Edge provisioning and recovery-key escrow (#268): a one-time code, or the node's own
     // signature, is the only credential, so they are outside the gates.
     let mut provisioning = None;
+    let mut sync = None;
     if settings.issuing_ca.is_some() || settings.kms.is_some() {
         let registry = NodeRegistry::new(fhir_store.clone(), Arc::new(SystemClock), "central");
+        // Sync with provisioned nodes (#81): each request is signed by the node (ADR 0062).
+        sync = Some(sync_routes(fhir_store.clone(), registry.clone())?);
         alert_hourly(registry.clone());
         let mut routes = Router::new();
         if let Some(issuer) = &settings.issuing_ca {
@@ -369,7 +372,23 @@ pub(crate) fn routes(
             );
         }
     }
+    if let Some(sync) = sync {
+        router = router.merge(sync);
+    }
     Ok(router.nest("/api", api))
+}
+
+/// The `/sync/v1` endpoints (#81; ADR 0062). Peers on this release or the one before are served;
+/// no package is approved yet, so a peer reporting one is quarantined.
+fn sync_routes(store: SurrealStore, registry: NodeRegistry) -> Result<Router, &'static str> {
+    let compatibility = health_sync_protocol::Compatibility {
+        protocol: health_sync_protocol::PROTOCOL,
+        software: env!("CARGO_PKG_VERSION")
+            .parse()
+            .map_err(|_| "the package version is not major.minor.patch")?,
+        approved: std::collections::BTreeSet::new(),
+    };
+    Ok(health_sync_server::SyncServer::new(store, registry, compatibility).router())
 }
 
 /// Keeps the standing alerts of ADR 0048 going, hourly: every active edge running under an

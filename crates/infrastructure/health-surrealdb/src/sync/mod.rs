@@ -19,8 +19,8 @@ use health_access_policy::{FACILITY_TAG_SYSTEM, is_facility_scope};
 use health_identifiers::{NodeId, OpId, ResourceId};
 use health_persistence::{RawJson, ResourceType, Store, StoreError, Transaction, WriteError};
 use health_sync_protocol::{
-    ApplyDecision, Authority, ContentHash, Cursor, Group, Hlc, Item, Kind, Local, Outcome,
-    PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, group as group_items,
+    ApplyDecision, Authority, ContentHash, Cursor, Group, Hello, Hlc, Item, Kind, Local, Outcome,
+    PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, Verdict, group as group_items,
 };
 use health_time::Timestamp;
 use serde_json::{Value, json};
@@ -408,6 +408,101 @@ impl SurrealStore {
             })
         })
         .transpose()
+    }
+
+    /// This node's own id on the sync protocol, for a node that has no provisioned one
+    /// (central). Kept with the store, so a restore keeps it.
+    pub async fn node_id(&self) -> Result<NodeId, StoreError> {
+        let node: Option<String> = self
+            .connection
+            .db()
+            .query("SELECT VALUE node FROM ONLY sync_state:node")
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        node.ok_or_else(|| corrupt("node id"))?
+            .parse()
+            .map_err(|_| corrupt("node id"))
+    }
+
+    /// Records `peer`'s handshake and the verdict on it.
+    pub async fn record_peer(
+        &self,
+        peer: NodeId,
+        hello: &Hello,
+        verdict: &Verdict,
+    ) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query(
+                "UPSERT type::record('sync_peer', $peer) SET hello = $hello, verdict = $verdict, \
+                 seen_at = time::now()",
+            )
+            .bind(("peer", peer.to_string()))
+            .bind((
+                "hello",
+                serde_json::to_string(hello).map_err(|_| corrupt("hello"))?,
+            ))
+            .bind((
+                "verdict",
+                serde_json::to_string(verdict).map_err(|_| corrupt("verdict"))?,
+            ))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?;
+        Ok(())
+    }
+
+    /// The verdict on `peer`'s last handshake, if it has made one.
+    pub async fn peer_verdict(&self, peer: NodeId) -> Result<Option<Verdict>, StoreError> {
+        let verdict: Option<String> = self
+            .connection
+            .db()
+            .query("SELECT VALUE verdict FROM ONLY type::record('sync_peer', $peer)")
+            .bind(("peer", peer.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        verdict
+            .map(|v| serde_json::from_str(&v).map_err(|_| corrupt("verdict")))
+            .transpose()
+    }
+
+    /// Holds items an out-of-range `peer` pushed, for review (synchronization.md § Handshake and
+    /// compatibility). A resent item replaces its earlier copy.
+    pub async fn quarantine(&self, peer: NodeId, items: &[Item]) -> Result<(), StoreError> {
+        let mut sql = Sql::default();
+        let peer = sql.str(peer.to_string());
+        for item in items {
+            let op = sql.str(item.op_id.to_string());
+            let text = sql.str(serde_json::to_string(item).map_err(|_| corrupt("item"))?);
+            sql.push(format!(
+                "UPSERT type::record('sync_quarantine', {op}) SET peer = {peer}, item = {text}, \
+                 received_at = time::now()"
+            ));
+        }
+        let tx = self.begin().await?;
+        sql.run(tx.tx()?).await.map_err(unavailable)?;
+        tx.commit().await.map_err(|e| match e {
+            WriteError::Store(e) => e,
+            other => StoreError::Unavailable(other.to_string()),
+        })
+    }
+
+    /// The `op_id`s held in quarantine.
+    pub async fn quarantined(&self) -> Result<Vec<String>, StoreError> {
+        self.connection
+            .db()
+            .query("SELECT VALUE record::id(id) FROM sync_quarantine")
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)
     }
 
     /// The Conflict Records opened for pushes, as `(tx_id, status)`.

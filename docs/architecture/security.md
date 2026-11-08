@@ -18,7 +18,7 @@ This page consolidates how MASTER_PROMPT §95–97 is met. Each mechanism is dec
 | Break-glass | One patient, 1 hour, reason code, immediate alert, privacy-officer review within 72 h | offline-auth.md |
 | Session management | 15-minute DPoP access tokens with a 12-hour cap; PIN resume and switch; idle lock after 15 min; tokens in memory only | offline-auth.md, client-application.md |
 | Device trust | Device-bound enrollment approved by a facility admin; DPoP keys; revocation | ADR 0009, lan-security.md |
-| Encryption in transit | TLS everywhere: a private PKI with name-constrained facility intermediates on the LAN, mTLS for sync | ADR 0008, synchronization.md |
+| Encryption in transit | TLS everywhere: a private PKI with name-constrained facility intermediates on the LAN, node-signed sync requests (ADR 0062) | ADR 0008, synchronization.md |
 | Encryption at rest | Encrypted backups everywhere. Edges: mandatory full-disk encryption with TPM-only unlock, recovery keys escrowed at central. Desktops: full-disk encryption check (warn or block by configuration) | ADR 0048, ADR 0040, backup-and-recovery.md |
 | Key management | See [Keys](#keys) | |
 | Secure backups | Encrypted per-node, keys escrowed, drills | ADR 0046 |
@@ -56,7 +56,7 @@ Permissions are enforced in the Rust services on every node, never only in the U
 | National root | Offline; the platform operator until MoH governance is decided | Anchors the private PKI | Ceremony; custody in fog | ADR 0008 |
 | Facility issuing CA | Central HSM/KMS, non-exportable | Issues facility intermediates at provisioning | 10 years, issuing for the first 5; issued at a root ceremony | ADR 0058 |
 | Facility intermediate | Edge keystore: systemd-creds (Linux) or DPAPI machine scope (Windows); generated on the edge and never exported | LAN TLS for the facility's names | 5 years; revoked on the issuing CA's CRL | ADRs 0008, 0058 |
-| Node and device keys | OS keystore (edge, desktop); non-extractable WebCrypto key (browser) | mTLS and DPoP | Re-enrollment; never recycled | ADRs 0009, 0013, 0040 |
+| Node and device keys | OS keystore (edge, desktop); non-extractable WebCrypto key (browser) | Node-signed sync requests (ADR 0062) and DPoP | Re-enrollment; never recycled | ADRs 0009, 0013, 0040 |
 | Edge pepper | Edge keystore: systemd-creds with the TPM2 (Linux) or DPAPI machine scope (Windows) | Wraps the credential hashes | — | offline-auth.md |
 | Permission-snapshot signing | Central | Signs per-user snapshots | — | ADR 0011 |
 | Publication signing | Central HSM/KMS | Signs definition packages; a code-signing certificate under the root, never a CA | Yearly, at a root ceremony | ADRs 0024, 0058 |

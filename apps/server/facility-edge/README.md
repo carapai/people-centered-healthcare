@@ -30,6 +30,7 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_BACKUP_KEY_FILE` | required with `HEALTH_BACKUP_DIR` | The node's backup key, 64 hex characters. Escrow at central is #138 |
 | `HEALTH_BACKUP_INTERVAL_SECS` | `3600` | |
 | `HEALTH_BACKUP_TEST_SECS` | `604800` | How often the newest backup is test-restored |
+| `HEALTH_SYNC_INTERVAL_SECS` | `300` | How often the node syncs with central when no hint wakes it sooner; doubled, up to 30 min, while central is unreachable |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | none | Without it only logs are written |
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | none | The in-country collector's OTLP/HTTP logs endpoint. Without it, log lines stay in the local buffer |
 | `HEALTH_TELEMETRY_DIR` | `telemetry` beside `HEALTH_DATA_DIR` | The bounded buffer (64 MiB) of log lines waiting to be shipped |

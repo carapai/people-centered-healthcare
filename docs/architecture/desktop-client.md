@@ -84,7 +84,7 @@ stateDiagram-v2
 | Role | Steps |
 |---|---|
 | Under an edge | 1. Pairing and device enrollment with the edge (lan-security.md)<br>2. Seed of the Sync Scope from the edge |
-| Mode B | 1. A central admin issues a one-time provisioning code for the facility<br>2. The desktop gets a node certificate from central for mTLS<br>3. Seed of the full facility scope from central, over the network or signed USB |
+| Mode B | 1. A central admin issues a one-time provisioning code for the facility<br>2. The desktop gets a key on record at central and signs its sync requests with it (ADR 0062)<br>3. Seed of the full facility scope from central, over the network or signed USB |
 
 - **Local login (ADR 0010).** In mode B and in offline fallback, the desktop runs `health-auth` itself, with the same rules as the edge: snapshot expiry, PIN switching, a 15-minute idle lock and the clock floor.
 - **Who can log in offline:** only staff whose permission snapshot is on the device. Mode B gets snapshots for all of the facility's staff. A desktop under an edge gets them for staff assigned to its service points.
