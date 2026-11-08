@@ -969,6 +969,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#247: inter-facility transfers matched at central (2026-11-09; product owner chose to sync the transfer document).**
+  - **Flow:** the source's dispatched transfer goes up, central keeps the source's lines, and the destination's edge pulls the transfers in transit to it and receives against them. The receipt goes up, and central matches it against the dispatch, opening a Reconciliation Record per discrepancy at central. Central alerts on transfers not received in 14 days and on receipts without a dispatch.
+  - **Tested:** KLA01 dispatches 40 to GUL02, GUL02 receives 35, and central records a short of 5 on GUL02's unit, even though the destination's copy claimed 35 were sent. Another facility cannot send the transfer, and the destination keeps it once.
 - **#81: the stock ledger goes up as operations (2026-11-08).**
   - **At the edge:** a stock movement is logged on the change log as an operation in its own transaction (migration `0044_ledger_ops`), and syncs up as a `kind: op` item.
   - **At central:** it is appended through inventory's rules as a late operation, with its receipt in one transaction. A movement held already is skipped, and a negative balance opens a Reconciliation Record. Operations never come back down.

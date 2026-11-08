@@ -24,6 +24,7 @@ health-identity = { workspace = true }
 health-observability = { workspace = true }
 health-pki = { workspace = true }
 health-identifiers = { workspace = true }
+health-inventory = { workspace = true }
 health-provisioning = { workspace = true }
 health-sync-protocol = { workspace = true }
 http-body-util = { workspace = true }

@@ -15,6 +15,10 @@
 //! A version received by sync keeps its `op_id` and the `lastUpdated` its origin stamped, is
 //! logged with its origin node, and is never queued back toward the peer it came from.
 
+mod transfers;
+
+pub use transfers::{TransferMatch, TransferRefused};
+
 use health_access_policy::{FACILITY_TAG_SYSTEM, is_facility_scope};
 use health_identifiers::{NodeId, OpId, ResourceId};
 use health_persistence::{RawJson, ResourceType, Store, StoreError, Transaction, WriteError};

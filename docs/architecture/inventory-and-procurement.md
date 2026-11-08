@@ -148,7 +148,15 @@ stateDiagram-v2
 
 - **Within a facility:** the same two steps apply between stores. A one-step "direct transfer" is allowed only when one user both sends and receives, and is audited.
 - **Between facilities:** each side records its own movement at its own Authority Node, and central matches dispatch with receipt (write-authority.md).
-- **Code** (#129): `health-inventory::transfers` and `reconciliation`, and `Inventory::dispatch`, `receive`, `direct_transfer` and `resolve`. Damaged stock is received into quarantine. Central's matching uses `transfers::discrepancies` once sync exists.
+- **Code** (#129): `health-inventory::transfers` and `reconciliation`, and `Inventory::dispatch`, `receive`, `direct_transfer` and `resolve`. Damaged stock is received into quarantine.
+- **Between facilities, through central (#247).** The transfer document travels up and on to the counterpart; each side's movements go up as stock operations.
+  - **Source edge:** saving a transfer between facilities queues it for central (`sync_transfer_outbox`, migration `0045_sync_transfers`), and the edge's sync round sends it to `POST /sync/v1/transfers`.
+  - **Central** (`SurrealStore::receive_transfer`):
+    - refuses a transfer naming neither end as the sending facility;
+    - keeps the source's lines as authoritative, and from the destination takes only its progress (status, who received, what was counted).
+  - **Destination edge:** fetches the transfers in transit addressed to it (`POST /sync/v1/transfers/inbound`) and receives against them as within a facility, opening its own Reconciliation Records.
+  - **Matching:** once the receipt arrives, central matches it against the source's lines with `transfers::discrepancies`. Each discrepancy is a Reconciliation Record at central on the destination's Stock Unit (`{transfer}-central-{n}`), and the result is recorded in `transfer_match` (`matched`, `mismatch`, `undispatched`).
+  - **Alerts:** central alerts hourly on transfers dispatched over 14 days ago and not received (`transfer-unreceived`), and on receipts with no dispatch (`transfer-undispatched`).
 
 ## Stock counts
 

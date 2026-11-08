@@ -60,5 +60,5 @@ pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, Sear
 pub use store::{SurrealStore, SurrealTx};
 pub use sync::{
     ConflictRecord, DOWN_GLOBAL, LEDGERS, Outgoing, Resolution, STOCK_LEDGER, SurrealAuthority,
-    SurrealReplica, SyncScope, UP_GLOBAL, class_of,
+    SurrealReplica, SyncScope, TransferMatch, TransferRefused, UP_GLOBAL, class_of,
 };

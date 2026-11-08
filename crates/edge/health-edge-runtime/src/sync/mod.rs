@@ -11,7 +11,8 @@
 //!    where central says it stopped, so an interrupted upload resumes.
 //! 4. **Break-glass grants** made or acknowledged here go up, so their review starts when they
 //!    reach central.
-//! 5. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
+//! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
+//! 6. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
@@ -91,6 +92,8 @@ pub struct Round {
     pub blobs: usize,
     /// Break-glass grants, and acknowledgements of them, sent for review (#224).
     pub grants: usize,
+    /// Inter-facility transfers sent up, and those addressed here taken in (#247).
+    pub transfers: (usize, usize),
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
 }
@@ -259,6 +262,44 @@ impl Sync {
         Ok(ids.len())
     }
 
+    /// Sends the inter-facility transfers queued for central, and takes in those in transit to
+    /// this facility, so its storekeeper receives against them (#247).
+    pub async fn exchange_transfers(&self, central: NodeId) -> Result<(usize, usize), String> {
+        let peer = central.to_string();
+        let queued = self
+            .store
+            .queued_transfers(&peer)
+            .await
+            .map_err(|e| e.to_string())?;
+        if !queued.is_empty() {
+            let body = serde_json::to_vec(&queued).map_err(|e| e.to_string())?;
+            self.post("/sync/v1/transfers", body).await?;
+            let ids: Vec<String> = queued.iter().map(|t| t.id.clone()).collect();
+            self.store
+                .transfers_sent(&peer, &ids)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        let inbound: Vec<health_inventory::transfers::Transfer> = serde_json::from_slice(
+            &self
+                .post("/sync/v1/transfers/inbound", b"{}".to_vec())
+                .await?,
+        )
+        .map_err(|e| format!("/sync/v1/transfers/inbound: {e}"))?;
+        let mut taken = 0;
+        for transfer in &inbound {
+            if self
+                .store
+                .accept_transfer(transfer)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                taken += 1;
+            }
+        }
+        Ok((queued.len(), taken))
+    }
+
     /// Fetches an attachment from central on demand and keeps it, verified, in this node's store.
     pub async fn fetch_blob(&self, blob: &health_sync_protocol::BlobRef) -> Result<(), String> {
         let blobs = self
@@ -401,6 +442,7 @@ impl Sync {
 
         round.blobs = self.upload_blobs(central).await?;
         round.grants = self.send_grants(central).await?;
+        round.transfers = self.exchange_transfers(central).await?;
 
         if welcome.verdict != Verdict::Compatible {
             tracing::warn!(

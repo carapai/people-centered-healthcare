@@ -117,6 +117,10 @@ impl StockStore for SurrealTx {
             vec![("id", transfer.id.clone()), ("data", data)],
         )
         .await?;
+        // Between facilities, it goes up to central and on to the counterpart (#247).
+        if transfer.between.is_some() {
+            self.queue_transfer(&transfer.id).await?;
+        }
         Ok(())
     }
 
