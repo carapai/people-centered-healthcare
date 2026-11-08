@@ -70,6 +70,7 @@ members = [
     "crates/infrastructure/health-surrealdb",
     "crates/infrastructure/health-sync-server",
     "crates/testing/health-persistence-memory",
+    "crates/testing/health-sync-sim",
     "crates/edge/health-edge-runtime",
     "crates/edge/health-node-identity",
     "apps/server/central-server",

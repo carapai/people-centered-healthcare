@@ -1,4 +1,5 @@
-# End-to-end suite (testing.md: Playwright on the web, nightly; #228): the built client against a
+# End-to-end suite (testing.md: Playwright on the web, nightly; #228) and the multi-node sync
+# simulation (#85): the built client against a
 # real central-server over SurrealDB, with provisioned users; and the client as a facility-edge
 # binary embeds and serves it (#76). Not a required check.
 name: e2e
@@ -21,6 +22,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  sync-sim:
+    name: multi-node sync simulation
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      # Central + edge + desktop with partitions, clock skew, long outages, re-seeding, restore
+      # and epoch change (#85): the §117 clinical scenario, and a week of clinics on a flaky link.
+      - run: cargo test --locked -p health-sync-sim -- --include-ignored
+      # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:
+      # PRs restore it and never evict it. Pruned first, it holds the dependencies, which change
+      # only with the toolchain and Cargo.lock (tools/github/prune-target.sh).
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+
   playwright:
     name: Playwright against central-server
     runs-on: ubuntu-24.04
