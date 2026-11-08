@@ -142,41 +142,50 @@ async fn sync(edge: &Node, central: &Node) -> Round {
             .expect("record");
         round.outcomes.extend(answers);
     }
-    loop {
-        let request = PullRequest {
-            cursor: edge.store.checkpoint(central.id).await.expect("checkpoint"),
-            lane: Lane::Clinical,
-            limit: 3,
-        };
-        let response = central
-            .store
-            .pull(&scope(), central.id, edge.id, &request)
-            .await
-            .expect("pull");
-        if response == PullResponse::ReseedRequired {
-            // Beyond the horizon: re-seed from central's snapshot, then carry on pulling.
-            let (items, cursor) = central
+    for lane in Lane::PULLED {
+        loop {
+            let request = PullRequest {
+                cursor: edge
+                    .store
+                    .checkpoint(central.id, lane)
+                    .await
+                    .expect("checkpoint"),
+                lane,
+                limit: 3,
+            };
+            let response = central
                 .store
-                .snapshot(&scope(), central.id)
+                .pull(&scope(), central.id, edge.id, &request)
                 .await
-                .expect("snapshot");
-            round.seeded += edge
-                .store
-                .seed(central.id, &items, &cursor)
-                .await
-                .expect("seed");
-            assert!(round.seeded < 1000, "a re-seed must move the checkpoint on");
-            continue;
-        }
-        let more = matches!(response, PullResponse::Items { more: true, .. });
-        if let PullResponse::Items { items, .. } = &response {
-            round.pulled += items.len();
-        }
-        apply_pull(&SurrealReplica::new(&edge.store, central.id), response)
+                .expect("pull");
+            if response == PullResponse::ReseedRequired {
+                // Beyond the horizon: re-seed from central's snapshot, then carry on pulling.
+                let (items, cursor) = central
+                    .store
+                    .snapshot(&scope(), central.id)
+                    .await
+                    .expect("snapshot");
+                round.seeded += edge
+                    .store
+                    .seed(central.id, &items, &cursor)
+                    .await
+                    .expect("seed");
+                assert!(round.seeded < 1000, "a re-seed must move the checkpoint on");
+                continue;
+            }
+            let more = matches!(response, PullResponse::Items { more: true, .. });
+            if let PullResponse::Items { items, .. } = &response {
+                round.pulled += items.len();
+            }
+            apply_pull(
+                &SurrealReplica::new(&edge.store, central.id, lane),
+                response,
+            )
             .await
             .expect("apply");
-        if !more {
-            break;
+            if !more {
+                break;
+            }
         }
     }
     round
@@ -606,4 +615,44 @@ async fn a_node_offline_beyond_the_horizon_reseeds_without_losing_data() {
     );
     // Caught up again: nothing moves.
     assert_eq!(sync(&edge, &central).await, Round::default());
+}
+
+#[tokio::test]
+async fn packages_arrive_before_the_clinical_data_written_before_them() {
+    let (central, edge) = pair().await;
+    let reading = ResourceId::new();
+    write(
+        &central,
+        reading,
+        &observation("KLA01", 5),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let value_set = ResourceId::new();
+    write(
+        &central,
+        value_set,
+        &json!({"resourceType": "ValueSet", "status": "active", "url": "urn:test:vs"}),
+        Precondition::MustNotExist,
+    )
+    .await;
+
+    sync(&edge, &central).await;
+    // The edge applied the packages lane first: the ValueSet sits earlier in its own log.
+    let applied = edge.store.changes_after(0, 10).await.expect("log");
+    let order: Vec<String> = applied
+        .iter()
+        .map(|c| c.resource_type.to_string())
+        .collect();
+    assert_eq!(order, vec!["ValueSet".to_owned(), "Observation".to_owned()]);
+    // Each lane has its own cursor, at the end of central's log.
+    let end = central.store.cursor().await.expect("cursor").seq;
+    for lane in Lane::PULLED {
+        let cursor = edge
+            .store
+            .checkpoint(central.id, lane)
+            .await
+            .expect("checkpoint");
+        assert_eq!(cursor.map(|c| c.seq), Some(end), "{lane:?}");
+    }
 }

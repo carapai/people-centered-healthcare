@@ -231,46 +231,52 @@ impl Sim {
                 .expect("record push");
             round.outcomes.extend(answers);
         }
-        let replica = SurrealReplica::new(&down.store, up_node.id);
-        loop {
-            let request = PullRequest {
-                cursor: down.store.checkpoint(up_node.id).await.expect("checkpoint"),
-                lane: Lane::Clinical,
-                limit: 50,
-            };
-            let response = up_node
-                .store
-                .pull(scope, up_node.id, down.id, &request)
-                .await
-                .expect("pull");
-            if response == PullResponse::ReseedRequired {
-                let (items, cursor) = up_node
+        for lane in Lane::PULLED {
+            let replica = SurrealReplica::new(&down.store, up_node.id, lane);
+            loop {
+                let request = PullRequest {
+                    cursor: down
+                        .store
+                        .checkpoint(up_node.id, lane)
+                        .await
+                        .expect("checkpoint"),
+                    lane,
+                    limit: 50,
+                };
+                let response = up_node
                     .store
-                    .snapshot(scope, up_node.id)
+                    .pull(scope, up_node.id, down.id, &request)
                     .await
-                    .expect("snapshot");
-                let applied = down
-                    .store
-                    .seed(up_node.id, &items, &cursor)
-                    .await
-                    .expect("seed");
-                round.seeded += applied;
-                self.reseeds.push((down.name, applied));
-                assert!(
-                    self.reseeds.len() < 1000,
-                    "{} keeps being told to re-seed by {}",
-                    down.name,
-                    up_node.name
-                );
-                continue;
-            }
-            let more = matches!(response, PullResponse::Items { more: true, .. });
-            if let PullResponse::Items { items, .. } = &response {
-                round.pulled += items.len();
-            }
-            apply_pull(&replica, response).await.expect("apply pull");
-            if !more {
-                break;
+                    .expect("pull");
+                if response == PullResponse::ReseedRequired {
+                    let (items, cursor) = up_node
+                        .store
+                        .snapshot(scope, up_node.id)
+                        .await
+                        .expect("snapshot");
+                    let applied = down
+                        .store
+                        .seed(up_node.id, &items, &cursor)
+                        .await
+                        .expect("seed");
+                    round.seeded += applied;
+                    self.reseeds.push((down.name, applied));
+                    assert!(
+                        self.reseeds.len() < 1000,
+                        "{} keeps being told to re-seed by {}",
+                        down.name,
+                        up_node.name
+                    );
+                    continue;
+                }
+                let more = matches!(response, PullResponse::Items { more: true, .. });
+                if let PullResponse::Items { items, .. } = &response {
+                    round.pulled += items.len();
+                }
+                apply_pull(&replica, response).await.expect("apply pull");
+                if !more {
+                    break;
+                }
             }
         }
         self.outcomes.extend(round.outcomes.iter().cloned());

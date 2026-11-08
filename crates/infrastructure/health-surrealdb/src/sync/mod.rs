@@ -19,8 +19,8 @@ use health_access_policy::{FACILITY_TAG_SYSTEM, is_facility_scope};
 use health_identifiers::{NodeId, OpId, ResourceId};
 use health_persistence::{RawJson, ResourceType, Store, StoreError, Transaction, WriteError};
 use health_sync_protocol::{
-    ApplyDecision, Authority, BlobRef, ContentHash, Cursor, Group, Hello, Hlc, Item, Kind, Local,
-    Outcome, PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, Verdict,
+    ApplyDecision, Authority, BlobRef, ContentHash, Cursor, Group, Hello, Hlc, Item, Kind, Lane,
+    Local, Outcome, PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, Verdict,
     group as group_items,
 };
 use health_time::Timestamp;
@@ -386,7 +386,9 @@ impl SurrealStore {
                 continue;
             }
             let item = self.item(change, node).await?;
-            if scope.admits_down(&item.resource_type, &item.body) {
+            if Lane::of(&item.resource_type) == request.lane
+                && scope.admits_down(&item.resource_type, &item.body)
+            {
                 pulled.push(Pulled {
                     seq: change.seq,
                     item,
@@ -404,8 +406,8 @@ impl SurrealStore {
         })
     }
 
-    /// The cursor into `peer`'s log this node has applied, if any.
-    pub async fn checkpoint(&self, peer: NodeId) -> Result<Option<Cursor>, StoreError> {
+    /// The cursor into `peer`'s log this node has applied in `lane`, if any.
+    pub async fn checkpoint(&self, peer: NodeId, lane: Lane) -> Result<Option<Cursor>, StoreError> {
         #[derive(SurrealValue)]
         struct Row {
             epoch: String,
@@ -414,8 +416,9 @@ impl SurrealStore {
         let row: Option<Row> = self
             .connection
             .db()
-            .query("SELECT epoch, seq FROM ONLY type::record('sync_checkpoint', $peer)")
+            .query("SELECT epoch, seq FROM ONLY type::record('sync_checkpoint', [$peer, $lane])")
             .bind(("peer", peer.to_string()))
+            .bind(("lane", lane.key()))
             .await
             .and_then(surrealdb::IndexedResults::check)
             .map_err(unavailable)?
@@ -566,7 +569,7 @@ impl SurrealStore {
         items: &[Item],
         cursor: &Cursor,
     ) -> Result<usize, WriteError> {
-        let replica = SurrealReplica::new(self, upstream);
+        let replica = SurrealReplica::new(self, upstream, Lane::Clinical);
         let mut applied = 0;
         for chunk in items.chunks(200) {
             let mut fresh = Vec::new();
@@ -589,7 +592,12 @@ impl SurrealStore {
             tx.commit().await?;
             applied += fresh.len();
         }
-        replica.advance(cursor).await?;
+        // The snapshot covers every lane: each lane resumes from its cursor.
+        for lane in Lane::PULLED {
+            SurrealReplica::new(self, upstream, lane)
+                .advance(cursor)
+                .await?;
+        }
         crate::change_log::new_epoch(&self.connection).await?;
         Ok(applied)
     }
@@ -1353,12 +1361,17 @@ async fn signed_note_refusal(
 pub struct SurrealReplica<'a> {
     store: &'a SurrealStore,
     upstream: NodeId,
+    lane: Lane,
 }
 
 impl<'a> SurrealReplica<'a> {
-    /// Applies what `upstream` serves.
-    pub fn new(store: &'a SurrealStore, upstream: NodeId) -> Self {
-        Self { store, upstream }
+    /// Applies what `upstream` serves in `lane`, checkpointing that lane.
+    pub fn new(store: &'a SurrealStore, upstream: NodeId, lane: Lane) -> Self {
+        Self {
+            store,
+            upstream,
+            lane,
+        }
     }
 }
 
@@ -1451,12 +1464,14 @@ impl Replica for SurrealReplica<'_> {
         }
         let mut sql = Sql::default();
         let peer = sql.str(checkpoint.node.to_string());
+        let lane = sql.str(self.lane.key());
         let epoch = sql.str(checkpoint.epoch.as_str());
         let seq = sql.value(Bind::Int(
             i64::try_from(checkpoint.seq).map_err(|_| WriteError::Store(corrupt("seq")))?,
         ));
         sql.push(format!(
-            "UPSERT type::record('sync_checkpoint', {peer}) SET epoch = {epoch}, seq = {seq}"
+            "UPSERT type::record('sync_checkpoint', [{peer}, {lane}]) SET epoch = {epoch}, \
+             seq = {seq}"
         ));
         sql.run(tx.tx()?).await.map_err(write_error)?;
         tx.commit().await
