@@ -19,8 +19,9 @@ use health_access_policy::{FACILITY_TAG_SYSTEM, is_facility_scope};
 use health_identifiers::{NodeId, OpId, ResourceId};
 use health_persistence::{RawJson, ResourceType, Store, StoreError, Transaction, WriteError};
 use health_sync_protocol::{
-    ApplyDecision, Authority, ContentHash, Cursor, Group, Hello, Hlc, Item, Kind, Local, Outcome,
-    PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, Verdict, group as group_items,
+    ApplyDecision, Authority, BlobRef, ContentHash, Cursor, Group, Hello, Hlc, Item, Kind, Local,
+    Outcome, PullRequest, PullResponse, Pulled, Reason, Receipt, Replica, Verdict,
+    group as group_items,
 };
 use health_time::Timestamp;
 use serde_json::{Value, json};
@@ -223,7 +224,7 @@ impl SurrealStore {
             snapshot_version: 0,
             provisional: false,
             deleted: change.deleted,
-            blobs: Vec::new(),
+            blobs: health_sync_protocol::blob_refs(&body),
             body,
         })
     }
@@ -283,8 +284,23 @@ impl SurrealStore {
     ) -> Result<(), StoreError> {
         let mut sql = Sql::default();
         let mut through = None;
+        let peer_key = sql.str(peer);
         for (outgoing, outcome) in sent.iter().zip(answers) {
             through = Some(outgoing.through);
+            if *outcome == Outcome::Accepted {
+                // Accepted: its attachments follow it (synchronization.md § Attachments).
+                for blob in outgoing.group.items.iter().flat_map(|item| &item.blobs) {
+                    let hash = sql.str(blob.hash.to_string());
+                    let size = sql.value(Bind::Int(
+                        i64::try_from(blob.size).map_err(|_| corrupt("blob size"))?,
+                    ));
+                    let content_type = sql.str(blob.content_type.as_str());
+                    sql.push(format!(
+                        "UPSERT type::record('sync_blob_queue', [{peer_key}, {hash}]) \
+                         SET size = {size}, content_type = {content_type}, queued_at = time::now()"
+                    ));
+                }
+            }
             let state = match outcome {
                 Outcome::Accepted => continue,
                 Outcome::Conflict { .. } => "conflict",
@@ -525,7 +541,7 @@ impl SurrealStore {
                     snapshot_version: 0,
                     provisional: false,
                     deleted: row.deleted,
-                    blobs: Vec::new(),
+                    blobs: health_sync_protocol::blob_refs(&body),
                     body,
                 });
             }
@@ -576,6 +592,51 @@ impl SurrealStore {
         replica.advance(cursor).await?;
         crate::change_log::new_epoch(&self.connection).await?;
         Ok(applied)
+    }
+
+    /// The blobs queued for `peer`, oldest first.
+    pub async fn queued_blobs(&self, peer: &str) -> Result<Vec<BlobRef>, StoreError> {
+        #[derive(SurrealValue)]
+        struct Row {
+            hash: String,
+            size: i64,
+            content_type: String,
+        }
+        let rows: Vec<Row> = self
+            .connection
+            .db()
+            .query(
+                "SELECT record::id(id)[1] AS hash, size, content_type, queued_at \
+                 FROM sync_blob_queue:[$peer]..[$peer, {}] ORDER BY queued_at",
+            )
+            .bind(("peer", peer.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(BlobRef {
+                    hash: row.hash.parse().map_err(|_| corrupt("blob hash"))?,
+                    size: u64::try_from(row.size).map_err(|_| corrupt("blob size"))?,
+                    content_type: row.content_type,
+                })
+            })
+            .collect()
+    }
+
+    /// Takes a blob off `peer`'s queue once the peer holds all of it.
+    pub async fn blob_sent(&self, peer: &str, hash: &ContentHash) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query("DELETE type::record('sync_blob_queue', [$peer, $hash])")
+            .bind(("peer", peer.to_owned()))
+            .bind(("hash", hash.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?;
+        Ok(())
     }
 
     /// This node's own id on the sync protocol, for a node that has no provisioned one

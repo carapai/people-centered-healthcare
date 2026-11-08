@@ -14,6 +14,10 @@
 //!   or refused peer is sent nothing.
 //! - `POST /sync/v1/snapshot` answers every head in the peer's scope with the cursor at that
 //!   instant, for a node told to re-seed.
+//! - `GET /sync/v1/blobs/{hash}/{size}` says how much of an attachment this node holds,
+//!   `PUT /sync/v1/blobs/{hash}/{size}/{offset}` appends a 1 MiB chunk there (the completing chunk
+//!   verifies the blob), and `GET /sync/v1/blobs/{hash}/content` serves it on demand
+//!   (synchronization.md § Attachments).
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -27,7 +31,7 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -61,6 +65,7 @@ struct Inner {
     registry: NodeRegistry,
     compatibility: Compatibility,
     scope_version: u64,
+    blobs: Option<health_files::FsBlobStore>,
 }
 
 impl SyncServer {
@@ -73,6 +78,25 @@ impl SyncServer {
                 registry,
                 compatibility,
                 scope_version: 1,
+                blobs: None,
+            }),
+        }
+    }
+
+    /// Accepts and serves attachments from `blobs` (synchronization.md § Attachments).
+    #[must_use]
+    pub fn with_blobs(self, blobs: health_files::FsBlobStore) -> Self {
+        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|shared| Inner {
+            store: shared.store.clone(),
+            registry: shared.registry.clone(),
+            compatibility: shared.compatibility.clone(),
+            scope_version: shared.scope_version,
+            blobs: shared.blobs.clone(),
+        });
+        Self {
+            inner: Arc::new(Inner {
+                blobs: Some(blobs),
+                ..inner
             }),
         }
     }
@@ -84,6 +108,12 @@ impl SyncServer {
             .route("/sync/v1/push", post(push))
             .route("/sync/v1/pull", post(pull))
             .route("/sync/v1/snapshot", post(snapshot))
+            .route("/sync/v1/blobs/{hash}/{size}", get(blob_status))
+            .route(
+                "/sync/v1/blobs/{hash}/{size}/{offset}",
+                axum::routing::put(blob_chunk),
+            )
+            .route("/sync/v1/blobs/{hash}/content", get(blob_content))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(MAX_BODY))
             .with_state(self)
@@ -357,6 +387,124 @@ async fn snapshot(
         Ok((items, cursor)) => {
             axum::Json(json!({ "cursor": cursor, "items": items })).into_response()
         }
+        Err(error) => failed(error),
+    }
+}
+
+/// The blob store, and the blob a path names.
+fn blob_target(
+    server: &SyncServer,
+    hash: &str,
+    size: u64,
+) -> Result<(health_files::FsBlobStore, health_files::BlobRef), Box<Response>> {
+    let store = server.inner.blobs.clone().ok_or_else(|| {
+        Box::new(problem(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "this node keeps no attachments",
+        ))
+    })?;
+    let hash = hash
+        .parse()
+        .map_err(|_| Box::new(problem(StatusCode::BAD_REQUEST, "not a sha-256 hash")))?;
+    if size > health_sync_protocol::MAX_BLOB_SIZE {
+        return Err(Box::new(problem(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "an attachment is at most 50 MiB",
+        )));
+    }
+    Ok((store, health_files::BlobRef { hash, size }))
+}
+
+fn blob_answer(result: Result<u64, health_files::BlobError>, size: u64) -> Response {
+    match result {
+        Ok(received) => {
+            axum::Json(health_sync_protocol::BlobStatus { received, size }).into_response()
+        }
+        Err(health_files::BlobError::OutOfOrder { received, .. }) => (
+            StatusCode::CONFLICT,
+            axum::Json(health_sync_protocol::BlobStatus { received, size }),
+        )
+            .into_response(),
+        Err(
+            error @ (health_files::BlobError::Mismatch { .. }
+            | health_files::BlobError::TooLarge { .. }),
+        ) => problem(StatusCode::UNPROCESSABLE_ENTITY, error.to_string()),
+        Err(error) => failed(error),
+    }
+}
+
+/// How much of a blob this node holds: where an upload resumes.
+async fn blob_status(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    Path((hash, size)): Path<(String, u64)>,
+) -> Response {
+    if let Err(response) = server.authenticate(&method, &uri, &headers, &[]).await {
+        return *response;
+    }
+    let (store, blob) = match blob_target(&server, &hash, size) {
+        Ok(target) => target,
+        Err(response) => return *response,
+    };
+    let result = tokio::task::spawn_blocking(move || store.received(&blob))
+        .await
+        .unwrap_or_else(|e| Err(health_files::BlobError::Io(std::io::Error::other(e))));
+    blob_answer(result, size)
+}
+
+/// One chunk of an upload, at the offset this node reported; the completing chunk verifies and
+/// stores the blob. An out-of-order chunk is answered 409 with where to resume.
+async fn blob_chunk(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    Path((hash, size, offset)): Path<(String, u64, u64)>,
+    body: Bytes,
+) -> Response {
+    if let Err(response) = server.authenticate(&method, &uri, &headers, &body).await {
+        return *response;
+    }
+    let (store, blob) = match blob_target(&server, &hash, size) {
+        Ok(target) => target,
+        Err(response) => return *response,
+    };
+    let result = tokio::task::spawn_blocking(move || {
+        store.write_chunk(&blob, offset, &body)?;
+        store.received(&blob)
+    })
+    .await
+    .unwrap_or_else(|e| Err(health_files::BlobError::Io(std::io::Error::other(e))));
+    blob_answer(result, size)
+}
+
+/// A whole blob, verified on read: the on-demand download.
+async fn blob_content(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    Path(hash): Path<String>,
+) -> Response {
+    if let Err(response) = server.authenticate(&method, &uri, &headers, &[]).await {
+        return *response;
+    }
+    let (store, blob) = match blob_target(&server, &hash, 0) {
+        Ok(target) => target,
+        Err(response) => return *response,
+    };
+    match tokio::task::spawn_blocking(move || store.read(&blob.hash)).await {
+        Ok(Ok(bytes)) => (
+            [(header::CONTENT_TYPE, "application/octet-stream")],
+            Body::from(bytes),
+        )
+            .into_response(),
+        Ok(Err(health_files::BlobError::NotFound(_))) => {
+            problem(StatusCode::NOT_FOUND, "no such attachment here")
+        }
+        Ok(Err(error)) => failed(error),
         Err(error) => failed(error),
     }
 }

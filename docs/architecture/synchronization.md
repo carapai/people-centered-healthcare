@@ -285,6 +285,18 @@ stateDiagram-v2
 - **Garbage collection** removes only blobs that nothing references, after the retention horizon.
 - **In code:** `health-files`' `FsBlobStore` ([README](../../crates/infrastructure/health-files/README.md)). It provides SHA-256 addressing, atomic writes, deduplication, the 50 MiB cap, chunked resumable uploads verified on completion, a hash check on every read (a mismatch is quarantined), and garbage collection behind a `BlobReferences` port. The sync upload endpoint and the `Attachment` reference index arrive with sync and persistence.
 
+- **Reference format (#84).** An `Attachment` names its blob as `url` `urn:health:blob:sha256:<64 hex>`, with `size` and `contentType`. `health_sync_protocol::blob_refs` finds every such reference in a resource, at any depth, and each item's `blobs` lists them.
+- **In code (#84, part 1).**
+  - **Queue:** once the upstream accepts a group, each blob its records reference is queued for that upstream (`sync_blob_queue`, migration `0042_sync_blobs`).
+  - **Upload:** after the push, the edge asks `GET /sync/v1/blobs/{hash}/{size}` how much central holds. It then sends `PUT /sync/v1/blobs/{hash}/{size}/{offset}` chunks of 1 MiB from there, into `health-files`' resumable upload, so an interrupted upload resumes rather than restarts. A chunk at the wrong offset is answered 409 with where to resume, and the completing chunk verifies the blob.
+  - **Pending:** a blob not yet held at the edge (its desktop's upload has not finished) stays queued.
+  - **Download:** on demand (`Sync::fetch_blob`, `GET /sync/v1/blobs/{hash}/content`), verified against its reference.
+  - **Storage:** central's store is `HEALTH_FILES_DIR`; the edge's is `files/` beside its data directory, where backups take it from.
+  - **Not yet:**
+    - the pre-fetch flag per type;
+    - the pending marker on an attachment whose blob has not arrived;
+    - checking a download against the requesting node's scope (today a node can only ask for hashes it has seen in records within its scope).
+
 ## Desktop reconnect (§90)
 
 1. TLS with the enrolled device certificate, then token exchange (lan-security.md, offline-auth.md).

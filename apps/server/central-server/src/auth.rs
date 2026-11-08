@@ -60,6 +60,8 @@ pub(crate) struct AuthSettings {
     pub(crate) issuing_ca: Option<Arc<health_pki::Authority>>,
     /// What wraps escrowed recovery keys (#268): the local adapter until the KMS.
     pub(crate) kms: Option<Arc<LocalKeyWrap>>,
+    /// The attachment store synced attachments go to (#84), with `HEALTH_FILES_DIR`.
+    pub(crate) files: Option<health_files::FsBlobStore>,
     /// The workflows central runs (#99), from the development definitions file.
     pub(crate) workflows: Option<health_fhir_server::WorkflowConfig>,
     /// Price Books and rules (#120), kept at central in the ledger's functional currency.
@@ -267,7 +269,11 @@ pub(crate) fn routes(
     if settings.issuing_ca.is_some() || settings.kms.is_some() {
         let registry = NodeRegistry::new(fhir_store.clone(), Arc::new(SystemClock), "central");
         // Sync with provisioned nodes (#81): each request is signed by the node (ADR 0062).
-        sync = Some(sync_routes(fhir_store.clone(), registry.clone())?);
+        sync = Some(sync_routes(
+            fhir_store.clone(),
+            registry.clone(),
+            settings.files.clone(),
+        )?);
         alert_hourly(registry.clone());
         let mut routes = Router::new();
         if let Some(issuer) = &settings.issuing_ca {
@@ -393,7 +399,11 @@ pub(crate) fn routes(
 
 /// The `/sync/v1` endpoints (#81; ADR 0062). Peers on this release or the one before are served;
 /// no package is approved yet, so a peer reporting one is quarantined.
-fn sync_routes(store: SurrealStore, registry: NodeRegistry) -> Result<Router, &'static str> {
+fn sync_routes(
+    store: SurrealStore,
+    registry: NodeRegistry,
+    files: Option<health_files::FsBlobStore>,
+) -> Result<Router, &'static str> {
     let compatibility = health_sync_protocol::Compatibility {
         protocol: health_sync_protocol::PROTOCOL,
         software: env!("CARGO_PKG_VERSION")
@@ -402,7 +412,12 @@ fn sync_routes(store: SurrealStore, registry: NodeRegistry) -> Result<Router, &'
         approved: std::collections::BTreeSet::new(),
     };
     conflicts_hourly(store.clone());
-    Ok(health_sync_server::SyncServer::new(store, registry, compatibility).router())
+    let server = health_sync_server::SyncServer::new(store, registry, compatibility);
+    Ok(match files {
+        Some(files) => server.with_blobs(files),
+        None => server,
+    }
+    .router())
 }
 
 /// Hourly sync upkeep: raises `sync-conflicts-ageing` while any Conflict Record has been open for
@@ -935,6 +950,7 @@ mod tests {
             payments: None,
             issuing_ca: None,
             kms: None,
+            files: None,
             workflows: None,
             pricing: health_fhir_server::PricingConfig {
                 currency: "UGX".into(),

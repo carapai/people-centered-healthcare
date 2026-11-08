@@ -33,6 +33,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217). Price Books and rules (#120), served at `/api/pricing` with the access policy, are in this currency |
 | `HEALTH_ISSUING_CA_CERT_FILE`, `HEALTH_ISSUING_CA_KEY_FILE` | none | The facility issuing CA's certificate and PKCS#8 key, PEM, until its key moves to the KMS (#268). With them, `/api/provisioning/nodes` is served, so an edge can provision itself with a one-time code. Set both or neither |
 | `HEALTH_KMS_KEY_FILE` | none | The master key, 64 hex characters, that wraps the edges' escrowed disk recovery keys until a KMS or HSM holds it (#268). With it, `/api/provisioning/recovery` is served and `central-server recovery` reads keys out |
+| `HEALTH_FILES_DIR` | none | Central's attachment store (#84): edges upload synced attachments here and fetch them on demand. Without it, attachments do not sync |
 | `HEALTH_BLOB_DIR` | required by `package` commands | The blob store's directory, where package tarballs are kept (#88) |
 | `HEALTH_PUBLICATION_KEY_FILE`, `HEALTH_PUBLICATION_CHAIN_FILE` | required by `package publish` | The publication-signing key (PKCS#8 PEM) and its certificate with any chain below the national root, until the key moves to the HSM or KMS |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |

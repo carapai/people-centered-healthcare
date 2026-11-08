@@ -492,3 +492,42 @@ fn the_hlc_moves_forward_past_local_and_remote_clocks() {
     );
     assert!(observed.tick(at(1_200)) > observed);
 }
+
+#[test]
+fn a_resource_names_its_blobs_and_an_upload_resumes_where_it_stopped() {
+    use health_sync_protocol::{BlobStatus, CHUNK_SIZE, blob_refs, blob_url};
+    let scan = ContentHash::of_bytes(b"scan");
+    let photo = ContentHash::of_bytes(b"photo");
+    let body = json!({
+        "resourceType": "DocumentReference",
+        "content": [
+            {"attachment": {"url": blob_url(&scan), "size": 2_621_440, "contentType": "application/pdf"}},
+            {"attachment": {"url": blob_url(&scan), "size": 2_621_440}},
+            {"attachment": {"url": "https://example.org/elsewhere.pdf"}}
+        ],
+        "extension": [{"valueAttachment": {"url": blob_url(&photo), "size": 10, "contentType": "image/jpeg"}}]
+    });
+    let refs = blob_refs(&body);
+    assert_eq!(refs.len(), 2, "each blob once, other URLs ignored");
+    assert_eq!(refs[0].hash, scan);
+    assert_eq!(refs[0].content_type, "application/pdf");
+    assert_eq!(refs[1].hash, photo);
+
+    let size = 2 * CHUNK_SIZE + CHUNK_SIZE / 2;
+    let fresh = BlobStatus { received: 0, size };
+    assert_eq!(fresh.next_chunk(), Some((0, CHUNK_SIZE)));
+    let interrupted = BlobStatus {
+        received: 2 * CHUNK_SIZE,
+        size,
+    };
+    assert_eq!(
+        interrupted.next_chunk(),
+        Some((2 * CHUNK_SIZE, CHUNK_SIZE / 2))
+    );
+    let stored = BlobStatus {
+        received: size,
+        size,
+    };
+    assert!(stored.complete());
+    assert_eq!(stored.next_chunk(), None);
+}

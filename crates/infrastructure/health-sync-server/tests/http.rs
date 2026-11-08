@@ -46,6 +46,7 @@ struct Setup {
     node: NodeId,
     key: SigningKey,
     edge: SurrealStore,
+    _files: tempfile::TempDir,
 }
 
 async fn setup() -> Setup {
@@ -93,7 +94,10 @@ async fn setup() -> Setup {
         approved: BTreeSet::new(),
     };
     let central_id = central.node_id().await.expect("central id");
-    let app = SyncServer::new(central.clone(), registry, compatibility).router();
+    let files = tempfile::tempdir().expect("files");
+    let app = SyncServer::new(central.clone(), registry, compatibility)
+        .with_blobs(health_files::FsBlobStore::open(files.path()).expect("blob store"))
+        .router();
     let edge = store("edge", clock.clone()).await;
     edge.add_upstream(&central_id.to_string())
         .await
@@ -105,6 +109,7 @@ async fn setup() -> Setup {
         node: node.id.to_string().parse().expect("node id"),
         key,
         edge,
+        _files: files,
     }
 }
 
@@ -346,4 +351,60 @@ async fn an_out_of_range_edge_is_quarantined_and_sent_nothing() {
         )
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn an_interrupted_attachment_upload_resumes_where_it_stopped() {
+    use health_sync_protocol::{BlobStatus, CHUNK_SIZE, ContentHash};
+    let s = setup().await;
+    let size = 2 * CHUNK_SIZE + CHUNK_SIZE / 2;
+    let content: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
+    let hash = ContentHash::of_bytes(&content);
+    let base = format!("/sync/v1/blobs/{hash}/{size}");
+    let chunk = |offset: u64| {
+        let end = (offset + CHUNK_SIZE).min(size);
+        content[usize::try_from(offset).expect("offset")..usize::try_from(end).expect("end")]
+            .to_vec()
+    };
+    let status = |body: &Bytes| serde_json::from_slice::<BlobStatus>(body).expect("status");
+
+    let (code, body) = s.send("GET", &base, Vec::new()).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(status(&body).received, 0);
+    // The first chunk arrives, then the connection drops.
+    let (code, body) = s.send("PUT", &format!("{base}/0"), chunk(0)).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(status(&body).received, CHUNK_SIZE);
+
+    // Resuming: central says where it stopped; a chunk from elsewhere is refused with that offset.
+    let (_, body) = s.send("GET", &base, Vec::new()).await;
+    let resume = status(&body);
+    assert_eq!(resume.next_chunk(), Some((CHUNK_SIZE, CHUNK_SIZE)));
+    let (code, body) = s
+        .send(
+            "PUT",
+            &format!("{base}/{}", 2 * CHUNK_SIZE),
+            chunk(2 * CHUNK_SIZE),
+        )
+        .await;
+    assert_eq!(code, StatusCode::CONFLICT);
+    assert_eq!(status(&body).received, CHUNK_SIZE);
+    let mut at = resume;
+    while let Some((offset, _)) = at.next_chunk() {
+        let (code, body) = s
+            .send("PUT", &format!("{base}/{offset}"), chunk(offset))
+            .await;
+        assert_eq!(code, StatusCode::OK);
+        at = status(&body);
+    }
+    assert!(at.complete());
+
+    // Stored and verified: it is served whole, and a second upload has nothing to send.
+    let (code, body) = s
+        .send("GET", &format!("/sync/v1/blobs/{hash}/content"), Vec::new())
+        .await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(body.as_ref(), content.as_slice());
+    let (_, body) = s.send("GET", &base, Vec::new()).await;
+    assert!(status(&body).complete(), "deduplicated");
 }

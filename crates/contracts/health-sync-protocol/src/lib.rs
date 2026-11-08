@@ -16,8 +16,11 @@
 //!   port): one transaction per group, with its checkpoint; pulled data never overwrites an
 //!   unaccepted local candidate.
 //! - **Item states** ([`ItemState`]): the outbox item's life cycle.
+//! - **Attachments** ([`blob_refs`], [`BlobStatus`]): blobs referenced by `Attachment.url`, sent
+//!   after their resource in resumable 1 MiB chunks.
 //! - **NDJSON bodies** ([`to_ndjson`], [`from_ndjson`]). Compression (zstd) belongs to the transport.
 
+mod blobs;
 mod envelope;
 mod handshake;
 mod hash;
@@ -28,6 +31,7 @@ mod push;
 mod receive;
 mod state;
 
+pub use blobs::{BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, blob_refs, blob_url};
 pub use envelope::{BlobRef, EnvelopeError, Item, Kind, PackageRef};
 pub use handshake::{
     Compatibility, Cursor, Hello, Incompatibility, PROTOCOL, ProtocolVersion, SoftwareVersion,

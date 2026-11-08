@@ -7,7 +7,9 @@
 //! 2. **Push.** The outbox goes up in batches of whole transactions (at most 500 items or 4 MiB).
 //!    Each answered group is acknowledged, and a conflict or rejection is kept as an unaccepted
 //!    candidate. A quarantined node still pushes; central holds its items for review.
-//! 3. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
+//! 3. **Attachments.** Each blob an accepted record references is uploaded in 1 MiB chunks from
+//!    where central says it stopped, so an interrupted upload resumes.
+//! 4. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
@@ -25,8 +27,8 @@ use health_identifiers::NodeId;
 use health_provisioning::{SYNC_SCHEME, sync_jws};
 use health_surrealdb::{Outgoing, SurrealReplica, SurrealStore};
 use health_sync_protocol::{
-    GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SoftwareVersion, Verdict,
-    Welcome, apply_pull, batches, from_ndjson, to_ndjson,
+    BlobStatus, GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SoftwareVersion,
+    Verdict, Welcome, apply_pull, batches, from_ndjson, to_ndjson,
 };
 use health_time::Timestamp;
 use http_body_util::{BodyExt as _, BodyStream, Full};
@@ -83,6 +85,8 @@ pub struct Round {
     pub pulled: usize,
     /// Heads applied from a re-seed, when central said the node was beyond its horizon.
     pub seeded: usize,
+    /// Attachments whose upload completed.
+    pub blobs: usize,
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
 }
@@ -97,6 +101,7 @@ pub struct Sync {
     key: Arc<SigningKey>,
     client: Client<Https, Full<VecDeque<u8>>>,
     software: SoftwareVersion,
+    blobs: Option<health_files::FsBlobStore>,
 }
 
 fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
@@ -140,7 +145,118 @@ impl Sync {
             software: env!("CARGO_PKG_VERSION")
                 .parse()
                 .map_err(|_| "the package version is not major.minor.patch".to_owned())?,
+            blobs: None,
         })
+    }
+
+    /// Sends the attachments its records reference from `blobs`, and keeps those it fetches there
+    /// (synchronization.md § Attachments).
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: health_files::FsBlobStore) -> Self {
+        self.blobs = Some(blobs);
+        self
+    }
+
+    /// Sends `method` to `path` with `body`; the status and the answer's body.
+    async fn send(
+        &self,
+        method: &str,
+        path: &str,
+        body: Vec<u8>,
+    ) -> Result<(u16, Vec<u8>), String> {
+        let request = self.request(method, path, body)?;
+        let response = tokio::time::timeout(TIMEOUT, self.client.request(request))
+            .await
+            .map_err(|_| format!("{path}: central did not answer in time"))?
+            .map_err(|e| format!("{path}: cannot reach central: {e}"))?;
+        let status = response.status().as_u16();
+        let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
+            .await
+            .map_err(|_| format!("{path}: central did not answer in time"))?
+            .map_err(|e| format!("{path}: {e}"))?
+            .to_bytes()
+            .to_vec();
+        Ok((status, bytes))
+    }
+
+    /// Uploads the attachments queued for central, each from where central says it stopped, so
+    /// an interrupted upload resumes rather than restarts. A blob not yet held here (its record
+    /// came from a desktop whose upload has not finished) stays queued. Returns blobs completed.
+    pub async fn upload_blobs(&self, central: NodeId) -> Result<usize, String> {
+        let Some(blobs) = self.blobs.clone() else {
+            return Ok(0);
+        };
+        let peer = central.to_string();
+        let mut completed = 0;
+        for blob in self
+            .store
+            .queued_blobs(&peer)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            let hash: health_files::BlobHash = blob
+                .hash
+                .to_string()
+                .parse()
+                .map_err(|_| "a queued blob has an invalid hash".to_owned())?;
+            let local = blobs.clone();
+            let Ok(Ok(bytes)) = tokio::task::spawn_blocking(move || local.read(&hash)).await else {
+                continue;
+            };
+            let base = format!("/sync/v1/blobs/{}/{}", blob.hash, blob.size);
+            let (status, answer) = self.send("GET", &base, Vec::new()).await?;
+            if status != 200 {
+                return Err(format!("{base}: central answered {status}"));
+            }
+            let mut at: BlobStatus =
+                serde_json::from_slice(&answer).map_err(|e| format!("{base}: {e}"))?;
+            while let Some((offset, length)) = at.next_chunk() {
+                let start = usize::try_from(offset).map_err(|e| e.to_string())?;
+                let end = usize::try_from(offset + length).map_err(|e| e.to_string())?;
+                let chunk = bytes
+                    .get(start..end)
+                    .ok_or_else(|| "a blob is shorter than its record says".to_owned())?
+                    .to_vec();
+                let path = format!("{base}/{offset}");
+                let (status, answer) = self.send("PUT", &path, chunk).await?;
+                if status != 200 && status != 409 {
+                    return Err(format!("{path}: central answered {status}"));
+                }
+                at = serde_json::from_slice(&answer).map_err(|e| format!("{path}: {e}"))?;
+            }
+            self.store
+                .blob_sent(&peer, &blob.hash)
+                .await
+                .map_err(|e| e.to_string())?;
+            completed += 1;
+        }
+        Ok(completed)
+    }
+
+    /// Fetches an attachment from central on demand and keeps it, verified, in this node's store.
+    pub async fn fetch_blob(&self, blob: &health_sync_protocol::BlobRef) -> Result<(), String> {
+        let blobs = self
+            .blobs
+            .clone()
+            .ok_or_else(|| "this node keeps no attachments".to_owned())?;
+        let path = format!("/sync/v1/blobs/{}/content", blob.hash);
+        let (status, bytes) = self.send("GET", &path, Vec::new()).await?;
+        if status != 200 {
+            return Err(format!("{path}: central answered {status}"));
+        }
+        let expected = health_files::BlobRef {
+            hash: blob
+                .hash
+                .to_string()
+                .parse()
+                .map_err(|_| "an invalid hash".to_owned())?,
+            size: blob.size,
+        };
+        tokio::task::spawn_blocking(move || blobs.put_expecting(expected, bytes.as_slice()))
+            .await
+            .map_err(|e| e.to_string())?
+            .map(|_| ())
+            .map_err(|e| format!("{path}: {e}"))
     }
 
     fn request(
@@ -256,6 +372,8 @@ impl Sync {
                 round.pushed += count;
             }
         }
+
+        round.blobs = self.upload_blobs(central).await?;
 
         if welcome.verdict != Verdict::Compatible {
             tracing::warn!(

@@ -78,6 +78,9 @@ pub(crate) struct AuthFiles {
     /// escrowed disk recovery keys, until a KMS or HSM holds it. With it, edges escrow their keys
     /// at `/api/provisioning/recovery`, and `central-server recovery` reads them out.
     pub(crate) kms_key_file: Option<PathBuf>,
+    /// `HEALTH_FILES_DIR` (#84): central's attachment store, which edges upload synced
+    /// attachments to and fetch them from. Without it, attachments do not sync.
+    pub(crate) files_dir: Option<PathBuf>,
     /// `HEALTH_DEV_WORKFLOW_DEFINITIONS` (#99): a JSON file holding an array of Workflow
     /// Definitions that central runs, at `/api/workflow`, for development and e2e only. Activation
     /// (#89) replaces it with the published packages a node has active.
@@ -160,6 +163,7 @@ impl Config {
                         .unwrap_or_default(),
                     currency: get("HEALTH_CURRENCY").unwrap_or_else(|| "UGX".to_owned()),
                     kms_key_file: get("HEALTH_KMS_KEY_FILE").map(PathBuf::from),
+                    files_dir: get("HEALTH_FILES_DIR").map(PathBuf::from),
                     dev_workflow_definitions: get("HEALTH_DEV_WORKFLOW_DEFINITIONS")
                         .map(PathBuf::from),
                     issuing_ca: match (

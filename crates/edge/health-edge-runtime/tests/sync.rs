@@ -64,6 +64,8 @@ async fn store(namespace: &str) -> SurrealStore {
 
 struct Central {
     store: SurrealStore,
+    files: health_files::FsBlobStore,
+    _dir: tempfile::TempDir,
     origin: String,
     cert_pem: String,
     node: NodeId,
@@ -109,7 +111,11 @@ async fn central() -> Central {
         software: env!("CARGO_PKG_VERSION").parse().expect("version"),
         approved: BTreeSet::new(),
     };
-    let app = SyncServer::new(store.clone(), registry, compatibility).router();
+    let dir = tempfile::tempdir().expect("files");
+    let files = health_files::FsBlobStore::open(dir.path()).expect("blob store");
+    let app = SyncServer::new(store.clone(), registry, compatibility)
+        .with_blobs(files.clone())
+        .router();
     let certified =
         rcgen::generate_simple_self_signed(vec!["localhost".to_owned()]).expect("certificate");
     let cert_pem = certified.cert.pem();
@@ -136,6 +142,8 @@ async fn central() -> Central {
     });
     Central {
         store,
+        files,
+        _dir: dir,
         origin: format!("https://localhost:{port}"),
         cert_pem,
         node: node.id.to_string().parse().expect("node id"),
@@ -258,4 +266,55 @@ async fn an_edge_beyond_central_s_horizon_reseeds_and_keeps_its_outbox() {
     }
     let again = sync.round().await.expect("round");
     assert_eq!((again.pushed, again.pulled, again.seeded), (0, 0, 0));
+}
+
+#[tokio::test]
+async fn an_attachment_follows_its_record_and_comes_down_on_demand() {
+    use health_sync_protocol::{BlobRef, ContentHash, blob_url};
+    let central = central().await;
+    let edge = store("edge").await;
+    let dir = tempfile::tempdir().expect("edge files");
+    let files = health_files::FsBlobStore::open(dir.path()).expect("edge blob store");
+    let sync = central
+        .sync(&edge, &central.origin)
+        .with_blobs(files.clone());
+
+    // A scanned consent at the edge: the record references the blob by hash.
+    let scan: Vec<u8> = (0..3_000_000u32).map(|i| (i % 253) as u8).collect();
+    let stored = files.put(scan.as_slice()).expect("put");
+    let hash: ContentHash = stored.blob.hash.to_string().parse().expect("hash");
+    let document = json!({
+        "resourceType": "DocumentReference",
+        "status": "current",
+        "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+        "content": [{"attachment": {
+            "url": blob_url(&hash),
+            "size": scan.len(),
+            "contentType": "application/pdf"
+        }}]
+    });
+    write(&edge, &document).await;
+
+    let round = sync.round().await.expect("round");
+    assert_eq!((round.pushed, round.blobs), (1, 1));
+    assert_eq!(
+        central.files.read(&stored.blob.hash).expect("at central"),
+        scan
+    );
+    assert_eq!(sync.round().await.expect("round").blobs, 0, "sent once");
+
+    // Central holds a blob the edge does not: it comes down when asked for.
+    let photo: Vec<u8> = b"a wound photo".to_vec();
+    let at_central = central.files.put(photo.as_slice()).expect("put");
+    let reference = BlobRef {
+        hash: at_central.blob.hash.to_string().parse().expect("hash"),
+        size: at_central.blob.size,
+        content_type: "image/jpeg".into(),
+    };
+    assert!(!files.contains(&at_central.blob.hash));
+    sync.fetch_blob(&reference).await.expect("fetch");
+    assert_eq!(
+        files.read(&at_central.blob.hash).expect("at the edge"),
+        photo
+    );
 }
