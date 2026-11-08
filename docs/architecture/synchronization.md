@@ -264,6 +264,15 @@ stateDiagram-v2
 | Node whose cursor is older than the horizon | Answered with `reseed_required`. It keeps its unsent outbox, re-seeds (new epoch), then re-pushes the outbox as Candidate Versions against the new heads |
 
 - **Deletes** are versions with `deleted: true`.
+- **In code (#83, part 1).**
+  - **Pruning:** central prunes the change log and receipts older than 180 days, hourly (`SurrealStore::prune_log`, migration `0041_sync_horizon`). It keeps any entry an outbox still needs, and records the highest `seq` pruned in `sync_horizon:node`. `seq` never goes below it, so a log pruned to empty never hands a `seq` out twice.
+  - **`reseed_required`:** central answers it to a pull whose cursor is below the horizon (a node that has never synced included), or from another epoch.
+  - **Snapshot:** `POST /sync/v1/snapshot` serves every head in the node's scope, tombstones included, with central's cursor, read in one transaction (`SurrealStore::snapshot`).
+  - **Seeding:** the edge applies the heads it lacks without queuing them back, which rebuilds its indexes locally (`SurrealStore::seed`). It moves its checkpoint to the snapshot's cursor and takes a new epoch. Its outbox is pushed before the pull, and anything left stays queued.
+  - **Not yet:**
+    - streaming the snapshot (it is one JSON body today);
+    - the signed USB seed;
+    - pruning non-head history.
 - **Reserved identifier blocks**, where they are mandated (ADR 0014), are sized for the 90-day window.
 
 ## Attachments (ADR 0021)

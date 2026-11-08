@@ -87,12 +87,18 @@ struct ChangeRow {
 const CHANGE_COLUMNS: &str =
     "record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, version_seq, deleted, origin";
 
+/// The last `seq` taken: the newest entry on the log, and never below the pruned horizon, so a
+/// log pruned to empty does not hand out a `seq` again (#83).
+pub(crate) const LAST_SEQ: &str = "RETURN math::max([\
+     (SELECT VALUE record::id(id) FROM change_log ORDER BY id DESC LIMIT 1)[0] ?? 0, \
+     sync_horizon:node.pruned_through ?? 0])";
+
 /// The last committed `seq`, read outside any transaction's snapshot; 0 before the first write.
 /// The unit of work calls it holding the commit lock, so nothing commits in between.
 pub(crate) async fn last_seq(connection: &Connection) -> Result<i64, StoreError> {
     let last: Option<i64> = connection
         .db()
-        .query("SELECT VALUE record::id(id) FROM change_log ORDER BY id DESC LIMIT 1")
+        .query(LAST_SEQ)
         .await
         .and_then(surrealdb::IndexedResults::check)
         .map_err(unavailable)?

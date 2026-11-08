@@ -405,13 +405,20 @@ fn sync_routes(store: SurrealStore, registry: NodeRegistry) -> Result<Router, &'
     Ok(health_sync_server::SyncServer::new(store, registry, compatibility).router())
 }
 
-/// Raises `sync-conflicts-ageing`, hourly, while any Conflict Record has been open for more than
-/// 7 days (synchronization.md § Conflict Record and review queue; #82).
+/// Hourly sync upkeep: raises `sync-conflicts-ageing` while any Conflict Record has been open for
+/// more than 7 days (#82), and prunes the change log and receipts older than the 180-day horizon,
+/// after which a node that was offline longer re-seeds (#83; synchronization.md § Tombstones,
+/// retention and long outages).
 fn conflicts_hourly(store: SurrealStore) {
     tokio::spawn(async move {
         let mut hourly = tokio::time::interval(std::time::Duration::from_secs(3600));
         loop {
             hourly.tick().await;
+            let horizon =
+                health_time::Timestamp::now() - health_time::SignedDuration::from_hours(24 * 180);
+            if let Err(error) = store.prune_log(horizon).await {
+                tracing::warn!(%error, "cannot prune the sync change log");
+            }
             let week_ago =
                 health_time::Timestamp::now() - health_time::SignedDuration::from_hours(24 * 7);
             match store.open_conflicts(Some(week_ago)).await {
