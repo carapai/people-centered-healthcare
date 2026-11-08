@@ -594,6 +594,92 @@ impl SurrealStore {
         Ok(applied)
     }
 
+    /// The break-glass grants queued for `peer` (#224).
+    pub async fn queued_grants(
+        &self,
+        peer: &str,
+    ) -> Result<Vec<health_sync_protocol::BreakGlassGrant>, StoreError> {
+        let mut tx = self.begin().await?;
+        let rows = tx.queued_grants(peer).await?;
+        drop(tx);
+        Ok(rows
+            .into_iter()
+            .map(|row| health_sync_protocol::BreakGlassGrant {
+                id: row.id,
+                session: row.session,
+                account: row.account,
+                facility: row.facility,
+                patient: row.patient,
+                reason: row.reason,
+                justification: row.justification,
+                at: row.at,
+                expires_at: row.expires_at,
+                acknowledged: row.acknowledged,
+            })
+            .collect())
+    }
+
+    /// Takes grants off `peer`'s queue once the peer has them.
+    pub async fn grants_sent(&self, peer: &str, ids: &[String]) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query("FOR $id IN $ids { DELETE type::record('sync_grant_outbox', [$peer, $id]); };")
+            .bind(("peer", peer.to_owned()))
+            .bind(("ids", ids.to_vec()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?;
+        Ok(())
+    }
+
+    /// Keeps a grant that arrived from a facility at `arrived`: new, its review is due 72 hours
+    /// after arrival (offline-auth.md § Break-glass); known, an acknowledgement is taken, never
+    /// undone. Returns whether it was new.
+    pub async fn receive_grant(
+        &self,
+        grant: &health_sync_protocol::BreakGlassGrant,
+        arrived: Timestamp,
+    ) -> Result<bool, StoreError> {
+        let due = arrived
+            + health_time::SignedDuration::from_hours(health_sync_protocol::REVIEW_WITHIN_HOURS);
+        let new: Option<bool> = self
+            .connection
+            .db()
+            .query(
+                "BEGIN; \
+                 LET $new = array::len((SELECT id FROM type::record('break_glass', $id))) = 0; \
+                 IF $new { \
+                   CREATE type::record('break_glass', $id) CONTENT { session: $grant_session, \
+                     account: $account, facility: $facility, patient: $patient, reason: $reason, \
+                     justification: $justification, at: <datetime>$at, \
+                     expires_at: <datetime>$expires_at, review_due: <datetime>$due, \
+                     arrived_at: <datetime>$arrived, acknowledged: $acknowledged }; \
+                 } ELSE IF $acknowledged { \
+                   UPDATE type::record('break_glass', $id) SET acknowledged = true; \
+                 }; \
+                 RETURN $new; \
+                 COMMIT;",
+            )
+            .bind(("id", grant.id.clone()))
+            .bind(("grant_session", grant.session.clone()))
+            .bind(("account", grant.account.clone()))
+            .bind(("facility", grant.facility.clone()))
+            .bind(("patient", grant.patient.clone()))
+            .bind(("reason", grant.reason.clone()))
+            .bind(("justification", grant.justification.clone()))
+            .bind(("at", grant.at.to_string()))
+            .bind(("expires_at", grant.expires_at.to_string()))
+            .bind(("due", due.to_string()))
+            .bind(("arrived", arrived.to_string()))
+            .bind(("acknowledged", grant.acknowledged))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(3)
+            .map_err(unavailable)?;
+        Ok(new.unwrap_or(false))
+    }
+
     /// The blobs queued for `peer`, oldest first.
     pub async fn queued_blobs(&self, peer: &str) -> Result<Vec<BlobRef>, StoreError> {
         #[derive(SurrealValue)]

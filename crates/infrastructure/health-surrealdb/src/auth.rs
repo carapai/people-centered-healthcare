@@ -527,7 +527,36 @@ impl SurrealTx {
             ],
         )
         .await?;
+        self.queue_grant(&row.id).await
+    }
+
+    /// Queues grant `id` for every upstream, so it reaches central (#224).
+    async fn queue_grant(&mut self, id: &str) -> Result<(), WriteError> {
+        self.tx()?
+            .query(
+                "FOR $peer IN (SELECT VALUE record::id(id) FROM sync_upstream) { \
+                   UPSERT type::record('sync_grant_outbox', [$peer, $id]) SET queued_at = time::now(); \
+                 };",
+            )
+            .bind(("id", id.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(write_error)?;
         Ok(())
+    }
+
+    /// The grants queued for `peer`.
+    pub(crate) async fn queued_grants(
+        &mut self,
+        peer: &str,
+    ) -> Result<Vec<BreakGlassRow>, StoreError> {
+        self.break_glass_rows(
+            "WHERE record::id(id) INSIDE \
+             (SELECT VALUE record::id(id)[1] FROM sync_grant_outbox:[$key]..[$key, {}])",
+            peer,
+            None,
+        )
+        .await
     }
 
     /// The latest break-glass grant of `session` still active at `now`.
@@ -640,7 +669,11 @@ impl SurrealTx {
                 vec![("id", id.to_owned()), ("facility", facility.to_owned())],
             )
             .await?;
-        Ok(!updated.is_empty())
+        if updated.is_empty() {
+            return Ok(false);
+        }
+        self.queue_grant(id).await?;
+        Ok(true)
     }
 
     async fn break_glass_rows(

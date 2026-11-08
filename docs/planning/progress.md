@@ -969,6 +969,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#224: break-glass grants reach central's review (2026-11-08).**
+  - **Queue:** a grant made or acknowledged at an edge is queued for central in its own transaction, including grants made before the edge first reached central.
+  - **At central:** the sync round sends them, and central keeps them with the review due 72 h after arrival, not after the event. It refuses another facility's grant and hints the privacy officers' queue. Central's `/api/events` and the sync server share one hint hub.
+  - **Tested:** in the store (queued, kept once, due from arrival, the acknowledgement follows without restarting the clock), and over HTTPS (a grant made a week ago, before the edge ever reached central, lands in central's review queue due 72 h after arrival, and is sent once).
 - **#85: the multi-node sync simulation (2026-11-08).**
   - **Harness:** `crates/testing/health-sync-sim` gives central, edge and desktop each their own clock, minutes apart. Links can be cut, and rounds use the real protocol, including re-seeding. A restore is an epoch change.
   - **Clinical scenario (§117)**, on every PR: a visit recorded at a desktop through internet and LAN outages, an outage past the horizon (the edge re-seeds), and central's restore (everyone below re-seeds). All three nodes end with the same records, nothing is lost or refused, and nothing moves on another pass.
