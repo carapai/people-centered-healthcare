@@ -410,36 +410,39 @@ impl Sync {
             );
             return Ok(round);
         }
-        let replica = SurrealReplica::new(&self.store, central);
-        loop {
-            let request = PullRequest {
-                cursor: self
-                    .store
-                    .checkpoint(central)
+        // Lane by lane, most urgent first, each from its own cursor.
+        for lane in Lane::PULLED {
+            let replica = SurrealReplica::new(&self.store, central, lane);
+            loop {
+                let request = PullRequest {
+                    cursor: self
+                        .store
+                        .checkpoint(central, lane)
+                        .await
+                        .map_err(|e| e.to_string())?,
+                    lane,
+                    limit: u32::try_from(BATCH).unwrap_or(u32::MAX),
+                };
+                let body = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
+                let response: PullResponse =
+                    serde_json::from_slice(&self.post("/sync/v1/pull", body).await?)
+                        .map_err(|e| format!("/sync/v1/pull: {e}"))?;
+                if response == PullResponse::ReseedRequired {
+                    // Beyond central's horizon (or central was restored): re-seed from its snapshot.
+                    // The outbox, already pushed above, is kept; anything left goes up next round.
+                    round.seeded += self.reseed(central).await?;
+                    continue;
+                }
+                let more = matches!(response, PullResponse::Items { more: true, .. });
+                if let PullResponse::Items { items, .. } = &response {
+                    round.pulled += items.len();
+                }
+                apply_pull(&replica, response)
                     .await
-                    .map_err(|e| e.to_string())?,
-                lane: Lane::Clinical,
-                limit: u32::try_from(BATCH).unwrap_or(u32::MAX),
-            };
-            let body = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
-            let response: PullResponse =
-                serde_json::from_slice(&self.post("/sync/v1/pull", body).await?)
-                    .map_err(|e| format!("/sync/v1/pull: {e}"))?;
-            if response == PullResponse::ReseedRequired {
-                // Beyond central's horizon (or central was restored): re-seed from its snapshot.
-                // The outbox, already pushed above, is kept; anything left goes up next round.
-                round.seeded += self.reseed(central).await?;
-                continue;
-            }
-            let more = matches!(response, PullResponse::Items { more: true, .. });
-            if let PullResponse::Items { items, .. } = &response {
-                round.pulled += items.len();
-            }
-            apply_pull(&replica, response)
-                .await
-                .map_err(|e| format!("applying the pull: {e}"))?;
-            if !more {
-                break;
+                    .map_err(|e| format!("applying the pull: {e}"))?;
+                if !more {
+                    break;
+                }
             }
         }
         Ok(round)

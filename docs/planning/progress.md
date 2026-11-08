@@ -969,6 +969,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#81: priority lanes (2026-11-08).** A pull reads one lane: revocations, then packages, then clinical data, then audit (`Lane::PULLED`, `Lane::of`), each from its own checkpoint. A ValueSet written at central after an observation reaches the edge first. A re-seed moves every lane's cursor. The edge task, the store tests and the simulator all pull lane by lane.
 - **#224: break-glass grants reach central's review (2026-11-08).**
   - **Queue:** a grant made or acknowledged at an edge is queued for central in its own transaction, including grants made before the edge first reached central.
   - **At central:** the sync round sends them, and central keeps them with the review due 72 h after arrival, not after the event. It refuses another facility's grant and hints the privacy officers' queue. Central's `/api/events` and the sync server share one hint hub.

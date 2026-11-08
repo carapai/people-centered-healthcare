@@ -21,6 +21,46 @@ pub enum Lane {
     Blobs,
 }
 
+impl Lane {
+    /// The lanes a node pulls, in the order it pulls them, each from its own cursor; blobs come
+    /// on demand instead (synchronization.md § Pull and Sync Scope).
+    pub const PULLED: [Lane; 4] = [
+        Lane::Revocations,
+        Lane::Packages,
+        Lane::Clinical,
+        Lane::Audit,
+    ];
+
+    /// The lane a version of `resource_type` travels in.
+    pub fn of(resource_type: &str) -> Lane {
+        match resource_type {
+            "Device" => Lane::Revocations,
+            "ActivityDefinition"
+            | "CodeSystem"
+            | "ConceptMap"
+            | "Library"
+            | "PlanDefinition"
+            | "Questionnaire"
+            | "SearchParameter"
+            | "StructureDefinition"
+            | "ValueSet" => Lane::Packages,
+            "AuditEvent" | "Provenance" => Lane::Audit,
+            _ => Lane::Clinical,
+        }
+    }
+
+    /// The lane's name, as stored with its checkpoint.
+    pub fn key(self) -> &'static str {
+        match self {
+            Lane::Revocations => "revocations",
+            Lane::Packages => "packages",
+            Lane::Clinical => "clinical",
+            Lane::Audit => "audit",
+            Lane::Blobs => "blobs",
+        }
+    }
+}
+
 /// A pull: what comes after `cursor` in the upstream's log, within the node's Sync Scope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PullRequest {

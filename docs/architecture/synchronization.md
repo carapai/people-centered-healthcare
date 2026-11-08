@@ -87,7 +87,6 @@ Every item on the wire, in either direction:
     - **Down:** the global replicas (`DOWN_GLOBAL`): registries and golden records, definitions and terminology, price masters, coverage and consent.
     - **Never:** another facility's records, and central's own audit.
   - **Not yet:**
-    - priority lanes, which need a cursor per lane;
     - golden-record narrowing of Patients;
     - ledger operations, which are refused as `invalid` for now;
     - HLC and package fields from the writer;
@@ -164,6 +163,13 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
   5. blobs.
 
   A slow link therefore delivers what matters first.
+- **In code (#81, lanes).** `Lane::of` puts each type in a lane:
+  - **Revocations:** `Device`.
+  - **Packages:** definitional types (StructureDefinition, ValueSet, CodeSystem, ConceptMap, Questionnaire, PlanDefinition, ActivityDefinition, Library, SearchParameter).
+  - **Audit:** AuditEvent and Provenance.
+  - **Clinical:** everything else.
+
+  A node pulls `Lane::PULLED` in that order. Each lane has its own cursor, a checkpoint keyed by peer and lane, so one lane's cursor never skips another lane's items. A re-seed moves every lane's cursor to the snapshot's. Permission snapshots and revocation lists join the revocations lane when they become records. Blobs come on demand rather than through a lane.
 
 ### Seeding
 
