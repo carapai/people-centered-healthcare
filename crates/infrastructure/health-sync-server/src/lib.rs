@@ -20,6 +20,8 @@
 //!   (synchronization.md § Attachments).
 //! - `POST /sync/v1/break-glass` takes the facility's break-glass grants, kept with the privacy
 //!   officer's review due 72 hours after they arrive (#224).
+//! - `POST /sync/v1/transfers` takes the facility's inter-facility transfers, matched once
+//!   received; `POST /sync/v1/transfers/inbound` answers those in transit to it (#247).
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -115,6 +117,8 @@ impl SyncServer {
             )
             .route("/sync/v1/blobs/{hash}/content", get(blob_content))
             .route("/sync/v1/break-glass", post(break_glass))
+            .route("/sync/v1/transfers", post(transfers))
+            .route("/sync/v1/transfers/inbound", post(inbound_transfers))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(MAX_BODY))
             .with_state(self)
@@ -442,6 +446,70 @@ async fn break_glass(
     }
     axum::Json(json!({ "received": grants.iter().map(|g| &g.id).collect::<Vec<_>>() }))
         .into_response()
+}
+
+/// The facility's inter-facility transfers (#247): kept, with the source's lines authoritative,
+/// and once received matched against the dispatch. A transfer naming neither end as this
+/// facility is refused.
+async fn transfers(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let SyncScope::Facility(facility) = &peer.scope else {
+        return problem(StatusCode::FORBIDDEN, "transfers come from a facility");
+    };
+    let Ok(transfers) = serde_json::from_slice::<Vec<health_inventory::transfers::Transfer>>(&body)
+    else {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "the body is not a list of transfers",
+        );
+    };
+    let mut answers = serde_json::Map::new();
+    for transfer in transfers {
+        let id = transfer.id.clone();
+        match server
+            .inner
+            .store
+            .receive_transfer(facility, transfer)
+            .await
+        {
+            Ok(outcome) => {
+                answers.insert(id, json!(format!("{outcome:?}")));
+            }
+            Err(health_surrealdb::TransferRefused::Store(error)) => return failed(error),
+            Err(refused) => return problem(StatusCode::FORBIDDEN, refused.to_string()),
+        }
+    }
+    axum::Json(json!({ "received": answers })).into_response()
+}
+
+/// The transfers in transit addressed to the facility, for its edge to receive (#247).
+async fn inbound_transfers(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let SyncScope::Facility(facility) = &peer.scope else {
+        return axum::Json(json!([])).into_response();
+    };
+    match server.inner.store.inbound_transfers(facility).await {
+        Ok(transfers) => axum::Json(transfers).into_response(),
+        Err(error) => failed(error),
+    }
 }
 
 /// The blob store, and the blob a path names.

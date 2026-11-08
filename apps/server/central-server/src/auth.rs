@@ -440,6 +440,19 @@ fn conflicts_hourly(store: SurrealStore) {
             if let Err(error) = store.prune_log(horizon).await {
                 tracing::warn!(%error, "cannot prune the sync change log");
             }
+            // Inter-facility transfers (#247): dispatched and not received in 14 days, and
+            // receipts with no dispatch.
+            match store.stale_transfers(14).await {
+                Ok((unreceived, undispatched)) => {
+                    if !unreceived.is_empty() {
+                        tracing::warn!(alert = "transfer-unreceived", transfers = ?unreceived, "transfers dispatched over 14 days ago are not received");
+                    }
+                    if !undispatched.is_empty() {
+                        tracing::warn!(alert = "transfer-undispatched", transfers = ?undispatched, "transfers were received with no dispatch");
+                    }
+                }
+                Err(error) => tracing::warn!(%error, "cannot check transfers"),
+            }
             let week_ago =
                 health_time::Timestamp::now() - health_time::SignedDuration::from_hours(24 * 7);
             match store.open_conflicts(Some(week_ago)).await {
