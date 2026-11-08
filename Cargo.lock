@@ -3239,6 +3239,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "health-access-policy",
+ "health-audit",
  "health-billing",
  "health-client-registry",
  "health-clinical-documentation-app",
@@ -3287,6 +3288,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "futures-util",
+ "health-access-policy",
+ "health-audit",
  "health-identifiers",
  "health-identity",
  "health-persistence",

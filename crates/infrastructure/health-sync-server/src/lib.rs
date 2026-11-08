@@ -17,6 +17,8 @@
 //!
 //! Bodies are uncompressed NDJSON or JSON; zstd belongs to a later transport change.
 
+mod review;
+
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,6 +37,8 @@ use health_sync_protocol::{
     from_ndjson, group, receive, to_ndjson,
 };
 use serde_json::json;
+
+pub use review::{CONFLICT_PERMISSION, review_router};
 
 /// The largest request body: a push batch is at most 4 MiB (synchronization.md § Push), with
 /// room for the envelope.

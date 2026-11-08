@@ -13,3 +13,7 @@ Layer: **infrastructure**. These are the `/sync/v1` endpoints a node serves its 
 - **`POST /sync/v1/pull`** takes a `PullRequest` and answers a `PullResponse` in the node's scope. An out-of-range node is sent nothing.
 - **`GET /sync/v1/events`** is a server-sent event stream of `cursor` hints, so a connected node pulls without waiting for its poll.
 - **Bodies** are uncompressed. zstd is a later transport change.
+- **Conflict review (#82):** `review_router` is the Conflict Record queue. Central mounts it at `/api/sync/conflicts` behind the subject layer, for staff whose roles grant `sync.resolve-conflicts`.
+  - `GET /` lists the open records, oldest first, with `overdue` after 7 days.
+  - `GET /{id}` shows both branches.
+  - `POST /{id}` takes `keep-head`, or `write` with the corrected version. The resolution and its AuditEvent commit together.

@@ -548,14 +548,15 @@ impl SurrealStore {
         row.map(ConflictRecord::from_row).transpose()
     }
 
-    /// Resolves an open Conflict Record as `resolver` decided, in one transaction: a new version
-    /// written on top of the head, which then syncs like any other, or the head kept as it is.
-    /// Returns the version the record is resolved to.
+    /// Resolves an open Conflict Record as `resolver` decided, in one transaction with `audit`,
+    /// the decision's AuditEvent: a new version written on top of the head, which then syncs like
+    /// any other, or the head kept as it is. Returns the version the record is resolved to.
     pub async fn resolve_conflict(
         &self,
         id: &str,
         resolver: &str,
         resolution: Resolution,
+        audit: Option<&Value>,
     ) -> Result<OpId, WriteError> {
         let record = self
             .conflict(id)
@@ -610,6 +611,9 @@ impl SurrealStore {
              WHERE status = 'open'"
         ));
         sql.run(tx.tx()?).await.map_err(write_error)?;
+        if let Some(event) = audit {
+            health_audit::append(&mut tx, event).await?;
+        }
         tx.commit().await?;
         Ok(version)
     }
