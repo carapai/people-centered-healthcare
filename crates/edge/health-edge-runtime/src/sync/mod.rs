@@ -9,7 +9,9 @@
 //!    candidate. A quarantined node still pushes; central holds its items for review.
 //! 3. **Attachments.** Each blob an accepted record references is uploaded in 1 MiB chunks from
 //!    where central says it stopped, so an interrupted upload resumes.
-//! 4. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
+//! 4. **Break-glass grants** made or acknowledged here go up, so their review starts when they
+//!    reach central.
+//! 5. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
@@ -87,6 +89,8 @@ pub struct Round {
     pub seeded: usize,
     /// Attachments whose upload completed.
     pub blobs: usize,
+    /// Break-glass grants, and acknowledgements of them, sent for review (#224).
+    pub grants: usize,
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
 }
@@ -233,6 +237,28 @@ impl Sync {
         Ok(completed)
     }
 
+    /// Sends the break-glass grants queued for central, so the privacy officer's review starts
+    /// when they arrive (#224; offline-auth.md § Break-glass).
+    pub async fn send_grants(&self, central: NodeId) -> Result<usize, String> {
+        let peer = central.to_string();
+        let grants = self
+            .store
+            .queued_grants(&peer)
+            .await
+            .map_err(|e| e.to_string())?;
+        if grants.is_empty() {
+            return Ok(0);
+        }
+        let body = serde_json::to_vec(&grants).map_err(|e| e.to_string())?;
+        self.post("/sync/v1/break-glass", body).await?;
+        let ids: Vec<String> = grants.into_iter().map(|g| g.id).collect();
+        self.store
+            .grants_sent(&peer, &ids)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(ids.len())
+    }
+
     /// Fetches an attachment from central on demand and keeps it, verified, in this node's store.
     pub async fn fetch_blob(&self, blob: &health_sync_protocol::BlobRef) -> Result<(), String> {
         let blobs = self
@@ -374,6 +400,7 @@ impl Sync {
         }
 
         round.blobs = self.upload_blobs(central).await?;
+        round.grants = self.send_grants(central).await?;
 
         if welcome.verdict != Verdict::Compatible {
             tracing::warn!(

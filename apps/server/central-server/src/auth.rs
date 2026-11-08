@@ -266,6 +266,8 @@ pub(crate) fn routes(
     // signature, is the only credential, so they are outside the gates.
     let mut provisioning = None;
     let mut sync = None;
+    // One hint hub for `/api/events`: the subjects' grants and the grants edges sync up (#224).
+    let events = health_http::Events::default();
     if settings.issuing_ca.is_some() || settings.kms.is_some() {
         let registry = NodeRegistry::new(fhir_store.clone(), Arc::new(SystemClock), "central");
         // Sync with provisioned nodes (#81): each request is signed by the node (ADR 0062).
@@ -273,6 +275,7 @@ pub(crate) fn routes(
             fhir_store.clone(),
             registry.clone(),
             settings.files.clone(),
+            events.clone(),
         )?);
         alert_hourly(registry.clone());
         let mut routes = Router::new();
@@ -294,6 +297,7 @@ pub(crate) fn routes(
     let mut router = Router::new().nest("/auth", server.router());
     if let (Some(policy), false) = (&settings.policy, settings.snapshot_keys.is_empty()) {
         let subjects = Subjects::new(server.verifier(), policy.roles.clone())
+            .with_events(events.clone())
             .with_auditor(Auditor::new("central", sensitive(policy)));
         api = api.merge(subjects.routes());
         escalate_hourly(subjects.clone());
@@ -403,6 +407,7 @@ fn sync_routes(
     store: SurrealStore,
     registry: NodeRegistry,
     files: Option<health_files::FsBlobStore>,
+    events: health_http::Events,
 ) -> Result<Router, &'static str> {
     let compatibility = health_sync_protocol::Compatibility {
         protocol: health_sync_protocol::PROTOCOL,
@@ -412,7 +417,8 @@ fn sync_routes(
         approved: std::collections::BTreeSet::new(),
     };
     conflicts_hourly(store.clone());
-    let server = health_sync_server::SyncServer::new(store, registry, compatibility);
+    let server =
+        health_sync_server::SyncServer::new(store, registry, compatibility).with_events(events);
     Ok(match files {
         Some(files) => server.with_blobs(files),
         None => server,

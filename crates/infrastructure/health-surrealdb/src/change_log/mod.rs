@@ -188,7 +188,7 @@ impl SurrealStore {
     }
 
     /// Adds an upstream peer. Added for the first time, it is queued every version already on
-    /// the log, except those received from it, so nothing written before the node first reached
+    /// the log, except those received from it, and every break-glass grant made here (#224), so nothing written before the node first reached
     /// it is left behind; from then on every committed version is queued for it. Adding it again
     /// changes nothing.
     pub async fn add_upstream(&self, peer: &str) -> Result<(), StoreError> {
@@ -203,6 +203,11 @@ impl SurrealStore {
                      CREATE type::record('sync_outbox', [$peer, $entry.seq]) \
                        SET tx_id = $entry.tx_id, \
                            resource = string::concat($entry.resource_type, '/', $entry.resource_id); \
+                   }; \
+                   FOR $grant IN (SELECT VALUE record::id(id) FROM break_glass \
+                                  WHERE arrived_at = NONE) { \
+                     UPSERT type::record('sync_grant_outbox', [$peer, $grant]) \
+                       SET queued_at = time::now(); \
                    }; \
                    CREATE type::record('sync_upstream', $peer) SET added_at = time::now(); \
                  }; \

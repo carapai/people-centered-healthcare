@@ -130,6 +130,9 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 4. **Audit:** an AuditEvent with BTG in `authorization`, and break-the-glass security labels on the access.
 5. **Alert:** an immediate alert to the facility in-charge on the LAN, through the edge status page and notifications.
 6. **Review:** mandatory review by a designated privacy officer within **72 h** of the event reaching central. Overdue reviews escalate.
+   - **Edge grants travel up (#224).** A grant made at an edge, and the in-charge's later acknowledgement of it, is queued for central in the same transaction (`sync_grant_outbox`, migration `0043_sync_break_glass`). Grants made before the edge first reaches central are queued once central becomes its upstream.
+   - **At central.** The edge's sync round sends them to `POST /sync/v1/break-glass`. Central refuses another facility's grant. It keeps a new grant with `review_due` 72 h after it *arrived* (`arrived_at`), however long ago it was made, and tells the privacy officers' queue (`break-glass-reviews` hint). An acknowledgement that arrives later is taken, but never undone, and the review clock is not restarted.
+   - **Audit.** The grant's BTG AuditEvent syncs up as a record, like any AuditEvent.
 
 ## Offline user and role administration (ADR 0011)
 

@@ -18,6 +18,8 @@
 //!   `PUT /sync/v1/blobs/{hash}/{size}/{offset}` appends a 1 MiB chunk there (the completing chunk
 //!   verifies the blob), and `GET /sync/v1/blobs/{hash}/content` serves it on demand
 //!   (synchronization.md § Attachments).
+//! - `POST /sync/v1/break-glass` takes the facility's break-glass grants, kept with the privacy
+//!   officer's review due 72 hours after they arrive (#224).
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -58,6 +60,8 @@ const KEEP_ALIVE: Duration = Duration::from_secs(25);
 #[derive(Clone)]
 pub struct SyncServer {
     inner: Arc<Inner>,
+    blobs: Option<health_files::FsBlobStore>,
+    events: Option<health_http::Events>,
 }
 
 struct Inner {
@@ -65,7 +69,6 @@ struct Inner {
     registry: NodeRegistry,
     compatibility: Compatibility,
     scope_version: u64,
-    blobs: Option<health_files::FsBlobStore>,
 }
 
 impl SyncServer {
@@ -78,27 +81,24 @@ impl SyncServer {
                 registry,
                 compatibility,
                 scope_version: 1,
-                blobs: None,
             }),
+            blobs: None,
+            events: None,
         }
     }
 
     /// Accepts and serves attachments from `blobs` (synchronization.md § Attachments).
     #[must_use]
-    pub fn with_blobs(self, blobs: health_files::FsBlobStore) -> Self {
-        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|shared| Inner {
-            store: shared.store.clone(),
-            registry: shared.registry.clone(),
-            compatibility: shared.compatibility.clone(),
-            scope_version: shared.scope_version,
-            blobs: shared.blobs.clone(),
-        });
-        Self {
-            inner: Arc::new(Inner {
-                blobs: Some(blobs),
-                ..inner
-            }),
-        }
+    pub fn with_blobs(mut self, blobs: health_files::FsBlobStore) -> Self {
+        self.blobs = Some(blobs);
+        self
+    }
+
+    /// Tells `events`' subscribers when grants arrive for review (#224).
+    #[must_use]
+    pub fn with_events(mut self, events: health_http::Events) -> Self {
+        self.events = Some(events);
+        self
     }
 
     /// The `/sync/v1` routes.
@@ -114,6 +114,7 @@ impl SyncServer {
                 axum::routing::put(blob_chunk),
             )
             .route("/sync/v1/blobs/{hash}/content", get(blob_content))
+            .route("/sync/v1/break-glass", post(break_glass))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(MAX_BODY))
             .with_state(self)
@@ -391,13 +392,65 @@ async fn snapshot(
     }
 }
 
+/// The facility's break-glass grants (#224): kept with the privacy officer's review due 72
+/// hours after they arrive here, however long ago they were made; an acknowledgement is taken.
+/// A grant of another facility is refused.
+async fn break_glass(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let Ok(grants) = serde_json::from_slice::<Vec<health_sync_protocol::BreakGlassGrant>>(&body)
+    else {
+        return problem(StatusCode::BAD_REQUEST, "the body is not a list of grants");
+    };
+    let facility = match &peer.scope {
+        SyncScope::Facility(facility) => Some(facility.as_str()),
+        SyncScope::All => None,
+    };
+    if let Some(stranger) = grants
+        .iter()
+        .find(|g| facility.is_some_and(|f| f != g.facility))
+    {
+        return problem(
+            StatusCode::FORBIDDEN,
+            format!("grant {} is another facility's", stranger.id),
+        );
+    }
+    let arrived = health_time::Timestamp::now();
+    for grant in &grants {
+        if let Err(error) = server.inner.store.receive_grant(grant, arrived).await {
+            return failed(error);
+        }
+    }
+    if !grants.is_empty()
+        && let Some(events) = &server.events
+    {
+        events.publish(health_http::Hint::worklist(
+            health_auth::REVIEWS_WORKLIST,
+            health_http::Audience {
+                facility: None,
+                permission: Some(health_auth::REVIEW_PERMISSION.into()),
+            },
+        ));
+    }
+    axum::Json(json!({ "received": grants.iter().map(|g| &g.id).collect::<Vec<_>>() }))
+        .into_response()
+}
+
 /// The blob store, and the blob a path names.
 fn blob_target(
     server: &SyncServer,
     hash: &str,
     size: u64,
 ) -> Result<(health_files::FsBlobStore, health_files::BlobRef), Box<Response>> {
-    let store = server.inner.blobs.clone().ok_or_else(|| {
+    let store = server.blobs.clone().ok_or_else(|| {
         Box::new(problem(
             StatusCode::SERVICE_UNAVAILABLE,
             "this node keeps no attachments",

@@ -318,3 +318,48 @@ async fn an_attachment_follows_its_record_and_comes_down_on_demand() {
         photo
     );
 }
+
+#[tokio::test]
+async fn a_grant_made_offline_reaches_central_s_review_queue_due_from_arrival() {
+    let central = central().await;
+    let edge = store("edge").await;
+    // Made while central was unreachable, a week ago.
+    let made = Timestamp::now() - health_time::SignedDuration::from_hours(24 * 7);
+    let mut tx = edge.begin().await.expect("begin");
+    tx.put_break_glass(&health_surrealdb::BreakGlassRow {
+        id: "bg-offline".into(),
+        session: "s-1".into(),
+        account: "a-nurse".into(),
+        facility: FACILITY.into(),
+        patient: "Patient/p-1".into(),
+        reason: "BTG".into(),
+        justification: "unconscious".into(),
+        at: made,
+        expires_at: made + health_time::SignedDuration::from_hours(1),
+        review_due: made + health_time::SignedDuration::from_hours(72),
+        acknowledged: false,
+        review: None,
+        escalated_at: None,
+    })
+    .await
+    .expect("grant");
+    tx.commit().await.expect("commit");
+
+    // The edge has never reached central: it does now.
+    let unreachable = central.sync(&edge, "https://localhost:1");
+    assert!(unreachable.round().await.is_err());
+    let sync = central.sync(&edge, &central.origin);
+    let before = Timestamp::now();
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.grants, 1);
+    let mut tx = central.store.begin().await.expect("begin");
+    let reviews = tx.break_glass_reviews(10).await.expect("reviews");
+    drop(tx);
+    assert_eq!(reviews.len(), 1);
+    assert_eq!(reviews[0].at, made);
+    assert!(
+        reviews[0].review_due >= before + health_time::SignedDuration::from_hours(72),
+        "due 72 h after it arrived, not after it was made"
+    );
+    assert_eq!(sync.round().await.expect("round").grants, 0, "sent once");
+}

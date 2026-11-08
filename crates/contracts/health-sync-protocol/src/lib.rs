@@ -22,6 +22,7 @@
 
 mod blobs;
 mod envelope;
+mod grants;
 mod handshake;
 mod hash;
 mod hlc;
@@ -33,6 +34,7 @@ mod state;
 
 pub use blobs::{BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, blob_refs, blob_url};
 pub use envelope::{BlobRef, EnvelopeError, Item, Kind, PackageRef};
+pub use grants::{BreakGlassGrant, REVIEW_WITHIN_HOURS};
 pub use handshake::{
     Compatibility, Cursor, Hello, Incompatibility, PROTOCOL, ProtocolVersion, SoftwareVersion,
     SoftwareVersionError, Verdict, Welcome, expected_cursor,

@@ -238,6 +238,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0042_sync_blobs",
         sql: include_str!("../migrations/0042_sync_blobs.surql"),
     },
+    Migration {
+        version: 43,
+        name: "0043_sync_break_glass",
+        sql: include_str!("../migrations/0043_sync_break_glass.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.

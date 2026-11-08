@@ -178,6 +178,7 @@ DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE break_glass TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD account ON break_glass TYPE string PERMISSIONS FULL
   DEFINE FIELD acknowledged ON break_glass TYPE bool PERMISSIONS FULL
+  DEFINE FIELD arrived_at ON break_glass TYPE none | datetime PERMISSIONS FULL
   DEFINE FIELD at ON break_glass TYPE datetime PERMISSIONS FULL
   DEFINE FIELD decision ON break_glass TYPE none | string ASSERT $value = NONE OR $value INSIDE ['appropriate', 'inappropriate'] PERMISSIONS FULL
   DEFINE FIELD escalated_at ON break_glass TYPE none | datetime PERMISSIONS FULL
@@ -1586,6 +1587,8 @@ DEFINE TABLE sync_conflict TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD resolved_by ON sync_conflict TYPE none | string PERMISSIONS FULL
   DEFINE FIELD status ON sync_conflict TYPE string ASSERT $value INSIDE ['open', 'resolved', 'superseded'] PERMISSIONS FULL
   DEFINE INDEX sync_conflict_status ON sync_conflict FIELDS status, opened_at
+DEFINE TABLE sync_grant_outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD queued_at ON sync_grant_outbox TYPE datetime PERMISSIONS FULL
 DEFINE TABLE sync_horizon TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD pruned_through ON sync_horizon TYPE int PERMISSIONS FULL
 DEFINE TABLE sync_item_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
