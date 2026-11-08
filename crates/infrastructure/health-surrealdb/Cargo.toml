@@ -34,6 +34,7 @@ health-fhir-search = { workspace = true }
 health-identity = { workspace = true }
 health-coverage = { workspace = true }
 health-inventory = { workspace = true }
+health-inventory-app = { workspace = true }
 health-patient-flow = { workspace = true }
 health-payments = { workspace = true }
 health-pricing = { workspace = true }

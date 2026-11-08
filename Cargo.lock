@@ -3251,6 +3251,7 @@ dependencies = [
  "health-identifiers",
  "health-identity",
  "health-inventory",
+ "health-inventory-app",
  "health-laboratory",
  "health-patient-flow",
  "health-payments",

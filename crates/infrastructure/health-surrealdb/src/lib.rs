@@ -59,6 +59,6 @@ pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, mig
 pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SurrealStore, SurrealTx};
 pub use sync::{
-    ConflictRecord, DOWN_GLOBAL, Outgoing, Resolution, SurrealAuthority, SurrealReplica, SyncScope,
-    UP_GLOBAL, class_of,
+    ConflictRecord, DOWN_GLOBAL, LEDGERS, Outgoing, Resolution, STOCK_LEDGER, SurrealAuthority,
+    SurrealReplica, SyncScope, UP_GLOBAL, class_of,
 };
