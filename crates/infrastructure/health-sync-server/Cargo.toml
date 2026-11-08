@@ -16,6 +16,7 @@ workspace = true
 axum = { workspace = true }
 health-access-policy = { workspace = true }
 health-audit = { workspace = true }
+health-files = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }
 futures-util = { workspace = true }
@@ -28,6 +29,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 health-identity = { workspace = true }
 health-pki = { workspace = true }
 http-body-util = { workspace = true }

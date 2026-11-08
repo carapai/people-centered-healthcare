@@ -969,6 +969,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#84, part 1: attachments follow their records (2026-11-08).**
+  - **Reference format:** a blob is referenced as `Attachment.url` `urn:health:blob:sha256:<hex>`, with `size` and `contentType`, and items list their blobs.
+  - **Upload:** accepted records queue their blobs for the upstream. The edge uploads each in 1 MiB chunks from the offset central reports, so an interrupted upload resumes; an out-of-order chunk gets 409 with the resume point.
+  - **Download:** on demand, verified.
+  - **Settings:** central's store is `HEALTH_FILES_DIR`.
+  - **Tested:** a 2.5 MiB upload interrupted after one chunk resumes at 1 MiB over HTTP; a scanned consent's 3 MB blob follows its DocumentReference to central exactly once; a blob only at central comes down on demand.
+  - **Still open:**
+    - the pre-fetch flag;
+    - the pending marker;
+    - scope checks on download.
 - **#83, part 1: the horizon and re-seeding (2026-11-08).**
   - **Pruning:** central prunes the change log and receipts past 180 days, hourly. Entries an outbox still needs are kept, and `seq` never goes below the pruned horizon. That was a bug the test found: pruning the whole log made `seq` restart at 1.
   - **Re-seeding:** a pull from below the horizon is answered `reseed_required`. The edge then fetches `POST /sync/v1/snapshot` (every head in its scope, with the cursor, from one transaction), applies the heads it lacks, takes a new epoch, and carries on. Its outbox goes up first, so nothing written offline is lost.

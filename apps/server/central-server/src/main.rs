@@ -228,6 +228,12 @@ fn auth_settings(
             None => Vec::new(),
         },
         registry_nin_system: files.registry_nin_system.clone(),
+        files: files
+            .files_dir
+            .as_ref()
+            .map(health_files::FsBlobStore::open)
+            .transpose()
+            .map_err(|_| "HEALTH_FILES_DIR cannot be opened as an attachment store")?,
         kms: files
             .kms_key_file
             .as_deref()

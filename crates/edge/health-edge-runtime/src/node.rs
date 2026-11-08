@@ -339,6 +339,16 @@ pub async fn run(
             );
             match crate::sync::Sync::new(fhir, upstream, key) {
                 Ok(sync) => {
+                    // Attachments live beside the store, where backups take them from.
+                    let sync = match health_files::FsBlobStore::open(
+                        config.data_dir.with_file_name("files"),
+                    ) {
+                        Ok(blobs) => sync.with_blobs(blobs),
+                        Err(error) => {
+                            tracing::warn!(%error, "no attachment store: attachments do not sync");
+                            sync
+                        }
+                    };
                     let every = config.sync_interval;
                     supervisor.spawn("sync", move || sync.clone().run(every));
                 }
