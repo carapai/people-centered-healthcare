@@ -505,6 +505,115 @@ impl SurrealStore {
             .map_err(unavailable)
     }
 
+    /// The open Conflict Records, oldest first; with `opened_before`, only those opened before
+    /// then (the review queue's ageing alert, synchronization.md § Conflict Record and review
+    /// queue).
+    pub async fn open_conflicts(
+        &self,
+        opened_before: Option<Timestamp>,
+    ) -> Result<Vec<ConflictRecord>, StoreError> {
+        let before = opened_before.map_or_else(
+            || "d'9999-12-31T00:00:00Z'".to_owned(),
+            |at| format!("d'{at}'"),
+        );
+        let rows: Vec<ConflictRow> = self
+            .connection
+            .db()
+            .query(format!(
+                "SELECT {CONFLICT_COLUMNS} FROM sync_conflict \
+                 WHERE status = 'open' AND opened_at < {before} ORDER BY opened_at"
+            ))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        rows.into_iter().map(ConflictRecord::from_row).collect()
+    }
+
+    /// One Conflict Record, by the `tx_id` of the group it was opened for.
+    pub async fn conflict(&self, id: &str) -> Result<Option<ConflictRecord>, StoreError> {
+        let row: Option<ConflictRow> = self
+            .connection
+            .db()
+            .query(format!(
+                "SELECT {CONFLICT_COLUMNS} FROM ONLY type::record('sync_conflict', $id)"
+            ))
+            .bind(("id", id.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        row.map(ConflictRecord::from_row).transpose()
+    }
+
+    /// Resolves an open Conflict Record as `resolver` decided, in one transaction: a new version
+    /// written on top of the head, which then syncs like any other, or the head kept as it is.
+    /// Returns the version the record is resolved to.
+    pub async fn resolve_conflict(
+        &self,
+        id: &str,
+        resolver: &str,
+        resolution: Resolution,
+    ) -> Result<OpId, WriteError> {
+        let record = self
+            .conflict(id)
+            .await?
+            .filter(|record| record.status == "open")
+            .ok_or_else(|| {
+                WriteError::Store(StoreError::Unavailable(format!(
+                    "no open Conflict Record {id}"
+                )))
+            })?;
+        let mut tx = self.begin().await?;
+        let version = match resolution {
+            Resolution::KeepHead {
+                resource_type,
+                id: resource,
+            } => tx
+                .head(&resource_type, resource)
+                .await?
+                .map(|head| head.version.version_id)
+                .ok_or_else(|| WriteError::Store(corrupt("a conflict without a head")))?,
+            Resolution::Write {
+                resource_type,
+                id: resource,
+                json,
+            } => {
+                let head = tx
+                    .head(&resource_type, resource)
+                    .await?
+                    .map(|h| h.version.version_id);
+                let op_id = OpId::new();
+                tx.write(health_persistence::WriteRequest {
+                    resource_type,
+                    id: resource,
+                    json,
+                    op_id,
+                    precondition: head.map_or(
+                        health_persistence::Precondition::MustNotExist,
+                        health_persistence::Precondition::IfMatch,
+                    ),
+                })
+                .await?;
+                op_id
+            }
+        };
+        let mut sql = Sql::default();
+        let key = sql.str(record.id.as_str());
+        let by = sql.str(resolver);
+        let resolved = sql.str(version.to_string());
+        sql.push(format!(
+            "UPDATE type::record('sync_conflict', {key}) SET status = 'resolved', \
+             resolved_by = {by}, resolved_at = time::now(), resolution = {resolved} \
+             WHERE status = 'open'"
+        ));
+        sql.run(tx.tx()?).await.map_err(write_error)?;
+        tx.commit().await?;
+        Ok(version)
+    }
+
     /// The Conflict Records opened for pushes, as `(tx_id, status)`.
     pub async fn conflicts(&self) -> Result<Vec<(String, String)>, StoreError> {
         #[derive(SurrealValue)]
@@ -685,27 +794,47 @@ impl SurrealAuthority<'_> {
                 ),
             ));
         }
+        for item in &group.items {
+            if let Some(why) = signed_note_refusal(tx, item).await? {
+                return Ok(rejected(Reason::SignedVersionEdited, why));
+            }
+        }
         let mut conflicts = Vec::new();
         for item in &group.items {
             if let Standing::Conflict { head } = self.standing(tx, item).await? {
+                let (class, _) = class_of(&item.resource_type);
                 conflicts.push(json!({
                     "op_id": item.op_id.to_string(),
                     "resource": format!("{}/{}", item.resource_type, item.resource_id),
                     "parent": item.parent_version_id.map(|p| p.to_string()),
                     "head": head.map(|h| h.to_string()),
+                    "class": class,
                 }));
             }
         }
-        if conflicts.is_empty() {
+        let Some(first) = conflicts.first() else {
             return Ok(Outcome::Accepted);
-        }
+        };
+        let resource_type = first["resource"]
+            .as_str()
+            .and_then(|r| r.split('/').next())
+            .unwrap_or_default()
+            .to_owned();
+        let (class, policy) = class_of(&resource_type);
         let mut sql = Sql::default();
         let key = sql.str(group.tx_id.to_string());
         let peer = sql.str(self.peer.to_string());
         let items = sql.str(Value::Array(conflicts).to_string());
+        let candidates = sql.str(
+            serde_json::to_string(&group.items)
+                .map_err(|_| WriteError::Store(corrupt("candidates")))?,
+        );
+        let class = sql.str(class);
+        let policy = sql.str(policy);
         sql.push(format!(
             "UPSERT type::record('sync_conflict', {key}) SET peer = {peer}, items = {items}, \
-             status = 'open', opened_at = time::now()"
+             candidates = {candidates}, class = {class}, policy = {policy}, status = 'open', \
+             opened_at = time::now()"
         ));
         sql.run(tx.tx()?).await.map_err(write_error)?;
         Ok(Outcome::Conflict {
@@ -743,6 +872,162 @@ impl SurrealAuthority<'_> {
             Ok(Standing::Conflict { head: head_id })
         }
     }
+}
+
+const CONFLICT_COLUMNS: &str = "record::id(id) AS id, peer, items, candidates, class, policy, \
+     status, <string> opened_at AS opened_at, resolved_by, resolution";
+
+#[derive(Debug, SurrealValue)]
+struct ConflictRow {
+    id: String,
+    peer: String,
+    items: String,
+    candidates: Option<String>,
+    class: Option<String>,
+    policy: Option<String>,
+    status: String,
+    opened_at: String,
+    resolved_by: Option<String>,
+    resolution: Option<String>,
+}
+
+/// A Conflict Record: a pushed group whose versions did not build on the head, with both branches
+/// (synchronization.md § Conflict Record and review queue; ADR 0020).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConflictRecord {
+    /// The pushed group's `tx_id`.
+    pub id: String,
+    /// The node that pushed it.
+    pub peer: String,
+    /// Per conflicting version: its `op_id`, resource, parent, the head it met, and its class.
+    pub items: Value,
+    /// The group as it was pushed: the candidate branch.
+    pub candidates: Vec<Item>,
+    /// The records' class, e.g. `clinical` or `identity`.
+    pub class: String,
+    /// What the class's policy says to do.
+    pub policy: String,
+    /// `open`, `resolved` or `superseded`.
+    pub status: String,
+    /// When it was opened.
+    pub opened_at: Timestamp,
+    /// Who resolved it.
+    pub resolved_by: Option<String>,
+    /// The version it was resolved to.
+    pub resolution: Option<String>,
+}
+
+impl ConflictRecord {
+    fn from_row(row: ConflictRow) -> Result<Self, StoreError> {
+        Ok(Self {
+            id: row.id,
+            peer: row.peer,
+            items: serde_json::from_str(&row.items).map_err(|_| corrupt("conflict items"))?,
+            candidates: row
+                .candidates
+                .map(|c| serde_json::from_str(&c).map_err(|_| corrupt("conflict candidates")))
+                .transpose()?
+                .unwrap_or_default(),
+            class: row.class.unwrap_or_else(|| "clinical".into()),
+            policy: row.policy.unwrap_or_default(),
+            status: row.status,
+            opened_at: row.opened_at.parse().map_err(|_| corrupt("opened_at"))?,
+            resolved_by: row.resolved_by,
+            resolution: row.resolution,
+        })
+    }
+}
+
+/// How a reviewer resolves a Conflict Record.
+#[derive(Debug, Clone)]
+pub enum Resolution {
+    /// The head stands as it is; the candidate stays recorded in the Conflict Record.
+    KeepHead {
+        /// The resource's type.
+        resource_type: ResourceType,
+        /// Its id.
+        id: ResourceId,
+    },
+    /// A new version, written on top of the head: the corrected record, or one branch marked
+    /// entered-in-error.
+    Write {
+        /// The resource's type.
+        resource_type: ResourceType,
+        /// Its id.
+        id: ResourceId,
+        /// The version to write.
+        json: RawJson,
+    },
+}
+
+/// A conflict's class and its policy (synchronization.md § Per-class policy).
+pub fn class_of(resource_type: &str) -> (&'static str, &'static str) {
+    match resource_type {
+        "Patient" | "Person" | "RelatedPerson" => (
+            "identity",
+            "resolved at central by registry staff; never auto-merged",
+        ),
+        "Composition" | "DocumentReference" => (
+            "signed-note",
+            "changes are amendments that relate to the original; a signed version is never edited",
+        ),
+        "Encounter" | "Task" | "RequestOrchestration" => (
+            "workflow",
+            "allowed, commuting transitions apply; anything else is reviewed",
+        ),
+        "QuestionnaireResponse" => (
+            "questionnaire-response",
+            "created once; later edits are handled like Observation",
+        ),
+        "Device" => ("device", "revocation wins"),
+        _ => (
+            "clinical",
+            "version-safe correction: both branches are kept, and the resolver writes the \
+             corrected version or marks one entered-in-error; never last-write-wins",
+        ),
+    }
+}
+
+/// Why a pushed version may not replace the note version it was written on, if it may not: a
+/// signed note is never edited in place or deleted, only marked entered-in-error as it was
+/// (synchronization.md § Per-class policy; clinical-documentation's rule).
+async fn signed_note_refusal(
+    tx: &mut SurrealTx,
+    item: &Item,
+) -> Result<Option<String>, WriteError> {
+    if !matches!(
+        item.resource_type.as_str(),
+        "Composition" | "DocumentReference"
+    ) {
+        return Ok(None);
+    }
+    let Some(parent) = item.parent_version_id else {
+        return Ok(None);
+    };
+    let resource_type: ResourceType = item
+        .resource_type
+        .parse()
+        .map_err(|_| WriteError::Store(corrupt("resource_type")))?;
+    let id: ResourceId = item
+        .resource_id
+        .parse()
+        .map_err(|_| WriteError::Store(corrupt("resource_id")))?;
+    let Some(base) = tx.version(&resource_type, id, parent).await? else {
+        return Ok(None);
+    };
+    let base: Value = serde_json::from_str(base.json.as_str())
+        .map_err(|_| WriteError::Store(corrupt("note json")))?;
+    let refused = if item.deleted {
+        health_clinical_documentation_app::notes::check_delete(&base)
+    } else {
+        health_clinical_documentation_app::notes::check_replace(&base, &item.body)
+    };
+    Ok(refused.err().map(|why| {
+        format!(
+            "{}/{}: {why}; amend it with a new note instead",
+            item.resource_type, item.resource_id
+        )
+    }))
 }
 
 /// The pulling side's store: an edge pulling from central, a desktop from its edge.

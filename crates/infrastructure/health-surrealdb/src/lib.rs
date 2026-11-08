@@ -58,4 +58,7 @@ pub use inbound::{InboundEntry, InboundKind, InboundStatus};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
 pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SurrealStore, SurrealTx};
-pub use sync::{DOWN_GLOBAL, Outgoing, SurrealAuthority, SurrealReplica, SyncScope, UP_GLOBAL};
+pub use sync::{
+    ConflictRecord, DOWN_GLOBAL, Outgoing, Resolution, SurrealAuthority, SurrealReplica, SyncScope,
+    UP_GLOBAL, class_of,
+};

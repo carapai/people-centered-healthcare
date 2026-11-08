@@ -10,8 +10,8 @@ use health_persistence::{
     Precondition, RawJson, ResourceType, Store, Transaction, VersionMeta, WriteRequest,
 };
 use health_surrealdb::{
-    Connection, DOWN_GLOBAL, MIGRATIONS, Settings, SurrealAuthority, SurrealReplica, SurrealStore,
-    SyncScope, Target, UP_GLOBAL, migrate,
+    Connection, DOWN_GLOBAL, MIGRATIONS, Resolution, Settings, SurrealAuthority, SurrealReplica,
+    SurrealStore, SyncScope, Target, UP_GLOBAL, migrate,
 };
 use health_sync_protocol::{Lane, Outcome, PullRequest, PullResponse, Reason, apply_pull, receive};
 use health_time::{FixedClock, Timestamp};
@@ -312,6 +312,130 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
     drop(tx);
     // Nothing more moves until the conflict is resolved at central.
     assert_eq!(sync(&edge, &central).await, Round::default());
+
+    // The Conflict Record keeps both branches, with its class and policy.
+    let open = central.store.open_conflicts(None).await.expect("queue");
+    assert_eq!(open.len(), 1);
+    let record = &open[0];
+    assert_eq!(record.class, "identity");
+    assert!(record.policy.contains("never auto-merged"));
+    assert!(record.candidates.iter().any(
+        |item| item.op_id == ours.version_id && item.body["name"][0]["text"] == "Chris (edge)"
+    ));
+    // Aged more than 7 days, it would raise the alert; it is not yet.
+    let week_ago = Timestamp::now() - health_time::SignedDuration::from_hours(24 * 7);
+    assert!(
+        central
+            .store
+            .open_conflicts(Some(week_ago))
+            .await
+            .expect("aged")
+            .is_empty()
+    );
+
+    // Registry staff resolve it with a corrected version on top of the head.
+    let resolved = central
+        .store
+        .resolve_conflict(
+            &record.id,
+            "registry:okello",
+            Resolution::Write {
+                resource_type: "Patient".parse().expect("type"),
+                id,
+                json: RawJson::from_validated(patient("Chris Okello").to_string()),
+            },
+        )
+        .await
+        .expect("resolve");
+    assert!(
+        central
+            .store
+            .open_conflicts(None)
+            .await
+            .expect("queue")
+            .is_empty()
+    );
+    let record = central
+        .store
+        .conflict(&record.id)
+        .await
+        .expect("read")
+        .expect("record");
+    assert_eq!(record.status, "resolved");
+    assert_eq!(record.resolved_by.as_deref(), Some("registry:okello"));
+    assert_eq!(record.resolution, Some(resolved.to_string()));
+    // The resolution syncs down like any other version.
+    sync(&edge, &central).await;
+    let (head_now, body) = head(&edge, "Patient", id).await.expect("head");
+    assert_eq!(head_now, resolved);
+    assert_eq!(body["name"][0]["text"], "Chris Okello");
+}
+
+fn note(status: &str, text: &str) -> Value {
+    json!({
+        "resourceType": "Composition",
+        "status": status,
+        "meta": {"tag": [{"system": "urn:health:facility", "code": "KLA01"}]},
+        "title": "Consultation note",
+        "section": [{"text": {"status": "generated", "div": text}}]
+    })
+}
+
+#[tokio::test]
+async fn a_signed_note_is_never_edited_in_place_by_sync() {
+    let (central, edge) = pair().await;
+    let id = ResourceId::new();
+    let signed = write(
+        &edge,
+        id,
+        &note("final", "<div>BP 120/80</div>"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    sync(&edge, &central).await;
+
+    // Edited in place at the edge: refused at central, which keeps the signed version.
+    write(
+        &edge,
+        id,
+        &note("final", "<div>BP 140/90</div>"),
+        Precondition::IfMatch(signed.version_id),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(
+            round.outcomes.as_slice(),
+            [Outcome::Rejected {
+                reason: Reason::SignedVersionEdited,
+                ..
+            }]
+        ),
+        "{:?}",
+        round.outcomes
+    );
+    let (at_central, _) = head(&central, "Composition", id).await.expect("head");
+    assert_eq!(at_central, signed.version_id);
+
+    // Marked entered-in-error as it was: accepted.
+    let other = ResourceId::new();
+    let first = write(
+        &edge,
+        other,
+        &note("final", "<div>wrong patient</div>"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    sync(&edge, &central).await;
+    write(
+        &edge,
+        other,
+        &note("entered-in-error", "<div>wrong patient</div>"),
+        Precondition::IfMatch(first.version_id),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.outcomes, vec![Outcome::Accepted]);
 }
 
 #[test]

@@ -388,7 +388,31 @@ fn sync_routes(store: SurrealStore, registry: NodeRegistry) -> Result<Router, &'
             .map_err(|_| "the package version is not major.minor.patch")?,
         approved: std::collections::BTreeSet::new(),
     };
+    conflicts_hourly(store.clone());
     Ok(health_sync_server::SyncServer::new(store, registry, compatibility).router())
+}
+
+/// Raises `sync-conflicts-ageing`, hourly, while any Conflict Record has been open for more than
+/// 7 days (synchronization.md § Conflict Record and review queue; #82).
+fn conflicts_hourly(store: SurrealStore) {
+    tokio::spawn(async move {
+        let mut hourly = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            hourly.tick().await;
+            let week_ago =
+                health_time::Timestamp::now() - health_time::SignedDuration::from_hours(24 * 7);
+            match store.open_conflicts(Some(week_ago)).await {
+                Ok(aged) if !aged.is_empty() => tracing::warn!(
+                    alert = "sync-conflicts-ageing",
+                    count = aged.len(),
+                    oldest = %aged[0].opened_at,
+                    "Conflict Records have been open for more than 7 days"
+                ),
+                Ok(_) => {}
+                Err(error) => tracing::warn!(%error, "cannot read the Conflict Record queue"),
+            }
+        }
+    });
 }
 
 /// Keeps the standing alerts of ADR 0048 going, hourly: every active edge running under an
