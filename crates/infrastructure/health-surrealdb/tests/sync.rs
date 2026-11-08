@@ -656,3 +656,90 @@ async fn packages_arrive_before_the_clinical_data_written_before_them() {
         assert_eq!(cursor.map(|c| c.seq), Some(end), "{lane:?}");
     }
 }
+
+#[tokio::test]
+async fn the_facility_stock_ledger_goes_up_as_operations_applied_once() {
+    use health_inventory::{
+        Movement, MovementKind, Origin, Ownership, Policy, Status, StockStore as _, StockUnit,
+    };
+    use health_inventory_app::Inventory;
+    let (central, edge) = pair().await;
+    let unit = StockUnit {
+        store: "Location/pharmacy".into(),
+        product: "amoxicillin-500".into(),
+        batch: "B42".into(),
+        expiry: "2027-06-30".into(),
+        funding_source: "government".into(),
+        ownership: Ownership::Owned,
+        status: Status::Usable,
+    };
+    let movement = |id: &str, kind: MovementKind, quantity: i64| {
+        let at: Timestamp = "2026-11-09T09:00:00Z".parse().expect("time");
+        Movement {
+            id: id.into(),
+            unit: unit.clone(),
+            kind,
+            quantity,
+            pack_size: 10,
+            unit_cost: None,
+            occurred_at: at,
+            recorded_at: at,
+            source_document: "doc".into(),
+            actor: "pharmacist".into(),
+            node: "E1".into(),
+            op_id: id.into(),
+            reason: None,
+            reverses: None,
+            emergency: false,
+        }
+    };
+    let at_edge = Inventory::new(edge.store.clone(), Policy::default());
+    let authority = Origin::Authority {
+        may_emergency_dispense: false,
+    };
+    at_edge
+        .record(&movement("grn-1", MovementKind::Receipt, 100), authority)
+        .await
+        .expect("receipt");
+    at_edge
+        .record(&movement("disp-1", MovementKind::Dispense, -30), authority)
+        .await
+        .expect("dispense");
+
+    // The pushed groups, kept to resend after a lost response.
+    let sent = edge
+        .store
+        .outbox(&central.id.to_string(), edge.id, 50)
+        .await
+        .expect("outbox");
+    assert!(sent.iter().all(|o| {
+        o.group
+            .items
+            .iter()
+            .all(|i| i.kind == health_sync_protocol::Kind::Op)
+    }));
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.outcomes, vec![Outcome::Accepted, Outcome::Accepted]);
+    let authority_central = SurrealAuthority::new(&central.store, edge.id, scope());
+    for outgoing in &sent {
+        let again = receive(&authority_central, &outgoing.group)
+            .await
+            .expect("resend");
+        assert!(again.replayed, "answered from the receipt");
+    }
+
+    // Central's copy of the facility's ledger: both movements, once, and the same balance.
+    let mut tx = central.store.begin().await.expect("begin");
+    let movements = tx.movements(&unit.key()).await.expect("movements");
+    let balance = tx
+        .stock_balance(&unit.key())
+        .await
+        .expect("balance")
+        .expect("unit");
+    drop(tx);
+    assert_eq!(movements.len(), 2);
+    assert_eq!(balance.on_hand, 70);
+    assert!(!balance.flagged);
+    // Operations never come back down.
+    assert_eq!(sync(&edge, &central).await, Round::default());
+}

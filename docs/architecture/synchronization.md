@@ -58,7 +58,10 @@ Every item on the wire, in either direction:
   - **`sync_upstream`** lists the upstream peers. **`sync_outbox`** rows are keyed `[peer, seq]` and are removed by `acknowledge`.
   - **`sync_state:node`** holds the epoch. Backup restore calls `new_epoch`.
   - **Reads:** `SurrealStore::cursor`, `changes_after` and `pending_for`.
-  - **Not yet on the log:** ledger operations (`kind: op`); the stock, charge and payment adapters write them with #81.
+  - **Ledger operations (#81).** A stock movement is logged as an operation in its own write transaction (`SurrealTx::log_op`; `change_log.op`, migration `0044_ledger_ops`). The entry's `resource_type` names the ledger (`stock`) and its `resource_id` the Stock Unit; it travels as a `kind: op` item.
+    - **At the receiver:** the operation is appended through inventory's own rules as a late operation (`Inventory::record_in`, `Origin::Late`), in the same transaction as its receipt. A balance it drives negative opens a Reconciliation Record, and a movement already held is skipped.
+    - **Direction:** operations go up only, and are never sent down.
+    - **Not yet:** charges and payments; checking that a movement's store is a Location of the sending facility.
 - **In code (#80).** `health-sync-protocol` (contracts) holds the wire types and both sides' rules, with no I/O ([README](../../crates/contracts/health-sync-protocol/README.md)):
   - the envelope `Item` and its `ContentHash`;
   - the handshake verdict;
@@ -88,7 +91,6 @@ Every item on the wire, in either direction:
     - **Never:** another facility's records, and central's own audit.
   - **Not yet:**
     - golden-record narrowing of Patients;
-    - ledger operations, which are refused as `invalid` for now;
     - HLC and package fields from the writer;
     - the edge's sync task (below).
 - **In code (#81, edge).** The `sync` task in `health-edge-runtime` ([README](../../crates/edge/health-edge-runtime/README.md)) runs the session above against central.

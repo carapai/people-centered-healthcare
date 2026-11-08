@@ -71,11 +71,13 @@ impl StockStore for SurrealTx {
             vec![
                 ("id", movement.id.clone()),
                 ("unit_key", movement.unit.key()),
-                ("data", json),
+                ("data", json.clone()),
                 ("recorded_at", movement.recorded_at.to_string()),
             ],
         )
         .await?;
+        // The facility's stock ledger goes up as operations (#81).
+        self.log_op(crate::sync::STOCK_LEDGER, &movement.unit.key(), &json);
         Ok(())
     }
 

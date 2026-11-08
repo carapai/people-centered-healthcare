@@ -89,15 +89,25 @@ pub const DOWN_GLOBAL: &[&str] = &[
     "ValueSet",
 ];
 
+/// The stock ledger's name on the change log: Stock Unit movements go up as operations
+/// (write-authority.md § Data authority matrix).
+pub const STOCK_LEDGER: &str = "stock";
+
+/// The ledgers whose operations sync: up only, from the facility that keeps them.
+pub const LEDGERS: &[&str] = &[STOCK_LEDGER];
+
 impl SyncScope {
-    /// Whether the peer may send up a version of `resource_type` with this body.
+    /// Whether the peer may send up a version of `resource_type` with this body, or an
+    /// operation on that ledger. A facility sends its own ledgers' operations; which store a
+    /// movement names is not yet checked against the facility's Locations.
     pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
-        self.admits(resource_type, body, UP_GLOBAL)
+        LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL)
     }
 
-    /// Whether the peer is sent a version of `resource_type` with this body.
+    /// Whether the peer is sent a version of `resource_type` with this body. Ledger operations
+    /// are never sent down: each ledger's authority is the facility that keeps it.
     pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
-        self.admits(resource_type, body, DOWN_GLOBAL)
+        !LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL)
     }
 
     fn admits(&self, resource_type: &str, body: &Value, global: &[&str]) -> bool {
@@ -177,14 +187,46 @@ impl SurrealStore {
     /// The envelope of a logged version: its body from history, its parent the version before
     /// it here, its origin `node` unless another node committed it first.
     async fn item(&self, change: &Change, node: NodeId) -> Result<Item, StoreError> {
-        let id = change.resource_id.to_string();
+        let origin_node = match &change.origin {
+            Some(origin) => origin.parse().map_err(|_| corrupt("origin"))?,
+            None => node,
+        };
+        if let Some(body) = &change.op {
+            // A ledger operation: its body travels as written, appended at the receiver.
+            let body: Value = serde_json::from_str(body).map_err(|_| corrupt("op"))?;
+            return Ok(Item {
+                kind: Kind::Op,
+                op_id: change.op_id,
+                tx_id: change.tx_id,
+                resource_type: change.resource_type.clone(),
+                resource_id: change.resource_id.clone(),
+                parent_version_id: None,
+                origin_node,
+                device_id: None,
+                author: None,
+                hlc: Hlc::default(),
+                content_hash: ContentHash::of(&body),
+                packages: Vec::new(),
+                snapshot_version: 0,
+                provisional: false,
+                deleted: false,
+                blobs: Vec::new(),
+                body,
+            });
+        }
+        let resource_type: ResourceType = change
+            .resource_type
+            .parse()
+            .map_err(|_| corrupt("resource_type"))?;
+        let change_type = &resource_type;
+        let id = change.resource_id.clone();
         let row = self
-            .stored_version(&change.resource_type, &id, change.version_seq)
+            .stored_version(change_type, &id, change.version_seq)
             .await?
             .ok_or_else(|| corrupt("change log entry without its version"))?;
         let parent_version_id = if change.version_seq > 1 {
             let parent = self
-                .stored_version(&change.resource_type, &id, change.version_seq - 1)
+                .stored_version(change_type, &id, change.version_seq - 1)
                 .await?
                 .ok_or_else(|| corrupt("history without its parent version"))?;
             Some(
@@ -201,10 +243,6 @@ impl SurrealStore {
             .last_updated
             .parse()
             .map_err(|_| corrupt("last_updated"))?;
-        let origin_node = match &change.origin {
-            Some(origin) => origin.parse().map_err(|_| corrupt("origin"))?,
-            None => node,
-        };
         Ok(Item {
             kind: Kind::Version,
             op_id: change.op_id,
@@ -1071,10 +1109,19 @@ impl Authority for SurrealAuthority<'_> {
             peer: self.peer.to_string(),
             origin,
         });
-        let outcome = self.judge(&mut tx, group).await?;
+        let mut outcome = self.judge(&mut tx, group).await?;
         if outcome == Outcome::Accepted {
             for item in &group.items {
-                if matches!(self.standing(&mut tx, item).await?, Standing::FastForward) {
+                if item.kind == Kind::Op {
+                    if let Some(refused) = self.append_op(&mut tx, item).await? {
+                        outcome = refused;
+                        // A refused operation leaves nothing of the group applied: start over
+                        // with only the receipts.
+                        drop(tx);
+                        tx = self.store.begin().await?;
+                        break;
+                    }
+                } else if matches!(self.standing(&mut tx, item).await?, Standing::FastForward) {
                     tx.apply_version(item).await?;
                 }
             }
@@ -1102,10 +1149,14 @@ impl SurrealAuthority<'_> {
     /// version does not build on the head (recorded as a Conflict Record), accepted otherwise.
     async fn judge(&self, tx: &mut SurrealTx, group: &Group) -> Result<Outcome, WriteError> {
         let rejected = |reason, detail: String| Outcome::Rejected { reason, detail };
-        if let Some(item) = group.items.iter().find(|i| i.kind == Kind::Op) {
+        if let Some(item) = group
+            .items
+            .iter()
+            .find(|i| i.kind == Kind::Op && !LEDGERS.contains(&i.resource_type.as_str()))
+        {
             return Ok(rejected(
                 Reason::Invalid,
-                format!("{}: ledger operations are not synced yet", item.op_id),
+                format!("{}: no ledger {}", item.op_id, item.resource_type),
             ));
         }
         if let Some(item) = group
@@ -1127,7 +1178,9 @@ impl SurrealAuthority<'_> {
             }
         }
         let mut conflicts = Vec::new();
-        for item in &group.items {
+        // Ledger operations are appended, never in conflict (synchronization.md § Conflict
+        // detection and resolution).
+        for item in group.items.iter().filter(|i| i.kind == Kind::Version) {
             if let Standing::Conflict { head } = self.standing(tx, item).await? {
                 let (class, _) = class_of(&item.resource_type);
                 conflicts.push(json!({
@@ -1167,6 +1220,51 @@ impl SurrealAuthority<'_> {
         Ok(Outcome::Conflict {
             conflict: group.tx_id.to_string(),
         })
+    }
+
+    /// Appends a ledger operation, unless it is here already: a stock movement through the
+    /// inventory's own rules as a late operation, so a balance it drives negative opens a
+    /// Reconciliation Record (write-authority.md: ledger reconciliation). `Some` when the
+    /// operation is refused.
+    async fn append_op(
+        &self,
+        tx: &mut SurrealTx,
+        item: &Item,
+    ) -> Result<Option<Outcome>, WriteError> {
+        let refused = |detail: String| {
+            Some(Outcome::Rejected {
+                reason: Reason::Invalid,
+                detail,
+            })
+        };
+        let Ok(movement) = serde_json::from_value::<health_inventory::Movement>(item.body.clone())
+        else {
+            return Ok(refused(format!("{}: not a stock movement", item.op_id)));
+        };
+        let held: Option<String> = tx
+            .tx()?
+            .query("SELECT VALUE record::id(id) FROM ONLY type::record('stock_movement', $id)")
+            .bind(("id", movement.id.clone()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(write_error)?
+            .take(0)
+            .map_err(write_error)?;
+        if held.is_some() {
+            return Ok(None);
+        }
+        let inventory = health_inventory_app::Inventory::new(
+            self.store.clone(),
+            health_inventory::Policy::default(),
+        );
+        match inventory
+            .record_in(tx, &movement, health_inventory::Origin::Late)
+            .await
+        {
+            Ok(_) => Ok(None),
+            Err(health_inventory_app::InventoryError::Busy) => Err(WriteError::Conflict),
+            Err(error) => Ok(refused(format!("{}: {error}", item.op_id))),
+        }
     }
 
     async fn standing(&self, tx: &mut SurrealTx, item: &Item) -> Result<Standing, WriteError> {

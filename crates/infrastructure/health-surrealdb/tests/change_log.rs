@@ -65,7 +65,14 @@ async fn each_version_gets_the_next_seq_and_a_transaction_shares_its_tx_id() {
     let changes = store.changes_after(0, 100).await.expect("changes");
     let summary: Vec<(u64, ResourceId, u64, bool)> = changes
         .iter()
-        .map(|c| (c.seq, c.resource_id, c.version_seq, c.deleted))
+        .map(|c| {
+            (
+                c.seq,
+                c.resource_id.parse().expect("id"),
+                c.version_seq,
+                c.deleted,
+            )
+        })
         .collect();
     assert_eq!(
         summary,
@@ -79,7 +86,7 @@ async fn each_version_gets_the_next_seq_and_a_transaction_shares_its_tx_id() {
     assert_eq!(changes[0].op_id, first.version_id);
     assert_ne!(changes[0].tx_id, changes[1].tx_id);
     assert!(changes[1..].iter().all(|c| c.tx_id == changes[1].tx_id));
-    assert!(changes.iter().all(|c| c.resource_type == obs()));
+    assert!(changes.iter().all(|c| c.resource_type == obs().as_str()));
 
     let cursor = store.cursor().await.expect("cursor");
     assert_eq!(
@@ -121,9 +128,9 @@ async fn a_rolled_back_transaction_takes_no_seq() {
     assert_eq!(
         changes
             .iter()
-            .map(|c| (c.seq, c.resource_id))
+            .map(|c| (c.seq, c.resource_id.clone()))
             .collect::<Vec<_>>(),
-        vec![(1, id)]
+        vec![(1, id.to_string())]
     );
 }
 
@@ -172,7 +179,7 @@ async fn each_upstream_gets_an_outbox_row_until_it_acknowledges() {
     );
     assert_eq!(
         store.pending_for("central", 10).await.expect("pending")[0].resource_id,
-        ids[2]
+        ids[2].to_string()
     );
 
     store.remove_upstream("edge-b").await.expect("remove");
@@ -236,7 +243,7 @@ async fn seq_order_is_commit_order_under_concurrent_writers() {
                 for change in &page {
                     assert_eq!(change.seq, cursor + 1, "the tail skipped or repeated a seq");
                     cursor = change.seq;
-                    seen.push(change.resource_id);
+                    seen.push(change.resource_id.clone());
                 }
                 if finished && page.is_empty() {
                     return seen;
@@ -287,6 +294,7 @@ async fn seq_order_is_commit_order_under_concurrent_writers() {
         u64::try_from(total).expect("total")
     );
     seen.sort();
+    let mut written: Vec<String> = written.iter().map(ToString::to_string).collect();
     written.sort();
     assert_eq!(seen, written, "every committed version is on the log once");
     eprintln!("{total} versions, {conflicts} conflicts retried");

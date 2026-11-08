@@ -194,6 +194,22 @@ where
         }
     }
 
+    /// Records `movement` from `origin` inside the caller's transaction `tx`, for a caller that
+    /// commits it with other writes, such as sync applying a facility's operation with its
+    /// receipt (#81). A lost write-write conflict is [`InventoryError::Busy`]; the caller reruns.
+    pub async fn record_in(
+        &self,
+        tx: &mut S::Tx,
+        movement: &Movement,
+        origin: Origin,
+    ) -> Result<Decision, InventoryError> {
+        match self.apply(tx, movement, origin).await {
+            Ok(decision) => Ok(decision),
+            Err(Attempt::Conflict) => Err(InventoryError::Busy),
+            Err(Attempt::Fail(error)) => Err(error),
+        }
+    }
+
     /// Records `movement` from `origin`: the new balance, and whether it was flagged.
     pub async fn record(
         &self,

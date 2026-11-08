@@ -382,6 +382,7 @@ impl SurrealTx {
                 .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?,
             deleted,
             origin: self.source.as_ref().map(|s| s.origin.clone()),
+            op: None,
         });
         Ok(VersionMeta {
             version_id: op_id,
@@ -393,6 +394,21 @@ impl SurrealTx {
 }
 
 impl SurrealTx {
+    /// Logs a ledger operation written in this transaction, so it syncs up like a version does
+    /// (#81; write-authority.md: ledgers go up as operations). `ledger` names the ledger,
+    /// `scope` the account or unit within it, and `body` is the operation as the ledger stores it.
+    pub(crate) fn log_op(&mut self, ledger: &str, scope: &str, body: &str) {
+        self.changes.push(crate::change_log::Pending {
+            op_id: OpId::new(),
+            resource_type: ledger.to_owned(),
+            resource_id: scope.to_owned(),
+            version_seq: 0,
+            deleted: false,
+            origin: self.source.as_ref().map(|s| s.origin.clone()),
+            op: Some(body.to_owned()),
+        });
+    }
+
     /// Marks this transaction as applying versions received by sync from `source.peer`: they
     /// are logged with their origin node and are not queued back toward that peer.
     pub(crate) fn received_from(&mut self, source: crate::change_log::Source) {

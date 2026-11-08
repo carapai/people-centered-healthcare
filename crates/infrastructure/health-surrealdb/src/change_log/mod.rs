@@ -12,8 +12,8 @@
 //! - **Epoch.** [`new_epoch`] replaces the node's epoch, after a restore from backup or a
 //!   re-seed, so a peer holding a cursor from before never misreads a `seq` that went back.
 
-use health_identifiers::{OpId, ResourceId};
-use health_persistence::{ResourceType, StoreError, WriteError};
+use health_identifiers::OpId;
+use health_persistence::{StoreError, WriteError};
 use surrealdb::engine::any::Any;
 use surrealdb::method::Transaction as SurrealTransaction;
 use surrealdb::types::SurrealValue;
@@ -40,16 +40,18 @@ pub struct Change {
     pub tx_id: OpId,
     /// The version's `op_id` (its `meta.versionId`).
     pub op_id: OpId,
-    /// The resource's type.
-    pub resource_type: ResourceType,
-    /// The resource's id.
-    pub resource_id: ResourceId,
+    /// The resource's type; for an operation, its ledger.
+    pub resource_type: String,
+    /// The resource's id; for an operation, its scope in the ledger.
+    pub resource_id: String,
     /// The version's place in the resource's history.
     pub version_seq: u64,
     /// Whether the version is a tombstone.
     pub deleted: bool,
     /// The node that first committed it, if another node did; `None` for a local write.
     pub origin: Option<String>,
+    /// A ledger operation's body, for an entry that is an operation rather than a version.
+    pub op: Option<String>,
 }
 
 /// Where the versions of a transaction applied by sync came from.
@@ -70,6 +72,7 @@ pub(crate) struct Pending {
     pub(crate) version_seq: i64,
     pub(crate) deleted: bool,
     pub(crate) origin: Option<String>,
+    pub(crate) op: Option<String>,
 }
 
 #[derive(Debug, SurrealValue)]
@@ -82,10 +85,11 @@ struct ChangeRow {
     version_seq: i64,
     deleted: bool,
     origin: Option<String>,
+    op: Option<String>,
 }
 
-const CHANGE_COLUMNS: &str =
-    "record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, version_seq, deleted, origin";
+const CHANGE_COLUMNS: &str = "record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, \
+     version_seq, deleted, origin, op";
 
 /// The last `seq` taken: the newest entry on the log, and never below the pruned horizon, so a
 /// log pruned to empty does not hand out a `seq` again (#83).
@@ -138,10 +142,14 @@ pub(crate) async fn append(
             Some(origin) => sql.str(origin.as_str()),
             None => "NONE".to_owned(),
         };
+        let op_body = match &change.op {
+            Some(body) => sql.str(body.as_str()),
+            None => "NONE".to_owned(),
+        };
         sql.push(format!(
             "CREATE type::record('change_log', {seq}) CONTENT {{ tx_id: {tx_text}, op_id: {op}, \
              resource_type: {resource_type}, resource_id: {resource_id}, \
-             version_seq: {version_seq}, deleted: {deleted}, origin: {origin}, \
+             version_seq: {version_seq}, deleted: {deleted}, origin: {origin}, op: {op_body}, \
              committed_at: time::now() }}"
         ));
         let resource = sql.str(format!("{}/{}", change.resource_type, change.resource_id));
@@ -308,16 +316,11 @@ fn change(row: ChangeRow) -> Result<Change, StoreError> {
         seq: u64::try_from(row.seq).map_err(|_| corrupt("seq"))?,
         tx_id: row.tx_id.parse().map_err(|_| corrupt("tx_id"))?,
         op_id: row.op_id.parse().map_err(|_| corrupt("op_id"))?,
-        resource_type: row
-            .resource_type
-            .parse()
-            .map_err(|_| corrupt("resource_type"))?,
-        resource_id: row
-            .resource_id
-            .parse()
-            .map_err(|_| corrupt("resource_id"))?,
+        resource_type: row.resource_type,
+        resource_id: row.resource_id,
         version_seq: u64::try_from(row.version_seq).map_err(|_| corrupt("version_seq"))?,
         deleted: row.deleted,
         origin: row.origin,
+        op: row.op,
     })
 }

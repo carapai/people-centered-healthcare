@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#81: the stock ledger goes up as operations (2026-11-08).**
+  - **At the edge:** a stock movement is logged on the change log as an operation in its own transaction (migration `0044_ledger_ops`), and syncs up as a `kind: op` item.
+  - **At central:** it is appended through inventory's rules as a late operation, with its receipt in one transaction. A movement held already is skipped, and a negative balance opens a Reconciliation Record. Operations never come back down.
+  - **Tested:** a receipt and a dispense at the edge reach central once (a resend is answered from receipts), and central's copy of the balance matches the edge's.
+  - **Still open:**
+    - charges and payments as operations;
+    - checking a movement's store against the facility's Locations;
+    - golden-record narrowing;
+    - zstd.
 - **#81: priority lanes (2026-11-08).** A pull reads one lane: revocations, then packages, then clinical data, then audit (`Lane::PULLED`, `Lane::of`), each from its own checkpoint. A ValueSet written at central after an observation reaches the edge first. A re-seed moves every lane's cursor. The edge task, the store tests and the simulator all pull lane by lane.
 - **#224: break-glass grants reach central's review (2026-11-08).**
   - **Queue:** a grant made or acknowledged at an edge is queued for central in its own transaction, including grants made before the edge first reached central.
