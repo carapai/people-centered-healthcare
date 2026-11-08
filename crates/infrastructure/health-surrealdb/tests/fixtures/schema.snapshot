@@ -259,6 +259,7 @@ DEFINE TABLE change_log TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD resource_type ON change_log TYPE string PERMISSIONS FULL
   DEFINE FIELD tx_id ON change_log TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON change_log TYPE int PERMISSIONS FULL
+  DEFINE INDEX change_log_committed ON change_log FIELDS committed_at
 DEFINE TABLE charge TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD account ON charge TYPE string PERMISSIONS FULL
   DEFINE FIELD at ON charge TYPE datetime PERMISSIONS FULL
@@ -1581,6 +1582,8 @@ DEFINE TABLE sync_conflict TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD resolved_by ON sync_conflict TYPE none | string PERMISSIONS FULL
   DEFINE FIELD status ON sync_conflict TYPE string ASSERT $value INSIDE ['open', 'resolved', 'superseded'] PERMISSIONS FULL
   DEFINE INDEX sync_conflict_status ON sync_conflict FIELDS status, opened_at
+DEFINE TABLE sync_horizon TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD pruned_through ON sync_horizon TYPE int PERMISSIONS FULL
 DEFINE TABLE sync_item_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD outcome ON sync_item_state TYPE string PERMISSIONS FULL
   DEFINE FIELD resource_id ON sync_item_state TYPE string PERMISSIONS FULL
@@ -1603,6 +1606,7 @@ DEFINE TABLE sync_receipt TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD content_hash ON sync_receipt TYPE string PERMISSIONS FULL
   DEFINE FIELD outcome ON sync_receipt TYPE string PERMISSIONS FULL
   DEFINE FIELD received_at ON sync_receipt TYPE datetime PERMISSIONS FULL
+  DEFINE INDEX sync_receipt_received ON sync_receipt FIELDS received_at
 DEFINE TABLE sync_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD epoch ON sync_state TYPE string PERMISSIONS FULL
   DEFINE FIELD node ON sync_state TYPE none | string PERMISSIONS FULL

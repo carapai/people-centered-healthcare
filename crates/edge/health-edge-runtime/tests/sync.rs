@@ -226,3 +226,36 @@ async fn the_edge_syncs_what_it_wrote_before_and_while_central_was_unreachable()
     let again = sync.round().await.expect("round");
     assert_eq!((again.pushed, again.pulled), (0, 0));
 }
+
+#[tokio::test]
+async fn an_edge_beyond_central_s_horizon_reseeds_and_keeps_its_outbox() {
+    let central = central().await;
+    let edge = store("edge").await;
+    let sync = central.sync(&edge, &central.origin);
+    let first = write(&central.store, &json!({"resourceType": "Patient"})).await;
+    sync.round().await.expect("first round");
+
+    // Offline past the horizon: the edge writes, central writes and prunes its whole log.
+    let offline = write(&edge, &observation()).await;
+    let meanwhile = write(&central.store, &json!({"resourceType": "Patient"})).await;
+    central
+        .store
+        .prune_log(Timestamp::now() + health_time::SignedDuration::from_mins(1))
+        .await
+        .expect("prune");
+
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.pushed, 1, "the outbox goes up first");
+    assert!(round.seeded >= 1, "{round:?}");
+    for (resource_type, id) in [
+        ("Patient", first),
+        ("Patient", meanwhile),
+        ("Observation", offline),
+    ] {
+        let at_edge = version(&edge, resource_type, id).await;
+        assert!(at_edge.is_some(), "{resource_type}/{id} at the edge");
+        assert_eq!(at_edge, version(&central.store, resource_type, id).await);
+    }
+    let again = sync.round().await.expect("round");
+    assert_eq!((again.pushed, again.pulled, again.seeded), (0, 0, 0));
+}

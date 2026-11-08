@@ -81,6 +81,8 @@ pub struct Round {
     pub pushed: usize,
     /// Items pulled.
     pub pulled: usize,
+    /// Heads applied from a re-seed, when central said the node was beyond its horizon.
+    pub seeded: usize,
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
 }
@@ -278,6 +280,12 @@ impl Sync {
             let response: PullResponse =
                 serde_json::from_slice(&self.post("/sync/v1/pull", body).await?)
                     .map_err(|e| format!("/sync/v1/pull: {e}"))?;
+            if response == PullResponse::ReseedRequired {
+                // Beyond central's horizon (or central was restored): re-seed from its snapshot.
+                // The outbox, already pushed above, is kept; anything left goes up next round.
+                round.seeded += self.reseed(central).await?;
+                continue;
+            }
             let more = matches!(response, PullResponse::Items { more: true, .. });
             if let PullResponse::Items { items, .. } = &response {
                 round.pulled += items.len();
@@ -290,6 +298,26 @@ impl Sync {
             }
         }
         Ok(round)
+    }
+
+    /// Re-seeds the node from central's snapshot; the number of heads applied.
+    async fn reseed(&self, central: NodeId) -> Result<usize, String> {
+        #[derive(serde::Deserialize)]
+        struct Snapshot {
+            cursor: health_sync_protocol::Cursor,
+            items: Vec<health_sync_protocol::Item>,
+        }
+        tracing::warn!(
+            alert = "sync-reseed",
+            "central asked this node to re-seed: it was offline beyond central's horizon, or central was restored"
+        );
+        let snapshot: Snapshot =
+            serde_json::from_slice(&self.post("/sync/v1/snapshot", b"{}".to_vec()).await?)
+                .map_err(|e| format!("/sync/v1/snapshot: {e}"))?;
+        self.store
+            .seed(central, &snapshot.items, &snapshot.cursor)
+            .await
+            .map_err(|e| format!("re-seeding: {e}"))
     }
 
     /// Wakes `hint` whenever central says its log advanced, reconnecting after a pause when the

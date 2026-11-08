@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#83, part 1: the horizon and re-seeding (2026-11-08).**
+  - **Pruning:** central prunes the change log and receipts past 180 days, hourly. Entries an outbox still needs are kept, and `seq` never goes below the pruned horizon. That was a bug the test found: pruning the whole log made `seq` restart at 1.
+  - **Re-seeding:** a pull from below the horizon is answered `reseed_required`. The edge then fetches `POST /sync/v1/snapshot` (every head in its scope, with the cursor, from one transaction), applies the heads it lacks, takes a new epoch, and carries on. Its outbox goes up first, so nothing written offline is lost.
+  - **Tested** in the store and over HTTPS: an edge offline beyond the horizon ends up with central's records, central with the edge's, and the next round moves nothing.
+  - **Migration note:** SurrealDB 4.0 rejected a `DEFINE FIELD` on `sync_state` alongside other statements in one migration, so the horizon has its own table.
+  - **Still open on #83:**
+    - a streamed snapshot;
+    - the signed USB seed;
+    - pruning non-head history.
 - **#82, part 2: the review queue over HTTP (2026-11-08).**
   - **What:** `/api/sync/conflicts` at central, for staff with `sync.resolve-conflicts`. It lists open Conflict Records with `overdue` after 7 days, shows both branches (the candidate as pushed and the current heads), and takes `keep-head` or `write`. The resolution and its AuditEvent commit in one transaction.
   - **Tested:** without the permission there is no queue; a decision about a record outside the Conflict Record is refused; a written resolution and its audit share one transaction.

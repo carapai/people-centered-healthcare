@@ -12,6 +12,8 @@
 //!   `quarantined`.
 //! - `POST /sync/v1/pull` takes a [`PullRequest`] and answers a [`PullResponse`](health_sync_protocol::PullResponse). A quarantined
 //!   or refused peer is sent nothing.
+//! - `POST /sync/v1/snapshot` answers every head in the peer's scope with the cursor at that
+//!   instant, for a node told to re-seed.
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -81,6 +83,7 @@ impl SyncServer {
             .route("/sync/v1/hello", post(hello))
             .route("/sync/v1/push", post(push))
             .route("/sync/v1/pull", post(pull))
+            .route("/sync/v1/snapshot", post(snapshot))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(MAX_BODY))
             .with_state(self)
@@ -319,6 +322,41 @@ async fn pull(
         .await
     {
         Ok(response) => axum::Json(response).into_response(),
+        Err(error) => failed(error),
+    }
+}
+
+/// A re-seed: every head in the peer's scope with central's cursor at that instant, as JSON
+/// `{"cursor": …, "items": […]}` (synchronization.md § Seeding).
+async fn snapshot(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    match server.verdict(&peer).await {
+        Ok(Verdict::Compatible) => {}
+        Ok(_) => {
+            return problem(
+                StatusCode::FORBIDDEN,
+                "an out-of-range node is sent no data until it upgrades",
+            );
+        }
+        Err(response) => return *response,
+    }
+    let node = match server.inner.store.node_id().await {
+        Ok(node) => node,
+        Err(error) => return failed(error),
+    };
+    match server.inner.store.snapshot(&peer.scope, node).await {
+        Ok((items, cursor)) => {
+            axum::Json(json!({ "cursor": cursor, "items": items })).into_response()
+        }
         Err(error) => failed(error),
     }
 }

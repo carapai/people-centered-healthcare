@@ -109,6 +109,7 @@ struct Round {
     pushed: usize,
     outcomes: Vec<Outcome>,
     pulled: usize,
+    seeded: usize,
 }
 
 /// One sync round of `edge` with `central`: push its outbox, then pull until caught up.
@@ -152,6 +153,21 @@ async fn sync(edge: &Node, central: &Node) -> Round {
             .pull(&scope(), central.id, edge.id, &request)
             .await
             .expect("pull");
+        if response == PullResponse::ReseedRequired {
+            // Beyond the horizon: re-seed from central's snapshot, then carry on pulling.
+            let (items, cursor) = central
+                .store
+                .snapshot(&scope(), central.id)
+                .await
+                .expect("snapshot");
+            round.seeded += edge
+                .store
+                .seed(central.id, &items, &cursor)
+                .await
+                .expect("seed");
+            assert!(round.seeded < 1000, "a re-seed must move the checkpoint on");
+            continue;
+        }
         let more = matches!(response, PullResponse::Items { more: true, .. });
         if let PullResponse::Items { items, .. } = &response {
             round.pulled += items.len();
@@ -522,4 +538,72 @@ async fn the_sync_scope_holds_on_push_and_pull() {
     assert!(head(&edge, "Observation", here).await.is_some());
     assert!(head(&edge, "Observation", elsewhere).await.is_none());
     assert!(head(&central, "Observation", smuggled).await.is_none());
+}
+
+#[tokio::test]
+async fn a_node_offline_beyond_the_horizon_reseeds_without_losing_data() {
+    let (central, edge) = pair().await;
+    let shared = ResourceId::new();
+    write(
+        &central,
+        shared,
+        &patient("Esther"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    sync(&edge, &central).await;
+    let epoch = edge.store.cursor().await.expect("cursor").epoch;
+
+    // The edge is offline for longer than central keeps its log: it records an observation, and
+    // central registers a patient and prunes its log past the edge's cursor.
+    let offline = ResourceId::new();
+    write(
+        &edge,
+        offline,
+        &observation("KLA01", 7),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let later = ResourceId::new();
+    write(
+        &central,
+        later,
+        &patient("Faith"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let horizon = central
+        .store
+        .prune_log(Timestamp::now() + health_time::SignedDuration::from_mins(1))
+        .await
+        .expect("prune");
+    assert!(horizon >= 2, "pruned through {horizon}");
+    // The log never hands out a seq again, even pruned to empty.
+    assert!(central.store.cursor().await.expect("cursor").seq >= horizon);
+
+    let round = sync(&edge, &central).await;
+    assert_eq!(
+        round.outcomes,
+        vec![Outcome::Accepted],
+        "the outbox survives and goes up"
+    );
+    assert!(round.seeded >= 1, "{round:?}");
+    for (resource_type, id) in [
+        ("Patient", shared),
+        ("Patient", later),
+        ("Observation", offline),
+    ] {
+        assert_eq!(
+            head(&edge, resource_type, id).await,
+            head(&central, resource_type, id).await,
+            "{resource_type}/{id}"
+        );
+    }
+    assert_ne!(
+        edge.store.cursor().await.expect("cursor").epoch,
+        epoch,
+        "a re-seeded node takes a new epoch"
+    );
+    // Caught up again: nothing moves.
+    assert_eq!(sync(&edge, &central).await, Round::default());
 }

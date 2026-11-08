@@ -338,6 +338,11 @@ impl SurrealStore {
             Some(cursor) => cursor.seq,
             None => 0,
         };
+        // Below the horizon the log has gaps: the peer re-seeds (synchronization.md § Tombstones,
+        // retention and long outages).
+        if after < self.pruned_through().await? {
+            return Ok(PullResponse::ReseedRequired);
+        }
         let limit = usize::try_from(request.limit.max(1)).unwrap_or(usize::MAX);
         let mut changes = self.changes_after(after, limit).await?;
         // Read on until the last transaction is whole.
@@ -408,6 +413,169 @@ impl SurrealStore {
             })
         })
         .transpose()
+    }
+
+    /// The highest `seq` pruned from the change log; 0 if none.
+    pub async fn pruned_through(&self) -> Result<u64, StoreError> {
+        let pruned: Option<i64> = self
+            .connection
+            .db()
+            .query("SELECT VALUE pruned_through FROM ONLY sync_horizon:node")
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        Ok(pruned.and_then(|p| u64::try_from(p).ok()).unwrap_or(0))
+    }
+
+    /// Prunes the change log and receipts committed before `before` (the horizon: at least 180
+    /// days back), except log entries an upstream's outbox still needs, and records how far the
+    /// log was pruned. Returns the new horizon.
+    pub async fn prune_log(&self, before: Timestamp) -> Result<u64, StoreError> {
+        let at = format!("d'{before}'");
+        let through: Option<i64> = self
+            .connection
+            .db()
+            .query(format!(
+                "BEGIN; \
+                 LET $pinned = (SELECT VALUE record::id(id)[1] FROM sync_outbox); \
+                 LET $through = (SELECT VALUE record::id(id) FROM change_log \
+                                 WHERE committed_at < {at} ORDER BY id DESC LIMIT 1)[0]; \
+                 DELETE change_log WHERE committed_at < {at} AND record::id(id) NOTINSIDE $pinned; \
+                 DELETE sync_receipt WHERE received_at < {at}; \
+                 IF $through != NONE AND $through > (sync_horizon:node.pruned_through ?? 0) {{ \
+                   UPSERT sync_horizon:node SET pruned_through = $through; \
+                 }}; \
+                 RETURN sync_horizon:node.pruned_through ?? 0; \
+                 COMMIT;"
+            ))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(6)
+            .map_err(unavailable)?;
+        Ok(through.and_then(|t| u64::try_from(t).ok()).unwrap_or(0))
+    }
+
+    /// The heads in `scope`, tombstones included, with this node's cursor at that instant, read
+    /// in one transaction: what a new, re-pointed or too-stale `peer` is seeded from
+    /// (synchronization.md § Seeding). Search indexes are never shipped; the node rebuilds them as
+    /// it applies the heads.
+    pub async fn snapshot(
+        &self,
+        scope: &SyncScope,
+        node: NodeId,
+    ) -> Result<(Vec<Item>, Cursor), StoreError> {
+        #[derive(SurrealValue)]
+        struct HeadRow {
+            rid: String,
+            json: String,
+            version_id: String,
+            deleted: bool,
+        }
+        let resources = crate::ownership::resources();
+        let mut sql = Sql::default();
+        let mut statements = Vec::with_capacity(resources.len());
+        for resource in resources {
+            statements.push((
+                resource.resource_type,
+                sql.push(format!(
+                    "SELECT record::id(id) AS rid, json, version_id, deleted FROM {}",
+                    resource.table
+                )),
+            ));
+        }
+        let epoch = sql.push("SELECT VALUE epoch FROM ONLY sync_state:node");
+        let last = sql.push(crate::change_log::LAST_SEQ);
+        let tx = self.begin().await?;
+        let mut results = sql.run(tx.tx()?).await.map_err(unavailable)?;
+        drop(tx);
+        let epoch: Option<String> = results.take(epoch).map_err(unavailable)?;
+        let last: Option<i64> = results.take(last).map_err(unavailable)?;
+        let mut items = Vec::new();
+        for (resource_type, statement) in statements {
+            let rows: Vec<HeadRow> = results.take(statement).map_err(unavailable)?;
+            for row in rows {
+                let body: Value = serde_json::from_str(&row.json).map_err(|_| corrupt("json"))?;
+                if !scope.admits_down(resource_type, &body) {
+                    continue;
+                }
+                let op_id: OpId = row.version_id.parse().map_err(|_| corrupt("version_id"))?;
+                let wall_ms = body["meta"]["lastUpdated"]
+                    .as_str()
+                    .and_then(|at| at.parse::<Timestamp>().ok())
+                    .map_or(0, |at| at.as_millisecond());
+                items.push(Item {
+                    kind: Kind::Version,
+                    op_id,
+                    tx_id: op_id,
+                    resource_type: resource_type.to_owned(),
+                    resource_id: row.rid,
+                    parent_version_id: None,
+                    origin_node: node,
+                    device_id: None,
+                    author: None,
+                    hlc: Hlc {
+                        wall_ms,
+                        logical: 0,
+                    },
+                    content_hash: ContentHash::of(&body),
+                    packages: Vec::new(),
+                    snapshot_version: 0,
+                    provisional: false,
+                    deleted: row.deleted,
+                    blobs: Vec::new(),
+                    body,
+                });
+            }
+        }
+        Ok((
+            items,
+            Cursor {
+                node,
+                epoch: epoch.ok_or_else(|| corrupt("epoch"))?,
+                seq: last.and_then(|l| u64::try_from(l).ok()).unwrap_or(0),
+            },
+        ))
+    }
+
+    /// Seeds this node from `upstream`'s snapshot: each head not already here becomes the local
+    /// head, applied in batches without being queued back; then the checkpoint moves to the
+    /// snapshot's cursor and this node takes a new epoch, so its own downstream peers re-seed in
+    /// turn. Local candidates still in the outbox stay queued and are pushed against the new heads.
+    pub async fn seed(
+        &self,
+        upstream: NodeId,
+        items: &[Item],
+        cursor: &Cursor,
+    ) -> Result<usize, WriteError> {
+        let replica = SurrealReplica::new(self, upstream);
+        let mut applied = 0;
+        for chunk in items.chunks(200) {
+            let mut fresh = Vec::new();
+            for item in chunk {
+                if !replica.local(item).await?.has_item {
+                    fresh.push(item);
+                }
+            }
+            if fresh.is_empty() {
+                continue;
+            }
+            let mut tx = self.begin().await?;
+            tx.received_from(Source {
+                peer: upstream.to_string(),
+                origin: upstream.to_string(),
+            });
+            for item in &fresh {
+                tx.apply_version(item).await?;
+            }
+            tx.commit().await?;
+            applied += fresh.len();
+        }
+        replica.advance(cursor).await?;
+        crate::change_log::new_epoch(&self.connection).await?;
+        Ok(applied)
     }
 
     /// This node's own id on the sync protocol, for a node that has no provisioned one
