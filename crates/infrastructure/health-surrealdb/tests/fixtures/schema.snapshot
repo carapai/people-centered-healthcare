@@ -254,6 +254,7 @@ DEFINE TABLE change_log TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD committed_at ON change_log TYPE datetime PERMISSIONS FULL
   DEFINE FIELD deleted ON change_log TYPE bool PERMISSIONS FULL
   DEFINE FIELD op_id ON change_log TYPE string PERMISSIONS FULL
+  DEFINE FIELD origin ON change_log TYPE none | string PERMISSIONS FULL
   DEFINE FIELD resource_id ON change_log TYPE string PERMISSIONS FULL
   DEFINE FIELD resource_type ON change_log TYPE string PERMISSIONS FULL
   DEFINE FIELD tx_id ON change_log TYPE string PERMISSIONS FULL
@@ -1565,8 +1566,28 @@ DEFINE TABLE supply_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON supply_request_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON supply_request_history TYPE int PERMISSIONS FULL
   DEFINE INDEX supply_request_history_last_updated ON supply_request_history FIELDS last_updated, version_seq
+DEFINE TABLE sync_checkpoint TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD epoch ON sync_checkpoint TYPE string PERMISSIONS FULL
+  DEFINE FIELD seq ON sync_checkpoint TYPE int PERMISSIONS FULL
+DEFINE TABLE sync_conflict TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD items ON sync_conflict TYPE string PERMISSIONS FULL
+  DEFINE FIELD opened_at ON sync_conflict TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD peer ON sync_conflict TYPE string PERMISSIONS FULL
+  DEFINE FIELD status ON sync_conflict TYPE string ASSERT $value INSIDE ['open', 'resolved', 'superseded'] PERMISSIONS FULL
+DEFINE TABLE sync_item_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD outcome ON sync_item_state TYPE string PERMISSIONS FULL
+  DEFINE FIELD resource_id ON sync_item_state TYPE string PERMISSIONS FULL
+  DEFINE FIELD resource_type ON sync_item_state TYPE string PERMISSIONS FULL
+  DEFINE FIELD state ON sync_item_state TYPE string ASSERT $value INSIDE ['conflict', 'rejected'] PERMISSIONS FULL
+  DEFINE INDEX sync_item_state_resource ON sync_item_state FIELDS resource_type, resource_id
 DEFINE TABLE sync_outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD resource ON sync_outbox TYPE none | string PERMISSIONS FULL
   DEFINE FIELD tx_id ON sync_outbox TYPE string PERMISSIONS FULL
+  DEFINE INDEX sync_outbox_resource ON sync_outbox FIELDS resource
+DEFINE TABLE sync_receipt TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD content_hash ON sync_receipt TYPE string PERMISSIONS FULL
+  DEFINE FIELD outcome ON sync_receipt TYPE string PERMISSIONS FULL
+  DEFINE FIELD received_at ON sync_receipt TYPE datetime PERMISSIONS FULL
 DEFINE TABLE sync_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD epoch ON sync_state TYPE string PERMISSIONS FULL
 DEFINE TABLE sync_upstream TYPE NORMAL SCHEMAFULL PERMISSIONS NONE

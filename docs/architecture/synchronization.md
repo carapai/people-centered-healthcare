@@ -69,6 +69,29 @@ Every item on the wire, in either direction:
   - the HLC.
 
   zstd compression and the `/sync/v1` endpoints belong to the transport (#81).
+- **In code (#81, store).** `health-surrealdb` (migration `0038_sync_apply`, `src/sync/`) implements the ports over the change log:
+  - **Sending:** `SurrealStore::outbox` reads whole transactions queued for an upstream and builds their items from history. `record_push` acknowledges whatever the upstream answered, and keeps conflicts and rejections in `sync_item_state` as unaccepted candidates.
+  - **Receiving a push:** `SurrealAuthority`.
+    - It checks the Sync Scope.
+    - It fast-forwards versions whose parent is the head. A version already present, or one with the head's content, writes nothing.
+    - For any other version it opens a Conflict Record (`sync_conflict`) for the group.
+    - It writes a `sync_receipt` per item, in the same transaction.
+  - **Serving a pull:** `SurrealStore::pull`.
+    - It reads whole transactions after the cursor, in the peer's scope, leaving out what the peer committed itself.
+    - It answers `reseed_required` to a cursor from another node or epoch.
+  - **Applying a pull:** `SurrealReplica` applies a group and its checkpoint (`sync_checkpoint`) in one transaction, through `Replica::advance` when the response read past items the node was not sent.
+  - **Applied versions:** a version received by sync keeps its `op_id` and the `lastUpdated` its origin stamped. It is logged with its origin node (`change_log.origin`) and never queued back toward the peer it came from.
+  - **`SyncScope::Facility`**, from the data authority matrix (write-authority.md):
+    - **Both ways:** facility-scope records tagged with the node's facility (ADR 0057).
+    - **Up:** the global types a facility creates (`UP_GLOBAL`): provisional Patients, Consents, AuditEvents, Provenance, its Locations and Devices, and requests.
+    - **Down:** the global replicas (`DOWN_GLOBAL`): registries and golden records, definitions and terminology, price masters, coverage and consent.
+    - **Never:** another facility's records, and central's own audit.
+  - **Not yet:**
+    - priority lanes, which need a cursor per lane;
+    - golden-record narrowing of Patients;
+    - ledger operations, which are refused as `invalid` for now;
+    - HLC and package fields from the writer;
+    - the transport: the `/sync/v1` endpoints and the edge's sync task.
 
 ## Session
 

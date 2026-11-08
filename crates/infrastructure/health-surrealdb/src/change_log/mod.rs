@@ -48,6 +48,17 @@ pub struct Change {
     pub version_seq: u64,
     /// Whether the version is a tombstone.
     pub deleted: bool,
+    /// The node that first committed it, if another node did; `None` for a local write.
+    pub origin: Option<String>,
+}
+
+/// Where the versions of a transaction applied by sync came from.
+#[derive(Debug, Clone)]
+pub(crate) struct Source {
+    /// The peer that sent them; they are not queued back toward it.
+    pub(crate) peer: String,
+    /// The node that first committed them.
+    pub(crate) origin: String,
 }
 
 /// A version written in this transaction, waiting for its `seq` at commit.
@@ -58,6 +69,7 @@ pub(crate) struct Pending {
     pub(crate) resource_id: String,
     pub(crate) version_seq: i64,
     pub(crate) deleted: bool,
+    pub(crate) origin: Option<String>,
 }
 
 #[derive(Debug, SurrealValue)]
@@ -69,7 +81,11 @@ struct ChangeRow {
     resource_id: String,
     version_seq: i64,
     deleted: bool,
+    origin: Option<String>,
 }
+
+const CHANGE_COLUMNS: &str =
+    "record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, version_seq, deleted, origin";
 
 /// The last committed `seq`, read outside any transaction's snapshot; 0 before the first write.
 /// The unit of work calls it holding the commit lock, so nothing commits in between.
@@ -86,20 +102,23 @@ pub(crate) async fn last_seq(connection: &Connection) -> Result<i64, StoreError>
 }
 
 /// Appends `pending` to the change log and the upstream outboxes inside `tx`, numbered after
-/// `last`. Called by the unit of work holding the commit lock, just before it commits.
+/// `last`. Called by the unit of work holding the commit lock, just before it commits. Versions
+/// received from `skip` are not queued back toward it.
 pub(crate) async fn append(
     tx: &SurrealTransaction<Any>,
     tx_id: OpId,
     last: i64,
     pending: &[Pending],
+    skip: Option<&str>,
 ) -> Result<(), WriteError> {
-    let peers: Vec<String> = tx
+    let mut peers: Vec<String> = tx
         .query("SELECT VALUE record::id(id) FROM sync_upstream")
         .await
         .and_then(surrealdb::IndexedResults::check)
         .map_err(write_error)?
         .take(0)
         .map_err(write_error)?;
+    peers.retain(|peer| Some(peer.as_str()) != skip);
     let mut sql = Sql::default();
     let tx_text = sql.str(tx_id.to_string());
     for (seq, change) in (last + 1..).zip(pending) {
@@ -109,15 +128,22 @@ pub(crate) async fn append(
         let resource_id = sql.str(change.resource_id.as_str());
         let version_seq = sql.value(Bind::Int(change.version_seq));
         let deleted = if change.deleted { "true" } else { "false" };
+        let origin = match &change.origin {
+            Some(origin) => sql.str(origin.as_str()),
+            None => "NONE".to_owned(),
+        };
         sql.push(format!(
             "CREATE type::record('change_log', {seq}) CONTENT {{ tx_id: {tx_text}, op_id: {op}, \
              resource_type: {resource_type}, resource_id: {resource_id}, \
-             version_seq: {version_seq}, deleted: {deleted}, committed_at: time::now() }}"
+             version_seq: {version_seq}, deleted: {deleted}, origin: {origin}, \
+             committed_at: time::now() }}"
         ));
+        let resource = sql.str(format!("{}/{}", change.resource_type, change.resource_id));
         for peer in &peers {
             let peer = sql.str(peer.as_str());
             sql.push(format!(
-                "CREATE type::record('sync_outbox', [{peer}, {seq}]) SET tx_id = {tx_text}"
+                "CREATE type::record('sync_outbox', [{peer}, {seq}]) SET tx_id = {tx_text}, \
+                 resource = {resource}"
             ));
         }
     }
@@ -140,8 +166,7 @@ impl SurrealStore {
             .connection
             .db()
             .query(format!(
-                "SELECT record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, \
-                 version_seq, deleted FROM change_log:{after}>..={through}"
+                "SELECT {CHANGE_COLUMNS} FROM change_log:{after}>..={through}"
             ))
             .await
             .and_then(surrealdb::IndexedResults::check)
@@ -191,8 +216,7 @@ impl SurrealStore {
             .query(format!(
                 "LET $entries = (SELECT VALUE type::record('change_log', record::id(id)[1]) \
                  FROM sync_outbox:[$peer]..[$peer, {{}}] LIMIT {limit}); \
-                 SELECT record::id(id) AS seq, tx_id, op_id, resource_type, resource_id, \
-                 version_seq, deleted FROM $entries ORDER BY seq"
+                 SELECT {CHANGE_COLUMNS} FROM $entries ORDER BY seq"
             ))
             .bind(("peer", peer.to_owned()))
             .await
@@ -267,5 +291,6 @@ fn change(row: ChangeRow) -> Result<Change, StoreError> {
             .map_err(|_| corrupt("resource_id"))?,
         version_seq: u64::try_from(row.version_seq).map_err(|_| corrupt("version_seq"))?,
         deleted: row.deleted,
+        origin: row.origin,
     })
 }

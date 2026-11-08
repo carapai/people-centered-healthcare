@@ -21,6 +21,7 @@ memory = ["surrealdb/kv-mem"]
 
 [dependencies]
 futures-util = { workspace = true }
+health-access-policy = { workspace = true }
 health-billing = { workspace = true }
 health-client-registry = { workspace = true }
 health-encounters = { workspace = true }
@@ -36,6 +37,7 @@ health-payments = { workspace = true }
 health-pricing = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
+health-sync-protocol = { workspace = true }
 health-time = { workspace = true }
 health-workflow = { workspace = true }
 jiff = { workspace = true }

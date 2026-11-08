@@ -947,3 +947,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Pull:** `decide` never applies an item twice and keeps an unaccepted local candidate under a pulled head; `apply_pull` over a `Replica` port applies one group per transaction with its checkpoint.
   - **Item states** as in synchronization.md.
   - **Not yet:** the adapters (the `Authority` and `Replica` ports over `health-surrealdb`), the HTTP endpoints, and ledger operations on the change log, all with #81.
+- **#81, part 1: sync over the store (2026-11-08).** `health-surrealdb` implements the sync ports (migration `0038_sync_apply`; synchronization.md § In code).
+  - **Tested** over two in-memory nodes:
+    - after a partition, edge and central hold the same version with the same body for every record, and a second round moves nothing;
+    - a retried push is applied once;
+    - concurrent edits open a Conflict Record, and the edge keeps its candidate under central's head;
+    - the facility Sync Scope refuses another facility's record on push and withholds it on pull;
+    - central's own audit never goes down, and a registry record never goes up (the scope follows the data authority matrix's directions).
+  - **Protocol change:** `Replica::advance` saves the cursor when a response read past items the node was not sent.
+  - **Decided (2026-11-08, product owner):** an edge authenticates its sync requests with a JWS from its facility-intermediate key, verified against the node registry, rather than mTLS. ADR 0062 comes with the transport.
