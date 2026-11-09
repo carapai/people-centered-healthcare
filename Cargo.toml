@@ -67,6 +67,7 @@ members = [
     "crates/infrastructure/health-pki",
     "crates/infrastructure/health-provisioning",
     "crates/infrastructure/health-publication",
+    "crates/infrastructure/health-activation",
     "crates/infrastructure/health-surrealdb",
     "crates/infrastructure/health-sync-server",
     "crates/testing/health-persistence-memory",
@@ -154,6 +155,7 @@ health-packages = { path = "crates/infrastructure/health-packages" }
 health-pki = { path = "crates/infrastructure/health-pki" }
 health-provisioning = { path = "crates/infrastructure/health-provisioning" }
 health-publication = { path = "crates/infrastructure/health-publication" }
+health-activation = { path = "crates/infrastructure/health-activation" }
 health-persistence-memory = { path = "crates/testing/health-persistence-memory" }
 health-product-registry-app = { path = "crates/application/health-product-registry-app" }
 health-programs-app = { path = "crates/application/health-programs-app" }

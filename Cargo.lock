@@ -727,6 +727,7 @@ dependencies = [
  "axum",
  "form_urlencoded",
  "health-access-policy",
+ "health-activation",
  "health-audit",
  "health-auth",
  "health-client-registry",
@@ -2289,6 +2290,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-activation"
+version = "0.1.0"
+dependencies = [
+ "health-configuration",
+ "health-fhir-validation",
+ "health-files",
+ "health-identifiers",
+ "health-packages",
+ "health-persistence",
+ "health-pki",
+ "health-surrealdb",
+ "health-time",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "health-audit"
 version = "0.1.0"
 dependencies = [
@@ -2533,6 +2555,7 @@ dependencies = [
  "flate2",
  "fs4",
  "futures-util",
+ "health-activation",
  "health-auth",
  "health-backup",
  "health-configuration",
@@ -2571,7 +2594,6 @@ dependencies = [
  "tokio-rustls",
  "tower",
  "tracing",
- "uuid",
  "windows-service",
 ]
 

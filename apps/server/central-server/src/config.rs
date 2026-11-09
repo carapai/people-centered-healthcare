@@ -30,6 +30,10 @@ pub(crate) struct Config {
     /// written once at startup, for development and e2e only. Activation (#89) replaces it with
     /// the published packages a node has active.
     pub(crate) dev_fhir_seed: Option<PathBuf>,
+    /// `HEALTH_NATIONAL_ROOT_FILE` (#89): the national root certificate (PEM) that published
+    /// packages are verified against before central activates them. With `HEALTH_FILES_DIR`,
+    /// central activates the national set and serves its definitions.
+    pub(crate) national_root_file: Option<PathBuf>,
 }
 
 /// Where the authorization server's settings and secrets are.
@@ -132,6 +136,7 @@ impl Config {
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
             log: get("HEALTH_LOG").unwrap_or_else(|| "info".to_owned()),
             dev_fhir_seed: get("HEALTH_DEV_FHIR_SEED").map(PathBuf::from),
+            national_root_file: get("HEALTH_NATIONAL_ROOT_FILE").map(PathBuf::from),
             auth: match get("HEALTH_AUTH_ISSUER") {
                 None => None,
                 Some(issuer) => Some(AuthFiles {

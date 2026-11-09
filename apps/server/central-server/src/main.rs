@@ -11,6 +11,7 @@
 //! `central-server openapi` prints central's OpenAPI document and exits, without configuration;
 //! `tools/codegen` generates `@health/api-client` from it (client-application.md § Types).
 
+mod activation;
 mod auth;
 mod config;
 mod node;
@@ -86,6 +87,19 @@ async fn open_database(
                         Ok(added) => tracing::info!(added, "development FHIR seed written"),
                         Err(reason) => tracing::error!(error.kind = reason, "seed refused"),
                     }
+                }
+                // Package activation (#89): the national set, and the definitions it serves.
+                match (
+                    &config.national_root_file,
+                    config.auth.as_ref().and_then(|a| a.files_dir.clone()),
+                ) {
+                    (Some(root), Some(files)) => {
+                        tokio::spawn(activation::run(connection.clone(), root.clone(), files));
+                    }
+                    (Some(_), None) => tracing::warn!(
+                        "HEALTH_NATIONAL_ROOT_FILE without HEALTH_FILES_DIR: packages are not activated"
+                    ),
+                    _ => {}
                 }
                 if let Some((settings, ready)) = &auth {
                     match auth::routes(connection.clone(), settings) {

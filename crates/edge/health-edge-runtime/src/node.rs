@@ -356,8 +356,10 @@ pub async fn run(
                         facility: config.facility.clone(),
                         programs: config.programs.clone(),
                     };
-                    let sync = match crate::activation::Activator::from_pki(&config.pki_dir, chain)
-                    {
+                    let sync = match crate::activation::Activator::from_root_file(
+                        &config.pki_dir.join(crate::tls::ROOT),
+                        chain,
+                    ) {
                         Ok(activator) => sync.with_activator(activator),
                         Err(error) => {
                             tracing::warn!(%error, "packages are not activated on this node");

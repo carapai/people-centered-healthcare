@@ -244,6 +244,17 @@ impl SurrealTx {
         Ok(all(rows))
     }
 
+    /// The tarball sha-256 of staged package `id` (`name@version`), if it is staged.
+    pub async fn staged_digest(&mut self, id: &str) -> Result<Option<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [digest] FROM type::record('package_staged', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await?;
+        Ok(first(rows))
+    }
+
     /// The node's active set, as JSON, once it has switched to one.
     pub async fn active_packages(&mut self) -> Result<Option<String>, StoreError> {
         let rows = self
