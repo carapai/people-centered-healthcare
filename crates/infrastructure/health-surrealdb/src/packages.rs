@@ -299,6 +299,91 @@ impl SurrealTx {
         Ok(all(rows))
     }
 
+    /// Up to `limit` of this node's activation reports central does not have yet, oldest
+    /// first: `[id, JSON]`.
+    pub async fn unsent_activation_reports(
+        &mut self,
+        limit: usize,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                &format!(
+                    "SELECT VALUE [<string>record::id(id), data] FROM package_activation_report \
+                     WHERE sent = false ORDER BY at, id LIMIT {limit}"
+                ),
+                vec![],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| match row.as_slice() {
+                [id, data] => Some((id.clone(), data.clone())),
+                _ => None,
+            })
+            .collect())
+    }
+
+    /// Marks this node's reports `ids` as received by central.
+    pub async fn activation_reports_sent(&mut self, ids: &[String]) -> Result<(), WriteError> {
+        for id in ids {
+            self.run(
+                "UPDATE type::record('package_activation_report', $id) SET sent = true \
+                 RETURN VALUE record::id(id)",
+                vec![("id", id.clone())],
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    /// Keeps `node`'s activation report `id` (`outcome` at `at`), once.
+    pub async fn receive_activation_report(
+        &mut self,
+        node: &str,
+        id: &str,
+        at: &str,
+        outcome: &str,
+        data: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('node_activation_report', [$node, $id]) CONTENT { node: $node, \
+             at: <datetime>$at, outcome: $outcome, received_at: time::now(), data: $data } \
+             RETURN VALUE $id",
+            vec![
+                ("node", node.to_owned()),
+                ("id", id.to_owned()),
+                ("at", at.to_owned()),
+                ("outcome", outcome.to_owned()),
+                ("data", data.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The latest `limit` reports nodes sent, newest first: `[node, JSON]`.
+    pub async fn node_activation_reports(
+        &mut self,
+        limit: usize,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                &format!(
+                    "SELECT VALUE [node, data] FROM node_activation_report \
+                     ORDER BY at DESC, id DESC LIMIT {limit}"
+                ),
+                vec![],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| match row.as_slice() {
+                [node, data] => Some((node.clone(), data.clone())),
+                _ => None,
+            })
+            .collect())
+    }
+
     /// The JSON of every published version of `package`.
     pub async fn published_versions(&mut self, package: &str) -> Result<Vec<String>, StoreError> {
         let rows = self

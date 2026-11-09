@@ -969,6 +969,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 4a: activation reports reach central (2026-11-09).**
+  - **What:**
+    - after each round, an edge sends central the activation reports it doesn't have yet (`POST /sync/v1/activation-reports`; migration 0051);
+    - central keeps them per node, raises `package-activation-failed` for a failure, and lists them with `central-server package reports`.
+  - **Tested:** the edge's activation and its failure both reach central under the edge's node, and are marked sent.
+  - **Next (4b):** load the active set into what a node serves (profiles, terminology, search with its reindex, workflows), replacing central's development seeds.
 - **#89, part 3: staging and the switch on an edge (2026-11-09).**
   - **What:** after each sync round, an edge works out the set its activation records want along its scope chain (`HEALTH_DISTRICT`, `HEALTH_FACILITY`, `HEALTH_PROGRAMS`).
     - It fetches each missing tarball from central by sha-256, verifies it against the national root, and keeps it in its blob store. It records the package as staged (migration 0050).

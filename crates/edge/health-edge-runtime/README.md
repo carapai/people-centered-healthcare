@@ -46,6 +46,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - **Package activation (#89, `activation`):** after each round, the node works out the set its activation records want. Its scope chain is national, `HEALTH_DISTRICT`, `HEALTH_FACILITY` and `HEALTH_PROGRAMS`.
     - **Staging:** each missing package is fetched from central by sha-256 and verified against the national root (`root.pem` in `HEALTH_PKI_DIR`). It is then kept in the blob store, which retains every version ever activated, and recorded as staged.
     - **Switch:** the node switches to the set in one transaction, or keeps the previous one. Each attempt is reported (`package_activation_report`), and a failure raises `package-activation-failed`.
+    - **Reports** go up to central (`/sync/v1/activation-reports`) and are marked sent once it has them.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.
   - **Retention:** the 48 newest, and the newest of each of the last 14 days (UTC). Pruning also removes unfinished backups and blobs that no kept backup refers to.

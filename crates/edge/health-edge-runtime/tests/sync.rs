@@ -545,7 +545,26 @@ async fn an_activated_package_is_fetched_verified_staged_and_switched_to() {
         report.problems,
         vec!["ug.moh.anc needs ug.moh.core@2.1.0, which is not active".to_owned()]
     );
+    assert!(
+        tx.unsent_activation_reports(10)
+            .await
+            .expect("unsent")
+            .is_empty(),
+        "sent to central"
+    );
     drop(tx);
+    // Central holds both reports, the failure newest, under this node.
+    let mut tx = central.store.begin().await.expect("begin");
+    let at_central = tx.node_activation_reports(10).await.expect("reports");
+    drop(tx);
+    assert_eq!(at_central.len(), 2, "{at_central:?}");
+    assert!(
+        at_central
+            .iter()
+            .all(|(node, _)| *node == central.node.to_string())
+    );
+    let newest: Report = serde_json::from_str(&at_central[0].1).expect("report");
+    assert_eq!(newest, report);
 
     // A record whose signature is not the package's never stages: a node seeing it for the
     // first time keeps nothing active and reports the signature.
