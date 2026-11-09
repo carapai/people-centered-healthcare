@@ -72,6 +72,7 @@ mod ops;
 mod outcome;
 mod payments;
 mod pharmacy;
+mod populate;
 mod portal;
 mod pricing;
 mod programs;
@@ -348,6 +349,7 @@ impl FhirServer {
                 get(terminology::translate).post(terminology::translate),
             )
             .route("/QuestionnaireResponse/$extract", post(completion::dry_run))
+            .route("/Questionnaire/{id}/$populate", post(populate::populate))
             .route("/Patient/$match", post(registry::matches))
             .route("/Patient/$register", post(registry::register))
             .route("/Patient/$merge", post(registry::merge))

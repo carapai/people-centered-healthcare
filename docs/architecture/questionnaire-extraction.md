@@ -146,6 +146,16 @@ Each extraction run writes, in the same transaction:
 - **Where it runs:** `$populate`, evaluated in `health-fhir-extraction` on the node.
 - **Data access.** Population may query local data. It is not pure, which is why it is kept apart from extraction.
 - **Not in v1:** CQL and StructureMap population. CQL stays in the map's rules-language fog.
+- **In code (#94):**
+  - **`health_fhir_extraction::populate`:**
+    - binds each `launchContext` by name, then the Questionnaire's and each item's `variable`s in turn (`FhirPathEngine::evaluate_with`);
+    - fills each item from its `initialExpression`, converted to the item's type;
+    - offers each `candidateExpression`'s answers beside the response;
+    - otherwise takes the newest Observation with one of the item's codes within its `observationLinkPeriod`, leaving out entered-in-error and cancelled ones.
+  - **`POST /Questionnaire/{id}/$populate`** (`health-fhir-server`) takes `subject` and `context`s:
+    - it reads the Questionnaire and each context as the caller would, and one they may not read is not found;
+    - it draws on the patient's Observations the caller may search, so a label they lack hides a value;
+    - it writes nothing, and answers Parameters with `response` and any `candidates`.
 
 ## Publication gates
 

@@ -5,6 +5,7 @@
 //! table as tier 1. It does not use `octofhir-fhirschema`, whose package manager would add
 //! about 120 crates (an HTTP client, SQLite, a CLI) to every node.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -61,6 +62,18 @@ pub trait FhirPathEngine: Send + Sync {
         &'a self,
         resource: &'a Value,
         expressions: &'a [String],
+    ) -> Pin<Box<dyn Future<Output = Results> + Send + 'a>> {
+        static NONE: std::sync::OnceLock<BTreeMap<String, Value>> = std::sync::OnceLock::new();
+        self.evaluate_with(resource, expressions, NONE.get_or_init(BTreeMap::new))
+    }
+
+    /// Evaluates each of `expressions` against `resource`, with each of `variables` bound by
+    /// name (`%patient`), as SDC's launch contexts and variables are (#94).
+    fn evaluate_with<'a>(
+        &'a self,
+        resource: &'a Value,
+        expressions: &'a [String],
+        variables: &'a BTreeMap<String, Value>,
     ) -> Pin<Box<dyn Future<Output = Results> + Send + 'a>>;
 }
 
@@ -123,10 +136,11 @@ fn item(value: &FhirPathValue) -> FhirPathItem {
 }
 
 impl FhirPathEngine for OctofhirEngine {
-    fn evaluate_many<'a>(
+    fn evaluate_with<'a>(
         &'a self,
         resource: &'a Value,
         expressions: &'a [String],
+        variables: &'a BTreeMap<String, Value>,
     ) -> Pin<Box<dyn Future<Output = Results> + Send + 'a>> {
         Box::pin(async move {
             let fail_all = |failure: FhirPathFailure| -> Results {
@@ -139,6 +153,7 @@ impl FhirPathEngine for OctofhirEngine {
             let provider = self.provider.clone();
             let resource = resource.clone();
             let owned: Vec<String> = expressions.to_vec();
+            let variables = variables.clone();
             // The engine is third-party code on the write path: run it in its own task, so a
             // panic inside it fails the evaluation closed instead of dropping the request.
             let task = tokio::spawn(async move {
@@ -149,6 +164,9 @@ impl FhirPathEngine for OctofhirEngine {
                     None,
                     Some(Arc::new(Silent) as SharedTraceProvider),
                 );
+                for (name, value) in variables {
+                    context.set_variable(name, json_to_fhirpath_value(value));
+                }
                 let mut results = Vec::with_capacity(owned.len());
                 for expression in &owned {
                     results.push(
@@ -396,5 +414,31 @@ impl ModelProvider for TableModelProvider {
 
     fn is_type_derived_from(&self, derived_type: &str, base_type: &str) -> bool {
         self.derives(derived_type, base_type)
+    }
+}
+
+#[cfg(test)]
+mod variables {
+    use super::*;
+
+    #[tokio::test]
+    async fn named_variables_are_bound() {
+        let engine = OctofhirEngine::new();
+        let patient = serde_json::json!({ "resourceType": "Patient", "birthDate": "1990-04-02" });
+        let variables = BTreeMap::from([("patient".to_owned(), patient)]);
+        let results = engine
+            .evaluate_with(
+                &serde_json::json!({ "resourceType": "QuestionnaireResponse", "status": "in-progress" }),
+                &["%patient.birthDate".to_owned(), "%resource.status".to_owned()],
+                &variables,
+            )
+            .await;
+        assert_eq!(
+            results,
+            vec![
+                Ok(vec![FhirPathItem::Temporal("1990-04-02".into())]),
+                Ok(vec![FhirPathItem::String("in-progress".into())]),
+            ]
+        );
     }
 }

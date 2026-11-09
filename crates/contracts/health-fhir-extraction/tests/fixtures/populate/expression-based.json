@@ -1,0 +1,192 @@
+{
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://health.go.ug/fhir/Questionnaire/anc-registration",
+    "version": "1.0.0",
+    "status": "active",
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+        "extension": [
+          {
+            "url": "name",
+            "valueCoding": {
+              "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+              "code": "patient"
+            }
+          },
+          {
+            "url": "type",
+            "valueCode": "Patient"
+          }
+        ]
+      },
+      {
+        "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+        "extension": [
+          {
+            "url": "name",
+            "valueCoding": {
+              "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+              "code": "encounter"
+            }
+          },
+          {
+            "url": "type",
+            "valueCode": "Encounter"
+          }
+        ]
+      },
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/variable",
+        "valueExpression": {
+          "name": "given",
+          "language": "text/fhirpath",
+          "expression": "%patient.name.first().given.first()"
+        }
+      }
+    ],
+    "item": [
+      {
+        "linkId": "name",
+        "text": "Name",
+        "type": "string",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+            "valueExpression": {
+              "language": "text/fhirpath",
+              "expression": "%given + ' ' + %patient.name.first().family"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "birth-date",
+        "text": "Date of birth",
+        "type": "date",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+            "valueExpression": {
+              "language": "text/fhirpath",
+              "expression": "%patient.birthDate"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "female",
+        "text": "Female",
+        "type": "boolean",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-initialExpression",
+            "valueExpression": {
+              "language": "text/fhirpath",
+              "expression": "%patient.gender = 'female'"
+            }
+          }
+        ]
+      },
+      {
+        "linkId": "notes",
+        "text": "Notes",
+        "type": "text"
+      },
+      {
+        "linkId": "ids",
+        "text": "Identifiers",
+        "type": "string",
+        "repeats": true,
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-candidateExpression",
+            "valueExpression": {
+              "language": "text/fhirpath",
+              "expression": "%patient.name.given"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "launch": {
+    "contexts": {
+      "patient": {
+        "resourceType": "Patient",
+        "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000aa",
+        "birthDate": "1991-03-14",
+        "gender": "female",
+        "name": [
+          {
+            "family": "Nakato",
+            "given": [
+              "Grace"
+            ]
+          }
+        ]
+      },
+      "encounter": {
+        "resourceType": "Encounter",
+        "id": "0190f1a2-7c3d-7e4f-8a5b-000000000201",
+        "status": "in-progress"
+      }
+    }
+  },
+  "expected": {
+    "resourceType": "QuestionnaireResponse",
+    "status": "in-progress",
+    "questionnaire": "https://health.go.ug/fhir/Questionnaire/anc-registration|1.0.0",
+    "subject": {
+      "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+    },
+    "encounter": {
+      "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201"
+    },
+    "item": [
+      {
+        "linkId": "name",
+        "text": "Name",
+        "answer": [
+          {
+            "valueString": "Grace Nakato"
+          }
+        ]
+      },
+      {
+        "linkId": "birth-date",
+        "text": "Date of birth",
+        "answer": [
+          {
+            "valueDate": "1991-03-14"
+          }
+        ]
+      },
+      {
+        "linkId": "female",
+        "text": "Female",
+        "answer": [
+          {
+            "valueBoolean": true
+          }
+        ]
+      },
+      {
+        "linkId": "notes",
+        "text": "Notes"
+      },
+      {
+        "linkId": "ids",
+        "text": "Identifiers"
+      }
+    ]
+  },
+  "candidates": {
+    "ids": [
+      {
+        "valueString": "Grace"
+      }
+    ]
+  }
+}
