@@ -1,0 +1,10 @@
+{
+  "resourceType": "Library",
+  "id": "manifest",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/ug.moh.opd-manifest",
+  "version": "1.0.0",
+  "type": {
+    "text": "asset-collection"
+  }
+}

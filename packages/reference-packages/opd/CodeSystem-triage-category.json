@@ -1,0 +1,23 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "triage-category",
+  "url": "https://health.go.ug/fhir/CodeSystem/triage-category",
+  "version": "1.0.0",
+  "name": "TriageCategory",
+  "status": "active",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "emergency",
+      "display": "Emergency: seen at once"
+    },
+    {
+      "code": "urgent",
+      "display": "Urgent: seen next"
+    },
+    {
+      "code": "routine",
+      "display": "Routine"
+    }
+  ]
+}
