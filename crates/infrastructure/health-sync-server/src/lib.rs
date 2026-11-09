@@ -27,6 +27,10 @@
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
+//! A server built [`with_check`](SyncServer::with_check) holds every pushed group to its
+//! [`GroupCheck`] before applying it: central re-derives a completed response's extraction there
+//! (ADR 0022).
+//!
 //! Bodies are NDJSON or JSON, zstd-compressed when the peer says so: a request with
 //! `Content-Encoding: zstd` is decompressed before its signature is checked (the signature
 //! covers the content), and an answer is compressed for a peer that sends `Accept-Encoding: zstd`.
@@ -56,6 +60,17 @@ use serde_json::json;
 
 pub use review::{CONFLICT_PERMISSION, review_router};
 
+/// A check a pushed group must pass before it is applied, e.g. re-deriving a completed
+/// response's extraction at the authority (ADR 0022). `Some` is the outcome the group gets
+/// instead of being applied.
+pub trait GroupCheck: Send + Sync {
+    /// The outcome for `group`, if the check refuses it.
+    fn check<'a>(
+        &'a self,
+        group: &'a health_sync_protocol::Group,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Outcome>> + Send + 'a>>;
+}
+
 /// The largest request body on the wire: a push batch is at most 4 MiB (synchronization.md
 /// § Push), with room for the envelope. A compressed one may expand to
 /// [`MAX_DECODED`](health_sync_protocol::MAX_DECODED).
@@ -71,6 +86,7 @@ pub struct SyncServer {
     inner: Arc<Inner>,
     blobs: Option<health_files::FsBlobStore>,
     events: Option<health_http::Events>,
+    check: Option<Arc<dyn GroupCheck>>,
 }
 
 struct Inner {
@@ -93,7 +109,15 @@ impl SyncServer {
             }),
             blobs: None,
             events: None,
+            check: None,
         }
+    }
+
+    /// Holds every pushed group to `check` before it is applied.
+    #[must_use]
+    pub fn with_check(mut self, check: Arc<dyn GroupCheck>) -> Self {
+        self.check = Some(check);
+        self
     }
 
     /// Accepts and serves attachments from `blobs` (synchronization.md § Attachments).
@@ -395,6 +419,17 @@ async fn push(
             let authority = SurrealAuthority::new(&server.inner.store, peer.id, peer.scope);
             let mut results = Vec::with_capacity(groups.len());
             for group in &groups {
+                if let Some(check) = &server.check
+                    && let Some(outcome) = check.check(group).await
+                {
+                    tracing::warn!(peer = %peer.id, ?outcome, "a pushed group failed its check");
+                    results.push(GroupResult {
+                        tx_id: group.tx_id,
+                        outcome,
+                        replayed: false,
+                    });
+                    continue;
+                }
                 match receive(&authority, group).await {
                     Ok(result) => results.push(result),
                     // Results so far stand; the node resends the rest.

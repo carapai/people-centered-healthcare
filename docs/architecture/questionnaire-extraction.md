@@ -102,6 +102,11 @@ sequenceDiagram
 - **Check.** When a sync group containing a completed or amended QuestionnaireResponse reaches the Authority Node, the node re-runs extraction with the recorded mapping version and compares content hashes with the extracted resources in the group.
 - **Mismatch.** The group is rejected with `extraction_mismatch` and sent to the originating node's review queue.
 - **Missing mapping.** If the mapping version is unknown or not approved at the authority, the group is rejected with `metadata_incompatible` (synchronization.md).
+- **In code (#93):**
+  - Central's sync server holds every pushed group to a `GroupCheck` before applying it (`health-sync-server`).
+  - Central's check re-derives each completed or amended response (`FhirServer::rederive`) with the mapping it records, found among central's `Library?url=&version=`.
+  - Every planned resource that came in the group must equal what central derives, compared without `meta`. One left unchanged need not come.
+  - A mismatch rejects the group with `extraction_mismatch`, and an unknown mapping with `metadata_incompatible`. The edge keeps the group as an unaccepted candidate for review.
 
 ## Re-extraction with a newer mapping
 

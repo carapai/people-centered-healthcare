@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#93: re-derivation at the authority (2026-11-09).** This completes #93.
+  - **What:**
+    - central's sync server runs a `GroupCheck` on each pushed group before applying it;
+    - central's check re-derives each completed or amended response with its recorded mapping (`FhirServer::rederive`);
+    - a resource that isn't what central derives rejects the group with `extraction_mismatch` (a new reason), and an unknown mapping with `metadata_incompatible`.
+  - **Tested:**
+    - a response completed on one node re-derives cleanly, also with nothing re-sent;
+    - a tampered resource is a mismatch, an unknown mapping version is reported, and drafts aren't checked;
+    - a group failing central's check is refused and nothing is applied.
 - **#89, part 4e: the active Workflow Definitions (2026-11-09).**
   - **What:**
     - `WorkflowConfig`'s definitions are shared by its clones and replaceable (`replace`), and `health_publication::workflow_definitions` reads a package's.

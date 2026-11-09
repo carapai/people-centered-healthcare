@@ -17,8 +17,12 @@ pub enum Reason {
     /// An item is malformed: its hash does not match its body, or its subject does not fit its
     /// kind.
     Malformed,
-    /// It was validated against package versions the receiver no longer approves.
+    /// It was validated against package versions the receiver no longer approves, or a
+    /// response's Extraction Mapping is not held at the authority.
     MetadataIncompatible,
+    /// A completed response's extracted resources are not what the authority derives from it
+    /// (ADR 0022).
+    ExtractionMismatch,
     /// Profile, references or invariants (ADR 0016).
     Invalid,
     /// The author was not authorized at action time.

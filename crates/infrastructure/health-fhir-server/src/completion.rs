@@ -15,6 +15,10 @@
 //!   - the Provenance gets a new version naming every target.
 //!
 //!   Any failure fails the whole write: the response stays as it was (all or nothing).
+//! - **At the authority** ([`FhirServer::rederive`]; ADR 0022): a response another node completed
+//!   is extracted again here with the mapping version it records, and every planned resource
+//!   that arrived with it must have the content this node derives. A mapping not held here is
+//!   [`Rederivation::UnknownMapping`]; different content is [`Rederivation::Mismatch`].
 
 use std::collections::BTreeMap;
 
@@ -374,4 +378,73 @@ pub(crate) async fn dry_run(
     }
     let bundle = health_fhir_extraction::bundle(&plan);
     Ok(crate::http::fhir_json(StatusCode::OK, bundle.to_string()))
+}
+
+/// Why a response another node completed does not stand here (ADR 0022).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Rederivation {
+    /// The mapping version it records is not held here.
+    UnknownMapping(String),
+    /// A resource it was sent with is not what this node derives.
+    Mismatch(String),
+    /// The extraction could not run here.
+    Failed(String),
+}
+
+/// The resource without `meta`, which each node's store and write path stamp.
+fn without_meta(resource: &Value) -> Value {
+    let mut copy = resource.clone();
+    if let Some(object) = copy.as_object_mut() {
+        object.remove("meta");
+    }
+    copy
+}
+
+impl FhirServer {
+    /// Re-derives the extraction of `response`, a QuestionnaireResponse another node completed,
+    /// against `arrived`: the resources sent with it, by `Type/id`. Each planned resource among
+    /// them must be the one this node derives with the response's recorded mapping; one a seed
+    /// target left unchanged, or a managed one not rewritten, need not have come.
+    pub async fn rederive(
+        &self,
+        response: &Value,
+        arrived: &BTreeMap<String, Value>,
+    ) -> Result<(), Rederivation> {
+        if !is_submitted(response) {
+            return Ok(());
+        }
+        let Some(canonical) = recorded_mapping(response).map(str::to_owned) else {
+            return Ok(());
+        };
+        let (url, version) = canonical
+            .split_once('|')
+            .unwrap_or((canonical.as_str(), ""));
+        let failed = |e: FhirError| Rederivation::Failed(format!("{e:?}"));
+        let mut tx = self
+            .store
+            .begin()
+            .await
+            .map_err(|e| Rederivation::Failed(e.to_string()))?;
+        let mapping = mappings(self, &mut tx, &[("url", url), ("version", version)])
+            .await
+            .map_err(failed)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Rederivation::UnknownMapping(canonical.clone()))?;
+        drop(tx);
+        let plan = extract(self.fhirpath.as_ref(), response, &mapping)
+            .await
+            .map_err(|e| Rederivation::Failed(e.to_string()))?;
+        for planned in &plan {
+            let here = key(&planned.resource_type, planned.id);
+            if let Some(sent) = arrived.get(&here)
+                && without_meta(sent) != without_meta(&planned.resource)
+            {
+                return Err(Rederivation::Mismatch(format!(
+                    "{here} is not what {canonical} derives from the response"
+                )));
+            }
+        }
+        Ok(())
+    }
 }
