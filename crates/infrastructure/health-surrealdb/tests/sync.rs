@@ -1285,3 +1285,108 @@ async fn activation_records_go_down_to_every_node_and_never_up() {
     let mut tx = fresh.store.begin().await.expect("begin");
     assert_eq!(tx.package_activations().await.expect("seeded").len(), 2);
 }
+
+#[tokio::test]
+async fn an_allowed_transition_commutes_with_a_concurrent_edit_and_a_competing_one_does_not() {
+    let (central, edge) = pair().await;
+    let encounter = |status: &str, note: Option<&str>, end: Option<&str>| {
+        let mut body = json!({
+            "resourceType": "Encounter", "status": status,
+            "meta": {"tag": [{"system": "urn:health:facility", "code": "KLA01"}]},
+            "actualPeriod": {"start": "2026-11-10T08:00:00Z"}
+        });
+        if let Some(note) = note {
+            body["serviceType"] = json!([{ "concept": { "text": note } }]);
+        }
+        if let Some(end) = end {
+            body["actualPeriod"]["end"] = json!(end);
+        }
+        body
+    };
+    let id = ResourceId::new();
+    write(
+        &edge,
+        id,
+        &encounter("in-progress", None, None),
+        Precondition::MustNotExist,
+    )
+    .await;
+    sync(&edge, &central).await;
+    let (base, _) = head(&central, "Encounter", id).await.expect("synced");
+
+    // Central records the service while the edge, offline, completes the visit.
+    write(
+        &central,
+        id,
+        &encounter("in-progress", Some("General OPD"), None),
+        Precondition::IfMatch(base),
+    )
+    .await;
+    write(
+        &edge,
+        id,
+        &encounter("completed", None, Some("2026-11-10T09:30:00Z")),
+        Precondition::IfMatch(base),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert_eq!(
+        round.outcomes,
+        vec![Outcome::Accepted],
+        "no Conflict Record"
+    );
+    assert!(
+        central
+            .store
+            .conflicts()
+            .await
+            .expect("conflicts")
+            .is_empty()
+    );
+    let (merged_id, merged) = head(&central, "Encounter", id).await.expect("head");
+    assert_eq!(merged["status"], "completed");
+    assert_eq!(merged["actualPeriod"]["end"], "2026-11-10T09:30:00Z");
+    assert_eq!(
+        merged["serviceType"][0]["concept"]["text"], "General OPD",
+        "central's edit is kept"
+    );
+    // The merge comes down to the edge as its head.
+    sync(&edge, &central).await;
+    assert_eq!(
+        head(&edge, "Encounter", id).await.expect("head").0,
+        merged_id
+    );
+    assert!(edge.store.unaccepted().await.expect("states").is_empty());
+
+    // Both moving the status from the same version is a Conflict Record, never a winner.
+    let other = ResourceId::new();
+    write(
+        &edge,
+        other,
+        &encounter("in-progress", None, None),
+        Precondition::MustNotExist,
+    )
+    .await;
+    sync(&edge, &central).await;
+    let (other_base, _) = head(&central, "Encounter", other).await.expect("synced");
+    write(
+        &central,
+        other,
+        &encounter("on-hold", None, None),
+        Precondition::IfMatch(other_base),
+    )
+    .await;
+    write(
+        &edge,
+        other,
+        &encounter("discontinued", None, Some("2026-11-10T10:00:00Z")),
+        Precondition::IfMatch(other_base),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(round.outcomes.as_slice(), [Outcome::Conflict { .. }]),
+        "{:?}",
+        round.outcomes
+    );
+}

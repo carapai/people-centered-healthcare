@@ -1214,6 +1214,96 @@ impl<'a> SurrealAuthority<'a> {
     }
 }
 
+/// A pushed transition merged onto the receiver's head (ADR 0020, case 2).
+struct Merge {
+    resource_type: ResourceType,
+    id: ResourceId,
+    /// The head it is written on.
+    head: OpId,
+    /// The head, with the candidate's transition applied.
+    merged: Value,
+}
+
+/// The fields an Encounter's transition changes: its status, and the end of its period.
+const TRANSITION_FIELDS: &[&str] = &["status", "actualPeriod"];
+
+/// `value` without `meta` and `fields`.
+fn without(value: &Value, fields: &[&str]) -> Value {
+    let mut copy = value.clone();
+    if let Some(object) = copy.as_object_mut() {
+        object.remove("meta");
+        for field in fields {
+            object.remove(*field);
+        }
+    }
+    copy
+}
+
+/// The head with `candidate`'s transition applied, when `candidate` is an Encounter that
+/// changes only its status (and the end of its period) from its parent, the head kept the
+/// parent's status, and the table allows that transition from it (ADR 0020, case 2). The two
+/// edits commute: the merge keeps both, so nothing is lost.
+async fn commute(
+    tx: &mut SurrealTx,
+    item: &Item,
+    head: Option<OpId>,
+) -> Result<Option<Merge>, WriteError> {
+    use health_encounters::EncounterStatus;
+    let (Some(head), Some(parent)) = (head, item.parent_version_id) else {
+        return Ok(None);
+    };
+    if item.resource_type != "Encounter" || item.deleted {
+        return Ok(None);
+    }
+    let resource_type: ResourceType = item
+        .resource_type
+        .parse()
+        .map_err(|_| WriteError::Store(corrupt("resource_type")))?;
+    let id: ResourceId = item
+        .resource_id
+        .parse()
+        .map_err(|_| WriteError::Store(corrupt("resource_id")))?;
+    let read = |entry: Option<crate::history::HistoryEntry>| {
+        entry
+            .filter(|e| !e.version.deleted)
+            .and_then(|e| serde_json::from_str::<Value>(e.json.as_str()).ok())
+    };
+    let (Some(before), Some(now)) = (
+        read(tx.version(&resource_type, id, parent).await?),
+        read(tx.version(&resource_type, id, head).await?),
+    ) else {
+        return Ok(None);
+    };
+    let candidate = &item.body;
+    let status = |v: &Value| serde_json::from_value::<EncounterStatus>(v["status"].clone()).ok();
+    let (Some(from), Some(to), Some(at_head)) = (status(&before), status(candidate), status(&now))
+    else {
+        return Ok(None);
+    };
+    let commutes = from != to
+        // The candidate changed nothing but the transition's fields.
+        && without(candidate, TRANSITION_FIELDS) == without(&before, TRANSITION_FIELDS)
+        // The head did not move the status, nor the period the candidate sets.
+        && at_head == from
+        && (candidate["actualPeriod"] == before["actualPeriod"]
+            || now["actualPeriod"] == before["actualPeriod"])
+        && at_head.may_become(to);
+    if !commutes {
+        return Ok(None);
+    }
+    let mut merged = now;
+    merged["status"] = candidate["status"].clone();
+    if candidate["actualPeriod"] != before["actualPeriod"] {
+        merged["actualPeriod"] = candidate["actualPeriod"].clone();
+    }
+    Ok(Some(Merge {
+        resource_type,
+        id,
+        head,
+        merged,
+    }))
+}
+
 /// How a pushed version stands against the receiver's head.
 enum Standing {
     /// Already here, or the same content as the head: nothing to write.
@@ -1277,7 +1367,7 @@ impl Authority for SurrealAuthority<'_> {
             peer: self.peer.to_string(),
             origin,
         });
-        let mut outcome = self.judge(&mut tx, group).await?;
+        let (mut outcome, merges) = self.judge(&mut tx, group).await?;
         if outcome == Outcome::Accepted {
             for item in &group.items {
                 if item.kind == Kind::Op {
@@ -1309,6 +1399,21 @@ impl Authority for SurrealAuthority<'_> {
                 }
             }
         }
+        if outcome == Outcome::Accepted && !merges.is_empty() {
+            // Written as this node's own versions, so they go back down to the pushing node too.
+            let source = tx.source.take();
+            for merge in merges {
+                tx.write(health_persistence::WriteRequest {
+                    resource_type: merge.resource_type,
+                    id: merge.id,
+                    json: RawJson::from_validated(merge.merged.to_string()),
+                    op_id: OpId::new(),
+                    precondition: health_persistence::Precondition::IfMatch(merge.head),
+                })
+                .await?;
+            }
+            tx.source = source;
+        }
         let mut sql = Sql::default();
         let outcome_text = sql.str(
             serde_json::to_string(&outcome).map_err(|_| WriteError::Store(corrupt("outcome")))?,
@@ -1330,8 +1435,12 @@ impl Authority for SurrealAuthority<'_> {
 impl SurrealAuthority<'_> {
     /// The group's outcome: rejected when out of scope or not a version, a conflict when any
     /// version does not build on the head (recorded as a Conflict Record), accepted otherwise.
-    async fn judge(&self, tx: &mut SurrealTx, group: &Group) -> Result<Outcome, WriteError> {
-        let rejected = |reason, detail: String| Outcome::Rejected { reason, detail };
+    async fn judge(
+        &self,
+        tx: &mut SurrealTx,
+        group: &Group,
+    ) -> Result<(Outcome, Vec<Merge>), WriteError> {
+        let rejected = |reason, detail: String| (Outcome::Rejected { reason, detail }, Vec::new());
         if let Some(item) = group
             .items
             .iter()
@@ -1361,10 +1470,16 @@ impl SurrealAuthority<'_> {
             }
         }
         let mut conflicts = Vec::new();
+        let mut merges = Vec::new();
         // Ledger operations are appended, never in conflict (synchronization.md § Conflict
         // detection and resolution).
         for item in group.items.iter().filter(|i| i.kind == Kind::Version) {
             if let Standing::Conflict { head } = self.standing(tx, item).await? {
+                // A transition the table allows, commuting with the head (ADR 0020, case 2).
+                if let Some(merge) = commute(tx, item, head).await? {
+                    merges.push(merge);
+                    continue;
+                }
                 let (class, _) = class_of(&item.resource_type);
                 conflicts.push(json!({
                     "op_id": item.op_id.to_string(),
@@ -1376,7 +1491,7 @@ impl SurrealAuthority<'_> {
             }
         }
         let Some(first) = conflicts.first() else {
-            return Ok(Outcome::Accepted);
+            return Ok((Outcome::Accepted, merges));
         };
         let resource_type = first["resource"]
             .as_str()
@@ -1400,9 +1515,13 @@ impl SurrealAuthority<'_> {
              opened_at = time::now()"
         ));
         sql.run(tx.tx()?).await.map_err(write_error)?;
-        Ok(Outcome::Conflict {
-            conflict: group.tx_id.to_string(),
-        })
+        // A group with any true conflict is held whole: its commuting edits wait with it.
+        Ok((
+            Outcome::Conflict {
+                conflict: group.tx_id.to_string(),
+            },
+            Vec::new(),
+        ))
     }
 
     /// Appends a ledger operation, unless it is here already: a stock movement through the

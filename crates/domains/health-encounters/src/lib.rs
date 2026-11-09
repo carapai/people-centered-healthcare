@@ -66,7 +66,9 @@ impl EncounterStatus {
         )
     }
 
-    fn may_become(self, to: Self) -> bool {
+    /// Whether an Encounter in this status may move to `to`: the allowed-transition table that
+    /// sync also applies to concurrent edits (ADR 0020).
+    pub fn may_become(self, to: Self) -> bool {
         use EncounterStatus::{
             Cancelled, Completed, Discharged, Discontinued, EnteredInError, InProgress, OnHold,
             Planned,

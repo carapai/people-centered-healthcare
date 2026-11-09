@@ -163,7 +163,7 @@ pub struct SurrealTx {
     /// The versions written so far, appended to the change log on commit.
     changes: Vec<crate::change_log::Pending>,
     /// Set when this transaction applies versions received by sync: where they came from.
-    source: Option<crate::change_log::Source>,
+    pub(crate) source: Option<crate::change_log::Source>,
 }
 
 impl Drop for SurrealTx {

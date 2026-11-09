@@ -264,9 +264,13 @@ stateDiagram-v2
     - Only that node pulls it. No node sends one up.
     - Applying it clears the candidates' `conflict` state, so the record is accepted as resolved (`conflict → accepted` above). A `keep-head` resolution writes no version, so this is the only way its node learns of it.
     - `SurrealStore::unaccepted` lists a node's candidates still in `conflict` or `rejected`, for the user to see as not accepted.
-  - **Not yet:**
-    - the review queue's screen in the web client;
-    - the commuting workflow transitions (auto-resolution 2).
+  - **Commuting transitions (#82, part 4; ADR 0020 case 2):** a pushed Encounter that meets another head is merged rather than held when three things hold:
+    - it changes only its status (and the end of its period) from its parent;
+    - the head kept the parent's status;
+    - the allowed-transition table (`EncounterStatus::may_become`) permits the move from the head's status.
+
+    The head with the transition applied is written as central's own version, so it comes back down to the edge. The group is accepted and both edits are kept. Two status moves from the same version, or any other change, still open a Conflict Record. Task and workflow-instance transitions come with #100.
+  - **Not yet:** the review queue's screen in the web client.
 
 ## Provisional states
 

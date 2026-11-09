@@ -969,6 +969,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#82, part 4: commuting transitions (2026-11-10).**
+  - **What:** central merges a pushed Encounter that changes only its status (and period end) onto a head that kept the parent's status, when `EncounterStatus::may_become` allows the move (ADR 0020, case 2). The merge is written as central's own version and comes back down, and the group is accepted.
+  - **Tested:** the edge completing a visit while central records its service gives no Conflict Record, a head with both, and that head on the edge. Two competing status moves open a Conflict Record.
+  - **Still open on #82:** the review screen.
 - **#82, part 3: the resolution reaches its node (2026-11-10).**
   - **What:**
     - resolving a Conflict Record logs a `resolution` operation, sent down only to the node whose push opened it, and never up;
