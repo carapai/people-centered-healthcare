@@ -18,9 +18,11 @@
 //! - **Item states** ([`ItemState`]): the outbox item's life cycle.
 //! - **Attachments** ([`blob_refs`], [`BlobStatus`]): blobs referenced by `Attachment.url`, sent
 //!   after their resource in resumable 1 MiB chunks.
-//! - **NDJSON bodies** ([`to_ndjson`], [`from_ndjson`]). Compression (zstd) belongs to the transport.
+//! - **NDJSON bodies** ([`to_ndjson`], [`from_ndjson`]), sent zstd-compressed ([`compress`],
+//!   [`decompress`]) with `Content-Encoding: zstd`.
 
 mod blobs;
+mod encoding;
 mod envelope;
 mod grants;
 mod handshake;
@@ -33,6 +35,7 @@ mod receive;
 mod state;
 
 pub use blobs::{BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, blob_refs, blob_url};
+pub use encoding::{DecodeError, MAX_DECODED, ZSTD, compress, decompress};
 pub use envelope::{BlobRef, EnvelopeError, Item, Kind, PackageRef};
 pub use grants::{BreakGlassGrant, REVIEW_WITHIN_HOURS};
 pub use handshake::{

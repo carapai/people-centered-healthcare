@@ -25,7 +25,10 @@
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
-//! Bodies are uncompressed NDJSON or JSON; zstd belongs to a later transport change.
+//! Bodies are NDJSON or JSON, zstd-compressed when the peer says so: a request with
+//! `Content-Encoding: zstd` is decompressed before its signature is checked (the signature
+//! covers the content), and an answer is compressed for a peer that sends `Accept-Encoding: zstd`.
+//! The event stream and attachment bytes are sent as they are.
 
 mod review;
 
@@ -35,23 +38,25 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::extract::{DefaultBodyLimit, Path, Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use health_identifiers::NodeId;
 use health_provisioning::{Error as RegistryError, NodeRegistry, SYNC_SCHEME};
 use health_surrealdb::{SurrealAuthority, SurrealStore, SyncScope};
 use health_sync_protocol::{
-    Compatibility, GroupResult, Hello, Item, Outcome, PullRequest, Reason, Verdict, Welcome,
-    from_ndjson, group, receive, to_ndjson,
+    Compatibility, DecodeError, GroupResult, Hello, Item, Outcome, PullRequest, Reason, Verdict,
+    Welcome, ZSTD, compress, decompress, from_ndjson, group, receive, to_ndjson,
 };
 use serde_json::json;
 
 pub use review::{CONFLICT_PERMISSION, review_router};
 
-/// The largest request body: a push batch is at most 4 MiB (synchronization.md § Push), with
-/// room for the envelope.
+/// The largest request body on the wire: a push batch is at most 4 MiB (synchronization.md
+/// § Push), with room for the envelope. A compressed one may expand to
+/// [`MAX_DECODED`](health_sync_protocol::MAX_DECODED).
 const MAX_BODY: usize = 8 * 1024 * 1024;
 
 /// How often the event stream checks the log, and how often a quiet stream sends a comment.
@@ -120,9 +125,88 @@ impl SyncServer {
             .route("/sync/v1/transfers", post(transfers))
             .route("/sync/v1/transfers/inbound", post(inbound_transfers))
             .route("/sync/v1/events", get(events))
-            .layer(DefaultBodyLimit::max(MAX_BODY))
+            .layer(DefaultBodyLimit::max(health_sync_protocol::MAX_DECODED))
+            .layer(axum::middleware::from_fn(zstd_bodies))
             .with_state(self)
     }
+}
+
+/// Whether the peer takes zstd answers.
+fn accepts_zstd(headers: &HeaderMap) -> bool {
+    headers
+        .get_all(header::ACCEPT_ENCODING)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .any(|token| {
+            let mut parts = token.split(';').map(str::trim);
+            parts.next() == Some(ZSTD) && parts.all(|q| q != "q=0" && q != "q=0.0")
+        })
+}
+
+/// zstd on the wire (synchronization.md § Wire format): decompresses a compressed request, at
+/// most [`MAX_BODY`] on the wire and [`MAX_DECODED`](health_sync_protocol::MAX_DECODED) once
+/// expanded, and compresses the answer for a peer that takes it. Streams and attachment bytes
+/// pass as they are.
+async fn zstd_bodies(request: Request, next: Next) -> Response {
+    let (mut parts, body) = request.into_parts();
+    let compress_answer = accepts_zstd(&parts.headers);
+    let request = match parts.headers.get(header::CONTENT_ENCODING) {
+        // The wire limit holds whatever the encoding.
+        None => Request::from_parts(
+            parts,
+            Body::new(http_body_util::Limited::new(body, MAX_BODY)),
+        ),
+        Some(encoding) if encoding.as_bytes() == ZSTD.as_bytes() => {
+            let Ok(wire) = axum::body::to_bytes(body, MAX_BODY).await else {
+                return problem(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    format!("a compressed body is at most {MAX_BODY} bytes"),
+                );
+            };
+            let content = match decompress(&wire) {
+                Ok(content) => content,
+                Err(DecodeError::TooLarge) => {
+                    return problem(
+                        StatusCode::PAYLOAD_TOO_LARGE,
+                        DecodeError::TooLarge.to_string(),
+                    );
+                }
+                Err(error) => return problem(StatusCode::BAD_REQUEST, error.to_string()),
+            };
+            parts.headers.remove(header::CONTENT_ENCODING);
+            parts.headers.remove(header::CONTENT_LENGTH);
+            Request::from_parts(parts, Body::from(content))
+        }
+        Some(_) => {
+            return problem(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "sync bodies are sent as they are or zstd-compressed",
+            );
+        }
+    };
+    let response = next.run(request).await;
+    let streamed = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|t| t.starts_with("text/event-stream") || t == "application/octet-stream");
+    if !compress_answer || streamed || response.headers().contains_key(header::CONTENT_ENCODING) {
+        return response;
+    }
+    let (mut parts, body) = response.into_parts();
+    let content = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(content) => content,
+        Err(error) => return failed(error),
+    };
+    parts
+        .headers
+        .insert(header::CONTENT_ENCODING, HeaderValue::from_static(ZSTD));
+    parts.headers.remove(header::CONTENT_LENGTH);
+    parts
+        .headers
+        .append(header::VARY, HeaderValue::from_static("accept-encoding"));
+    Response::from_parts(parts, Body::from(compress(&content)))
 }
 
 /// An authenticated peer.
