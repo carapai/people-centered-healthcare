@@ -6,9 +6,13 @@
 //! - [`lifecycle`]: the publication lifecycle at central (ADR 0025): Draft, Validation,
 //!   Simulation, Review, Approval and Publication, with separation of duties and the semver diff
 //!   check.
+//! - [`activation`]: scoped activation on nodes: the activation record, the active set merged
+//!   along a node's scope chain, the checks before a switch, the switch itself (whole or not at
+//!   all) and the versions a node retains.
 //!
 //! Reading archives, hashing and signatures are adapters' work (`health-packages`); this crate
 //! sees a package's parsed contents only.
 
+pub mod activation;
 pub mod lifecycle;
 pub mod package;
