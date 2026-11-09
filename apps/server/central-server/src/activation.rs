@@ -11,6 +11,9 @@
 //! whose profiles do not compile keeps the previous ones and raises
 //! `package-activation-failed`.
 //!
+//! Its Workflow Definitions are the ones central runs at `/api/workflow`: new instances start
+//! on them, and a set whose definitions cannot run keeps the previous ones.
+//!
 //! Its SearchParameters join central's built-in ones ([`search`]): one new to central is indexed
 //! on every write at once, and searchable once a reindex job has backfilled what is stored.
 
@@ -23,7 +26,7 @@ use std::collections::BTreeMap;
 use health_activation::definitions::{active_files, definitions, write_definitions};
 use health_activation::{Activator, Outcome, activate};
 use health_configuration::activation::{ActiveSet, Chain};
-use health_fhir_server::{ActiveProfiles, ActiveTerminology, Profiles};
+use health_fhir_server::{ActiveProfiles, ActiveTerminology, Profiles, WorkflowConfig};
 use health_fhir_validation::ProfileSet;
 use health_files::FsBlobStore;
 use health_packages::Files;
@@ -44,6 +47,8 @@ pub(crate) struct Definitions {
     pub(crate) terminology: ActiveTerminology,
     /// The search registry: central's built-in parameters and the active packages'.
     pub(crate) search: SharedRegistry,
+    /// The Workflow Definitions central runs: the active packages'.
+    pub(crate) workflows: WorkflowConfig,
 }
 
 impl Default for Definitions {
@@ -52,6 +57,8 @@ impl Default for Definitions {
             profiles: ActiveProfiles::default(),
             terminology: ActiveTerminology::default(),
             search: SharedRegistry::new(crate::auth::search_registry()),
+            workflows: WorkflowConfig::new(Vec::new(), "central")
+                .expect("no definitions always compile"),
         }
     }
 }
@@ -89,6 +96,22 @@ impl Definitions {
         });
         self.terminology.replace(terminology);
         Ok(profiles)
+    }
+
+    /// Runs the Workflow Definitions of `packages` from now on, or keeps the previous ones when
+    /// any cannot be read or run. The number running.
+    pub(crate) fn run_workflows(&self, packages: &[(String, Files)]) -> Result<usize, String> {
+        let mut definitions = Vec::new();
+        for (id, files) in packages {
+            let (found, problems) = health_publication::workflow_definitions(files);
+            if let Some(problem) = problems.first() {
+                return Err(format!("{id}: {problem}"));
+            }
+            definitions.extend(found.into_iter().map(|(_, definition)| definition));
+        }
+        self.workflows
+            .replace(definitions)
+            .map_err(|e| format!("the active Workflow Definitions cannot run: {e}"))
     }
 }
 
@@ -182,6 +205,14 @@ async fn once(
             alert = "package-activation-failed",
             %error,
             "the active packages' search parameters are not all searchable"
+        ),
+    }
+    match served.run_workflows(&packages) {
+        Ok(running) => tracing::info!(running, "running the active packages' workflows"),
+        Err(error) => tracing::error!(
+            alert = "package-activation-failed",
+            %error,
+            "the previous workflows keep running"
         ),
     }
     match served.load(&packages) {
@@ -301,5 +332,22 @@ mod tests {
             .expect_err("does not compile");
         assert!(error.contains("do not compile"), "{error}");
         assert!(lookup(&served), "the previous terminology stays");
+    }
+
+    #[test]
+    fn a_package_whose_workflow_cannot_be_read_keeps_the_running_ones() {
+        let served = Definitions::default();
+        assert_eq!(served.run_workflows(&[]), Ok(0));
+        let library = json!({
+            "resourceType": "Library", "id": "opd",
+            "url": "http://health.go.ug/fhir/Library/opd", "version": "1.0.0",
+            "status": "active",
+            "type": { "coding": [{ "code": "workflow-definition" }] },
+            "content": [{ "contentType": "application/vnd.health.workflow+json", "data": "not base64!" }]
+        });
+        let error = served
+            .run_workflows(&[("ug.moh.opd@1.0.0".into(), files(&[library]))])
+            .expect_err("unreadable");
+        assert!(error.starts_with("ug.moh.opd@1.0.0: "), "{error}");
     }
 }

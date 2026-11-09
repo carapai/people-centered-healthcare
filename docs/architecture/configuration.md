@@ -125,7 +125,8 @@ sequenceDiagram
     - Its SearchParameters join central's built-in ones in a registry the FHIR server shares (`SharedRegistry`).
       - A parameter new to central is indexed on every write at once and is searchable once a reindex job has backfilled what is stored (ADR 0017).
       - One already searched stays searchable, and a deactivated package's parameters are dropped.
-  - **Not yet:** the active set's workflows, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
+    - Its Workflow Definitions (each a `workflow-definition` Library, ADR 0049) are the ones central runs at `/api/workflow`. `WorkflowConfig` is shared and replaceable. A set whose definitions can't be read or run keeps the previous ones and raises `package-activation-failed`. With activation, `HEALTH_DEV_WORKFLOW_DEFINITIONS` is ignored.
+  - **Not yet:** desktops. `HEALTH_DEV_FHIR_SEED` stays for development and e2e.
 
 ## Rollback
 
