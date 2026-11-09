@@ -61,7 +61,8 @@ Every item on the wire, in either direction:
   - **Ledger operations (#81).** A stock movement is logged as an operation in its own write transaction (`SurrealTx::log_op`; `change_log.op`, migration `0044_ledger_ops`). The entry's `resource_type` names the ledger (`stock`) and its `resource_id` the Stock Unit; it travels as a `kind: op` item.
     - **At the receiver:** the operation is appended through inventory's own rules as a late operation (`Inventory::record_in`, `Origin::Late`), in the same transaction as its receipt. A balance it drives negative opens a Reconciliation Record, and a movement already held is skipped.
     - **Direction:** operations go up only, and are never sent down.
-    - **Not yet:** charges and payments; checking that a movement's store is a Location of the sending facility.
+    - **Financial records (#81):** charges, deferrals, settlements, waivers, ledger postings, payments and cashier shifts are each logged as an operation on their own ledger (`sync::finance`). The receiver replays the record through the same store method, so central's copy follows the facility's in commit order. A charge billed after it was created arrives billed, as one charge. Records with an id are never created twice; receipts keep the rest once.
+    - **Not yet:** checking that a movement's store, or a charge's account, belongs to the sending facility; central's ledger-balance and external payment checks.
 - **In code (#80).** `health-sync-protocol` (contracts) holds the wire types and both sides' rules, with no I/O ([README](../../crates/contracts/health-sync-protocol/README.md)):
   - the envelope `Item` and its `ContentHash`;
   - the handshake verdict;
