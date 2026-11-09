@@ -65,7 +65,12 @@ Every item on the wire, in either direction:
     - **Whose ledger (#81):** each operation's scope is claimed by the first facility to send an operation on it (`ledger_claim`, migration `0046_ledger_claims`). The scope is a stock store, a billing account, or a posting, payment or shift id. Central refuses operations on it from any other facility, so a facility can neither post to another's store nor overwrite another's payment.
       - A charge naming an Encounter that central holds must come from that Encounter's facility (ADR 0057 tag).
       - A store's true owner comes from the facility registry's Locations once they record it; until then the first claim stands.
-    - **Not yet:** central's ledger-balance and external payment checks.
+    - **Central's checks (#81):** central does not hold the facility's chart of accounts, so it checks what a record shows on its own (`sync::finance`, migration `0048_finance_checks`). A refused record refuses its whole group.
+      - **Postings** (`Posting::balanced`): at least two positive lines in one currency, with debits equal to credits, every line on the sending facility. A reversal must name a posting central holds that is not itself a reversal and has not been reversed already.
+      - **Payments** (`Payment::may_follow`): a non-cash payment carries its provider reference. A posted one names its provider evidence, and a customer-reported one is posted only on a statement line.
+        - Against the copy central holds, what the payment is (method, purpose, amount, payer, reference, shift) never changes.
+        - Its status only moves on: pending to final, or posted to reversed. Refunds only grow.
+        - No other payment may carry the same provider reference (the external transaction id).
 - **In code (#80).** `health-sync-protocol` (contracts) holds the wire types and both sides' rules, with no I/O ([README](../../crates/contracts/health-sync-protocol/README.md)):
   - the envelope `Item` and its `ContentHash`;
   - the handshake verdict;

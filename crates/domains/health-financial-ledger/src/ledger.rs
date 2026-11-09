@@ -257,6 +257,42 @@ pub struct Posting {
     pub reverses: Option<String>,
 }
 
+impl Posting {
+    /// The checks a posting passes on its own, without the chart: at least two lines, each
+    /// positive, all in one currency, debits equal to credits. Central applies them to a posting a
+    /// facility sends up, whose chart it does not hold (#81).
+    pub fn balanced(&self) -> Result<(), PostingRefused> {
+        let Some(first) = self.lines.first() else {
+            return Err(PostingRefused::TooFewLines);
+        };
+        if self.lines.len() < 2 {
+            return Err(PostingRefused::TooFewLines);
+        }
+        let currency = first.amount.currency();
+        let mut debits = Money::zero(currency);
+        let mut credits = Money::zero(currency);
+        for line in &self.lines {
+            if line.amount.currency() != currency {
+                return Err(PostingRefused::WrongCurrency(currency));
+            }
+            if line.amount.amount() <= Decimal::ZERO {
+                return Err(PostingRefused::NonPositive);
+            }
+            match line.side {
+                Side::Debit => debits = debits.plus(line.amount)?,
+                Side::Credit => credits = credits.plus(line.amount)?,
+            }
+        }
+        if debits != credits {
+            return Err(PostingRefused::Unbalanced {
+                debits: debits.amount(),
+                credits: credits.amount(),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Why a posting was refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PostingRefused {

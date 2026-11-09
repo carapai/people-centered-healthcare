@@ -39,11 +39,12 @@ fn status_code(status: Status) -> &'static str {
 impl PostingStore for SurrealTx {
     async fn append_posting(&mut self, posting: &Posting) -> Result<(), WriteError> {
         self.run(
-            "CREATE type::record('ledger_posting', $id) CONTENT { at: <datetime>$at, data: $data } \
-             RETURN VALUE record::id(id)",
+            "CREATE type::record('ledger_posting', $id) CONTENT { at: <datetime>$at, data: $data, \
+             reverses: IF $reverses = '' THEN NONE ELSE $reverses END } RETURN VALUE record::id(id)",
             vec![
                 ("id", posting.id.clone()),
                 ("at", posting.at.to_string()),
+                ("reverses", posting.reverses.clone().unwrap_or_default()),
                 ("data", encode(posting)?),
             ],
         )
@@ -72,9 +73,11 @@ impl PaymentStore for SurrealTx {
         self.run(
             "UPSERT type::record('payment', $id) CONTENT { status: $status, \
              shift: IF $shift = '' THEN NONE ELSE $shift END, \
+             reference: IF $reference = '' THEN NONE ELSE $reference END, \
              recorded_at: <datetime>$recorded_at, data: $data } RETURN VALUE record::id(id)",
             vec![
                 ("id", payment.id.clone()),
+                ("reference", payment.reference.clone().unwrap_or_default()),
                 ("status", status_code(payment.status).to_owned()),
                 ("shift", payment.shift.clone().unwrap_or_default()),
                 ("recorded_at", payment.recorded_at.to_string()),
