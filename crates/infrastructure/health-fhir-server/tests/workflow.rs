@@ -336,3 +336,14 @@ async fn activation_replaces_the_definitions_every_holder_runs() {
     let (_, listed) = send(&nurse, "GET", "/definitions", None).await;
     assert_eq!(listed.as_array().map(Vec::len), Some(1));
 }
+
+/// The OPD reference definition (`ug.moh.opd`, #105) is one a node runs: no guards, no typed
+/// actions, its gate and parallel orders as written.
+#[test]
+fn the_opd_reference_definition_runs_on_a_node() {
+    let source: Value = serde_json::from_str(include_str!(
+        "../../../../packages/reference-packages/sources/opd-visit.json"
+    ))
+    .expect("json");
+    assert!(WorkflowConfig::new(vec![definition(source)], "central").is_ok());
+}

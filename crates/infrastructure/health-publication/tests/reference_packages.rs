@@ -94,26 +94,33 @@ async fn the_opd_package_publishes() {
     );
 }
 
-#[test]
-fn the_lab_definition_is_its_source() {
-    let library: Value = serde_json::from_slice(
-        &std::fs::read(root().join("lab/Library-lab-test.json")).expect("library"),
-    )
-    .expect("json");
+/// The Workflow Definition Library at `library` holds exactly the readable source `source`.
+fn holds_its_source(library: &str, source: &str) {
+    let library: Value =
+        serde_json::from_slice(&std::fs::read(root().join(library)).expect("library"))
+            .expect("json");
     let content = STANDARD
         .decode(library["content"][0]["data"].as_str().expect("data"))
         .expect("base64");
     let held: Value = serde_json::from_slice(&content).expect("definition");
-    let source: Value = serde_json::from_slice(
-        &std::fs::read(root().join("sources/lab-test.json")).expect("source"),
-    )
-    .expect("json");
+    let source_json: Value =
+        serde_json::from_slice(&std::fs::read(root().join(source)).expect("source")).expect("json");
     assert_eq!(
-        held, source,
-        "regenerate the Library's content from sources/lab-test.json"
+        held, source_json,
+        "regenerate the Library's content from {source}"
     );
     assert_eq!(
         (library["url"].clone(), library["version"].clone()),
-        (source["url"].clone(), source["version"].clone())
+        (source_json["url"].clone(), source_json["version"].clone())
     );
+}
+
+#[test]
+fn the_lab_definition_is_its_source() {
+    holds_its_source("lab/Library-lab-test.json", "sources/lab-test.json");
+}
+
+#[test]
+fn the_opd_definition_is_its_source() {
+    holds_its_source("opd/Library-opd-visit.json", "sources/opd-visit.json");
 }

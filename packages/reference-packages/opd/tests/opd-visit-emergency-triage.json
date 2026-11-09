@@ -1,0 +1,43 @@
+{
+  "type": "workflow-scenario",
+  "name": "an emergency at triage bypasses the payment gate",
+  "definition": "https://health.go.ug/fhir/Library/opd-visit|1.0.0",
+  "gates": {
+    "https://health.go.ug/fhir/FinancialGate/before-consultation": "block"
+  },
+  "steps": [
+    {
+      "event": "opd.arrived",
+      "expect": {
+        "configuration": [
+          "triage"
+        ]
+      }
+    },
+    {
+      "event": "opd.triaged-emergency",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    },
+    {
+      "event": "opd.seen",
+      "expect": {
+        "configuration": [
+          "disposition"
+        ]
+      }
+    },
+    {
+      "event": "opd.admitted",
+      "expect": {
+        "configuration": [
+          "admitted"
+        ],
+        "running": false
+      }
+    }
+  ]
+}

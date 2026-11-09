@@ -1,0 +1,34 @@
+{
+  "type": "workflow-scenario",
+  "name": "a routine visit waits at the cashier until it is paid",
+  "definition": "https://health.go.ug/fhir/Library/opd-visit|1.0.0",
+  "gates": {
+    "https://health.go.ug/fhir/FinancialGate/before-consultation": "block"
+  },
+  "steps": [
+    {
+      "event": "opd.arrived",
+      "expect": {
+        "configuration": [
+          "triage"
+        ]
+      }
+    },
+    {
+      "event": "opd.triaged-routine",
+      "expect": {
+        "configuration": [
+          "payment"
+        ]
+      }
+    },
+    {
+      "event": "gate.pass",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    }
+  ]
+}

@@ -5,7 +5,7 @@ Published Definition packages the platform ships as references (configuration.md
 | Package | What | Issue |
 |---|---|---|
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
-| `opd/` (`ug.moh.opd`) | OPD triage: the triage Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures | #103 |
+| `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
 
 **Sources:** a Workflow Definition is inline, base64 content in its Library. Its readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
 
@@ -46,4 +46,27 @@ The clinician's worklist gets a test only once its results are verified, and a c
 - **Fixtures** (`tests/`):
   - `triage-emergency` has every vital sign, giving seven Observations.
   - `triage-partial` has temperature and pulse, and a systolic pressure with no diastolic, giving two Observations and no panel.
-- **The triage category** is not extracted. The triage screen sends it to the visit's workflow as its completing event, and the OPD Workflow Definition (#105) records it as the visit's `urgency`. An urgent or emergency visit then never waits at a Financial Gate.
+- **The triage category** is not extracted. It is the triage task's completing event, `opd.triaged-<category>`, and the visit's workflow records it as `urgency` (below).
+
+### `Library/opd-visit`: the visit (#105; workflow-engine.md § Reference shapes)
+
+One Encounter-scoped instance, whose `urgency` data field is the triage category.
+
+| State | Task (worklist) | Leaves on |
+|---|---|---|
+| `reception` | none | `opd.arrived` → triage; `opd.arrived-emergency` → consultation (urgency `emergency`) |
+| `triage` | nurse (`opd-triage`), form `opd-triage` | `opd.triaged-routine` / `-urgent` → payment; `opd.triaged-emergency` → consultation, **bypassing the gate** |
+| `payment` | Financial Gate `before-consultation`; the cashier (`cashier`) while it blocks | `gate.pass` or `gate.defer` → consultation |
+| `consultation` | clinician (`opd-consult`) | `opd.orders-placed` → orders; `opd.seen` → disposition |
+| `orders` (parallel) | none | `lab`: `laboratory.reviewed` or `opd.no-lab`; `pharmacy`: `pharmacy.dispensed` or `opd.no-pharmacy`; when both are back → review |
+| `review` | clinician (`opd-review`, urgent) | `opd.orders-placed` → orders again; `opd.seen` → disposition |
+| `disposition` | clerk (`opd-disposition`) | `opd.discharged`, `opd.admitted` or `opd.referred` (final) |
+
+- **The gate** reads `urgency`, so urgent and emergency care are never blocked (ADR 0033). An emergency never reaches it.
+- **Node requirements:** the definition uses no guards or typed actions, so a node runs it as written. Lab and pharmacy report back as events rather than invoked sub-workflows.
+
+Scenarios in `tests/`:
+- `opd-visit-routine`: paid, seen, both orders back, seen again, discharged.
+- `opd-visit-emergency-triage` and `opd-visit-emergency-arrival`: the gate is set to block, and the visit never reaches it.
+- `opd-visit-unpaid`: blocked at the cashier until paid.
+- `opd-visit-urgent`: the gate defers, and there are no lab or pharmacy orders.
