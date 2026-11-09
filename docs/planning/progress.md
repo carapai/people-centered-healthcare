@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#82, part 3: the resolution reaches its node (2026-11-10).**
+  - **What:**
+    - resolving a Conflict Record logs a `resolution` operation, sent down only to the node whose push opened it, and never up;
+    - applying it clears that node's `conflict` item state for the candidates, which `keep-head` (writing no version) needed;
+    - `SurrealStore::unaccepted` lists a node's unaccepted candidates.
+  - **Tested:** the edge holds its candidate as `conflict` until the resolution is pulled, then holds nothing, and another node's pull never carries the resolution.
+  - **Still open on #82:** the review screen, and commuting workflow transitions.
 - **#94: population (2026-11-09).** This completes #94.
   - **What:**
     - `health_fhir_extraction::populate` does expression-based population (`launchContext`, `variable`, `initialExpression`, `candidateExpression`) and observation-based population (`observationLinkPeriod`);

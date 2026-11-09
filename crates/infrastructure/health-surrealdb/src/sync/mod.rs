@@ -114,12 +114,18 @@ pub const LEDGERS: &[&str] = &[
 /// sent down to every node as operations in the packages lane, never up.
 pub(crate) const ACTIVATIONS: &str = "activation";
 
+/// A Conflict Record's resolution on the change log (#82; synchronization.md § Item states:
+/// `conflict → accepted`, the resolution pulled down): sent to the node whose push opened it, so
+/// it clears its candidates' `conflict` state, never up.
+pub(crate) const RESOLUTIONS: &str = "resolution";
+
 impl SyncScope {
     /// Whether the peer may send up a version of `resource_type` with this body, or an
     /// operation on that ledger. A facility sends its own ledgers' operations; which store a
     /// movement names is not yet checked against the facility's Locations.
     pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
         resource_type != ACTIVATIONS
+            && resource_type != RESOLUTIONS
             && (LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL))
     }
 
@@ -128,6 +134,7 @@ impl SyncScope {
     /// records go to every node, which applies those its scope chain covers.
     pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
         resource_type == ACTIVATIONS
+            || resource_type == RESOLUTIONS
             || (!LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL))
     }
 
@@ -474,7 +481,11 @@ impl SurrealStore {
                 continue;
             }
             let item = self.item(change, node).await?;
+            // A resolution goes only to the node whose push opened its Conflict Record.
+            let resolution_for_another =
+                item.resource_type == RESOLUTIONS && item.body["peer"] != peer_text.as_str();
             if Lane::of(&item.resource_type) == request.lane
+                && !resolution_for_another
                 && scope.admits_down(&item.resource_type, &item.body)
                 && self
                     .person_admitted(scope, &item.resource_type, &item.resource_id, &item.body)
@@ -1101,11 +1112,39 @@ impl SurrealStore {
              WHERE status = 'open'"
         ));
         sql.run(tx.tx()?).await.map_err(write_error)?;
+        // The node whose push opened it learns the outcome, and stops holding its candidates.
+        let resolution = serde_json::json!({
+            "conflict": record.id,
+            "peer": record.peer,
+            "candidates": record.candidates.iter().map(|i| i.op_id.to_string()).collect::<Vec<_>>(),
+            "resolution": version.to_string(),
+        });
+        tx.log_op(RESOLUTIONS, &record.id, &resolution.to_string());
         if let Some(event) = audit {
             health_audit::append(&mut tx, event).await?;
         }
         tx.commit().await?;
         Ok(version)
+    }
+
+    /// This node's candidates the upstream did not accept, as `(op_id, state)`: `conflict` or
+    /// `rejected` (synchronization.md § Item states), for the user to see as not accepted.
+    pub async fn unaccepted(&self) -> Result<Vec<(String, String)>, StoreError> {
+        #[derive(SurrealValue)]
+        struct Row {
+            op: String,
+            state: String,
+        }
+        let rows: Vec<Row> = self
+            .connection
+            .db()
+            .query("SELECT <string>record::id(id) AS op, state FROM sync_item_state ORDER BY op")
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        Ok(rows.into_iter().map(|r| (r.op, r.state)).collect())
     }
 
     /// The Conflict Records opened for pushes, as `(tx_id, status)`.
@@ -1819,6 +1858,20 @@ impl SurrealTx {
     /// Appends an operation received from upstream: an activation record, kept once. Ledger
     /// operations only go up, so no other comes down.
     pub(crate) async fn receive_op(&mut self, item: &Item) -> Result<(), WriteError> {
+        if item.resource_type == RESOLUTIONS {
+            // The candidates the upstream resolved are no longer held: the resolution (a new
+            // head, or the head kept) is the record now.
+            for op in item.body["candidates"].as_array().into_iter().flatten() {
+                if let Some(op) = op.as_str() {
+                    self.run(
+                        "DELETE type::record('sync_item_state', $op) RETURN NONE",
+                        vec![("op", op.to_owned())],
+                    )
+                    .await?;
+                }
+            }
+            return Ok(());
+        }
         if item.resource_type != ACTIVATIONS {
             return Err(WriteError::Store(corrupt("a ledger operation came down")));
         }
