@@ -1372,3 +1372,48 @@ export const triageMessages = defineMessages<TriageValues>({
   trFailed: { id: 'app.triage.failed', defaultMessage: 'The triage was not recorded. {reason}', description: 'Triage: the save failed' },
   trBack: { id: 'app.triage.back', defaultMessage: 'Back to the queue', description: 'Triage action: close the form' },
 })
+
+type ConflictValues = {
+  cfTitle: {}
+  cfNone: {}
+  cfLoading: {}
+  cfRefused: {}
+  cfOpen: { resource: string; peer: string; opened: string }
+  cfOverdue: {}
+  cfRecord: { resource: string }
+  cfPolicy: { policy: string }
+  cfHead: {}
+  cfCandidate: { peer: string }
+  cfNoCandidate: {}
+  cfKeepHead: {}
+  cfTakeCandidate: {}
+  cfCorrected: {}
+  cfWriteCorrected: {}
+  cfNotJson: {}
+  cfResolved: {}
+  cfFailed: { reason: string }
+  cfBack: {}
+}
+
+// The Conflict Record review queue's strings (features/conflicts, #82).
+export const conflictMessages = defineMessages<ConflictValues>({
+  cfTitle: { id: 'app.conflicts.title', defaultMessage: 'Sync conflicts', description: 'Conflict review page heading and link' },
+  cfNone: { id: 'app.conflicts.none', defaultMessage: 'No conflicts are waiting for review.', description: 'Conflict review: empty queue' },
+  cfLoading: { id: 'app.conflicts.loading', defaultMessage: 'Loading the conflicts…', description: 'Conflict review: loading' },
+  cfRefused: { id: 'app.conflicts.refused', defaultMessage: 'You may not review sync conflicts.', description: 'Conflict review: no permission' },
+  cfOpen: { id: 'app.conflicts.open', defaultMessage: 'Review {resource} from {peer}, opened {opened}', description: 'Conflict review action: open a record' },
+  cfOverdue: { id: 'app.conflicts.overdue', defaultMessage: 'Overdue', description: 'Conflict review: open for more than 7 days' },
+  cfRecord: { id: 'app.conflicts.record', defaultMessage: 'Conflict: {resource}', description: 'Conflict review: the record heading' },
+  cfPolicy: { id: 'app.conflicts.policy', defaultMessage: 'Policy: {policy}', description: 'Conflict review: what the class policy says' },
+  cfHead: { id: 'app.conflicts.head', defaultMessage: 'Current version here', description: 'Conflict review: the head branch' },
+  cfCandidate: { id: 'app.conflicts.candidate', defaultMessage: 'Version from {peer}', description: 'Conflict review: the candidate branch' },
+  cfNoCandidate: { id: 'app.conflicts.noCandidate', defaultMessage: 'No version was sent for this record.', description: 'Conflict review: missing candidate' },
+  cfKeepHead: { id: 'app.conflicts.keepHead', defaultMessage: 'Keep the current version', description: 'Conflict review decision' },
+  cfTakeCandidate: { id: 'app.conflicts.takeCandidate', defaultMessage: 'Use the facility’s version', description: 'Conflict review decision' },
+  cfCorrected: { id: 'app.conflicts.corrected', defaultMessage: 'Corrected version (JSON)', description: 'Conflict review: the editable corrected version' },
+  cfWriteCorrected: { id: 'app.conflicts.writeCorrected', defaultMessage: 'Save the corrected version', description: 'Conflict review decision' },
+  cfNotJson: { id: 'app.conflicts.notJson', defaultMessage: 'The corrected version is not valid JSON.', description: 'Conflict review: bad corrected JSON' },
+  cfResolved: { id: 'app.conflicts.resolved', defaultMessage: 'Resolved. The decision syncs to the facility.', description: 'Conflict review: decision recorded' },
+  cfFailed: { id: 'app.conflicts.failed', defaultMessage: 'The decision was not recorded. {reason}', description: 'Conflict review: decision refused' },
+  cfBack: { id: 'app.conflicts.back', defaultMessage: 'Back to the queue', description: 'Conflict review action' },
+})

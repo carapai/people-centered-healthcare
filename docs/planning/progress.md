@@ -969,6 +969,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#82, part 5: the review screen (2026-11-10).** This completes #82.
+  - **What:** `/sync/conflicts` in the web client:
+    - the open Conflict Records, oldest first, overdue after 7 days;
+    - for one record, the current version beside the facility's (without `meta`), with the class's policy;
+    - three decisions: keep the current version, use the facility's version, or save a corrected version edited as JSON.
+  - **Tested:** the client's API (queue, refusal, record, comparison, decisions). The server side is tested in `health-sync-server`.
 - **#82, part 4: commuting transitions (2026-11-10).**
   - **What:** central merges a pushed Encounter that changes only its status (and period end) onto a head that kept the parent's status, when `EncounterStatus::may_become` allows the move (ADR 0020, case 2). The merge is written as central's own version and comes back down, and the group is accepted.
   - **Tested:** the edge completing a visit while central records its service gives no Conflict Record, a head with both, and that head on the edge. Two competing status moves open a Conflict Record.

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { accessMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, triageMessages, worklistMessages } from '../i18n/messages'
+import { accessMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, triageMessages, worklistMessages } from '../i18n/messages'
 import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
@@ -50,6 +50,9 @@ function Home() {
               </li>
               <li>
                 <Link to="/registry/reviews">{intl.formatMessage(messages.rrTitle)}</Link>
+              </li>
+              <li>
+                <Link to="/sync/conflicts">{intl.formatMessage(conflictMessages.cfTitle)}</Link>
               </li>
               <li>
                 <Link to="/break-glass/alerts">{intl.formatMessage(messages.bgAlertsTitle)}</Link>

@@ -270,7 +270,7 @@ stateDiagram-v2
     - the allowed-transition table (`EncounterStatus::may_become`) permits the move from the head's status.
 
     The head with the transition applied is written as central's own version, so it comes back down to the edge. The group is accepted and both edits are kept. Two status moves from the same version, or any other change, still open a Conflict Record. Task and workflow-instance transitions come with #100.
-  - **Not yet:** the review queue's screen in the web client.
+  - **The review screen (#82, part 5):** `/sync/conflicts` in the web client lists the open records and shows a record's current version beside the facility's. It offers three decisions: keep the current version, use the facility's version, or save a corrected version.
 
 ## Provisional states
 
