@@ -1166,3 +1166,91 @@ async fn central_checks_the_payments_and_postings_a_facility_sends() {
     assert!(tx.payment("pay-2").await.expect("read").is_none());
     assert!(tx.payment("pay-3").await.expect("read").is_none());
 }
+
+#[tokio::test]
+async fn activation_records_go_down_to_every_node_and_never_up() {
+    let (central, edge) = pair().await;
+    let record = |id: &str, scope: Value| {
+        json!({
+            "activation": {
+                "id": id, "package": "ug.moh.anc", "version": "1.0.0", "scope": scope,
+                "effectiveAt": "2026-11-09T09:00:00Z", "issuedAt": "2026-11-09T08:00:00Z",
+                "by": "ops"
+            },
+            "digest": "ab".repeat(32),
+            "signature": "header..sig"
+        })
+    };
+    let mut tx = central.store.begin().await.expect("begin");
+    for (id, scope) in [
+        ("act-1", json!({"level": "national"})),
+        // Another facility's: sent all the same; the node applies what its chain covers.
+        ("act-2", json!({"level": "facility", "facility": "GUL02"})),
+    ] {
+        let body = record(id, scope);
+        assert!(
+            tx.put_package_activation(id, "ug.moh.anc", "2026-11-09T08:00:00Z", &body.to_string())
+                .await
+                .expect("put")
+        );
+    }
+    // Kept once: a second put of the same record is a no-op.
+    assert!(
+        !tx.put_package_activation("act-1", "ug.moh.anc", "2026-11-09T08:00:00Z", "{}")
+            .await
+            .expect("again")
+    );
+    tx.commit().await.expect("commit");
+
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.pulled, 2, "{round:?}");
+    let mut tx = edge.store.begin().await.expect("begin");
+    let held = tx.package_activations().await.expect("held");
+    drop(tx);
+    assert_eq!(held.len(), 2);
+    let first: Value = serde_json::from_str(&held[0]).expect("json");
+    assert_eq!(first, record("act-1", json!({"level": "national"})));
+    // Received from central, so not queued back to it; a second round brings nothing.
+    assert_eq!(sync(&edge, &central).await, Round::default());
+
+    // An activation an edge makes is never pushed up.
+    let mut tx = edge.store.begin().await.expect("begin");
+    let forged = record("act-3", json!({"level": "national"}));
+    tx.put_package_activation(
+        "act-3",
+        "ug.moh.anc",
+        "2026-11-09T08:00:00Z",
+        &forged.to_string(),
+    )
+    .await
+    .expect("put");
+    tx.commit().await.expect("commit");
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(round.outcomes.as_slice(), [Outcome::Rejected { .. }]),
+        "{round:?}"
+    );
+    let mut tx = central.store.begin().await.expect("begin");
+    assert_eq!(tx.package_activations().await.expect("held").len(), 2);
+    drop(tx);
+
+    // A re-seed carries them, and seeding a node that holds them already changes nothing.
+    let (items, cursor) = central
+        .store
+        .snapshot(&scope(), central.id)
+        .await
+        .expect("snapshot");
+    let activations: Vec<_> = items
+        .iter()
+        .filter(|i| i.resource_type == "activation")
+        .collect();
+    assert_eq!(activations.len(), 2);
+    let fresh = node("2026-11-09T10:00:00Z").await;
+    fresh
+        .store
+        .seed(central.id, &items, &cursor)
+        .await
+        .expect("seed");
+    let mut tx = fresh.store.begin().await.expect("begin");
+    assert_eq!(tx.package_activations().await.expect("seeded").len(), 2);
+}

@@ -1154,6 +1154,11 @@ DEFINE TABLE outbox TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD op_id ON outbox TYPE string PERMISSIONS FULL
   DEFINE FIELD payload ON outbox TYPE string PERMISSIONS FULL
   DEFINE INDEX outbox_created_at ON outbox FIELDS created_at
+DEFINE TABLE package_activation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON package_activation TYPE string PERMISSIONS FULL
+  DEFINE FIELD issued_at ON package_activation TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD package ON package_activation TYPE string PERMISSIONS FULL
+  DEFINE INDEX package_activation_package ON package_activation FIELDS package, issued_at
 DEFINE TABLE package_lifecycle TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON package_lifecycle TYPE string PERMISSIONS FULL
   DEFINE FIELD package ON package_lifecycle TYPE string PERMISSIONS FULL

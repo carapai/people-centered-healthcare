@@ -110,18 +110,25 @@ pub const LEDGERS: &[&str] = &[
     finance::SHIFT,
 ];
 
+/// Package activation records on the change log (#89; ADR 0025): global records central issues,
+/// sent down to every node as operations in the packages lane, never up.
+pub(crate) const ACTIVATIONS: &str = "activation";
+
 impl SyncScope {
     /// Whether the peer may send up a version of `resource_type` with this body, or an
     /// operation on that ledger. A facility sends its own ledgers' operations; which store a
     /// movement names is not yet checked against the facility's Locations.
     pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
-        LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL)
+        resource_type != ACTIVATIONS
+            && (LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL))
     }
 
     /// Whether the peer is sent a version of `resource_type` with this body. Ledger operations
-    /// are never sent down: each ledger's authority is the facility that keeps it.
+    /// are never sent down: each ledger's authority is the facility that keeps it. Activation
+    /// records go to every node, which applies those its scope chain covers.
     pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
-        !LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL)
+        resource_type == ACTIVATIONS
+            || (!LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL))
     }
 
     fn admits(&self, resource_type: &str, body: &Value, global: &[&str]) -> bool {
@@ -626,6 +633,8 @@ impl SurrealStore {
                 )),
             ));
         }
+        let activations =
+            sql.push("SELECT VALUE data FROM package_activation ORDER BY issued_at, id");
         let epoch = sql.push("SELECT VALUE epoch FROM ONLY sync_state:node");
         let last = sql.push(crate::change_log::LAST_SEQ);
         let tx = self.begin().await?;
@@ -633,7 +642,36 @@ impl SurrealStore {
         drop(tx);
         let epoch: Option<String> = results.take(epoch).map_err(unavailable)?;
         let last: Option<i64> = results.take(last).map_err(unavailable)?;
+        let activations: Vec<String> = results.take(activations).map_err(unavailable)?;
+        // Activation records first, as in the packages lane: every node is sent them all.
         let mut items = Vec::new();
+        for data in activations {
+            let body: Value = serde_json::from_str(&data).map_err(|_| corrupt("activation"))?;
+            let id = body["activation"]["id"]
+                .as_str()
+                .ok_or_else(|| corrupt("activation id"))?
+                .to_owned();
+            let op_id = OpId::new();
+            items.push(Item {
+                kind: Kind::Op,
+                op_id,
+                tx_id: op_id,
+                resource_type: ACTIVATIONS.to_owned(),
+                resource_id: id,
+                parent_version_id: None,
+                origin_node: node,
+                device_id: None,
+                author: None,
+                hlc: Hlc::default(),
+                content_hash: ContentHash::of(&body),
+                packages: Vec::new(),
+                snapshot_version: 0,
+                provisional: false,
+                deleted: false,
+                blobs: Vec::new(),
+                body,
+            });
+        }
         for (resource_type, statement) in statements {
             let rows: Vec<HeadRow> = results.take(statement).map_err(unavailable)?;
             for row in rows {
@@ -712,7 +750,11 @@ impl SurrealStore {
                 origin: upstream.to_string(),
             });
             for item in &fresh {
-                tx.apply_version(item).await?;
+                if item.kind == Kind::Op {
+                    tx.receive_op(item).await?;
+                } else {
+                    tx.apply_version(item).await?;
+                }
             }
             tx.commit().await?;
             applied += fresh.len();
@@ -1659,6 +1701,13 @@ impl Replica for SurrealReplica<'_> {
     type Error = WriteError;
 
     async fn local(&self, item: &Item) -> Result<Local, WriteError> {
+        if item.kind == Kind::Op {
+            // An operation is appended once, by its own id; it has no head to keep.
+            return Ok(Local {
+                has_item: false,
+                unaccepted_candidate: None,
+            });
+        }
         let resource_type: ResourceType = item
             .resource_type
             .parse()
@@ -1735,11 +1784,7 @@ impl Replica for SurrealReplica<'_> {
                 ApplyDecision::Head | ApplyDecision::HeadKeepingCandidate(_) => {
                     tx.apply_version(item).await?;
                 }
-                ApplyDecision::Append => {
-                    return Err(WriteError::Store(StoreError::Unavailable(
-                        "ledger operations are not synced yet".into(),
-                    )));
-                }
+                ApplyDecision::Append => tx.receive_op(item).await?,
             }
         }
         let mut sql = Sql::default();
@@ -1767,5 +1812,26 @@ impl Replica for SurrealReplica<'_> {
             checkpoint,
         )
         .await
+    }
+}
+
+impl SurrealTx {
+    /// Appends an operation received from upstream: an activation record, kept once. Ledger
+    /// operations only go up, so no other comes down.
+    pub(crate) async fn receive_op(&mut self, item: &Item) -> Result<(), WriteError> {
+        if item.resource_type != ACTIVATIONS {
+            return Err(WriteError::Store(corrupt("a ledger operation came down")));
+        }
+        let activation = &item.body["activation"];
+        let (Some(id), Some(package), Some(issued_at)) = (
+            activation["id"].as_str(),
+            activation["package"].as_str(),
+            activation["issuedAt"].as_str(),
+        ) else {
+            return Err(WriteError::Store(corrupt("activation record")));
+        };
+        self.put_package_activation(id, package, issued_at, &item.body.to_string())
+            .await
+            .map(|_| ())
     }
 }

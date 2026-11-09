@@ -461,3 +461,80 @@ async fn unknown_packages_are_not_found() {
         Err(Error::NotFound(_))
     ));
 }
+
+#[tokio::test]
+async fn a_published_version_is_activated_in_a_scope_and_rolled_back_by_another() {
+    use health_configuration::activation::Scope;
+    let central = central().await;
+    let version = "1.0.0".parse().expect("version");
+    // Not yet published: nothing to activate.
+    assert!(matches!(
+        central
+            .publications
+            .activate("ug.moh.anc", &version, Scope::National, None, "ops", None)
+            .await,
+        Err(Error::NotFound(_))
+    ));
+    let files = package("ug.moh.anc", "1.0.0", "program", "1.0.0", items());
+    central
+        .publications
+        .draft(&files, "ann")
+        .await
+        .expect("draft");
+    to_approval(&central, "ug.moh.anc@1.0.0").await;
+    for approver in ["bob", "cara"] {
+        central
+            .publications
+            .approve("ug.moh.anc@1.0.0", approver)
+            .await
+            .expect("approve");
+    }
+    let published = central
+        .publications
+        .publish("ug.moh.anc@1.0.0", "ops", &central.signer)
+        .await
+        .expect("publish");
+
+    let pilot = Scope::Facility {
+        facility: "KLA01".into(),
+    };
+    let tomorrow = at("2026-11-05T06:00:00Z");
+    let record = central
+        .publications
+        .activate(
+            "ug.moh.anc",
+            &version,
+            pilot.clone(),
+            Some(tomorrow),
+            "ops",
+            Some("pilot"),
+        )
+        .await
+        .expect("activate");
+    assert_eq!(record.activation.scope, pilot);
+    assert_eq!(record.activation.effective_at, tomorrow);
+    assert_eq!(record.activation.issued_at, central.clock.now());
+    assert_eq!(
+        record.digest, published.digest,
+        "nodes fetch the published tarball"
+    );
+    assert_eq!(record.signature, published.signature);
+
+    // Rollback is a later activation; both stay.
+    central
+        .clock
+        .advance(health_time::SignedDuration::from_hours(1));
+    let rollback = central
+        .publications
+        .activate("ug.moh.anc", &version, pilot, None, "ops", Some("re-run"))
+        .await
+        .expect("again");
+    let all = central.publications.activations().await.expect("list");
+    assert_eq!(all, vec![record, rollback]);
+
+    // Both are held for the nodes below.
+    let mut tx = health_persistence::Store::begin(&central.store)
+        .await
+        .expect("begin");
+    assert_eq!(tx.package_activations().await.expect("held").len(), 2);
+}

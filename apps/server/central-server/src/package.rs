@@ -16,13 +16,21 @@
 //! - `package export <name@version> --out <dir>` writes a published package's
 //!   `<name>-<version>.tgz` and `.tgz.sig`.
 //!
+//! - `package activate <name@version> --scope <scope> --by <operator> [--effective <time>]
+//!   [--reason <why>]` activates a published version in `<scope>`: `national`,
+//!   `district:<code>`, `facility:<code>` or `program:<facility>:<program>`, from `<time>`
+//!   (RFC 3339; now by default). Rollback is the activation of an earlier version (#89).
+//! - `package activations` prints every activation issued, oldest first.
+//!
 //! Tarballs are kept in the blob store under `HEALTH_BLOB_DIR`.
 
 use std::io::Write as _;
 use std::path::Path;
 use std::sync::Arc;
 
+use health_configuration::activation::Scope;
 use health_configuration::lifecycle::{Lifecycle, Record, Step};
+use health_configuration::package::Version;
 use health_files::FsBlobStore;
 use health_packages::Schemas;
 use health_publication::{Files, LocalSigner, Publications, WorkflowSandbox};
@@ -30,7 +38,7 @@ use health_time::SystemClock;
 
 use crate::config::Config;
 
-const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir>), where <id> is name@version";
+const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir> | activate <id> --scope <scope> --by <operator> [--effective <time>] [--reason <why>] | activations), where <id> is name@version and <scope> is national, district:<code>, facility:<code> or program:<facility>:<program>";
 
 type Failure = Box<dyn std::error::Error>;
 
@@ -158,6 +166,30 @@ fn record_line(record: &Record) -> String {
     line
 }
 
+/// A scope as the operator writes it.
+fn scope(text: &str) -> Result<Scope, Failure> {
+    let parts: Vec<&str> = text.split(':').collect();
+    let named = |part: &str| (!part.trim().is_empty()).then(|| part.trim().to_owned());
+    let scope = match parts.as_slice() {
+        ["national"] => Some(Scope::National),
+        ["district", code] => named(code).map(|district| Scope::District { district }),
+        ["facility", code] => named(code).map(|facility| Scope::Facility { facility }),
+        ["program", facility, program] => named(facility)
+            .zip(named(program))
+            .map(|(facility, program)| Scope::Program { facility, program }),
+        _ => None,
+    };
+    scope.ok_or_else(|| format!("{text:?} is not a scope\n{USAGE}").into())
+}
+
+/// `name@version`, split.
+fn package_id(id: &str) -> Result<(&str, Version), Failure> {
+    let (name, version) = id
+        .rsplit_once('@')
+        .ok_or_else(|| format!("{id:?} is not name@version"))?;
+    Ok((name, version.parse().map_err(|e| format!("{id}: {e}"))?))
+}
+
 /// Runs `args` (after `package`).
 pub(crate) async fn run(config: &Config, args: &[String]) -> Result<(), Failure> {
     let open = || async { publications(crate::provision::open_surreal(config).await?) };
@@ -251,6 +283,56 @@ pub(crate) async fn run(config: &Config, args: &[String]) -> Result<(), Failure>
             std::fs::write(dir.join(format!("{name}.sig")), &published.signature)?;
             writeln!(out, "{name} and {name}.sig are in {}", dir.display())?;
         }
+        [cmd, id, rest @ ..] if cmd == "activate" => {
+            let found = flags(rest, &["--scope", "--by", "--effective", "--reason"])?;
+            let (name, version) = package_id(id)?;
+            let effective = found
+                .iter()
+                .find(|(flag, _)| *flag == "--effective")
+                .map(|(_, at)| at.parse().map_err(|e| format!("--effective {at}: {e}")))
+                .transpose()?;
+            let reason = found
+                .iter()
+                .find(|(flag, _)| *flag == "--reason")
+                .map(|(_, why)| *why);
+            let record = open()
+                .await?
+                .activate(
+                    name,
+                    &version,
+                    scope(flag(&found, "--scope")?)?,
+                    effective,
+                    flag(&found, "--by")?,
+                    reason,
+                )
+                .await
+                .map_err(said)?;
+            let a = &record.activation;
+            writeln!(
+                out,
+                "{}@{} activated for {} from {} ({}). Nodes receive it in the packages lane.",
+                a.package, a.version, a.scope, a.effective_at, a.id
+            )?;
+        }
+        [cmd] if cmd == "activations" => {
+            for record in open().await?.activations().await.map_err(said)? {
+                let a = &record.activation;
+                writeln!(
+                    out,
+                    "{}\t{}@{}\t{}\tfrom {}\tby {}{}",
+                    a.issued_at,
+                    a.package,
+                    a.version,
+                    a.scope,
+                    a.effective_at,
+                    a.by,
+                    a.reason
+                        .as_deref()
+                        .map(|why| format!("\t{why}"))
+                        .unwrap_or_default()
+                )?;
+            }
+        }
         _ => return Err(USAGE.into()),
     }
     Ok(())
@@ -272,6 +354,40 @@ mod tests {
         assert!(flag(&found, "--out").is_err());
         assert!(flags(&args, &["--by"]).is_err());
         assert!(flags(&args[..1], &["--by"]).is_err());
+    }
+
+    #[test]
+    fn scopes_and_ids_are_read_as_the_operator_writes_them() {
+        assert_eq!(scope("national").expect("national"), Scope::National);
+        assert_eq!(
+            scope("district:kampala").expect("district"),
+            Scope::District {
+                district: "kampala".into()
+            }
+        );
+        assert_eq!(
+            scope("facility:KLA01").expect("facility"),
+            Scope::Facility {
+                facility: "KLA01".into()
+            }
+        );
+        assert_eq!(
+            scope("program:KLA01:art").expect("program"),
+            Scope::Program {
+                facility: "KLA01".into(),
+                program: "art".into()
+            }
+        );
+        for bad in ["", "facility", "facility:", "program:KLA01", "regional:x"] {
+            assert!(scope(bad).is_err(), "{bad}");
+        }
+        let (name, version) = package_id("ug.moh.anc@1.2.0").expect("id");
+        assert_eq!(
+            (name, version.to_string().as_str()),
+            ("ug.moh.anc", "1.2.0")
+        );
+        assert!(package_id("ug.moh.anc").is_err());
+        assert!(package_id("ug.moh.anc@latest").is_err());
     }
 
     #[test]
