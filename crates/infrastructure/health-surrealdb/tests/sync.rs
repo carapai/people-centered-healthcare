@@ -1017,3 +1017,152 @@ async fn an_edge_receives_golden_records_only_for_patients_with_records_there() 
     assert!(patients.contains(&ours.to_string().as_str()));
     assert!(!patients.contains(&theirs.to_string().as_str()));
 }
+
+#[tokio::test]
+async fn central_checks_the_payments_and_postings_a_facility_sends() {
+    use health_financial_ledger::{
+        Currency, Dimensions, Line, Money, Posting, PostingStore as _, Side,
+    };
+    use health_payments::{Evidence, Method, Payment, PaymentStore as _, Purpose, Status};
+    use rust_decimal::Decimal;
+    let (central, kla) = pair().await;
+    let ugx = |n: i64| Money::new(Decimal::from(n), Currency::from_code("UGX").expect("UGX"));
+    let line = |account: &str, side: Side, amount: i64, facility: &str| Line {
+        account: account.into(),
+        side,
+        amount: ugx(amount).expect("money"),
+        dimensions: Dimensions {
+            facility: facility.into(),
+            ..Dimensions::default()
+        },
+        original: None,
+    };
+    let posting = |id: &str, lines: Vec<Line>, reverses: Option<&str>| Posting {
+        id: id.into(),
+        at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        description: id.into(),
+        lines,
+        reverses: reverses.map(Into::into),
+    };
+    let visit = |id: &str, facility: &str| {
+        posting(
+            id,
+            vec![
+                line("receivable/patient", Side::Debit, 5000, facility),
+                line("revenue/consultation", Side::Credit, 5000, facility),
+            ],
+            None,
+        )
+    };
+    let reversal = |id: &str, of: &str| {
+        posting(
+            id,
+            vec![
+                line("receivable/patient", Side::Credit, 5000, "KLA01"),
+                line("revenue/consultation", Side::Debit, 5000, "KLA01"),
+            ],
+            Some(of),
+        )
+    };
+    let payment = |id: &str, reference: &str, status: Status, evidence: Option<Evidence>| Payment {
+        id: id.into(),
+        method: Method::MtnMomo,
+        purpose: Purpose::Settlement,
+        amount: Decimal::from(5000),
+        payer: "Account/a-1".into(),
+        reference: Some(reference.into()),
+        shift: None,
+        status,
+        recorded_at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        expires_at: None,
+        evidence,
+        reason: None,
+        refunded: Decimal::ZERO,
+        receipt: None,
+    };
+    // Written straight to the facility's store, past its own rules, as a faulty or tampered node
+    // could; each in its own transaction, since a group is refused whole.
+    enum Op {
+        Post(Posting),
+        Pay(Payment),
+    }
+    let mut unbalanced = visit("unbalanced", "KLA01");
+    unbalanced.lines[1].amount = ugx(4000).expect("money");
+    let callback = Some(Evidence::Callback);
+    for op in [
+        Op::Post(visit("good", "KLA01")),
+        Op::Post(unbalanced),
+        Op::Post(visit("elsewhere", "GUL02")),
+        Op::Post(reversal("undo", "good")),
+        Op::Post(reversal("undo-again", "good")),
+        Op::Post(reversal("undo-nothing", "never-sent")),
+        Op::Pay(payment("pay-1", "mtn-1", Status::Pending, None)),
+        Op::Pay(payment("pay-2", "mtn-2", Status::Posted, None)),
+        Op::Pay(payment("pay-3", "mtn-1", Status::Posted, callback)),
+        // Confirmed later, then edited after posting.
+        Op::Pay(payment("pay-1", "mtn-1", Status::Posted, callback)),
+        Op::Pay(Payment {
+            amount: Decimal::from(9000),
+            ..payment("pay-1", "mtn-1", Status::Posted, callback)
+        }),
+    ] {
+        let mut tx = kla.store.begin().await.expect("begin");
+        match op {
+            Op::Post(posting) => tx.append_posting(&posting).await.expect("post"),
+            Op::Pay(payment) => tx.put_payment(&payment).await.expect("pay"),
+        }
+        tx.commit().await.expect("commit");
+    }
+    let sent = kla
+        .store
+        .outbox(&central.id.to_string(), kla.id, 50)
+        .await
+        .expect("outbox");
+    let authority = SurrealAuthority::new(&central.store, kla.id, scope());
+    let mut refusals = Vec::new();
+    for outgoing in &sent {
+        let result = receive(&authority, &outgoing.group).await.expect("receive");
+        if let Outcome::Rejected { detail, .. } = result.outcome {
+            refusals.push(detail);
+        }
+    }
+    let refused = |text: &str| refusals.iter().any(|r| r.contains(text));
+    assert!(refused("does not balance"), "{refusals:?}");
+    assert!(
+        refused("posting elsewhere has a line on facility GUL02"),
+        "{refusals:?}"
+    );
+    assert!(refused("posting good is already reversed"), "{refusals:?}");
+    assert!(
+        refused("posting never-sent is not held here"),
+        "{refusals:?}"
+    );
+    assert!(
+        refused("payment pay-2: a posted MtnMomo payment names its provider evidence"),
+        "{refusals:?}"
+    );
+    assert!(
+        refused("provider reference mtn-1 is payment pay-1's already"),
+        "{refusals:?}"
+    );
+    assert!(
+        refused("payment pay-1: a payment is reversed, never edited: its amount changed"),
+        "{refusals:?}"
+    );
+    assert_eq!(refusals.len(), 7, "{refusals:?}");
+
+    let mut tx = central.store.begin().await.expect("begin");
+    let postings: Vec<String> = tx
+        .postings()
+        .await
+        .expect("postings")
+        .into_iter()
+        .map(|p| p.id)
+        .collect();
+    assert_eq!(postings, vec!["good".to_owned(), "undo".to_owned()]);
+    let pay_1 = tx.payment("pay-1").await.expect("read").expect("held");
+    assert_eq!(pay_1.status, Status::Posted, "confirmed");
+    assert_eq!(pay_1.amount, Decimal::from(5000), "not edited");
+    assert!(tx.payment("pay-2").await.expect("read").is_none());
+    assert!(tx.payment("pay-3").await.expect("read").is_none());
+}

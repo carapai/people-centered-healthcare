@@ -114,6 +114,13 @@ pub enum PaymentRefused {
     /// A refund is no more than what was paid and not yet refunded.
     #[error("refunds total at most what was paid")]
     TooMuch,
+    /// A posted non-cash payment names the provider evidence that confirmed it.
+    #[error("a posted {0:?} payment names its provider evidence")]
+    NoEvidence(Method),
+    /// What a payment is (its method, amount, payer, reference, shift) never changes; a mistake
+    /// is reversed, not edited.
+    #[error("a payment is reversed, never edited: its {0} changed")]
+    Edited(&'static str),
 }
 
 /// A payment received.
@@ -328,6 +335,70 @@ impl Payment {
     /// Whether it is confirmed: only a posted payment is. A pending one never is (§68).
     pub fn is_confirmed(&self) -> bool {
         self.status == Status::Posted
+    }
+
+    /// Whether this copy of a payment may replace `held`, the copy already kept (`None` when
+    /// it is new), on its own evidence: central applies it to a payment a facility sends up
+    /// (#81). The payment is well formed (a positive amount, refunds within it, a reference when
+    /// it is non-cash, provider evidence when a non-cash one is posted, a statement line for a
+    /// customer-reported one). Against `held`, what the payment is stays the same, its status
+    /// only moves on (pending to final, posted to reversed), and refunds only grow.
+    pub fn may_follow(&self, held: Option<&Self>) -> Result<(), PaymentRefused> {
+        if self.amount <= Decimal::ZERO || self.refunded < Decimal::ZERO {
+            return Err(PaymentRefused::NonPositive);
+        }
+        if self.refunded > self.amount {
+            return Err(PaymentRefused::TooMuch);
+        }
+        if self.method.two_phase()
+            && self
+                .reference
+                .as_deref()
+                .is_none_or(|r| r.trim().is_empty())
+        {
+            return Err(PaymentRefused::NoReference);
+        }
+        if self.method.two_phase() && matches!(self.status, Status::Posted | Status::Reversed) {
+            match self.evidence {
+                None => return Err(PaymentRefused::NoEvidence(self.method)),
+                Some(evidence)
+                    if self.method == Method::CustomerReported
+                        && evidence != Evidence::Statement =>
+                {
+                    return Err(PaymentRefused::StatementRequired);
+                }
+                Some(_) => {}
+            }
+        }
+        let Some(held) = held else {
+            return Ok(());
+        };
+        let fixed: [(&'static str, bool); 6] = [
+            ("method", self.method == held.method),
+            ("purpose", self.purpose == held.purpose),
+            ("amount", self.amount == held.amount),
+            ("payer", self.payer == held.payer),
+            ("reference", self.reference == held.reference),
+            ("shift", self.shift == held.shift),
+        ];
+        if let Some((field, _)) = fixed.iter().find(|(_, same)| !same) {
+            return Err(PaymentRefused::Edited(field));
+        }
+        let moves_on = match held.status {
+            Status::Pending | Status::PendingUnverified => true,
+            Status::Posted => matches!(self.status, Status::Posted | Status::Reversed),
+            final_status => self.status == final_status,
+        };
+        if !moves_on {
+            return Err(PaymentRefused::WrongState {
+                status: held.status,
+                action: "move back",
+            });
+        }
+        if self.refunded < held.refunded {
+            return Err(PaymentRefused::Edited("refunded amount"));
+        }
+        Ok(())
     }
 
     /// What its receipt says.

@@ -472,3 +472,53 @@ fn foreign_payments_keep_their_original_amount_and_rate() {
     assert!(ledger.encounter_balances("Encounter/e4").is_empty());
     assert_eq!(ledger.postings()[1].lines[0].original, Some(original));
 }
+
+#[test]
+fn a_posting_checks_its_own_balance_without_the_chart() {
+    let visit = dims("Encounter/e1", "patient");
+    let ok = posting(
+        "p",
+        vec![
+            line("receivable/patient", Side::Debit, "5000", &visit),
+            line("anything/at/all", Side::Credit, "5000", &visit),
+        ],
+    );
+    assert_eq!(ok.balanced(), Ok(()), "the chart is not consulted");
+    assert!(matches!(
+        posting(
+            "p",
+            vec![
+                line("receivable/patient", Side::Debit, "5000", &visit),
+                line("revenue/consultation", Side::Credit, "4000", &visit),
+            ]
+        )
+        .balanced(),
+        Err(PostingRefused::Unbalanced { .. })
+    ));
+    assert_eq!(
+        posting("p", vec![]).balanced(),
+        Err(PostingRefused::TooFewLines)
+    );
+    assert_eq!(
+        posting(
+            "p",
+            vec![line("receivable/patient", Side::Debit, "5000", &visit)]
+        )
+        .balanced(),
+        Err(PostingRefused::TooFewLines)
+    );
+    assert_eq!(
+        posting(
+            "p",
+            vec![
+                line("receivable/patient", Side::Debit, "-5", &visit),
+                line("revenue/consultation", Side::Credit, "-5", &visit),
+            ]
+        )
+        .balanced(),
+        Err(PostingRefused::NonPositive)
+    );
+    let mut mixed = ok;
+    mixed.lines[1].amount = Money::new(d("5000"), usd()).expect("usd");
+    assert_eq!(mixed.balanced(), Err(PostingRefused::WrongCurrency(ugx())));
+}

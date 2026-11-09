@@ -1345,7 +1345,14 @@ impl SurrealAuthority<'_> {
             return Ok(refused(format!("{}: {why}", item.op_id)));
         }
         if finance::FINANCE.contains(&item.resource_type.as_str()) {
-            return match tx.replay_finance(&item.resource_type, &item.body).await {
+            let facility = match &self.scope {
+                SyncScope::Facility(facility) => Some(facility.as_str()),
+                _ => None,
+            };
+            return match tx
+                .replay_finance(&item.resource_type, &item.body, facility)
+                .await
+            {
                 Ok(()) => Ok(None),
                 Err(Ok(reason)) => Ok(refused(format!("{}: {reason}", item.op_id))),
                 Err(Err(error)) => Err(error),

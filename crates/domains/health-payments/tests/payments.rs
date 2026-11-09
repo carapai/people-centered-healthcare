@@ -227,3 +227,107 @@ fn a_provider_statement_confirms_pending_payments_and_queues_the_exceptions() {
         "posted by callback but not on the statement"
     );
 }
+
+#[test]
+fn a_payment_sent_up_moves_on_and_is_never_edited() {
+    let pending =
+        Payment::pending(&new(Method::MtnMomo, 20_000), "ref-1", at(0), at(600)).expect("pending");
+    assert_eq!(pending.may_follow(None), Ok(()));
+    let mut posted = pending.clone();
+    posted.confirm(Evidence::Callback).expect("confirmed");
+    assert_eq!(posted.may_follow(Some(&pending)), Ok(()));
+    // A replay of the same copy is fine.
+    assert_eq!(posted.may_follow(Some(&posted)), Ok(()));
+
+    // Posted back to pending, or voided after posting: refused.
+    assert!(matches!(
+        pending.may_follow(Some(&posted)),
+        Err(PaymentRefused::WrongState {
+            status: Status::Posted,
+            ..
+        })
+    ));
+    let mut voided = posted.clone();
+    voided.status = Status::Voided;
+    assert!(matches!(
+        voided.may_follow(Some(&posted)),
+        Err(PaymentRefused::WrongState { .. })
+    ));
+    let mut gone = pending.clone();
+    gone.void("failed").expect("voided");
+    assert!(matches!(
+        posted.may_follow(Some(&gone)),
+        Err(PaymentRefused::WrongState {
+            status: Status::Voided,
+            ..
+        })
+    ));
+    // Posted, then reversed: fine.
+    let mut reversed = posted.clone();
+    reversed.reverse("wrong account").expect("reversed");
+    assert_eq!(reversed.may_follow(Some(&posted)), Ok(()));
+
+    // What the payment is never changes.
+    let mut more = posted.clone();
+    more.amount = ugx(25_000);
+    assert_eq!(
+        more.may_follow(Some(&posted)),
+        Err(PaymentRefused::Edited("amount"))
+    );
+    let mut other = posted.clone();
+    other.reference = Some("ref-2".into());
+    assert_eq!(
+        other.may_follow(Some(&posted)),
+        Err(PaymentRefused::Edited("reference"))
+    );
+    let mut refunded = posted.clone();
+    refunded.refund(ugx(5_000), true).expect("refund");
+    assert_eq!(refunded.may_follow(Some(&posted)), Ok(()));
+    assert_eq!(
+        posted.may_follow(Some(&refunded)),
+        Err(PaymentRefused::Edited("refunded amount"))
+    );
+}
+
+#[test]
+fn a_payment_sent_up_carries_its_own_evidence() {
+    let pending =
+        Payment::pending(&new(Method::MtnMomo, 20_000), "ref-1", at(0), at(600)).expect("pending");
+    let mut unconfirmed = pending.clone();
+    unconfirmed.status = Status::Posted;
+    assert_eq!(
+        unconfirmed.may_follow(Some(&pending)),
+        Err(PaymentRefused::NoEvidence(Method::MtnMomo)),
+        "posted without provider evidence"
+    );
+    let mut no_reference = pending.clone();
+    no_reference.reference = None;
+    assert_eq!(
+        no_reference.may_follow(None),
+        Err(PaymentRefused::NoReference)
+    );
+    let reported = Payment::pending(
+        &new(Method::CustomerReported, 20_000),
+        "sms-1",
+        at(0),
+        at(600),
+    )
+    .expect("reported");
+    let mut by_callback = reported.clone();
+    by_callback.status = Status::Posted;
+    by_callback.evidence = Some(Evidence::Callback);
+    assert_eq!(
+        by_callback.may_follow(Some(&reported)),
+        Err(PaymentRefused::StatementRequired)
+    );
+    let mut too_much = pending.clone();
+    too_much.refunded = ugx(30_000);
+    assert_eq!(too_much.may_follow(None), Err(PaymentRefused::TooMuch));
+    let mut nothing = pending;
+    nothing.amount = ugx(0);
+    assert_eq!(nothing.may_follow(None), Err(PaymentRefused::NonPositive));
+    // Cash needs neither a reference nor evidence.
+    let mut till = shift();
+    let cash = Payment::cash(&new(Method::Cash, 1_000), &mut till, at(0)).expect("cash");
+    assert_eq!(cash.may_follow(None), Ok(()));
+}
