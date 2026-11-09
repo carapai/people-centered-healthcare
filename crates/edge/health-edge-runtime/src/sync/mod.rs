@@ -14,6 +14,9 @@
 //! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
 //! 6. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
+//! 7. **Activation.** With an [`Activator`](crate::activation::Activator), the node stages the
+//!    packages its activation records want, fetching each tarball from central by its sha-256,
+//!    and switches to the set, or keeps the previous one and reports why (#89).
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
 //! for the polling interval. While central cannot be reached, the interval doubles, up to 30
@@ -96,6 +99,8 @@ pub struct Round {
     pub transfers: (usize, usize),
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
+    /// The package switch, or failed activation, this round brought (#89).
+    pub activation: Option<crate::activation::Outcome>,
 }
 
 type Https = hyper_rustls::HttpsConnector<HttpConnector>;
@@ -109,6 +114,7 @@ pub struct Sync {
     client: Client<Https, Full<VecDeque<u8>>>,
     software: SoftwareVersion,
     blobs: Option<health_files::FsBlobStore>,
+    activator: Option<crate::activation::Activator>,
 }
 
 fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
@@ -153,7 +159,25 @@ impl Sync {
                 .parse()
                 .map_err(|_| "the package version is not major.minor.patch".to_owned())?,
             blobs: None,
+            activator: None,
         })
+    }
+
+    /// Stages and activates the packages the activation records want after each round (#89).
+    #[must_use]
+    pub fn with_activator(mut self, activator: crate::activation::Activator) -> Self {
+        self.activator = Some(activator);
+        self
+    }
+
+    /// A package tarball from central's blob store, by its sha-256.
+    async fn fetch_package(&self, digest: String) -> Result<Vec<u8>, String> {
+        let path = format!("/sync/v1/blobs/{digest}/content");
+        let (status, bytes) = self.send("GET", &path, Vec::new()).await?;
+        if status != 200 {
+            return Err(format!("{path}: central answered {status}"));
+        }
+        Ok(bytes)
     }
 
     /// Sends the attachments its records reference from `blobs`, and keeps those it fetches there
@@ -495,6 +519,17 @@ impl Sync {
                     break;
                 }
             }
+        }
+        if let Some(activator) = &self.activator {
+            round.activation = crate::activation::activate(
+                &self.store,
+                self.blobs.as_ref(),
+                activator,
+                Timestamp::now(),
+                |digest| self.fetch_package(digest),
+            )
+            .await?
+            .map(|report| report.outcome);
         }
         Ok(round)
     }

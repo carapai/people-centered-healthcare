@@ -212,6 +212,93 @@ impl SurrealTx {
         Ok(all(rows))
     }
 
+    /// Records package `id` (`name@version`) as staged on this node: verified, its tarball
+    /// (`digest`) in the blob store, `data` its `package.json`.
+    pub async fn put_staged_package(
+        &mut self,
+        id: &str,
+        digest: &str,
+        data: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('package_staged', $id) CONTENT { digest: $digest, \
+             staged_at: time::now(), data: $data } RETURN VALUE record::id(id)",
+            vec![
+                ("id", id.to_owned()),
+                ("digest", digest.to_owned()),
+                ("data", data.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The `package.json` of every package staged on this node, by id.
+    pub async fn staged_packages(&mut self) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM package_staged ORDER BY id",
+                vec![],
+            )
+            .await?;
+        Ok(all(rows))
+    }
+
+    /// The node's active set, as JSON, once it has switched to one.
+    pub async fn active_packages(&mut self) -> Result<Option<String>, StoreError> {
+        let rows = self
+            .rows("SELECT VALUE [data] FROM package_state:node", vec![])
+            .await?;
+        Ok(first(rows))
+    }
+
+    /// Switches the node's active set to `data`, in this transaction: whole, or not at all.
+    pub async fn set_active_packages(&mut self, data: &str) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT package_state:node CONTENT { data: $data, switched_at: time::now() } \
+             RETURN VALUE record::id(id)",
+            vec![("data", data.to_owned())],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Keeps a report of a switch, or of an activation that failed (`outcome`).
+    pub async fn append_activation_report(
+        &mut self,
+        id: &str,
+        at: &str,
+        outcome: &str,
+        data: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "CREATE type::record('package_activation_report', $id) CONTENT { \
+             at: <datetime>$at, outcome: $outcome, data: $data } RETURN VALUE record::id(id)",
+            vec![
+                ("id", id.to_owned()),
+                ("at", at.to_owned()),
+                ("outcome", outcome.to_owned()),
+                ("data", data.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The latest `limit` activation reports, newest first.
+    pub async fn activation_reports(&mut self, limit: usize) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                &format!(
+                    "SELECT VALUE [data] FROM package_activation_report \
+                     ORDER BY at DESC, id DESC LIMIT {limit}"
+                ),
+                vec![],
+            )
+            .await?;
+        Ok(all(rows))
+    }
+
     /// The JSON of every published version of `package`.
     pub async fn published_versions(&mut self, package: &str) -> Result<Vec<String>, StoreError> {
         let rows = self

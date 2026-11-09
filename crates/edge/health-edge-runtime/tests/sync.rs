@@ -379,3 +379,206 @@ async fn a_grant_made_offline_reaches_central_s_review_queue_due_from_arrival() 
     );
     assert_eq!(sync.round().await.expect("round").grants, 0, "sent once");
 }
+
+/// A package `ug.moh.anc@version` with one Questionnaire, depending on `dependencies`.
+fn anc_package(version: &str, dependencies: Value) -> health_packages::Files {
+    let file = |path: &str, json: Value| (path.to_owned(), json.to_string().into_bytes());
+    let depends_on: Vec<Value> = dependencies
+        .as_object()
+        .map(|deps| {
+            deps.keys()
+                .map(|_| json!({"type": "depends-on", "resource": "http://health.go.ug/fhir/ValueSet/core-codes|2.1.0"}))
+                .collect()
+        })
+        .unwrap_or_default();
+    health_packages::Files::from([
+        file(
+            "package.json",
+            json!({
+                "name": "ug.moh.anc", "version": version, "fhirVersions": ["5.0.0"],
+                "dependencies": dependencies,
+                "kind": "program", "platform": { "minSoftware": "0.1.0", "formatVersion": 1 }
+            }),
+        ),
+        file(
+            "Library-manifest.json",
+            json!({
+                "resourceType": "Library", "id": "manifest",
+                "url": "http://health.go.ug/fhir/Library/ug.moh.anc-manifest", "version": version,
+                "status": "active", "type": { "text": "asset-collection" },
+                "relatedArtifact": depends_on
+            }),
+        ),
+        file(
+            "Questionnaire-anc-visit.json",
+            json!({
+                "resourceType": "Questionnaire", "id": "anc-visit",
+                "url": "http://health.go.ug/fhir/Questionnaire/anc-visit", "version": version,
+                "status": "active",
+                "item": [{ "linkId": "bp", "text": "Blood pressure", "type": "string" }]
+            }),
+        ),
+    ])
+}
+
+#[tokio::test]
+async fn an_activated_package_is_fetched_verified_staged_and_switched_to() {
+    use health_configuration::activation::Chain;
+    use health_edge_runtime::activation::{Activator, Outcome, Report};
+    use health_packages::{LocalSigner, Schemas, publish};
+    use health_pki::Trust;
+
+    let central = central().await;
+    let edge = store("edge").await;
+    let dir = tempfile::tempdir().expect("edge files");
+    let files = health_files::FsBlobStore::open(dir.path()).expect("edge blob store");
+
+    // The national root and its publication signer.
+    let now = Timestamp::now();
+    let root = Authority::root("Uganda Health Root", now).expect("root");
+    let key = new_key().expect("key");
+    let issued = root
+        .issue_publication(
+            &request(&key, "MoH publication signing").expect("csr"),
+            "MoH publication signing",
+            now,
+        )
+        .expect("publication certificate");
+    let signer = LocalSigner::from_pem(&key.serialize_pem(), issued.pem()).expect("signer");
+    let schemas = Schemas::platform();
+
+    // Central publishes two versions: 1.1.0 depends on a core package no one activated.
+    let mut records = Vec::new();
+    for (version, dependencies) in [
+        ("1.0.0", json!({})),
+        ("1.1.0", json!({ "ug.moh.core": "2.1.0" })),
+    ] {
+        let published =
+            publish(&anc_package(version, dependencies), &schemas, &signer, now).expect("publish");
+        central
+            .files
+            .put(published.tgz.as_slice())
+            .expect("central blob");
+        records.push((version, published.digest.to_string(), published.signature));
+    }
+    let activate = |id: &str, version: &str, at: &str| {
+        let (_, digest, signature) = records
+            .iter()
+            .find(|(v, ..)| *v == version)
+            .expect("published")
+            .clone();
+        json!({
+            "activation": {
+                "id": id, "package": "ug.moh.anc", "version": version,
+                "scope": {"level": "facility", "facility": FACILITY},
+                "effectiveAt": at, "issuedAt": at, "by": "ops"
+            },
+            "digest": digest,
+            "signature": signature
+        })
+    };
+    let issue = |body: Value| {
+        let store = central.store.clone();
+        async move {
+            let mut tx = store.begin().await.expect("begin");
+            tx.put_package_activation(
+                body["activation"]["id"].as_str().expect("id"),
+                "ug.moh.anc",
+                body["activation"]["issuedAt"].as_str().expect("issued"),
+                &body.to_string(),
+            )
+            .await
+            .expect("activation");
+            tx.commit().await.expect("commit");
+        }
+    };
+    issue(activate("act-1", "1.0.0", "2026-01-01T00:00:00Z")).await;
+
+    let activator = Activator::new(
+        Trust::new(&root.certificate_pem()).expect("trust"),
+        Chain {
+            facility: Some(FACILITY.into()),
+            ..Chain::default()
+        },
+    )
+    .expect("activator");
+    let sync = central
+        .sync(&edge, &central.origin)
+        .with_blobs(files.clone())
+        .with_activator(activator);
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.activation, Some(Outcome::Activated), "{round:?}");
+    let mut tx = edge.begin().await.expect("begin");
+    let active: Value =
+        serde_json::from_str(&tx.active_packages().await.expect("read").expect("active"))
+            .expect("json");
+    assert_eq!(active, json!({ "ug.moh.anc": "1.0.0" }));
+    assert_eq!(tx.staged_packages().await.expect("staged").len(), 1);
+    drop(tx);
+    assert!(
+        files.contains(&records[0].1.parse().expect("hash")),
+        "the tarball is retained"
+    );
+    assert_eq!(
+        sync.round().await.expect("round").activation,
+        None,
+        "unchanged"
+    );
+
+    // 1.1.0 needs a core package no one activated: the edge keeps 1.0.0 and reports why.
+    issue(activate("act-2", "1.1.0", "2026-01-02T00:00:00Z")).await;
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.activation, Some(Outcome::Failed));
+    let mut tx = edge.begin().await.expect("begin");
+    let active: Value =
+        serde_json::from_str(&tx.active_packages().await.expect("read").expect("active"))
+            .expect("json");
+    assert_eq!(
+        active,
+        json!({ "ug.moh.anc": "1.0.0" }),
+        "the previous set stays"
+    );
+    let report: Report =
+        serde_json::from_str(&tx.activation_reports(1).await.expect("reports")[0]).expect("report");
+    assert_eq!(report.outcome, Outcome::Failed);
+    assert_eq!(
+        report.problems,
+        vec!["ug.moh.anc needs ug.moh.core@2.1.0, which is not active".to_owned()]
+    );
+    drop(tx);
+
+    // A record whose signature is not the package's never stages: a node seeing it for the
+    // first time keeps nothing active and reports the signature.
+    let mut forged = activate("act-3", "1.0.0", "2026-01-03T00:00:00Z");
+    forged["signature"] = json!(records[1].2.clone());
+    issue(forged).await;
+    let fresh = store("fresh").await;
+    let fresh_dir = tempfile::tempdir().expect("fresh files");
+    let fresh_sync = central
+        .sync(&fresh, &central.origin)
+        .with_blobs(health_files::FsBlobStore::open(fresh_dir.path()).expect("blobs"))
+        .with_activator(
+            Activator::new(
+                Trust::new(&root.certificate_pem()).expect("trust"),
+                Chain {
+                    facility: Some(FACILITY.into()),
+                    ..Chain::default()
+                },
+            )
+            .expect("activator"),
+        );
+    let round = fresh_sync.round().await.expect("round");
+    assert_eq!(round.activation, Some(Outcome::Failed));
+    let mut tx = fresh.begin().await.expect("begin");
+    assert_eq!(tx.active_packages().await.expect("read"), None);
+    assert!(tx.staged_packages().await.expect("staged").is_empty());
+    let report: Report =
+        serde_json::from_str(&tx.activation_reports(1).await.expect("reports")[0]).expect("report");
+    assert!(
+        report
+            .problems
+            .iter()
+            .any(|p| p.starts_with("ug.moh.anc@1.0.0: ")),
+        "{report:?}"
+    );
+}

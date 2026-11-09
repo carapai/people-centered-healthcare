@@ -22,7 +22,8 @@
 //!   (RFC 3339; now by default). Rollback is the activation of an earlier version (#89).
 //! - `package activations` prints every activation issued, oldest first.
 //!
-//! Tarballs are kept in the blob store under `HEALTH_BLOB_DIR`.
+//! Tarballs are kept in central's blob store, `HEALTH_FILES_DIR`, from which nodes fetch the
+//! packages activated for them (`HEALTH_BLOB_DIR` is read when it is not set).
 
 use std::io::Write as _;
 use std::path::Path;
@@ -95,8 +96,10 @@ fn read_dir(dir: &Path) -> Result<Files, Failure> {
 }
 
 fn publications(store: health_surrealdb::SurrealStore) -> Result<Publications, Failure> {
-    let dir = std::env::var("HEALTH_BLOB_DIR")
-        .map_err(|_| "package commands need HEALTH_BLOB_DIR, where the tarballs are kept")?;
+    // The store sync serves, so nodes can fetch what is activated for them.
+    let dir = std::env::var("HEALTH_FILES_DIR")
+        .or_else(|_| std::env::var("HEALTH_BLOB_DIR"))
+        .map_err(|_| "package commands need HEALTH_FILES_DIR, central's blob store")?;
     let blobs = FsBlobStore::open(&dir).map_err(|e| format!("cannot open {dir}: {e}"))?;
     Ok(Publications::new(
         store,

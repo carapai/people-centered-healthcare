@@ -349,6 +349,21 @@ pub async fn run(
                             sync
                         }
                     };
+                    // Package activation (#89), against the national root installed at
+                    // provisioning, for this node's place in the scope chain.
+                    let chain = health_configuration::activation::Chain {
+                        district: config.district.clone(),
+                        facility: config.facility.clone(),
+                        programs: config.programs.clone(),
+                    };
+                    let sync = match crate::activation::Activator::from_pki(&config.pki_dir, chain)
+                    {
+                        Ok(activator) => sync.with_activator(activator),
+                        Err(error) => {
+                            tracing::warn!(%error, "packages are not activated on this node");
+                            sync
+                        }
+                    };
                     let every = config.sync_interval;
                     supervisor.spawn("sync", move || sync.clone().run(every));
                 }

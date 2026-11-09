@@ -111,7 +111,11 @@ sequenceDiagram
     - Dependencies must be active at exactly their pinned versions.
   - **At central:** `central-server package activate <name@version> --scope … --by …` issues the record (`Publications::activate`). `package activations` lists them.
   - **To nodes:** each record is kept in `package_activation` (migration `0049_package_activation`) and goes down as an operation in the packages lane, to every node, in pulls and re-seeds alike. A node never sends one up.
-  - **Not yet:** staging, the switch and reindex on a node, and loading the active set into what it serves.
+  - **On an edge** (`health-edge-runtime::activation`), after each sync round, the node works out the set its records want along its chain (`HEALTH_DISTRICT`, `HEALTH_FACILITY`, `HEALTH_PROGRAMS`).
+    - It fetches each missing tarball from central's blob store by sha-256 and verifies it against the national root. It keeps the tarball (retention) and records the package as staged (migration `0050_package_staging`).
+    - It then switches in one transaction or keeps the previous set. Each attempt is reported, and a failure raises `package-activation-failed`.
+    - Central keeps tarballs in `HEALTH_FILES_DIR`, the store sync serves.
+  - **Not yet:** reporting failures to central, the reindex when a SearchParameter changes, desktops, and loading the active set into what the node serves.
 
 ## Rollback
 

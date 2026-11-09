@@ -21,6 +21,7 @@
 //! TLS with a leaf it issues itself under its facility intermediate (`tls`, #74); before
 //! provisioning it serves plain HTTP on the loopback address only.
 
+pub mod activation;
 pub mod admin;
 mod auth;
 pub mod backup;

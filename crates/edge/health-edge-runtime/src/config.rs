@@ -94,6 +94,11 @@ pub struct EdgeConfig {
     pub certificate_interval: Duration,
     /// `HEALTH_FACILITY`: the facility this edge serves; sign-in needs a snapshot for it.
     pub facility: Option<String>,
+    /// `HEALTH_DISTRICT`: the facility's district, whose package activations apply here (#89).
+    pub district: Option<String>,
+    /// `HEALTH_PROGRAMS`: the programs the facility runs, comma-separated, whose package
+    /// activations apply here (#89).
+    pub programs: std::collections::BTreeSet<String>,
     /// `HEALTH_SNAPSHOT_KEYS_FILE`: central's snapshot public keys, a JSON array of JWKs
     /// (`central-server provision snapshot-keys`). With `HEALTH_FACILITY`, the node serves sign-in.
     pub snapshot_keys_file: Option<PathBuf>,
@@ -196,6 +201,16 @@ impl EdgeConfig {
             dns_name: get("HEALTH_DNS_NAME").map(|n| n.trim().to_ascii_lowercase()),
             certificate_interval: positive("HEALTH_CERTIFICATE_SECS", 3600)?,
             facility: get("HEALTH_FACILITY").map(|f| f.trim().to_owned()),
+            district: get("HEALTH_DISTRICT")
+                .map(|d| d.trim().to_owned())
+                .filter(|d| !d.is_empty()),
+            programs: get("HEALTH_PROGRAMS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+                .map(str::to_owned)
+                .collect(),
             snapshot_keys_file: get("HEALTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
             mdns: match get("HEALTH_MDNS").as_deref().map(str::trim) {
                 None | Some("on") => true,
@@ -262,6 +277,24 @@ mod tests {
         assert_eq!(c.encryption_interval, Duration::from_secs(3600));
         assert_eq!(c.pki_dir, PathBuf::from("/var/lib/pki"));
         assert_eq!(c.origins, vec!["https://facility-edge.local".to_owned()]);
+    }
+
+    #[test]
+    fn the_scope_chain_is_read_from_district_facility_and_programs() {
+        let c = config(&[
+            ("HEALTH_DATA_DIR", "/d"),
+            ("HEALTH_FACILITY", "KLA01"),
+            ("HEALTH_DISTRICT", " kampala "),
+            ("HEALTH_PROGRAMS", "art, tb,,"),
+        ])
+        .expect("config");
+        assert_eq!(c.district.as_deref(), Some("kampala"));
+        assert_eq!(
+            c.programs.iter().map(String::as_str).collect::<Vec<_>>(),
+            ["art", "tb"]
+        );
+        let none = config(&[("HEALTH_DATA_DIR", "/d")]).expect("config");
+        assert_eq!((none.district, none.programs.len()), (None, 0));
     }
 
     #[test]
