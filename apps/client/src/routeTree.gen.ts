@@ -36,6 +36,7 @@ import { Route as StockIndexRouteImport } from './routes/stock.index'
 import { Route as StockProductsRouteImport } from './routes/stock.products'
 import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
+import { Route as SyncConflictsRouteImport } from './routes/sync.conflicts'
 import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
@@ -175,6 +176,11 @@ const StockRequisitionsRoute = StockRequisitionsRouteImport.update({
   path: '/stock/requisitions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SyncConflictsRoute = SyncConflictsRouteImport.update({
+  id: '/sync/conflicts',
+  path: '/sync/conflicts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TillIndexRoute = TillIndexRouteImport.update({
   id: '/till/',
   path: '/till/',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/reception/': typeof ReceptionIndexRoute
@@ -248,6 +255,7 @@ export interface FileRoutesByTo {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal': typeof PortalIndexRoute
   '/reception': typeof ReceptionIndexRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/reception/': typeof ReceptionIndexRoute
@@ -315,6 +324,7 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
     | '/reception/'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/sync/conflicts'
     | '/till/supervise'
     | '/portal'
     | '/reception'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
     | '/reception/'
@@ -412,6 +424,7 @@ export interface RootRouteChildren {
   StockProductsRoute: typeof StockProductsRoute
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
+  SyncConflictsRoute: typeof SyncConflictsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
   PortalIndexRoute: typeof PortalIndexRoute
   ReceptionIndexRoute: typeof ReceptionIndexRoute
@@ -611,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StockRequisitionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sync/conflicts': {
+      id: '/sync/conflicts'
+      path: '/sync/conflicts'
+      fullPath: '/sync/conflicts'
+      preLoaderRoute: typeof SyncConflictsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/till/': {
       id: '/till/'
       path: '/till'
@@ -660,6 +680,7 @@ const rootRouteChildren: RootRouteChildren = {
   StockProductsRoute: StockProductsRoute,
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
+  SyncConflictsRoute: SyncConflictsRoute,
   TillSuperviseRoute: TillSuperviseRoute,
   PortalIndexRoute: PortalIndexRoute,
   ReceptionIndexRoute: ReceptionIndexRoute,
