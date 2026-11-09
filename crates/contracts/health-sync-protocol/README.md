@@ -20,4 +20,5 @@ Layer: **contracts**. The `sync/v1` protocol (synchronization.md; ADRs 0019, 002
   - **`decide`** never applies an item twice, and never overwrites an unaccepted local candidate: the pulled version becomes the head and the candidate is kept.
   - **`apply_pull`** works over the **`Replica`** port and applies one group per transaction, each with its checkpoint.
 - **`ItemState`:** pending, sending, accepted, conflict, rejected, held, and the transitions between them.
-- **`to_ndjson` / `from_ndjson`:** request and response bodies. zstd compression belongs to the transport.
+- **`to_ndjson` / `from_ndjson`:** request and response bodies.
+- **`compress` / `decompress`:** the bodies' zstd encoding on the wire, refusing a body that expands past `MAX_DECODED` (64 MiB).

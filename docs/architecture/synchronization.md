@@ -98,10 +98,7 @@ Every item on the wire, in either direction:
     - **Up:** the global types a facility creates (`UP_GLOBAL`): provisional Patients, Consents, AuditEvents, Provenance, its Locations and Devices, and requests.
     - **Down:** the global replicas (`DOWN_GLOBAL`): registries and golden records, definitions and terminology, price masters, coverage and consent.
     - **Never:** another facility's records, and central's own audit.
-  - **Not yet:**
-    - golden-record narrowing of Patients;
-    - HLC and package fields from the writer;
-    - the edge's sync task (below).
+  - **Not yet:** HLC and package fields from the writer.
 - **In code (#81, edge).** The `sync` task in `health-edge-runtime` ([README](../../crates/edge/health-edge-runtime/README.md)) runs the session above against central.
   - **Wake-up:** central's hints, with polling every `HEALTH_SYNC_INTERVAL_SECS` and backoff while offline.
   - **Backlog:** adding an upstream queues the whole existing log for it, so writes from before the first contact are never left behind.
@@ -112,7 +109,10 @@ Every item on the wire, in either direction:
     - A quarantined node's pushes are held in `sync_quarantine` and answered `quarantined`, and it is sent nothing.
     - A refused node gets 403.
   - **Central's node id** is kept in its store (`sync_state:node.node`), and `Welcome` carries it to the peer.
-  - **Not yet:** zstd bodies.
+  - **zstd (#81):** a node sends its JSON and NDJSON bodies with `Content-Encoding: zstd` and asks for compressed answers with `Accept-Encoding: zstd` (`health_sync_protocol::compress`, `decompress`).
+    - The signature covers a body's content, not its encoding, so central decompresses before it checks the signature.
+    - A body is at most 8 MiB on the wire and 64 MiB once expanded; a larger one is refused before it is held. Another encoding is refused with 415.
+    - The event stream and attachment bytes are sent as they are. A peer that does not ask for zstd is answered uncompressed.
 
 ## Session
 

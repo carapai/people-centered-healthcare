@@ -39,7 +39,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
   - **The web client:** `runtime.json`'s `auth` names the issuer, `health-edge` and `/callback`.
   - **Without its settings or keys,** the node logs `sign-in-off`.
 - **`sync`:** sync with central (#81, [synchronization.md](../../../docs/architecture/synchronization.md); ADR 0062), once `node.json` names central.
-  - **A round:** a handshake, then the outbox pushed in batches of whole transactions, then pulls until caught up. Every request is signed with the facility intermediate's key, over HTTPS verified against central's CA.
+  - **A round:** a handshake, then the outbox pushed in batches of whole transactions, then pulls until caught up. Every request is signed with the facility intermediate's key, over HTTPS verified against central's CA. Its JSON body goes zstd-compressed, signed over the content, and answers come back compressed.
   - **Backlog:** when central first becomes the upstream, everything already on the log is queued for it.
   - **Wake-up:** central's `cursor` hint on `/sync/v1/events`, or the poll every `HEALTH_SYNC_INTERVAL_SECS`, doubled with jitter up to 30 min while central is unreachable (`sync-failing`).
   - **A quarantined node** still pushes, and central holds its pushes for review (`sync-quarantined`). It pulls nothing.

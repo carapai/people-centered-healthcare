@@ -31,7 +31,7 @@ use health_provisioning::{SYNC_SCHEME, sync_jws};
 use health_surrealdb::{Outgoing, SurrealReplica, SurrealStore};
 use health_sync_protocol::{
     BlobStatus, GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SoftwareVersion,
-    Verdict, Welcome, apply_pull, batches, from_ndjson, to_ndjson,
+    Verdict, Welcome, ZSTD, apply_pull, batches, compress, decompress, from_ndjson, to_ndjson,
 };
 use health_time::Timestamp;
 use http_body_util::{BodyExt as _, BodyStream, Full};
@@ -177,12 +177,22 @@ impl Sync {
             .map_err(|_| format!("{path}: central did not answer in time"))?
             .map_err(|e| format!("{path}: cannot reach central: {e}"))?;
         let status = response.status().as_u16();
+        let compressed = response
+            .headers()
+            .get("content-encoding")
+            .is_some_and(|v| v.as_bytes() == ZSTD.as_bytes());
         let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
             .await
             .map_err(|_| format!("{path}: central did not answer in time"))?
             .map_err(|e| format!("{path}: {e}"))?
             .to_bytes()
             .to_vec();
+        if compressed {
+            return Ok((
+                status,
+                decompress(&bytes).map_err(|e| format!("{path}: {e}"))?,
+            ));
+        }
         Ok((status, bytes))
     }
 
@@ -340,10 +350,11 @@ impl Sync {
             &self.key,
             Timestamp::now(),
         );
-        hyper::Request::builder()
+        let mut request = hyper::Request::builder()
             .method(method)
             .uri(format!("{}{path}", self.upstream.origin))
             .header("authorization", format!("{SYNC_SCHEME} {token}"))
+            .header("accept-encoding", ZSTD)
             .header(
                 "content-type",
                 if path.ends_with("/push") {
@@ -351,25 +362,23 @@ impl Sync {
                 } else {
                     "application/json"
                 },
-            )
+            );
+        // JSON and NDJSON go compressed, signed over their content; attachment chunks as they are.
+        let body = if method == "POST" && !body.is_empty() {
+            request = request.header("content-encoding", ZSTD);
+            compress(&body)
+        } else {
+            body
+        };
+        request
             .body(Full::new(VecDeque::from(body)))
             .map_err(|e| format!("{path}: {e}"))
     }
 
     /// POSTs `body` to `path`; the answer's body, or why there is none.
     async fn post(&self, path: &str, body: Vec<u8>) -> Result<Vec<u8>, String> {
-        let request = self.request("POST", path, body)?;
-        let response = tokio::time::timeout(TIMEOUT, self.client.request(request))
-            .await
-            .map_err(|_| format!("{path}: central did not answer in time"))?
-            .map_err(|e| format!("{path}: cannot reach central: {e}"))?;
-        let status = response.status();
-        let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
-            .await
-            .map_err(|_| format!("{path}: central did not answer in time"))?
-            .map_err(|e| format!("{path}: {e}"))?
-            .to_bytes()
-            .to_vec();
+        let (status, bytes) = self.send("POST", path, body).await?;
+        let status = hyper::StatusCode::from_u16(status).map_err(|e| format!("{path}: {e}"))?;
         if status.is_success() {
             Ok(bytes)
         } else {

@@ -21,6 +21,7 @@ health-files = { workspace = true }
 health-http = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }
+http-body-util = { workspace = true }
 futures-util = { workspace = true }
 health-identifiers = { workspace = true }
 health-inventory = { workspace = true }
@@ -35,7 +36,6 @@ tracing = { workspace = true }
 tempfile = { workspace = true }
 health-identity = { workspace = true }
 health-pki = { workspace = true }
-http-body-util = { workspace = true }
 p256 = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tower = { workspace = true }

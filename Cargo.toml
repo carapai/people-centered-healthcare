@@ -228,6 +228,8 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["std", "registry", "env-filter"] }
 unicode-normalization = "0.1.26"
 windows-service = "0.8.0"
+# Sync bodies on the wire (synchronization.md: zstd-compressed NDJSON); already built for surrealkv.
+zstd = { version = "0.13.4", default-features = false }
 # Reads the PKI's own certificates back: path length, names and validity (health-pki).
 x509-parser = "0.18.1"
 uuid = { version = "1.29.0", features = ["serde", "v5", "v7"] }

@@ -14,8 +14,8 @@ use health_pki::{Authority, IssuingCa, KeyPair, new_key, request};
 use health_provisioning::{NodeRegistry, SYNC_SCHEME, sync_jws};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_sync_protocol::{
-    Compatibility, GroupResult, Hello, Lane, Outcome, PROTOCOL, PullRequest, PullResponse, Reason,
-    Verdict, Welcome, from_ndjson, to_ndjson,
+    Compatibility, GroupResult, Hello, Lane, MAX_DECODED, Outcome, PROTOCOL, PullRequest,
+    PullResponse, Reason, Verdict, Welcome, ZSTD, compress, decompress, from_ndjson, to_ndjson,
 };
 use health_sync_server::SyncServer;
 use health_time::{Clock as _, FixedClock, SignedDuration, Timestamp};
@@ -407,4 +407,88 @@ async fn an_interrupted_attachment_upload_resumes_where_it_stopped() {
     assert_eq!(body.as_ref(), content.as_slice());
     let (_, body) = s.send("GET", &base, Vec::new()).await;
     assert!(status(&body).complete(), "deduplicated");
+}
+
+#[tokio::test]
+async fn bodies_go_zstd_compressed_and_the_signature_covers_their_content() {
+    let s = setup().await;
+    let central = s.hello("1.3.2").await.node;
+    // Signed over the content, sent compressed, answered compressed.
+    let send = |path: &'static str, content: Vec<u8>, wire: Vec<u8>, encoding: &'static str| {
+        let token = sync_jws(
+            &s.node.to_string(),
+            "POST",
+            path,
+            &content,
+            &s.key,
+            s.clock.now(),
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri(path)
+            .header("authorization", format!("{SYNC_SCHEME} {token}"))
+            .header("content-encoding", encoding)
+            .header("accept-encoding", "gzip, zstd")
+            .body(Body::from(wire))
+            .expect("request");
+        let app = s.app.clone();
+        async move {
+            let response = app.oneshot(request).await.expect("response");
+            let status = response.status();
+            let encoding = response
+                .headers()
+                .get("content-encoding")
+                .map(|v| v.to_str().expect("ascii").to_owned());
+            let body = response
+                .into_body()
+                .collect()
+                .await
+                .expect("body")
+                .to_bytes();
+            (status, encoding, body)
+        }
+    };
+    let ours = s.observation_from_edge(FACILITY, central).await;
+    let (status, encoding, body) = send("/sync/v1/push", ours.clone(), compress(&ours), ZSTD).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(encoding.as_deref(), Some(ZSTD));
+    let results: Vec<GroupResult> =
+        from_ndjson(&decompress(&body).expect("zstd")).expect("results");
+    assert_eq!(results[0].outcome, Outcome::Accepted);
+
+    let pull = serde_json::to_vec(&PullRequest {
+        cursor: None,
+        lane: Lane::Clinical,
+        limit: 100,
+    })
+    .expect("json");
+    let (status, encoding, body) = send("/sync/v1/pull", pull.clone(), compress(&pull), ZSTD).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(encoding.as_deref(), Some(ZSTD));
+    let _: PullResponse = serde_json::from_slice(&decompress(&body).expect("zstd")).expect("pull");
+
+    // Not zstd, a bomb, or another encoding: refused before anything is read.
+    let (status, ..) = send("/sync/v1/pull", pull.clone(), b"garbage".to_vec(), ZSTD).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let bomb = vec![b' '; MAX_DECODED + 1];
+    let (status, ..) = send("/sync/v1/pull", bomb.clone(), compress(&bomb), ZSTD).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    let (status, ..) = send("/sync/v1/pull", pull.clone(), pull, "gzip").await;
+    assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    // A peer that does not ask for zstd is answered as before.
+    let (status, body) = s
+        .send(
+            "POST",
+            "/sync/v1/pull",
+            serde_json::to_vec(&PullRequest {
+                cursor: None,
+                lane: Lane::Clinical,
+                limit: 100,
+            })
+            .expect("json"),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let _: PullResponse = serde_json::from_slice(&body).expect("plain pull");
 }

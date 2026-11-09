@@ -969,6 +969,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#81: zstd bodies (2026-11-09).**
+  - **What:** the edge sends its sync bodies zstd-compressed and asks for compressed answers. Central decompresses before checking the signature, which covers the content. It caps a body at 8 MiB on the wire and 64 MiB expanded, and answers uncompressed to a peer that does not ask for zstd. The event stream and attachments are not compressed.
+  - **Tested:**
+    - a compressed push and pull are answered compressed;
+    - garbage gets 400, a zstd bomb gets 413, and gzip gets 415;
+    - a plain peer is answered as before;
+    - the edge's round trips run compressed.
+  - **#81 is complete:** the store, transport, lanes, ledger operations, ledger claims, golden-record narrowing, central's finance checks and zstd.
 - **#81: central checks payments and postings (2026-11-09).**
   - **What:** central refuses a posting that does not balance, has a line on another facility, or reverses a posting it does not hold or that is already reversed. It refuses a payment that is posted without provider evidence, edited after being recorded, moved backwards in its lifecycle, or carrying another payment's provider reference.
   - **Tested:** seven bad records written straight to an edge's store are each refused, and central keeps only the good ones.
