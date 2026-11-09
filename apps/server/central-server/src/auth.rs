@@ -280,6 +280,7 @@ pub(crate) fn routes(
             registry.clone(),
             settings.files.clone(),
             events.clone(),
+            settings.definitions.as_ref(),
         )?);
         alert_hourly(registry.clone());
         let mut routes = Router::new();
@@ -405,6 +406,61 @@ pub(crate) fn routes(
     Ok(router.nest("/api", api))
 }
 
+/// Re-derives each completed response a group carries (ADR 0022; questionnaire-extraction.md
+/// § Re-derivation at authority): a mapping central does not hold rejects the group
+/// `metadata_incompatible`, and resources that are not what central derives reject it
+/// `extraction_mismatch`.
+struct Rederive(FhirServer);
+
+impl health_sync_server::GroupCheck for Rederive {
+    fn check<'a>(
+        &'a self,
+        group: &'a health_sync_protocol::Group,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Option<health_sync_protocol::Outcome>> + Send + 'a>,
+    > {
+        use health_sync_protocol::{Kind, Outcome, Reason};
+        Box::pin(async move {
+            let versions = || {
+                group
+                    .items
+                    .iter()
+                    .filter(|i| i.kind == Kind::Version && !i.deleted)
+            };
+            let arrived: std::collections::BTreeMap<String, serde_json::Value> = versions()
+                .map(|i| {
+                    (
+                        format!("{}/{}", i.resource_type, i.resource_id),
+                        i.body.clone(),
+                    )
+                })
+                .collect();
+            for response in versions().filter(|i| i.resource_type == "QuestionnaireResponse") {
+                let refused = |reason, detail: String| Some(Outcome::Rejected { reason, detail });
+                match self.0.rederive(&response.body, &arrived).await {
+                    Ok(()) => {}
+                    Err(health_fhir_server::Rederivation::UnknownMapping(mapping)) => {
+                        return refused(
+                            Reason::MetadataIncompatible,
+                            format!("the Extraction Mapping {mapping} is not held here"),
+                        );
+                    }
+                    Err(health_fhir_server::Rederivation::Mismatch(detail)) => {
+                        return refused(Reason::ExtractionMismatch, detail);
+                    }
+                    Err(health_fhir_server::Rederivation::Failed(detail)) => {
+                        return refused(
+                            Reason::Invalid,
+                            format!("the extraction does not run here: {detail}"),
+                        );
+                    }
+                }
+            }
+            None
+        })
+    }
+}
+
 /// The `/sync/v1` endpoints (#81; ADR 0062). Peers on this release or the one before are served;
 /// no package is approved yet, so a peer reporting one is quarantined.
 fn sync_routes(
@@ -412,7 +468,19 @@ fn sync_routes(
     registry: NodeRegistry,
     files: Option<health_files::FsBlobStore>,
     events: health_http::Events,
+    definitions: Option<&crate::activation::Definitions>,
 ) -> Result<Router, &'static str> {
+    // Completed responses are re-derived here, the authority, before their group applies (ADR
+    // 0022), with the mappings central holds and searches as the FHIR server does.
+    let searched = match definitions {
+        Some(definitions) => store.clone().with_shared_registry(&definitions.search),
+        None => store.clone().with_registry(search_registry()),
+    };
+    let rederive = Arc::new(Rederive(FhirServer::new(
+        searched,
+        "urn:health:central",
+        Arc::new(Unrestricted),
+    )));
     let compatibility = health_sync_protocol::Compatibility {
         protocol: health_sync_protocol::PROTOCOL,
         software: env!("CARGO_PKG_VERSION")
@@ -421,8 +489,9 @@ fn sync_routes(
         approved: std::collections::BTreeSet::new(),
     };
     conflicts_hourly(store.clone());
-    let server =
-        health_sync_server::SyncServer::new(store, registry, compatibility).with_events(events);
+    let server = health_sync_server::SyncServer::new(store, registry, compatibility)
+        .with_events(events)
+        .with_check(rederive);
     Ok(match files {
         Some(files) => server.with_blobs(files),
         None => server,

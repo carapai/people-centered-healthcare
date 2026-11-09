@@ -108,6 +108,7 @@ pub use care_plans::{
     MANAGE_PERMISSION as CARE_PLANS_MANAGE_PERMISSION,
     VIEW_PERMISSION as CARE_PLANS_VIEW_PERMISSION,
 };
+pub use completion::Rederivation;
 pub use consultation::{DOCUMENT_PERMISSION, ORDER_PERMISSION, PRESCRIBE_PERMISSION};
 pub use dispensing::{DISPENSE_PERMISSION, Dispensing};
 pub use http::{FHIR_JSON, etag, http_date};

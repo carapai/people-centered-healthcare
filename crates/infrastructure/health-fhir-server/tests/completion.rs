@@ -50,6 +50,11 @@ fn registry() -> Registry {
 }
 
 async fn app() -> Router {
+    served().await.1
+}
+
+/// The server, and its routes with the fixtures written.
+async fn served() -> (FhirServer, Router) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "completion-http".into(),
@@ -59,10 +64,10 @@ async fn app() -> Router {
     .expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
     let store = SurrealStore::new(connection, Arc::new(SystemClock)).with_registry(registry());
-    let app = FhirServer::new(store, "http://test/fhir", Arc::new(Unrestricted))
+    let server = FhirServer::new(store, "http://test/fhir", Arc::new(Unrestricted))
         .with_questionnaire_checks()
-        .with_extraction()
-        .router();
+        .with_extraction();
+    let app = server.clone().router();
     for (path, body) in [
         ("/Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa", json!({ "resourceType": "Patient", "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000aa" }).to_string()),
         (
@@ -75,7 +80,7 @@ async fn app() -> Router {
         let (status, body) = send(&app, "PUT", path, &body).await;
         assert_eq!(status, StatusCode::CREATED, "{path}: {body}");
     }
-    app
+    (server, app)
 }
 
 async fn send(app: &Router, method: &str, path: &str, body: &str) -> (StatusCode, Value) {
@@ -426,4 +431,56 @@ async fn the_dry_run_shows_what_would_be_written_and_keeps_nothing() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn the_authority_re_derives_what_a_completed_response_produced() {
+    use health_fhir_server::Rederivation;
+    let (server, app) = served().await;
+    let (status, stored) = submit(&app, &response()).await;
+    assert_eq!(status, StatusCode::CREATED, "{stored}");
+    // What arrived with the response: every resource its extraction wrote.
+    let mut arrived = std::collections::BTreeMap::new();
+    for target in targets(&provenance(&app).await) {
+        let resource = at(&app, &target).await;
+        let key = target
+            .split("/_history")
+            .next()
+            .unwrap_or_default()
+            .to_owned();
+        arrived.insert(key, resource);
+    }
+    assert!(!arrived.is_empty());
+    assert_eq!(server.rederive(&stored, &arrived).await, Ok(()));
+    // A resource left unchanged need not come again.
+    assert_eq!(
+        server
+            .rederive(&stored, &std::collections::BTreeMap::new())
+            .await,
+        Ok(())
+    );
+
+    // A node that extracted something else is caught.
+    let mut tampered = arrived.clone();
+    let (key, resource) = tampered.iter_mut().next().expect("one");
+    resource["note"] = json!([{ "text": "not from the response" }]);
+    let key = key.clone();
+    assert!(matches!(
+        server.rederive(&stored, &tampered).await,
+        Err(Rederivation::Mismatch(detail)) if detail.starts_with(&key)
+    ));
+
+    // A mapping version not held here, and drafts, which are not extracted.
+    let mut unknown = stored.clone();
+    unknown["extension"][0]["valueCanonical"] =
+        json!("https://health.go.ug/fhir/Library/anc-visit-mapping|9.9.9");
+    assert_eq!(
+        server.rederive(&unknown, &arrived).await,
+        Err(Rederivation::UnknownMapping(
+            "https://health.go.ug/fhir/Library/anc-visit-mapping|9.9.9".into()
+        ))
+    );
+    let mut draft = unknown;
+    draft["status"] = json!("in-progress");
+    assert_eq!(server.rederive(&draft, &tampered).await, Ok(()));
 }

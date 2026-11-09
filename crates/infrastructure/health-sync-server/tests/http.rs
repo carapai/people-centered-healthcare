@@ -50,6 +50,11 @@ struct Setup {
 }
 
 async fn setup() -> Setup {
+    setup_with(None).await
+}
+
+/// The setup, with central holding pushed groups to `check`.
+async fn setup_with(check: Option<Arc<dyn health_sync_server::GroupCheck>>) -> Setup {
     let clock = Arc::new(FixedClock::new(
         "2026-11-08T09:00:00Z".parse().expect("timestamp"),
     ));
@@ -95,9 +100,13 @@ async fn setup() -> Setup {
     };
     let central_id = central.node_id().await.expect("central id");
     let files = tempfile::tempdir().expect("files");
-    let app = SyncServer::new(central.clone(), registry, compatibility)
-        .with_blobs(health_files::FsBlobStore::open(files.path()).expect("blob store"))
-        .router();
+    let server = SyncServer::new(central.clone(), registry, compatibility)
+        .with_blobs(health_files::FsBlobStore::open(files.path()).expect("blob store"));
+    let app = match check {
+        Some(check) => server.with_check(check),
+        None => server,
+    }
+    .router();
     let edge = store("edge", clock.clone()).await;
     edge.add_upstream(&central_id.to_string())
         .await
@@ -491,4 +500,48 @@ async fn bodies_go_zstd_compressed_and_the_signature_covers_their_content() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let _: PullResponse = serde_json::from_slice(&body).expect("plain pull");
+}
+
+/// Refuses every group that carries an Observation, as a re-derivation would a mismatch.
+struct RefuseObservations;
+
+impl health_sync_server::GroupCheck for RefuseObservations {
+    fn check<'a>(
+        &'a self,
+        group: &'a health_sync_protocol::Group,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Outcome>> + Send + 'a>> {
+        Box::pin(async move {
+            group
+                .items
+                .iter()
+                .any(|i| i.resource_type == "Observation")
+                .then(|| Outcome::Rejected {
+                    reason: Reason::ExtractionMismatch,
+                    detail: "not what central derives".into(),
+                })
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_group_failing_central_s_check_is_refused_and_not_applied() {
+    let s = setup_with(Some(Arc::new(RefuseObservations))).await;
+    let central = s.hello("1.4.0").await.node;
+    let ours = s.observation_from_edge(FACILITY, central).await;
+    let before = s.central.cursor().await.expect("cursor").seq;
+    let (status, body) = s.send("POST", "/sync/v1/push", ours).await;
+    assert_eq!(status, StatusCode::OK);
+    let results: Vec<GroupResult> = from_ndjson(&body).expect("results");
+    assert_eq!(
+        results[0].outcome,
+        Outcome::Rejected {
+            reason: Reason::ExtractionMismatch,
+            detail: "not what central derives".into(),
+        }
+    );
+    assert_eq!(
+        s.central.cursor().await.expect("cursor").seq,
+        before,
+        "nothing was applied at central"
+    );
 }
