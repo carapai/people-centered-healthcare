@@ -312,6 +312,7 @@ impl SurrealTx {
         let version_seq = previous_seq + 1;
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
+        let mut patient_facility: Option<(Vec<String>, String)> = None;
         let (extraction, references, blocks) = if deleted {
             // A tombstone keeps its body but is never found by search, references nothing and
             // sits in no block.
@@ -328,6 +329,18 @@ impl SurrealTx {
                 .as_ref()
                 .map(|b| b.keys(resource_type.as_str(), &resource))
                 .unwrap_or_default();
+            // A facility-tagged record ties its patients to the facility (golden-record
+            // narrowing, #81).
+            if let Some(facility) = crate::sync::facility_tag(&resource) {
+                let patients: Vec<String> = crate::search::write::references(&resource)
+                    .into_iter()
+                    .filter(|r| r.target_type == "Patient")
+                    .map(|r| r.target_id)
+                    .collect();
+                if !patients.is_empty() {
+                    patient_facility = Some((patients, facility.to_owned()));
+                }
+            }
             (
                 extract(&self.registry, resource_type.as_str(), &resource, None),
                 crate::search::write::references(&resource),
@@ -373,6 +386,16 @@ impl SurrealTx {
             "CREATE type::record({history}, [{rid}, {seq}]) CONTENT {{ json: {json}, \
              version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text}{owner_field} }}"
         ));
+        if let Some((patients, facility)) = patient_facility {
+            let facility = sql.str(facility);
+            for patient in patients {
+                let patient = sql.str(patient);
+                sql.push(format!(
+                    "UPSERT type::record('patient_facility', [{patient}, {facility}]) \
+                     SET at = time::now()"
+                ));
+            }
+        }
         sql.run(self.tx()?).await.map_err(write_error)?;
         self.changes.push(crate::change_log::Pending {
             op_id,

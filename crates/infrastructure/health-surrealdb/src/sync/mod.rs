@@ -136,6 +136,35 @@ impl SyncScope {
 }
 
 /// A record's facility tag (ADR 0057).
+pub(crate) fn facility_tag(body: &Value) -> Option<&str> {
+    facility_of(body)
+}
+
+/// The patient a person record is about: the Patient itself, a RelatedPerson's patient, or a
+/// Person's linked Patients (golden-record narrowing).
+fn people_of(resource_type: &str, id: &str, body: &Value) -> Option<Vec<String>> {
+    let patient = |reference: &Value| {
+        reference
+            .as_str()
+            .and_then(|r| r.strip_prefix("Patient/"))
+            .map(str::to_owned)
+    };
+    match resource_type {
+        "Patient" => Some(vec![id.to_owned()]),
+        "RelatedPerson" => Some(patient(&body["patient"]["reference"]).into_iter().collect()),
+        "Person" => Some(
+            body["link"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|l| patient(&l["target"]["reference"]))
+                .collect(),
+        ),
+        _ => None,
+    }
+}
+
+/// A record's facility tag (ADR 0057).
 fn facility_of(body: &Value) -> Option<&str> {
     body["meta"]["tag"]
         .as_array()?
@@ -440,6 +469,9 @@ impl SurrealStore {
             let item = self.item(change, node).await?;
             if Lane::of(&item.resource_type) == request.lane
                 && scope.admits_down(&item.resource_type, &item.body)
+                && self
+                    .person_admitted(scope, &item.resource_type, &item.resource_id, &item.body)
+                    .await?
             {
                 pulled.push(Pulled {
                     seq: change.seq,
@@ -484,6 +516,43 @@ impl SurrealStore {
             })
         })
         .transpose()
+    }
+
+    /// Whether a person record (Patient, RelatedPerson, Person) goes down to `scope`: only to the
+    /// facilities its patient has records at (synchronization.md § Pull and Sync Scope). Other
+    /// records are not narrowed here.
+    async fn person_admitted(
+        &self,
+        scope: &SyncScope,
+        resource_type: &str,
+        id: &str,
+        body: &Value,
+    ) -> Result<bool, StoreError> {
+        let (SyncScope::Facility(facility), Some(patients)) =
+            (scope, people_of(resource_type, id, body))
+        else {
+            return Ok(true);
+        };
+        for patient in patients {
+            let held: Option<String> = self
+                .connection
+                .db()
+                .query(
+                    "SELECT VALUE <string>record::id(id)[0] FROM ONLY \
+                     type::record('patient_facility', [$patient, $facility])",
+                )
+                .bind(("patient", patient))
+                .bind(("facility", facility.clone()))
+                .await
+                .and_then(surrealdb::IndexedResults::check)
+                .map_err(unavailable)?
+                .take(0)
+                .map_err(unavailable)?;
+            if held.is_some() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// The highest `seq` pruned from the change log; 0 if none.
@@ -569,7 +638,11 @@ impl SurrealStore {
             let rows: Vec<HeadRow> = results.take(statement).map_err(unavailable)?;
             for row in rows {
                 let body: Value = serde_json::from_str(&row.json).map_err(|_| corrupt("json"))?;
-                if !scope.admits_down(resource_type, &body) {
+                if !scope.admits_down(resource_type, &body)
+                    || !self
+                        .person_admitted(scope, resource_type, &row.rid, &body)
+                        .await?
+                {
                     continue;
                 }
                 let op_id: OpId = row.version_id.parse().map_err(|_| corrupt("version_id"))?;
@@ -1137,6 +1210,21 @@ impl Authority for SurrealAuthority<'_> {
                     }
                 } else if matches!(self.standing(&mut tx, item).await?, Standing::FastForward) {
                     tx.apply_version(item).await?;
+                    // A Patient a facility registered is that facility's to receive back.
+                    if item.resource_type == "Patient"
+                        && let SyncScope::Facility(facility) = &self.scope
+                    {
+                        tx.tx()?
+                            .query(
+                                "UPSERT type::record('patient_facility', [$patient, $facility]) \
+                                 SET at = time::now()",
+                            )
+                            .bind(("patient", item.resource_id.clone()))
+                            .bind(("facility", facility.clone()))
+                            .await
+                            .and_then(surrealdb::IndexedResults::check)
+                            .map_err(write_error)?;
+                    }
                 }
             }
         }

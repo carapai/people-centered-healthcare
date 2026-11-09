@@ -61,6 +61,17 @@ fn observation(facility: &str, value: i64) -> Value {
     })
 }
 
+/// A visit at `facility` for `patient`, written at `node`: what ties a patient to a facility, so
+/// their golden record goes down to it (golden-record narrowing).
+async fn visit(node: &Node, patient: ResourceId, facility: &str) {
+    let body = json!({
+        "resourceType": "Encounter", "status": "planned",
+        "meta": {"tag": [{"system": "urn:health:facility", "code": facility}]},
+        "subject": {"reference": format!("Patient/{patient}")}
+    });
+    write(node, ResourceId::new(), &body, Precondition::MustNotExist).await;
+}
+
 fn patient(name: &str) -> Value {
     json!({"resourceType": "Patient", "name": [{"text": name}]})
 }
@@ -203,6 +214,7 @@ async fn edge_and_central_converge_after_a_partition() {
         Precondition::MustNotExist,
     )
     .await;
+    visit(&central, shared, "KLA01").await;
     sync(&edge, &central).await;
     let (base, _) = head(&edge, "Patient", shared).await.expect("synced");
 
@@ -234,11 +246,15 @@ async fn edge_and_central_converge_after_a_partition() {
         Precondition::MustNotExist,
     )
     .await;
+    visit(&central, at_central, "KLA01").await;
 
     let round = sync(&edge, &central).await;
     assert_eq!(round.pushed, 6);
     assert!(round.outcomes.iter().all(|o| *o == Outcome::Accepted));
-    assert_eq!(round.pulled, 1, "only what central wrote comes back");
+    assert_eq!(
+        round.pulled, 2,
+        "only what central wrote comes back: a patient and their visit"
+    );
 
     for (resource_type, id) in at_edge
         .iter()
@@ -290,6 +306,7 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
     let (central, edge) = pair().await;
     let id = ResourceId::new();
     write(&central, id, &patient("Chris"), Precondition::MustNotExist).await;
+    visit(&central, id, "KLA01").await;
     sync(&edge, &central).await;
     let (base, _) = head(&edge, "Patient", id).await.expect("synced");
 
@@ -560,6 +577,7 @@ async fn a_node_offline_beyond_the_horizon_reseeds_without_losing_data() {
         Precondition::MustNotExist,
     )
     .await;
+    visit(&central, shared, "KLA01").await;
     sync(&edge, &central).await;
     let epoch = edge.store.cursor().await.expect("cursor").epoch;
 
@@ -581,6 +599,7 @@ async fn a_node_offline_beyond_the_horizon_reseeds_without_losing_data() {
         Precondition::MustNotExist,
     )
     .await;
+    visit(&central, later, "KLA01").await;
     let horizon = central
         .store
         .prune_log(Timestamp::now() + health_time::SignedDuration::from_mins(1))
@@ -906,4 +925,95 @@ async fn a_facility_cannot_send_operations_on_another_facility_s_ledgers() {
         "{}",
         refusals[1]
     );
+}
+
+#[tokio::test]
+async fn an_edge_receives_golden_records_only_for_patients_with_records_there() {
+    let (central, edge) = pair().await;
+    // Seen at this facility, and seen only elsewhere.
+    let ours = ResourceId::new();
+    write(
+        &central,
+        ours,
+        &patient("Grace"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    visit(&central, ours, "KLA01").await;
+    let theirs = ResourceId::new();
+    write(
+        &central,
+        theirs,
+        &patient("Hope"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    visit(&central, theirs, "GUL02").await;
+    // Their relatives follow them.
+    let relative = |patient: ResourceId| json!({"resourceType": "RelatedPerson", "patient": {"reference": format!("Patient/{patient}")}});
+    let our_relative = ResourceId::new();
+    write(
+        &central,
+        our_relative,
+        &relative(ours),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let their_relative = ResourceId::new();
+    write(
+        &central,
+        their_relative,
+        &relative(theirs),
+        Precondition::MustNotExist,
+    )
+    .await;
+    // A patient the edge registers itself comes back after central's golden-record work.
+    let registered = ResourceId::new();
+    write(
+        &edge,
+        registered,
+        &patient("Ivy"),
+        Precondition::MustNotExist,
+    )
+    .await;
+
+    sync(&edge, &central).await;
+    assert!(head(&edge, "Patient", ours).await.is_some());
+    assert!(head(&edge, "RelatedPerson", our_relative).await.is_some());
+    assert!(
+        head(&edge, "Patient", theirs).await.is_none(),
+        "another facility's patient"
+    );
+    assert!(head(&edge, "RelatedPerson", their_relative).await.is_none());
+
+    // Central updates the edge's own registration: the update comes down.
+    let (version, _) = head(&central, "Patient", registered)
+        .await
+        .expect("at central");
+    write(
+        &central,
+        registered,
+        &patient("Ivy Akello"),
+        Precondition::IfMatch(version),
+    )
+    .await;
+    sync(&edge, &central).await;
+    let (_, body) = head(&edge, "Patient", registered)
+        .await
+        .expect("at the edge");
+    assert_eq!(body["name"][0]["text"], "Ivy Akello");
+
+    // A re-seed narrows the same way.
+    let (items, _) = central
+        .store
+        .snapshot(&scope(), central.id)
+        .await
+        .expect("snapshot");
+    let patients: Vec<&str> = items
+        .iter()
+        .filter(|i| i.resource_type == "Patient")
+        .map(|i| i.resource_id.as_str())
+        .collect();
+    assert!(patients.contains(&ours.to_string().as_str()));
+    assert!(!patients.contains(&theirs.to_string().as_str()));
 }
