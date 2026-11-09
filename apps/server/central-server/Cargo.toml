@@ -20,6 +20,7 @@ health-auth = { workspace = true }
 health-consent = { workspace = true }
 health-financial-ledger = { workspace = true }
 health-client-registry = { workspace = true }
+health-activation = { workspace = true }
 health-configuration = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }

@@ -111,12 +111,16 @@ sequenceDiagram
     - Dependencies must be active at exactly their pinned versions.
   - **At central:** `central-server package activate <name@version> --scope … --by …` issues the record (`Publications::activate`). `package activations` lists them.
   - **To nodes:** each record is kept in `package_activation` (migration `0049_package_activation`) and goes down as an operation in the packages lane, to every node, in pulls and re-seeds alike. A node never sends one up.
-  - **On an edge** (`health-edge-runtime::activation`), after each sync round, the node works out the set its records want along its chain (`HEALTH_DISTRICT`, `HEALTH_FACILITY`, `HEALTH_PROGRAMS`).
+  - **On a node** (`health-activation`, shared by the edge after each sync round and central every minute).
+  - **On an edge**, after each sync round, the node works out the set its records want along its chain (`HEALTH_DISTRICT`, `HEALTH_FACILITY`, `HEALTH_PROGRAMS`).
     - It fetches each missing tarball from central's blob store by sha-256 and verifies it against the national root. It keeps the tarball (retention) and records the package as staged (migration `0050_package_staging`).
     - It then switches in one transaction or keeps the previous set. Each attempt is reported, and a failure raises `package-activation-failed`.
     - Central keeps tarballs in `HEALTH_FILES_DIR`, the store sync serves.
     - Its reports go up to central (`POST /sync/v1/activation-reports`; migration `0051_activation_reports`). Central keeps them per node, raises `package-activation-failed` for a failure, and lists them with `central-server package reports`.
-  - **Not yet:** loading the active set into what a node serves (profiles, terminology, search and its reindex, workflows), and desktops.
+  - **On central** (`HEALTH_NATIONAL_ROOT_FILE` with `HEALTH_FILES_DIR`), the national set is activated from central's own blob store.
+    - When it changes, and at startup, the active packages' definitional resources are written into central's store (`health_activation::definitions`), each under a UUIDv5 of its `url|version`.
+    - Clients read them there, and they sync down to every node in the packages lane. A rollback finds the earlier version still there.
+  - **Not yet:** loading the active set's profiles, terminology, SearchParameters (with their reindex) and workflows into what a node serves, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
 
 ## Rollback
 

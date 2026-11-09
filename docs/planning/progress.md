@@ -969,6 +969,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 4b: central activates the national set and serves its definitions (2026-11-09).**
+  - **What:**
+    - The activation logic moved from the edge into a shared infrastructure crate, `health-activation`.
+    - Central runs it every minute for the national chain, against `HEALTH_NATIONAL_ROOT_FILE` and its own blob store.
+    - When the set changes, and at startup, central writes the active packages' definitional resources into its store, each under a UUIDv5 of its `url|version`. Clients read them there, and they sync down to every node.
+  - **Tested:** each active version's definitions are written once under their own ids, both versions stay readable, and an unstaged package is refused. The edge's activation tests pass unchanged.
+  - **Next:**
+    - load profiles and terminology into validation;
+    - load SearchParameters, with their reindex;
+    - make workflow definitions swappable and load them;
+    - then retire the dev seeds.
 - **#89, part 4a: activation reports reach central (2026-11-09).**
   - **What:**
     - after each round, an edge sends central the activation reports it doesn't have yet (`POST /sync/v1/activation-reports`; migration 0051);
