@@ -1,0 +1,58 @@
+{
+  "type": "workflow-scenario",
+  "name": "an urgent visit is never held at the gate",
+  "definition": "https://health.go.ug/fhir/Library/opd-visit|1.0.0",
+  "gates": {
+    "https://health.go.ug/fhir/FinancialGate/before-consultation": "defer"
+  },
+  "steps": [
+    {
+      "event": "opd.arrived",
+      "expect": {
+        "configuration": [
+          "triage"
+        ]
+      }
+    },
+    {
+      "event": "opd.triaged-urgent",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    },
+    {
+      "event": "opd.orders-placed",
+      "expect": {
+        "configuration": [
+          "lab",
+          "lab-awaiting",
+          "orders",
+          "pharmacy",
+          "pharmacy-awaiting"
+        ]
+      }
+    },
+    {
+      "event": "opd.no-lab",
+      "expect": {
+        "configuration": [
+          "lab",
+          "lab-back",
+          "orders",
+          "pharmacy",
+          "pharmacy-awaiting"
+        ]
+      }
+    },
+    {
+      "event": "opd.no-pharmacy",
+      "expect": {
+        "configuration": [
+          "review"
+        ]
+      }
+    }
+  ]
+}

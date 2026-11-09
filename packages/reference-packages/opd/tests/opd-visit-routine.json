@@ -1,0 +1,82 @@
+{
+  "type": "workflow-scenario",
+  "name": "a routine visit is paid, seen, sent for tests and seen again with the results",
+  "definition": "https://health.go.ug/fhir/Library/opd-visit|1.0.0",
+  "gates": {
+    "https://health.go.ug/fhir/FinancialGate/before-consultation": "pass"
+  },
+  "steps": [
+    {
+      "expect": {
+        "configuration": [
+          "reception"
+        ]
+      }
+    },
+    {
+      "event": "opd.arrived",
+      "expect": {
+        "configuration": [
+          "triage"
+        ]
+      }
+    },
+    {
+      "event": "opd.triaged-routine",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    },
+    {
+      "event": "opd.orders-placed",
+      "expect": {
+        "configuration": [
+          "lab",
+          "lab-awaiting",
+          "orders",
+          "pharmacy",
+          "pharmacy-awaiting"
+        ]
+      }
+    },
+    {
+      "event": "laboratory.reviewed",
+      "expect": {
+        "configuration": [
+          "lab",
+          "lab-back",
+          "orders",
+          "pharmacy",
+          "pharmacy-awaiting"
+        ]
+      }
+    },
+    {
+      "event": "pharmacy.dispensed",
+      "expect": {
+        "configuration": [
+          "review"
+        ]
+      }
+    },
+    {
+      "event": "opd.seen",
+      "expect": {
+        "configuration": [
+          "disposition"
+        ]
+      }
+    },
+    {
+      "event": "opd.discharged",
+      "expect": {
+        "configuration": [
+          "discharged"
+        ],
+        "running": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "workflow-scenario",
+  "name": "an emergency arrival goes straight to consultation",
+  "definition": "https://health.go.ug/fhir/Library/opd-visit|1.0.0",
+  "gates": {
+    "https://health.go.ug/fhir/FinancialGate/before-consultation": "block"
+  },
+  "steps": [
+    {
+      "event": "opd.arrived-emergency",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    }
+  ]
+}

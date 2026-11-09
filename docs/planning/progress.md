@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#105: the OPD Workflow Definition (2026-11-09).**
+  - **What:** `Library/opd-visit` in `ug.moh.opd`, with its source in `sources/opd-visit.json`:
+    - reception, then triage, whose category is the `urgency` data field; an emergency bypasses the gate;
+    - the payment gate, with the cashier's task while it blocks;
+    - consultation, then lab and pharmacy orders in parallel, then a repeat consultation once both are back;
+    - disposition (discharged, admitted or referred).
+
+    It uses no guards or typed actions, so a node runs it as written.
+  - **Tested:** five scenarios pass in publication's simulation (routine, emergency at triage and on arrival, blocked until paid, urgent). The Library holds exactly its source, and a node's `WorkflowConfig` accepts it.
 - **#103, part 2: the triage screen (2026-11-09).** This completes #103.
   - **What:** `/triage` lists the triage queue. For the patient being seen it renders the OPD triage form with the visit's patient and encounter. On submit, the node extracts the vital signs as Observations with Provenance, and the visit moves to consultation.
   - **Tested (e2e):** a nurse triages a checked-in patient, keyboard only and with axe, and the clinician's summary shows the extracted vital signs.

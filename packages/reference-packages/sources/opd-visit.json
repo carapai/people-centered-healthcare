@@ -1,0 +1,291 @@
+{
+  "url": "https://health.go.ug/fhir/Library/opd-visit",
+  "version": "1.0.0",
+  "dataModel": [
+    {
+      "name": "urgency",
+      "kind": "text"
+    }
+  ],
+  "statechart": {
+    "states": [
+      {
+        "id": "reception",
+        "kind": "atomic",
+        "transitions": [
+          {
+            "events": [
+              "opd.arrived"
+            ],
+            "targets": [
+              "triage"
+            ]
+          },
+          {
+            "events": [
+              "opd.arrived-emergency"
+            ],
+            "targets": [
+              "consultation"
+            ],
+            "actions": [
+              {
+                "kind": "assign",
+                "field": "urgency",
+                "value": "emergency"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "triage",
+        "kind": "atomic",
+        "task": {
+          "role": "nurse",
+          "form": "https://health.go.ug/fhir/Questionnaire/opd-triage|1.0.0",
+          "worklist": "opd-triage"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.triaged-routine"
+            ],
+            "targets": [
+              "payment"
+            ],
+            "actions": [
+              {
+                "kind": "assign",
+                "field": "urgency",
+                "value": "routine"
+              }
+            ]
+          },
+          {
+            "events": [
+              "opd.triaged-urgent"
+            ],
+            "targets": [
+              "payment"
+            ],
+            "actions": [
+              {
+                "kind": "assign",
+                "field": "urgency",
+                "value": "urgent"
+              }
+            ]
+          },
+          {
+            "events": [
+              "opd.triaged-emergency"
+            ],
+            "targets": [
+              "consultation"
+            ],
+            "actions": [
+              {
+                "kind": "assign",
+                "field": "urgency",
+                "value": "emergency"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "payment",
+        "kind": "atomic",
+        "gate": "https://health.go.ug/fhir/FinancialGate/before-consultation",
+        "task": {
+          "role": "cashier",
+          "worklist": "cashier"
+        },
+        "transitions": [
+          {
+            "events": [
+              "gate.pass"
+            ],
+            "targets": [
+              "consultation"
+            ]
+          },
+          {
+            "events": [
+              "gate.defer"
+            ],
+            "targets": [
+              "consultation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "consultation",
+        "kind": "atomic",
+        "task": {
+          "role": "clinician",
+          "worklist": "opd-consult"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.orders-placed"
+            ],
+            "targets": [
+              "orders"
+            ]
+          },
+          {
+            "events": [
+              "opd.seen"
+            ],
+            "targets": [
+              "disposition"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "orders",
+        "kind": "parallel",
+        "transitions": [
+          {
+            "events": [
+              "done.state.orders"
+            ],
+            "targets": [
+              "review"
+            ]
+          }
+        ],
+        "children": [
+          {
+            "id": "lab",
+            "kind": "compound",
+            "children": [
+              {
+                "id": "lab-awaiting",
+                "kind": "atomic",
+                "transitions": [
+                  {
+                    "events": [
+                      "laboratory.reviewed",
+                      "opd.no-lab"
+                    ],
+                    "targets": [
+                      "lab-back"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "lab-back",
+                "kind": "final"
+              }
+            ]
+          },
+          {
+            "id": "pharmacy",
+            "kind": "compound",
+            "children": [
+              {
+                "id": "pharmacy-awaiting",
+                "kind": "atomic",
+                "transitions": [
+                  {
+                    "events": [
+                      "pharmacy.dispensed",
+                      "opd.no-pharmacy"
+                    ],
+                    "targets": [
+                      "pharmacy-back"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "pharmacy-back",
+                "kind": "final"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "review",
+        "kind": "atomic",
+        "task": {
+          "role": "clinician",
+          "worklist": "opd-review",
+          "priority": "urgent"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.orders-placed"
+            ],
+            "targets": [
+              "orders"
+            ]
+          },
+          {
+            "events": [
+              "opd.seen"
+            ],
+            "targets": [
+              "disposition"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "disposition",
+        "kind": "atomic",
+        "task": {
+          "role": "clerk",
+          "worklist": "opd-disposition"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.discharged"
+            ],
+            "targets": [
+              "discharged"
+            ]
+          },
+          {
+            "events": [
+              "opd.admitted"
+            ],
+            "targets": [
+              "admitted"
+            ]
+          },
+          {
+            "events": [
+              "opd.referred"
+            ],
+            "targets": [
+              "referred"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "discharged",
+        "kind": "final"
+      },
+      {
+        "id": "admitted",
+        "kind": "final"
+      },
+      {
+        "id": "referred",
+        "kind": "final"
+      }
+    ]
+  }
+}
