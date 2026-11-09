@@ -343,6 +343,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some(files) => {
             let mut settings = auth_settings(files)?;
             settings.definitions = definitions.clone();
+            // With activation, central runs the active packages' workflows, not a file's.
+            if let Some(definitions) = &definitions {
+                if settings.workflows.is_some() {
+                    tracing::warn!(
+                        "HEALTH_DEV_WORKFLOW_DEFINITIONS is ignored: central runs the active packages' workflows"
+                    );
+                }
+                settings.workflows = Some(definitions.workflows.clone());
+            }
             Some((settings, Arc::new(OnceCell::new())))
         }
     };

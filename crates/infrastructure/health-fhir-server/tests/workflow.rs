@@ -302,3 +302,37 @@ async fn a_node_refuses_definitions_it_cannot_run() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn activation_replaces_the_definitions_every_holder_runs() {
+    let config = WorkflowConfig::new(Vec::new(), "central").expect("empty");
+    let connection = Connection::open(&Settings {
+        target: Target::Memory,
+        namespace: "workflow-replace".into(),
+        database: "main".into(),
+    })
+    .await
+    .expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let server = FhirServer::new(
+        SurrealStore::new(connection, Arc::new(SystemClock)),
+        "http://test/fhir",
+        Arc::new(Unrestricted),
+    )
+    .with_workflows(config.clone());
+    let nurse = as_(&server, "nurse-1", &[WORKFLOW_PERMISSION]);
+    let (_, listed) = send(&nurse, "GET", "/definitions", None).await;
+    assert_eq!(listed.as_array().map(Vec::len), Some(0));
+
+    // The kept clone replaces what the server runs.
+    assert_eq!(config.replace(vec![definition(opd())]), Ok(1));
+    let (_, listed) = send(&nurse, "GET", "/definitions", None).await;
+    assert_eq!(listed.as_array().map(Vec::len), Some(1));
+
+    // Definitions that cannot run leave the running ones in place.
+    let mut guarded = opd();
+    guarded["statechart"]["states"][0]["transitions"][0]["guard"] = json!("%encounter.exists()");
+    assert!(config.replace(vec![definition(guarded)]).is_err());
+    let (_, listed) = send(&nurse, "GET", "/definitions", None).await;
+    assert_eq!(listed.as_array().map(Vec::len), Some(1));
+}

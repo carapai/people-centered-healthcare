@@ -969,6 +969,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 4e: the active Workflow Definitions (2026-11-09).**
+  - **What:**
+    - `WorkflowConfig`'s definitions are shared by its clones and replaceable (`replace`), and `health_publication::workflow_definitions` reads a package's.
+    - With activation, central runs the active set's definitions, replaced after each switch and at startup. A set whose definitions can't be read or run keeps the previous ones and raises `package-activation-failed`.
+    - `HEALTH_DEV_WORKFLOW_DEFINITIONS` is ignored then.
+  - **Tested:** activation replaces what the server lists and runs, an unrunnable set leaves it, and an unreadable package's workflow keeps the running ones.
 - **#89, part 4d: the active SearchParameters, with their reindex (2026-11-09).**
   - **What:** when central activates packages, the FHIR server's search registry is shared with activation (`SharedRegistry`, health-surrealdb). After each switch and at startup, the active set's SearchParameters join central's built-in ones (`registry_with`).
     - A new one is indexed on every write at once (`Reindexing`), backfilled by a reindex job in batches of 500, and then made searchable.

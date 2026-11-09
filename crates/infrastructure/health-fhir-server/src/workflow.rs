@@ -50,9 +50,12 @@ pub const SUPERVISE_PERMISSION: &str = "workflow.supervise";
 /// The definitions this node runs, compiled, and the node that decides their instances.
 #[derive(Debug, Clone)]
 pub struct WorkflowConfig {
-    definitions: Arc<BTreeMap<String, Arc<Compiled>>>,
+    /// Shared by clones, so activation (#89) can replace what every holder runs.
+    definitions: Arc<std::sync::RwLock<Definitions>>,
     authority: String,
 }
+
+type Definitions = Arc<BTreeMap<String, Arc<Compiled>>>;
 
 /// Why the node's definitions cannot run.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -93,30 +96,62 @@ impl WorkflowConfig {
         definitions: Vec<WorkflowDefinition>,
         authority: &str,
     ) -> Result<Self, WorkflowConfigError> {
-        let mut compiled = BTreeMap::new();
-        for definition in definitions {
-            let key = format!("{}|{}", definition.url, definition.version);
-            if let Some(problem) = definition.problems(&[]).first() {
-                return Err(WorkflowConfigError::Problem {
-                    definition: key,
-                    problem: problem.to_string(),
-                });
-            }
-            if uses_unwired(&definition.statechart.states) {
-                return Err(WorkflowConfigError::Unsupported(key));
-            }
-            let chart =
-                Compiled::new(definition.statechart).map_err(|e| WorkflowConfigError::Problem {
-                    definition: key.clone(),
-                    problem: e.to_string(),
-                })?;
-            compiled.insert(key, Arc::new(chart));
-        }
         Ok(Self {
-            definitions: Arc::new(compiled),
+            definitions: Arc::new(std::sync::RwLock::new(compile(definitions)?)),
             authority: authority.to_owned(),
         })
     }
+
+    /// Runs `definitions` from now on, here and in every clone; on any problem the previous ones
+    /// stay. New instances start on them, and running instances keep their own definition while
+    /// it is among them (activation retains every version ever active).
+    pub fn replace(
+        &self,
+        definitions: Vec<WorkflowDefinition>,
+    ) -> Result<usize, WorkflowConfigError> {
+        let compiled = compile(definitions)?;
+        let count = compiled.len();
+        *self
+            .definitions
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = compiled;
+        Ok(count)
+    }
+
+    /// The definitions running now.
+    fn definitions(&self) -> Definitions {
+        Arc::clone(
+            &self
+                .definitions
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+}
+
+/// Compiles `definitions`: each must pass its publication checks and use no guards or typed
+/// actions.
+fn compile(definitions: Vec<WorkflowDefinition>) -> Result<Definitions, WorkflowConfigError> {
+    let mut compiled = BTreeMap::new();
+    for definition in definitions {
+        let key = format!("{}|{}", definition.url, definition.version);
+        if let Some(problem) = definition.problems(&[]).first() {
+            return Err(WorkflowConfigError::Problem {
+                definition: key,
+                problem: problem.to_string(),
+            });
+        }
+        if uses_unwired(&definition.statechart.states) {
+            return Err(WorkflowConfigError::Unsupported(key));
+        }
+        let chart =
+            Compiled::new(definition.statechart).map_err(|e| WorkflowConfigError::Problem {
+                definition: key.clone(),
+                problem: e.to_string(),
+            })?;
+        compiled.insert(key, Arc::new(chart));
+    }
+    Ok(Arc::new(compiled))
 }
 
 /// Guards are not wired yet: none holds (and [`WorkflowConfig::new`] refuses definitions with
@@ -182,7 +217,7 @@ fn staff(
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let service = Workflows::new(
         server.store.clone(),
-        config.definitions.clone(),
+        config.definitions(),
         NoActions,
         NoGuards,
         clock,
@@ -227,7 +262,7 @@ fn task_json(config: &WorkflowConfig, task: &TaskView) -> Value {
     let open = task.status.is_open();
     if let Some(object) = value.as_object_mut() {
         let offered = config
-            .definitions
+            .definitions()
             .get(&task.definition)
             .filter(|_| open)
             .map(|c| events(&c.chart, &task.state))
@@ -326,7 +361,7 @@ async fn definitions(
 ) -> Response {
     let (_, _, config) = staff_or_return!(server, subject, WORK_PERMISSION);
     let listed: Vec<Value> = config
-        .definitions
+        .definitions()
         .iter()
         .map(|(key, compiled)| {
             let tasks: Vec<Value> = human_tasks(&compiled.chart)
@@ -479,12 +514,12 @@ pub(crate) async fn start_for(
     let Some(config) = server.workflows.clone() else {
         return Ok(None);
     };
-    let key = if config.definitions.contains_key(canonical) {
+    let key = if config.definitions().contains_key(canonical) {
         Some(canonical.to_owned())
     } else {
         let prefix = format!("{canonical}|");
         config
-            .definitions
+            .definitions()
             .keys()
             .filter(|k| k.starts_with(&prefix))
             .max_by_key(|k| {
@@ -501,7 +536,7 @@ pub(crate) async fn start_for(
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let service = Workflows::new(
         server.store.clone(),
-        config.definitions.clone(),
+        config.definitions(),
         NoActions,
         NoGuards,
         clock,
@@ -529,7 +564,7 @@ pub(crate) async fn deliver_for(
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let service = Workflows::new(
         server.store.clone(),
-        config.definitions.clone(),
+        config.definitions(),
         NoActions,
         NoGuards,
         clock,
@@ -559,7 +594,7 @@ pub(crate) async fn worklist_for(server: &FhirServer, key: &str) -> Vec<TaskView
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let service = Workflows::new(
         server.store.clone(),
-        config.definitions.clone(),
+        config.definitions(),
         NoActions,
         NoGuards,
         clock,

@@ -54,7 +54,7 @@ mod programs;
 mod workflows;
 
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
-pub use workflows::WorkflowSandbox;
+pub use workflows::{WorkflowSandbox, workflow_definitions};
 
 pub use health_workflow_actions::ActionDescriptor;
 

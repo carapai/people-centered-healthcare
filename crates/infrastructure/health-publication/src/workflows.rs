@@ -5,7 +5,7 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use health_packages::Packed;
+use health_packages::{Files, Packed};
 use health_workflow::definition::WorkflowDefinition;
 use health_workflow::simulation::{SCENARIO_TYPE, Scenario, simulate};
 use health_workflow_actions::ActionDescriptor;
@@ -28,23 +28,25 @@ fn is_workflow(library: &Value) -> bool {
 
 /// The package's Workflow Definitions, each with its file, and every problem reading them.
 fn read(packed: &Packed) -> (Vec<(String, WorkflowDefinition)>, Vec<String>) {
+    workflow_definitions(&packed.files)
+}
+
+/// The Workflow Definitions among a package's top-level `files` (each a `Library` of type
+/// `workflow-definition` with its definition inline, ADR 0049), each with its file, and every
+/// problem reading them. Activation (#89) reads an active package's with it.
+pub fn workflow_definitions(files: &Files) -> (Vec<(String, WorkflowDefinition)>, Vec<String>) {
     let mut definitions = Vec::new();
     let mut found = Vec::new();
-    for artefact in &packed.contents.artefacts {
-        if artefact.resource_type != "Library" {
+    for (path, bytes) in files {
+        if path.contains('/') || path.starts_with('.') || !path.ends_with(".json") {
             continue;
         }
-        let Some(library) = packed
-            .files
-            .get(&artefact.path)
-            .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
-        else {
+        let Ok(library) = serde_json::from_slice::<Value>(bytes) else {
             continue;
         };
         if !is_workflow(&library) {
             continue;
         }
-        let path = &artefact.path;
         let content = &library["content"][0];
         if content["contentType"] != CONTENT_TYPE {
             found.push(format!("{path}: the content is not {CONTENT_TYPE}"));
