@@ -186,6 +186,22 @@ async fn write(store: &SurrealStore, body: &Value) -> ResourceId {
     id
 }
 
+/// A patient registered at central with a visit at this facility, so their golden record comes
+/// down (golden-record narrowing).
+async fn patient_seen_here(central: &SurrealStore) -> ResourceId {
+    let patient = write(central, &json!({"resourceType": "Patient"})).await;
+    write(
+        central,
+        &json!({
+            "resourceType": "Encounter", "status": "planned",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+            "subject": {"reference": format!("Patient/{patient}")}
+        }),
+    )
+    .await;
+    patient
+}
+
 async fn version(store: &SurrealStore, resource_type: &str, id: ResourceId) -> Option<OpId> {
     let mut tx = store.begin().await.expect("begin");
     tx.read(&resource_type.parse().expect("type"), id)
@@ -208,7 +224,7 @@ async fn the_edge_syncs_what_it_wrote_before_and_while_central_was_unreachable()
     let edge = store("edge").await;
     // Written before the edge ever reached central.
     let early = write(&edge, &observation()).await;
-    let registered = write(&central.store, &json!({"resourceType": "Patient"})).await;
+    let registered = patient_seen_here(&central.store).await;
 
     // Central is unreachable: the round fails, and the edge keeps working.
     let unreachable = central.sync(&edge, "https://localhost:1");
@@ -219,7 +235,7 @@ async fn the_edge_syncs_what_it_wrote_before_and_while_central_was_unreachable()
     let round = sync.round().await.expect("round");
     assert_eq!(round.verdict, Some(Verdict::Compatible));
     assert_eq!(round.pushed, 2, "both observations go up");
-    assert_eq!(round.pulled, 1, "the patient comes down");
+    assert_eq!(round.pulled, 2, "the patient and their visit come down");
     for (resource_type, id) in [
         ("Observation", early),
         ("Observation", offline),
@@ -240,12 +256,12 @@ async fn an_edge_beyond_central_s_horizon_reseeds_and_keeps_its_outbox() {
     let central = central().await;
     let edge = store("edge").await;
     let sync = central.sync(&edge, &central.origin);
-    let first = write(&central.store, &json!({"resourceType": "Patient"})).await;
+    let first = patient_seen_here(&central.store).await;
     sync.round().await.expect("first round");
 
     // Offline past the horizon: the edge writes, central writes and prunes its whole log.
     let offline = write(&edge, &observation()).await;
-    let meanwhile = write(&central.store, &json!({"resourceType": "Patient"})).await;
+    let meanwhile = patient_seen_here(&central.store).await;
     central
         .store
         .prune_log(Timestamp::now() + health_time::SignedDuration::from_mins(1))

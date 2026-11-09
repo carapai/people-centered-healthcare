@@ -160,6 +160,7 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
 | Standalone desktop (mode B) from central | Its facility's scope, as an edge would |
 
 - **Shared-record reads** of another facility's records are on-demand queries to central, not replicated.
+- **Golden-record narrowing (#81).** Central sends a Patient, RelatedPerson or Person down only to facilities its patient has records at. The index is `patient_facility` (migration `0047_patient_facility`), written with every facility-tagged record that references the patient, and when a facility sends a Patient it registered. Pulls and snapshots both narrow this way.
 - **Scope changes.** Growing a scope produces a delta seed. Shrinking a scope, or a revocation, triggers the audited purge (persistence.md).
 - **Priority lanes:**
   1. revocations and permission snapshots;

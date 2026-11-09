@@ -67,6 +67,16 @@ async fn a_week_of_clinics_on_a_flaky_link_converges() {
             )
             .await;
         records.push(("Patient", referred));
+        // Referred to this facility: a planned visit there ties them to it.
+        let referral = sim
+            .node(central)
+            .create(&json!({
+                "resourceType": "Encounter", "status": "planned",
+                "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+                "subject": {"reference": format!("Patient/{referred}")}
+            }))
+            .await;
+        records.push(("Encounter", referral));
         if day == 2 || day == 5 {
             sim.set_link(wan, true);
             sim.settle().await;
