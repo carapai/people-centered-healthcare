@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#103, part 2: the triage screen (2026-11-09).** This completes #103.
+  - **What:** `/triage` lists the triage queue. For the patient being seen it renders the OPD triage form with the visit's patient and encounter. On submit, the node extracts the vital signs as Observations with Provenance, and the visit moves to consultation.
+  - **Tested (e2e):** a nurse triages a checked-in patient, keyboard only and with axe, and the clinician's summary shows the extracted vital signs.
+  - **Found on the way:**
+    - completing a form writes its targets and Provenance through the user's own permissions, so the triage role needs `Observation` and `Provenance` writes;
+    - the summary doesn't show a blood-pressure panel's components yet.
+  - **Left to #105:** the triage category drives the visit's `urgency` through the OPD Workflow Definition.
 - **#103, part 1: the OPD triage package (2026-11-09).** #103 is split: part 1 is the package, and part 2 the client's triage screen with its e2e test.
   - **What:** `packages/reference-packages/opd/` (`ug.moh.opd`) holds the triage Questionnaire, the triage categories, and an Extraction Mapping. Each answered vital sign becomes a managed `vital-signs` Observation with its LOINC code and UCUM unit. Blood pressure is one panel with systolic and diastolic components.
   - **Tested:** the package passes publication (every extraction gate and both fixtures).

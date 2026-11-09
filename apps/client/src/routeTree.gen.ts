@@ -21,6 +21,7 @@ import { Route as PharmacyRouteImport } from './routes/pharmacy'
 import { Route as RegistrationRouteImport } from './routes/registration'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as TriageRouteImport } from './routes/triage'
 import { Route as WorklistsRouteImport } from './routes/worklists'
 import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alerts'
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
@@ -97,6 +98,11 @@ const ResultsRoute = ResultsRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TriageRoute = TriageRouteImport.update({
+  id: '/triage',
+  path: '/triage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorklistsRoute = WorklistsRouteImport.update({
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/registration': typeof RegistrationRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
+  '/triage': typeof TriageRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/registration': typeof RegistrationRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
+  '/triage': typeof TriageRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/registration': typeof RegistrationRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
+  '/triage': typeof TriageRoute
   '/worklists': typeof WorklistsRoute
   '/break-glass/alerts': typeof BreakGlassAlertsRoute
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
@@ -294,6 +303,7 @@ export interface FileRouteTypes {
     | '/registration'
     | '/results'
     | '/sign-in'
+    | '/triage'
     | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -325,6 +335,7 @@ export interface FileRouteTypes {
     | '/registration'
     | '/results'
     | '/sign-in'
+    | '/triage'
     | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -356,6 +367,7 @@ export interface FileRouteTypes {
     | '/registration'
     | '/results'
     | '/sign-in'
+    | '/triage'
     | '/worklists'
     | '/break-glass/alerts'
     | '/break-glass/reviews'
@@ -388,6 +400,7 @@ export interface RootRouteChildren {
   RegistrationRoute: typeof RegistrationRoute
   ResultsRoute: typeof ResultsRoute
   SignInRoute: typeof SignInRoute
+  TriageRoute: typeof TriageRoute
   WorklistsRoute: typeof WorklistsRoute
   BreakGlassAlertsRoute: typeof BreakGlassAlertsRoute
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
@@ -491,6 +504,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/triage': {
+      id: '/triage'
+      path: '/triage'
+      fullPath: '/triage'
+      preLoaderRoute: typeof TriageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/worklists': {
@@ -628,6 +648,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegistrationRoute: RegistrationRoute,
   ResultsRoute: ResultsRoute,
   SignInRoute: SignInRoute,
+  TriageRoute: TriageRoute,
   WorklistsRoute: WorklistsRoute,
   BreakGlassAlertsRoute: BreakGlassAlertsRoute,
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,

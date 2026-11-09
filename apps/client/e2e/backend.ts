@@ -40,7 +40,8 @@ const env = {
   HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
   // Payments at one till (#254).
   HEALTH_PAYMENT_TILLS: 'till-1',
-  // The ANC visit form (#92), until activation brings published Questionnaires (#89).
+  // The ANC visit form (#92), and the OPD triage form with its vital-signs mapping (#103) from
+  // the ug.moh.opd reference package, each under a UUID id, for nodes without activation (#89).
   HEALTH_DEV_FHIR_SEED: file(
     'fhir-seed.json',
     JSON.stringify({
@@ -73,6 +74,13 @@ const env = {
             ],
           },
         },
+        ...[
+          ['Questionnaire-opd-triage.json', '0190f1a2-7c3d-7e4f-8a5b-0000000103a1'],
+          ['CodeSystem-triage-category.json', '0190f1a2-7c3d-7e4f-8a5b-0000000103a2'],
+          ['Library-opd-triage-mapping.json', '0190f1a2-7c3d-7e4f-8a5b-0000000103a3'],
+        ].map(([path, id]) => ({
+          resource: { ...JSON.parse(readFileSync(new URL(`../../../packages/reference-packages/opd/${path}`, import.meta.url), 'utf8')), id },
+        })),
       ],
     }),
   ),
@@ -99,7 +107,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'Provenance.cru', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'] },
       labels: [],
     }),
   ),
