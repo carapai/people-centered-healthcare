@@ -969,6 +969,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 4c: the active profiles and terminology (2026-11-09).**
+  - **What:** when central activates packages (`HEALTH_NATIONAL_ROOT_FILE`), its FHIR server validates writes against the active set's compiled StructureDefinitions (tiers 3–4) and answers terminology from its CodeSystems, ValueSets and ConceptMaps. These are replaced after each switch and at startup. A set whose profiles do not compile keeps the previous ones and raises `package-activation-failed`.
+  - **Tested:** an active CodeSystem is looked up, and a set with an unenforceable profile is refused while the previous terminology stays.
+  - **Next:** SearchParameters with their reindex, then workflows, then retire the dev seeds.
 - **#89, part 4b: central activates the national set and serves its definitions (2026-11-09).**
   - **What:**
     - The activation logic moved from the edge into a shared infrastructure crate, `health-activation`.

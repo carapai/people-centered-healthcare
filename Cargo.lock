@@ -751,6 +751,7 @@ dependencies = [
  "health-surrealdb",
  "health-sync-protocol",
  "health-sync-server",
+ "health-terminology",
  "health-time",
  "health-workflow",
  "http-body-util",

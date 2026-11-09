@@ -120,7 +120,9 @@ sequenceDiagram
   - **On central** (`HEALTH_NATIONAL_ROOT_FILE` with `HEALTH_FILES_DIR`), the national set is activated from central's own blob store.
     - When it changes, and at startup, the active packages' definitional resources are written into central's store (`health_activation::definitions`), each under a UUIDv5 of its `url|version`.
     - Clients read them there, and they sync down to every node in the packages lane. A rollback finds the earlier version still there.
-  - **Not yet:** loading the active set's profiles, terminology, SearchParameters (with their reindex) and workflows into what a node serves, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
+    - The same set gives central's FHIR server its profiles and terminology. Its StructureDefinitions, compiled, validate writes (tiers 3–4). Its CodeSystems, ValueSets and ConceptMaps answer the terminology operations and bindings.
+    - A set whose profiles do not compile keeps the previous ones and raises `package-activation-failed`. Without `HEALTH_NATIONAL_ROOT_FILE`, central validates no profiles, as before.
+  - **Not yet:** the active set's SearchParameters (with their reindex) and workflows, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
 
 ## Rollback
 

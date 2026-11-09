@@ -58,6 +58,7 @@ async fn open_database(
     password: String,
     database: Database,
     auth: Option<(auth::AuthSettings, Arc<OnceCell<axum::Router>>)>,
+    definitions: activation::Definitions,
 ) {
     let settings = Settings {
         target: Target::Remote {
@@ -94,7 +95,12 @@ async fn open_database(
                     config.auth.as_ref().and_then(|a| a.files_dir.clone()),
                 ) {
                     (Some(root), Some(files)) => {
-                        tokio::spawn(activation::run(connection.clone(), root.clone(), files));
+                        tokio::spawn(activation::run(
+                            connection.clone(),
+                            root.clone(),
+                            files,
+                            definitions.clone(),
+                        ));
                     }
                     (Some(_), None) => tracing::warn!(
                         "HEALTH_NATIONAL_ROOT_FILE without HEALTH_FILES_DIR: packages are not activated"
@@ -254,6 +260,7 @@ fn auth_settings(
             .map(auth::read_kms_key)
             .transpose()?
             .map(|key| Arc::new(health_provisioning::LocalKeyWrap::new(&key))),
+        definitions: None,
         pricing: health_fhir_server::PricingConfig {
             currency: health_financial_ledger::Currency::from_code(&files.currency)
                 .map_err(|_| "HEALTH_CURRENCY is not an ISO 4217 code")?
@@ -326,10 +333,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .trim()
         .to_owned();
 
+    // The profiles and terminology activation loads (#89), when central activates packages.
+    let definitions = config
+        .national_root_file
+        .as_ref()
+        .map(|_| activation::Definitions::default());
     let auth = match &config.auth {
         None => None,
         Some(files) => {
-            let settings = auth_settings(files)?;
+            let mut settings = auth_settings(files)?;
+            settings.definitions = definitions.clone();
             Some((settings, Arc::new(OnceCell::new())))
         }
     };
@@ -344,6 +357,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         password,
         database.clone(),
         auth,
+        definitions.unwrap_or_default(),
     ));
 
     let router = app(api, Readiness::new(vec![Arc::new(database)]));

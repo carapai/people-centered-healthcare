@@ -66,6 +66,10 @@ pub(crate) struct AuthSettings {
     pub(crate) workflows: Option<health_fhir_server::WorkflowConfig>,
     /// Price Books and rules (#120), kept at central in the ledger's functional currency.
     pub(crate) pricing: health_fhir_server::PricingConfig,
+    /// The active packages' profiles and terminology (#89), when central activates packages:
+    /// writes are validated against them (tiers 3–4) and the terminology operations answer
+    /// from them.
+    pub(crate) definitions: Option<crate::activation::Definitions>,
 }
 
 /// The patient portal's phone sign-in.
@@ -843,6 +847,11 @@ fn fhir(
     if let Some(payments) = settings.payments.clone() {
         fhir = fhir.with_payments(payments);
     }
+    if let Some(definitions) = &settings.definitions {
+        fhir = fhir
+            .with_profiles(definitions.profiles.clone())
+            .with_terminology(definitions.terminology.clone());
+    }
     if let Some(workflows) = settings.workflows.clone() {
         fhir = fhir.with_workflows(workflows);
     }
@@ -971,6 +980,7 @@ mod tests {
             kms: None,
             files: None,
             workflows: None,
+            definitions: None,
             pricing: health_fhir_server::PricingConfig {
                 currency: "UGX".into(),
             },
