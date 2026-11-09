@@ -1345,3 +1345,30 @@ export const productMessages = defineMessages<ProductValues>({
   pdSaved: { id: 'app.products.saved', defaultMessage: 'Saved {name}.', description: 'Products: saved' },
   pdSaveFailed: { id: 'app.products.saveFailed', defaultMessage: 'That did not work. {reason}', description: 'Products: save failed' },
 })
+
+type TriageValues = {
+  trTitle: {}
+  trWaiting: {}
+  trNoneWaiting: {}
+  trTriage: { name: string }
+  trWith: { name: string }
+  trLoading: {}
+  trNoForm: {}
+  trDone: { name: string }
+  trFailed: { reason: string }
+  trBack: {}
+}
+
+// Triage's strings (features/triage, #103).
+export const triageMessages = defineMessages<TriageValues>({
+  trTitle: { id: 'app.triage.title', defaultMessage: 'Triage', description: 'Triage page heading and link' },
+  trWaiting: { id: 'app.triage.waiting', defaultMessage: 'Waiting for triage', description: 'Triage: the queue heading' },
+  trNoneWaiting: { id: 'app.triage.noneWaiting', defaultMessage: 'Nobody is waiting for triage.', description: 'Triage: empty queue' },
+  trTriage: { id: 'app.triage.triage', defaultMessage: 'Triage {name}', description: 'Triage action: open the patient' },
+  trWith: { id: 'app.triage.with', defaultMessage: 'Triage: {name}', description: 'Triage: the form heading' },
+  trLoading: { id: 'app.triage.loading', defaultMessage: 'Loading the triage form…', description: 'Triage: the form is loading' },
+  trNoForm: { id: 'app.triage.noForm', defaultMessage: 'The triage form is not available on this node.', description: 'Triage: no active triage Questionnaire' },
+  trDone: { id: 'app.triage.done', defaultMessage: '{name} is triaged and waiting for consultation.', description: 'Triage: the triage was recorded' },
+  trFailed: { id: 'app.triage.failed', defaultMessage: 'The triage was not recorded. {reason}', description: 'Triage: the save failed' },
+  trBack: { id: 'app.triage.back', defaultMessage: 'Back to the queue', description: 'Triage action: close the form' },
+})
