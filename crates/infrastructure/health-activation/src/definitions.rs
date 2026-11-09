@@ -63,14 +63,14 @@ pub fn definitions(files: &Files) -> Vec<(ResourceType, ResourceId, Value)> {
         .collect()
 }
 
-/// Writes the definitions of every package in `active` (staged here, its tarball in `blobs`)
-/// into `store`: the number newly written.
-pub async fn write_definitions(
+/// The files of every package in `active` (staged here, its tarball in `blobs`), by
+/// `name@version`.
+pub async fn active_files(
     store: &SurrealStore,
     blobs: &FsBlobStore,
     active: &ActiveSet,
-) -> Result<usize, String> {
-    let mut written = 0;
+) -> Result<Vec<(String, Files)>, String> {
+    let mut packages = Vec::with_capacity(active.len());
     for (name, version) in active {
         let id = format!("{name}@{version}");
         let mut tx = store.begin().await.map_err(|e| e.to_string())?;
@@ -91,6 +91,20 @@ pub async fn write_definitions(
         let files = unpack(&tgz, Limits::default())
             .map_err(|e| format!("{id}: {e}"))?
             .files;
+        packages.push((id, files));
+    }
+    Ok(packages)
+}
+
+/// Writes the definitions of every package in `active` (staged here, its tarball in `blobs`)
+/// into `store`: the number newly written.
+pub async fn write_definitions(
+    store: &SurrealStore,
+    blobs: &FsBlobStore,
+    active: &ActiveSet,
+) -> Result<usize, String> {
+    let mut written = 0;
+    for (id, files) in active_files(store, blobs, active).await? {
         for (resource_type, resource_id, resource) in definitions(&files) {
             let json = resource.to_string();
             if let Some(issue) = validate_structure(&json).first() {
