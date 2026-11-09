@@ -115,7 +115,8 @@ sequenceDiagram
     - It fetches each missing tarball from central's blob store by sha-256 and verifies it against the national root. It keeps the tarball (retention) and records the package as staged (migration `0050_package_staging`).
     - It then switches in one transaction or keeps the previous set. Each attempt is reported, and a failure raises `package-activation-failed`.
     - Central keeps tarballs in `HEALTH_FILES_DIR`, the store sync serves.
-  - **Not yet:** reporting failures to central, the reindex when a SearchParameter changes, desktops, and loading the active set into what the node serves.
+    - Its reports go up to central (`POST /sync/v1/activation-reports`; migration `0051_activation_reports`). Central keeps them per node, raises `package-activation-failed` for a failure, and lists them with `central-server package reports`.
+  - **Not yet:** loading the active set into what a node serves (profiles, terminology, search and its reindex, workflows), and desktops.
 
 ## Rollback
 

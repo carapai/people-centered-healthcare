@@ -22,6 +22,8 @@
 //!   officer's review due 72 hours after they arrive (#224).
 //! - `POST /sync/v1/transfers` takes the facility's inter-facility transfers, matched once
 //!   received; `POST /sync/v1/transfers/inbound` answers those in transit to it (#247).
+//! - `POST /sync/v1/activation-reports` takes the node's package activation reports, `[{"id",
+//!   "report"}]`, kept per node; a failed activation raises `package-activation-failed` (#89).
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -124,6 +126,7 @@ impl SyncServer {
             .route("/sync/v1/break-glass", post(break_glass))
             .route("/sync/v1/transfers", post(transfers))
             .route("/sync/v1/transfers/inbound", post(inbound_transfers))
+            .route("/sync/v1/activation-reports", post(activation_reports))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(health_sync_protocol::MAX_DECODED))
             .layer(axum::middleware::from_fn(zstd_bodies))
@@ -529,6 +532,68 @@ async fn break_glass(
         ));
     }
     axum::Json(json!({ "received": grants.iter().map(|g| &g.id).collect::<Vec<_>>() }))
+        .into_response()
+}
+
+/// A node's package activation reports (#89): kept per node, once each; a failed activation is
+/// raised at central, where the rollout is run.
+async fn activation_reports(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let Ok(reports) = serde_json::from_slice::<Vec<serde_json::Value>>(&body) else {
+        return problem(StatusCode::BAD_REQUEST, "the body is not a list of reports");
+    };
+    let Some(reports) = reports
+        .iter()
+        .map(|sent| Some((sent["id"].as_str()?, &sent["report"])))
+        .collect::<Option<Vec<_>>>()
+    else {
+        return problem(StatusCode::BAD_REQUEST, "a report has no id");
+    };
+    let mut tx = match health_persistence::Store::begin(&server.inner.store).await {
+        Ok(tx) => tx,
+        Err(error) => return failed(error),
+    };
+    for (id, report) in &reports {
+        let (Some(at), Some(outcome)) = (report["at"].as_str(), report["outcome"].as_str()) else {
+            return problem(
+                StatusCode::BAD_REQUEST,
+                format!("report {id} has no time or outcome"),
+            );
+        };
+        if let Err(error) = tx
+            .receive_activation_report(&peer.id.to_string(), id, at, outcome, &report.to_string())
+            .await
+        {
+            return match error {
+                health_persistence::WriteError::Store(error) => failed(error),
+                _ => problem(
+                    StatusCode::BAD_REQUEST,
+                    format!("report {id} is not a report"),
+                ),
+            };
+        }
+        if outcome == "failed" {
+            tracing::warn!(
+                alert = "package-activation-failed",
+                node = %peer.id,
+                problems = %report["problems"],
+                "a node could not activate its packages and kept its previous set"
+            );
+        }
+    }
+    if let Err(error) = health_persistence::Transaction::commit(tx).await {
+        return failed(error);
+    }
+    axum::Json(json!({ "received": reports.iter().map(|(id, _)| id).collect::<Vec<_>>() }))
         .into_response()
 }
 

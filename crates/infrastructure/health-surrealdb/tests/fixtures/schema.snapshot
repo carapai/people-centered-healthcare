@@ -1092,6 +1092,13 @@ DEFINE TABLE node TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD short_code ON node TYPE string PERMISSIONS FULL
   DEFINE INDEX node_code ON node FIELDS code UNIQUE
   DEFINE INDEX node_short_code ON node FIELDS facility, short_code UNIQUE
+DEFINE TABLE node_activation_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD at ON node_activation_report TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD data ON node_activation_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD node ON node_activation_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD outcome ON node_activation_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD received_at ON node_activation_report TYPE datetime PERMISSIONS FULL
+  DEFINE INDEX node_activation_report_at ON node_activation_report FIELDS at
 DEFINE TABLE node_provisioning_code TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON node_provisioning_code TYPE string PERMISSIONS FULL
   DEFINE FIELD hash ON node_provisioning_code TYPE string PERMISSIONS FULL
@@ -1163,6 +1170,7 @@ DEFINE TABLE package_activation_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD at ON package_activation_report TYPE datetime PERMISSIONS FULL
   DEFINE FIELD data ON package_activation_report TYPE string PERMISSIONS FULL
   DEFINE FIELD outcome ON package_activation_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD sent ON package_activation_report TYPE bool DEFAULT false PERMISSIONS FULL
   DEFINE INDEX package_activation_report_at ON package_activation_report FIELDS at
 DEFINE TABLE package_lifecycle TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON package_lifecycle TYPE string PERMISSIONS FULL

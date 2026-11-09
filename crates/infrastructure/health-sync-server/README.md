@@ -12,6 +12,7 @@ Layer: **infrastructure**. These are the `/sync/v1` endpoints a node serves its 
   - A refused node gets 403.
 - **`POST /sync/v1/pull`** takes a `PullRequest` and answers a `PullResponse` in the node's scope. An out-of-range node is sent nothing.
 - **`GET /sync/v1/events`** is a server-sent event stream of `cursor` hints, so a connected node pulls without waiting for its poll.
+- **Activation reports** (`POST /sync/v1/activation-reports`, #89): a node's package activation reports, kept per node. A failure raises `package-activation-failed` here, where the rollout is run.
 - **Bodies** are zstd-compressed when the peer says so: a `Content-Encoding: zstd` request is decompressed (at most 8 MiB on the wire, 64 MiB expanded) before its signature is checked, and answers are compressed for a peer that sends `Accept-Encoding: zstd`. The event stream and attachment bytes pass as they are.
 - **Conflict review (#82):** `review_router` is the Conflict Record queue. Central mounts it at `/api/sync/conflicts` behind the subject layer, for staff whose roles grant `sync.resolve-conflicts`.
   - `GET /` lists the open records, oldest first, with `overdue` after 7 days.

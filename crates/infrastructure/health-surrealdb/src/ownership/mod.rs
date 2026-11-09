@@ -114,6 +114,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("package_staged", "configuration"),
     ("package_state", "configuration"),
     ("package_activation_report", "configuration"),
+    ("node_activation_report", "configuration"),
     ("workflow_instance", "workflow"),
     ("workflow_history", "workflow"),
     ("workflow_timer", "workflow"),

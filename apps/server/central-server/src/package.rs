@@ -20,7 +20,8 @@
 //!   [--reason <why>]` activates a published version in `<scope>`: `national`,
 //!   `district:<code>`, `facility:<code>` or `program:<facility>:<program>`, from `<time>`
 //!   (RFC 3339; now by default). Rollback is the activation of an earlier version (#89).
-//! - `package activations` prints every activation issued, oldest first.
+//! - `package activations` prints every activation issued, oldest first; `package reports` the
+//!   latest activation reports nodes sent, newest first, with why a failed one failed.
 //!
 //! Tarballs are kept in central's blob store, `HEALTH_FILES_DIR`, from which nodes fetch the
 //! packages activated for them (`HEALTH_BLOB_DIR` is read when it is not set).
@@ -39,7 +40,7 @@ use health_time::SystemClock;
 
 use crate::config::Config;
 
-const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir> | activate <id> --scope <scope> --by <operator> [--effective <time>] [--reason <why>] | activations), where <id> is name@version and <scope> is national, district:<code>, facility:<code> or program:<facility>:<program>";
+const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir> | activate <id> --scope <scope> --by <operator> [--effective <time>] [--reason <why>] | activations | reports), where <id> is name@version and <scope> is national, district:<code>, facility:<code> or program:<facility>:<program>";
 
 type Failure = Box<dyn std::error::Error>;
 
@@ -334,6 +335,23 @@ pub(crate) async fn run(config: &Config, args: &[String]) -> Result<(), Failure>
                         .map(|why| format!("\t{why}"))
                         .unwrap_or_default()
                 )?;
+            }
+        }
+        [cmd] if cmd == "reports" => {
+            let store = crate::provision::open_surreal(config).await?;
+            let mut tx = health_persistence::Store::begin(&store).await?;
+            for (node, data) in tx.node_activation_reports(50).await? {
+                let report: serde_json::Value = serde_json::from_str(&data)?;
+                writeln!(
+                    out,
+                    "{}\t{node}\t{}\t{}",
+                    report["at"].as_str().unwrap_or_default(),
+                    report["outcome"].as_str().unwrap_or_default(),
+                    report["active"]
+                )?;
+                for problem in report["problems"].as_array().into_iter().flatten() {
+                    writeln!(out, "    - {}", problem.as_str().unwrap_or_default())?;
+                }
             }
         }
         _ => return Err(USAGE.into()),

@@ -16,7 +16,8 @@
 //!    with its checkpoint.
 //! 7. **Activation.** With an [`Activator`](crate::activation::Activator), the node stages the
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
-//!    and switches to the set, or keeps the previous one and reports why (#89).
+//!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
+//!    does not have yet go up to `/sync/v1/activation-reports`.
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
 //! for the polling interval. While central cannot be reached, the interval doubles, up to 30
@@ -530,8 +531,49 @@ impl Sync {
             )
             .await?
             .map(|report| report.outcome);
+            self.send_activation_reports().await?;
         }
         Ok(round)
+    }
+
+    /// Sends central the activation reports it does not have yet, so a failed rollout is seen
+    /// where it is run (#89). The number sent.
+    pub async fn send_activation_reports(&self) -> Result<usize, String> {
+        let mut tx = health_persistence::Store::begin(&self.store)
+            .await
+            .map_err(|e| e.to_string())?;
+        let unsent = tx
+            .unsent_activation_reports(50)
+            .await
+            .map_err(|e| e.to_string())?;
+        drop(tx);
+        if unsent.is_empty() {
+            return Ok(0);
+        }
+        let body: Vec<serde_json::Value> = unsent
+            .iter()
+            .map(|(id, data)| {
+                serde_json::from_str::<serde_json::Value>(data)
+                    .map(|report| serde_json::json!({ "id": id, "report": report }))
+                    .map_err(|e| e.to_string())
+            })
+            .collect::<Result<_, _>>()?;
+        self.post(
+            "/sync/v1/activation-reports",
+            serde_json::to_vec(&body).map_err(|e| e.to_string())?,
+        )
+        .await?;
+        let ids: Vec<String> = unsent.into_iter().map(|(id, _)| id).collect();
+        let mut tx = health_persistence::Store::begin(&self.store)
+            .await
+            .map_err(|e| e.to_string())?;
+        tx.activation_reports_sent(&ids)
+            .await
+            .map_err(|e| e.to_string())?;
+        health_persistence::Transaction::commit(tx)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(ids.len())
     }
 
     /// Re-seeds the node from central's snapshot; the number of heads applied.
