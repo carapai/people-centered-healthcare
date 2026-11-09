@@ -177,7 +177,7 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
   A slow link therefore delivers what matters first.
 - **In code (#81, lanes).** `Lane::of` puts each type in a lane:
   - **Revocations:** `Device`.
-  - **Packages:** definitional types (StructureDefinition, ValueSet, CodeSystem, ConceptMap, Questionnaire, PlanDefinition, ActivityDefinition, Library, SearchParameter).
+  - **Packages:** definitional types (StructureDefinition, ValueSet, CodeSystem, ConceptMap, Questionnaire, PlanDefinition, ActivityDefinition, Library, SearchParameter), and package activation records (#89). Activation records are operations central sends down to every node, never up; each node applies those its scope chain covers.
   - **Audit:** AuditEvent and Provenance.
   - **Clinical:** everything else.
 

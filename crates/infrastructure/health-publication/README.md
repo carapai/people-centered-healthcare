@@ -42,9 +42,10 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
 - **Audit:** every transition is a record and an AuditEvent (`package-lifecycle`), in the transaction that makes it.
 - **Concurrency:** each change is a compare-and-set on the lifecycle's revision. Of two people acting at once, one gets `Error::Conflict` rather than overwriting the other.
 
-## Not yet
-
-- **Activation,** the scoped and dated record that puts a published version to use, is #89.
+- **`Publications::activate(package, version, scope, effective_at, by, reason)`** (#89; ADR 0025) issues an `ActivationRecord`: the published version, its scope (national, district, facility or program), when it takes effect (now by default), and the tarball's sha-256 and signature so nodes can fetch and verify it.
+  - A version that is not published is refused.
+  - The record is kept once (`package_activation`) and logged for every node below, in the packages lane. It is audited (`package-activation`).
+  - Rollback is another activation, of an earlier version. `activations()` lists them all, oldest first.
 
 ## Tests
 

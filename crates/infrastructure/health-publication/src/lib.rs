@@ -24,12 +24,18 @@
 //!   ([`PublicationSigner`]), checking its sha-256 is still the approved one, and records the
 //!   [`PublishedPackage`], once: a published `name@version` never changes.
 //!
+//! - [`Publications::activate`] issues a scoped, dated activation of a published version
+//!   (ADR 0025; #89), with the tarball's sha-256 and signature so nodes can fetch and verify it.
+//!   It is kept once and logged for every node below, and audited. Rollback is another
+//!   activation, of an earlier version.
+//!
 //! Each change is a compare-and-set on the lifecycle's revision, so of two people acting at
 //! once one gets [`Error::Conflict`] rather than overwriting the other.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use health_configuration::activation::{Activation, ActivationRecord, Scope};
 use health_configuration::lifecycle::semver::{self, BumpProblem, ContentChange, Release};
 use health_configuration::lifecycle::{Lifecycle, Record, Refused, Stage, Step};
 use health_configuration::package::{PackageKind, Version};
@@ -567,6 +573,86 @@ impl Publications {
     pub async fn open(&self) -> Result<Vec<Lifecycle>, Error> {
         let mut tx = self.begin().await?;
         tx.open_package_lifecycles()
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|json| serde_json::from_str(json).map_err(failed))
+            .collect()
+    }
+
+    /// `by` activates published `package@version` in `scope` from `effective_at` (now, if
+    /// `None`), saying why. Activating a version that is not published is refused.
+    pub async fn activate(
+        &self,
+        package: &str,
+        version: &Version,
+        scope: Scope,
+        effective_at: Option<Timestamp>,
+        by: &str,
+        reason: Option<&str>,
+    ) -> Result<ActivationRecord, Error> {
+        let mut tx = self.begin().await?;
+        let id = format!("{package}@{version}");
+        let json = tx
+            .published_package(&id)
+            .await
+            .map_err(failed)?
+            .ok_or_else(|| Error::NotFound(format!("{id} is not published")))?;
+        let published: PublishedPackage = serde_json::from_str(&json).map_err(failed)?;
+        let now = self.clock.now();
+        let record = ActivationRecord {
+            activation: Activation {
+                id: Uuid::now_v7().to_string(),
+                package: package.to_owned(),
+                version: version.clone(),
+                scope,
+                effective_at: effective_at.unwrap_or(now),
+                issued_at: now,
+                by: by.to_owned(),
+                reason: reason.map(str::to_owned),
+            },
+            digest: published.digest,
+            signature: published.signature,
+        };
+        let activation = &record.activation;
+        tx.put_package_activation(
+            &activation.id,
+            package,
+            &now.to_string(),
+            &serde_json::to_string(&record).map_err(failed)?,
+        )
+        .await
+        .map_err(failed)?;
+        let audit = json!({
+            "resourceType": "AuditEvent",
+            "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/audit-event-type", "code": "rest", "display": "Restful Operation" }] }],
+            "code": { "coding": [{ "system": "urn:health:audit-event", "code": "package-activation" }] },
+            "action": "C",
+            "severity": "notice",
+            "recorded": now.to_string(),
+            "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
+            "agent": [{ "who": { "display": by }, "requestor": true }],
+            "source": { "observer": { "display": self.observer } },
+            "entity": [{
+                "what": { "display": format!("package {id}") },
+                "detail": [
+                    { "type": { "text": "scope" }, "valueString": activation.scope.to_string() },
+                    { "type": { "text": "effective" }, "valueString": activation.effective_at.to_string() },
+                    { "type": { "text": "reason" }, "valueString": reason.unwrap_or("") },
+                ],
+            }],
+        });
+        health_audit::append(&mut tx, &audit)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok(record)
+    }
+
+    /// Every activation issued, oldest first.
+    pub async fn activations(&self) -> Result<Vec<ActivationRecord>, Error> {
+        let mut tx = self.begin().await?;
+        tx.package_activations()
             .await
             .map_err(failed)?
             .iter()

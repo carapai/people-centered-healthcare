@@ -102,6 +102,20 @@ pub struct Activation {
     pub reason: Option<String>,
 }
 
+/// An activation as it travels to nodes in the metadata lane: the record, with the published
+/// tarball's sha-256 (its blob) and detached signature, so a node can fetch the package and
+/// verify it before staging.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivationRecord {
+    /// The activation.
+    pub activation: Activation,
+    /// The tarball's sha-256, hex.
+    pub digest: String,
+    /// Its detached signature (configuration.md § Signing).
+    pub signature: String,
+}
+
 /// A node's place in the scope chain.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Chain {

@@ -1,6 +1,9 @@
 //! Central's publication lifecycle (migration `0027_package_lifecycle`; #88), used by
 //! `health-publication`: each lifecycle, its records and each published package as JSON, with
 //! the columns lookups need. Tarballs are blobs, outside the database.
+//!
+//! Package activation records (migration `0049_package_activation`; #89) are kept here too: on
+//! central, where publication issues them, and on every node they reach by sync.
 
 use health_persistence::{StoreError, WriteError};
 
@@ -161,6 +164,52 @@ impl SurrealTx {
             )
             .await?;
         Ok(first(rows))
+    }
+
+    /// Keeps activation record `id` of `package`, issued at `issued_at` (RFC 3339), and logs it
+    /// for the nodes below, unless it is here already: records are never changed. `true` when
+    /// it is new.
+    pub async fn put_package_activation(
+        &mut self,
+        id: &str,
+        package: &str,
+        issued_at: &str,
+        data: &str,
+    ) -> Result<bool, WriteError> {
+        let held = self
+            .rows(
+                "SELECT VALUE [<string>record::id(id)] FROM type::record('package_activation', $id)",
+                vec![("id", id.to_owned())],
+            )
+            .await
+            .map_err(WriteError::Store)?;
+        if !held.is_empty() {
+            return Ok(false);
+        }
+        self.run(
+            "CREATE type::record('package_activation', $id) CONTENT { package: $package, \
+             issued_at: <datetime>$issued_at, data: $data } RETURN VALUE record::id(id)",
+            vec![
+                ("id", id.to_owned()),
+                ("package", package.to_owned()),
+                ("issued_at", issued_at.to_owned()),
+                ("data", data.to_owned()),
+            ],
+        )
+        .await?;
+        self.log_op(crate::sync::ACTIVATIONS, id, data);
+        Ok(true)
+    }
+
+    /// The JSON of every activation record held here, oldest issued first.
+    pub async fn package_activations(&mut self) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM package_activation ORDER BY issued_at, id",
+                vec![],
+            )
+            .await?;
+        Ok(all(rows))
     }
 
     /// The JSON of every published version of `package`.

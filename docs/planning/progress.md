@@ -969,6 +969,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 2: activation records at central, down to every node (2026-11-09).**
+  - **What:**
+    - `Publications::activate` issues a record for a published version. It carries the scope, effective time and reason, and the tarball's sha-256 and signature for the node to fetch and verify.
+    - `central-server package activate | activations` drives it.
+    - Records are kept in `package_activation` (migration 0049) and logged as operations in the packages lane. Every node pulls them, re-seeds carry them, and a node never sends one up.
+  - **Tested:**
+    - activating an unpublished version is refused;
+    - a pilot activation and its re-activation are both kept;
+    - records reach an edge once, an edge's own is refused at central, and a re-seed carries them;
+    - scopes are read as the operator writes them.
 - **#89, part 1: scoped activation in the domain (2026-11-09).** #89 is split into parts:
   1. the domain (this part);
   2. activation records at central, travelling in the metadata lane;

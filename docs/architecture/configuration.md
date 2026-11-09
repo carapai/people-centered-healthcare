@@ -105,6 +105,13 @@ sequenceDiagram
 - **Offline.** Packages can be applied from USB on an offline edge. The signature is verified the same way.
 - **Software compatibility.** Each package declares `minSoftware` and `formatVersion`, and each software release declares the format versions it supports. Activation is refused on a mismatch, which is the same check as the sync handshake (synchronization.md).
 - **Retention.** Nodes retain every package version ever activated in their scope for as long as referencing data exists (metadata.md).
+- **In code (#89):**
+  - **Domain** (`health_configuration::activation`): the active set merged along a node's scope chain, the checks before a switch, and a switch that is whole or keeps the previous set and reports.
+    - For one package, the most specific scope wins, and within a scope the latest issued activation in effect.
+    - Dependencies must be active at exactly their pinned versions.
+  - **At central:** `central-server package activate <name@version> --scope … --by …` issues the record (`Publications::activate`). `package activations` lists them.
+  - **To nodes:** each record is kept in `package_activation` (migration `0049_package_activation`) and goes down as an operation in the packages lane, to every node, in pulls and re-seeds alike. A node never sends one up.
+  - **Not yet:** staging, the switch and reindex on a node, and loading the active set into what it serves.
 
 ## Rollback
 

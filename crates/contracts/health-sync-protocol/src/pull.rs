@@ -43,7 +43,9 @@ impl Lane {
             | "Questionnaire"
             | "SearchParameter"
             | "StructureDefinition"
-            | "ValueSet" => Lane::Packages,
+            | "ValueSet"
+            // Package activation records (configuration.md; ADR 0025).
+            | "activation" => Lane::Packages,
             "AuditEvent" | "Provenance" => Lane::Audit,
             _ => Lane::Clinical,
         }

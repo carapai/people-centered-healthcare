@@ -538,6 +538,7 @@ fn each_type_has_its_lane_and_lanes_are_pulled_most_urgent_first() {
     assert_eq!(Lane::of("Device"), Lane::Revocations);
     assert_eq!(Lane::of("ValueSet"), Lane::Packages);
     assert_eq!(Lane::of("Questionnaire"), Lane::Packages);
+    assert_eq!(Lane::of("activation"), Lane::Packages);
     assert_eq!(Lane::of("Observation"), Lane::Clinical);
     assert_eq!(Lane::of("AuditEvent"), Lane::Audit);
     assert!(
