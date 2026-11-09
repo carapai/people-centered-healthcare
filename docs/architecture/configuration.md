@@ -122,7 +122,10 @@ sequenceDiagram
     - Clients read them there, and they sync down to every node in the packages lane. A rollback finds the earlier version still there.
     - The same set gives central's FHIR server its profiles and terminology. Its StructureDefinitions, compiled, validate writes (tiers 3–4). Its CodeSystems, ValueSets and ConceptMaps answer the terminology operations and bindings.
     - A set whose profiles do not compile keeps the previous ones and raises `package-activation-failed`. Without `HEALTH_NATIONAL_ROOT_FILE`, central validates no profiles, as before.
-  - **Not yet:** the active set's SearchParameters (with their reindex) and workflows, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
+    - Its SearchParameters join central's built-in ones in a registry the FHIR server shares (`SharedRegistry`).
+      - A parameter new to central is indexed on every write at once and is searchable once a reindex job has backfilled what is stored (ADR 0017).
+      - One already searched stays searchable, and a deactivated package's parameters are dropped.
+  - **Not yet:** the active set's workflows, and desktops. `HEALTH_DEV_FHIR_SEED` and `HEALTH_DEV_WORKFLOW_DEFINITIONS` stay until then.
 
 ## Rollback
 

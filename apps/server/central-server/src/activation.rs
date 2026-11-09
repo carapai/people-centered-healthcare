@@ -10,6 +10,9 @@
 //! CodeSystems, ValueSets and ConceptMaps answer the terminology operations and bindings. A set
 //! whose profiles do not compile keeps the previous ones and raises
 //! `package-activation-failed`.
+//!
+//! Its SearchParameters join central's built-in ones ([`search`]): one new to central is indexed
+//! on every write at once, and searchable once a reindex job has backfilled what is stored.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,19 +28,38 @@ use health_fhir_validation::ProfileSet;
 use health_files::FsBlobStore;
 use health_packages::Files;
 use health_persistence::Store as _;
-use health_surrealdb::{Connection, SurrealStore};
+use health_persistence::WriteError;
+use health_surrealdb::{Connection, ReindexJob, SharedRegistry, SurrealStore};
 use health_time::{SystemClock, Timestamp};
 
 /// How often central looks for a new set.
 const EVERY: Duration = Duration::from_secs(60);
 
-/// What the FHIR server validates and answers with, from the active set.
-#[derive(Debug, Clone, Default)]
+/// What the FHIR server validates, answers and searches with, from the active set.
+#[derive(Clone)]
 pub(crate) struct Definitions {
     /// The active packages' profiles.
     pub(crate) profiles: ActiveProfiles,
     /// Their terminology.
     pub(crate) terminology: ActiveTerminology,
+    /// The search registry: central's built-in parameters and the active packages'.
+    pub(crate) search: SharedRegistry,
+}
+
+impl Default for Definitions {
+    fn default() -> Self {
+        Self {
+            profiles: ActiveProfiles::default(),
+            terminology: ActiveTerminology::default(),
+            search: SharedRegistry::new(crate::auth::search_registry()),
+        }
+    }
+}
+
+impl std::fmt::Debug for Definitions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Definitions").finish_non_exhaustive()
+    }
 }
 
 impl Definitions {
@@ -68,6 +90,52 @@ impl Definitions {
         self.terminology.replace(terminology);
         Ok(profiles)
     }
+}
+
+/// Resources reindexed per transaction.
+const REINDEX_BATCH: usize = 500;
+
+/// Searches with the SearchParameters of `packages` beside central's own, reindexing what is
+/// stored for each new one before it is searchable. The parameters made searchable.
+async fn search(store: &SurrealStore, packages: &[(String, Files)]) -> Result<usize, String> {
+    let parameters: Vec<serde_json::Value> = packages
+        .iter()
+        .flat_map(|(_, files)| definitions(files))
+        .filter(|(kind, ..)| kind.as_str() == "SearchParameter")
+        .map(|(.., resource)| resource)
+        .collect();
+    let (registry, reindex) = crate::auth::registry_with(&parameters, Some(&store.registry()));
+    // Indexed on every write from now on; searchable once backfilled.
+    store.set_registry(registry);
+    let set: Vec<&str> = packages.iter().map(|(id, _)| id.as_str()).collect();
+    let mut activated = 0;
+    for (resource_type, codes) in reindex {
+        let job = ReindexJob {
+            id: format!(
+                "{}-{resource_type}",
+                health_packages::Digest::of(set.join(",").as_bytes())
+            ),
+            resource_type: resource_type
+                .parse()
+                .map_err(|_| format!("{resource_type} is not a resource type"))?,
+            params: codes.clone(),
+        };
+        store.start_reindex(&job).await.map_err(|e| e.to_string())?;
+        loop {
+            match store.reindex_batch(&job.id, REINDEX_BATCH).await {
+                Ok(progress) if progress.done => break,
+                Ok(_) | Err(WriteError::Conflict) => {}
+                Err(error) => return Err(format!("reindexing {resource_type}: {error}")),
+            }
+        }
+        let mut registry = (*store.registry()).clone();
+        for code in &codes {
+            registry.activate(&resource_type, code);
+        }
+        store.set_registry(registry);
+        activated += codes.len();
+    }
+    Ok(activated)
 }
 
 /// The active set and its definitions, once.
@@ -106,7 +174,17 @@ async fn once(
     if written > 0 {
         tracing::info!(written, "definitions of the active packages written");
     }
-    match served.load(&active_files(store, blobs, &active).await?) {
+    let packages = active_files(store, blobs, &active).await?;
+    match search(store, &packages).await {
+        Ok(0) => {}
+        Ok(searchable) => tracing::info!(searchable, "new search parameters reindexed"),
+        Err(error) => tracing::error!(
+            alert = "package-activation-failed",
+            %error,
+            "the active packages' search parameters are not all searchable"
+        ),
+    }
+    match served.load(&packages) {
         Ok(profiles) => {
             tracing::info!(
                 profiles,
@@ -129,9 +207,9 @@ pub(crate) async fn run(
     files: PathBuf,
     served: Definitions,
 ) {
-    // Indexed with central's search registry, like every write of the FHIR server.
-    let store = SurrealStore::new(connection, Arc::new(SystemClock))
-        .with_registry(crate::auth::search_registry());
+    // Indexed and searched with the FHIR server's own registry, which this replaces.
+    let store =
+        SurrealStore::new(connection, Arc::new(SystemClock)).with_shared_registry(&served.search);
     let started = (|| {
         let activator = Activator::from_root_file(&root, Chain::default())?;
         let blobs = FsBlobStore::open(&files)

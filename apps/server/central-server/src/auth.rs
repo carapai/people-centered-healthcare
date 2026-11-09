@@ -596,6 +596,19 @@ const SUMMARY_PATIENT_PATHS: [(&str, &str); 11] = [
 /// Activation (#89) replaces this with the SearchParameters of the published packages a node has
 /// active.
 pub(crate) fn search_registry() -> health_fhir_search::Registry {
+    registry_with(&[], None).0
+}
+
+/// Central's built-in parameters with the active packages' SearchParameters `extra` (#89). A
+/// package parameter `previous` already searches stays active; a new one is `Reindexing` until
+/// its backfill finishes, and is returned by resource type to be reindexed.
+pub(crate) fn registry_with(
+    extra: &[serde_json::Value],
+    previous: Option<&health_fhir_search::Registry>,
+) -> (
+    health_fhir_search::Registry,
+    std::collections::BTreeMap<String, Vec<String>>,
+) {
     let definition = |url: &str, code: &str, base: &str, kind: &str, expression: &str| {
         serde_json::json!({
             "resourceType": "SearchParameter",
@@ -704,7 +717,8 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
         patient["target"] = serde_json::json!(["Patient"]);
         definitions.push(patient);
     }
-    let catalog = health_fhir_search::Catalog::from_definitions(definitions.iter());
+    let catalog =
+        health_fhir_search::Catalog::from_definitions(definitions.iter().chain(extra.iter()));
     let mut registry = health_fhir_search::Registry::new(jiff::tz::Offset::UTC);
     let mut labelled: Vec<&str> = health_access_policy::FACILITY_SCOPE_TYPES.to_vec();
     labelled.extend(SUMMARY_PATIENT_PATHS.iter().map(|(t, _)| *t));
@@ -742,7 +756,42 @@ pub(crate) fn search_registry() -> health_fhir_search::Registry {
             tracing::warn!(resource_type, code, "a search parameter is not supported");
         }
     }
-    registry
+    let mut reindex: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for parameter in extra {
+        let Some(code) = parameter["code"].as_str() else {
+            continue;
+        };
+        for base in parameter["base"].as_array().into_iter().flatten() {
+            let Some(resource_type) = base.as_str() else {
+                continue;
+            };
+            if registry.get(resource_type, code).is_some() {
+                continue;
+            }
+            let searched = previous
+                .and_then(|r| r.get(resource_type, code))
+                .is_some_and(|s| s.state == health_fhir_search::ParamState::Active);
+            let state = if searched {
+                health_fhir_search::ParamState::Active
+            } else {
+                health_fhir_search::ParamState::Reindexing
+            };
+            match registry.support(&catalog, resource_type, code, state) {
+                Ok(()) if !searched => reindex
+                    .entry(resource_type.to_owned())
+                    .or_default()
+                    .push(code.to_owned()),
+                Ok(()) => {}
+                Err(_) => tracing::warn!(
+                    resource_type,
+                    code,
+                    "an active package's search parameter does not compile"
+                ),
+            }
+        }
+    }
+    (registry, reindex)
 }
 
 /// The policy's sensitive labels, as the auditor takes them.
@@ -788,8 +837,12 @@ fn fhir(
     policy: &AccessPolicy,
     subjects: Subjects<SurrealAuthStore>,
 ) -> Routes {
-    // Facility-scope records are searched by their facility tag (ADR 0057).
-    let store = store.with_registry(search_registry());
+    // Facility-scope records are searched by their facility tag (ADR 0057). With activation,
+    // the registry is shared with it, which adds the active packages' parameters (#89).
+    let store = match &settings.definitions {
+        Some(definitions) => store.with_shared_registry(&definitions.search),
+        None => store.with_registry(search_registry()),
+    };
     // With the registry, source Patients carry their blocking keys, and block counts are kept.
     let store = match registry_rules(settings) {
         Some((config, rules)) => {
@@ -1919,6 +1972,53 @@ mod tests {
             .collect();
         assert!(failed.is_empty(), "{failed:?}");
         let _ = search_registry();
+    }
+
+    #[test]
+    fn a_package_s_new_search_parameter_reindexes_before_it_is_searched() {
+        use health_fhir_search::ParamState;
+        let birthdate = serde_json::json!({
+            "resourceType": "SearchParameter",
+            "url": "http://health.go.ug/fhir/SearchParameter/Patient-birthdate",
+            "code": "birthdate", "base": ["Patient"], "type": "date",
+            "expression": "Patient.birthDate"
+        });
+        let (registry, reindex) = registry_with(std::slice::from_ref(&birthdate), None);
+        assert_eq!(
+            registry.get("Patient", "birthdate").map(|s| s.state),
+            Some(ParamState::Reindexing)
+        );
+        assert_eq!(reindex.get("Patient"), Some(&vec!["birthdate".to_owned()]));
+        // Built-in parameters stay searchable.
+        assert_eq!(
+            registry.get("Patient", "family").map(|s| s.state),
+            Some(ParamState::Active)
+        );
+
+        // Once reindexed, the next set keeps it searchable without another backfill.
+        let mut searched = registry.clone();
+        assert!(searched.activate("Patient", "birthdate"));
+        let (again, reindex) = registry_with(std::slice::from_ref(&birthdate), Some(&searched));
+        assert_eq!(
+            again.get("Patient", "birthdate").map(|s| s.state),
+            Some(ParamState::Active)
+        );
+        assert!(reindex.is_empty());
+
+        // A set without the package drops it; a built-in it repeats is not reindexed.
+        assert!(
+            registry_with(&[], Some(&searched))
+                .0
+                .get("Patient", "birthdate")
+                .is_none()
+        );
+        let family = serde_json::json!({
+            "resourceType": "SearchParameter",
+            "url": "http://health.go.ug/fhir/SearchParameter/Patient-family",
+            "code": "family", "base": ["Patient"], "type": "string",
+            "expression": "Patient.name.family"
+        });
+        assert!(registry_with(&[family], None).1.is_empty());
     }
 
     #[test]

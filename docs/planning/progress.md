@@ -969,6 +969,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 4d: the active SearchParameters, with their reindex (2026-11-09).**
+  - **What:** when central activates packages, the FHIR server's search registry is shared with activation (`SharedRegistry`, health-surrealdb). After each switch and at startup, the active set's SearchParameters join central's built-in ones (`registry_with`).
+    - A new one is indexed on every write at once (`Reindexing`), backfilled by a reindex job in batches of 500, and then made searchable.
+    - One already searched stays searchable, and a deactivated package's parameters are dropped.
+  - **Tested:** a package parameter reindexes before it is searched, stays searchable in the next set without another backfill, and is dropped with its package. A package repeating a built-in doesn't reindex it.
+  - **Next:** swappable workflow definitions, then retire the dev seeds.
 - **#89, part 4c: the active profiles and terminology (2026-11-09).**
   - **What:** when central activates packages (`HEALTH_NATIONAL_ROOT_FILE`), its FHIR server validates writes against the active set's compiled StructureDefinitions (tiers 3–4) and answers terminology from its CodeSystems, ValueSets and ConceptMaps. These are replaced after each switch and at startup. A set whose profiles do not compile keeps the previous ones and raises `package-activation-failed`.
   - **Tested:** an active CodeSystem is looked up, and a set with an unenforceable profile is refused while the previous terminology stays.

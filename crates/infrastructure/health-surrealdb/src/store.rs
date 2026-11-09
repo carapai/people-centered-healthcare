@@ -30,6 +30,19 @@ use crate::search::sql::Sql;
 use crate::search::write::replace_entries;
 use crate::{Connection, ownership};
 
+/// A search registry shared by every store built with it ([`SurrealStore::with_shared_registry`]),
+/// so one place can replace what all of them index and search, as activation does when a
+/// package brings SearchParameters (#89).
+#[derive(Clone)]
+pub struct SharedRegistry(Arc<RwLock<Arc<Registry>>>);
+
+impl SharedRegistry {
+    /// Sharing `registry`.
+    pub fn new(registry: Registry) -> Self {
+        Self(Arc::new(RwLock::new(Arc::new(registry))))
+    }
+}
+
 /// The SurrealDB-backed [`Store`].
 #[derive(Clone)]
 pub struct SurrealStore {
@@ -84,6 +97,14 @@ impl SurrealStore {
             .take(0)
             .map_err(unavailable)?;
         Ok(usize::try_from(blocks.unwrap_or(0)).unwrap_or(0))
+    }
+
+    /// This store, indexing and searching with `shared`: replacing the registry of any store
+    /// sharing it replaces it for all.
+    #[must_use]
+    pub fn with_shared_registry(mut self, shared: &SharedRegistry) -> Self {
+        self.registry = Arc::clone(&shared.0);
+        self
     }
 
     /// This store, indexing the parameters `registry` supports.
