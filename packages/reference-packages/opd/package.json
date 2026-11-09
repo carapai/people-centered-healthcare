@@ -1,0 +1,12 @@
+{
+  "name": "ug.moh.opd",
+  "version": "1.0.0",
+  "fhirVersions": [
+    "5.0.0"
+  ],
+  "kind": "program",
+  "platform": {
+    "minSoftware": "0.1.0",
+    "formatVersion": 1
+  }
+}

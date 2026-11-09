@@ -969,6 +969,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#103, part 1: the OPD triage package (2026-11-09).** #103 is split: part 1 is the package, and part 2 the client's triage screen with its e2e test.
+  - **What:** `packages/reference-packages/opd/` (`ug.moh.opd`) holds the triage Questionnaire, the triage categories, and an Extraction Mapping. Each answered vital sign becomes a managed `vital-signs` Observation with its LOINC code and UCUM unit. Blood pressure is one panel with systolic and diastolic components.
+  - **Tested:** the package passes publication (every extraction gate and both fixtures).
 - **#93: re-derivation at the authority (2026-11-09).** This completes #93.
   - **What:**
     - central's sync server runs a `GroupCheck` on each pushed group before applying it;

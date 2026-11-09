@@ -1,5 +1,5 @@
-//! The reference packages in `packages/reference-packages/` publish (#109): each passes
-//! validation and its workflow scenarios, and a Workflow Definition Library holds exactly its
+//! The reference packages in `packages/reference-packages/` publish (#109, #103): each passes
+//! validation, its extraction fixtures and its workflow scenarios, and a Workflow Definition Library holds exactly its
 //! readable source in `packages/reference-packages/sources/`.
 
 use std::path::{Path, PathBuf};
@@ -40,8 +40,9 @@ fn files(dir: &Path) -> Files {
     out
 }
 
-#[tokio::test]
-async fn the_lab_package_publishes() {
+/// Drafts and submits the package in directory `package` as `id`, and returns any problems validation or
+/// simulation found.
+async fn submitted(package: &str, id: &str) -> (Stage, Vec<String>) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "central".into(),
@@ -62,23 +63,35 @@ async fn the_lab_package_publishes() {
         Arc::new(WorkflowSandbox),
         "central",
     );
-    let lab = files(&root().join("lab"));
-    publications.draft(&lab, "ann").await.expect("draft");
-    let lifecycle = publications
-        .submit("ug.moh.lab@1.0.0", "ann")
-        .await
-        .expect("submit");
-    let (_, records) = publications
-        .lifecycle("ug.moh.lab@1.0.0")
-        .await
-        .expect("records");
+    let files = files(&root().join(package));
+    publications.draft(&files, "ann").await.expect("draft");
+    let lifecycle = publications.submit(id, "ann").await.expect("submit");
+    let (_, records) = publications.lifecycle(id).await.expect("records");
     let problems = match records.last().map(|r| &r.step) {
         Some(Step::ValidationFailed { problems } | Step::SimulationFailed { problems }) => {
             problems.clone()
         }
         _ => Vec::new(),
     };
-    assert_eq!((lifecycle.stage, problems), (Stage::Review, Vec::new()));
+    (lifecycle.stage, problems)
+}
+
+#[tokio::test]
+async fn the_lab_package_publishes() {
+    assert_eq!(
+        submitted("lab", "ug.moh.lab@1.0.0").await,
+        (Stage::Review, Vec::new())
+    );
+}
+
+/// The OPD package (#103): the triage Questionnaire and its Extraction Mapping, whose fixtures
+/// give the expected vital-sign Observations.
+#[tokio::test]
+async fn the_opd_package_publishes() {
+    assert_eq!(
+        submitted("opd", "ug.moh.opd@1.0.0").await,
+        (Stage::Review, Vec::new())
+    );
 }
 
 #[test]

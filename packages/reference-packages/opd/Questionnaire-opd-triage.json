@@ -1,0 +1,97 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "opd-triage",
+  "url": "https://health.go.ug/fhir/Questionnaire/opd-triage",
+  "version": "1.0.0",
+  "name": "OpdTriage",
+  "title": "OPD triage",
+  "status": "active",
+  "subjectType": [
+    "Patient"
+  ],
+  "item": [
+    {
+      "linkId": "vitals",
+      "text": "Vital signs",
+      "type": "group",
+      "item": [
+        {
+          "linkId": "temperature",
+          "text": "Temperature (°C)",
+          "type": "decimal"
+        },
+        {
+          "linkId": "pulse",
+          "text": "Pulse (beats/min)",
+          "type": "integer"
+        },
+        {
+          "linkId": "respiratory-rate",
+          "text": "Respiratory rate (breaths/min)",
+          "type": "integer"
+        },
+        {
+          "linkId": "spo2",
+          "text": "Oxygen saturation (%)",
+          "type": "integer"
+        },
+        {
+          "linkId": "weight",
+          "text": "Weight (kg)",
+          "type": "decimal"
+        },
+        {
+          "linkId": "height",
+          "text": "Height (cm)",
+          "type": "decimal"
+        },
+        {
+          "linkId": "blood-pressure",
+          "text": "Blood pressure (mmHg)",
+          "type": "group",
+          "item": [
+            {
+              "linkId": "systolic",
+              "text": "Systolic",
+              "type": "integer"
+            },
+            {
+              "linkId": "diastolic",
+              "text": "Diastolic",
+              "type": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "linkId": "triage-category",
+      "text": "Triage category",
+      "type": "coding",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "system": "https://health.go.ug/fhir/CodeSystem/triage-category",
+            "code": "emergency",
+            "display": "Emergency: seen at once"
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "https://health.go.ug/fhir/CodeSystem/triage-category",
+            "code": "urgent",
+            "display": "Urgent: seen next"
+          }
+        },
+        {
+          "valueCoding": {
+            "system": "https://health.go.ug/fhir/CodeSystem/triage-category",
+            "code": "routine",
+            "display": "Routine"
+          }
+        }
+      ]
+    }
+  ]
+}

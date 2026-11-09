@@ -1,0 +1,187 @@
+{
+  "type": "extraction-fixture",
+  "mapping": "https://health.go.ug/fhir/Library/opd-triage-mapping|1.0.0",
+  "response": {
+    "resourceType": "QuestionnaireResponse",
+    "id": "0190f1a2-7c3d-7e4f-8a5b-0000000003c2",
+    "questionnaire": "https://health.go.ug/fhir/Questionnaire/opd-triage|1.0.0",
+    "status": "completed",
+    "subject": {
+      "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+    },
+    "encounter": {
+      "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201"
+    },
+    "authored": "2026-11-10T08:15:00+03:00",
+    "item": [
+      {
+        "linkId": "vitals",
+        "item": [
+          {
+            "linkId": "temperature",
+            "answer": [
+              {
+                "valueDecimal": 36.8
+              }
+            ]
+          },
+          {
+            "linkId": "pulse",
+            "answer": [
+              {
+                "valueInteger": 76
+              }
+            ]
+          },
+          {
+            "linkId": "blood-pressure",
+            "item": [
+              {
+                "linkId": "systolic",
+                "answer": [
+                  {
+                    "valueInteger": 118
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "linkId": "triage-category",
+        "answer": [
+          {
+            "valueCoding": {
+              "system": "https://health.go.ug/fhir/CodeSystem/triage-category",
+              "code": "routine",
+              "display": "Routine"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "resourceType": "Bundle",
+    "type": "transaction",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:ee6a401e-5e40-5333-8354-e431dfd50651",
+        "resource": {
+          "resourceType": "Observation",
+          "effectiveDateTime": "2026-11-10T08:15:00+03:00",
+          "valueQuantity": {
+            "value": 36.8,
+            "unit": "°C",
+            "system": "http://unitsofmeasure.org",
+            "code": "Cel"
+          },
+          "status": "final",
+          "category": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                  "code": "vital-signs",
+                  "display": "Vital Signs"
+                }
+              ]
+            }
+          ],
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8310-5",
+                "display": "Body temperature"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+          },
+          "encounter": {
+            "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201"
+          },
+          "id": "ee6a401e-5e40-5333-8354-e431dfd50651",
+          "meta": {
+            "tag": [
+              {
+                "system": "urn:health:extraction",
+                "code": "managed"
+              }
+            ]
+          },
+          "derivedFrom": [
+            {
+              "reference": "QuestionnaireResponse/0190f1a2-7c3d-7e4f-8a5b-0000000003c2"
+            }
+          ]
+        },
+        "request": {
+          "method": "PUT",
+          "url": "Observation/ee6a401e-5e40-5333-8354-e431dfd50651"
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:c994a21f-401d-5596-82ea-57706febbcc5",
+        "resource": {
+          "resourceType": "Observation",
+          "effectiveDateTime": "2026-11-10T08:15:00+03:00",
+          "valueQuantity": {
+            "value": 76,
+            "unit": "beats/min",
+            "system": "http://unitsofmeasure.org",
+            "code": "/min"
+          },
+          "status": "final",
+          "category": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                  "code": "vital-signs",
+                  "display": "Vital Signs"
+                }
+              ]
+            }
+          ],
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8867-4",
+                "display": "Heart rate"
+              }
+            ]
+          },
+          "subject": {
+            "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+          },
+          "encounter": {
+            "reference": "Encounter/0190f1a2-7c3d-7e4f-8a5b-000000000201"
+          },
+          "id": "c994a21f-401d-5596-82ea-57706febbcc5",
+          "meta": {
+            "tag": [
+              {
+                "system": "urn:health:extraction",
+                "code": "managed"
+              }
+            ]
+          },
+          "derivedFrom": [
+            {
+              "reference": "QuestionnaireResponse/0190f1a2-7c3d-7e4f-8a5b-0000000003c2"
+            }
+          ]
+        },
+        "request": {
+          "method": "PUT",
+          "url": "Observation/c994a21f-401d-5596-82ea-57706febbcc5"
+        }
+      }
+    ]
+  }
+}
