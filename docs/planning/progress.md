@@ -969,6 +969,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#81: financial records go up as operations (2026-11-09).**
+  - **What:** charges, deferrals, settlements, waivers, ledger postings, payments and shifts are logged as operations in the write transaction. Central replays each through the same store method, following the facility's records in commit order (the matrix: up, as operations; reversals only).
+  - **Tested:** a charge created and then billed at the edge arrives at central as one charge, billed.
+  - **Still open on #81:**
+    - checking stores and accounts against the sending facility;
+    - central's balance and external payment checks;
+    - golden-record narrowing;
+    - zstd.
 - **#247: inter-facility transfers matched at central (2026-11-09; product owner chose to sync the transfer document).**
   - **Flow:** the source's dispatched transfer goes up, central keeps the source's lines, and the destination's edge pulls the transfers in transit to it and receives against them. The receipt goes up, and central matches it against the dispatch, opening a Reconciliation Record per discrepancy at central. Central alerts on transfers not received in 14 days and on receipts without a dispatch.
   - **Tested:** KLA01 dispatches 40 to GUL02, GUL02 receives 35, and central records a short of 5 on GUL02's unit, even though the destination's copy claimed 35 were sent. Another facility cannot send the transfer, and the destination keeps it once.

@@ -15,6 +15,7 @@
 //! A version received by sync keeps its `op_id` and the `lastUpdated` its origin stamped, is
 //! logged with its origin node, and is never queued back toward the peer it came from.
 
+pub(crate) mod finance;
 mod transfers;
 
 pub use transfers::{TransferMatch, TransferRefused};
@@ -98,7 +99,16 @@ pub const DOWN_GLOBAL: &[&str] = &[
 pub const STOCK_LEDGER: &str = "stock";
 
 /// The ledgers whose operations sync: up only, from the facility that keeps them.
-pub const LEDGERS: &[&str] = &[STOCK_LEDGER];
+pub const LEDGERS: &[&str] = &[
+    STOCK_LEDGER,
+    finance::CHARGE,
+    finance::DEFERRAL,
+    finance::SETTLEMENT,
+    finance::WAIVER,
+    finance::POSTING,
+    finance::PAYMENT,
+    finance::SHIFT,
+];
 
 impl SyncScope {
     /// Whether the peer may send up a version of `resource_type` with this body, or an
@@ -1241,6 +1251,13 @@ impl SurrealAuthority<'_> {
                 detail,
             })
         };
+        if finance::FINANCE.contains(&item.resource_type.as_str()) {
+            return match tx.replay_finance(&item.resource_type, &item.body).await {
+                Ok(()) => Ok(None),
+                Err(Ok(reason)) => Ok(refused(format!("{}: {reason}", item.op_id))),
+                Err(Err(error)) => Err(error),
+            };
+        }
         let Ok(movement) = serde_json::from_value::<health_inventory::Movement>(item.body.clone())
         else {
             return Ok(refused(format!("{}: not a stock movement", item.op_id)));

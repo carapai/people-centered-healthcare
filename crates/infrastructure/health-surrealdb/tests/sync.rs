@@ -743,3 +743,50 @@ async fn the_facility_stock_ledger_goes_up_as_operations_applied_once() {
     // Operations never come back down.
     assert_eq!(sync(&edge, &central).await, Round::default());
 }
+
+#[tokio::test]
+async fn charges_go_up_as_operations_and_central_follows_their_changes() {
+    use health_billing::{Charge, ChargeStatus, ChargeStore as _};
+    let (central, edge) = pair().await;
+    let charge = Charge {
+        id: "ch-1".into(),
+        trigger: "consultation".into(),
+        event: "Encounter/e-1".into(),
+        event_item: "consult".into(),
+        patient: "Patient/p-1".into(),
+        item: "opd-consultation".into(),
+        quantity: rust_decimal::Decimal::ONE,
+        at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        account: "Account/a-1".into(),
+        service_point: None,
+        free_care: None,
+        status: ChargeStatus::Billable,
+        price: None,
+        cancelled: None,
+    };
+    let mut tx = edge.store.begin().await.expect("begin");
+    assert!(tx.add_charge(&charge).await.expect("add"));
+    tx.commit().await.expect("commit");
+    // Billed later at the facility: the change follows the charge up.
+    let mut tx = edge.store.begin().await.expect("begin");
+    tx.put_charge(&Charge {
+        status: ChargeStatus::Billed,
+        ..charge.clone()
+    })
+    .await
+    .expect("bill");
+    tx.commit().await.expect("commit");
+
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.outcomes, vec![Outcome::Accepted, Outcome::Accepted]);
+    let mut tx = central.store.begin().await.expect("begin");
+    let at_central = tx.charges_of_account("Account/a-1").await.expect("charges");
+    drop(tx);
+    assert_eq!(at_central.len(), 1, "one charge, not two");
+    assert_eq!(
+        at_central[0].status,
+        ChargeStatus::Billed,
+        "in commit order"
+    );
+    assert_eq!(sync(&edge, &central).await, Round::default());
+}

@@ -48,6 +48,11 @@ impl ChargeStore for SurrealTx {
             binds(charge)?,
         )
         .await?;
+        self.log_op(
+            crate::sync::finance::CHARGE,
+            &charge.account,
+            &encode(charge)?,
+        );
         Ok(true)
     }
 
@@ -58,6 +63,11 @@ impl ChargeStore for SurrealTx {
             binds(charge)?,
         )
         .await?;
+        self.log_op(
+            crate::sync::finance::CHARGE,
+            &charge.account,
+            &encode(charge)?,
+        );
         Ok(())
     }
 
@@ -135,6 +145,11 @@ mod accounts {
                 ],
             )
             .await?;
+            self.log_op(
+                crate::sync::finance::DEFERRAL,
+                &deferral.account,
+                &encode(deferral)?,
+            );
             Ok(())
         }
 
@@ -154,6 +169,11 @@ mod accounts {
                 ],
             )
             .await?;
+            self.log_op(
+                crate::sync::finance::SETTLEMENT,
+                &settlement.account,
+                &encode(settlement)?,
+            );
             Ok(())
         }
 
@@ -184,6 +204,11 @@ mod accounts {
                 ],
             )
             .await?;
+            self.log_op(
+                crate::sync::finance::WAIVER,
+                &waiver.account,
+                &encode(waiver)?,
+            );
             Ok(())
         }
 

@@ -48,6 +48,11 @@ impl PostingStore for SurrealTx {
             ],
         )
         .await?;
+        self.log_op(
+            crate::sync::finance::POSTING,
+            &posting.id,
+            &encode(posting)?,
+        );
         Ok(())
     }
 
@@ -77,6 +82,11 @@ impl PaymentStore for SurrealTx {
             ],
         )
         .await?;
+        self.log_op(
+            crate::sync::finance::PAYMENT,
+            &payment.id,
+            &encode(payment)?,
+        );
         Ok(())
     }
 
@@ -128,6 +138,7 @@ impl PaymentStore for SurrealTx {
             ],
         )
         .await?;
+        self.log_op(crate::sync::finance::SHIFT, &shift.id, &encode(shift)?);
         Ok(())
     }
 
