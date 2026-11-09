@@ -34,6 +34,10 @@ impl std::fmt::Debug for Schemas {
     }
 }
 
+/// The package format versions this release reads (configuration.md § Distribution and
+/// activation on nodes): like the schemas, they belong to the release, never to a package.
+pub const FORMAT_VERSIONS: &[u32] = &[1];
+
 impl Schemas {
     /// The schemas built into this release, each arriving with the feature that reads its
     /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]). Configuration naming any other schema

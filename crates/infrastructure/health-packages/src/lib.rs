@@ -29,7 +29,7 @@ use health_time::Timestamp;
 use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
-pub use schemas::{FORM_LAYOUT, Schemas};
+pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, Schemas};
 pub use signature::{LocalSigner, PublicationSigner, TYP};
 
 /// A sha-256.
@@ -47,6 +47,27 @@ impl fmt::Display for Digest {
     /// Lower-case hex.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.iter().try_for_each(|b| write!(f, "{b:02x}"))
+    }
+}
+
+/// Not a lower- or upper-case hex sha-256.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{0:?} is not a hex sha-256")]
+pub struct NotADigest(pub String);
+
+impl std::str::FromStr for Digest {
+    type Err = NotADigest;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let refused = || NotADigest(text.to_owned());
+        if text.len() != 64 || !text.is_ascii() {
+            return Err(refused());
+        }
+        let mut bytes = [0_u8; 32];
+        for (i, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).map_err(|_| refused())?;
+        }
+        Ok(Self(bytes))
     }
 }
 
@@ -271,4 +292,22 @@ pub fn verify(
         digest,
         signed_at,
     })
+}
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+
+    #[test]
+    fn a_digest_reads_back_from_its_hex() {
+        let digest = Digest::of(b"package");
+        assert_eq!(digest.to_string().parse::<Digest>(), Ok(digest));
+        assert_eq!(
+            digest.to_string().to_uppercase().parse::<Digest>(),
+            Ok(digest)
+        );
+        for bad in ["", "ab", &"g".repeat(64), &"é".repeat(32)] {
+            assert!(bad.parse::<Digest>().is_err(), "{bad}");
+        }
+    }
 }

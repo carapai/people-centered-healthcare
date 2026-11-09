@@ -1159,6 +1159,11 @@ DEFINE TABLE package_activation TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD issued_at ON package_activation TYPE datetime PERMISSIONS FULL
   DEFINE FIELD package ON package_activation TYPE string PERMISSIONS FULL
   DEFINE INDEX package_activation_package ON package_activation FIELDS package, issued_at
+DEFINE TABLE package_activation_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD at ON package_activation_report TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD data ON package_activation_report TYPE string PERMISSIONS FULL
+  DEFINE FIELD outcome ON package_activation_report TYPE string PERMISSIONS FULL
+  DEFINE INDEX package_activation_report_at ON package_activation_report FIELDS at
 DEFINE TABLE package_lifecycle TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON package_lifecycle TYPE string PERMISSIONS FULL
   DEFINE FIELD package ON package_lifecycle TYPE string PERMISSIONS FULL
@@ -1169,6 +1174,13 @@ DEFINE TABLE package_lifecycle_record TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON package_lifecycle_record TYPE string PERMISSIONS FULL
   DEFINE FIELD lifecycle ON package_lifecycle_record TYPE string PERMISSIONS FULL
   DEFINE INDEX package_lifecycle_record_lifecycle ON package_lifecycle_record FIELDS lifecycle
+DEFINE TABLE package_staged TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON package_staged TYPE string PERMISSIONS FULL
+  DEFINE FIELD digest ON package_staged TYPE string PERMISSIONS FULL
+  DEFINE FIELD staged_at ON package_staged TYPE datetime PERMISSIONS FULL
+DEFINE TABLE package_state TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON package_state TYPE string PERMISSIONS FULL
+  DEFINE FIELD switched_at ON package_state TYPE datetime PERMISSIONS FULL
 DEFINE TABLE patient TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON patient TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON patient TYPE array<record> DEFAULT [] PERMISSIONS FULL

@@ -969,6 +969,18 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 3: staging and the switch on an edge (2026-11-09).**
+  - **What:** after each sync round, an edge works out the set its activation records want along its scope chain (`HEALTH_DISTRICT`, `HEALTH_FACILITY`, `HEALTH_PROGRAMS`).
+    - It fetches each missing tarball from central by sha-256, verifies it against the national root, and keeps it in its blob store. It records the package as staged (migration 0050).
+    - It switches in one transaction, or keeps the previous set and reports (`package-activation-failed`).
+    - Central's package commands now keep tarballs in `HEALTH_FILES_DIR`, the store sync serves.
+  - **Tested over HTTPS in process:**
+    - an activated package is fetched, verified, staged, retained and switched to, and a second round changes nothing;
+    - a version with an unactivated dependency fails, and the edge keeps the previous set with the reason;
+    - a record whose signature isn't the package's never stages.
+  - **Next (part 4):**
+    - load the active set into what the node serves (profiles, terminology, search with its reindex, workflows);
+    - report failures to central.
 - **#89, part 2: activation records at central, down to every node (2026-11-09).**
   - **What:**
     - `Publications::activate` issues a record for a published version. It carries the scope, effective time and reason, and the tarball's sha-256 and signature for the node to fetch and verify.

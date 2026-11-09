@@ -2535,12 +2535,14 @@ dependencies = [
  "futures-util",
  "health-auth",
  "health-backup",
+ "health-configuration",
  "health-files",
  "health-http",
  "health-identifiers",
  "health-identity",
  "health-inventory",
  "health-observability",
+ "health-packages",
  "health-persistence",
  "health-pki",
  "health-provisioning",
@@ -2569,6 +2571,7 @@ dependencies = [
  "tokio-rustls",
  "tower",
  "tracing",
+ "uuid",
  "windows-service",
 ]
 

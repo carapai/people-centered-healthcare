@@ -46,6 +46,8 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_CERTIFICATE_SECS` | `3600` | How often the leaf is checked for renewal and address changes |
 | `HEALTH_MDNS` | `on` | `off` stops the `_health-edge._tcp` mDNS announcement |
 | `HEALTH_FACILITY` | none | The facility this edge serves. With `HEALTH_SNAPSHOT_KEYS_FILE`, the node serves staff sign-in (#75) |
+| `HEALTH_DISTRICT` | none | The facility's district, whose package activations apply here (#89) |
+| `HEALTH_PROGRAMS` | none | The programs the facility runs, comma-separated, whose package activations apply here (#89) |
 | `HEALTH_SNAPSHOT_KEYS_FILE` | none | Central's snapshot public keys, a JSON array of JWKs (`central-server provision snapshot-keys`) |
 | `HEALTH_LOG` | `info` | `EnvFilter` directive |
 

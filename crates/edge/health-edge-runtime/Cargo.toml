@@ -18,10 +18,13 @@ flate2 = { workspace = true }
 fs4 = { workspace = true }
 health-auth = { workspace = true }
 health-backup = { workspace = true }
+health-configuration = { workspace = true }
 health-files = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-packages = { workspace = true }
+health-persistence = { workspace = true }
 health-pki = { workspace = true }
 health-identifiers = { workspace = true }
 health-inventory = { workspace = true }
@@ -50,12 +53,12 @@ tokio = { workspace = true, features = ["io-util", "net", "signal", "sync"] }
 tokio-rustls = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = { workspace = true }
 
 [dev-dependencies]
-health-persistence = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
 health-sync-server = { workspace = true }
 rcgen = { workspace = true }

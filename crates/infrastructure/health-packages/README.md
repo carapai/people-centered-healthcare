@@ -108,7 +108,7 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
 
 ## Not yet
 
-- Activation and staging come with scoped activation (#89). Central stores packages as blobs through `health-publication`.
+- Staging and activation on a node are `health-edge-runtime`'s (#89): it fetches a tarball by the sha-256 its activation names (`Digest` reads back from hex), `verify`s it, and checks the package's `formatVersion` against the release's `FORMAT_VERSIONS`. Central stores packages as blobs through `health-publication`.
 
 ## Tests
 
