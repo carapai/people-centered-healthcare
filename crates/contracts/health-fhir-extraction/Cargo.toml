@@ -17,6 +17,7 @@ workspace = true
 health-fhir-validation = { workspace = true }
 health-identifiers = { workspace = true }
 serde_json = { workspace = true }
+health-time = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

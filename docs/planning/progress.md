@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#94: population (2026-11-09).** This completes #94.
+  - **What:**
+    - `health_fhir_extraction::populate` does expression-based population (`launchContext`, `variable`, `initialExpression`, `candidateExpression`) and observation-based population (`observationLinkPeriod`);
+    - the FHIRPath port gained `evaluate_with` for named variables;
+    - the server answers `POST /Questionnaire/{id}/$populate` under the caller's policy.
+  - **Tested:**
+    - the prefill fixtures pass (expression-based with a variable and candidates; observation-based, newest within the period, skipping entered-in-error);
+    - a missing patient context and a bad expression fail;
+    - over HTTP with the PDP, a labelled newer Observation is used only for a caller in its program, and an unreadable patient is not found.
 - **#105: the OPD Workflow Definition (2026-11-09).**
   - **What:** `Library/opd-visit` in `ug.moh.opd`, with its source in `sources/opd-visit.json`:
     - reception, then triage, whose category is the `urgency` data field; an emergency bypasses the gate;

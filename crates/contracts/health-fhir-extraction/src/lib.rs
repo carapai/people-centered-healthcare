@@ -37,6 +37,7 @@ use health_identifiers::{DerivationName, ResourceId, derive_id};
 use serde_json::{Map, Value, json};
 
 pub mod gates;
+pub mod populate;
 
 /// SDC's `templateExtractContext` extension.
 pub const TEMPLATE_EXTRACT_CONTEXT: &str =

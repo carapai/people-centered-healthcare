@@ -499,3 +499,114 @@ async fn central_shares_patient_confined_reads_across_facilities() {
     // Labels still apply to shared reads.
     assert_eq!(f.read(&clinician, "hiv").await, StatusCode::NOT_FOUND);
 }
+
+/// `$populate` (#94) draws only on what the caller may see: a labelled Observation they may not
+/// read is not used, and a patient they may not read is not found.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn population_draws_only_on_what_the_caller_may_see() {
+    let store = store().await;
+    let admin = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted)).router();
+    let (_, patient) = send(
+        &admin,
+        None,
+        Method::POST,
+        "/Patient",
+        Some(json!({ "resourceType": "Patient", "birthDate": "1991-03-14" })),
+    )
+    .await;
+    let patient = patient["id"].as_str().expect("id").to_owned();
+    let sdc = "http://hl7.org/fhir/uv/sdc/StructureDefinition";
+    let (_, questionnaire) = send(
+        &admin,
+        None,
+        Method::POST,
+        "/Questionnaire",
+        Some(json!({
+            "resourceType": "Questionnaire", "status": "active",
+            "url": "https://health.go.ug/fhir/Questionnaire/weights", "version": "1.0.0",
+            "extension": [{ "url": format!("{sdc}/sdc-questionnaire-launchContext"),
+                "extension": [{ "url": "name", "valueCoding": { "code": "patient" } }] }],
+            "item": [
+                { "linkId": "born", "type": "date", "extension": [{
+                    "url": format!("{sdc}/sdc-questionnaire-initialExpression"),
+                    "valueExpression": { "language": "text/fhirpath", "expression": "%patient.birthDate" } }] },
+                { "linkId": "weight", "type": "decimal",
+                  "code": [{ "system": "http://loinc.org", "code": "29463-7" }],
+                  "extension": [{ "url": format!("{sdc}/sdc-questionnaire-observationLinkPeriod"),
+                    "valueDuration": { "value": 3650, "unit": "d", "system": "http://unitsofmeasure.org", "code": "d" } }] }
+            ]
+        })),
+    )
+    .await;
+    let questionnaire = questionnaire["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{questionnaire}"))
+        .to_owned();
+    // An older plain weight, and a newer one under the HIV label.
+    let now = Timestamp::now();
+    for (value, ago, labels) in [
+        (58.0, 48, json!([])),
+        (61.5, 2, json!([{ "system": ACT, "code": "HIV" }])),
+    ] {
+        let at = now
+            .checked_sub(health_time::SignedDuration::from_hours(ago))
+            .expect("time");
+        let mut observation = json!({
+            "resourceType": "Observation", "status": "final",
+            "code": { "coding": [{ "system": "http://loinc.org", "code": "29463-7" }] },
+            "subject": { "reference": format!("Patient/{patient}") },
+            "effectiveDateTime": at.to_string(),
+            "valueQuantity": { "value": value, "unit": "kg", "system": "http://unitsofmeasure.org", "code": "kg" },
+            "meta": { "tag": [{ "system": FACILITY_TAG_SYSTEM, "code": "F1" }] }
+        });
+        if labels.as_array().is_some_and(|l| !l.is_empty()) {
+            observation["meta"]["security"] = labels;
+        }
+        let (status, body) = send(
+            &admin,
+            None,
+            Method::POST,
+            "/Observation",
+            Some(observation),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+    }
+    let router = FhirServer::new(store, BASE, Arc::new(Unrestricted))
+        .with_access_control(pdp(), Arc::new(FacilityTag))
+        .router();
+    let populate = |subject: Subject| {
+        let router = router.clone();
+        let path = format!("/Questionnaire/{questionnaire}/$populate");
+        let body = json!({ "resourceType": "Parameters", "parameter": [
+            { "name": "subject", "valueReference": { "reference": format!("Patient/{patient}") } }
+        ] });
+        async move { send(&router, Some(&subject), Method::POST, &path, Some(body)).await }
+    };
+    let weight = |out: &Value| {
+        out["parameter"][0]["resource"]["item"][1]["answer"][0]["valueDecimal"].clone()
+    };
+
+    let clinician = subject(Permissions::from(["*.rs"]), &[]);
+    let (status, out) = populate(clinician).await;
+    assert_eq!(status, StatusCode::OK, "{out}");
+    assert_eq!(
+        out["parameter"][0]["resource"]["item"][0]["answer"][0]["valueDate"],
+        "1991-03-14"
+    );
+    assert_eq!(
+        weight(&out),
+        json!(58.0),
+        "the labelled, newer weight is not used"
+    );
+
+    let counsellor = subject(Permissions::from(["*.rs"]), &["hiv"]);
+    assert_eq!(weight(&populate(counsellor).await.1), json!(61.5));
+
+    // No Patient read: the patient is not found, and nothing is populated.
+    let stranger = subject(
+        Permissions::from(["Questionnaire.rs", "Observation.rs"]),
+        &[],
+    );
+    assert_eq!(populate(stranger).await.0, StatusCode::NOT_FOUND);
+}

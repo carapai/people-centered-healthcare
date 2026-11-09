@@ -1,0 +1,219 @@
+{
+  "questionnaire": {
+    "resourceType": "Questionnaire",
+    "url": "https://health.go.ug/fhir/Questionnaire/opd-triage",
+    "version": "1.0.0",
+    "status": "active",
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-launchContext",
+        "extension": [
+          {
+            "url": "name",
+            "valueCoding": {
+              "system": "http://hl7.org/fhir/uv/sdc/CodeSystem/launchContext",
+              "code": "patient"
+            }
+          },
+          {
+            "url": "type",
+            "valueCode": "Patient"
+          }
+        ]
+      }
+    ],
+    "item": [
+      {
+        "linkId": "vitals",
+        "type": "group",
+        "item": [
+          {
+            "linkId": "weight",
+            "text": "Weight (kg)",
+            "type": "decimal",
+            "code": [
+              {
+                "system": "http://loinc.org",
+                "code": "29463-7"
+              }
+            ],
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-observationLinkPeriod",
+                "valueDuration": {
+                  "value": 30,
+                  "unit": "days",
+                  "system": "http://unitsofmeasure.org",
+                  "code": "d"
+                }
+              }
+            ]
+          },
+          {
+            "linkId": "height",
+            "text": "Height (cm)",
+            "type": "decimal",
+            "code": [
+              {
+                "system": "http://loinc.org",
+                "code": "8302-2"
+              }
+            ],
+            "extension": [
+              {
+                "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-observationLinkPeriod",
+                "valueDuration": {
+                  "value": 30,
+                  "unit": "days",
+                  "system": "http://unitsofmeasure.org",
+                  "code": "d"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "launch": {
+    "contexts": {
+      "patient": {
+        "resourceType": "Patient",
+        "id": "0190f1a2-7c3d-7e4f-8a5b-0000000000aa",
+        "birthDate": "1991-03-14",
+        "gender": "female",
+        "name": [
+          {
+            "family": "Nakato",
+            "given": [
+              "Grace"
+            ]
+          }
+        ]
+      }
+    },
+    "now": "2026-11-10T08:00:00Z",
+    "observations": [
+      {
+        "resourceType": "Observation",
+        "id": "w-old",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "effectiveDateTime": "2026-11-01T09:00:00Z",
+        "valueQuantity": {
+          "value": 55.0,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        }
+      },
+      {
+        "resourceType": "Observation",
+        "id": "w-new",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "effectiveDateTime": "2026-11-08T09:00:00Z",
+        "valueQuantity": {
+          "value": 61.50,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        }
+      },
+      {
+        "resourceType": "Observation",
+        "id": "w-wrong",
+        "status": "entered-in-error",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "29463-7"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "effectiveDateTime": "2026-11-09T09:00:00Z",
+        "valueQuantity": {
+          "value": 99.0,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        }
+      },
+      {
+        "resourceType": "Observation",
+        "id": "h-stale",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8302-2"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+        },
+        "effectiveDateTime": "2026-08-01T09:00:00Z",
+        "valueQuantity": {
+          "value": 160.0,
+          "unit": "kg",
+          "system": "http://unitsofmeasure.org",
+          "code": "kg"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "resourceType": "QuestionnaireResponse",
+    "status": "in-progress",
+    "questionnaire": "https://health.go.ug/fhir/Questionnaire/opd-triage|1.0.0",
+    "subject": {
+      "reference": "Patient/0190f1a2-7c3d-7e4f-8a5b-0000000000aa"
+    },
+    "item": [
+      {
+        "linkId": "vitals",
+        "item": [
+          {
+            "linkId": "weight",
+            "text": "Weight (kg)",
+            "answer": [
+              {
+                "valueDecimal": 61.50
+              }
+            ]
+          },
+          {
+            "linkId": "height",
+            "text": "Height (cm)"
+          }
+        ]
+      }
+    ]
+  }
+}
