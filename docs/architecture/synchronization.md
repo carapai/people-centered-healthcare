@@ -260,10 +260,13 @@ stateDiagram-v2
     - `GET /{id}` shows both branches: the candidate as pushed, and the current head of each conflicting record.
     - `POST /{id}` takes `keep-head`, or `write` with the corrected resource.
     - The decision and its AuditEvent are committed in one transaction.
+  - **The resolution reaches its node (#82, part 3):** resolving a record logs a `resolution` operation naming the record, the node whose push opened it, its candidates' `op_id`s and the version it was resolved to.
+    - Only that node pulls it. No node sends one up.
+    - Applying it clears the candidates' `conflict` state, so the record is accepted as resolved (`conflict → accepted` above). A `keep-head` resolution writes no version, so this is the only way its node learns of it.
+    - `SurrealStore::unaccepted` lists a node's candidates still in `conflict` or `rejected`, for the user to see as not accepted.
   - **Not yet:**
     - the review queue's screen in the web client;
-    - the commuting workflow transitions (auto-resolution 2);
-    - clearing the originating node's `conflict` item state when the resolution arrives.
+    - the commuting workflow transitions (auto-resolution 2).
 
 ## Provisional states
 

@@ -354,6 +354,11 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
     drop(tx);
     // Nothing more moves until the conflict is resolved at central.
     assert_eq!(sync(&edge, &central).await, Round::default());
+    assert_eq!(
+        edge.store.unaccepted().await.expect("states"),
+        vec![(ours.version_id.to_string(), "conflict".to_owned())],
+        "the user sees the record as not accepted"
+    );
 
     // The Conflict Record keeps both branches, with its class and policy.
     let open = central.store.open_conflicts(None).await.expect("queue");
@@ -407,11 +412,37 @@ async fn concurrent_edits_open_a_conflict_and_the_edge_keeps_its_candidate() {
     assert_eq!(record.status, "resolved");
     assert_eq!(record.resolved_by.as_deref(), Some("registry:okello"));
     assert_eq!(record.resolution, Some(resolved.to_string()));
-    // The resolution syncs down like any other version.
+    // The resolution syncs down like any other version, and the edge stops holding its
+    // candidate: the record is accepted as resolved (synchronization.md § Item states).
     sync(&edge, &central).await;
     let (head_now, body) = head(&edge, "Patient", id).await.expect("head");
     assert_eq!(head_now, resolved);
     assert_eq!(body["name"][0]["text"], "Chris Okello");
+    assert!(edge.store.unaccepted().await.expect("states").is_empty());
+    // Another node is never sent it.
+    let another = NodeId::new();
+    let PullResponse::Items { items, .. } = central
+        .store
+        .pull(
+            &scope(),
+            central.id,
+            another,
+            &PullRequest {
+                cursor: None,
+                lane: Lane::Clinical,
+                limit: 500,
+            },
+        )
+        .await
+        .expect("pull")
+    else {
+        panic!("items")
+    };
+    assert!(items.iter().all(|i| i.item.resource_type != "resolution"));
+    assert!(
+        items.iter().any(|i| i.item.resource_id == id.to_string()),
+        "while the record itself is"
+    );
 }
 
 fn note(status: &str, text: &str) -> Value {
