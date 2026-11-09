@@ -790,3 +790,120 @@ async fn charges_go_up_as_operations_and_central_follows_their_changes() {
     );
     assert_eq!(sync(&edge, &central).await, Round::default());
 }
+
+#[tokio::test]
+async fn a_facility_cannot_send_operations_on_another_facility_s_ledgers() {
+    use health_billing::{Charge, ChargeStatus, ChargeStore as _};
+    use health_inventory::{Movement, MovementKind, Origin, Ownership, Policy, Status, StockUnit};
+    use health_inventory_app::Inventory;
+    let (central, kla) = pair().await;
+    let gul = node("2026-11-09T09:00:00Z").await;
+    gul.store
+        .add_upstream(&central.id.to_string())
+        .await
+        .expect("upstream");
+    let movement = |id: &str| Movement {
+        id: id.into(),
+        unit: StockUnit {
+            store: "Location/kla-store".into(),
+            product: "amoxicillin-500".into(),
+            batch: "B42".into(),
+            expiry: "2027-06-30".into(),
+            funding_source: "government".into(),
+            ownership: Ownership::Owned,
+            status: Status::Usable,
+        },
+        kind: MovementKind::Receipt,
+        quantity: 10,
+        pack_size: 10,
+        unit_cost: None,
+        occurred_at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        recorded_at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        source_document: "grn".into(),
+        actor: "storekeeper".into(),
+        node: "E1".into(),
+        op_id: id.into(),
+        reason: None,
+        reverses: None,
+        emergency: false,
+    };
+    let authority = Origin::Authority {
+        may_emergency_dispense: false,
+    };
+    // KLA01's store and encounter reach central first.
+    Inventory::new(kla.store.clone(), Policy::default())
+        .record(&movement("kla-grn"), authority)
+        .await
+        .expect("kla receipt");
+    let encounter = ResourceId::new();
+    write(
+        &kla,
+        encounter,
+        &json!({
+            "resourceType": "Encounter", "status": "in-progress",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": "KLA01"}]}
+        }),
+        Precondition::MustNotExist,
+    )
+    .await;
+    assert!(
+        sync(&kla, &central)
+            .await
+            .outcomes
+            .iter()
+            .all(|o| *o == Outcome::Accepted)
+    );
+
+    // GUL02 sends a movement on KLA01's store and a charge on KLA01's encounter: both refused.
+    Inventory::new(gul.store.clone(), Policy::default())
+        .record(&movement("gul-grn"), authority)
+        .await
+        .expect("gul receipt");
+    let mut tx = gul.store.begin().await.expect("begin");
+    tx.add_charge(&Charge {
+        id: "gul-charge".into(),
+        trigger: "consultation".into(),
+        event: format!("Encounter/{encounter}"),
+        event_item: "consult".into(),
+        patient: "Patient/p-1".into(),
+        item: "opd-consultation".into(),
+        quantity: rust_decimal::Decimal::ONE,
+        at: "2026-11-09T09:00:00Z".parse().expect("time"),
+        account: "Account/gul-a".into(),
+        service_point: None,
+        free_care: None,
+        status: ChargeStatus::Billable,
+        price: None,
+        cancelled: None,
+    })
+    .await
+    .expect("charge");
+    tx.commit().await.expect("commit");
+    let sent = gul
+        .store
+        .outbox(&central.id.to_string(), gul.id, 50)
+        .await
+        .expect("outbox");
+    let authority_gul =
+        SurrealAuthority::new(&central.store, gul.id, SyncScope::Facility("GUL02".into()));
+    let mut refusals = Vec::new();
+    for outgoing in &sent {
+        let result = receive(&authority_gul, &outgoing.group)
+            .await
+            .expect("receive");
+        if let Outcome::Rejected { detail, .. } = result.outcome {
+            refusals.push(detail);
+        }
+    }
+    assert_eq!(refusals.len(), 2, "{refusals:?}");
+    assert!(
+        refusals[0].contains("belongs to facility KLA01"),
+        "{}",
+        refusals[0]
+    );
+    assert!(
+        refusals[1].contains("another facility's"),
+        "{}",
+        refusals[1]
+    );
+}

@@ -969,6 +969,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#81: whose ledger an operation is on (2026-11-09).** Central records which facility first sent operations on each stock store, billing account, posting, payment or shift, and refuses operations on it from any other facility. A charge on another facility's Encounter is refused too. Tested: GUL02's movement on KLA01's store and its charge on KLA01's encounter are both refused.
 - **#81: financial records go up as operations (2026-11-09).**
   - **What:** charges, deferrals, settlements, waivers, ledger postings, payments and shifts are logged as operations in the write transaction. Central replays each through the same store method, following the facility's records in commit order (the matrix: up, as operations; reversals only).
   - **Tested:** a charge created and then billed at the edge arrives at central as one charge, billed.
