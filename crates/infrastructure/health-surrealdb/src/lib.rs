@@ -57,7 +57,7 @@ pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
 pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
-pub use store::{SurrealStore, SurrealTx};
+pub use store::{SharedRegistry, SurrealStore, SurrealTx};
 pub use sync::{
     ConflictRecord, DOWN_GLOBAL, LEDGERS, Outgoing, Resolution, STOCK_LEDGER, SurrealAuthority,
     SurrealReplica, SyncScope, TransferMatch, TransferRefused, UP_GLOBAL, class_of,
