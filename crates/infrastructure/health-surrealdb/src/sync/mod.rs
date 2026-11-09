@@ -1251,6 +1251,11 @@ impl SurrealAuthority<'_> {
                 detail,
             })
         };
+        if let SyncScope::Facility(facility) = &self.scope
+            && let Some(why) = self.claim(tx, item, facility).await?
+        {
+            return Ok(refused(format!("{}: {why}", item.op_id)));
+        }
         if finance::FINANCE.contains(&item.resource_type.as_str()) {
             return match tx.replay_finance(&item.resource_type, &item.body).await {
                 Ok(()) => Ok(None),
@@ -1286,6 +1291,67 @@ impl SurrealAuthority<'_> {
             Err(health_inventory_app::InventoryError::Busy) => Err(WriteError::Conflict),
             Err(error) => Ok(refused(format!("{}: {error}", item.op_id))),
         }
+    }
+
+    /// Why `facility` may not send this operation, if it may not: its scope (a stock store, a
+    /// billing account, a posting, payment or shift) belongs to another facility, claimed by the
+    /// first to send an operation on it; or a charge names an encounter of another facility.
+    async fn claim(
+        &self,
+        tx: &mut SurrealTx,
+        item: &Item,
+        facility: &str,
+    ) -> Result<Option<String>, WriteError> {
+        let scope = if item.resource_type == STOCK_LEDGER {
+            item.body["unit"]["store"]
+                .as_str()
+                .unwrap_or(item.resource_id.as_str())
+                .to_owned()
+        } else {
+            item.resource_id.clone()
+        };
+        let held: Option<String> = tx
+            .tx()?
+            .query(
+                "LET $claim = type::record('ledger_claim', [$ledger, $scope]); \
+                 LET $held = (SELECT VALUE facility FROM ONLY $claim); \
+                 IF $held = NONE { CREATE $claim SET facility = $facility, claimed_at = time::now(); }; \
+                 RETURN $held;",
+            )
+            .bind(("ledger", item.resource_type.clone()))
+            .bind(("scope", scope.clone()))
+            .bind(("facility", facility.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(write_error)?
+            .take(3)
+            .map_err(write_error)?;
+        if let Some(owner) = held.filter(|owner| owner != facility) {
+            return Ok(Some(format!(
+                "{} {scope} belongs to facility {owner}",
+                item.resource_type
+            )));
+        }
+        if item.resource_type == finance::CHARGE
+            && let Some(encounter) = item.body["event"]
+                .as_str()
+                .and_then(|e| e.strip_prefix("Encounter/"))
+                .and_then(|id| id.parse::<ResourceId>().ok())
+        {
+            let resource_type: ResourceType = "Encounter"
+                .parse()
+                .map_err(|_| WriteError::Store(corrupt("resource_type")))?;
+            if let Some(head) = tx.head(&resource_type, encounter).await? {
+                let body: Value = serde_json::from_str(head.json.as_str())
+                    .map_err(|_| WriteError::Store(corrupt("encounter json")))?;
+                if facility_of(&body).is_some_and(|tagged| tagged != facility) {
+                    return Ok(Some(format!(
+                        "the charge's encounter {encounter} is another facility's"
+                    )));
+                }
+            }
+        }
+        Ok(None)
     }
 
     async fn standing(&self, tx: &mut SurrealTx, item: &Item) -> Result<Standing, WriteError> {

@@ -62,7 +62,10 @@ Every item on the wire, in either direction:
     - **At the receiver:** the operation is appended through inventory's own rules as a late operation (`Inventory::record_in`, `Origin::Late`), in the same transaction as its receipt. A balance it drives negative opens a Reconciliation Record, and a movement already held is skipped.
     - **Direction:** operations go up only, and are never sent down.
     - **Financial records (#81):** charges, deferrals, settlements, waivers, ledger postings, payments and cashier shifts are each logged as an operation on their own ledger (`sync::finance`). The receiver replays the record through the same store method, so central's copy follows the facility's in commit order. A charge billed after it was created arrives billed, as one charge. Records with an id are never created twice; receipts keep the rest once.
-    - **Not yet:** checking that a movement's store, or a charge's account, belongs to the sending facility; central's ledger-balance and external payment checks.
+    - **Whose ledger (#81):** each operation's scope is claimed by the first facility to send an operation on it (`ledger_claim`, migration `0046_ledger_claims`). The scope is a stock store, a billing account, or a posting, payment or shift id. Central refuses operations on it from any other facility, so a facility can neither post to another's store nor overwrite another's payment.
+      - A charge naming an Encounter that central holds must come from that Encounter's facility (ADR 0057 tag).
+      - A store's true owner comes from the facility registry's Locations once they record it; until then the first claim stands.
+    - **Not yet:** central's ledger-balance and external payment checks.
 - **In code (#80).** `health-sync-protocol` (contracts) holds the wire types and both sides' rules, with no I/O ([README](../../crates/contracts/health-sync-protocol/README.md)):
   - the envelope `Item` and its `ContentHash`;
   - the handshake verdict;

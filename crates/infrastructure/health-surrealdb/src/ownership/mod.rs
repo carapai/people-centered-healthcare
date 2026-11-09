@@ -62,6 +62,7 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "sync_grant_outbox",
     "sync_transfer_outbox",
     "sync_transfer_state",
+    "ledger_claim",
     "idx_token",
     "idx_string",
     "idx_date",
