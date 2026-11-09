@@ -60,6 +60,29 @@ The semver diff check (metadata.md § Versioning). **`check(latest, next, conten
 - **`Release::of(contents, fingerprints)`** reads a release from a package's contents, leaving out the generated `package.json`, `.index.json` and manifest.
 - **Each artefact's own bump** is checked against what changed in its content: `check` takes those `ContentChange`s by canonical URL, and refuses an artefact whose new version understates them (`ArtefactUnderstated`). `health-packages`' `bump` module finds them in the JSON, since this crate reads no JSON.
 
+## `activation`
+
+Scoped activation on nodes (configuration.md § Distribution and activation on nodes, § Rollback; #89).
+
+- **`Activation`** is a record that package `name@version` is active in a `Scope` from `effective_at`. The scope is national, a district, a facility, or a program at a facility. Records are never changed: rollback is a new activation of an earlier version.
+- **`active_set(activations, chain, now)`** merges the activations along a node's `Chain` (its district, facility and programs).
+  - For each package, the most specific scope wins: program, then facility, then district, then national.
+  - Within a scope, the latest-issued activation already in effect wins.
+  - Central, with no district or facility, takes the national set.
+- **`check(set, staged, release)`** lists what stops a set being activated (`Problem`):
+  - a package not staged on the node;
+  - a dependency missing, or active at a version other than the one it was published against (ADR 0024: no floating ranges at activation);
+  - `minSoftware` newer than the running release;
+  - a `formatVersion` the release does not read.
+- **`switch(current, …)`** moves to the new set whole, or not at all.
+  - It returns `Unchanged`, `Activated` with the changes by package (the caller reindexes when a changed package carries SearchParameters), or `Failed` with the problems, keeping the previous set.
+- **`retained(activations, chain)`** lists every version ever activated in the node's scope. The node keeps each one while data refers to it.
+
 ## Tests
 
-Unit tests cover exact versions and their precedence, each publication rule, and reading `package.json` as written. The lifecycle tests cover two approvers for each clinical kind and one for configuration, authors and co-authors refused as reviewers and approvers, returns to Draft clearing approvals, content pinned from submission to signing, steps out of order, and records as JSON. The semver tests cover each row of the table, understated and overstated versions, rewritten `url|version`s, downgrades, inexact versions, major zero and pre-releases.
+Unit tests cover exact versions and their precedence, each publication rule, and reading `package.json` as written. The lifecycle tests cover two approvers for each clinical kind and one for configuration, authors and co-authors refused as reviewers and approvers, returns to Draft clearing approvals, content pinned from submission to signing, steps out of order, and records as JSON. The activation tests cover:
+- the scope chain's merge, including another district's, facility's or program's activation;
+- effective times and rollback;
+- the staging, dependency, software and format checks;
+- a failed activation keeping the previous set;
+- records as JSON. The semver tests cover each row of the table, understated and overstated versions, rewritten `url|version`s, downgrades, inexact versions, major zero and pre-releases.

@@ -969,6 +969,18 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#89, part 1: scoped activation in the domain (2026-11-09).** #89 is split into parts:
+  1. the domain (this part);
+  2. activation records at central, travelling in the metadata lane;
+  3. staging, the switch and reindex on a node;
+  4. loading the active set into what the node serves.
+  - **What:** `health-configuration::activation` covers:
+    - the `Activation` record (package, version, scope, effective time);
+    - the active set merged along a node's scope chain, the most specific scope and then the latest issued winning;
+    - the checks before a switch (staged, exact dependencies, `minSoftware`, `formatVersion`);
+    - a switch that is whole or keeps the previous set and reports;
+    - the versions a node retains.
+  - **Tested:** the chain's merge, effective times, rollback as re-activation, each check, and a failed activation keeping the previous set.
 - **#81: zstd bodies (2026-11-09).**
   - **What:** the edge sends its sync bodies zstd-compressed and asks for compressed answers. Central decompresses before checking the signature, which covers the content. It caps a body at 8 MiB on the wire and 64 MiB expanded, and answers uncompressed to a peer that does not ask for zstd. The event stream and attachments are not compressed.
   - **Tested:**
