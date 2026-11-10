@@ -46,12 +46,15 @@ export async function startEdge(options: { signIn?: boolean } = {}): Promise<Edg
   let auth: Record<string, string> = {}
   let bundle: string | undefined
   if (options.signIn === true) {
-    const made = spawnSync(fixture, [dir, 'ug-kla-0001', 'ug-kla-mulago', staff.username, staff.password], { stdio: 'inherit' })
+    const made = spawnSync(fixture, [dir, 'ug-kla-0001', 'KLA001', staff.username, staff.password], { stdio: 'inherit' })
     if (made.status !== 0) throw new Error('edge-fixture failed: run `cargo build -p facility-edge --example edge-fixture`')
     auth = {
       HEALTH_NODE_ID: 'ug-kla-0001',
-      HEALTH_FACILITY: 'ug-kla-mulago',
+      HEALTH_FACILITY: 'KLA001',
       HEALTH_SNAPSHOT_KEYS_FILE: join(dir, 'snapshot-keys.json'),
+      // Registration on the edge (#106), its MRNs under the edge's own code.
+      HEALTH_NODE_CODE: 'E1',
+      HEALTH_REGISTRY_NIN_SYSTEM: 'urn:health:nin',
       CREDENTIALS_DIRECTORY: join(dir, 'credentials'),
     }
     bundle = readFileSync(join(dir, 'bundle.jws'), 'utf8')

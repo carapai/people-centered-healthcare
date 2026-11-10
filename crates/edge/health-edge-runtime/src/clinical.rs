@@ -8,6 +8,9 @@
 //!   turn each user's snapshot into permissions, and the sensitivity labels restrict records in
 //!   the policy decision point, as at central. They are read per request, and the routes are
 //!   rebuilt when a new bundle brings different rules. Before any bundle the API answers 503.
+//! - **Registration** (`Patient/$register`), with `HEALTH_NODE_CODE` and
+//!   `HEALTH_REGISTRY_NIN_SYSTEM`: the same matching as central, and MRNs minted under this node's
+//!   own code, so they never collide with another node's.
 //! - **Search** uses the parameters central does (`health_fhir_server::search_registry`), and a
 //!   submitted form is re-validated against its Questionnaire and extracted (#103), with the
 //!   definitions central sends down.
@@ -25,8 +28,13 @@ use health_audit::Auditor;
 use health_auth::{
     AccessVerifier, AuthStore as _, LocalConfig, Subjects, SurrealAuthStore, subject_layer,
 };
+use health_client_registry::matching::MatchingRules;
 use health_fhir_search::Unrestricted;
 use health_fhir_server::{FacilityTag, FhirServer, search_registry};
+use health_identifiers::{NumberFormat, ShortCode};
+use health_registries_app::fhir::{ECID_SYSTEM, RegistryConfig};
+use health_registries_app::matching::RegistryBlocking;
+use health_registries_app::register::MrnSettings;
 use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use tower::ServiceExt as _;
@@ -40,7 +48,19 @@ pub(crate) struct Clinical {
     /// The FHIR base the server names in its links, e.g. `https://edge.local/api/fhir`.
     base: String,
     node: String,
+    /// Registration (#106): the national ID system and this node's MRN code, when configured.
+    registry: Option<(String, ShortCode)>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
+}
+
+/// The client registry's configuration and matching rules for `nin`.
+fn registry_rules(nin: &str) -> (RegistryConfig, MatchingRules) {
+    (
+        RegistryConfig {
+            nin_system: nin.to_owned(),
+        },
+        MatchingRules::platform_default(nin, &[nin, ECID_SYSTEM]),
+    )
 }
 
 impl Clinical {
@@ -51,14 +71,25 @@ impl Clinical {
         verifier: AccessVerifier<SurrealAuthStore>,
         origin: &str,
         node: &str,
+        registry: Option<(String, ShortCode)>,
     ) -> Self {
+        let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock))
+            .with_registry(search_registry());
+        // With the registry, source Patients carry their blocking keys, as at central.
+        let store = match &registry {
+            Some((nin, _)) => {
+                let (config, rules) = registry_rules(nin);
+                store.with_blocking(Arc::new(RegistryBlocking::new(rules, config)))
+            }
+            None => store,
+        };
         Self {
-            store: SurrealStore::new(connection.clone(), Arc::new(SystemClock))
-                .with_registry(search_registry()),
+            store,
             auth,
             verifier,
             base: format!("{origin}/api/fhir"),
             node: node.to_owned(),
+            registry,
             built: Arc::new(RwLock::new(None)),
         }
     }
@@ -80,6 +111,22 @@ impl Clinical {
         .with_audit(Auditor::new(self.node.clone(), sensitive))
         .with_questionnaire_checks()
         .with_extraction();
+        // Registration with this node's own MRNs, which never collide with another node's.
+        let fhir = match &self.registry {
+            Some((nin, node)) => {
+                let (config, rules) = registry_rules(nin);
+                fhir.with_client_registry(config, rules)
+                    .with_registration(MrnSettings {
+                        node: node.clone(),
+                        format: NumberFormat {
+                            padding: 6,
+                            ..NumberFormat::default()
+                        },
+                        system: "urn:health:mrn".into(),
+                    })
+            }
+            None => fhir,
+        };
         let subjects = Subjects::new(self.verifier.clone(), config.roles.clone());
         let layer =
             axum::middleware::from_fn_with_state(subjects, subject_layer::<SurrealAuthStore>);

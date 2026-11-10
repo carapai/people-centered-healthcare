@@ -94,6 +94,13 @@ pub struct EdgeConfig {
     pub certificate_interval: Duration,
     /// `HEALTH_FACILITY`: the facility this edge serves; sign-in needs a snapshot for it.
     pub facility: Option<String>,
+    /// `HEALTH_NODE_CODE`: this edge's short code in the numbers it mints, such as MRNs
+    /// (`KAM013-E1-000001`; ADR 0014). Unique among the facility's nodes. With
+    /// `HEALTH_REGISTRY_NIN_SYSTEM`, the edge registers patients (#106).
+    pub node_code: Option<health_identifiers::ShortCode>,
+    /// `HEALTH_REGISTRY_NIN_SYSTEM`: the national ID's identifier system, which registration
+    /// matches on.
+    pub registry_nin_system: Option<String>,
     /// `HEALTH_DISTRICT`: the facility's district, whose package activations apply here (#89).
     pub district: Option<String>,
     /// `HEALTH_PROGRAMS`: the programs the facility runs, comma-separated, whose package
@@ -201,6 +208,16 @@ impl EdgeConfig {
             dns_name: get("HEALTH_DNS_NAME").map(|n| n.trim().to_ascii_lowercase()),
             certificate_interval: positive("HEALTH_CERTIFICATE_SECS", 3600)?,
             facility: get("HEALTH_FACILITY").map(|f| f.trim().to_owned()),
+            node_code: get("HEALTH_NODE_CODE")
+                .map(|code| {
+                    code.trim()
+                        .parse()
+                        .map_err(|_| ConfigError::Malformed("HEALTH_NODE_CODE"))
+                })
+                .transpose()?,
+            registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM")
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty()),
             district: get("HEALTH_DISTRICT")
                 .map(|d| d.trim().to_owned())
                 .filter(|d| !d.is_empty()),
@@ -295,6 +312,22 @@ mod tests {
         );
         let none = config(&[("HEALTH_DATA_DIR", "/d")]).expect("config");
         assert_eq!((none.district, none.programs.len()), (None, 0));
+    }
+
+    #[test]
+    fn registration_needs_a_short_node_code() {
+        let c = config(&[
+            ("HEALTH_DATA_DIR", "/d"),
+            ("HEALTH_NODE_CODE", "E1"),
+            ("HEALTH_REGISTRY_NIN_SYSTEM", " urn:health:nin "),
+        ])
+        .expect("config");
+        assert_eq!(c.node_code.map(|c| c.to_string()).as_deref(), Some("E1"));
+        assert_eq!(c.registry_nin_system.as_deref(), Some("urn:health:nin"));
+        assert_eq!(
+            config(&[("HEALTH_DATA_DIR", "/d"), ("HEALTH_NODE_CODE", "edge-1")]),
+            Err(ConfigError::Malformed("HEALTH_NODE_CODE"))
+        );
     }
 
     #[test]
