@@ -51,7 +51,7 @@ impl Api {
             .enrollment_router()
             .merge(admin::local_only(gate.admin_router()))
             .merge(gate.device_router());
-        match auth::routes(config, store, &gate, secrets, clock) {
+        match auth::routes(config, connection, store, &gate, secrets, clock) {
             Ok(routes) => {
                 api = api.merge(routes);
                 tracing::info!(

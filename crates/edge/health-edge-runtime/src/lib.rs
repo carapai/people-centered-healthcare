@@ -25,6 +25,7 @@ pub mod activation;
 pub mod admin;
 mod auth;
 pub mod backup;
+mod clinical;
 mod config;
 mod discovery;
 mod enrollment;
