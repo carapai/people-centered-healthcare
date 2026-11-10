@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#106, part 4: the acceptance run (2026-11-10).** This completes #106.
+  - **What:** edge e2e `opd-lan.spec.ts`: three enrolled devices on an edge with no internet register, check in, triage (vital signs extracted on the edge) and consult, then complete the visit. The edge fixture writes the OPD package's definitions into the edge's store, as central's sync would.
+  - **Results:** documented in `tests/acceptance/opd-lan/` (§132), with the reconnect and sync evidence.
+  - **Fixed on the way:**
+    - the edge's sync store indexes what central sends down;
+    - every searched type carries `_security`, so label rules hide nothing else (#403).
+  - **Not yet:** one run across a real central and edge, and orders and workflows on the edge.
 - **#106, part 3: registration on the edge (2026-11-10).**
   - **What:** with `HEALTH_NODE_CODE` and `HEALTH_REGISTRY_NIN_SYSTEM`, the edge serves `Patient/$register`. It uses central's matching and blocking keys, and its MRNs are minted under its own code, so they never collide with central's (`C1`) or another edge's. The facility code must be a short code.
   - **Tested (edge e2e):** with no internet, staff register a patient on the edge (MRN `KLA001-E1-000001`) and Reception finds them. The config refuses a node code that isn't a short code.
