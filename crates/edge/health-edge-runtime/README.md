@@ -47,6 +47,10 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
     - **Staging:** each missing package is fetched from central by sha-256 and verified against the national root (`root.pem` in `HEALTH_PKI_DIR`). It is then kept in the blob store, which retains every version ever activated, and recorded as staged.
     - **Switch:** the node switches to the set in one transaction, or keeps the previous one. Each attempt is reported (`package_activation_report`), and a failure raises `package-activation-failed`.
     - **Reports** go up to central (`/sync/v1/activation-reports`) and are marked sent once it has them.
+- **`clinical`: the clinical API (#106):** `/api/fhir` (the client's FHIR base on an edge), `/api/reception`, `/api/consultation` and `/api/notes`, over the edge's own store, for LAN browsers with the WAN down.
+  - **Access:** they sit behind the device gate (an enrolled device's DPoP proof) and the subject layer (the signed-in user's permissions for the facility).
+  - **Rules:** they are central's, from the provisioning bundle. The role mappings turn each user's snapshot into permissions, and the sensitivity labels restrict records in the PDP. They are read per request, and the routes are rebuilt when a new bundle brings different rules. Before any bundle, the API answers 503.
+  - **Search** uses central's parameters (`health_fhir_server::search_registry`). A submitted form is re-validated and extracted, with the definitions central sends down.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.
   - **Retention:** the 48 newest, and the newest of each of the last 14 days (UTC). Pruning also removes unfinished backups and blobs that no kept backup refers to.

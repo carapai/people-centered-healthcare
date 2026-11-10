@@ -969,6 +969,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#106, part 2: the edge serves the clinical API (2026-11-10).**
+  - **What:** `health-edge-runtime::clinical` serves `/api/fhir`, `/api/reception`, `/api/consultation` and `/api/notes` over the edge's store.
+    - It sits behind the device gate and the subject layer, under the bundle's role mappings and label rules. These are read per request, and the routes are rebuilt when they change.
+    - It uses central's search parameters (moved to `health-fhir-server`, part 2a), questionnaire checks and extraction.
+  - **Tested (edge e2e):** with central's bundle imported and no internet, staff on an enrolled device search the edge's own patients from Reception, with axe. The whole edge suite passes (8/8).
 - **#106, part 1: label rules reach the edge (2026-11-10).** Decided by the maintainer: edges enforce the labels, register patients with their own node code, and read role permissions per request. #106 is split into parts:
   1. the label rules (this part);
   2. the edge serving the clinical API;

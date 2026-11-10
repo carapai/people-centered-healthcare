@@ -64,7 +64,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         snapshot_version: 1,
     };
     let roles = RolePermissions(BTreeMap::from([
-        ("clinician".into(), BTreeSet::from(["record.read".into()])),
+        // The OPD work the edge serves with the WAN down (#106).
+        (
+            "clinician".into(),
+            [
+                "record.read",
+                "Patient.crs",
+                "Encounter.rs",
+                "Observation.crus",
+                "Questionnaire.rs",
+                "QuestionnaireResponse.crus",
+                "queues.view",
+                "queues.work",
+                "encounters.checkin",
+                "encounters.manage",
+                "consultation.document",
+            ]
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+        ),
         (
             "facility-admin".into(),
             BTreeSet::from([health_identity::snapshot::ADMINISTER_LOCAL.into()]),

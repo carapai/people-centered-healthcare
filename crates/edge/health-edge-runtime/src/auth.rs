@@ -91,6 +91,7 @@ fn secret(secrets: &Secrets, name: &str) -> Result<Vec<u8>, String> {
 /// none.
 pub(crate) fn routes(
     config: &EdgeConfig,
+    connection: &health_surrealdb::Connection,
     store: SurrealAuthStore,
     gate: &DeviceGate<SurrealAuthStore>,
     secrets: Option<&Secrets>,
@@ -141,6 +142,7 @@ pub(crate) fn routes(
                 .map_err(|_| format!("{INTERMEDIATE_KEY} is not a P-256 key"))
         })
     };
+    let provisioning_store = store.clone();
     let provisioning = Provisioning::new(
         store,
         credentials,
@@ -167,6 +169,14 @@ pub(crate) fn routes(
         })
     };
     let local_admin = LocalAdmin::new(server.verifier(), grant_signer, config.node_id.clone());
+    // The clinical API (#106), under the bundle's role mappings and label rules.
+    let clinical = crate::clinical::Clinical::new(
+        connection,
+        provisioning_store,
+        server.verifier(),
+        config.origins.first().map_or("", String::as_str),
+        &config.node_id,
+    );
     Ok(Router::new()
         .nest("/auth", server.router())
         .merge(
@@ -174,5 +184,6 @@ pub(crate) fn routes(
                 Router::new().nest("/api", server.session_route().merge(local_admin.router())),
             ),
         )
+        .merge(gate.layer(clinical.routes()))
         .merge(admin::local_only(provisioning.router())))
 }
