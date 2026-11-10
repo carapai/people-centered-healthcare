@@ -1,10 +1,13 @@
 //! Plays central for the client's edge e2e suite (#75): writes what `provision request` seals in
 //! the keystore, central's snapshot keys, and a provisioning bundle for one member of staff.
 //!
-//! Usage: `edge-fixture <dir> <node-id> <facility> <username> <password>`. Writes:
+//! Usage: `edge-fixture <dir> <node-id> <facility> <username> <password> [<package-dir>]`.
+//! Writes:
 //! - `credentials/`: the keys systemd would unseal into `$CREDENTIALS_DIRECTORY`;
 //! - `snapshot-keys.json`: central's snapshot public keys (`HEALTH_SNAPSHOT_KEYS_FILE`);
-//! - `bundle.jws`: the bundle, for `POST /api/admin/provision/accounts`.
+//! - `bundle.jws`: the bundle, for `POST /api/admin/provision/accounts`;
+//! - with a package directory, its definitions into the edge's store (`store/`), each under the
+//!   id activation gives it, as central's sync would bring them down (#106).
 //!
 //! The member of staff is a `clinician` and a `facility-admin`, who administers access offline;
 //! `clinician` is the one locally grantable role.
@@ -22,8 +25,19 @@ use p256::pkcs8::DecodePrivateKey;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [dir, node, facility, username, password] = args.as_slice() else {
-        return Err("usage: edge-fixture <dir> <node-id> <facility> <username> <password>".into());
+    let (dir, node, facility, username, password, package) = match args.as_slice() {
+        [dir, node, facility, username, password] => {
+            (dir, node, facility, username, password, None)
+        }
+        [dir, node, facility, username, password, package] => {
+            (dir, node, facility, username, password, Some(package))
+        }
+        _ => {
+            return Err(
+                "usage: edge-fixture <dir> <node-id> <facility> <username> <password> [<package-dir>]"
+                    .into(),
+            );
+        }
     };
     let dir = PathBuf::from(dir);
     let credentials = dir.join("credentials");
@@ -115,6 +129,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &p256::SecretKey::from_pkcs8_pem(&key)?.public_key(),
     )?;
     std::fs::write(dir.join("bundle.jws"), bundle)?;
+    if let Some(package) = package {
+        tokio::runtime::Runtime::new()?
+            .block_on(definitions(&dir.join("store"), package.as_ref()))?;
+    }
+    Ok(())
+}
+
+/// Writes the definitions of the package in `package` into the edge's store at `store`.
+async fn definitions(
+    store: &std::path::Path,
+    package: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use health_persistence::{Precondition, RawJson, Store as _, Transaction as _, WriteRequest};
+    use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
+    let connection = Connection::open(&Settings {
+        target: Target::SurrealKv {
+            path: store.to_path_buf(),
+        },
+        namespace: "ug".into(),
+        database: "main".into(),
+    })
+    .await?;
+    migrate(&connection, MIGRATIONS).await?;
+    // Indexed as the edge's sync indexes what central sends down.
+    let store = SurrealStore::new(connection, std::sync::Arc::new(health_time::SystemClock))
+        .with_registry(health_fhir_server::search_registry());
+    let mut files = health_packages::Files::new();
+    for entry in std::fs::read_dir(package)? {
+        let path = entry?.path();
+        if path.is_file() {
+            files.insert(
+                path.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                std::fs::read(&path)?,
+            );
+        }
+    }
+    for (resource_type, id, resource) in health_activation::definitions::definitions(&files) {
+        let mut tx = store.begin().await?;
+        tx.write(WriteRequest {
+            resource_type,
+            id,
+            json: RawJson::from_validated(resource.to_string()),
+            op_id: health_identifiers::OpId::new(),
+            precondition: Precondition::MustNotExist,
+        })
+        .await?;
+        tx.commit().await?;
+    }
     Ok(())
 }
 

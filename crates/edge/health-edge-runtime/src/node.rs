@@ -336,7 +336,9 @@ pub async fn run(
             let fhir = health_surrealdb::SurrealStore::new(
                 connection.clone(),
                 Arc::new(health_time::SystemClock),
-            );
+            )
+            // Indexed as the clinical API searches: what central sends down is found here (#106).
+            .with_registry(health_fhir_server::search_registry());
             match crate::sync::Sync::new(fhir, upstream, key) {
                 Ok(sync) => {
                     // Attachments live beside the store, where backups take them from.
