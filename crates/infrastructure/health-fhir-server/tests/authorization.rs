@@ -610,3 +610,48 @@ async fn population_draws_only_on_what_the_caller_may_see() {
     );
     assert_eq!(populate(stranger).await.0, StatusCode::NOT_FOUND);
 }
+
+/// Under label rules, a search of a type no rule labels still finds its records (#106): every
+/// type the node's registry searches carries `_security`, which the policy excludes labels by.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn label_rules_do_not_hide_definitions() {
+    let settings = Settings {
+        target: Target::Memory,
+        namespace: "pdp-definitions".into(),
+        database: "main".into(),
+    };
+    let connection = Connection::open(&settings).await.expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let store = SurrealStore::new(connection, Arc::new(SystemClock))
+        .with_registry(health_fhir_server::search_registry());
+    let admin = FhirServer::new(store.clone(), BASE, Arc::new(Unrestricted)).router();
+    let (status, _) = send(
+        &admin,
+        None,
+        Method::POST,
+        "/Questionnaire",
+        Some(json!({ "resourceType": "Questionnaire", "status": "active",
+                     "url": "https://health.go.ug/fhir/Questionnaire/opd-triage", "version": "1.0.0" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // `pdp()` holds the HIV and mental-health rules.
+    let router = FhirServer::new(store, BASE, Arc::new(Unrestricted))
+        .with_access_control(pdp(), Arc::new(FacilityTag))
+        .router();
+    let nurse = subject(Permissions::from(["Questionnaire.rs"]), &[]);
+    let (status, bundle) = send(
+        &router,
+        Some(&nurse),
+        Method::GET,
+        "/Questionnaire?url=https://health.go.ug/fhir/Questionnaire/opd-triage&status=active",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        bundle["entry"].as_array().map(Vec::len),
+        Some(1),
+        "{bundle}"
+    );
+}

@@ -23,7 +23,8 @@ const SUMMARY_PATIENT_PATHS: [(&str, &str); 11] = [
 
 /// The search parameters a node supports, central and edge alike (#106):
 /// - `_tag` on every facility-scope type (ADR 0057), and `_security` on them, Patient and the
-///   summary's types, which the search policy excludes labelled records by;
+///   summary's types, and every other type searched here, which the search policy excludes
+///   labelled records by (a type without it would find nothing once a label rule exists);
 /// - Questionnaire `status`, `url` and `version`, and QuestionnaireResponse `status`, for forms
 ///   and their re-validation (#92);
 /// - Library `type`, `url` and `version`, which completion finds Extraction Mappings by (#93);
@@ -161,6 +162,9 @@ pub fn registry_with(
     let mut labelled: Vec<&str> = health_access_policy::FACILITY_SCOPE_TYPES.to_vec();
     labelled.extend(SUMMARY_PATIENT_PATHS.iter().map(|(t, _)| *t));
     labelled.push("Patient");
+    // Every other type a node searches carries `_security` too: the search policy excludes a
+    // label rule's records by `_security:not`, which finds nothing of a type without it (#106).
+    labelled.extend(["Questionnaire", "Library", "PlanDefinition"]);
     labelled.sort_unstable();
     labelled.dedup();
     let supported = health_access_policy::FACILITY_SCOPE_TYPES
@@ -215,6 +219,10 @@ pub fn registry_with(
             } else {
                 health_fhir_search::ParamState::Reindexing
             };
+            // Searchable under the label rules, as every type is.
+            if registry.get(resource_type, "_security").is_none() {
+                let _ = registry.support(&catalog, resource_type, "_security", state);
+            }
             match registry.support(&catalog, resource_type, code, state) {
                 Ok(()) if !searched => reindex
                     .entry(resource_type.to_owned())
