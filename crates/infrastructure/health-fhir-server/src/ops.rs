@@ -237,6 +237,30 @@ pub(crate) async fn write(
     json: &RawJson,
     precondition: Precondition,
 ) -> Result<(VersionMeta, RawJson), Attempt> {
+    write_checked(tx, resource_type, id, json, precondition, true).await
+}
+
+/// [`write`] for a record the node keeps itself about a user's write, such as an extraction
+/// run's Provenance (#103): stamped, validated and audited the same, but not held to the user's
+/// permissions, which the write it records already was.
+pub(crate) async fn write_as_node(
+    tx: &mut SurrealTx,
+    resource_type: &ResourceType,
+    id: ResourceId,
+    json: &RawJson,
+    precondition: Precondition,
+) -> Result<(VersionMeta, RawJson), Attempt> {
+    write_checked(tx, resource_type, id, json, precondition, false).await
+}
+
+async fn write_checked(
+    tx: &mut SurrealTx,
+    resource_type: &ResourceType,
+    id: ResourceId,
+    json: &RawJson,
+    precondition: Precondition,
+    checked: bool,
+) -> Result<(VersionMeta, RawJson), Attempt> {
     audit::writable(resource_type.as_str())?;
     let interaction = if precondition == Precondition::MustNotExist {
         Interaction::Create
@@ -250,7 +274,7 @@ pub(crate) async fn write(
             .filter(|head| !head.version.deleted),
         _ => None,
     };
-    if let Some(head) = &replaced {
+    if checked && let Some(head) = &replaced {
         // The version replaced must be updatable too: another facility's record stays theirs.
         access::permitted(Decide::Update, &head.json)?;
     }
@@ -267,14 +291,16 @@ pub(crate) async fn write(
         json,
         replaced.as_ref().map(|head| &head.json),
     )?;
-    access::permitted(
-        if interaction == Interaction::Create {
-            Decide::Create
-        } else {
-            Decide::Update
-        },
-        json,
-    )?;
+    if checked {
+        access::permitted(
+            if interaction == Interaction::Create {
+                Decide::Create
+            } else {
+                Decide::Update
+            },
+            json,
+        )?;
+    }
     let version = tx
         .write(WriteRequest {
             resource_type: resource_type.clone(),
