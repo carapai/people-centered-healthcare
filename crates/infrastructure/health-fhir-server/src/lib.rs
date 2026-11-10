@@ -82,6 +82,7 @@ mod references;
 mod registry;
 mod requests;
 mod search;
+mod search_parameters;
 mod summary;
 mod terminology;
 mod timeline;
@@ -137,6 +138,7 @@ pub use references::{AllMustResolve, ReferenceScope};
 pub use registry::REVIEW_PERMISSION;
 pub use requests::BOOK_PERMISSION as APPOINTMENTS_BOOK_PERMISSION;
 pub use search::CURSOR;
+pub use search_parameters::{registry_with, search_registry};
 pub use terminology::ActiveTerminology;
 pub use validation::{ActiveProfiles, Profiles};
 pub use workflow::{
