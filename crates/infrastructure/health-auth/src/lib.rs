@@ -50,7 +50,7 @@ pub use server::{
 pub use snapshot::{SnapshotError, SnapshotGate, SnapshotSigner, SnapshotVerifier};
 pub use store::{
     AuthStore, AuthorizationCode, BreakGlassRecord, BreakGlassReview, LocalConfig, MemoryStore,
-    Session, StoreError,
+    SensitiveLabel, Session, StoreError,
 };
 pub use subject::{
     ALERTS_PERMISSION, ALERTS_WORKLIST, PURPOSE_HEADER, REVIEW_PERMISSION, REVIEW_WITHIN,

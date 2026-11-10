@@ -123,6 +123,17 @@ pub(crate) struct LabelFile {
     program: String,
 }
 
+impl LabelFile {
+    /// The rule as an edge's provisioning bundle carries it (#106).
+    pub(crate) fn sensitive(&self) -> health_auth::SensitiveLabel {
+        health_auth::SensitiveLabel {
+            system: self.system.clone(),
+            code: self.code.clone(),
+            program: self.program.clone(),
+        }
+    }
+}
+
 /// Reads the access policy file.
 pub(crate) fn read_policy(path: &Path) -> Result<AccessPolicy, &'static str> {
     let text =

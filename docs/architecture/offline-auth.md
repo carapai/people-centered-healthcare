@@ -90,6 +90,7 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 - **Offline administration** (#75, part 3), with the decisions taken there:
   - **Who:** a signed-in facility admin whose snapshot gives `access.administer-local`.
   - **The grantable list and role mappings** come in central's signed bundle.
+  - **The sensitivity label rules** come in it too (`LocalConfig.labels`, #106), the same rules central's policy file holds. A node serving records applies them in its policy decision point, so a labelled record is restricted at the edge as at central.
   - **Grants:**
     - stored with a JWS signed by the facility intermediate's key, for central to ratify;
     - laid over the central snapshot at sign-in and on every request, for at most 7 days;

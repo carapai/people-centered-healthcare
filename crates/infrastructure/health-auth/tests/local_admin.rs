@@ -185,6 +185,7 @@ async fn edge() -> Edge {
         .put_local_config(&LocalConfig {
             roles: mappings(),
             grantable: vec!["nurse".into(), "in-charge".into()],
+            labels: Vec::new(),
         })
         .await
         .expect("config");

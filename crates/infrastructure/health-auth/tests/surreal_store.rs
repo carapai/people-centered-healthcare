@@ -723,12 +723,21 @@ async fn local_grants_revocations_and_configuration_are_kept() {
     let config = LocalConfig {
         roles: Default::default(),
         grantable: vec!["nurse".into()],
+        labels: vec![health_auth::SensitiveLabel {
+            system: "http://terminology.hl7.org/CodeSystem/v3-ActCode".into(),
+            code: "HIV".into(),
+            program: "hiv".into(),
+        }],
     };
     node.store.put_local_config(&config).await.expect("put");
     assert_eq!(
         node.store.local_config().await.expect("config"),
-        Some(config)
+        Some(config.clone())
     );
+    // The labels become the rules a node's policy decision point applies (#106).
+    let rules = config.label_rules();
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0].program, "hiv");
 }
 
 #[tokio::test]
