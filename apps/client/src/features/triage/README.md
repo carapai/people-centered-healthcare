@@ -10,7 +10,7 @@ The OPD triage screen (#103; patient-flow.md; questionnaire-extraction.md).
     2. The visit moves to consultation, and the screen is back at the queue with a status message.
 - **Who:** the triage role needs:
   - `QuestionnaireResponse` create and update;
-  - create and update on what the form produces: `Observation`, and `Provenance` for the extraction record;
+  - create and update on what the form produces: `Observation`. The extraction's Provenance is the node's own record of the run, written without the user's permissions;
   - `queues.work` and `encounters.manage`.
 - **Not yet:**
   - **The triage category's effect on the visit:** sending it as the visit's workflow event comes with the OPD Workflow Definition (#105), which records it as `urgency`. Urgent and emergency visits then never wait at a Financial Gate. Until then the category is kept on the response only.

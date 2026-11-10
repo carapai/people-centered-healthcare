@@ -12,7 +12,8 @@
 //!     1–2, the facility stamp, audit, reference checks);
 //!   - a seed resource the amendment would change is left as it is, and
 //!     `clinical-documentation.source-form-amended.v1` goes on the outbox for its review;
-//!   - the Provenance gets a new version naming every target.
+//!   - the Provenance gets a new version naming every target. It is the node's own record of the
+//!     run, written without the user's permissions; every target is held to them.
 //!
 //!   Any failure fails the whole write: the response stays as it was (all or nothing).
 //! - **At the authority** ([`FhirServer::rederive`]; ADR 0022): a response another node completed
@@ -119,6 +120,19 @@ async fn put(
     id: ResourceId,
     resource: &Value,
 ) -> Result<String, Attempt> {
+    put_as(server, tx, resource_type, id, resource, true).await
+}
+
+/// Writes `resource`, held to the user's permissions when `checked`: every extracted target is,
+/// and the run's Provenance, the node's own record of it, is not.
+async fn put_as(
+    server: &FhirServer,
+    tx: &mut SurrealTx,
+    resource_type: &str,
+    id: ResourceId,
+    resource: &Value,
+    checked: bool,
+) -> Result<String, Attempt> {
     let found = health_fhir_validation::validate_value(resource);
     if !found.is_empty() {
         return Err(Attempt::Fail(FhirError::invalid_resource(&found)));
@@ -130,7 +144,11 @@ async fn put(
         None => Precondition::MustNotExist,
     };
     let json = RawJson::from_validated(resource.to_string());
-    let (version, stored) = ops::write(tx, &kind, id, &json, precondition).await?;
+    let (version, stored) = if checked {
+        ops::write(tx, &kind, id, &json, precondition).await?
+    } else {
+        ops::write_as_node(tx, &kind, id, &json, precondition).await?
+    };
     crate::references::check_written(server, tx, &stored).await?;
     Ok(format!(
         "{}/_history/{}",
@@ -280,7 +298,7 @@ pub(crate) async fn complete(
         },
         response_id,
     );
-    put(server, tx, "Provenance", provenance_id, &record).await?;
+    put_as(server, tx, "Provenance", provenance_id, &record, false).await?;
     Ok(())
 }
 
