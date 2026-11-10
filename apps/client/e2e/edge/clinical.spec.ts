@@ -5,9 +5,10 @@ import { staff, startEdge } from './edge'
 
 // The clinical API on the edge (#106): with central's bundle imported and no internet, staff on
 // an enrolled device use the edge's own FHIR API, under the bundle's role mappings and label
-// rules. Reception's patient search answers from the edge's store.
+// rules. They register a patient, who gets an MRN under the edge's own code, and Reception finds
+// them in the edge's store.
 
-test('staff search the edge’s own records with nothing but the edge', async ({ browser }) => {
+test('staff register and find a patient with nothing but the edge', async ({ browser }) => {
   const edge = await startEdge({ signIn: true })
   try {
     const admin = await (await browser.newContext({ baseURL: edge.origin, serviceWorkers: 'block' })).newPage()
@@ -40,6 +41,22 @@ test('staff search the edge’s own records with nothing but the edge', async ({
     await device.getByRole('button', { name: 'Find the patient' }).click()
     await expect(device.getByRole('status').filter({ hasText: 'No patient matches. Register them first.' })).toBeVisible()
     await noViolations(device)
+
+    // Registered on the edge: the MRN is minted under the edge's code, E1.
+    await device.goBack()
+    await device.getByRole('link', { name: 'Register a patient' }).click()
+    await device.getByLabel(/Family name/).fill('Achieng')
+    await device.getByLabel(/Given names/).fill('Ruth')
+    await device.getByLabel(/^Sex/).selectOption('female')
+    await device.getByLabel('National ID (NIN)').fill('CF1234567EDGE')
+    await device.getByLabel('Age in years (if the date is not known)').fill('31')
+    await device.getByRole('button', { name: 'Check for this patient' }).click()
+    await expect(device.getByRole('status').filter({ hasText: /Registered\. MRN: .*-E1-\d{6}/ })).toBeVisible()
+    await device.goBack()
+    await device.getByRole('link', { name: 'Reception', exact: true }).click()
+    await device.getByLabel('Family name').fill('Achieng')
+    await device.getByRole('button', { name: 'Find the patient' }).click()
+    await expect(device.getByRole('button', { name: 'Choose Ruth Achieng' })).toBeVisible()
   } finally {
     await edge.stop()
   }

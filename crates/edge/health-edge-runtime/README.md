@@ -50,6 +50,7 @@ Layer: **runtime**. The Facility Edge Node's runtime ([facility-edge.md](../../.
 - **`clinical`: the clinical API (#106):** `/api/fhir` (the client's FHIR base on an edge), `/api/reception`, `/api/consultation` and `/api/notes`, over the edge's own store, for LAN browsers with the WAN down.
   - **Access:** they sit behind the device gate (an enrolled device's DPoP proof) and the subject layer (the signed-in user's permissions for the facility).
   - **Rules:** they are central's, from the provisioning bundle. The role mappings turn each user's snapshot into permissions, and the sensitivity labels restrict records in the PDP. They are read per request, and the routes are rebuilt when a new bundle brings different rules. Before any bundle, the API answers 503.
+  - **Registration** (`Patient/$register`), with `HEALTH_NODE_CODE` and `HEALTH_REGISTRY_NIN_SYSTEM`: central's matching, and MRNs under the edge's own code (`KLA001-E1-000001`), which never collide with another node's. The facility code must be a short code (`A–Z`, `0–9`).
   - **Search** uses central's parameters (`health_fhir_server::search_registry`). A submitted form is re-validated and extracted, with the definitions central sends down.
 - **`backup`:** scheduled backups on `health-backup` (#78, [backup-and-recovery.md](../../../docs/architecture/backup-and-recovery.md)).
   - **Hourly** (`HEALTH_BACKUP_INTERVAL_SECS`), each verified after writing. The next is due one interval after the last attempt, so a restart neither skips nor repeats one.

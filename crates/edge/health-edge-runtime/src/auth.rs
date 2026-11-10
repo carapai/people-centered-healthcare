@@ -176,6 +176,10 @@ pub(crate) fn routes(
         server.verifier(),
         config.origins.first().map_or("", String::as_str),
         &config.node_id,
+        config
+            .registry_nin_system
+            .clone()
+            .zip(config.node_code.clone()),
     );
     Ok(Router::new()
         .nest("/auth", server.router())
