@@ -250,6 +250,12 @@ async fn bundle(config: &Config, args: &[String]) -> Result<(), Box<dyn std::err
         .map(|policy| health_auth::LocalConfig {
             roles: policy.roles.clone(),
             grantable: policy.locally_grantable.clone(),
+            // The same label rules central applies, so the edge serving records enforces them.
+            labels: policy
+                .labels
+                .iter()
+                .map(crate::auth::LabelFile::sensitive)
+                .collect(),
         })
         .unwrap_or_default();
     let sealed = Bundle {

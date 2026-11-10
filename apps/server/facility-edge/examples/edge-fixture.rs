@@ -84,6 +84,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         local: health_auth::LocalConfig {
             roles: roles.clone(),
             grantable: vec!["clinician".into()],
+            labels: vec![health_auth::SensitiveLabel {
+                system: "http://terminology.hl7.org/CodeSystem/v3-ActCode".into(),
+                code: "HIV".into(),
+                program: "hiv".into(),
+            }],
         },
     }
     .seal(

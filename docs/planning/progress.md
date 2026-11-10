@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#106, part 1: label rules reach the edge (2026-11-10).** Decided by the maintainer: edges enforce the labels, register patients with their own node code, and read role permissions per request. #106 is split into parts:
+  1. the label rules (this part);
+  2. the edge serving the clinical API;
+  3. registration on the edge;
+  4. the acceptance run.
+  - **What:** central's provisioning bundle carries its policy's label rules (`LocalConfig.labels`, stored with the role mappings). `LocalConfig::label_rules` gives the rules a node's PDP applies.
+  - **Tested:** stored and read back, and turned into PDP rules. The fixture edge carries an HIV rule.
 - **#82, part 5: the review screen (2026-11-10).** This completes #82.
   - **What:** `/sync/conflicts` in the web client:
     - the open Conflict Records, oldest first, overdue after 7 days;

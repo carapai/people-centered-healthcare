@@ -21,14 +21,44 @@ use uuid::Uuid;
 use crate::otp::PhoneOtp;
 
 /// What central provisions for offline administration (offline-auth.md § Offline user and role
-/// administration): the country's role → permission mappings, and the roles a facility admin may
-/// grant locally.
+/// administration): the country's role → permission mappings, the roles a facility admin may
+/// grant locally, and the sensitivity labels that restrict records, so a node serving records
+/// enforces the same rules as central (#106).
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LocalConfig {
     /// The role → permission mappings.
     pub roles: RolePermissions,
     /// The locally grantable roles.
     pub grantable: Vec<String>,
+    /// The labels that restrict records, and the program that opens each. Configurations stored
+    /// before #106 hold none.
+    #[serde(default)]
+    pub labels: Vec<SensitiveLabel>,
+}
+
+/// One sensitivity label rule: a `meta.security` label, and the program a user must be assigned
+/// to (with a treatment purpose of use) to see records carrying it (security.md § Labels).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SensitiveLabel {
+    /// The label's code system.
+    pub system: String,
+    /// Its code.
+    pub code: String,
+    /// The program that opens it.
+    pub program: String,
+}
+
+impl LocalConfig {
+    /// The label rules a node's policy decision point applies.
+    pub fn label_rules(&self) -> Vec<health_access_policy::LabelRule> {
+        self.labels
+            .iter()
+            .map(|l| health_access_policy::LabelRule {
+                label: health_access_policy::Label::new(&l.system, &l.code),
+                program: l.program.clone(),
+            })
+            .collect()
+    }
 }
 
 /// A store failure.
