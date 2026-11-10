@@ -117,3 +117,38 @@ fn the_golden_record_links_the_same_person_elsewhere() {
     assert_eq!(golden_of(&alone), None);
     assert_eq!(linked(&alone, None), ["Patient/p"]);
 }
+
+#[test]
+fn a_panel_shows_its_components_in_their_unit() {
+    let vital = |id: &str, components: Value| {
+        json!({ "resourceType": "Observation", "id": id, "status": "final",
+                "category": [{ "coding": [{ "code": "vital-signs" }] }],
+                "code": { "coding": [{ "system": "http://loinc.org", "code": "85354-9", "display": "Blood pressure panel" }] },
+                "component": components })
+    };
+    let quantity = |code: &str, value: i64, unit: &str| json!({ "code": { "coding": [{ "code": code }] }, "valueQuantity": { "value": value, "unit": unit } });
+    let mut sections = found();
+    sections[3] = Some(vec![
+        vital(
+            "bp",
+            json!([
+                quantity("8480-6", 104, "mmHg"),
+                quantity("8462-4", 66, "mmHg")
+            ]),
+        ),
+        vital(
+            "mixed",
+            json!([quantity("a", 1, "kg"), quantity("b", 2, "cm")]),
+        ),
+    ]);
+    let record = record(&sections);
+    let vitals = record.vitals.as_ref().expect("vitals");
+    assert_eq!(
+        (vitals[0].value.as_deref(), vitals[0].unit.as_deref()),
+        (Some("104/66"), Some("mmHg"))
+    );
+    assert_eq!(
+        vitals[1].value, None,
+        "components in different units are not joined"
+    );
+}

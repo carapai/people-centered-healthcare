@@ -65,6 +65,6 @@ test('a nurse records vital signs at triage and the clinician sees them', async 
   await expect(vitals.getByText('Heart rate: 118 beats/min')).toBeVisible()
   await expect(vitals.getByText('Body weight: 61.5 kg')).toBeVisible()
   await expect(vitals.getByText('Oxygen saturation in Arterial blood by Pulse oximetry: 94 %')).toBeVisible()
-  // Blood pressure is one panel; the summary does not show its components yet.
-  await expect(vitals.getByText(/^Blood pressure panel/)).toBeVisible()
+  // Blood pressure is one panel, read from its components.
+  await expect(vitals.getByText('Blood pressure panel with all children optional: 104/66 mmHg')).toBeVisible()
 })

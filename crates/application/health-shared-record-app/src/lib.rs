@@ -102,20 +102,46 @@ fn is_vital(observation: &Value) -> bool {
         .any(|c| c["code"] == "vital-signs")
 }
 
+/// A panel's component quantities in one unit, as one value: blood pressure reads `104/66` in
+/// `mmHg`. `None` unless every component is a quantity in the same unit.
+fn components(r: &Value) -> Option<(String, Option<String>)> {
+    let parts = r["component"].as_array().filter(|c| !c.is_empty())?;
+    let mut values = Vec::with_capacity(parts.len());
+    let mut unit: Option<Option<String>> = None;
+    for part in parts {
+        let quantity = &part["valueQuantity"];
+        let this = text(&quantity["unit"]).or_else(|| text(&quantity["code"]));
+        match &unit {
+            None => unit = Some(this),
+            Some(seen) if *seen == this => {}
+            Some(_) => return None,
+        }
+        values.push(quantity.get("value")?.to_string());
+    }
+    Some((values.join("/"), unit.flatten()))
+}
+
 fn vital(r: &Value) -> Option<Vital> {
     if !is_vital(r) {
         return None;
     }
     let quantity = &r["valueQuantity"];
+    let (value, unit) = match quantity.get("value") {
+        // The number's own text, so a decimal keeps its scale.
+        Some(value) => (
+            Some(value.to_string()),
+            text(&quantity["unit"]).or_else(|| text(&quantity["code"])),
+        ),
+        None => match components(r) {
+            Some((values, unit)) => (Some(values), unit),
+            None => (text(&r["valueString"]), None),
+        },
+    };
     Some(Vital {
         reference: reference(r)?,
         code: coded(&r["code"]),
-        // The number's own text, so a decimal keeps its scale.
-        value: quantity
-            .get("value")
-            .map(Value::to_string)
-            .or_else(|| text(&r["valueString"])),
-        unit: text(&quantity["unit"]).or_else(|| text(&quantity["code"])),
+        value,
+        unit,
         status: text(&r["status"])?,
         effective: text(&r["effectiveDateTime"]).or_else(|| text(&r["effectivePeriod"]["start"])),
     })
