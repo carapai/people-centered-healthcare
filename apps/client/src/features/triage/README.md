@@ -14,7 +14,6 @@ The OPD triage screen (#103; patient-flow.md; questionnaire-extraction.md).
   - `queues.work` and `encounters.manage`.
 - **Not yet:**
   - **The triage category's effect on the visit:** sending it as the visit's workflow event comes with the OPD Workflow Definition (#105), which records it as `urgency`. Urgent and emergency visits then never wait at a Financial Gate. Until then the category is kept on the response only.
-  - **Blood pressure in the summary:** the patient summary lists the panel but not its components.
 
 ## Tests
 
