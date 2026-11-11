@@ -241,6 +241,22 @@ pub async fn subject_layer<S: AuthStore + 'static>(
     }
 }
 
+/// Middleware: refuses (401) a request that `subject_layer` or `patient_layer` let through
+/// without credentials. Layer it inside them on routes that serve only signed-in callers, so a
+/// request is authenticated before its body or query is read (#140).
+pub async fn signed_in(request: Request, next: Next) -> Response {
+    let extensions = request.extensions();
+    if extensions.get::<health_access_policy::Subject>().is_some()
+        || extensions
+            .get::<health_access_policy::PatientSubject>()
+            .is_some()
+    {
+        next.run(request).await
+    } else {
+        problem(StatusCode::UNAUTHORIZED, "login", "sign in first")
+    }
+}
+
 /// A break-glass request.
 #[derive(Debug, serde::Deserialize)]
 struct GlassRequest {

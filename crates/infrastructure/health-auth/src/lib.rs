@@ -54,6 +54,6 @@ pub use store::{
 };
 pub use subject::{
     ALERTS_PERMISSION, ALERTS_WORKLIST, PURPOSE_HEADER, REVIEW_PERMISSION, REVIEW_WITHIN,
-    REVIEWS_WORKLIST, Refused, Subjects, subject_layer,
+    REVIEWS_WORKLIST, Refused, Subjects, signed_in, subject_layer,
 };
 pub use surreal::SurrealAuthStore;

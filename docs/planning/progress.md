@@ -969,6 +969,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#140, part 1: every route in the authorization matrix (2026-11-11).**
+  - **What:** `central-server`'s route matrix (`src/auth/route_matrix.rs`) mounts every optional router and checks each route central serves. It sends all five methods with no credentials, then as a signed-in member of staff whose roles carry no permissions.
+    - Anonymous: 401 on every gated route.
+    - No permissions: nothing is served, except four listed responses that are the caller's own or filtered to what they may see. Records they may not read answer 404 like unknown ones.
+    - Patient routes refuse a staff token, and sync routes refuse a user's token.
+    - The inventory is checked against the `.route(…)` declarations in the routers' source, so a new route that isn't listed fails the test.
+  - **Found and fixed:**
+    - **Central's gate did not forward `/sync/*` or `/api/provisioning/*`.** The deployed binary answered 404 to edges syncing or provisioning online; every earlier test built those routers without the gate.
+    - **`/api` routes read requests before authenticating them.** Anonymous requests got 422 or 400 from the body or query parser. `health_auth::signed_in` now refuses them with 401 first, at central and on the edge. `/auth/pin` checks the bearer before reading its form.
+  - **Next for #140:** a ZAP baseline, and a review of the edge's LAN surface. The penetration test itself is for people.
 - **#106, part 4: the acceptance run (2026-11-10).** This completes #106.
   - **What:** edge e2e `opd-lan.spec.ts`: three enrolled devices on an edge with no internet register, check in, triage (vital signs extracted on the edge) and consult, then complete the visit. The edge fixture writes the OPD package's definitions into the edge's store, as central's sync would.
   - **Results:** documented in `tests/acceptance/opd-lan/` (§132), with the reconnect and sync evidence.

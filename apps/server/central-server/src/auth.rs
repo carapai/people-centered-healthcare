@@ -15,7 +15,7 @@ use health_audit::Auditor;
 use health_auth::{
     AuthConfig, AuthServer, CaregiverRoutes, Client, Credentials, OtpSendError, OtpSender,
     PhoneSignIn, SendFuture, SnapshotGate, SnapshotSigner, SnapshotVerifier, Subjects,
-    SurrealAuthStore, TokenSigner, patient_layer, subject_layer,
+    SurrealAuthStore, TokenSigner, patient_layer, signed_in, subject_layer,
 };
 use health_consent::Confidentiality;
 use health_fhir_search::Unrestricted;
@@ -315,7 +315,15 @@ pub(crate) fn routes(
         let subjects = Subjects::new(server.verifier(), policy.roles.clone())
             .with_events(events.clone())
             .with_auditor(Auditor::new("central", sensitive(policy)));
-        api = api.merge(subjects.routes());
+        api = api.merge(
+            subjects
+                .routes()
+                .layer(axum::middleware::from_fn(signed_in))
+                .layer(axum::middleware::from_fn_with_state(
+                    subjects.clone(),
+                    subject_layer,
+                )),
+        );
         escalate_hourly(subjects.clone());
         // Caregiver delegation (#113): staff manage grants; patients see their dependents. The
         // policy's labels are the sensitive ones an adolescent's guardian does not see.
@@ -340,6 +348,7 @@ pub(crate) fn routes(
             "/caregivers",
             caregivers
                 .caregiver_router()
+                .layer(axum::middleware::from_fn(signed_in))
                 .layer(axum::middleware::from_fn_with_state(
                     subjects.clone(),
                     subject_layer,
@@ -353,6 +362,7 @@ pub(crate) fn routes(
                 fhir_store.clone(),
                 Auditor::new("central", sensitive(policy)),
             )
+            .layer(axum::middleware::from_fn(signed_in))
             .layer(axum::middleware::from_fn_with_state(
                 subjects.clone(),
                 subject_layer,
@@ -402,12 +412,13 @@ pub(crate) fn routes(
         if let (Some(portal), Some(_)) = (portal, &settings.portal) {
             api = api.nest(
                 "/portal",
-                portal.merge(caregivers.dependents_router()).layer(
-                    axum::middleware::from_fn_with_state(
+                portal
+                    .merge(caregivers.dependents_router())
+                    .layer(axum::middleware::from_fn(signed_in))
+                    .layer(axum::middleware::from_fn_with_state(
                         server.verifier(),
                         patient_layer::<SurrealAuthStore>,
-                    ),
-                ),
+                    )),
             );
         }
     }
@@ -743,9 +754,14 @@ fn fhir(
             });
     }
     let layer = axum::middleware::from_fn_with_state(subjects, subject_layer);
+    // Inside the subject layer: a request without credentials is refused before it is read.
+    let signed = || axum::middleware::from_fn(signed_in);
     // The registry review queue (#203), with the registry.
-    let reviews =
-        registry_rules(settings).map(|_| fhir.registry_review_router().layer(layer.clone()));
+    let reviews = registry_rules(settings).map(|_| {
+        fhir.registry_review_router()
+            .layer(signed())
+            .layer(layer.clone())
+    });
     // The portal, with the registry; its patients pass `patient_layer`, not the subject layer.
     // The patient's requests (#114) are the portal's too.
     let portal = registry_rules(settings)
@@ -765,26 +781,35 @@ fn fhir(
     let workflows = settings
         .workflows
         .as_ref()
-        .map(|_| fhir.workflow_router().layer(layer.clone()));
+        .map(|_| fhir.workflow_router().layer(signed()).layer(layer.clone()));
     // Price Books and rules (#120): edited and approved at central only.
     fhir = fhir.with_pricing(settings.pricing.clone());
-    let pricing = fhir.pricing_router().layer(layer.clone());
+    let pricing = fhir.pricing_router().layer(signed()).layer(layer.clone());
     // Check-in, Encounters and patient-flow queues (#102), for the session's facility.
-    let reception = fhir.reception_router().layer(layer.clone());
-    let consultation = fhir.consultation_router().layer(layer.clone());
-    let programs = fhir.programs_router().layer(layer.clone());
-    let notes = fhir.notes_router().layer(layer.clone());
-    let pharmacy = fhir.pharmacy_router().layer(layer.clone());
-    let laboratory = fhir.laboratory_router().layer(layer.clone());
-    let inbox = fhir.inbox_router().layer(layer.clone());
-    let care_plans = fhir.care_plans_router().layer(layer.clone());
-    let requests = fhir.requests_router().layer(layer.clone());
-    let stock = fhir.inventory_router().layer(layer.clone());
+    let reception = fhir.reception_router().layer(signed()).layer(layer.clone());
+    let consultation = fhir
+        .consultation_router()
+        .layer(signed())
+        .layer(layer.clone());
+    let programs = fhir.programs_router().layer(signed()).layer(layer.clone());
+    let notes = fhir.notes_router().layer(signed()).layer(layer.clone());
+    let pharmacy = fhir.pharmacy_router().layer(signed()).layer(layer.clone());
+    let laboratory = fhir
+        .laboratory_router()
+        .layer(signed())
+        .layer(layer.clone());
+    let inbox = fhir.inbox_router().layer(signed()).layer(layer.clone());
+    let care_plans = fhir
+        .care_plans_router()
+        .layer(signed())
+        .layer(layer.clone());
+    let requests = fhir.requests_router().layer(signed()).layer(layer.clone());
+    let stock = fhir.inventory_router().layer(signed()).layer(layer.clone());
     // Payments and cashier shifts (#254), for the session's facility.
     let payments = settings
         .payments
         .as_ref()
-        .map(|_| fhir.payments_router().layer(layer.clone()));
+        .map(|_| fhir.payments_router().layer(signed()).layer(layer.clone()));
     Routes {
         fhir: fhir.router().layer(layer),
         reviews,
@@ -855,9 +880,16 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/caregivers", service.clone())
         .route_service("/api/caregivers/{*rest}", service.clone())
         .route_service("/api/break-glass/{*rest}", service.clone())
+        // Edge provisioning, recovery-key escrow and sync (#140: the route matrix found them
+        // unreachable through the gate).
+        .route_service("/api/provisioning/{*rest}", service.clone())
+        .route_service("/sync/{*rest}", service.clone())
         .route_service("/fhir", service.clone())
         .route_service("/fhir/{*rest}", service)
 }
+
+#[cfg(test)]
+mod route_matrix;
 
 #[cfg(test)]
 mod tests {
@@ -866,7 +898,7 @@ mod tests {
 
     use super::*;
 
-    fn settings() -> AuthSettings {
+    pub(super) fn settings() -> AuthSettings {
         AuthSettings {
             issuer: "https://central.test/auth".into(),
             keys: vec![[9u8; 32], [8u8; 32]],
@@ -1112,7 +1144,10 @@ mod tests {
         assert_eq!(registered["access"], "self-submitted");
     }
 
-    async fn send(app: &Router, request: Request<Body>) -> (StatusCode, String, Option<String>) {
+    pub(super) async fn send(
+        app: &Router,
+        request: Request<Body>,
+    ) -> (StatusCode, String, Option<String>) {
         let response = app.clone().oneshot(request).await.expect("response");
         let location = response
             .headers()
@@ -1133,7 +1168,7 @@ mod tests {
         )
     }
 
-    fn form(path: &str, fields: &[(&str, &str)]) -> Request<Body> {
+    pub(super) fn form(path: &str, fields: &[(&str, &str)]) -> Request<Body> {
         let body = form_urlencoded::Serializer::new(String::new())
             .extend_pairs(fields)
             .finish();

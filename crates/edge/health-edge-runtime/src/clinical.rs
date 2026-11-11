@@ -26,7 +26,8 @@ use axum::routing::any;
 use health_access_policy::Pdp;
 use health_audit::Auditor;
 use health_auth::{
-    AccessVerifier, AuthStore as _, LocalConfig, Subjects, SurrealAuthStore, subject_layer,
+    AccessVerifier, AuthStore as _, LocalConfig, Subjects, SurrealAuthStore, signed_in,
+    subject_layer,
 };
 use health_client_registry::matching::MatchingRules;
 use health_fhir_search::Unrestricted;
@@ -130,11 +131,16 @@ impl Clinical {
         let subjects = Subjects::new(self.verifier.clone(), config.roles.clone());
         let layer =
             axum::middleware::from_fn_with_state(subjects, subject_layer::<SurrealAuthStore>);
+        let signed = || axum::middleware::from_fn(signed_in);
         Router::new()
             .nest("/api/fhir", fhir.clone().router())
-            .nest("/api/reception", fhir.reception_router())
-            .nest("/api/consultation", fhir.consultation_router())
-            .nest("/api/notes", fhir.notes_router())
+            // Inside the subject layer: refused before it is read without credentials (#140).
+            .nest("/api/reception", fhir.reception_router().layer(signed()))
+            .nest(
+                "/api/consultation",
+                fhir.consultation_router().layer(signed()),
+            )
+            .nest("/api/notes", fhir.notes_router().layer(signed()))
             .layer(layer)
     }
 
