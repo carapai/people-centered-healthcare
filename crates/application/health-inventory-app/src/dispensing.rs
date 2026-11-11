@@ -177,6 +177,7 @@ where
         eligibility: &Eligibility,
         rule: BatchRule,
     ) -> Result<Vec<Reservation>, InventoryError> {
+        let _turn = crate::queue::stores([preparation.store.as_str()]).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
@@ -261,6 +262,8 @@ where
         &self,
         completion: &Completion,
     ) -> Result<Vec<Movement>, InventoryError> {
+        // Its stores are its reservations', read inside the transaction.
+        let _turn = crate::queue::node().await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
@@ -369,6 +372,7 @@ where
         at: Timestamp,
         record: Option<&Record>,
     ) -> Result<usize, InventoryError> {
+        let _turn = crate::queue::node().await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
