@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#141, part 1: kill -9 loops on the edge's store (2026-11-11).**
+  - **What:** `health-edge-runtime`'s `kill_loop` test.
+    - A child process writes transactions of one to three Observations to the edge's SurrealKV store and reports each commit once it is acknowledged.
+    - It is killed with SIGKILL after a random 1–7 s, sometimes while the store is reopening, and the store is reopened.
+    - Then every acknowledged write must be there, the change log must have no gap and end at the commit counter, every logged transaction must be whole and stored, and the store must take writes again.
+    - It runs 5 rounds per PR and 50 nightly (`e2e.yml`, `recovery`). The seed is printed for replay.
+  - **Results:** 10 rounds locally (348 log entries), no loss. Some kills landed between a commit and its acknowledgement, and those writes were kept too. A negative control, acknowledging before committing, fails as "acknowledged but lost".
+  - **Noted:** migrating a fresh SurrealKV store takes about 67 s in a debug build, and reopening a migrated one about 3 s. This is most of each edge e2e test's minute.
+  - **Still open for #141:** facility-scale load and power-loss loops on edge hardware, long-outage re-sync at scale, national-scale matching (#200), and the stock soak.
 - **#140, part 3: the edge's LAN surface (2026-11-11).**
   - **What:** a test of the edge's API from a LAN address with no enrolled device, with sign-in on.
     - Only discovery and keys are served, and sign-in refuses.
