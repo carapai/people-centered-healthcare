@@ -69,7 +69,7 @@ jobs:
         with:
           tool: cargo-deny
       # The repository's policy, over the desktop's own lock file.
-      - run: cargo deny --manifest-path apps/client/src-tauri/Cargo.toml --locked check --config deny.toml
+      - run: cargo deny --manifest-path apps/client/src-tauri/Cargo.toml --config deny.toml --locked check
       - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
