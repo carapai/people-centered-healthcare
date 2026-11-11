@@ -1310,7 +1310,8 @@ struct PinForm {
 async fn set_pin<S: AuthStore>(
     State(inner): State<Arc<Inner<S>>>,
     headers: HeaderMap,
-    Form(form): Form<PinForm>,
+    // Read only once the caller is known: an anonymous request is 401 whatever it carries.
+    form: Result<Form<PinForm>, axum::extract::rejection::FormRejection>,
 ) -> Response {
     let verifier = AccessVerifier {
         inner: Arc::clone(&inner),
@@ -1321,6 +1322,9 @@ async fn set_pin<S: AuthStore>(
     {
         Ok(principal) => principal,
         Err(refused) => return refused.into_response(),
+    };
+    let Ok(Form(form)) = form else {
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_request");
     };
     if !inner.config.pin.valid(&form.pin) {
         return oauth_error(StatusCode::BAD_REQUEST, "invalid_request");
