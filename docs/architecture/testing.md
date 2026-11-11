@@ -17,7 +17,7 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | Frontend | Vitest unit tests; component tests and axe accessibility checks in Chromium (Vitest browser mode), axe over the design system's example page in every theme and density | Every PR |
 | End-to-end | Playwright on the web; Tauri via `tauri-driver` on Windows and Linux; the §117–119 scenarios | Nightly |
 | Offline and sync | Multi-node simulation (central, edge, desktop) with partitions, clock skew, long outages, `reseed_required`, restore and epoch change (`crates/testing/health-sync-sim`, #85) | Nightly; the §117 scenario on every PR too |
-| Recovery | kill -9 loops; power-loss harness on hardware runners; export → import round trip; restore drills | Nightly / weekly |
+| Recovery | kill -9 loops (`health-edge-runtime` `kill_loop`: every acknowledged write on the edge's store survives SIGKILL and the change log stays whole; 5 rounds per PR, 50 nightly); power-loss harness on hardware runners; export → import round trip; restore drills | Nightly / weekly |
 | Stock concurrency | Concurrent issues and dispenses on the same Stock Unit; balances against ledger rebuild | Nightly (soak) |
 | Payment reconciliation | Mock MoMo and Airtel with dropped callbacks, duplicates and statement mismatches | Nightly |
 | Security | Authorization-matrix suite (facility isolation, sensitive labels, adolescent confidentiality, break-glass; every central route, `central-server` `route_matrix`); ZAP baseline (`zap.yml`) of central and of an edge serving the app, against staging once it exists, with triaged alerts in `.zap/rules.tsv`; telemetry redaction test | Every PR (matrix, redaction); nightly (ZAP) |

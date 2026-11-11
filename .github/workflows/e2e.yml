@@ -63,6 +63,47 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
 
+  recovery:
+    name: kill -9 loop on the edge's store
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      # Every acknowledged write survives SIGKILL, and the change log stays whole (#141;
+      # testing.md § Recovery). The seed is printed, so a failing round can be replayed with
+      # HEALTH_KILL_SEED.
+      - run: cargo test --locked -p health-edge-runtime --test kill_loop -- --nocapture
+        env:
+          HEALTH_KILL_ROUNDS: "50"
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+
   playwright:
     name: Playwright against central-server
     runs-on: ubuntu-24.04
