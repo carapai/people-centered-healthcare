@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#132, part 1: the desktop runtime's IPC dispatch (2026-11-11).**
+  - **What:** a new crate, `health-desktop-runtime` (runtime layer):
+    - `ipc::dispatch` takes the envelope the client's `TauriIpcTransport` sends and answers through the shared router with `tower` `oneshot`. Bodies cross as text so decimals stay lossless, query pairs keep their order, and only origin-relative paths are dispatched.
+    - `data_dir::per_machine` gives the per-machine data directory.
+    - `keystore` is the OS keystore port, with the check that refuses an install without a working keystore.
+  - **The acceptance criterion:** the same API contract suite passes over IPC as over HTTP. The client's contract suite now has a third node, a desktop reached through the client's own `ipcTransport` into `ipc::dispatch` (the `ipc_server` example). All 28 tests pass: 9 per node, plus the test that the nodes are separate. Over IPC no envelope carries a credential.
+  - **Next for #132:** the Tauri binary (`apps/client/src-tauri`): the `api_request` command, the embedded store, the `keyring` adapter, the disk-encryption check, single instance and the capability allowlist. Its dependency tree is to be reviewed for licences first.
 - **#83, part 4: seeds on removable media (2026-11-11).** This completes #83.
   - **What:**
     - `central-server seed export <facility> <file>` streams the facility's snapshot into a zstd file with a `seed` header and signs its sha-256 with the publication signer as `health-seed+jws`.

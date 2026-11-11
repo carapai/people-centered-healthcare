@@ -8,40 +8,48 @@ import { operationClient } from './operations'
 import { memorySession } from './session'
 import type { ApiRequest, ApiResponse, Platform, Transport } from './types'
 
-interface IpcResponse {
+export interface IpcResponse {
   status: number
   headers: Record<string, string>
   /** JSON text, so numbers stay lossless across the IPC boundary. */
   body: string
 }
 
-/** TauriIpcTransport: the same envelope, dispatched in-process into the Axum router (ADR 0036). */
-const ipcTransport: Transport = {
-  async request(request: ApiRequest): Promise<ApiResponse> {
-    const form = request.form === undefined ? undefined : pairs(request.form)
-    const response = await invoke<IpcResponse>('api_request', {
-      envelope: {
-        method: request.method,
-        path: request.path,
-        query: pairs(request.query ?? {}),
-        headers: {
-          ...request.headers,
-          ...(form === undefined ? {} : { 'content-type': 'application/x-www-form-urlencoded' }),
+/** How a command reaches the Rust side: Tauri's `invoke`, or a stand-in in the contract tests. */
+export type Invoke = <T>(command: string, args: Record<string, unknown>) => Promise<T>
+
+/**
+ * TauriIpcTransport: the same envelope, dispatched in-process into the Axum router (ADR 0036).
+ * The session lives on the Rust side, so no credential is ever put in the envelope.
+ */
+export function ipcTransport(call: Invoke = invoke): Transport {
+  return {
+    async request(request: ApiRequest): Promise<ApiResponse> {
+      const form = request.form === undefined ? undefined : pairs(request.form)
+      const response = await call<IpcResponse>('api_request', {
+        envelope: {
+          method: request.method,
+          path: request.path,
+          query: pairs(request.query ?? {}),
+          headers: {
+            ...request.headers,
+            ...(form === undefined ? {} : { 'content-type': 'application/x-www-form-urlencoded' }),
+          },
+          body:
+            form !== undefined
+              ? new URLSearchParams(form).toString()
+              : request.body === undefined
+                ? null
+                : stringifyJson(request.body),
         },
-        body:
-          form !== undefined
-            ? new URLSearchParams(form).toString()
-            : request.body === undefined
-              ? null
-              : stringifyJson(request.body),
-      },
-    })
-    return {
-      status: response.status,
-      headers: response.headers,
-      body: response.body === '' ? undefined : parseJson(response.body),
-    }
-  },
+      })
+      return {
+        status: response.status,
+        headers: response.headers,
+        body: response.body === '' ? undefined : parseJson(response.body),
+      }
+    },
+  }
 }
 
 /** Query and form parameters as ordered pairs, so repeated parameters survive IPC. */
@@ -52,13 +60,14 @@ function pairs(params: NonNullable<ApiRequest['query']>): [string, string][] {
 }
 
 export function tauriPlatform(): Platform {
+  const transport = ipcTransport()
   return {
     mode: 'tauri',
-    transport: ipcTransport,
-    fhir: fhirClient(ipcTransport),
-    registries: registriesCommands(ipcTransport),
-    forms: formsCommands(ipcTransport),
-    operations: operationClient(ipcTransport),
+    transport,
+    fhir: fhirClient(transport),
+    registries: registriesCommands(transport),
+    forms: formsCommands(transport),
+    operations: operationClient(transport),
     // The local desktop session is carried by the Rust side; ending it still clears the cache.
     session: memorySession(),
     events: { subscribe: () => () => {} },
