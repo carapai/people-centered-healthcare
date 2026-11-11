@@ -334,6 +334,7 @@ impl SurrealTx {
         let seq = i64::try_from(version_seq)
             .map_err(|_| StoreError::Unavailable("version_seq overflow".into()))?;
         let mut patient_facility: Option<(Vec<String>, String)> = None;
+        let mut blobs: Vec<String> = Vec::new();
         let (extraction, references, blocks) = if deleted {
             // A tombstone keeps its body but is never found by search, references nothing and
             // sits in no block.
@@ -352,6 +353,12 @@ impl SurrealTx {
                 .unwrap_or_default();
             // A facility-tagged record ties its patients to the facility (golden-record
             // narrowing, #81).
+            // The blobs it references, so a blob is served only to a node with a record that
+            // uses it in scope (#84).
+            blobs = health_sync_protocol::blob_refs(&resource)
+                .into_iter()
+                .map(|blob| blob.hash.to_string())
+                .collect();
             if let Some(facility) = crate::sync::facility_tag(&resource) {
                 let patients: Vec<String> = crate::search::write::references(&resource)
                     .into_iter()
@@ -407,6 +414,14 @@ impl SurrealTx {
             "CREATE type::record({history}, [{rid}, {seq}]) CONTENT {{ json: {json}, \
              version_id: {version_id}, version_seq: {seq}, last_updated: {at}, deleted: {deleted_text}{owner_field} }}"
         ));
+        for hash in blobs {
+            let hash = sql.str(hash);
+            let resource_type = sql.str(resource_type.as_str());
+            sql.push(format!(
+                "UPSERT type::record('blob_owner', [{hash}, {resource_type}, {rid}]) \
+                 SET hash = {hash}, resource_type = {resource_type}, resource_id = {rid}"
+            ));
+        }
         if let Some((patients, facility)) = patient_facility {
             let facility = sql.str(facility);
             for patient in patients {

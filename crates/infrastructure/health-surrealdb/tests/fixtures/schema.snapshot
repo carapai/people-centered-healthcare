@@ -172,6 +172,11 @@ DEFINE TABLE billing_waiver TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD account ON billing_waiver TYPE string PERMISSIONS FULL
   DEFINE FIELD data ON billing_waiver TYPE string PERMISSIONS FULL
   DEFINE INDEX billing_waiver_account ON billing_waiver FIELDS account
+DEFINE TABLE blob_owner TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD hash ON blob_owner TYPE string PERMISSIONS FULL
+  DEFINE FIELD resource_id ON blob_owner TYPE string PERMISSIONS FULL
+  DEFINE FIELD resource_type ON blob_owner TYPE string PERMISSIONS FULL
+  DEFINE INDEX blob_owner_hash ON blob_owner FIELDS hash
 DEFINE TABLE block_count TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD count ON block_count TYPE int PERMISSIONS FULL
   DEFINE FIELD counted_at ON block_count TYPE datetime PERMISSIONS FULL

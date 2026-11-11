@@ -536,6 +536,90 @@ impl SurrealStore {
         .transpose()
     }
 
+    /// Whether a node with `scope` may be sent the blob `hash` (#84): it is the tarball an
+    /// activation record names, or some record whose current version references it would be sent
+    /// down to that scope. A blob no such record references, or one held only for other
+    /// facilities, is not.
+    pub async fn blob_admitted(&self, scope: &SyncScope, hash: &str) -> Result<bool, StoreError> {
+        #[derive(SurrealValue)]
+        struct Owner {
+            resource_type: String,
+            resource_id: String,
+        }
+        #[derive(SurrealValue)]
+        struct Head {
+            json: String,
+            deleted: bool,
+        }
+        if matches!(scope, SyncScope::All) {
+            return Ok(true);
+        }
+        // A package's tarball goes to the nodes its activation records reach (#89), as do the
+        // records themselves: what a node fetches is the digest one of them names.
+        let published: Option<String> = self
+            .connection
+            .db()
+            .query(
+                "SELECT VALUE package FROM package_activation \
+                 WHERE string::contains(data, $hash) LIMIT 1",
+            )
+            .bind(("hash", hash.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        if published.is_some() {
+            return Ok(true);
+        }
+        let owners: Vec<Owner> = self
+            .connection
+            .db()
+            .query("SELECT resource_type, resource_id FROM blob_owner WHERE hash = $hash")
+            .bind(("hash", hash.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        for owner in owners {
+            let Ok(resource_type) = owner.resource_type.parse::<ResourceType>() else {
+                continue;
+            };
+            let table = crate::store::table(&resource_type)?;
+            let head: Option<Head> = self
+                .connection
+                .db()
+                .query("SELECT json, deleted FROM ONLY type::record($table, $id)")
+                .bind(("table", table))
+                .bind(("id", owner.resource_id.clone()))
+                .await
+                .and_then(surrealdb::IndexedResults::check)
+                .map_err(unavailable)?
+                .take(0)
+                .map_err(unavailable)?;
+            let Some(head) = head.filter(|h| !h.deleted) else {
+                continue;
+            };
+            let body: Value = serde_json::from_str(&head.json)
+                .map_err(|_| corrupt("a stored version is not JSON"))?;
+            // The current version must still reference it: an attachment replaced or removed
+            // no longer opens its blob.
+            let still = health_sync_protocol::blob_refs(&body)
+                .iter()
+                .any(|blob| blob.hash.to_string() == hash);
+            if still
+                && scope.admits_down(&owner.resource_type, &body)
+                && self
+                    .person_admitted(scope, &owner.resource_type, &owner.resource_id, &body)
+                    .await?
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// Whether a person record (Patient, RelatedPerson, Person) goes down to `scope`: only to the
     /// facilities its patient has records at (synchronization.md § Pull and Sync Scope). Other
     /// records are not narrowed here.

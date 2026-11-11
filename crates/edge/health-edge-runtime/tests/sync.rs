@@ -328,6 +328,25 @@ async fn an_attachment_follows_its_record_and_comes_down_on_demand() {
         content_type: "image/jpeg".into(),
     };
     assert!(!files.contains(&at_central.blob.hash));
+    // Only once a record in the edge's facility references it (#84).
+    assert!(
+        sync.fetch_blob(&reference).await.is_err(),
+        "no record references it"
+    );
+    write(
+        &central.store,
+        &json!({
+            "resourceType": "DocumentReference",
+            "status": "current",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+            "content": [{"attachment": {
+                "url": blob_url(&reference.hash),
+                "size": photo.len(),
+                "contentType": "image/jpeg"
+            }}]
+        }),
+    )
+    .await;
     sync.fetch_blob(&reference).await.expect("fetch");
     assert_eq!(
         files.read(&at_central.blob.hash).expect("at the edge"),
