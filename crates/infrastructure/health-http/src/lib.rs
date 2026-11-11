@@ -211,8 +211,43 @@ pub async fn trace_request(request: Request, next: Next) -> Response {
     response
 }
 
-/// A runtime's application: its `api` routes plus the system routes, all traced.
+/// The web app's content security policy: everything from its own origin, no inline script or
+/// style, never framed. The app needs nothing else (#140).
+pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+/// The headers every response carries unless its handler set its own (#140; the ZAP baseline).
+/// Responses are not stored by browsers or proxies unless the handler says otherwise: they carry
+/// patients' records.
+const SECURITY_HEADERS: [(&str, &str); 9] = [
+    ("content-security-policy", CONTENT_SECURITY_POLICY),
+    ("x-content-type-options", "nosniff"),
+    ("x-frame-options", "DENY"),
+    ("referrer-policy", "no-referrer"),
+    (
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()",
+    ),
+    ("cross-origin-opener-policy", "same-origin"),
+    ("cross-origin-resource-policy", "same-origin"),
+    ("cross-origin-embedder-policy", "require-corp"),
+    ("cache-control", "no-store"),
+];
+
+async fn security_headers(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    for (name, value) in SECURITY_HEADERS {
+        if !headers.contains_key(name) {
+            headers.insert(name, HeaderValue::from_static(value));
+        }
+    }
+    response
+}
+
+/// A runtime's application: its `api` routes plus the system routes, all traced, and every
+/// response with the security headers.
 pub fn app(api: Router, readiness: Readiness) -> Router {
     api.merge(system_routes(readiness))
+        .layer(middleware::from_fn(security_headers))
         .layer(middleware::from_fn(trace_request))
 }
