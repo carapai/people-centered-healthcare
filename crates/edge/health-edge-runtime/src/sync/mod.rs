@@ -34,8 +34,9 @@ use health_identifiers::NodeId;
 use health_provisioning::{SYNC_SCHEME, sync_jws};
 use health_surrealdb::{Outgoing, SurrealReplica, SurrealStore};
 use health_sync_protocol::{
-    BlobStatus, GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SoftwareVersion,
-    Verdict, Welcome, ZSTD, apply_pull, batches, compress, decompress, from_ndjson, to_ndjson,
+    BlobStatus, GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SnapshotEvent,
+    SoftwareVersion, Verdict, Welcome, ZSTD, apply_pull, batches, compress, decoder, decompress,
+    from_ndjson, read_snapshot, to_ndjson,
 };
 use health_time::Timestamp;
 use http_body_util::{BodyExt as _, BodyStream, Full};
@@ -576,24 +577,110 @@ impl Sync {
         Ok(ids.len())
     }
 
-    /// Re-seeds the node from central's snapshot; the number of heads applied.
+    /// Re-seeds the node from central's snapshot; the number of heads applied. The answer is read
+    /// as it arrives (#83): decompressed and parsed on a blocking thread, its heads applied a batch
+    /// at a time, so the node never holds the whole snapshot, whatever the facility's size. The
+    /// checkpoints move only once all of it has been read.
     async fn reseed(&self, central: NodeId) -> Result<usize, String> {
-        #[derive(serde::Deserialize)]
-        struct Snapshot {
-            cursor: health_sync_protocol::Cursor,
-            items: Vec<health_sync_protocol::Item>,
-        }
+        const PATH: &str = "/sync/v1/snapshot";
         tracing::warn!(
             alert = "sync-reseed",
             "central asked this node to re-seed: it was offline beyond central's horizon, or central was restored"
         );
-        let snapshot: Snapshot =
-            serde_json::from_slice(&self.post("/sync/v1/snapshot", b"{}".to_vec()).await?)
-                .map_err(|e| format!("/sync/v1/snapshot: {e}"))?;
-        self.store
-            .seed(central, &snapshot.items, &snapshot.cursor)
+        let request = self.request("POST", PATH, b"{}".to_vec())?;
+        let response = tokio::time::timeout(TIMEOUT, self.client.request(request))
             .await
-            .map_err(|e| format!("re-seeding: {e}"))
+            .map_err(|_| format!("{PATH}: central did not answer in time"))?
+            .map_err(|e| format!("{PATH}: cannot reach central: {e}"))?;
+        let compressed = response
+            .headers()
+            .get("content-encoding")
+            .is_some_and(|v| v.as_bytes() == ZSTD.as_bytes());
+        if !response.status().is_success() {
+            let status = response.status();
+            let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
+                .await
+                .map_err(|_| format!("{PATH}: central did not answer in time"))?
+                .map_err(|e| format!("{PATH}: {e}"))?
+                .to_bytes();
+            let bytes = if compressed {
+                decompress(&bytes).unwrap_or_default()
+            } else {
+                bytes.to_vec()
+            };
+            let detail = serde_json::from_slice::<serde_json::Value>(&bytes)
+                .ok()
+                .and_then(|v| v["detail"].as_str().map(str::to_owned))
+                .unwrap_or_default();
+            return Err(format!("{PATH}: central answered {status}: {detail}"));
+        }
+
+        let (chunks, received) = tokio::sync::mpsc::channel::<hyper::body::Bytes>(8);
+        let (events, mut parsed) = tokio::sync::mpsc::channel::<SnapshotEvent>(2);
+        let parser = tokio::task::spawn_blocking(move || {
+            let reader = ChunkReader {
+                chunks: received,
+                current: hyper::body::Bytes::new(),
+            };
+            let reader: Box<dyn std::io::Read> = if compressed {
+                decoder(reader)?
+            } else {
+                Box::new(reader)
+            };
+            read_snapshot(reader, 200, |event| {
+                events
+                    .blocking_send(event)
+                    .map_err(|_| "the re-seed stopped".to_owned())
+            })
+        });
+        let feed = async move {
+            let mut body = response.into_body();
+            while let Some(frame) = tokio::time::timeout(TIMEOUT, body.frame())
+                .await
+                .map_err(|_| format!("{PATH}: central stopped sending"))?
+            {
+                let frame = frame.map_err(|e| format!("{PATH}: {e}"))?;
+                if let Ok(data) = frame.into_data()
+                    && chunks.send(data).await.is_err()
+                {
+                    // The parser stopped: its error says why.
+                    break;
+                }
+            }
+            Ok::<(), String>(())
+        };
+        let seed = async {
+            let mut cursor = None;
+            let mut applied = 0;
+            while let Some(event) = parsed.recv().await {
+                match event {
+                    SnapshotEvent::Cursor(at) => cursor = Some(at),
+                    SnapshotEvent::Items(batch) => {
+                        applied += self
+                            .store
+                            .seed_items(central, &batch)
+                            .await
+                            .map_err(|e| format!("re-seeding: {e}"))?;
+                    }
+                }
+            }
+            Ok::<_, String>((cursor, applied))
+        };
+        let (fed, seeded) = tokio::join!(feed, seed);
+        let read = parser
+            .await
+            .map_err(|e| format!("{PATH}: the reader failed: {e}"))?;
+        // The first failure is the one that explains the others.
+        seeded.as_ref().map_err(Clone::clone)?;
+        fed?;
+        read.map_err(|e| format!("{PATH}: {e}"))?;
+        let (cursor, applied) = seeded?;
+        let cursor = cursor.ok_or_else(|| format!("{PATH}: no cursor"))?;
+        self.store
+            .seed_complete(central, &cursor)
+            .await
+            .map_err(|e| format!("re-seeding: {e}"))?;
+        Ok(applied)
     }
 
     /// Wakes `hint` whenever central says its log advanced, reconnecting after a pause when the
@@ -673,6 +760,27 @@ pub fn backoff(every: Duration, failures: u32) -> Duration {
         .map_or(0, |d| d.subsec_nanos());
     let jitter = base / 10 * (nanos % 1000) / 1000;
     base + jitter
+}
+
+/// The snapshot's body as a blocking reader, for the parser's thread: the chunks the response
+/// delivers, in order, and the end once it ends.
+struct ChunkReader {
+    chunks: tokio::sync::mpsc::Receiver<hyper::body::Bytes>,
+    current: hyper::body::Bytes,
+}
+
+impl std::io::Read for ChunkReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        while self.current.is_empty() {
+            match self.chunks.blocking_recv() {
+                Some(chunk) => self.current = chunk,
+                None => return Ok(0),
+            }
+        }
+        let n = buf.len().min(self.current.len());
+        buf[..n].copy_from_slice(&self.current.split_to(n));
+        Ok(n)
+    }
 }
 
 #[cfg(test)]

@@ -969,11 +969,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#83, part 3: the edge reads the snapshot as a stream (2026-11-11).**
+  - **What was wrong:** the edge decoded the whole answer, capped at 64 MiB (`MAX_DECODED`), and seeded from one in-memory vector. A facility whose snapshot expanded past that could never re-seed.
+  - **Now:** the response body is fed to a blocking thread that decompresses and parses it as it arrives (`health_sync_protocol::read_snapshot` and `decoder`, with serde seeds over the items array). Heads are applied in batches of 200 (`SurrealStore::seed_items`). The checkpoints and the new epoch follow only when the whole answer has been read (`seed_complete`), so a broken stream leaves the node to re-seed again.
+  - **Tested:** the reader hands out the cursor and exact batches, reads a stream-compressed answer the same, and refuses a cut-short or foreign answer. Over HTTPS with zstd, an edge beyond the horizon re-seeds 450+ heads across several batches, keeps its outbox, and the next round moves nothing.
+  - **Next for #83:** the signed USB seed and pruning non-head history.
 - **#83, part 2: central streams the snapshot (2026-11-11).**
   - **What was wrong:** a re-seed read every resource table in full, across all facilities, and filtered by scope in memory. The answer was one JSON body, buffered again by the compression layer. At central, one facility's re-seed would have loaded the national dataset.
   - **Now:** `SurrealStore::snapshot_stream` reads each table 500 rows at a time inside one read transaction, so the snapshot is still as of its cursor. It hands pages over a bounded channel. The handler writes the same JSON shape as it goes, compressed with a streaming zstd encoder, so the edge and the protocol are unchanged. A failure part way breaks the body rather than ending it early.
   - **Tested:** across more than six pages, with another facility's records mixed in, the cursor comes first, every page is within the page size, every head in scope arrives exactly once and none outside it, and the collected snapshot agrees. The edge's re-seed over HTTPS with zstd still converges.
-  - **Next for #83:** the edge reads the snapshot as a stream. It decodes at most 64 MiB today, so a facility larger than that cannot re-seed. Then the signed USB seed and pruning non-head history.
+  - **Next for #83:** the edge reads the snapshot as a stream (done in part 3).
 - **#84, part 2: scope checks on attachment download (2026-11-11).**
   - **What:** central served any blob by its hash to any authenticated node, so a node could fetch another facility's attachment if it learned the hash. Every version that references a blob now records it in `blob_owner` (migration `0052_blob_owner`). `GET /sync/v1/blobs/{hash}/content` serves a blob only when:
     - some record's current, non-deleted version still references it, and that record would be sent down to the node by the same rules as pull; or
