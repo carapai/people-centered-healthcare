@@ -72,6 +72,7 @@ members = [
     "crates/infrastructure/health-sync-server",
     "crates/testing/health-persistence-memory",
     "crates/testing/health-sync-sim",
+    "crates/desktop/health-desktop-runtime",
     "crates/edge/health-edge-runtime",
     "crates/edge/health-node-identity",
     "apps/server/central-server",
@@ -102,6 +103,7 @@ health-client-registry = { path = "crates/domains/health-client-registry" }
 health-clinical-documentation = { path = "crates/domains/health-clinical-documentation" }
 health-consent = { path = "crates/domains/health-consent" }
 health-coverage = { path = "crates/domains/health-coverage" }
+health-desktop-runtime = { path = "crates/desktop/health-desktop-runtime" }
 health-edge-runtime = { path = "crates/edge/health-edge-runtime" }
 health-fhir-server = { path = "crates/infrastructure/health-fhir-server" }
 health-fhir-models = { path = "crates/contracts/health-fhir-models" }

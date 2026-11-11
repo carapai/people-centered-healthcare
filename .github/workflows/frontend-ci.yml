@@ -107,9 +107,10 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      # Built first, so the suite's setup only starts it (health-fhir-server's contract_server).
-      - run: cargo build --locked -p health-fhir-server --example contract_server
-      # The same FhirClient suite against a central (bearer) and an edge (DPoP) base URL.
+      # Built first, so the suite's setup only starts them (health-fhir-server's contract_server
+      # and health-desktop-runtime's ipc_server).
+      - run: cargo build --locked -p health-fhir-server --example contract_server -p health-desktop-runtime --example ipc_server
+      # The same FhirClient suite against a central (bearer), an edge (DPoP) and a desktop (IPC).
       - run: bun run test:contract
         working-directory: apps/client
       # Only main saves (a push or the nightly run), and only a cache it did not restore exactly:

@@ -2554,6 +2554,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-desktop-runtime"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "form_urlencoded",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-surrealdb",
+ "health-time",
+ "http-body-util",
+ "jiff",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "health-edge-runtime"
 version = "0.1.0"
 dependencies = [

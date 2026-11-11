@@ -1,5 +1,7 @@
 // The FhirClient contract (client-application.md § Ports): one suite, run against central (OIDC
-// bearer) and an edge (DPoP) base URL, over the real Rust FhirServer.
+// bearer), an edge (DPoP) and a desktop over IPC (ADR 0036), over the real Rust FhirServer. The
+// desktop is read through the client's own IPC transport into health-desktop-runtime's dispatch,
+// so both halves of the IPC boundary meet the same contract as HTTP.
 
 import type { Observation, Patient } from '@health/fhir-types'
 import { isLosslessNumber } from 'lossless-json'
@@ -10,6 +12,8 @@ import { FhirError, fhirClient } from '../../src/platform/fhir'
 import { httpTransport } from '../../src/platform/http'
 import { parseJson, stringifyJson } from '../../src/platform/json'
 import { memorySession } from '../../src/platform/session'
+import { ipcTransport, type Invoke } from '../../src/platform/tauri'
+import type { Transport } from '../../src/platform/types'
 import type { ContractServers } from './context'
 
 const servers: ContractServers = inject('servers')
@@ -21,18 +25,33 @@ async function deviceKey(): Promise<CryptoKeyPair> {
 describe.each([
   { node: 'central', base: servers.central, scheme: 'Bearer' },
   { node: 'edge', base: servers.edge, scheme: 'DPoP' },
+  { node: 'desktop', base: servers.desktop.base, scheme: 'IPC' },
 ])('FhirClient against $node', async ({ node, base, scheme }) => {
   const sent: Headers[] = []
   const recording: typeof fetch = (input, init) => {
     sent.push(new Headers(init?.headers))
     return fetch(input, init)
   }
+  // The desktop's `invoke('api_request', …)`, carried to the Rust dispatch: what the webview sends.
+  const invoking: Invoke = async <T,>(command: string, args: Record<string, unknown>): Promise<T> => {
+    expect(command).toBe('api_request')
+    sent.push(new Headers((args['envelope'] as { headers: Record<string, string> }).headers))
+    const response = await fetch(servers.desktop.ipc, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(args),
+    })
+    return (await response.json()) as T
+  }
   const session = memorySession()
   session.setAccessToken(`contract-${node}`)
   const keys = await deviceKey()
-  const auth = scheme === 'Bearer' ? bearerAuth(session) : dpopAuth(session, () => keys)
   const url = new URL(base)
-  const fhir = fhirClient(httpTransport(url.origin, auth, recording), url.pathname)
+  const transport: Transport =
+    scheme === 'IPC'
+      ? ipcTransport(invoking)
+      : httpTransport(url.origin, scheme === 'Bearer' ? bearerAuth(session) : dpopAuth(session, () => keys), recording)
+  const fhir = fhirClient(transport, url.pathname)
 
   // Writes are not FhirClient's job (command ports own them), so the fixture is posted directly.
   async function create<T>(resource: object): Promise<T> {
@@ -112,11 +131,17 @@ describe.each([
     expect((error as FhirError).outcome?.resourceType).toBe('OperationOutcome')
   })
 
-  test(`authorizes every request with ${scheme}`, () => {
+  test(scheme === 'IPC' ? 'puts no credential in an IPC envelope' : `authorizes every request with ${scheme}`, () => {
     expect(sent.length).toBeGreaterThan(0)
     for (const headers of sent) {
-      expect(headers.get('authorization')).toBe(`${scheme} contract-${node}`)
-      expect(headers.has('dpop')).toBe(scheme === 'DPoP')
+      if (scheme === 'IPC') {
+        // The desktop's session lives on the Rust side: nothing secret crosses into the webview.
+        expect(headers.has('authorization')).toBe(false)
+        expect(headers.has('dpop')).toBe(false)
+      } else {
+        expect(headers.get('authorization')).toBe(`${scheme} contract-${node}`)
+        expect(headers.has('dpop')).toBe(scheme === 'DPoP')
+      }
     }
   })
 })
