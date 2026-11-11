@@ -293,9 +293,10 @@ stateDiagram-v2
   - **Pruning:** central prunes the change log and receipts older than 180 days, hourly (`SurrealStore::prune_log`, migration `0041_sync_horizon`). It keeps any entry an outbox still needs, and records the highest `seq` pruned in `sync_horizon:node`. `seq` never goes below it, so a log pruned to empty never hands a `seq` out twice.
   - **`reseed_required`:** central answers it to a pull whose cursor is below the horizon (a node that has never synced included), or from another epoch.
   - **Snapshot:** `POST /sync/v1/snapshot` serves every head in the node's scope, tombstones included, with central's cursor, read in one transaction (`SurrealStore::snapshot`).
+  - **Streamed at central (#83, part 2):** the transaction reads each table a page of 500 rows at a time (`SurrealStore::snapshot_stream`), and the answer is written as it is read: `{"cursor":…,"items":[` first, then each page, then `]}`. It is zstd-compressed as it goes (`health_sync_protocol::StreamEncoder`) for a node that accepts zstd. Central holds one page, not every head of every facility, and a slow reader holds the producer back. A failure part way breaks the body rather than ending it early, so a partial answer never parses. The wire format is the JSON it was, so the edge is unchanged.
   - **Seeding:** the edge applies the heads it lacks without queuing them back, which rebuilds its indexes locally (`SurrealStore::seed`). It moves its checkpoint to the snapshot's cursor and takes a new epoch. Its outbox is pushed before the pull, and anything left stays queued.
   - **Not yet:**
-    - streaming the snapshot (it is one JSON body today);
+    - reading the snapshot as a stream at the edge, which decodes at most `MAX_DECODED` (64 MiB), so a facility whose snapshot expands past that cannot re-seed yet;
     - the signed USB seed;
     - pruning non-head history.
 - **Reserved identifier blocks**, where they are mandated (ADR 0014), are sized for the 90-day window.

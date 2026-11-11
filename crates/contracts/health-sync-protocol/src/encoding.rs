@@ -32,6 +32,45 @@ pub fn compress(body: &[u8]) -> Vec<u8> {
     zstd::bulk::compress(body, LEVEL).unwrap_or_else(|_| unreachable!("in-memory zstd"))
 }
 
+/// A zstd stream compressed a piece at a time, for an answer written as it is produced (#83):
+/// each [`Self::push`] returns the compressed bytes so far, and the concatenation of every push
+/// and [`Self::finish`] decompresses as one body.
+pub struct StreamEncoder(zstd::stream::write::Encoder<'static, Vec<u8>>);
+
+impl StreamEncoder {
+    /// A new stream at the protocol's level.
+    pub fn new() -> Self {
+        // Writing into memory has no I/O to fail.
+        Self(
+            zstd::stream::write::Encoder::new(Vec::new(), LEVEL)
+                .unwrap_or_else(|_| unreachable!("in-memory zstd")),
+        )
+    }
+
+    /// Compresses `piece` and returns what is ready to send.
+    pub fn push(&mut self, piece: &[u8]) -> Vec<u8> {
+        use std::io::Write as _;
+        self.0
+            .write_all(piece)
+            .and_then(|()| self.0.flush())
+            .unwrap_or_else(|_| unreachable!("in-memory zstd"));
+        std::mem::take(self.0.get_mut())
+    }
+
+    /// Ends the stream: the last bytes to send.
+    pub fn finish(self) -> Vec<u8> {
+        self.0
+            .finish()
+            .unwrap_or_else(|_| unreachable!("in-memory zstd"))
+    }
+}
+
+impl Default for StreamEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// `body`, decompressed, refusing more than [`MAX_DECODED`] bytes.
 pub fn decompress(body: &[u8]) -> Result<Vec<u8>, DecodeError> {
     let decoder =
@@ -63,6 +102,20 @@ mod tests {
         );
         assert_eq!(decompress(&wire).expect("decompress"), body);
         assert_eq!(decompress(&compress(b"")).expect("empty"), b"");
+    }
+
+    #[test]
+    fn a_stream_compressed_in_pieces_decompresses_as_one_body() {
+        let pieces: Vec<Vec<u8>> = (0..50)
+            .map(|n| format!(r#"{{"n":{n},"resourceType":"Observation"}},"#).into_bytes())
+            .collect();
+        let mut encoder = StreamEncoder::new();
+        let mut wire = Vec::new();
+        for piece in &pieces {
+            wire.extend(encoder.push(piece));
+        }
+        wire.extend(encoder.finish());
+        assert_eq!(decompress(&wire).expect("decompress"), pieces.concat());
     }
 
     #[test]

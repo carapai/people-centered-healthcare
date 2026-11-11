@@ -1390,3 +1390,75 @@ async fn an_allowed_transition_commutes_with_a_concurrent_edit_and_a_competing_o
         round.outcomes
     );
 }
+
+/// A snapshot is read a page at a time in one transaction (#83): the cursor first, then pages
+/// of at most the page size, every head in scope exactly once and none outside it.
+#[tokio::test]
+async fn a_snapshot_streams_in_pages_with_every_head_in_scope_once() {
+    use health_surrealdb::SnapshotPart;
+    const PAGE: usize = 40;
+    let central = node("2026-11-08T08:00:00Z").await;
+    let mut ours = std::collections::BTreeSet::new();
+    // More than two pages of the facility's records, among another facility's.
+    for batch in 0..3 {
+        let mut tx = central.store.begin().await.expect("begin");
+        for n in 0..100 {
+            let id = ResourceId::new();
+            let facility = if n % 5 == 0 { "KLA02" } else { "KLA01" };
+            tx.write(WriteRequest {
+                resource_type: "Observation".parse().expect("type"),
+                id,
+                json: RawJson::from_validated(observation(facility, batch * 100 + n).to_string()),
+                op_id: OpId::new(),
+                precondition: Precondition::MustNotExist,
+            })
+            .await
+            .expect("write");
+            if facility == "KLA01" {
+                ours.insert(id.to_string());
+            }
+        }
+        tx.commit().await.expect("commit");
+    }
+    assert!(ours.len() > 5 * PAGE);
+
+    let mut parts = central
+        .store
+        .snapshot_stream_paged(scope(), central.id, PAGE);
+    let Some(Ok(SnapshotPart::Cursor(cursor))) = parts.recv().await else {
+        panic!("the cursor comes first");
+    };
+    assert_eq!(cursor.seq, 300);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut pages = 0;
+    while let Some(part) = parts.recv().await {
+        let SnapshotPart::Items(page) = part.expect("page") else {
+            panic!("one cursor only");
+        };
+        assert!(page.len() <= PAGE, "a page of {}", page.len());
+        pages += 1;
+        for item in page.iter().filter(|i| i.resource_type == "Observation") {
+            assert!(
+                seen.insert(item.resource_id.clone()),
+                "{} twice",
+                item.resource_id
+            );
+        }
+    }
+    assert!(pages >= 6, "{pages} pages");
+    assert_eq!(seen, ours, "exactly the facility's records");
+    // The collected snapshot agrees.
+    let (items, collected) = central
+        .store
+        .snapshot(&scope(), central.id)
+        .await
+        .expect("snapshot");
+    assert_eq!(collected, cursor);
+    assert_eq!(
+        items
+            .iter()
+            .filter(|i| i.resource_type == "Observation")
+            .count(),
+        ours.len()
+    );
+}
