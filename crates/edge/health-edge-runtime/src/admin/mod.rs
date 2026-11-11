@@ -233,9 +233,11 @@ async fn status(
     response
 }
 
-/// `routes`, served to this machine only: 403 for any other peer.
+/// `routes`, served to this machine only: 403 for any other peer. Only the routes themselves:
+/// a path they do not match is left to the rest of the API (#140), so the LAN cannot tell them
+/// apart from unknown paths.
 pub(crate) fn local_only(routes: Router) -> Router {
-    routes.layer(axum::middleware::from_fn(
+    routes.route_layer(axum::middleware::from_fn(
         |ConnectInfo(peer): ConnectInfo<SocketAddr>,
          request: axum::extract::Request,
          next: axum::middleware::Next| async move {

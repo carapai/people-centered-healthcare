@@ -969,6 +969,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#140, part 3: the edge's LAN surface (2026-11-11).**
+  - **What:** a test of the edge's API from a LAN address with no enrolled device, with sign-in on.
+    - Only discovery and keys are served, and sign-in refuses.
+    - The administrator's routes and provisioning answer this machine only.
+    - Every other route answers 401, unknown ones too.
+  - **TLS reviewed:** rustls's safe defaults (TLS 1.2 and 1.3, AEAD suites only), HTTP/1.1 only, served on 443. The plain-HTTP console binds to loopback only, and the config refuses anything else.
+  - **Found and fixed:** with sign-in on, unknown `/api` paths answered 403 (or 404), not 401. An unenrolled device could therefore tell which paths exist, which lan-security.md rules out. `local_only` now guards only its own routes, and the API's fallback is behind the device gate.
+  - **What remains of #140** is the penetration test of the edge's LAN surface, by people.
 - **#140, part 2: the ZAP baseline and security headers (2026-11-11).**
   - **What:** `zap.yml` boots central (the e2e backend) and an edge serving the app, and runs ZAP's baseline against both, nightly and on PRs that change the scan. Any alert not triaged in `.zap/rules.tsv` fails it, and the reports are kept as an artifact.
   - **Found and fixed:** `health_http::app` now gives every response, at central and on the edge, these security headers unless its handler set its own:
@@ -986,7 +994,6 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Found and fixed:**
     - **Central's gate did not forward `/sync/*` or `/api/provisioning/*`.** The deployed binary answered 404 to edges syncing or provisioning online; every earlier test built those routers without the gate.
     - **`/api` routes read requests before authenticating them.** Anonymous requests got 422 or 400 from the body or query parser. `health_auth::signed_in` now refuses them with 401 first, at central and on the edge. `/auth/pin` checks the bearer before reading its form.
-  - **Next for #140:** a review of the edge's LAN surface. The penetration test itself is for people.
 - **#106, part 4: the acceptance run (2026-11-10).** This completes #106.
   - **What:** edge e2e `opd-lan.spec.ts`: three enrolled devices on an edge with no internet register, check in, triage (vital signs extracted on the edge) and consult, then complete the visit. The edge fixture writes the OPD package's definitions into the edge's store, as central's sync would.
   - **Results:** documented in `tests/acceptance/opd-lan/` (§132), with the reconnect and sync evidence.
