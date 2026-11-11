@@ -122,3 +122,61 @@ fn the_document_describes_the_system_routes_and_their_bodies() {
         serde_json::json!(["ready", "not-ready"])
     );
 }
+
+#[tokio::test]
+async fn responses_carry_the_security_headers_unless_their_handler_set_its_own() {
+    use axum::http::header;
+    use axum::routing::get;
+
+    let api = Router::new()
+        .route("/api/record", get(|| async { "{}" }))
+        .route(
+            "/assets/app.js",
+            get(|| async {
+                (
+                    [(header::CACHE_CONTROL, "public, max-age=31536000, immutable")],
+                    "",
+                )
+            }),
+        );
+    let router = app(api, Readiness::new(Vec::new()));
+    let get = |path: &'static str| {
+        router
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).expect("request"))
+    };
+
+    let record = get("/api/record").await.expect("response");
+    let headers = record.headers();
+    assert_eq!(
+        headers["content-security-policy"],
+        health_http::CONTENT_SECURITY_POLICY
+    );
+    assert!(
+        health_http::CONTENT_SECURITY_POLICY.contains("frame-ancestors 'none'")
+            && !health_http::CONTENT_SECURITY_POLICY.contains("unsafe")
+    );
+    assert_eq!(headers["x-content-type-options"], "nosniff");
+    assert_eq!(headers["x-frame-options"], "DENY");
+    assert_eq!(headers["referrer-policy"], "no-referrer");
+    assert_eq!(headers["cross-origin-resource-policy"], "same-origin");
+    assert_eq!(headers["cross-origin-opener-policy"], "same-origin");
+    assert_eq!(headers["cross-origin-embedder-policy"], "require-corp");
+    assert!(
+        headers["permissions-policy"]
+            .to_str()
+            .expect("ascii")
+            .contains("camera=()")
+    );
+    // A patient's record is not stored by the browser or a proxy.
+    assert_eq!(headers[header::CACHE_CONTROL], "no-store");
+
+    // A handler's own caching stays; the system routes carry the headers too.
+    let asset = get("/assets/app.js").await.expect("response");
+    assert_eq!(
+        asset.headers()[header::CACHE_CONTROL],
+        "public, max-age=31536000, immutable"
+    );
+    let health = get("/health").await.expect("response");
+    assert_eq!(health.headers()["x-frame-options"], "DENY");
+}

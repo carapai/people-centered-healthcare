@@ -1,0 +1,106 @@
+# The ZAP baseline (#140; testing.md § Security): a passive scan of central's HTTP surface and of
+# an edge serving the web app. Any alert not triaged in .zap/rules.tsv fails the job. Nightly, and
+# on pull requests that change the scan.
+name: zap
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/zap.yml
+      - .zap/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: ZAP baseline (central and edge)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+      # ghcr.io/zaproxy/zaproxy:stable, pinned.
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Install SurrealDB 4.0.0 (the pinned server version)
+        run: |
+          curl --fail --silent --show-error --location --output surreal.tgz \
+            https://download.surrealdb.com/v4.0.0/surreal-v4.0.0.linux-amd64.tgz
+          echo "e910760179b9f13d0773ce98ac50f9a537051156365239284c2dc687adf3049d  surreal.tgz" | sha256sum --check
+          tar -xzf surreal.tgz
+      - run: docker pull --quiet "$ZAP_IMAGE"
+      - run: bun install --frozen-lockfile
+      # The edge embeds the built app.
+      - run: bun run codegen && bun run build
+        working-directory: apps/client
+      - run: cargo build --locked -p central-server -p facility-edge --bin central-server --bin facility-edge
+      - name: Start central (the e2e backend) and an edge
+        run: |
+          (cd apps/client && SURREAL_BIN="$GITHUB_WORKSPACE/surreal" bun e2e/backend.ts > "$RUNNER_TEMP/central.log" 2>&1 &)
+          data="$(mktemp -d)"
+          HEALTH_DATA_DIR="$data/store" HEALTH_CONSOLE_BIND=127.0.0.1:18443 HEALTH_BIND=127.0.0.1:18444 \
+            HEALTH_ORIGINS=http://127.0.0.1:18443 HEALTH_MDNS=off HEALTH_LOG=warn \
+            target/debug/facility-edge > "$RUNNER_TEMP/edge.log" 2>&1 &
+          for _ in $(seq 90); do
+            curl --silent --fail http://127.0.0.1:18080/ready > /dev/null \
+              && curl --silent --fail http://127.0.0.1:18443/ > /dev/null && exit 0
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/central.log" "$RUNNER_TEMP/edge.log"
+          exit 1
+      - name: Scan
+        run: |
+          mkdir -p zap && cp .zap/rules.tsv zap/ && chmod -R a+rwX zap
+          status=0
+          for target in \
+            central=http://127.0.0.1:18080/auth/.well-known/openid-configuration \
+            edge=http://127.0.0.1:18443/; do
+            name="${target%%=*}"
+            docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
+              zap-baseline.py -t "${target#*=}" -c rules.tsv -m 3 \
+              -r "$name.html" -J "$name.json" || status=$?
+          done
+          exit "$status"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-reports
+          path: zap/*.html
+          if-no-files-found: ignore
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}

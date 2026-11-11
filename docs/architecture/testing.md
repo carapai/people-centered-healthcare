@@ -20,7 +20,7 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | Recovery | kill -9 loops; power-loss harness on hardware runners; export → import round trip; restore drills | Nightly / weekly |
 | Stock concurrency | Concurrent issues and dispenses on the same Stock Unit; balances against ledger rebuild | Nightly (soak) |
 | Payment reconciliation | Mock MoMo and Airtel with dropped callbacks, duplicates and statement mismatches | Nightly |
-| Security | Authorization-matrix suite (facility isolation, sensitive labels, adolescent confidentiality, break-glass); ZAP baseline against staging; telemetry redaction test | Every PR (matrix, redaction); nightly (ZAP) |
+| Security | Authorization-matrix suite (facility isolation, sensitive labels, adolescent confidentiality, break-glass; every central route, `central-server` `route_matrix`); ZAP baseline (`zap.yml`) of central and of an edge serving the app, against staging once it exists, with triaged alerts in `.zap/rules.tsv`; telemetry redaction test | Every PR (matrix, redaction); nightly (ZAP) |
 
 ### The client's FHIR contract
 
