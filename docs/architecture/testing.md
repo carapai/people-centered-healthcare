@@ -16,7 +16,7 @@ Status: **accepted** (ADR 0045). Produced while resolving the Wayfinder ticket [
 | Payer adapters | Contract tests per payer adapter against recorded or mock payer responses (eligibility, claim, remittance) | Every PR (mock); nightly (sandbox where available) |
 | Frontend | Vitest unit tests; component tests and axe accessibility checks in Chromium (Vitest browser mode), axe over the design system's example page in every theme and density | Every PR |
 | End-to-end | Playwright on the web; Tauri via `tauri-driver` on Windows and Linux; the §117–119 scenarios | Nightly |
-| Offline and sync | Multi-node simulation (central, edge, desktop) with partitions, clock skew, long outages, `reseed_required`, restore and epoch change (`crates/testing/health-sync-sim`, #85) | Nightly; the §117 scenario on every PR too |
+| Offline and sync | Multi-node simulation (central, edge, desktop) with partitions, clock skew, long outages (at volume, within and beyond the horizon: `outage`), `reseed_required`, restore and epoch change (`crates/testing/health-sync-sim`, #85) | Nightly; the §117 scenario on every PR too |
 | Recovery | kill -9 loops (`health-edge-runtime` `kill_loop`: every acknowledged write on the edge's store survives SIGKILL and the change log stays whole; 5 rounds per PR, 50 nightly); power-loss harness on hardware runners; export → import round trip; restore drills | Nightly / weekly |
 | Stock concurrency | Concurrent issues and dispenses on the same Stock Unit; balances against ledger rebuild (`health-inventory-app` `soak`: 4 writers and 200 operations per PR, 16 and 2000 nightly) | Nightly (soak) |
 | Payment reconciliation | Mock MoMo and Airtel with dropped callbacks, duplicates and statement mismatches | Nightly |
