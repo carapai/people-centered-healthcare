@@ -114,6 +114,19 @@ pub const LEDGERS: &[&str] = &[
 /// sent down to every node as operations in the packages lane, never up.
 pub(crate) const ACTIVATIONS: &str = "activation";
 
+/// How many rows of a table a snapshot reads at a time (#83).
+pub const SNAPSHOT_PAGE: usize = 500;
+
+/// A part of a snapshot, as [`SurrealStore::snapshot_stream`] produces it: the cursor first,
+/// then the heads in pages.
+#[derive(Debug)]
+pub enum SnapshotPart {
+    /// The node's cursor as of the snapshot.
+    Cursor(Cursor),
+    /// A page of heads in scope.
+    Items(Vec<Item>),
+}
+
 /// A Conflict Record's resolution on the change log (#82; synchronization.md § Item states:
 /// `conflict → accepted`, the resolution pulled down): sent to the node whose push opened it, so
 /// it clears its candidates' `conflict` state, never up.
@@ -703,12 +716,61 @@ impl SurrealStore {
     /// The heads in `scope`, tombstones included, with this node's cursor at that instant, read
     /// in one transaction: what a new, re-pointed or too-stale `peer` is seeded from
     /// (synchronization.md § Seeding). Search indexes are never shipped; the node rebuilds them as
-    /// it applies the heads.
+    /// it applies the heads. Collected from [`Self::snapshot_stream`].
     pub async fn snapshot(
         &self,
         scope: &SyncScope,
         node: NodeId,
     ) -> Result<(Vec<Item>, Cursor), StoreError> {
+        let mut parts = self.snapshot_stream(scope.clone(), node);
+        let mut cursor = None;
+        let mut items = Vec::new();
+        while let Some(part) = parts.recv().await {
+            match part? {
+                SnapshotPart::Cursor(at) => cursor = Some(at),
+                SnapshotPart::Items(page) => items.extend(page),
+            }
+        }
+        Ok((items, cursor.ok_or_else(|| corrupt("snapshot cursor"))?))
+    }
+
+    /// The snapshot in parts (#83): the cursor first, then the heads in pages of
+    /// [`SNAPSHOT_PAGE`] rows, read in one transaction so the whole is as of the cursor. Each table
+    /// is read a page at a time, so the node holds one page, not every head of every facility,
+    /// and a slow reader holds the producer back. The stream ends early if the reader goes away.
+    pub fn snapshot_stream(
+        &self,
+        scope: SyncScope,
+        node: NodeId,
+    ) -> tokio::sync::mpsc::Receiver<Result<SnapshotPart, StoreError>> {
+        self.snapshot_stream_paged(scope, node, SNAPSHOT_PAGE)
+    }
+
+    /// [`Self::snapshot_stream`] with pages of `page` rows.
+    pub fn snapshot_stream_paged(
+        &self,
+        scope: SyncScope,
+        node: NodeId,
+        page: usize,
+    ) -> tokio::sync::mpsc::Receiver<Result<SnapshotPart, StoreError>> {
+        let (sender, receiver) = tokio::sync::mpsc::channel(2);
+        let store = self.clone();
+        let page = page.max(1);
+        tokio::spawn(async move {
+            if let Err(error) = store.snapshot_pages(&scope, node, page, &sender).await {
+                let _ = sender.send(Err(error)).await;
+            }
+        });
+        receiver
+    }
+
+    async fn snapshot_pages(
+        &self,
+        scope: &SyncScope,
+        node: NodeId,
+        page: usize,
+        out: &tokio::sync::mpsc::Sender<Result<SnapshotPart, StoreError>>,
+    ) -> Result<(), StoreError> {
         #[derive(SurrealValue)]
         struct HeadRow {
             rid: String,
@@ -716,28 +778,24 @@ impl SurrealStore {
             version_id: String,
             deleted: bool,
         }
-        let resources = crate::ownership::resources();
+        let tx = self.begin().await?;
         let mut sql = Sql::default();
-        let mut statements = Vec::with_capacity(resources.len());
-        for resource in resources {
-            statements.push((
-                resource.resource_type,
-                sql.push(format!(
-                    "SELECT record::id(id) AS rid, json, version_id, deleted FROM {}",
-                    resource.table
-                )),
-            ));
-        }
         let activations =
             sql.push("SELECT VALUE data FROM package_activation ORDER BY issued_at, id");
         let epoch = sql.push("SELECT VALUE epoch FROM ONLY sync_state:node");
         let last = sql.push(crate::change_log::LAST_SEQ);
-        let tx = self.begin().await?;
         let mut results = sql.run(tx.tx()?).await.map_err(unavailable)?;
-        drop(tx);
         let epoch: Option<String> = results.take(epoch).map_err(unavailable)?;
         let last: Option<i64> = results.take(last).map_err(unavailable)?;
         let activations: Vec<String> = results.take(activations).map_err(unavailable)?;
+        let cursor = Cursor {
+            node,
+            epoch: epoch.ok_or_else(|| corrupt("epoch"))?,
+            seq: last.and_then(|l| u64::try_from(l).ok()).unwrap_or(0),
+        };
+        if out.send(Ok(SnapshotPart::Cursor(cursor))).await.is_err() {
+            return Ok(());
+        }
         // Activation records first, as in the packages lane: every node is sent them all.
         let mut items = Vec::new();
         for data in activations {
@@ -767,54 +825,86 @@ impl SurrealStore {
                 body,
             });
         }
-        for (resource_type, statement) in statements {
-            let rows: Vec<HeadRow> = results.take(statement).map_err(unavailable)?;
-            for row in rows {
-                let body: Value = serde_json::from_str(&row.json).map_err(|_| corrupt("json"))?;
-                if !scope.admits_down(resource_type, &body)
-                    || !self
-                        .person_admitted(scope, resource_type, &row.rid, &body)
-                        .await?
-                {
-                    continue;
+        if !items.is_empty() && out.send(Ok(SnapshotPart::Items(items))).await.is_err() {
+            return Ok(());
+        }
+        for resource in crate::ownership::resources() {
+            let resource_type = resource.resource_type;
+            let mut after: Option<String> = None;
+            loop {
+                let query = match &after {
+                    None => format!(
+                        "SELECT record::id(id) AS rid, json, version_id, deleted FROM {} \
+                         ORDER BY id LIMIT {page}",
+                        resource.table
+                    ),
+                    Some(_) => format!(
+                        "SELECT record::id(id) AS rid, json, version_id, deleted FROM {table} \
+                         WHERE id > type::record('{table}', $after) ORDER BY id LIMIT {page}",
+                        table = resource.table
+                    ),
+                };
+                let mut request = tx.tx()?.query(query);
+                if let Some(after) = &after {
+                    request = request.bind(("after", after.clone()));
                 }
-                let op_id: OpId = row.version_id.parse().map_err(|_| corrupt("version_id"))?;
-                let wall_ms = body["meta"]["lastUpdated"]
-                    .as_str()
-                    .and_then(|at| at.parse::<Timestamp>().ok())
-                    .map_or(0, |at| at.as_millisecond());
-                items.push(Item {
-                    kind: Kind::Version,
-                    op_id,
-                    tx_id: op_id,
-                    resource_type: resource_type.to_owned(),
-                    resource_id: row.rid,
-                    parent_version_id: None,
-                    origin_node: node,
-                    device_id: None,
-                    author: None,
-                    hlc: Hlc {
-                        wall_ms,
-                        logical: 0,
-                    },
-                    content_hash: ContentHash::of(&body),
-                    packages: Vec::new(),
-                    snapshot_version: 0,
-                    provisional: false,
-                    deleted: row.deleted,
-                    blobs: health_sync_protocol::blob_refs(&body),
-                    body,
-                });
+                let rows: Vec<HeadRow> = request
+                    .await
+                    .and_then(surrealdb::IndexedResults::check)
+                    .map_err(unavailable)?
+                    .take(0)
+                    .map_err(unavailable)?;
+                let full = rows.len() == page;
+                after = rows.last().map(|row| row.rid.clone());
+                let mut items = Vec::new();
+                for row in rows {
+                    let body: Value =
+                        serde_json::from_str(&row.json).map_err(|_| corrupt("json"))?;
+                    if !scope.admits_down(resource_type, &body)
+                        || !self
+                            .person_admitted(scope, resource_type, &row.rid, &body)
+                            .await?
+                    {
+                        continue;
+                    }
+                    let op_id: OpId = row.version_id.parse().map_err(|_| corrupt("version_id"))?;
+                    let wall_ms = body["meta"]["lastUpdated"]
+                        .as_str()
+                        .and_then(|at| at.parse::<Timestamp>().ok())
+                        .map_or(0, |at| at.as_millisecond());
+                    items.push(Item {
+                        kind: Kind::Version,
+                        op_id,
+                        tx_id: op_id,
+                        resource_type: resource_type.to_owned(),
+                        resource_id: row.rid,
+                        parent_version_id: None,
+                        origin_node: node,
+                        device_id: None,
+                        author: None,
+                        hlc: Hlc {
+                            wall_ms,
+                            logical: 0,
+                        },
+                        content_hash: ContentHash::of(&body),
+                        packages: Vec::new(),
+                        snapshot_version: 0,
+                        provisional: false,
+                        deleted: row.deleted,
+                        blobs: health_sync_protocol::blob_refs(&body),
+                        body,
+                    });
+                }
+                if !items.is_empty() && out.send(Ok(SnapshotPart::Items(items))).await.is_err() {
+                    return Ok(());
+                }
+                if !full {
+                    break;
+                }
             }
         }
-        Ok((
-            items,
-            Cursor {
-                node,
-                epoch: epoch.ok_or_else(|| corrupt("epoch"))?,
-                seq: last.and_then(|l| u64::try_from(l).ok()).unwrap_or(0),
-            },
-        ))
+        drop(tx);
+        Ok(())
     }
 
     /// Seeds this node from `upstream`'s snapshot: each head not already here becomes the local

@@ -52,10 +52,11 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use health_identifiers::NodeId;
 use health_provisioning::{Error as RegistryError, NodeRegistry, SYNC_SCHEME};
-use health_surrealdb::{SurrealAuthority, SurrealStore, SyncScope};
+use health_surrealdb::{SnapshotPart, SurrealAuthority, SurrealStore, SyncScope};
 use health_sync_protocol::{
-    Compatibility, DecodeError, GroupResult, Hello, Item, Outcome, PullRequest, Reason, Verdict,
-    Welcome, ZSTD, compress, decompress, from_ndjson, group, receive, to_ndjson,
+    Compatibility, DecodeError, GroupResult, Hello, Item, Outcome, PullRequest, Reason,
+    StreamEncoder, Verdict, Welcome, ZSTD, compress, decompress, from_ndjson, group, receive,
+    to_ndjson,
 };
 use serde_json::json;
 
@@ -511,11 +512,101 @@ async fn snapshot(
         Ok(node) => node,
         Err(error) => return failed(error),
     };
-    match server.inner.store.snapshot(&peer.scope, node).await {
-        Ok((items, cursor)) => {
-            axum::Json(json!({ "cursor": cursor, "items": items })).into_response()
+    // Streamed a page at a time (#83): central never holds every head in the peer's scope, nor
+    // the whole answer. The cursor comes first, so a failure before it is still a clean answer.
+    let mut parts = server.inner.store.snapshot_stream(peer.scope.clone(), node);
+    let cursor = match parts.recv().await {
+        Some(Ok(SnapshotPart::Cursor(cursor))) => cursor,
+        Some(Err(error)) => return failed(error),
+        _ => return failed("the snapshot ended before its cursor"),
+    };
+    let Ok(cursor) = serde_json::to_string(&cursor) else {
+        return failed("the cursor does not serialize");
+    };
+    let zstd = accepts_zstd(&headers);
+    let stream = SnapshotBody {
+        parts,
+        encoder: zstd.then(StreamEncoder::new),
+        head: Some(format!(r#"{{"cursor":{cursor},"items":["#)),
+        first: true,
+        done: false,
+    }
+    .into_stream();
+    let mut response = Response::new(Body::from_stream(stream));
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    if zstd {
+        headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static(ZSTD));
+        headers.append(header::VARY, HeaderValue::from_static("accept-encoding"));
+    }
+    response
+}
+
+/// A snapshot answer as it is written: `{"cursor":…,"items":[…]}`, one page of items at a time,
+/// compressed as it goes for a peer that takes zstd. A store failure part way ends the body with
+/// an error, so the peer sees a broken answer, never a short one that parses.
+struct SnapshotBody {
+    parts: tokio::sync::mpsc::Receiver<Result<SnapshotPart, health_persistence::StoreError>>,
+    encoder: Option<StreamEncoder>,
+    head: Option<String>,
+    first: bool,
+    done: bool,
+}
+
+impl SnapshotBody {
+    fn into_stream(self) -> impl futures_util::Stream<Item = Result<Bytes, std::io::Error>> {
+        futures_util::stream::unfold(self, |mut body| async move {
+            if body.done {
+                return None;
+            }
+            if let Some(head) = body.head.take() {
+                let bytes = body.encode(head.as_bytes());
+                return Some((Ok(Bytes::from(bytes)), body));
+            }
+            loop {
+                match body.parts.recv().await {
+                    Some(Ok(SnapshotPart::Items(page))) => {
+                        let mut raw = Vec::new();
+                        for item in &page {
+                            if !body.first {
+                                raw.push(b',');
+                            }
+                            body.first = false;
+                            if serde_json::to_writer(&mut raw, item).is_err() {
+                                body.done = true;
+                                return Some((Err(std::io::Error::other("an item")), body));
+                            }
+                        }
+                        let bytes = body.encode(&raw);
+                        return Some((Ok(Bytes::from(bytes)), body));
+                    }
+                    Some(Ok(SnapshotPart::Cursor(_))) => {}
+                    Some(Err(error)) => {
+                        tracing::error!(%error, "snapshot failed part way");
+                        body.done = true;
+                        return Some((Err(std::io::Error::other(error.to_string())), body));
+                    }
+                    None => {
+                        body.done = true;
+                        let mut bytes = body.encode(b"]}");
+                        if let Some(encoder) = body.encoder.take() {
+                            bytes.extend(encoder.finish());
+                        }
+                        return Some((Ok(Bytes::from(bytes)), body));
+                    }
+                }
+            }
+        })
+    }
+
+    fn encode(&mut self, raw: &[u8]) -> Vec<u8> {
+        match &mut self.encoder {
+            Some(encoder) => encoder.push(raw),
+            None => raw.to_vec(),
         }
-        Err(error) => failed(error),
     }
 }
 

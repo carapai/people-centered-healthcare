@@ -35,7 +35,7 @@ mod receive;
 mod state;
 
 pub use blobs::{BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, blob_refs, blob_url};
-pub use encoding::{DecodeError, MAX_DECODED, ZSTD, compress, decompress};
+pub use encoding::{DecodeError, MAX_DECODED, StreamEncoder, ZSTD, compress, decompress};
 pub use envelope::{BlobRef, EnvelopeError, Item, Kind, PackageRef};
 pub use grants::{BreakGlassGrant, REVIEW_WITHIN_HOURS};
 pub use handshake::{
