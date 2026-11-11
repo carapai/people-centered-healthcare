@@ -25,6 +25,10 @@ use crate::{Digest, Error};
 /// The JWS `typ` of a package signature.
 pub const TYP: &str = "health-package+jws";
 
+/// The JWS `typ` of a seed signature (#83): a facility's snapshot on removable media. A seed's
+/// signature never passes as a package's, nor a package's as a seed's.
+pub const SEED_TYP: &str = "health-seed+jws";
+
 /// How far ahead of the verifier's clock `iat` may be.
 const SKEW: SignedDuration = SignedDuration::from_mins(5);
 
@@ -75,6 +79,17 @@ pub(crate) fn sign(
     signer: &dyn PublicationSigner,
     at: Timestamp,
 ) -> Result<String, Error> {
+    sign_detached(digest, signer, at, TYP)
+}
+
+/// Signs the bytes whose sha-256 is `digest` as a `typ` ([`TYP`], [`SEED_TYP`]), at `at`: the
+/// detached signature, `<header>..<signature>`.
+pub fn sign_detached(
+    digest: &Digest,
+    signer: &dyn PublicationSigner,
+    at: Timestamp,
+    typ: &str,
+) -> Result<String, Error> {
     let x5c: Vec<String> = CertificateDer::pem_slice_iter(signer.chain_pem().as_bytes())
         .map(|der| der.map(|der| STANDARD.encode(der.as_ref())))
         .collect::<Result<_, _>>()
@@ -82,7 +97,7 @@ pub(crate) fn sign(
     if x5c.is_empty() {
         return Err(Error::Signature("no certificate".into()));
     }
-    let header = json!({ "alg": "ES256", "typ": TYP, "x5c": x5c, "iat": at.as_second() });
+    let header = json!({ "alg": "ES256", "typ": typ, "x5c": x5c, "iat": at.as_second() });
     let header = URL_SAFE_NO_PAD.encode(header.to_string());
     let signature = signer.sign(signing_input(&header, digest).as_bytes())?;
     Ok(format!("{header}..{}", URL_SAFE_NO_PAD.encode(signature)))
@@ -109,6 +124,19 @@ pub(crate) fn verify(
     trust: &Trust,
     now: Timestamp,
 ) -> Result<Timestamp, Error> {
+    verify_detached(jws, digest, trust, now, TYP)
+}
+
+/// Verifies `jws` as a `typ` signature over the bytes whose sha-256 is `digest`, against
+/// `trust`, at `now`: the publication signer's, under the national root. Returns when it was
+/// signed.
+pub fn verify_detached(
+    jws: &str,
+    digest: &Digest,
+    trust: &Trust,
+    now: Timestamp,
+    typ: &str,
+) -> Result<Timestamp, Error> {
     let refused = |why: &str| Error::Signature(why.to_owned());
     let mut parts = jws.trim().split('.');
     let (Some(header_b64), Some(""), Some(signature_b64), None) =
@@ -124,8 +152,8 @@ pub(crate) fn verify(
     if header.get("alg").and_then(Value::as_str) != Some("ES256") {
         return Err(refused("alg must be ES256"));
     }
-    if header.get("typ").and_then(Value::as_str) != Some(TYP) {
-        return Err(refused("not a package signature"));
+    if header.get("typ").and_then(Value::as_str) != Some(typ) {
+        return Err(refused(&format!("not a {typ} signature")));
     }
     if header.get("crit").is_some() {
         return Err(refused("unknown critical header"));

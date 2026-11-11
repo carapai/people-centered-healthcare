@@ -112,7 +112,7 @@ fn publications(store: health_surrealdb::SurrealStore) -> Result<Publications, F
     ))
 }
 
-fn signer() -> Result<LocalSigner, Failure> {
+pub(crate) fn signer() -> Result<LocalSigner, Failure> {
     let read = |name: &str| -> Result<String, Failure> {
         let path = std::env::var(name).map_err(|_| format!("publishing needs {name}"))?;
         std::fs::read_to_string(&path).map_err(|e| format!("cannot read {path}: {e}").into())

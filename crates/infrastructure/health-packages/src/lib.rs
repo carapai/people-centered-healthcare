@@ -30,7 +30,9 @@ use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
 pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, Schemas};
-pub use signature::{LocalSigner, PublicationSigner, TYP};
+pub use signature::{
+    LocalSigner, PublicationSigner, SEED_TYP, TYP, sign_detached, verify_detached,
+};
 
 /// A sha-256.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

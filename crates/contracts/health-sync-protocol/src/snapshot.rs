@@ -11,6 +11,8 @@ use crate::{Cursor, Item};
 /// What [`read_snapshot`] hands out, in the order the answer carries them.
 #[derive(Debug)]
 pub enum SnapshotEvent {
+    /// A seed's header (`"seed"`, #83): what the media is for, written before the cursor.
+    Seed(serde_json::Value),
     /// The upstream's cursor as of the snapshot.
     Cursor(Cursor),
     /// A batch of heads.
@@ -73,6 +75,10 @@ where
         let mut items = false;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
+                "seed" => {
+                    let header: serde_json::Value = map.next_value()?;
+                    (self.on)(SnapshotEvent::Seed(header)).map_err(de::Error::custom)?;
+                }
                 "cursor" => {
                     let at: Cursor = map.next_value()?;
                     (self.on)(SnapshotEvent::Cursor(at)).map_err(de::Error::custom)?;
@@ -144,7 +150,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::{ContentHash, Hlc, Kind, StreamEncoder};
@@ -190,6 +196,7 @@ mod tests {
             match event {
                 SnapshotEvent::Cursor(at) => cursor = Some(at),
                 SnapshotEvent::Items(page) => batches.push(page.len()),
+                SnapshotEvent::Seed(_) => {}
             }
             Ok(())
         })?;
@@ -219,6 +226,34 @@ mod tests {
             read(decoder(wire.as_slice()).expect("decoder"), 3).expect("read");
         assert_eq!(read_cursor, Some(cursor));
         assert_eq!(batches, vec![3, 3, 1]);
+    }
+
+    #[test]
+    fn a_seed_header_comes_before_the_cursor() {
+        let (cursor, body) = answer(&[item(0)]);
+        let mut seeded: Value = serde_json::from_slice(&body).expect("json");
+        let mut ordered = serde_json::Map::new();
+        ordered.insert("seed".into(), json!({"facility": "KLA01"}));
+        ordered.extend(seeded.as_object_mut().expect("object").clone());
+        let body = serde_json::to_vec(&Value::Object(ordered)).expect("json");
+        let mut events = Vec::new();
+        read_snapshot(body.as_slice(), 10, |event| {
+            events.push(match event {
+                SnapshotEvent::Seed(header) => format!("seed {}", header["facility"]),
+                SnapshotEvent::Cursor(at) => format!("cursor {}", at.seq),
+                SnapshotEvent::Items(page) => format!("items {}", page.len()),
+            });
+            Ok(())
+        })
+        .expect("read");
+        assert_eq!(
+            events,
+            [
+                "seed \"KLA01\"",
+                &format!("cursor {}", cursor.seq),
+                "items 1"
+            ]
+        );
     }
 
     #[test]

@@ -31,6 +31,7 @@ mod discovery;
 mod enrollment;
 mod node;
 mod notify;
+pub mod seed;
 mod supervisor;
 pub mod sync;
 mod tls;

@@ -38,6 +38,7 @@
 //! The event stream and attachment bytes are sent as they are.
 
 mod review;
+mod seed;
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -61,6 +62,7 @@ use health_sync_protocol::{
 use serde_json::json;
 
 pub use review::{CONFLICT_PERMISSION, review_router};
+pub use seed::write_seed;
 
 /// A check a pushed group must pass before it is applied, e.g. re-deriving a completed
 /// response's extraction at the authority (ADR 0022). `Some` is the outcome the group gets

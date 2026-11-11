@@ -73,6 +73,7 @@ The binary embeds the client and serves it, with its `runtime.json` and app-shel
 | 9 | A `backup` command failed | (commands only) |
 | 10 | The encryption gate refused provisioning (`encryption check`, `provision request`), or an `encryption` command failed | (commands only) |
 | 11 | A `provision` command failed | (commands only) |
+| 12 | A `seed` command failed | (commands only) |
 
 The first start and three restarts are allowed within 24 hours. After that the unit stays stopped.
 
@@ -105,6 +106,10 @@ The running node takes a backup every hour and test-restores the newest one ever
 - `facility-edge backup status`: prints `status.json` and the backups kept.
 
 A backup on demand while the node runs is not available yet: the admin page (#77) shows the backup status only.
+
+## Seeding from removable media
+
+`facility-edge seed import <file>` applies a seed central wrote with `central-server seed export` (`<file>.jws` beside it), for a first install whose link cannot carry the facility's records (#83; synchronization.md § Seeding). The edge owns its store, so stop the service first. The signature must be the publication signer's under the national root installed at provisioning, and the seed must be for this edge's facility; otherwise nothing is applied. Sync resumes after it once the link is up.
 
 ## Provisioning
 

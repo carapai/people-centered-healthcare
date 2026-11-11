@@ -654,6 +654,8 @@ impl Sync {
             let mut applied = 0;
             while let Some(event) = parsed.recv().await {
                 match event {
+                    // A seed's header: central's network answer carries none.
+                    SnapshotEvent::Seed(_) => {}
                     SnapshotEvent::Cursor(at) => cursor = Some(at),
                     SnapshotEvent::Items(batch) => {
                         applied += self

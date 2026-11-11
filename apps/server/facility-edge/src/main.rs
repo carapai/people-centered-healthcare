@@ -34,6 +34,7 @@ mod central;
 mod encryption;
 mod provision;
 mod recovery;
+mod seed;
 mod service;
 mod update;
 
@@ -81,6 +82,13 @@ fn main() -> ExitCode {
                 ExitCode::from(10)
             }
         },
+        Some("seed") => match seed::run(&config, &args[1..]) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("facility-edge: {error}");
+                ExitCode::from(12)
+            }
+        },
         Some("provision") => match provision::run(&config, &args[1..]) {
             Ok(()) => ExitCode::SUCCESS,
             Err(provision::Failure::Refused(error)) => {
@@ -94,7 +102,7 @@ fn main() -> ExitCode {
         },
         Some(_) => {
             eprintln!(
-                "usage: facility-edge [--service | update … | backup … | encryption … | provision …]"
+                "usage: facility-edge [--service | update … | backup … | encryption … | provision … | seed …]"
             );
             ExitCode::from(2)
         }

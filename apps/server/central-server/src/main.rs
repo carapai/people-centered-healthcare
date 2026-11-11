@@ -19,6 +19,7 @@ mod package;
 mod provision;
 mod recovery;
 mod seed;
+mod seed_media;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -318,6 +319,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("recovery") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         return recovery::run(&config, &args).await;
+    }
+    if std::env::args().nth(1).as_deref() == Some("seed") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return seed_media::run(&config, &args).await;
     }
     if std::env::args().nth(1).as_deref() == Some("provision") {
         let args: Vec<String> = std::env::args().skip(2).collect();
