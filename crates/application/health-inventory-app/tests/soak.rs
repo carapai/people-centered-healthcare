@@ -177,12 +177,16 @@ async fn concurrent_movements_on_one_unit_never_go_negative_and_match_the_ledger
         expected,
         "the ledger"
     );
-    // Read in occurrence order, the running balance never dips below zero.
-    assert!(
+    // The stock card ends at the balance. It orders by `occurred_at`, which each writer sets
+    // before its reruns, so a dispense made a moment before a delivery, that could only commit
+    // after it, may dip below zero part way: occurrence order is not commit order. The guard is
+    // the balance record, checked above.
+    assert_eq!(
         health_inventory::stock_card(&movements)
-            .iter()
-            .all(|(_, running)| *running >= 0),
-        "the stock card goes negative"
+            .last()
+            .map(|(_, running)| *running),
+        Some(expected),
+        "the stock card's closing balance"
     );
     assert!(
         inventory.nightly_check().await.expect("check").is_empty(),
