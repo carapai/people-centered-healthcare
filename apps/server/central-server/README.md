@@ -99,6 +99,10 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 - The password comes from `HEALTH_PROVISION_PASSWORD_FILE`. It must pass the password policy and the breached-password list (15 characters, since central sign-in has no device factor).
 - The roles must be defined in the access policy.
 
+## Seeds on removable media
+
+`central-server seed export <facility> <file>` writes the facility's snapshot to `<file>` and its signature to `<file>.jws`, for an edge whose link cannot carry a first seed (#83; synchronization.md § Seeding). It signs with the publication signer (`HEALTH_PUBLICATION_KEY_FILE`, `HEALTH_PUBLICATION_CHAIN_FILE`). The edge applies it with `facility-edge seed import <file>`.
+
 ## Publishing packages
 
 `central-server package …` runs the publication lifecycle for Published Definition packages (#88; configuration.md § Lifecycle; ADR 0025), until the Clinical Metadata Studio. `<id>` is `name@version`, and `--by` names who acted. Every step is audited.

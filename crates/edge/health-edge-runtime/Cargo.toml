@@ -29,6 +29,7 @@ health-files = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
 health-observability = { workspace = true }
+health-packages = { workspace = true }
 health-persistence = { workspace = true }
 health-pki = { workspace = true }
 health-registries-app = { workspace = true }
@@ -64,7 +65,6 @@ tracing = { workspace = true }
 windows-service = { workspace = true }
 
 [dev-dependencies]
-health-packages = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
 health-sync-server = { workspace = true }
 rcgen = { workspace = true }

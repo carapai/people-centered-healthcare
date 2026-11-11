@@ -188,7 +188,7 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
 A new, re-pointed or too-stale node is seeded from a snapshot of its scope:
 - The snapshot is the head rows streamed as NDJSON from **one read transaction**, together with the cursor at that instant.
 - The node rebuilds its search indexes locally. Indexes are never shipped.
-- A large first install can be seeded from removable media signed with the facility certificate.
+- A large first install can be seeded from removable media: central's snapshot of the facility, signed by the publication signer under the national root (#83, below).
 
 ### Wake-up
 
@@ -296,9 +296,10 @@ stateDiagram-v2
   - **Streamed at central (#83, part 2):** the transaction reads each table a page of 500 rows at a time (`SurrealStore::snapshot_stream`), and the answer is written as it is read: `{"cursor":…,"items":[` first, then each page, then `]}`. It is zstd-compressed as it goes (`health_sync_protocol::StreamEncoder`) for a node that accepts zstd. Central holds one page, not every head of every facility, and a slow reader holds the producer back. A failure part way breaks the body rather than ending it early, so a partial answer never parses. The wire format is the JSON it was, so the edge is unchanged.
   - **Read as a stream at the edge (#83, part 3):** the edge reads the answer as it arrives. A blocking thread decompresses and parses it (`health_sync_protocol::read_snapshot`, `decoder`), handing over the cursor and then batches of 200 heads. The heads are applied a batch at a time (`SurrealStore::seed_items`). Only once the whole answer has been read do the checkpoints move and the node take a new epoch (`seed_complete`), so an interrupted re-seed leaves the node to re-seed again. The 64 MiB limit of a decompressed body no longer applies to snapshots, and the edge holds one batch whatever the facility's size.
   - **Seeding:** the edge applies the heads it lacks without queuing them back, which rebuilds its indexes locally (`SurrealStore::seed`). It moves its checkpoint to the snapshot's cursor and takes a new epoch. Its outbox is pushed before the pull, and anything left stays queued.
-  - **Not yet:**
-    - the signed USB seed;
-    - pruning non-head history.
+  - **Seeding from removable media (#83, part 4).**
+    - **Export:** `central-server seed export <facility> <file>` writes the facility's snapshot, streamed as over the network, zstd-compressed, with a `seed` header naming the facility, central and the time (`health_sync_server::write_seed`). It writes `<file>.jws` beside it, a detached signature over the file's sha-256 by the publication signer, whose `typ` is `health-seed+jws`, so a seed's signature never passes as a package's (`health_packages::SEED_TYP`).
+    - **Import:** `facility-edge seed import <file>`, with the service stopped, verifies the signature against the national root installed at provisioning before reading any further. The header must name the edge's own facility before any head is applied. The heads are applied in batches as for a network re-seed, and the checkpoints move to the seed's cursor last (`health_edge_runtime::seed::import`). When the link comes up, sync resumes after the seed.
+  - **Version history is kept.** Pruning stops at the change log and receipts. The versions behind each head (`{type}_history`) are part of the clinical record and are never pruned for sync's sake. Retention is set by the record-retention policy, not by the horizon.
 - **Reserved identifier blocks**, where they are mandated (ADR 0014), are sized for the 90-day window.
 
 ## Attachments (ADR 0021)

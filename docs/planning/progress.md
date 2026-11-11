@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#83, part 4: seeds on removable media (2026-11-11).** This completes #83.
+  - **What:**
+    - `central-server seed export <facility> <file>` streams the facility's snapshot into a zstd file with a `seed` header and signs its sha-256 with the publication signer as `health-seed+jws`.
+    - `facility-edge seed import <file>` verifies the signature against the national root before reading further. It requires the header to name its own facility before any head is applied, applies the heads in batches, and moves the checkpoints last.
+    - Detached signatures now take their `typ` (`health_packages::sign_detached`, `verify_detached`), so a seed's signature can't pass as a package's, nor the reverse.
+  - **Decided:** clinical version history is never pruned for sync. Pruning stops at the change log and receipts, and retention belongs to the record-retention policy (synchronization.md).
+  - **Tested:** central exports KLA01's records among KLA02's. An import for another facility, under a package signature, or with a changed byte is refused before anything is applied. KLA01's edge receives all its records and none of KLA02's, its cursor is central's so sync resumes after it, and a second import applies nothing. The reader hands out the seed header before the cursor.
 - **#141, part 4: stock writers take turns per store (2026-11-11).**
   - **What:** stock use cases on one node now queue per store (`health-inventory-app` `queue`) instead of racing to commit and rerunning.
     - A use case that knows its stores waits for each of them in key order, while other stores' work runs alongside.
@@ -980,7 +987,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **What was wrong:** the edge decoded the whole answer, capped at 64 MiB (`MAX_DECODED`), and seeded from one in-memory vector. A facility whose snapshot expanded past that could never re-seed.
   - **Now:** the response body is fed to a blocking thread that decompresses and parses it as it arrives (`health_sync_protocol::read_snapshot` and `decoder`, with serde seeds over the items array). Heads are applied in batches of 200 (`SurrealStore::seed_items`). The checkpoints and the new epoch follow only when the whole answer has been read (`seed_complete`), so a broken stream leaves the node to re-seed again.
   - **Tested:** the reader hands out the cursor and exact batches, reads a stream-compressed answer the same, and refuses a cut-short or foreign answer. Over HTTPS with zstd, an edge beyond the horizon re-seeds 450+ heads across several batches, keeps its outbox, and the next round moves nothing.
-  - **Next for #83:** the signed USB seed and pruning non-head history.
+  - **Next for #83:** the signed USB seed (done in part 4).
 - **#83, part 2: central streams the snapshot (2026-11-11).**
   - **What was wrong:** a re-seed read every resource table in full, across all facilities, and filtered by scope in memory. The answer was one JSON body, buffered again by the compression layer. At central, one facility's re-seed would have loaded the national dataset.
   - **Now:** `SurrealStore::snapshot_stream` reads each table 500 rows at a time inside one read transaction, so the snapshot is still as of its cursor. It hands pages over a bounded channel. The handler writes the same JSON shape as it goes, compressed with a streaming zstd encoder, so the edge and the protocol are unchanged. A failure part way breaks the body rather than ending it early.

@@ -29,6 +29,7 @@ health-provisioning = { workspace = true }
 health-surrealdb = { workspace = true }
 health-sync-protocol = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
