@@ -32,6 +32,7 @@ mod ndjson;
 mod pull;
 mod push;
 mod receive;
+mod snapshot;
 mod state;
 
 pub use blobs::{BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, blob_refs, blob_url};
@@ -51,4 +52,5 @@ pub use pull::{
 };
 pub use push::{Group, GroupError, MAX_BATCH_BYTES, MAX_BATCH_ITEMS, batches, group};
 pub use receive::{Authority, GroupResult, Outcome, Reason, Receipt, receive};
+pub use snapshot::{SnapshotEvent, decoder, read_snapshot};
 pub use state::{Answer, Event, InvalidTransition, ItemState};

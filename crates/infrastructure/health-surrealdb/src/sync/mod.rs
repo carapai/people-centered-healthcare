@@ -917,6 +917,15 @@ impl SurrealStore {
         items: &[Item],
         cursor: &Cursor,
     ) -> Result<usize, WriteError> {
+        let applied = self.seed_items(upstream, items).await?;
+        self.seed_complete(upstream, cursor).await?;
+        Ok(applied)
+    }
+
+    /// Applies a batch of `upstream`'s snapshot (#83): each head not already here becomes the
+    /// local head, without being queued back. A re-seed read as a stream applies each batch as it
+    /// arrives, then calls [`Self::seed_complete`] once the whole snapshot has been read.
+    pub async fn seed_items(&self, upstream: NodeId, items: &[Item]) -> Result<usize, WriteError> {
         let replica = SurrealReplica::new(self, upstream, Lane::Clinical);
         let mut applied = 0;
         for chunk in items.chunks(200) {
@@ -944,6 +953,13 @@ impl SurrealStore {
             tx.commit().await?;
             applied += fresh.len();
         }
+        Ok(applied)
+    }
+
+    /// Ends a re-seed from `upstream` whose every head has been applied: each lane's checkpoint
+    /// moves to the snapshot's `cursor`, and this node takes a new epoch. Called only after the
+    /// whole snapshot was read, so an interrupted re-seed leaves the node to re-seed again.
+    pub async fn seed_complete(&self, upstream: NodeId, cursor: &Cursor) -> Result<(), WriteError> {
         // The snapshot covers every lane: each lane resumes from its cursor.
         for lane in Lane::PULLED {
             SurrealReplica::new(self, upstream, lane)
@@ -951,7 +967,7 @@ impl SurrealStore {
                 .await?;
         }
         crate::change_log::new_epoch(&self.connection).await?;
-        Ok(applied)
+        Ok(())
     }
 
     /// The break-glass grants queued for `peer` (#224).

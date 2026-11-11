@@ -262,6 +262,23 @@ async fn an_edge_beyond_central_s_horizon_reseeds_and_keeps_its_outbox() {
     // Offline past the horizon: the edge writes, central writes and prunes its whole log.
     let offline = write(&edge, &observation()).await;
     let meanwhile = patient_seen_here(&central.store).await;
+    // More than two of the edge's batches, so the snapshot is read and applied as a stream (#83).
+    let mut bulk = Vec::new();
+    let mut tx = central.store.begin().await.expect("begin");
+    for _ in 0..450 {
+        let id = ResourceId::new();
+        tx.write(WriteRequest {
+            resource_type: "Observation".parse().expect("type"),
+            id,
+            json: RawJson::from_validated(observation().to_string()),
+            op_id: OpId::new(),
+            precondition: Precondition::MustNotExist,
+        })
+        .await
+        .expect("write");
+        bulk.push(id);
+    }
+    tx.commit().await.expect("commit");
     central
         .store
         .prune_log(Timestamp::now() + health_time::SignedDuration::from_mins(1))
@@ -270,7 +287,13 @@ async fn an_edge_beyond_central_s_horizon_reseeds_and_keeps_its_outbox() {
 
     let round = sync.round().await.expect("round");
     assert_eq!(round.pushed, 1, "the outbox goes up first");
-    assert!(round.seeded >= 1, "{round:?}");
+    assert!(round.seeded >= bulk.len(), "{round:?}");
+    for id in &bulk {
+        assert!(
+            version(&edge, "Observation", *id).await.is_some(),
+            "Observation/{id} at the edge"
+        );
+    }
     for (resource_type, id) in [
         ("Patient", first),
         ("Patient", meanwhile),
