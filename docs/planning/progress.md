@@ -969,6 +969,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#141, part 3: long outages at volume (2026-11-11).**
+  - **What:** `health-sync-sim`'s `outage` scenarios, nightly with the other simulations. An edge is cut off from central while both write facility records (`HEALTH_OUTAGE_RECORDS` each, 200 by default), then reconnected.
+    - After 30 days, it catches up without re-seeding.
+    - After 200 days, with central's log pruned at the horizon, it is told to re-seed, takes central's snapshot, and still delivers everything it wrote while apart.
+    - Either way every record agrees at both nodes, and another pass moves nothing.
+  - **Results:** both variants converge with 400 records written apart, in about a minute each (debug build, memory engine). The 200-day variant re-seeded the edge with 200 records.
+  - **Noted:** the change log's `committed_at` is stamped by the database's clock (`time::now()`), not by the store's `Clock`, so simulated clocks don't age it and the scenario takes its horizon in real time. In production the two clocks agree.
+  - **What remains of #141** needs edge hardware or scale runs: facility-scale load and power-loss loops on edge hardware, and national-scale matching (#200).
 - **#141, part 2: the stock soak (2026-11-11).**
   - **What:** `health-inventory-app`'s `soak` test. Concurrent writers issue, dispense and receive on one Stock Unit, and it runs dry and refills while they race.
     - No movement leaves the balance negative.
