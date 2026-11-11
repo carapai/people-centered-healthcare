@@ -1,6 +1,13 @@
 # Licence policy for actions/dependency-review-action (deployment.md § Licences; ADR 0045).
 # The same allowlist as deny.toml; SurrealDB's BSL 1.1 is allowed only for its own crates.
 fail-on-severity: moderate
+# Advisories allowed, each with its reason and when it goes (approved by the maintainer).
+allow-ghsas:
+  # glib 0.18 VariantStrIter unsoundness: Tauri 2's Linux WebKitGTK bindings are tied to gtk-rs
+  # 0.18 and the fix is in glib 0.20. It reaches only the Linux desktop build
+  # (apps/client/src-tauri, #132), not central or the edge. Remove when the desktop moves to
+  # Tauri 3 (gtk-rs >= 0.20).
+  - GHSA-wrw7-89jp-8q8g
 license-check: true
 allow-licenses:
   - MIT

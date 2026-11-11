@@ -148,7 +148,7 @@ stateDiagram-v2
   - **One command.** `api_request` is the only one, and it is listed in `AppManifest::commands` and granted to the main window alone. The CSP is the web app's, plus Tauri's IPC origin.
   - **Startup.** Without a working keystore the app does not start. It opens the embedded store in the per-machine directory (`HEALTH_DESKTOP_DATA_DIR` in development) and migrates it.
   - **No records yet.** The router serves only the system routes until local sign-in arrives (#133, #134).
-  - **Policy exceptions.** `cargo deny` checks it under the repository's policy. Four advisories deep in Tauri's Linux stack (unmaintained crates, no vulnerability) are ignored with reasons in `deny.toml`.
+  - **Policy exceptions.** `cargo deny` checks it under the repository's policy. Four advisories deep in Tauri's Linux stack (unmaintained crates, no vulnerability) are ignored with reasons in `deny.toml`. GitHub's dependency review allows one more, with the maintainer's approval: `glib` 0.18's `VariantStrIter` unsoundness (GHSA-wrw7-89jp-8q8g). Tauri 2's WebKitGTK bindings are tied to gtk-rs 0.18, so it can't be upgraded until Tauri 3. It is listed in `.github/dependency-review-config.yml`, to be removed then.
 - **Not yet:**
   - local sign-in and the FHIR and application routes (#133, #134);
   - the disk-encryption check at provisioning;
