@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#84, part 2: scope checks on attachment download (2026-11-11).**
+  - **What:** central served any blob by its hash to any authenticated node, so a node could fetch another facility's attachment if it learned the hash. Every version that references a blob now records it in `blob_owner` (migration `0052_blob_owner`). `GET /sync/v1/blobs/{hash}/content` serves a blob only when:
+    - some record's current, non-deleted version still references it, and that record would be sent down to the node by the same rules as pull; or
+    - it is the tarball an activation record names.
+  - Anything else answers 404, as for an unknown blob.
+  - **Tested:** over HTTP, a blob no record references, or only another facility's record, is 404, and one referenced by a record in the node's facility is served. The edge's on-demand download and package activation still work end to end.
+  - **Still open on #84:** the pre-fetch flag and the pending marker.
 - **#141, part 3: long outages at volume (2026-11-11).**
   - **What:** `health-sync-sim`'s `outage` scenarios, nightly with the other simulations. An edge is cut off from central while both write facility records (`HEALTH_OUTAGE_RECORDS` each, 200 by default), then reconnected.
     - After 30 days, it catches up without re-seeding.
@@ -1217,7 +1224,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Still open:**
     - the pre-fetch flag;
     - the pending marker;
-    - scope checks on download.
+    - scope checks on download (done in part 2).
 - **#83, part 1: the horizon and re-seeding (2026-11-08).**
   - **Pruning:** central prunes the change log and receipts past 180 days, hourly. Entries an outbox still needs are kept, and `seq` never goes below the pruned horizon. That was a bug the test found: pruning the whole log made `seq` restart at 1.
   - **Re-seeding:** a pull from below the horizon is answered `reseed_required`. The edge then fetches `POST /sync/v1/snapshot` (every head in its scope, with the cursor, from one transaction), applies the heads it lacks, takes a new epoch, and carries on. Its outbox goes up first, so nothing written offline is lost.

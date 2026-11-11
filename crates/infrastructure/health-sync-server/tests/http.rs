@@ -176,6 +176,27 @@ impl Setup {
         serde_json::from_slice(&body).expect("welcome")
     }
 
+    /// Writes `body` at central.
+    async fn at_central(&self, body: &Value) -> ResourceId {
+        let id = ResourceId::new();
+        let mut tx = self.central.begin().await.expect("begin");
+        tx.write(WriteRequest {
+            resource_type: body["resourceType"]
+                .as_str()
+                .expect("type")
+                .parse()
+                .expect("type"),
+            id,
+            json: RawJson::from_validated(body.to_string()),
+            op_id: OpId::new(),
+            precondition: Precondition::MustNotExist,
+        })
+        .await
+        .expect("write");
+        tx.commit().await.expect("commit");
+        id
+    }
+
     /// Writes an observation at the edge and returns the items queued for central.
     async fn observation_from_edge(&self, facility: &str, central: NodeId) -> Vec<u8> {
         let body = json!({
@@ -408,12 +429,34 @@ async fn an_interrupted_attachment_upload_resumes_where_it_stopped() {
     }
     assert!(at.complete());
 
-    // Stored and verified: it is served whole, and a second upload has nothing to send.
-    let (code, body) = s
-        .send("GET", &format!("/sync/v1/blobs/{hash}/content"), Vec::new())
-        .await;
+    // Stored and verified. It is served only to a node with a record in its scope that
+    // references it (#84): not while no record does, nor for another facility's record.
+    let content_path = format!("/sync/v1/blobs/{hash}/content");
+    let (code, _) = s.send("GET", &content_path, Vec::new()).await;
+    assert_eq!(code, StatusCode::NOT_FOUND, "no record references it");
+    let scan = |facility: &str| {
+        json!({
+            "resourceType": "DocumentReference", "status": "current",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": facility}]},
+            "content": [{"attachment": {
+                "contentType": "application/pdf",
+                "url": health_sync_protocol::blob_url(&hash),
+                "size": size
+            }}]
+        })
+    };
+    s.at_central(&scan("ELSEWHERE")).await;
+    let (code, _) = s.send("GET", &content_path, Vec::new()).await;
+    assert_eq!(
+        code,
+        StatusCode::NOT_FOUND,
+        "only another facility's record"
+    );
+    s.at_central(&scan(FACILITY)).await;
+    let (code, body) = s.send("GET", &content_path, Vec::new()).await;
     assert_eq!(code, StatusCode::OK);
     assert_eq!(body.as_ref(), content.as_slice());
+    // A second upload has nothing to send.
     let (_, body) = s.send("GET", &base, Vec::new()).await;
     assert!(status(&body).complete(), "deduplicated");
 }

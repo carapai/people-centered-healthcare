@@ -59,6 +59,7 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "sync_quarantine",
     "sync_horizon",
     "sync_blob_queue",
+    "blob_owner",
     "sync_grant_outbox",
     "sync_transfer_outbox",
     "sync_transfer_state",

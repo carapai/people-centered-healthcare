@@ -16,7 +16,8 @@
 //!   instant, for a node told to re-seed.
 //! - `GET /sync/v1/blobs/{hash}/{size}` says how much of an attachment this node holds,
 //!   `PUT /sync/v1/blobs/{hash}/{size}/{offset}` appends a 1 MiB chunk there (the completing chunk
-//!   verifies the blob), and `GET /sync/v1/blobs/{hash}/content` serves it on demand
+//!   verifies the blob), and `GET /sync/v1/blobs/{hash}/content` serves it on demand, to a node
+//!   with a record in its scope that references it
 //!   (synchronization.md § Attachments).
 //! - `POST /sync/v1/break-glass` takes the facility's break-glass grants, kept with the privacy
 //!   officer's review due 72 hours after they arrive (#224).
@@ -793,13 +794,26 @@ async fn blob_content(
     headers: HeaderMap,
     Path(hash): Path<String>,
 ) -> Response {
-    if let Err(response) = server.authenticate(&method, &uri, &headers, &[]).await {
-        return *response;
-    }
+    let peer = match server.authenticate(&method, &uri, &headers, &[]).await {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
     let (store, blob) = match blob_target(&server, &hash, 0) {
         Ok(target) => target,
         Err(response) => return *response,
     };
+    // Only a blob that a record in the node's scope references (#84); any other answers as an
+    // unknown one does.
+    match server
+        .inner
+        .store
+        .blob_admitted(&peer.scope, &blob.hash.to_string())
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => return problem(StatusCode::NOT_FOUND, "no such attachment here"),
+        Err(error) => return failed(error),
+    }
     match tokio::task::spawn_blocking(move || store.read(&blob.hash)).await {
         Ok(Ok(bytes)) => (
             [(header::CONTENT_TYPE, "application/octet-stream")],

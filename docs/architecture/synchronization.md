@@ -316,6 +316,7 @@ stateDiagram-v2
   - **Upload:** after the push, the edge asks `GET /sync/v1/blobs/{hash}/{size}` how much central holds. It then sends `PUT /sync/v1/blobs/{hash}/{size}/{offset}` chunks of 1 MiB from there, into `health-files`' resumable upload, so an interrupted upload resumes rather than restarts. A chunk at the wrong offset is answered 409 with where to resume, and the completing chunk verifies the blob.
   - **Pending:** a blob not yet held at the edge (its desktop's upload has not finished) stays queued.
   - **Download:** on demand (`Sync::fetch_blob`, `GET /sync/v1/blobs/{hash}/content`), verified against its reference.
+  - **Scope on download (#84, part 2):** every version that references a blob records it in `blob_owner` (migration `0052_blob_owner`). Central serves a blob only when some record's current, non-deleted version still references it and would be sent down to the node's scope, by the same rules as pull (`SurrealStore::blob_admitted`). A package tarball an activation record names is served to any node, as the records are. Otherwise it answers 404, as for an unknown blob, so a node cannot fetch another facility's attachment by its hash. Blobs referenced only by records written before the migration have no owner yet and are not served; there is no production data before it.
   - **Storage:** central's store is `HEALTH_FILES_DIR`; the edge's is `files/` beside its data directory, where backups take it from.
   - **Not yet:**
     - the pre-fetch flag per type;
