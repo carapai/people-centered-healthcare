@@ -154,7 +154,10 @@ jobs:
         env:
           HEALTH_TEST_SURREALDB_WS: ws://127.0.0.1:18100
       - run: bun install --frozen-lockfile
-      - run: bunx --bun playwright install --with-deps chromium
+      # From Playwright's CDN; apt's libraries if a mirror answers, else the runner image's.
+      - run: |
+          bunx --bun playwright install chromium
+          bunx --bun playwright install-deps chromium || echo "::warning::apt is unreachable; using the runner image's libraries"
         working-directory: apps/client
       - run: bun run codegen
         working-directory: apps/client
@@ -205,7 +208,10 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bunx --bun playwright install --with-deps chromium
+      # From Playwright's CDN; apt's libraries if a mirror answers, else the runner image's.
+      - run: |
+          bunx --bun playwright install chromium
+          bunx --bun playwright install-deps chromium || echo "::warning::apt is unreachable; using the runner image's libraries"
         working-directory: apps/client
       # The client first: the edge's build script embeds apps/client/dist.
       - run: bun run codegen && bun run build
