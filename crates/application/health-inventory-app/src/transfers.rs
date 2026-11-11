@@ -85,6 +85,7 @@ where
             records,
             requisition,
         } = step;
+        let _turn = crate::queue::stores(legs.iter().map(|leg| leg.unit.store.as_str())).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
@@ -220,6 +221,7 @@ where
         by: &str,
         now: Timestamp,
     ) -> Result<ReconciliationRecord, InventoryError> {
+        let _turn = crate::queue::node().await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;

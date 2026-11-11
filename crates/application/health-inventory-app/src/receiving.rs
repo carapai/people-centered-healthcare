@@ -29,6 +29,7 @@ where
         now: Timestamp,
     ) -> Result<(), InventoryError> {
         note.validate()?;
+        let _turn = crate::queue::stores([note.store.as_str()]).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;

@@ -3,7 +3,7 @@
 //! zero, every movement that was refused or lost left nothing behind, and the balance record
 //! equals the ledger rebuilt from the movements, so the nightly check finds no drift.
 //! `HEALTH_STOCK_SOAK_WRITERS` and `HEALTH_STOCK_SOAK_OPERATIONS` set the load: 4 writers and 200
-//! operations by default, 16 and 2000 nightly. How many ran out of attempts (`busy`) is reported.
+//! operations by default, 16 and 2000 nightly. They take turns per store, so none is ever `Busy`.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
@@ -155,6 +155,8 @@ async fn concurrent_movements_on_one_unit_never_go_negative_and_match_the_ledger
          {refused} refused for stock, {busy} busy; {expected} on hand"
     );
     assert_eq!(recorded + refused + busy, operations);
+    // Writers on one node take turns per store, so none runs out of attempts.
+    assert_eq!(busy, 0, "writers on one node collided");
     // The stock ran out and was refused, so the race was real.
     assert!(
         refused > 0,
