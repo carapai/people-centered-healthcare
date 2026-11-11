@@ -177,7 +177,8 @@ where
         eligibility: &Eligibility,
         rule: BatchRule,
     ) -> Result<Vec<Reservation>, InventoryError> {
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = Self::reserve(&mut tx, preparation, eligibility, rule).await;
             if let Some(done) = Self::settle(tx, attempt).await {
@@ -260,7 +261,8 @@ where
         &self,
         completion: &Completion,
     ) -> Result<Vec<Movement>, InventoryError> {
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = self.consume(&mut tx, completion).await;
             if let Some(done) = Self::settle(tx, attempt).await {
@@ -367,7 +369,8 @@ where
         at: Timestamp,
         record: Option<&Record>,
     ) -> Result<usize, InventoryError> {
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = Self::release(&mut tx, dispense, at, record).await;
             if let Some(done) = Self::settle(tx, attempt).await {

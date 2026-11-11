@@ -29,7 +29,8 @@ where
         now: Timestamp,
     ) -> Result<(), InventoryError> {
         note.validate()?;
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = async {
                 if tx.goods_received(&note.id).await?.is_some() {

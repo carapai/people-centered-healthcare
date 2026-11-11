@@ -110,7 +110,8 @@ where
         causes: &[Cause],
         now: Timestamp,
     ) -> Result<(StockCount, Vec<Variance>), InventoryError> {
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = async {
                 let mut count = tx.count(id).await?.ok_or_else(|| {
