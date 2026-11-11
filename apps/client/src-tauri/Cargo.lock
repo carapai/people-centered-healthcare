@@ -2831,9 +2831,11 @@ dependencies = [
  "axum",
  "health-desktop-runtime",
  "health-http",
+ "health-node-identity",
  "health-surrealdb",
  "health-time",
  "keyring",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -2979,6 +2981,18 @@ dependencies = [
  "health-time",
  "rust_decimal",
  "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-node-identity"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "health-time",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 

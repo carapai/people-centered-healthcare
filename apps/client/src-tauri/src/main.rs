@@ -3,14 +3,22 @@
 //! (`health_desktop_runtime::ipc`), the embedded store in the per-machine data directory, and the
 //! OS keystore. One instance per PC.
 //!
+//! At startup the volumes are checked for full-disk encryption ([`encryption`]); a shortfall
+//! blocks the client unless the country lets it warn, and `GET /api/desktop/encryption` reports
+//! it to the app either way.
+//!
 //! The FHIR and application routes join the router with local sign-in (#133, #134): until a
 //! session can be checked here, the router serves only the system routes, never records.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
+use std::sync::Arc;
+
+mod encryption;
 
 use axum::Router;
+use axum::routing::get;
 use health_desktop_runtime::ipc::{self, Envelope, Reply};
 use health_desktop_runtime::keystore::{self, Keystore, KeystoreError};
 use health_http::Readiness;
@@ -78,6 +86,35 @@ async fn open() -> Result<Api, String> {
     // No keystore, no client (desktop-client.md § Secrets): there is no file fallback.
     keystore::check(&OsKeystore).map_err(|e| e.to_string())?;
     let dir = data_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("cannot create the data directory {}: {e}", dir.display()))?;
+    // SurrealDB has no encryption at rest: the OS must encrypt the volumes (ADR 0040).
+    let probed = dir.clone();
+    let state = tokio::task::spawn_blocking(move || {
+        health_node_identity::encryption::probe(
+            &health_node_identity::encryption::system_root(),
+            &probed,
+            health_time::Timestamp::now(),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let policy = encryption::Policy::from_setting(
+        std::env::var("HEALTH_DESKTOP_ENCRYPTION").ok().as_deref(),
+    );
+    let report = encryption::Report::of(state, policy);
+    if !report.may_start() {
+        return Err(format!(
+            "full-disk encryption is required here: {}",
+            report.shortfalls.join("; ")
+        ));
+    }
+    if !report.encrypted {
+        eprintln!(
+            "health-desktop: warning: not fully encrypted ({}); the country allows it",
+            report.shortfalls.join("; ")
+        );
+    }
     let connection = Connection::open(&Settings {
         target: Target::SurrealKv {
             path: dir.join("store"),
@@ -91,8 +128,16 @@ async fn open() -> Result<Api, String> {
         .await
         .map_err(|e| format!("cannot migrate the store: {e:?}"))?;
     let readiness = Readiness::new(Vec::new());
+    let report = Arc::new(report);
+    let desktop = Router::new().route(
+        "/api/desktop/encryption",
+        get(move || {
+            let report = Arc::clone(&report);
+            async move { axum::Json((*report).clone()) }
+        }),
+    );
     Ok(Api {
-        router: health_http::app(Router::new(), readiness),
+        router: health_http::app(desktop, readiness),
     })
 }
 
