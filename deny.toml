@@ -12,6 +12,12 @@ ignore = [
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack via jsonwebtoken in SurrealDB's JWT access methods, which we do not use; no fixed release" },
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained, via surrealmx in the in-memory engine used only by tests" },
     { id = "RUSTSEC-2026-0441", reason = "pin-utils unmaintained (no vulnerability), via wasmtimer in SurrealDB; nothing to upgrade to yet" },
+    # The desktop (apps/client/src-tauri, #132): unmaintained, no vulnerability, deep in Tauri's
+    # Linux stack. Reviewed on every Tauri bump.
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained (no vulnerability), via gtk-rs 0.18's glib-macros under WebKitGTK in Tauri 2.12; nothing to upgrade to" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant no longer a standalone crate (no vulnerability), via zbus in keyring's Secret Service store and the single-instance plugin" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names no longer a standalone crate (no vulnerability), via zbus in keyring's Secret Service store and the single-instance plugin" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive no longer a standalone crate (no vulnerability), via zbus in keyring's Secret Service store and the single-instance plugin" },
 ]
 
 [licenses]

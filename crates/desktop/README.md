@@ -9,3 +9,5 @@ Desktop runtime crates for the Tauri client ([desktop-client.md](../../docs/arch
   - The `ipc_server` example is the desktop node of the client's contract suite.
 
 The Tauri binary (`apps/client/src-tauri`) composes them with the embedded store and the application crates.
+
+The binary itself is `apps/client/src-tauri`, its own workspace, built by `desktop.yml`.

@@ -49,4 +49,9 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 | `lint` | oxlint errors, including `@tauri-apps/**` imported outside `src/platform/**`; runtime checks or browser storage outside the allowlist (`scripts/check-boundaries.ts`) |
 | `test` | A platform-layer unit test fails (`test/`) |
 | `test:contract` | The `FhirClient` suite fails against either the central or the edge node (`test/contract/`; client-application.md § Ports) |
+| `test:contract` (desktop) | The same suite fails over IPC, through `ipcTransport` into `health-desktop-runtime` |
 | `scan` | The web bundle contains Tauri or devtools code, or Panda CSS has no token variables, has raw shorthands, or names an undefined z-index token |
+
+## The desktop (Tauri)
+
+`src-tauri/` is the desktop binary (`health-desktop`), its own Cargo workspace (desktop-client.md § In code). Build the web app first (`bun run build`), since the webview's assets are embedded at compile time. Then, in `src-tauri/`, run `cargo build` or `cargo run`, with `HEALTH_DESKTOP_DATA_DIR` set to a writable directory in development. It needs WebKitGTK 4.1 on Linux and WebView2 on Windows.

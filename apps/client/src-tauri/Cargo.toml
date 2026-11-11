@@ -1,0 +1,51 @@
+# The Tauri desktop client (desktop-client.md; ADRs 0039–0041). Its own workspace: Tauri needs
+# WebKitGTK to build on Linux, which the main workspace's jobs do not install. It depends on the
+# main workspace's crates by path; `desktop.yml` builds, lints and checks it.
+[workspace]
+
+[package]
+name = "health-desktop"
+description = "The Tauri desktop client: the webview over health-desktop-runtime (desktop-client.md)."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+license = "Apache-2.0"
+
+[package.metadata.health]
+layer = "runtime"
+
+[dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
+health-desktop-runtime = { path = "../../../crates/desktop/health-desktop-runtime" }
+health-http = { path = "../../../crates/infrastructure/health-http" }
+health-surrealdb = { path = "../../../crates/infrastructure/health-surrealdb", features = ["embedded"] }
+health-time = { path = "../../../crates/foundation/health-time" }
+keyring = "=4.2.0"
+serde_json = "1.0.154"
+tauri = { version = "=2.12.5", default-features = false, features = ["wry", "compression"] }
+tauri-plugin-single-instance = "=2.5.4"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+# The main workspace's lints.
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+print_stdout = "warn"
+
+# The main workspace's patches: a separate workspace does not inherit them, and without them the
+# desktop would build the unpatched crates (ADR 0052).
+[patch.crates-io]
+octofhir-fhirpath = { path = "../../../third_party/octofhir-fhirpath" }
+octofhir-ucum = { path = "../../../third_party/octofhir-ucum" }
