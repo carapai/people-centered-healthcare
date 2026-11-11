@@ -969,6 +969,15 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#141, part 2: the stock soak (2026-11-11).**
+  - **What:** `health-inventory-app`'s `soak` test. Concurrent writers issue, dispense and receive on one Stock Unit, and it runs dry and refills while they race.
+    - No movement leaves the balance negative.
+    - Refused and lost movements leave no trace.
+    - The balance record equals the ledger rebuilt from the movements, and the stock card never dips below zero.
+    - The nightly check finds no drift.
+    - It runs 4 writers and 200 operations per PR, and 16 and 2000 nightly (`e2e.yml`, `recovery`).
+  - **Found and changed:** the use cases reran a lost write-write conflict up to 8 times with no pause, so writers that lost together collided again. With 16 writers, 55% of operations ran out of attempts (`Busy`); with 4, 12.5%. Reruns now wait a random pause that doubles each time, with 16 attempts. That gives 22% with 16 writers and 2.5% with 4 (debug build, memory engine, about 200 ms per transaction). Consistency held throughout.
+  - **Open question:** per-unit serialization within a node would remove in-process conflicts entirely. It is a design choice, left for review.
 - **#141, part 1: kill -9 loops on the edge's store (2026-11-11).**
   - **What:** `health-edge-runtime`'s `kill_loop` test.
     - A child process writes transactions of one to three Observations to the edge's SurrealKV store and reports each commit once it is acknowledged.

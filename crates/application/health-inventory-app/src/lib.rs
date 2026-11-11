@@ -128,7 +128,23 @@ impl From<TransferRefused> for Attempt {
 }
 
 /// How many times a use case is rerun after losing a write-write conflict.
-const ATTEMPTS: u32 = 8;
+const ATTEMPTS: u32 = 16;
+
+/// Before attempt `attempt` (from 0): nothing for the first, then a random pause of up to
+/// 2^attempt × 4 ms. Writers that lost the same conflict would otherwise rerun in lockstep and
+/// collide again; under sixteen concurrent writers on one Stock Unit, most then ran out of
+/// attempts (#141, the stock soak).
+pub(crate) async fn pause(attempt: u32) {
+    use std::hash::{BuildHasher, Hasher};
+    if attempt == 0 {
+        return;
+    }
+    let ceiling = 4u64 << attempt.min(7);
+    let random = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
+    tokio::time::sleep(std::time::Duration::from_millis(random % ceiling)).await;
+}
 
 /// The inventory of one store (or a node's stores) over `store`.
 pub struct Inventory<S> {
@@ -216,7 +232,8 @@ where
         movement: &Movement,
         origin: Origin,
     ) -> Result<Decision, InventoryError> {
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = self.apply(&mut tx, movement, origin).await;
             if let Some(done) = Self::settle(tx, attempt).await {
@@ -252,7 +269,8 @@ where
             },
             ..movement.clone()
         };
-        for _ in 0..ATTEMPTS {
+        for attempt in 0..ATTEMPTS {
+            crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
             let attempt = match self.apply(&mut tx, &out, origin).await {
                 Ok(left) => self

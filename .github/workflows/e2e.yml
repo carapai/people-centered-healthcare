@@ -64,7 +64,7 @@ jobs:
           key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
 
   recovery:
-    name: kill -9 loop on the edge's store
+    name: kill -9 loop and stock soak
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -91,6 +91,11 @@ jobs:
       - run: cargo test --locked -p health-edge-runtime --test kill_loop -- --nocapture
         env:
           HEALTH_KILL_ROUNDS: "50"
+      # Sixteen writers on one Stock Unit: never negative, no drift from the ledger (#141).
+      - run: cargo test --locked -p health-inventory-app --test soak -- --nocapture
+        env:
+          HEALTH_STOCK_SOAK_WRITERS: "16"
+          HEALTH_STOCK_SOAK_OPERATIONS: "2000"
       - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
         shell: bash
         run: tools/github/prune-target.sh
