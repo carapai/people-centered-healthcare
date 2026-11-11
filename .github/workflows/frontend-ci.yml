@@ -72,7 +72,12 @@ jobs:
       - run: bun run lint
       # Component tests and axe run in Chromium (vitest browser mode), on the example page in every
       # theme and density.
-      - run: bunx playwright install --with-deps chromium
+      # The browser comes from Playwright's CDN. Its system libraries come from apt, but the
+      # runner image already carries Chrome's, so an apt mirror outage does not fail the job; a
+      # library truly missing still fails the tests.
+      - run: |
+          bunx playwright install chromium
+          bunx playwright install-deps chromium || echo "::warning::apt is unreachable; using the runner image's libraries"
       - run: bun run test
       - run: bun run build:example
 
