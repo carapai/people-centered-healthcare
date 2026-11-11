@@ -126,8 +126,102 @@ fn round(dir: &Path, millis: u64) -> Vec<ResourceId> {
         .expect("lock")
 }
 
+const ACKED: &str = "HEALTH_KILL_LOOP_ACKED";
+const LABEL: &str = "HEALTH_KILL_LOOP_ROUND";
+
+/// The second child: reopens the store after a kill and checks it. A child too, so the store's
+/// file lock goes with its process (Windows keeps it while the opening process lives).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn acknowledged_writes_survive_kill_9_and_the_log_stays_whole() {
+#[ignore = "run by the kill loop as its child"]
+async fn checker() {
+    let (Some(dir), Some(acked)) = (std::env::var_os(DIR), std::env::var_os(ACKED)) else {
+        return;
+    };
+    let label = std::env::var(LABEL).unwrap_or_default();
+    let acknowledged: BTreeSet<ResourceId> = std::fs::read_to_string(acked)
+        .expect("acknowledged ids")
+        .lines()
+        .map(|id| id.parse().expect("id"))
+        .collect();
+    let store = open(Path::new(&dir)).await;
+    let cursor = store.cursor().await.expect("cursor");
+    let changes = store
+        .changes_after(0, usize::try_from(cursor.seq).expect("seq") + 10)
+        .await
+        .expect("changes");
+    eprintln!("{label}, log at {}", cursor.seq);
+    // The log has no gap and ends at the counter.
+    let seqs: Vec<u64> = changes.iter().map(|c| c.seq).collect();
+    assert_eq!(
+        seqs,
+        (1..=cursor.seq).collect::<Vec<_>>(),
+        "{label}: the log has a gap or runs past the counter"
+    );
+    // Every acknowledged write is on the log and readable.
+    let logged: BTreeSet<ResourceId> = changes
+        .iter()
+        .map(|c| c.resource_id.parse().expect("id"))
+        .collect();
+    let missing: Vec<_> = acknowledged.difference(&logged).collect();
+    assert!(
+        missing.is_empty(),
+        "{label}: acknowledged but lost: {missing:?}"
+    );
+    // Every transaction on the log is whole, and what it wrote is there.
+    let mut transactions: BTreeMap<String, usize> = BTreeMap::new();
+    let mut tx = store.begin().await.expect("begin");
+    for change in &changes {
+        *transactions.entry(change.tx_id.to_string()).or_default() += 1;
+        let id: ResourceId = change.resource_id.parse().expect("id");
+        let stored = tx.read(&observation(), id).await.expect("read");
+        assert!(
+            stored.is_some(),
+            "{label}: {id} is on the log but not stored"
+        );
+    }
+    drop(tx);
+    for (tx_id, entries) in &transactions {
+        assert!(
+            (1..=3).contains(entries),
+            "{label}: transaction {tx_id} has {entries} entries"
+        );
+    }
+    // And the store takes writes again.
+    let mut tx = store.begin().await.expect("begin");
+    tx.write(WriteRequest {
+        resource_type: observation(),
+        id: ResourceId::new(),
+        json: RawJson::from_validated(r#"{"resourceType":"Observation","status":"final"}"#),
+        op_id: OpId::new(),
+        precondition: Precondition::MustNotExist,
+    })
+    .await
+    .expect("write after recovery");
+    tx.commit().await.expect("commit after recovery");
+}
+
+/// Runs the checker over `dir` with the ids acknowledged so far; whether it passed.
+fn check(dir: &Path, acked: &Path, label: &str) -> bool {
+    Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            "--exact",
+            "checker",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(DIR, dir)
+        .env(ACKED, acked)
+        .env(LABEL, label)
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .status()
+        .expect("spawn checker")
+        .success()
+}
+
+#[test]
+fn acknowledged_writes_survive_kill_9_and_the_log_stays_whole() {
     let rounds: u64 = std::env::var("HEALTH_KILL_ROUNDS")
         .ok()
         .and_then(|r| r.parse().ok())
@@ -144,80 +238,41 @@ async fn acknowledged_writes_survive_kill_9_and_the_log_stays_whole() {
     eprintln!("kill loop: {rounds} rounds, HEALTH_KILL_SEED={seed}");
     let mut random = XorShift(seed);
     let dir = tempfile::tempdir().expect("dir");
-    // Migrated once here: a fresh store's migrations take a minute in a debug build, a reopen a
-    // few seconds.
-    drop(open(dir.path()).await);
-    let mut acknowledged = BTreeSet::new();
+    let store = dir.path().join("kv");
+    let acked = dir.path().join("acked");
+    std::fs::write(&acked, "").expect("acked");
+    // The first check migrates the store: a fresh store's migrations take a minute in a debug
+    // build, a reopen a few seconds.
+    assert!(
+        check(&store, &acked, "migrated"),
+        "the fresh store fails its checks"
+    );
+    let mut acknowledged = 0;
     for n in 1..=rounds {
         // From before the reopen ends to several seconds of writes: some kills land while the
         // store opens, most mid-transaction.
         let millis = 1_000 + random.below(6_000);
-        let acked = round(dir.path(), millis);
-        let in_round = acked.len();
-        acknowledged.extend(acked);
-
-        let store = open(dir.path()).await;
-        let cursor = store.cursor().await.expect("cursor");
-        let changes = store
-            .changes_after(0, usize::try_from(cursor.seq).expect("seq") + 10)
-            .await
-            .expect("changes");
-        eprintln!(
-            "round {n}: killed after {millis} ms, {in_round} writes acknowledged, log at {}",
-            cursor.seq
+        let ids = round(&store, millis);
+        acknowledged += ids.len();
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&acked)
+            .expect("acked");
+        for id in &ids {
+            writeln!(file, "{id}").expect("append");
+        }
+        drop(file);
+        let label = format!(
+            "round {n} (seed {seed}): killed after {millis} ms, {} writes acknowledged",
+            ids.len()
         );
-        // The log has no gap and ends at the counter.
-        let seqs: Vec<u64> = changes.iter().map(|c| c.seq).collect();
-        assert_eq!(
-            seqs,
-            (1..=cursor.seq).collect::<Vec<_>>(),
-            "round {n} (seed {seed}): the log has a gap or runs past the counter"
-        );
-        // Every acknowledged write is on the log and readable.
-        let logged: BTreeSet<ResourceId> = changes
-            .iter()
-            .map(|c| c.resource_id.parse().expect("id"))
-            .collect();
-        let missing: Vec<_> = acknowledged.difference(&logged).collect();
         assert!(
-            missing.is_empty(),
-            "round {n} (seed {seed}): acknowledged but lost: {missing:?}"
+            check(&store, &acked, &label),
+            "{label}: the store fails its checks"
         );
-        // Every transaction on the log is whole, and what it wrote is there.
-        let mut transactions: BTreeMap<String, usize> = BTreeMap::new();
-        let mut tx = store.begin().await.expect("begin");
-        for change in &changes {
-            *transactions.entry(change.tx_id.to_string()).or_default() += 1;
-            let id: ResourceId = change.resource_id.parse().expect("id");
-            let stored = tx.read(&observation(), id).await.expect("read");
-            assert!(
-                stored.is_some(),
-                "round {n} (seed {seed}): {id} is on the log but not stored"
-            );
-        }
-        drop(tx);
-        for (tx_id, entries) in &transactions {
-            assert!(
-                (1..=3).contains(entries),
-                "round {n} (seed {seed}): transaction {tx_id} has {entries} entries"
-            );
-        }
-        // And the store takes writes again.
-        let mut tx = store.begin().await.expect("begin");
-        tx.write(WriteRequest {
-            resource_type: observation(),
-            id: ResourceId::new(),
-            json: RawJson::from_validated(r#"{"resourceType":"Observation","status":"final"}"#),
-            op_id: OpId::new(),
-            precondition: Precondition::MustNotExist,
-        })
-        .await
-        .expect("write after recovery");
-        tx.commit().await.expect("commit after recovery");
-        drop(store);
     }
     assert!(
-        !acknowledged.is_empty(),
+        acknowledged > 0,
         "the writer acknowledged nothing in {rounds} rounds"
     );
 }
