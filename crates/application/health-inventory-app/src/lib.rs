@@ -25,6 +25,7 @@ use health_persistence::{Store, StoreError, Transaction, WriteError};
 
 mod counts;
 mod dispensing;
+mod queue;
 mod receiving;
 mod transfers;
 mod valuation;
@@ -232,6 +233,7 @@ where
         movement: &Movement,
         origin: Origin,
     ) -> Result<Decision, InventoryError> {
+        let _turn = queue::stores([movement.unit.store.as_str()]).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;
@@ -269,6 +271,7 @@ where
             },
             ..movement.clone()
         };
+        let _turn = queue::stores([movement.unit.store.as_str()]).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;

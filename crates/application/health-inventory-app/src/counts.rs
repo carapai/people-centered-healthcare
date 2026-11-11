@@ -110,6 +110,7 @@ where
         causes: &[Cause],
         now: Timestamp,
     ) -> Result<(StockCount, Vec<Variance>), InventoryError> {
+        let _turn = crate::queue::node().await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
             let mut tx = self.store.begin().await?;

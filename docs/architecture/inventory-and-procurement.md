@@ -72,10 +72,11 @@ sequenceDiagram
 ```
 
 - **The balance record is the guard.** Each Stock Unit has exactly one balance record, written in every movement's transaction (persistence.md guard-record pattern).
+- **Turns per store within a node (#141).** Stock use cases on one node take turns per store (`health-inventory-app` `queue`), so writers on the same store run one after another instead of racing to commit and rerunning. A use case that knows its stores waits for each of them in key order, while other stores' work runs alongside. One that learns its stores only inside its transaction (completing or cancelling a dispense, approving a count, resolving a reconciliation) waits for the whole node. The balance record's write-write conflict still guards against other processes, such as sync applying a facility's operations, and conflicts there are rerun after a random, doubling pause. In the soak, 16 writers on one unit went from 22% of operations ending `Busy` to none.
 - **Derived values.** `available = on-hand − reserved − on-hold`.
 - **Stock card.** A running balance per Stock Unit, ordered by `occurred_at`, then `recorded_at`, then movement id. A backdated movement recomputes it from that date. Reports use `occurred_at`.
 - **Nightly check.** A job rebuilds balances from the ledger, compares them with the balance records, and alerts on any drift.
-- **Code.** `health-inventory` (the Stock Unit, movements, the policy and the stock card), `health-inventory-app` (`Inventory::record`, rerun on a write conflict) and SurrealDB migration `0011_stock`.
+- **Code.** `health-inventory` (the Stock Unit, movements, the policy and the stock card), `health-inventory-app` (`Inventory::record`, queued per store and rerun on a write conflict) and SurrealDB migration `0011_stock`.
 
 ## Negative stock
 

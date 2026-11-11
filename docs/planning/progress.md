@@ -969,6 +969,13 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#141, part 4: stock writers take turns per store (2026-11-11).**
+  - **What:** stock use cases on one node now queue per store (`health-inventory-app` `queue`) instead of racing to commit and rerunning.
+    - A use case that knows its stores waits for each of them in key order, while other stores' work runs alongside.
+    - One that learns its stores only inside its transaction waits for the whole node.
+    - The balance record's optimistic guard and the jittered reruns stay for writers in other processes.
+  - **Results:** in the soak, 16 writers on one unit went from 22% of operations ending `Busy` to none, and 4 writers from 2.5% to none. The 400-operation run took 36 s instead of 87 s. The soak now asserts that nothing is `Busy`.
+  - **Tested:** the queue keeps one store's writers apart, runs other stores alongside, and keeps the whole-node case exclusive. The inventory use cases, the HTTP stock, dispensing, pharmacy and requests tests, and the store's sync tests all pass.
 - **#83, part 3: the edge reads the snapshot as a stream (2026-11-11).**
   - **What was wrong:** the edge decoded the whole answer, capped at 64 MiB (`MAX_DECODED`), and seeded from one in-memory vector. A facility whose snapshot expanded past that could never re-seed.
   - **Now:** the response body is fed to a blocking thread that decompresses and parses it as it arrives (`health_sync_protocol::read_snapshot` and `decoder`, with serde seeds over the items array). Heads are applied in batches of 200 (`SurrealStore::seed_items`). The checkpoints and the new epoch follow only when the whole answer has been read (`seed_complete`), so a broken stream leaves the node to re-seed again.
@@ -1002,7 +1009,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - The nightly check finds no drift.
     - It runs 4 writers and 200 operations per PR, and 16 and 2000 nightly (`e2e.yml`, `recovery`).
   - **Found and changed:** the use cases reran a lost write-write conflict up to 8 times with no pause, so writers that lost together collided again. With 16 writers, 55% of operations ran out of attempts (`Busy`); with 4, 12.5%. Reruns now wait a random pause that doubles each time, with 16 attempts. That gives 22% with 16 writers and 2.5% with 4 (debug build, memory engine, about 200 ms per transaction). Consistency held throughout.
-  - **Open question:** per-unit serialization within a node would remove in-process conflicts entirely. It is a design choice, left for review.
+  - **Then:** writers on a node take turns per store (part 4).
 - **#141, part 1: kill -9 loops on the edge's store (2026-11-11).**
   - **What:** `health-edge-runtime`'s `kill_loop` test.
     - A child process writes transactions of one to three Observations to the edge's SurrealKV store and reports each commit once it is acknowledged.
