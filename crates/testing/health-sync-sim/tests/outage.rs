@@ -54,7 +54,9 @@ async fn outage(days: i64, prune: bool) -> Sim {
     sim.settle().await;
 
     sim.set_link(wan, false);
-    let per_day = records().div_ceil(usize::try_from(days).expect("days")).max(1);
+    let per_day = records()
+        .div_ceil(usize::try_from(days).expect("days"))
+        .max(1);
     let mut n = 0;
     // The change log is stamped by the database's clock, not the nodes' simulated ones, so the
     // horizon is taken in real time: halfway through the outage's writes.
@@ -85,7 +87,10 @@ async fn outage(days: i64, prune: bool) -> Sim {
             .prune_log(horizon.expect("the outage's midpoint"))
             .await
             .expect("prune");
-        assert!(horizon > 0, "nothing was pruned: the outage is within the horizon");
+        assert!(
+            horizon > 0,
+            "nothing was pruned: the outage is within the horizon"
+        );
     }
 
     sim.set_link(wan, true);
@@ -108,14 +113,20 @@ async fn outage(days: i64, prune: bool) -> Sim {
 
     for id in &written {
         let at_central = sim.node(central).head("Observation", *id).await;
-        assert!(at_central.is_some(), "Observation/{id} never reached central");
+        assert!(
+            at_central.is_some(),
+            "Observation/{id} never reached central"
+        );
         assert_eq!(
             sim.node(edge).head("Observation", *id).await,
             at_central,
             "Observation/{id} differs at the edge"
         );
     }
-    assert!(!sim.round(wan).await.moved(), "another pass moved something");
+    assert!(
+        !sim.round(wan).await.moved(),
+        "another pass moved something"
+    );
     sim
 }
 
@@ -123,7 +134,11 @@ async fn outage(days: i64, prune: bool) -> Sim {
 #[ignore = "nightly: hundreds of records each way take minutes"]
 async fn a_month_apart_catches_up_page_by_page() {
     let sim = outage(30, false).await;
-    assert!(sim.reseeds.is_empty(), "re-seeded within the horizon: {:?}", sim.reseeds);
+    assert!(
+        sim.reseeds.is_empty(),
+        "re-seeded within the horizon: {:?}",
+        sim.reseeds
+    );
 }
 
 #[tokio::test]
