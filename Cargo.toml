@@ -84,7 +84,8 @@ members = [
     "tools/synthetic-data",
 ]
 # Vendored upstream crates are path dependencies through [patch.crates-io], not members.
-exclude = ["third_party"]
+# The Tauri binary is its own workspace (apps/client/src-tauri/Cargo.toml).
+exclude = ["third_party", "apps/client/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

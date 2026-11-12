@@ -969,6 +969,14 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#132, part 2: the Tauri binary (2026-11-11).**
+  - **What:** `apps/client/src-tauri` (`health-desktop`), its own workspace, because Tauri needs WebKitGTK on Linux. A new `desktop.yml` builds, lints, tests and runs `cargo deny` on it on Linux and Windows, for PRs that touch it or its crates, and nightly.
+    - Tauri 2.12.5, single instance, and the `keyring` OS keystore. The app refuses to start without a working keystore.
+    - The embedded store opens in the per-machine directory and is migrated.
+    - `api_request` is the only command, on an explicit allowlist and granted to the main window alone.
+    - It serves only the system routes until local sign-in (#133, #134).
+  - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
+  - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
 - **#134, part 1: the sync client is shared (2026-11-12).**
   - **What:** the edge's sync client moved out of `health-edge-runtime` into a new infrastructure crate, `health-sync-client`, so the standalone desktop can sync with central too. A runtime library may not depend on another. `health_edge_runtime::sync` re-exports it, so the edge and its tests are unchanged.
   - **Tidied:** five HTTP dependencies the edge runtime no longer uses are dropped.
@@ -979,7 +987,7 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - `data_dir::per_machine` gives the per-machine data directory.
     - `keystore` is the OS keystore port, with the check that refuses an install without a working keystore.
   - **The acceptance criterion:** the same API contract suite passes over IPC as over HTTP. The client's contract suite now has a third node, a desktop reached through the client's own `ipcTransport` into `ipc::dispatch` (the `ipc_server` example). All 28 tests pass: 9 per node, plus the test that the nodes are separate. Over IPC no envelope carries a credential.
-  - **Next for #132:** the Tauri binary (`apps/client/src-tauri`): the `api_request` command, the embedded store, the `keyring` adapter, the disk-encryption check, single instance and the capability allowlist. Its dependency tree is to be reviewed for licences first.
+  - **Next for #132:** the Tauri binary (done in part 2).
 - **#83, part 4: seeds on removable media (2026-11-11).** This completes #83.
   - **What:**
     - `central-server seed export <facility> <file>` streams the facility's snapshot into a zstd file with a `seed` header and signs its sha-256 with the publication signer as `health-seed+jws`.

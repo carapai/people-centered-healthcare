@@ -134,3 +134,23 @@ stateDiagram-v2
 - **Printing** (receipts, labels) goes through the OS.
 - **Barcode scanners** are supported in keyboard-wedge mode, with no driver work.
 - **Serial or HL7 analyser links** are out of v1 and sit in the map's integration-catalogue fog.
+
+## In code
+
+- **#132, part 1:** `health-desktop-runtime` (`crates/desktop/`).
+  - `ipc::dispatch` answers the webview's `api_request` envelope through the shared router.
+  - `data_dir::per_machine` gives the per-machine data directory.
+  - `keystore` is the keystore port, with the check that refuses an install without a working keystore.
+  - The client's contract suite runs against a desktop node over IPC as well as over HTTP.
+- **#132, part 2:** the Tauri binary, `apps/client/src-tauri` (`health-desktop`).
+  - **Its own workspace.** WebKitGTK is needed to build on Linux, so it is excluded from the main workspace and built by `desktop.yml` on Linux and Windows. Its lock file was seeded from the main workspace's so the shared crates resolve alike, and it copies the main workspace's patches and lints.
+  - **Pinned.** Tauri 2.12.5, the single-instance plugin, and `keyring` 4 for Windows Credential Manager and the Linux Secret Service.
+  - **One command.** `api_request` is the only one, and it is listed in `AppManifest::commands` and granted to the main window alone. The CSP is the web app's, plus Tauri's IPC origin.
+  - **Startup.** Without a working keystore the app does not start. It opens the embedded store in the per-machine directory (`HEALTH_DESKTOP_DATA_DIR` in development) and migrates it.
+  - **No records yet.** The router serves only the system routes until local sign-in arrives (#133, #134).
+  - **Policy exceptions.** `cargo deny` checks it under the repository's policy. Four advisories deep in Tauri's Linux stack (unmaintained crates, no vulnerability) are ignored with reasons in `deny.toml`. GitHub's dependency review allows one more, with the maintainer's approval: `glib` 0.18's `VariantStrIter` unsoundness (GHSA-wrw7-89jp-8q8g). Tauri 2's WebKitGTK bindings are tied to gtk-rs 0.18, so it can't be upgraded until Tauri 3. It is listed in `.github/dependency-review-config.yml`, to be removed then.
+- **Not yet:**
+  - local sign-in and the FHIR and application routes (#133, #134);
+  - the disk-encryption check at provisioning;
+  - packaging and signing (#136);
+  - end-to-end tests on WebView2 and WebKitGTK.

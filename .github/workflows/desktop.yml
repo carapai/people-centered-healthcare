@@ -1,0 +1,122 @@
+# The Tauri desktop client (#132; desktop-client.md): its own workspace, apps/client/src-tauri,
+# built, linted and checked here because it needs WebKitGTK on Linux. On pull requests that touch
+# it or the crates it is built from, and nightly.
+name: desktop
+
+on:
+  pull_request:
+    paths:
+      - apps/client/src-tauri/**
+      - apps/client/src/**
+      - crates/**
+      - Cargo.lock
+      - deny.toml
+      - .github/workflows/desktop.yml
+  schedule:
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+jobs:
+  linux:
+    name: desktop (Linux, WebKitGTK)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/client/src-tauri/target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'apps/client/src-tauri/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - name: Install WebKitGTK 4.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libwebkit2gtk-4.1-dev librsvg2-dev
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      # The webview's assets are embedded at compile time.
+      - run: bun run codegen && bun run build
+        working-directory: apps/client
+      - run: cargo fmt --check
+        working-directory: apps/client/src-tauri
+      - run: cargo clippy --locked --all-targets -- -D warnings
+        working-directory: apps/client/src-tauri
+      - run: cargo test --locked
+        working-directory: apps/client/src-tauri
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-deny
+      # The repository's policy, over the desktop's own lock file.
+      - run: cargo deny --manifest-path apps/client/src-tauri/Cargo.toml --config deny.toml --locked check
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/client/src-tauri/target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'apps/client/src-tauri/Cargo.lock') }}
+
+  windows:
+    name: desktop (Windows, WebView2)
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/client/src-tauri/target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'apps/client/src-tauri/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build
+        working-directory: apps/client
+      - run: cargo clippy --locked --all-targets -- -D warnings
+        working-directory: apps/client/src-tauri
+      - run: cargo test --locked
+        working-directory: apps/client/src-tauri
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/client/src-tauri/target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'apps/client/src-tauri/Cargo.lock') }}
