@@ -39,6 +39,7 @@ health-inventory = { workspace = true }
 health-provisioning = { workspace = true }
 health-sync-client = { workspace = true }
 health-sync-protocol = { workspace = true }
+health-sync-server = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
 if-addrs = { workspace = true }
@@ -63,5 +64,6 @@ windows-service = { workspace = true }
 
 [dev-dependencies]
 health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
-health-sync-server = { workspace = true }
+http-body-util = { workspace = true }
 rcgen = { workspace = true }
+uuid = { workspace = true }

@@ -41,13 +41,15 @@ mod review;
 mod seed;
 
 use std::convert::Infallible;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Path, Request, State};
-use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
+use axum::http::{Extensions, HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -95,7 +97,7 @@ pub struct SyncServer {
 
 struct Inner {
     store: SurrealStore,
-    registry: NodeRegistry,
+    auth: Arc<dyn PeerAuth>,
     compatibility: Compatibility,
     scope_version: u64,
 }
@@ -104,10 +106,21 @@ impl SyncServer {
     /// Serves `store`'s log, under the node id the store keeps, authenticating peers against
     /// `registry` and judging them by `compatibility`.
     pub fn new(store: SurrealStore, registry: NodeRegistry, compatibility: Compatibility) -> Self {
+        Self::with_auth(store, Arc::new(registry), compatibility)
+    }
+
+    /// A server over `store` whose peers `auth` authenticates: an edge's enrolled desktops, by
+    /// their DPoP proofs (ADR 0062: desktops under an edge use device enrollment), where central
+    /// uses its node registry.
+    pub fn with_auth(
+        store: SurrealStore,
+        auth: Arc<dyn PeerAuth>,
+        compatibility: Compatibility,
+    ) -> Self {
         Self {
             inner: Arc::new(Inner {
                 store,
-                registry,
+                auth,
                 compatibility,
                 scope_version: 1,
             }),
@@ -240,6 +253,79 @@ async fn zstd_bodies(request: Request, next: Next) -> Response {
     Response::from_parts(parts, Body::from(compress(&content)))
 }
 
+/// A sync request's sender, as a [`PeerAuth`] established it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthenticatedPeer {
+    /// The node, or the desktop under an edge, that sent it.
+    pub id: NodeId,
+    /// What it is sent and may send.
+    pub scope: SyncScope,
+}
+
+/// Why a sync request's sender was not established.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PeerRefused {
+    /// No credential, or one that does not verify (401).
+    Unauthorized(String),
+    /// The check could not be made (503).
+    Unavailable(String),
+}
+
+/// How a sync server knows who sent a request. Central checks each request's signature against
+/// its node registry (ADR 0062); an edge serving its desktops takes the enrolled device that a
+/// gate in front of the routes already verified, from the request's extensions.
+pub trait PeerAuth: Send + Sync + 'static {
+    /// The sender of the request with `method`, `uri`, `headers`, `extensions` and `body`.
+    fn authenticate<'a>(
+        &'a self,
+        method: &'a Method,
+        uri: &'a Uri,
+        headers: &'a HeaderMap,
+        extensions: &'a Extensions,
+        body: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = Result<AuthenticatedPeer, PeerRefused>> + Send + 'a>>;
+}
+
+/// Central's peers: each request signed by a provisioned node (ADR 0062), whose facility sets
+/// its Sync Scope.
+impl PeerAuth for NodeRegistry {
+    fn authenticate<'a>(
+        &'a self,
+        method: &'a Method,
+        uri: &'a Uri,
+        headers: &'a HeaderMap,
+        _extensions: &'a Extensions,
+        body: &'a [u8],
+    ) -> Pin<Box<dyn Future<Output = Result<AuthenticatedPeer, PeerRefused>> + Send + 'a>> {
+        Box::pin(async move {
+            let token = headers
+                .get(header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.strip_prefix(SYNC_SCHEME))
+                .map(str::trim)
+                .ok_or_else(|| {
+                    PeerRefused::Unauthorized(format!("a {SYNC_SCHEME} signature is required"))
+                })?;
+            let node = self
+                .authenticate_sync(token, method.as_str(), uri.path(), body)
+                .await
+                .map_err(|error| match error {
+                    RegistryError::Unauthorized(why) | RegistryError::Malformed(why) => {
+                        PeerRefused::Unauthorized(why)
+                    }
+                    other => PeerRefused::Unavailable(other.to_string()),
+                })?;
+            let id = node.id.to_string().parse().map_err(|_| {
+                PeerRefused::Unavailable("a registry node id is not a node id".into())
+            })?;
+            Ok(AuthenticatedPeer {
+                id,
+                scope: SyncScope::Facility(node.facility),
+            })
+        })
+    }
+}
+
 /// An authenticated peer.
 struct Peer {
     id: NodeId,
@@ -260,46 +346,29 @@ fn failed(error: impl std::fmt::Display) -> Response {
 }
 
 impl SyncServer {
-    /// The node that signed this request (ADR 0062).
+    /// The node that sent this request, by the server's [`PeerAuth`].
     async fn authenticate(
         &self,
         method: &Method,
         uri: &Uri,
         headers: &HeaderMap,
+        extensions: &Extensions,
         body: &[u8],
     ) -> Result<Peer, Box<Response>> {
-        let token = headers
-            .get(header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix(SYNC_SCHEME))
-            .map(str::trim)
-            .ok_or_else(|| {
-                Box::new(problem(
-                    StatusCode::UNAUTHORIZED,
-                    format!("a {SYNC_SCHEME} signature is required"),
-                ))
-            })?;
-        let node = self
+        let peer = self
             .inner
-            .registry
-            .authenticate_sync(token, method.as_str(), uri.path(), body)
+            .auth
+            .authenticate(method, uri, headers, extensions, body)
             .await
-            .map_err(|error| {
-                Box::new(match error {
-                    RegistryError::Unauthorized(why) | RegistryError::Malformed(why) => {
-                        problem(StatusCode::UNAUTHORIZED, why)
-                    }
-                    other => failed(other),
+            .map_err(|refused| {
+                Box::new(match refused {
+                    PeerRefused::Unauthorized(why) => problem(StatusCode::UNAUTHORIZED, why),
+                    PeerRefused::Unavailable(why) => failed(why),
                 })
             })?;
-        let id = node
-            .id
-            .to_string()
-            .parse()
-            .map_err(|_| Box::new(failed("a registry node id is not a node id")))?;
         Ok(Peer {
-            id,
-            scope: SyncScope::Facility(node.facility),
+            id: peer.id,
+            scope: peer.scope,
         })
     }
 
@@ -324,9 +393,13 @@ async fn hello(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -378,9 +451,13 @@ async fn push(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -453,9 +530,13 @@ async fn pull(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -494,9 +575,13 @@ async fn snapshot(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -620,9 +705,13 @@ async fn break_glass(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -671,9 +760,13 @@ async fn activation_reports(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -734,9 +827,13 @@ async fn transfers(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -775,9 +872,13 @@ async fn inbound_transfers(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     body: Bytes,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &body).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -838,9 +939,13 @@ async fn blob_status(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     Path((hash, size)): Path<(String, u64)>,
 ) -> Response {
-    if let Err(response) = server.authenticate(&method, &uri, &headers, &[]).await {
+    if let Err(response) = server
+        .authenticate(&method, &uri, &headers, &extensions, &[])
+        .await
+    {
         return *response;
     }
     let (store, blob) = match blob_target(&server, &hash, size) {
@@ -860,10 +965,14 @@ async fn blob_chunk(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     Path((hash, size, offset)): Path<(String, u64, u64)>,
     body: Bytes,
 ) -> Response {
-    if let Err(response) = server.authenticate(&method, &uri, &headers, &body).await {
+    if let Err(response) = server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
         return *response;
     }
     let (store, blob) = match blob_target(&server, &hash, size) {
@@ -885,9 +994,13 @@ async fn blob_content(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
     Path(hash): Path<String>,
 ) -> Response {
-    let peer = match server.authenticate(&method, &uri, &headers, &[]).await {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &[])
+        .await
+    {
         Ok(peer) => peer,
         Err(response) => return *response,
     };
@@ -926,8 +1039,12 @@ async fn events(
     method: Method,
     uri: Uri,
     headers: HeaderMap,
+    extensions: Extensions,
 ) -> Response {
-    if let Err(response) = server.authenticate(&method, &uri, &headers, &[]).await {
+    if let Err(response) = server
+        .authenticate(&method, &uri, &headers, &extensions, &[])
+        .await
+    {
         return *response;
     }
     let store = server.inner.store.clone();

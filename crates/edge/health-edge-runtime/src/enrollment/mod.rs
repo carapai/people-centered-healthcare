@@ -4,6 +4,7 @@
 //! - `POST` / `GET /api/enrollment` are open to the LAN, rate-limited per address.
 //! - The registry's admin routes (`/api/admin/enrollments…`, `/api/admin/devices…`) are served
 //!   to this machine only, like the status page, until staff sign-in (#75) names the admin.
+//! - `/sync/v1` serves the desktops under this edge (#133), behind the gate like the API.
 //! - Every other `/api/…` route is behind the gate: a DPoP proof by an enrolled, active device.
 //!
 //! Until the store is open, `/api/…` answers 503 and the app shell still loads.
@@ -24,6 +25,8 @@ use tower::ServiceExt;
 use crate::admin;
 use crate::auth::{self, Secrets};
 use crate::config::EdgeConfig;
+
+mod sync;
 
 /// The API, set once the store is open.
 #[derive(Clone, Default)]
@@ -51,6 +54,16 @@ impl Api {
             .enrollment_router()
             .merge(admin::local_only(gate.admin_router()))
             .merge(gate.device_router());
+        // The desktops under this edge sync with it, as it does with central (#133).
+        if let Some(facility) = &config.facility {
+            let data = SurrealStore::new(connection.clone(), Arc::clone(&clock));
+            match sync::routes(data, &gate, facility) {
+                Ok(routes) => api = api.merge(routes),
+                Err(reason) => {
+                    tracing::warn!(alert = "desktop-sync-off", reason = %reason, "desktops cannot sync with this edge");
+                }
+            }
+        }
         match auth::routes(config, connection, store, &gate, secrets, clock) {
             Ok(routes) => {
                 api = api.merge(routes);
@@ -75,6 +88,7 @@ impl Api {
         Router::new()
             .route("/api/{*rest}", any(forward))
             .route("/auth/{*rest}", any(forward))
+            .route("/sync/{*rest}", any(forward))
             .with_state(self.clone())
     }
 }
@@ -167,12 +181,8 @@ mod tests {
         );
     }
 
-    /// The edge's LAN surface (#140): with sign-in on, a LAN peer with no enrolled device reaches
-    /// nothing but sign-in, its discovery documents and the enrolment request. The administrator's
-    /// routes answer this machine only, and everything else needs an enrolled device first, before
-    /// a body is read.
-    #[tokio::test]
-    async fn a_lan_peer_without_an_enrolled_device_reaches_only_sign_in_and_enrolment() {
+    /// An edge for facility KLA001 at `https://edge.test`, with sign-in on.
+    async fn signed_in_edge() -> (tempfile::TempDir, Api) {
         use std::collections::BTreeMap;
 
         let dir = tempfile::tempdir().expect("dir");
@@ -216,6 +226,16 @@ mod tests {
         let secrets: Secrets = Arc::new(move |name| Ok(sealed.get(name).cloned()));
         let api = Api::default();
         api.open(&config, &connection, Some(&secrets));
+        (dir, api)
+    }
+
+    /// The edge's LAN surface (#140): with sign-in on, a LAN peer with no enrolled device reaches
+    /// nothing but sign-in, its discovery documents and the enrolment request. The administrator's
+    /// routes answer this machine only, and everything else needs an enrolled device first, before
+    /// a body is read.
+    #[tokio::test]
+    async fn a_lan_peer_without_an_enrolled_device_reaches_only_sign_in_and_enrolment() {
+        let (_dir, api) = signed_in_edge().await;
 
         let id = "018f0000-0000-7000-8000-000000000000";
         // Open to the LAN by design: discovery, sign-in, and a device asking to be enrolled.
@@ -258,6 +278,11 @@ mod tests {
             format!("/api/notes/patients/{id}/notes"),
             "/api/anything".to_owned(),
             "/auth/pin".to_owned(),
+            "/sync/v1/hello".to_owned(),
+            "/sync/v1/push".to_owned(),
+            "/sync/v1/pull".to_owned(),
+            "/sync/v1/snapshot".to_owned(),
+            "/sync/v1/events".to_owned(),
         ];
         let lan = "192.168.1.20:5000";
         let mut problems = Vec::new();
@@ -288,5 +313,135 @@ mod tests {
             }
         }
         assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// A request from `peer`, with a DPoP proof by `key` when given; its status and JSON body.
+    async fn call(
+        api: &Api,
+        peer: &str,
+        method: &str,
+        path: &str,
+        key: Option<&p256::ecdsa::SigningKey>,
+        body: serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
+        use health_auth::jose::{EcJwk, sign};
+        use http_body_util::BodyExt;
+
+        let peer: SocketAddr = peer.parse().expect("peer");
+        let router = api.routes().layer(MockConnectInfo(peer));
+        let mut request = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("content-type", "application/json");
+        if let Some(key) = key {
+            let claims = serde_json::json!({
+                "jti": uuid::Uuid::now_v7().to_string(),
+                "htm": method,
+                "htu": format!("https://edge.test{path}"),
+                "iat": SystemClock.now().as_second(),
+            });
+            let header = serde_json::json!({
+                "typ": "dpop+jwt",
+                "alg": "ES256",
+                "jwk": EcJwk::of(key.verifying_key()),
+            });
+            request = request.header("dpop", sign(key, &header, &claims));
+        }
+        let request = request.body(Body::from(body.to_string())).expect("request");
+        let response = router.oneshot(request).await.expect("response");
+        let status = response.status();
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("body")
+            .to_bytes();
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+        )
+    }
+
+    /// The edge is its desktops' sync server (#133): an enrolled desktop's DPoP proof admits it to
+    /// `/sync/v1` as itself, and the edge holds it to its own Hello.
+    #[tokio::test]
+    async fn an_enrolled_desktop_syncs_with_the_edge_as_itself() {
+        use health_sync_protocol::{Hello, PROTOCOL, Verdict};
+
+        let (_dir, api) = signed_in_edge().await;
+        let lan = "192.168.1.20:5000";
+        let desktop = p256::ecdsa::SigningKey::from_bytes(&[7; 32].into()).expect("key");
+        let (status, request) = call(
+            &api,
+            lan,
+            "POST",
+            "/api/enrollment",
+            Some(&desktop),
+            serde_json::json!({ "label": "Reception PC" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{request}");
+        let (status, device) = call(
+            &api,
+            "127.0.0.1:1",
+            "POST",
+            "/api/admin/enrollments/approve",
+            None,
+            serde_json::json!({ "code": request["code"], "name": "Reception", "location": "OPD" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{device}");
+        let id = device["id"].as_str().expect("id");
+
+        let hello = |node: &str| {
+            serde_json::to_value(Hello {
+                protocol: PROTOCOL,
+                software: env!("CARGO_PKG_VERSION").parse().expect("version"),
+                node: node.parse().expect("node"),
+                epoch: "e1".into(),
+                packages: Vec::new(),
+                snapshot_version: 0,
+                cursor: None,
+            })
+            .expect("json")
+        };
+        let (status, _) = call(&api, lan, "POST", "/sync/v1/hello", None, hello(id)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "no proof");
+        let stranger = p256::ecdsa::SigningKey::from_bytes(&[9; 32].into()).expect("key");
+        let (status, _) = call(
+            &api,
+            lan,
+            "POST",
+            "/sync/v1/hello",
+            Some(&stranger),
+            hello(id),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "a device not enrolled");
+        let other = uuid::Uuid::now_v7().to_string();
+        let (status, _) = call(
+            &api,
+            lan,
+            "POST",
+            "/sync/v1/hello",
+            Some(&desktop),
+            hello(&other),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "a Hello naming another node");
+        let (status, welcome) = call(
+            &api,
+            lan,
+            "POST",
+            "/sync/v1/hello",
+            Some(&desktop),
+            hello(id),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{welcome}");
+        assert_eq!(
+            welcome["verdict"],
+            serde_json::to_value(Verdict::Compatible).expect("json")
+        );
     }
 }
