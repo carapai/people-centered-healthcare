@@ -153,6 +153,12 @@ stateDiagram-v2
   - Only encryption counts: BitLocker or LUKS, not suspended. No TPM or Secure Boot is required on a desktop, unlike an edge (ADR 0048).
   - A shortfall blocks the client unless `HEALTH_DESKTOP_ENCRYPTION=warn`, the country's choice until country configuration carries it.
   - `GET /api/desktop/encryption` reports the policy, the shortfalls and the probe to the app either way.
+- **#134, part 2: provisioning a standalone desktop (mode B).** `health-desktop provision --code CODE --central URL --root FILE [--central-ca FILE]` runs once, by an admin, before the client is used.
+  - It needs a working keystore. It probes the volumes and tells central whether they are encrypted; an unencrypted machine is accepted only under an exemption on the code.
+  - It refuses a machine that is already provisioned.
+  - The node key is made in the OS keystore and never written to disk. An unfinished attempt's key is reused.
+  - It redeems the code at central with a request for that key, through `health-sync-client`, as the edge does.
+  - It keeps the chain only once it verifies against the national root, then writes the root, the chain and the node's identity under the data directory's `pki/`.
 - **Not yet:**
   - local sign-in and the FHIR and application routes (#133, #134);
   - packaging and signing (#136);

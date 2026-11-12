@@ -59,3 +59,5 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 ```sh
 HEALTH_DESKTOP_DATA_DIR=~/health-desktop-data HEALTH_DESKTOP_ENCRYPTION=warn cargo run
 ```
+
+A standalone desktop (mode B) is provisioned once, with a one-time code from central: `cargo run -- provision --code XXXX-XXXX --central https://central… --root root.pem` (desktop-client.md § Provisioning).
