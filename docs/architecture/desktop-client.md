@@ -162,7 +162,14 @@ stateDiagram-v2
 - **#134, part 3: the provisioned desktop syncs.**
   - Once provisioned, it runs `health-sync-client`'s sync with central as an edge does. Requests are signed with the node key from the OS keystore. It pushes what it wrote, pulls its facility's records into a store indexed as the clinical API searches, and re-seeds from central's streamed snapshot when told to. Attachments go to `files/` beside the store, and it activates the packages its activation records name for its facility. `HEALTH_SYNC_INTERVAL_SECS` sets the polling interval (default 300).
   - `health-desktop seed import <file>`, with the client closed, applies a signed seed for its facility from removable media (`health_sync_client::seed`, moved there from the edge runtime and shared).
+- **#134, part 4: local sign-in and the clinical API.**
+  - `health-desktop accounts import <bundle.jws> --snapshot-keys <keys.json>` imports central's provisioning bundle, opened with the node key from the keystore, and keeps central's snapshot keys beside the chain.
+  - The `sign_in` command takes the username and password over IPC. It runs the authorization-code flow with PKCE against `health_auth::AuthServer` in process, the same code, with the same lockout, snapshot, clock and idle-lock checks, as edges and central.
+  - The access token stays in Rust: `api_request` attaches it and drops any credential the webview put in the envelope. `sign_out` ends the session.
+  - The clinical API (`health-node-api`) answers behind it, under the bundle's rules. Before the accounts are imported there is no sign-in and no record route.
+  - The pepper and token-signing keys are made on first use, in the OS keystore.
 - **Not yet:**
-  - local sign-in and the FHIR and application routes (#133, #134);
+  - the client's sign-in screen on the desktop (calling `sign_in`);
+  - hourly backups (#134);
   - packaging and signing (#136);
   - end-to-end tests on WebView2 and WebKitGTK.

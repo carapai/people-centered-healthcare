@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window may call the API command and nothing else. No remote URL is granted anything.",
+  "description": "The main window may call the API, sign in and sign out, and nothing else. No remote URL is granted anything.",
   "windows": ["main"],
-  "permissions": ["allow-api-request"]
+  "permissions": ["allow-api-request", "allow-sign-in", "allow-sign-out"]
 }

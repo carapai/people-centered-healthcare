@@ -2951,6 +2951,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-auth"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "axum",
+ "base64 0.22.1",
+ "chacha20poly1305 0.10.1",
+ "form_urlencoded",
+ "health-access-policy",
+ "health-audit",
+ "health-consent",
+ "health-http",
+ "health-identity",
+ "health-identity-app",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "hkdf 0.12.4",
+ "jiff",
+ "p256",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sha2 0.11.1",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "health-billing"
 version = "0.1.0"
 dependencies = [
@@ -3077,12 +3109,17 @@ name = "health-desktop"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
+ "form_urlencoded",
  "health-activation",
+ "health-auth",
  "health-configuration",
  "health-desktop-runtime",
  "health-fhir-server",
  "health-files",
  "health-http",
+ "health-identity",
+ "health-node-api",
  "health-node-identity",
  "health-pki",
  "health-surrealdb",
@@ -3090,13 +3127,16 @@ dependencies = [
  "health-time",
  "keyring",
  "p256",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",
  "tempfile",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -3367,6 +3407,25 @@ dependencies = [
  "health-time",
  "serde_json",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-node-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-access-policy",
+ "health-audit",
+ "health-auth",
+ "health-client-registry",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-identifiers",
+ "health-registries-app",
+ "health-surrealdb",
+ "health-time",
+ "tower",
+ "tracing",
 ]
 
 [[package]]
