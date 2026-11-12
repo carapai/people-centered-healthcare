@@ -77,6 +77,45 @@ pub(crate) fn sync(
     Ok(Some(sync))
 }
 
+/// The hourly backups (#134; desktop-client.md § Storage and backup; ADR 0040), as an edge takes
+/// them: encrypted, to `HEALTH_BACKUP_DIR` (a second volume or USB) with the key in
+/// `HEALTH_BACKUP_KEY_FILE`, every `HEALTH_BACKUP_INTERVAL_SECS` (default 3600), and the newest
+/// test-restored every `HEALTH_BACKUP_TEST_SECS` (default 604800). `None` with why, before the
+/// desktop is provisioned or when no backup directory is set.
+pub(crate) fn backups(
+    data_dir: &Path,
+    get: impl Fn(&str) -> Option<String>,
+) -> Result<health_backup::node::Schedule, String> {
+    let node = std::fs::read_to_string(pki_dir(data_dir).join("node.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|value| value["node_id"].as_str().map(str::to_owned))
+        .ok_or("not provisioned")?;
+    let dir =
+        get("HEALTH_BACKUP_DIR").ok_or("no HEALTH_BACKUP_DIR: this desktop takes no backups")?;
+    let key_file = get("HEALTH_BACKUP_KEY_FILE")
+        .ok_or("HEALTH_BACKUP_DIR is set, but HEALTH_BACKUP_KEY_FILE is not")?;
+    let seconds = |name: &str, default: u64| -> Result<Duration, String> {
+        match get(name) {
+            None => Ok(Duration::from_secs(default)),
+            Some(text) => text
+                .trim()
+                .parse::<u64>()
+                .ok()
+                .filter(|s| *s > 0)
+                .map(Duration::from_secs)
+                .ok_or_else(|| format!("{name} is not a positive number of seconds")),
+        }
+    };
+    Ok(health_backup::node::Schedule {
+        backups: health_backup::node::Backups::new(dir, node),
+        key_file: key_file.into(),
+        every: seconds("HEALTH_BACKUP_INTERVAL_SECS", 3600)?,
+        test_every: seconds("HEALTH_BACKUP_TEST_SECS", 604_800)?,
+        data_dir: data_dir.to_path_buf(),
+    })
+}
+
 /// `health-desktop seed import <file>`, with `<file>.jws` beside it: the seed must be signed by
 /// the publication signer under the national root installed at provisioning, and be for this
 /// desktop's facility. Returns the heads applied.
@@ -127,6 +166,47 @@ mod tests {
         assert_eq!(facility(dir.path()).as_deref(), Some("KLA001"));
         let upstream = Upstream::from_identity(&pki_dir(dir.path())).expect("upstream");
         assert_eq!(upstream.origin, "https://central.example");
+    }
+
+    #[test]
+    fn backups_follow_the_edge_s_settings_once_provisioned() {
+        let dir = tempfile::tempdir().expect("dir");
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        let set = env(&[
+            ("HEALTH_BACKUP_DIR", "/mnt/backup"),
+            ("HEALTH_BACKUP_KEY_FILE", "/etc/k"),
+        ]);
+        assert_eq!(
+            backups(dir.path(), set).err().as_deref(),
+            Some("not provisioned")
+        );
+        std::fs::create_dir_all(pki_dir(dir.path())).expect("pki");
+        std::fs::write(
+            pki_dir(dir.path()).join("node.json"),
+            r#"{"node_id":"ug-kla-0002","facility":"KLA001","central":"https://central.example"}"#,
+        )
+        .expect("node");
+        let schedule = backups(dir.path(), set).expect("schedule");
+        assert_eq!(schedule.every, Duration::from_secs(3600));
+        assert_eq!(schedule.test_every, Duration::from_secs(604_800));
+        assert!(backups(dir.path(), env(&[])).is_err_and(|e| e.contains("no HEALTH_BACKUP_DIR")));
+        assert!(
+            backups(dir.path(), env(&[("HEALTH_BACKUP_DIR", "/mnt/backup")]))
+                .is_err_and(|e| e.contains("HEALTH_BACKUP_KEY_FILE"))
+        );
+        let hourly = env(&[
+            ("HEALTH_BACKUP_DIR", "/mnt/backup"),
+            ("HEALTH_BACKUP_KEY_FILE", "/etc/k"),
+            ("HEALTH_BACKUP_INTERVAL_SECS", "0"),
+        ]);
+        assert!(backups(dir.path(), hourly).is_err());
     }
 
     #[test]

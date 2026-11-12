@@ -195,6 +195,20 @@ async fn open() -> Result<Api, String> {
         Ok(None) => eprintln!("health-desktop: not provisioned: no sync with central"),
         Err(e) => eprintln!("health-desktop: cannot sync with central: {e}"),
     }
+    // Hourly encrypted backups, as an edge takes them (#134).
+    match node::backups(&dir, |name| {
+        std::env::var(name).ok().filter(|v| !v.trim().is_empty())
+    }) {
+        Ok(schedule) => {
+            let connection = connection.clone();
+            tokio::spawn(async move {
+                if let Err(e) = schedule.run(connection).await {
+                    eprintln!("health-desktop: backups stopped: {e}");
+                }
+            });
+        }
+        Err(why) => eprintln!("health-desktop: warning: backups are off: {why}"),
+    }
     // Local sign-in and, behind it, the clinical API, once the accounts are imported.
     let signed = match auth::routes(&connection, &dir, &OsKeystore) {
         Ok(routes) => routes,

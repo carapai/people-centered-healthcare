@@ -169,7 +169,7 @@ stateDiagram-v2
   - The clinical API (`health-node-api`) answers behind it, under the bundle's rules. Before the accounts are imported there is no sign-in and no record route.
   - The pepper and token-signing keys are made on first use, in the OS keystore.
 - **The client's sign-in on the desktop:** the Tauri platform's `signIn.password` invokes `sign_in` and keeps only a marker in the webview's session, never a token. The sign-in page shows a plain form for it, with no redirect, and a temporary password is replaced first and then used. `signOut` invokes `sign_out`.
+- **#134, part 5: backups.** Once provisioned, the desktop takes the edge's scheduled backups (`health_backup::node`, shared in part 5a). They are encrypted, to `HEALTH_BACKUP_DIR` (a second volume or USB), with the key in `HEALTH_BACKUP_KEY_FILE`, hourly, with the newest test-restored weekly; the two intervals are set as on the edge. Without a backup directory it starts and warns that backups are off.
 - **Not yet:**
-  - hourly backups (#134);
   - packaging and signing (#136);
   - end-to-end tests on WebView2 and WebKitGTK.
