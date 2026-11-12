@@ -3323,6 +3323,7 @@ dependencies = [
  "futures-util",
  "health-access-policy",
  "health-audit",
+ "health-authority-leases",
  "health-billing",
  "health-client-registry",
  "health-clinical-documentation-app",
@@ -3351,6 +3352,7 @@ dependencies = [
  "surrealdb",
  "thiserror 2.0.21",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

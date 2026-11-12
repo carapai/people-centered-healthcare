@@ -170,6 +170,15 @@ where
         origin: Origin,
     ) -> Result<Decision, Attempt> {
         let key = movement.unit.key();
+        // Authority Leases (#135): a node moves a leased store's stock only as its active holder.
+        // A late operation was checked where it arrived, against the peer that sent it.
+        if matches!(origin, Origin::Authority { .. })
+            && !tx
+                .may_write_store(&movement.unit.store, movement.recorded_at)
+                .await?
+        {
+            return Err(Refused::Leased(movement.unit.store.clone()).into());
+        }
         // Only live reservations hold stock (ADR 0035).
         let (balance, _) = dispensing::live_balance(tx, &key, movement.recorded_at, None).await?;
         let decision = self.policy.decide(balance, movement, origin)?;

@@ -1752,6 +1752,18 @@ impl SurrealAuthority<'_> {
         else {
             return Ok(refused(format!("{}: not a stock movement", item.op_id)));
         };
+        // A store leased to one desktop takes stock operations from that desktop alone (#135).
+        if let Some(holder) = tx
+            .leased_to(&movement.unit.store)
+            .await
+            .map_err(WriteError::Store)?
+            && holder != self.peer.to_string()
+        {
+            return Ok(refused(format!(
+                "{}: store {} is leased to {holder}",
+                item.op_id, movement.unit.store
+            )));
+        }
         let held: Option<String> = tx
             .tx()?
             .query("SELECT VALUE record::id(id) FROM ONLY type::record('stock_movement', $id)")

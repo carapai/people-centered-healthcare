@@ -33,6 +33,7 @@ health-financial-ledger = { workspace = true }
 health-fhir-search = { workspace = true }
 health-identity = { workspace = true }
 health-coverage = { workspace = true }
+health-authority-leases = { workspace = true }
 health-inventory = { workspace = true }
 health-inventory-app = { workspace = true }
 health-patient-flow = { workspace = true }
@@ -53,6 +54,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
+uuid = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 tokio = { workspace = true }

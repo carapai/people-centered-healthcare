@@ -27,6 +27,7 @@ mod encounters;
 mod history;
 mod inbound;
 mod laboratory;
+mod leases;
 mod local;
 mod migrations;
 mod nodes;
@@ -55,6 +56,7 @@ pub use connection::{
 pub use devices::DeviceRow;
 pub use history::{HistoryEntry, HistoryScope};
 pub use inbound::{InboundEntry, InboundKind, InboundStatus};
+pub use leases::LeaseRole;
 pub use migrations::{MIGRATIONS, Migration, MigrationError, MigrationReport, migrate};
 pub use search::{DEFAULT_COUNT, ReindexJob, ReindexProgress, SearchFailure, SearchPage};
 pub use store::{SharedRegistry, SurrealStore, SurrealTx};
