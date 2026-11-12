@@ -154,6 +154,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0060](../adr/0060-surrealdb-4-with-embedded-surrealkv.md) | SurrealDB 4 on every node, with SurrealKV (`sync=every`) as the embedded engine, after RUSTSEC-2026-0454 |
 | [0061](../adr/0061-change-log-seq-taken-under-a-commit-lock.md) | The change log's `seq` is taken under an in-process commit lock, not a counter record written in every transaction (amends 0019) |
 | [0062](../adr/0062-nodes-sign-their-sync-requests.md) | Nodes sign each sync request with their facility-intermediate key, checked against the node registry, in place of mTLS (settles 0058's open point) |
+| [0063](../adr/0063-an-edge-gives-its-desktops-their-staff.md) | An edge gives each enrolled desktop the staff at its location for offline sign-in, hashes encrypted to the device key, the bundle signed with the facility intermediate key (extends 0059) |
 
 ## Still open
 
