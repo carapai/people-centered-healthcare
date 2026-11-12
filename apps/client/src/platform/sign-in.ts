@@ -51,11 +51,19 @@ export interface SignIn {
   unlock?(username: string, pin: string): Promise<void>
   /** Sets the signed-in user's 6-digit PIN on this device. */
   setPin?(pin: string): Promise<void>
+  /**
+   * On the desktop (#134): signs `username` in with `password` in place, over IPC, with no
+   * redirect. The session stays on the Rust side. Throws `SignInError` with `refused`,
+   * `facility` (several facilities and none named) or `change-password` (a temporary password).
+   */
+  password?(username: string, password: string): Promise<void>
 }
 
 /** Why a sign-in could not complete. */
 export class SignInError extends Error {
-  constructor(readonly reason: 'state' | 'issuer' | 'refused' | 'rejected' | 'locked' | 'no-transaction' | 'unavailable') {
+  constructor(
+    readonly reason: 'state' | 'issuer' | 'refused' | 'rejected' | 'locked' | 'no-transaction' | 'unavailable' | 'facility' | 'change-password',
+  ) {
     super(`sign-in failed: ${reason}`)
     this.name = 'SignInError'
   }
