@@ -90,6 +90,13 @@ stateDiagram-v2
   4. Resume.
 - **Program transfer** (an ART/TB EpisodeOfCare moving to another facility) is a hand-over coordinated by central. The old facility closes its episode and the new facility opens its own. No record changes authority.
 
+- **In code (#135, part 1).** `health-authority-leases` holds the rules as a pure state machine, for the edge and the desktop to apply:
+  - `Lease::grant` covers a set of stores for a time-box of up to 30 days, and is refused while any of them is under a holding lease.
+  - `edge_may_write` is false for a store while a lease is active, returning or frozen. `holder_may_write` is true only for the holder, in scope, while the lease is active and unexpired.
+  - `request_return` (active or frozen, holder only) stops the holder's new writes. `complete_return` needs the holder's outbox for the scope drained.
+  - `expire` freezes an unreturned lease once and reports it, for the alert. `recover` takes a frozen lease back for an admin with a reason, for the audit.
+  - Still to come: storing leases, enforcing them on the edge's stock writes and the holder's pushes, the grant and return endpoints, the freeze alert, and the desktop's side.
+
 ## Validation on ingest
 
 - Central re-validates every incoming candidate and operation:

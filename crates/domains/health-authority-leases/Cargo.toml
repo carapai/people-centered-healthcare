@@ -1,0 +1,20 @@
+[package]
+name = "health-authority-leases"
+description = "Authority Leases: an edge hands a desktop write authority over a scope (an outreach sub-store) for a time-box, refuses its own writes there meanwhile, and takes it back only once the desktop's outbox has drained; an unreturned lease freezes, and only an audited admin recovery unfreezes it (write-authority.md § Hand-over rules; #135)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "write-authority"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-time = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
