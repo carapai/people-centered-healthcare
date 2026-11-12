@@ -6,12 +6,14 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use health_identifiers::NodeId;
-use health_persistence::{Store as _, Transaction as _};
+use health_persistence::Store as _;
 use health_surrealdb::{
-    Connection, MIGRATIONS, Settings, SurrealAuthority, SurrealStore, SurrealTx, SyncScope, Target,
-    migrate,
+    Connection, MIGRATIONS, Settings, SurrealAuthority, SurrealReplica, SurrealStore, SurrealTx,
+    SyncScope, Target, migrate,
 };
-use health_sync_protocol::{Outcome as Pushed, receive};
+use health_sync_protocol::{
+    Lane, Outcome as Pushed, PullRequest, PullResponse, apply_pull, receive,
+};
 use health_time::{Clock, FixedClock, Timestamp};
 use health_workflow::{
     DataModel, Event, Guards, InstanceRecord, Kind, State, Statechart, Transition,
@@ -109,9 +111,11 @@ fn applied(outcome: Outcome) -> InstanceRecord {
     }
 }
 
-/// The edge, and a desktop holding a replica of the edge's instance started with `op`.
+/// The edge, and a desktop that pulled its replica of the edge's instance started with `op`.
 async fn replicated(op: &str) -> (Node, Node, InstanceRecord) {
     let edge = node("edge").await;
+    let central = NodeId::new().to_string();
+    edge.store.add_upstream(&central).await.expect("central");
     let desktop = node("desktop").await;
     desktop
         .store
@@ -124,10 +128,54 @@ async fn replicated(op: &str) -> (Node, Node, InstanceRecord) {
             .await
             .expect("start"),
     );
+    pull(&desktop, &edge).await;
     let mut tx = desktop.store.begin().await.expect("begin");
-    tx.create_instance(&record).await.expect("replica");
-    tx.commit().await.expect("commit");
+    let replica = tx
+        .instance(&record.id)
+        .await
+        .expect("read")
+        .expect("replica");
+    assert_eq!(replica, record, "the desktop holds the edge's instance");
     (edge, desktop, record)
+}
+
+/// Pulls the edge's changes down to the desktop: how many items came.
+async fn pull(desktop: &Node, edge: &Node) -> usize {
+    let mut pulled = 0;
+    loop {
+        let request = PullRequest {
+            cursor: desktop
+                .store
+                .checkpoint(edge.id, Lane::Clinical)
+                .await
+                .expect("checkpoint"),
+            lane: Lane::Clinical,
+            limit: 50,
+        };
+        let response = edge
+            .store
+            .pull(
+                &SyncScope::Facility("KLA01".into()),
+                edge.id,
+                desktop.id,
+                &request,
+            )
+            .await
+            .expect("pull");
+        let more = matches!(response, PullResponse::Items { more: true, .. });
+        if let PullResponse::Items { items, .. } = &response {
+            pulled += items.len();
+        }
+        apply_pull(
+            &SurrealReplica::new(&desktop.store, edge.id, Lane::Clinical),
+            response,
+        )
+        .await
+        .expect("apply");
+        if !more {
+            return pulled;
+        }
+    }
 }
 
 /// Pushes the desktop's queued operations to the edge: their outcomes.

@@ -54,6 +54,7 @@ impl WorkflowStore for SurrealTx {
             ],
         )
         .await?;
+        self.replicate(instance)?;
         Ok(())
     }
 
@@ -86,6 +87,9 @@ impl WorkflowStore for SurrealTx {
                 ],
             )
             .await?;
+        if !updated.is_empty() {
+            self.replicate(instance)?;
+        }
         Ok(!updated.is_empty())
     }
 
@@ -293,6 +297,62 @@ impl WorkflowStore for SurrealTx {
             ],
         )
         .await?;
+        Ok(())
+    }
+}
+
+impl SurrealTx {
+    /// Logs `instance` for the desktops below to pull (#100), when this node decides it: a
+    /// replica's own offline moves go up as candidates instead.
+    fn replicate(&mut self, instance: &InstanceRecord) -> Result<(), WriteError> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        self.log_op(
+            crate::sync::WORKFLOW_INSTANCES,
+            &instance.id,
+            &encode(instance)?,
+        );
+        Ok(())
+    }
+
+    /// Keeps `instance`, pulled from upstream, unless this replica already holds it at that
+    /// version or later.
+    pub(crate) async fn keep_replica(
+        &mut self,
+        instance: &InstanceRecord,
+    ) -> Result<(), WriteError> {
+        let held = self
+            .rows(
+                "SELECT VALUE [<string>version] FROM type::record('workflow_instance', $id)",
+                vec![("id", instance.id.clone())],
+            )
+            .await?;
+        let newer = match held.first().and_then(|row| row.first()) {
+            Some(version) => {
+                version
+                    .parse::<u64>()
+                    .map_err(|_| WriteError::Store(invalid()))?
+                    < instance.version
+            }
+            None => true,
+        };
+        if newer {
+            self.run(
+                "UPSERT type::record('workflow_instance', $id) CONTENT { data: $data, \
+                 version: <int>$version, definition: $definition, context: $context, \
+                 running: <bool>$running } RETURN VALUE record::id(id)",
+                vec![
+                    ("id", instance.id.clone()),
+                    ("data", encode(instance)?),
+                    ("version", instance.version.to_string()),
+                    ("definition", instance.definition.clone()),
+                    ("context", instance.context.clone()),
+                    ("running", instance.state.running.to_string()),
+                ],
+            )
+            .await?;
+        }
         Ok(())
     }
 }
