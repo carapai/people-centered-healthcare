@@ -685,47 +685,21 @@ impl health_sync_server::PeerAuth for Desktops {
     }
 }
 
-/// A desktop under an edge (#133): its sync client proves each request with a DPoP proof by its
-/// enrolled device key, the edge's gate admits it, and records move both ways over TLS.
+/// A desktop under an edge (#133): it asks to enroll over HTTPS and learns once it is approved;
+/// then its sync client proves each request with a DPoP proof by its enrolled device key, the
+/// edge's gate admits it, and records move both ways over TLS.
 #[tokio::test]
 async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
     use health_auth::{DeviceConfig, DeviceGate, DeviceStore as _, SurrealAuthStore};
-    use health_identity::{DeviceId, EnrollmentPolicy, SessionPolicy};
+    use health_identity::{DeviceId, SessionPolicy};
+    use health_sync_client::enrollment::{self, Enrollment};
 
     let edge = store("edge").await;
     let (listener, origin, cert_pem) = tls().await;
     let devices = SurrealAuthStore::new(edge.clone(), SessionPolicy::default().hard_cap);
     let key = SigningKey::from_bytes(&[11; 32].into()).expect("key");
-    let device = DeviceId(uuid::Uuid::now_v7());
-    let now = Timestamp::now();
-    let request = EnrollmentPolicy::default().request(
-        uuid::Uuid::now_v7(),
-        health_auth::jose::EcJwk::of(key.verifying_key()).thumbprint(),
-        "desktop".into(),
-        "123456".into(),
-        now,
-    );
-    assert!(
-        devices
-            .put_enrollment(&request, now)
-            .await
-            .expect("request")
-    );
-    let enrolled = request
-        .approve(device, "Reception", "OPD", "admin", now)
-        .expect("approve");
-    assert!(
-        devices
-            .enroll(
-                request.id,
-                &enrolled,
-                &json!({"resourceType": "AuditEvent"})
-            )
-            .await
-            .expect("enroll")
-    );
     let gate = DeviceGate::new(
-        devices,
+        devices.clone(),
         DeviceConfig::new(vec![origin.clone()], "edge"),
         Arc::new(SystemClock),
     );
@@ -734,11 +708,67 @@ async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
         software: env!("CARGO_PKG_VERSION").parse().expect("version"),
         approved: BTreeSet::new(),
     };
-    let app =
-        gate.layer(SyncServer::with_auth(edge.clone(), Arc::new(Desktops), compatibility).router());
+    let app = gate.enrollment_router().merge(
+        gate.layer(SyncServer::with_auth(edge.clone(), Arc::new(Desktops), compatibility).router()),
+    );
     tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
+
+    // The desktop asks over HTTPS and is shown a code; the admin approves it on the edge.
+    let ask = |key: SigningKey, first: bool| {
+        let (origin, ca) = (origin.clone(), cert_pem.clone());
+        tokio::task::spawn_blocking(move || {
+            if first {
+                enrollment::request(&origin, "health-desktop on linux", &key, Some(&ca))
+            } else {
+                enrollment::status(&origin, &key, Some(&ca))
+            }
+        })
+    };
+    let code = match ask(key.clone(), true)
+        .await
+        .expect("join")
+        .expect("request")
+    {
+        Enrollment::Pending { code } => code,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(
+        ask(key.clone(), false)
+            .await
+            .expect("join")
+            .expect("status"),
+        Enrollment::Pending { code: code.clone() }
+    );
+    let request = devices
+        .enrollment_by_code(&code)
+        .await
+        .expect("read")
+        .expect("pending");
+    let device = DeviceId(uuid::Uuid::now_v7());
+    let approved = request
+        .approve(device, "Reception", "OPD", "admin", Timestamp::now())
+        .expect("approve");
+    assert!(
+        devices
+            .enroll(
+                request.id,
+                &approved,
+                &json!({"resourceType": "AuditEvent"})
+            )
+            .await
+            .expect("enroll")
+    );
+    assert_eq!(
+        ask(key.clone(), false)
+            .await
+            .expect("join")
+            .expect("status"),
+        Enrollment::Enrolled {
+            device: device.to_string()
+        }
+    );
 
     let desktop = store("desktop").await;
     let registered = patient_seen_here(&edge).await;

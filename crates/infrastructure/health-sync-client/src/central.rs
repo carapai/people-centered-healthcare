@@ -69,6 +69,18 @@ pub fn post(
     body: Vec<u8>,
     ca_pem: Option<&str>,
 ) -> Result<(u16, Value), String> {
+    send("POST", url, &[("content-type", content_type)], body, ca_pem)
+}
+
+/// Sends `method` to `url` with `headers` and `body`; returns the status and the JSON answer
+/// (`null` if none).
+pub fn send(
+    method: &str,
+    url: &str,
+    headers: &[(&str, &str)],
+    body: Vec<u8>,
+    ca_pem: Option<&str>,
+) -> Result<(u16, Value), String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -76,9 +88,14 @@ pub fn post(
     runtime.block_on(async {
         let client: Client<_, Full<VecDeque<u8>>> =
             Client::builder(TokioExecutor::new()).build(tls(ca_pem)?);
-        let request = hyper::Request::post(url)
-            .header("content-type", content_type)
-            .header("accept", "application/json")
+        let mut request = hyper::Request::builder()
+            .method(method)
+            .uri(url)
+            .header("accept", "application/json");
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let request = request
             .body(Full::new(VecDeque::from(body)))
             .map_err(|e| format!("{url}: {e}"))?;
         let response = tokio::time::timeout(TIMEOUT, client.request(request))

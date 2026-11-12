@@ -28,6 +28,7 @@
 //! and goes over HTTPS only, verified against central's CA when provisioning named one.
 
 pub mod central;
+pub mod enrollment;
 pub mod provisioning;
 pub mod seed;
 
