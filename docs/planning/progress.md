@@ -982,6 +982,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#135, part 1: the Authority Lease rules (2026-11-12).**
+  - **What:** a new domain crate, `health-authority-leases` (context `write-authority`), holds write-authority.md's hand-over state machine as pure rules:
+    - a grant over a set of stores, with a time-box of up to 30 days and no overlapping holding lease;
+    - the edge refuses writes in scope while a lease is active, returning or frozen;
+    - the holder writes only while the lease is active and unexpired;
+    - a return completes only once the holder's outbox has drained;
+    - expiry freezes the scope at both ends, once, for the alert;
+    - only a frozen lease is recovered, by an admin, with a reason.
+  - **Tested:** 6 unit tests covering each rule and transition.
+  - **Next:** storing leases, enforcing them on the edge's stock writes and the holder's pushes, then the endpoints, the freeze alert, and the desktop's side.
 - **#133, part 4: offline sign-in under an edge (2026-11-12).** ADR 0063, chosen by the maintainer. With this, #133's scope is built.
   - **What:**
     - The edge serves `POST /api/desktop/accounts` behind its device gate. For the enrolled desktop's own key, it returns the staff whose snapshots hold a facility-wide role or one at the device's location. Their hashes are re-encrypted to the device key, and the bundle (ADR 0059's format) is signed with the facility intermediate key. The answer also carries central's snapshot keys.
