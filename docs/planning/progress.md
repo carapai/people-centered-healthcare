@@ -969,6 +969,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#132, part 3: full-disk encryption on the desktop (2026-11-12).** This completes #132.
+  - **What:** at startup the desktop probes its system and data volumes with the edge's shared check (`health-node-identity`). Only OS encryption counts (BitLocker or LUKS, not suspended), and no TPM or Secure Boot is required, unlike an edge.
+    - A shortfall blocks the client unless `HEALTH_DESKTOP_ENCRYPTION=warn`, the country's choice until country configuration carries it.
+    - `GET /api/desktop/encryption` reports the policy, the shortfalls and the probe to the app.
+  - **Tested:** encrypted volumes start with or without a TPM. An unencrypted data volume blocks by default and starts with a warning under `warn`, and anything but `warn` blocks. Suspended and unreadable volumes are named as shortfalls. Running it on facility PCs is left to the user.
 - **#132, part 2: the Tauri binary (2026-11-11).**
   - **What:** `apps/client/src-tauri` (`health-desktop`), its own workspace, because Tauri needs WebKitGTK on Linux. A new `desktop.yml` builds, lints, tests and runs `cargo deny` on it on Linux and Windows, for PRs that touch it or its crates, and nightly.
     - Tauri 2.12.5, single instance, and the `keyring` OS keystore. The app refuses to start without a working keystore.

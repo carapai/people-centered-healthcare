@@ -54,4 +54,8 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 
 ## The desktop (Tauri)
 
-`src-tauri/` is the desktop binary (`health-desktop`), its own Cargo workspace (desktop-client.md § In code). Build the web app first (`bun run build`), since the webview's assets are embedded at compile time. Then, in `src-tauri/`, run `cargo build` or `cargo run`, with `HEALTH_DESKTOP_DATA_DIR` set to a writable directory in development. It needs WebKitGTK 4.1 on Linux and WebView2 on Windows.
+`src-tauri/` is the desktop binary (`health-desktop`), its own Cargo workspace (desktop-client.md § In code). Build the web app first (`bun run build`), since the webview's assets are embedded at compile time. Then, in `src-tauri/`, run `cargo build` or `cargo run`, with `HEALTH_DESKTOP_DATA_DIR` set to a writable directory in development. It needs WebKitGTK 4.1 on Linux and WebView2 on Windows. The client starts only on a machine whose system and data volumes are encrypted (BitLocker or LUKS). On a development machine without it, or on macOS, which is not probed, set `HEALTH_DESKTOP_ENCRYPTION=warn`:
+
+```sh
+HEALTH_DESKTOP_DATA_DIR=~/health-desktop-data HEALTH_DESKTOP_ENCRYPTION=warn cargo run
+```
