@@ -115,6 +115,12 @@ sequenceDiagram
 - **At the authority,** the guard is re-evaluated:
   - if the transition is allowed from the current configuration and commutes, it is applied;
   - otherwise a Conflict Record is opened (ADR 0020).
+- **In code (#100, part 1).** `health_workflow_app::sync`:
+  - **The candidate.** A `Candidate` carries the event, the instance version and configuration it was made from, and the states its transition left there.
+  - **Applies through the engine.** `Workflows::apply_candidate` runs the event with the authority's own guards, as a command would. It applies when the instance has not moved since the candidate's base, or when every state the candidate left is still active there: the change made meanwhile was elsewhere, such as in another parallel region, so the two commute.
+  - **Conflicts.** A candidate from a state the instance has left, one on an ended or unknown instance, or one the authority's guards no longer enable is `Judged::Conflict`, with the reason for the Conflict Record.
+  - **Once.** A replayed candidate does nothing.
+  - **Still to come:** sending candidates as operations, the authority applying them on arrival and opening Conflict Records, and instance replicas down to desktops.
 
 ## Versioning and migration
 

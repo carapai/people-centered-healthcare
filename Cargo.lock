@@ -3491,6 +3491,7 @@ dependencies = [
  "health-time",
  "health-workflow",
  "health-workflow-actions",
+ "serde",
  "serde_json",
  "surrealdb",
  "thiserror 2.0.21",
