@@ -5,7 +5,8 @@ import { formsCommands } from './forms'
 import { registriesCommands } from './registries'
 import { parseJson, stringifyJson } from './json'
 import { operationClient } from './operations'
-import { memorySession } from './session'
+import { memorySession, type MemorySession } from './session'
+import { SignInError, type SignIn } from './sign-in'
 import type { ApiRequest, ApiResponse, Platform, Transport } from './types'
 
 export interface IpcResponse {
@@ -59,8 +60,49 @@ function pairs(params: NonNullable<ApiRequest['query']>): [string, string][] {
   )
 }
 
+/**
+ * Sign-in on the desktop (#134): the credentials go over IPC to the Rust side, which runs the
+ * authorization server's flow in process and keeps the session. No token ever reaches the
+ * webview; the session here holds only a marker, so the app knows someone is signed in, and the
+ * Rust side drops any credential an envelope carries and attaches its own.
+ */
+export function tauriSignIn(call: Invoke, session: MemorySession, transport: Transport, navigate: (path: string) => void): SignIn {
+  return {
+    async password(username, password) {
+      try {
+        await call<null>('sign_in', { username, password })
+      } catch (reason) {
+        const code = typeof reason === 'string' ? reason : 'unavailable'
+        throw new SignInError(code === 'refused' || code === 'facility' ? code : code === 'change_password' ? 'change-password' : 'unavailable')
+      }
+      session.setAccessToken(SIGNED_IN)
+    },
+    async signOut() {
+      await call<null>('sign_out', {})
+      session.end('logout')
+    },
+    async start(returnTo) {
+      navigate(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`)
+    },
+    async complete() {
+      return '/'
+    },
+    async changePassword(username, password, newPassword) {
+      const response = await transport.request({ method: 'POST', path: '/auth/password', form: { username, password, new_password: newPassword } })
+      if (response.status >= 200 && response.status < 300) return
+      if (response.status === 422) throw new SignInError('rejected')
+      throw new SignInError(response.status === 401 ? 'refused' : 'unavailable')
+    },
+    authorizeEndpoint: '',
+  }
+}
+
+/** What the desktop's session holds once signed in: a marker, never a token. */
+export const SIGNED_IN = 'ipc-session'
+
 export function tauriPlatform(): Platform {
   const transport = ipcTransport()
+  const session = memorySession()
   return {
     mode: 'tauri',
     transport,
@@ -69,7 +111,8 @@ export function tauriPlatform(): Platform {
     forms: formsCommands(transport),
     operations: operationClient(transport),
     // The local desktop session is carried by the Rust side; ending it still clears the cache.
-    session: memorySession(),
+    session,
+    signIn: tauriSignIn(invoke, session, transport, (path) => window.location.assign(path)),
     events: { subscribe: () => () => {} },
     capabilities: {
       offlineCapable: true,

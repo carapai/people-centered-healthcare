@@ -1,12 +1,12 @@
 import { Field } from '@health/design-system'
 import { css } from '@health/design-system/css'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useIntl } from 'react-intl'
 
 import { messages } from '../i18n/messages'
 import { usePlatform } from '../platform'
-import { SignInError } from '../platform/sign-in'
+import { type SignIn, SignInError } from '../platform/sign-in'
 
 /** The authorization request's parameters, passed through untouched to `/authorize`. */
 const PASSED = ['response_type', 'client_id', 'redirect_uri', 'scope', 'state', 'nonce', 'code_challenge', 'code_challenge_method'] as const
@@ -31,6 +31,10 @@ function SignInPage() {
   const action = platform.signIn?.authorizeEndpoint ?? '/auth/authorize'
   if (platform.portal !== undefined && search['client_id'] === platform.portal.clientId) {
     return <PhoneSignIn search={search} action={platform.portal.signIn.authorizeEndpoint} />
+  }
+  // The desktop signs in in place, over IPC: no redirect, and no token in the webview (#134).
+  if (platform.signIn?.password !== undefined) {
+    return <DesktopSignIn signIn={platform.signIn} returnTo={search['returnTo'] ?? '/'} />
   }
   if (search['error'] === 'change_password' && platform.signIn !== undefined) {
     return <ChangePassword search={search} action={action} change={(username, password, newPassword) => platform.signIn!.changePassword(username, password, newPassword)} />
@@ -68,6 +72,94 @@ function SignInPage() {
           className={css({ minHeight: 'control', px: 'controlX', bg: 'accent.default', color: 'accent.fg', borderRadius: 'md', fontSize: 'control', cursor: 'pointer', _focusVisible: { outline: '2px solid', outlineColor: 'focusRing' } })}
         >
           {intl.formatMessage(messages.signInSubmit)}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+const DESKTOP_ERRORS = {
+  refused: messages.signInRefused,
+  facility: messages.signInChooseFacility,
+  failed: messages.signInChangeFailed,
+} as const
+
+/**
+ * Sign-in on the desktop (#134): the credentials go to the Rust side, which signs the user in
+ * and keeps the session. A temporary password an admin set is replaced first, then used.
+ */
+function DesktopSignIn({ signIn, returnTo }: { signIn: SignIn; returnTo: string }) {
+  const intl = useIntl()
+  const navigate = useNavigate()
+  const [error, setError] = useState<keyof typeof DESKTOP_ERRORS | keyof typeof CHANGE_ERRORS | null>(null)
+  const [changing, setChanging] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const done = () => void navigate({ to: returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/' })
+  const failed = (failure: unknown) => {
+    setBusy(false)
+    if (failure instanceof SignInError && failure.reason === 'change-password') {
+      setChanging(true)
+      setError(null)
+      return
+    }
+    setError(failure instanceof SignInError && (failure.reason === 'refused' || failure.reason === 'facility' || failure.reason === 'rejected') ? failure.reason : 'failed')
+  }
+  return (
+    <section className={css({ maxWidth: 'sm', mx: 'auto', display: 'flex', flexDirection: 'column', gap: '4' })}>
+      <h1 className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>
+        {intl.formatMessage(changing ? messages.signInChangeTitle : messages.signInTitle)}
+      </h1>
+      {changing ? <p>{intl.formatMessage(messages.signInChangeIntro)}</p> : null}
+      {error === null ? null : (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(error in DESKTOP_ERRORS ? DESKTOP_ERRORS[error as keyof typeof DESKTOP_ERRORS] : CHANGE_ERRORS[error as keyof typeof CHANGE_ERRORS])}
+        </p>
+      )}
+      <form
+        className={css({ display: 'flex', flexDirection: 'column', gap: '4' })}
+        onSubmit={(event) => {
+          event.preventDefault()
+          const data = new FormData(event.currentTarget)
+          const field = (name: string) => String(data.get(name) ?? '')
+          setBusy(true)
+          if (!changing) {
+            signIn.password!(field('username'), field('password')).then(done, failed)
+            return
+          }
+          if (field('new_password') !== field('confirm_password')) {
+            setBusy(false)
+            setError('mismatch')
+            return
+          }
+          signIn
+            .changePassword(field('username'), field('password'), field('new_password'))
+            .then(() => signIn.password!(field('username'), field('new_password')))
+            .then(done, failed)
+        }}
+      >
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(messages.signInUsername)}</Field.Label>
+          <Field.Input name="username" autoComplete="username" />
+        </Field.Root>
+        <Field.Root required>
+          <Field.Label>{intl.formatMessage(changing ? messages.signInCurrentPassword : messages.signInPassword)}</Field.Label>
+          <Field.Input name="password" type="password" autoComplete="current-password" />
+        </Field.Root>
+        {changing ? (
+          <>
+            <Field.Root required>
+              <Field.Label>{intl.formatMessage(messages.signInNewPassword)}</Field.Label>
+              <Field.Input name="new_password" type="password" autoComplete="new-password" />
+              <Field.HelperText>{intl.formatMessage(messages.signInNewPasswordHelp)}</Field.HelperText>
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>{intl.formatMessage(messages.signInConfirmPassword)}</Field.Label>
+              <Field.Input name="confirm_password" type="password" autoComplete="new-password" />
+            </Field.Root>
+          </>
+        ) : null}
+        <button type="submit" className={submitButton} disabled={busy}>
+          {intl.formatMessage(changing ? messages.signInChangeSubmit : messages.signInSubmit)}
         </button>
       </form>
     </section>

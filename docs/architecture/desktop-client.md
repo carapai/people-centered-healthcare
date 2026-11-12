@@ -168,8 +168,8 @@ stateDiagram-v2
   - The access token stays in Rust: `api_request` attaches it and drops any credential the webview put in the envelope. `sign_out` ends the session.
   - The clinical API (`health-node-api`) answers behind it, under the bundle's rules. Before the accounts are imported there is no sign-in and no record route.
   - The pepper and token-signing keys are made on first use, in the OS keystore.
+- **The client's sign-in on the desktop:** the Tauri platform's `signIn.password` invokes `sign_in` and keeps only a marker in the webview's session, never a token. The sign-in page shows a plain form for it, with no redirect, and a temporary password is replaced first and then used. `signOut` invokes `sign_out`.
 - **Not yet:**
-  - the client's sign-in screen on the desktop (calling `sign_in`);
   - hourly backups (#134);
   - packaging and signing (#136);
   - end-to-end tests on WebView2 and WebKitGTK.
