@@ -98,9 +98,14 @@ pub const DOWN_GLOBAL: &[&str] = &[
 /// (write-authority.md § Data authority matrix).
 pub const STOCK_LEDGER: &str = "stock";
 
+/// Workflow candidates on the change log: transitions made on a replica go up to the instance's
+/// authority as operations (#100; workflow-engine.md § Offline and sync).
+pub const WORKFLOW_CANDIDATES: &str = "workflow-candidate";
+
 /// The ledgers whose operations sync: up only, from the facility that keeps them.
 pub const LEDGERS: &[&str] = &[
     STOCK_LEDGER,
+    WORKFLOW_CANDIDATES,
     finance::CHARGE,
     finance::DEFERRAL,
     finance::SETTLEMENT,
@@ -1733,6 +1738,27 @@ impl SurrealAuthority<'_> {
             && let Some(why) = self.claim(tx, item, facility).await?
         {
             return Ok(refused(format!("{}: {why}", item.op_id)));
+        }
+        // A workflow candidate waits for the engine to judge it (#100): kept once, as pushed.
+        if item.resource_type == WORKFLOW_CANDIDATES {
+            let pushed = serde_json::to_string(item)
+                .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+            tx.tx()?
+                .query(
+                    "IF (SELECT VALUE id FROM ONLY type::record('workflow_candidate', $id)) = NONE { \
+                     CREATE type::record('workflow_candidate', $id) SET peer = $peer, \
+                     instance = $instance, data = $data, item = $item, status = 'pending', \
+                     received_at = time::now(); };",
+                )
+                .bind(("id", item.op_id.to_string()))
+                .bind(("peer", self.peer.to_string()))
+                .bind(("instance", item.resource_id.clone()))
+                .bind(("data", item.body.to_string()))
+                .bind(("item", pushed))
+                .await
+                .and_then(surrealdb::IndexedResults::check)
+                .map_err(write_error)?;
+            return Ok(None);
         }
         if finance::FINANCE.contains(&item.resource_type.as_str()) {
             let facility = match &self.scope {

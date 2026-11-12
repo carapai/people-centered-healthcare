@@ -120,7 +120,11 @@ sequenceDiagram
   - **Applies through the engine.** `Workflows::apply_candidate` runs the event with the authority's own guards, as a command would. It applies when the instance has not moved since the candidate's base, or when every state the candidate left is still active there: the change made meanwhile was elsewhere, such as in another parallel region, so the two commute.
   - **Conflicts.** A candidate from a state the instance has left, one on an ended or unknown instance, or one the authority's guards no longer enable is `Judged::Conflict`, with the reason for the Conflict Record.
   - **Once.** A replayed candidate does nothing.
-  - **Still to come:** sending candidates as operations, the authority applying them on arrival and opening Conflict Records, and instance replicas down to desktops.
+- **In code (#100, part 2): candidates over sync.**
+  - **On a replica.** A command on an instance whose authority is another node also queues its `Candidate`. It goes up as a `workflow-candidate` operation, which, like the ledgers' operations, is never sent down.
+  - **At the authority.** Sync keeps each arriving candidate once in `workflow_candidate` (migration `0054_workflow_candidates`). `Workflows::apply_candidates` judges them in order.
+  - **Conflicts.** Each candidate that does not apply opens a Conflict Record of class `workflow`, with the pushed candidate as its candidate branch, in the review queue. Keeping the head discards it.
+  - **Still to come:** instance replicas down to desktops, and the edge running the drain.
 
 ## Versioning and migration
 

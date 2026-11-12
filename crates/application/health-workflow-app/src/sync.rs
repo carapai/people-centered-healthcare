@@ -14,6 +14,11 @@
 //!   it has ended. The caller opens a Conflict Record (ADR 0020), and nothing is applied.
 //!
 //! A candidate is applied once: a replay of its `op_id` does nothing.
+//!
+//! On a replica, [`Workflows::command`] queues each move as a candidate, which sync carries up as
+//! an operation. At the authority, sync keeps arriving candidates, and
+//! [`Workflows::apply_candidates`] judges them in order, opening a Conflict Record for each that
+//! does not apply.
 
 use health_persistence::{Store, Transaction};
 use health_workflow::{Event, Guards, InstanceRecord, WorkflowStore};
@@ -134,6 +139,44 @@ where
         };
         tx.commit().await?;
         Ok(Judged::Applied(next))
+    }
+}
+
+impl<S, D, A, G> Workflows<S, D, A, G>
+where
+    S: Store,
+    S::Tx: WorkflowStore,
+    D: Definitions,
+    A: Actions<S::Tx>,
+    G: Guards + Send + Sync,
+{
+    /// Judges up to `limit` candidates received from other nodes, oldest first: each is applied,
+    /// or settled as a conflict with its Conflict Record. A candidate that cannot be read is a
+    /// conflict too. Returns each one's operation id and verdict.
+    pub async fn apply_candidates(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<(String, Judged)>, WorkflowError> {
+        let pending = {
+            let mut tx = self.store.begin().await?;
+            tx.pending_candidates(limit).await?
+        };
+        let mut judged = Vec::new();
+        for (op_id, json) in pending {
+            let verdict = match serde_json::from_str::<Candidate>(&json) {
+                Ok(candidate) => self.apply_candidate(&candidate).await?,
+                Err(e) => Judged::Conflict(format!("the candidate cannot be read: {e}")),
+            };
+            let mut tx = self.store.begin().await?;
+            let conflict = match &verdict {
+                Judged::Conflict(why) => Some(why.as_str()),
+                Judged::Applied(_) | Judged::Replayed => None,
+            };
+            tx.settle_candidate(&op_id, conflict).await?;
+            tx.commit().await?;
+            judged.push((op_id, verdict));
+        }
+        Ok(judged)
     }
 }
 

@@ -215,4 +215,84 @@ impl WorkflowStore for SurrealTx {
             .await?;
         decode(rows)
     }
+
+    async fn send_candidate(&mut self, instance: &str, candidate: &str) -> Result<(), WriteError> {
+        // Candidates go up to the authority as operations (#100), as the ledgers' do.
+        self.log_op(crate::sync::WORKFLOW_CANDIDATES, instance, candidate);
+        Ok(())
+    }
+
+    async fn pending_candidates(
+        &mut self,
+        limit: u32,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [record::id(id), data] FROM workflow_candidate \
+                 WHERE status = 'pending' ORDER BY received_at LIMIT <int>$limit",
+                vec![("limit", limit.to_string())],
+            )
+            .await?;
+        rows.into_iter()
+            .map(|row| {
+                let [id, data]: [String; 2] = row.try_into().map_err(|_| invalid())?;
+                Ok((id, data))
+            })
+            .collect()
+    }
+
+    async fn settle_candidate(
+        &mut self,
+        op_id: &str,
+        conflict: Option<&str>,
+    ) -> Result<(), WriteError> {
+        let Some(reason) = conflict else {
+            self.run(
+                "UPDATE type::record('workflow_candidate', $id) SET status = 'applied' \
+                 RETURN VALUE record::id(id)",
+                vec![("id", op_id.to_owned())],
+            )
+            .await?;
+            return Ok(());
+        };
+        // The Conflict Record (ADR 0020): the candidate as it was pushed is its candidate branch,
+        // reviewed in the queue like any other; keeping the head discards it.
+        let (class, policy) = crate::sync::class_of("RequestOrchestration");
+        let [peer, item]: [String; 2] = self
+            .rows(
+                "SELECT VALUE [peer, item] FROM type::record('workflow_candidate', $id)",
+                vec![("id", op_id.to_owned())],
+            )
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| WriteError::Store(invalid()))?
+            .try_into()
+            .map_err(|_| WriteError::Store(invalid()))?;
+        self.run(
+            "UPDATE type::record('workflow_candidate', $id) SET status = 'conflict', \
+             reason = $reason RETURN VALUE record::id(id)",
+            vec![("id", op_id.to_owned()), ("reason", reason.to_owned())],
+        )
+        .await?;
+        self.run(
+            "UPSERT type::record('sync_conflict', $id) SET peer = $peer, items = $items, \
+             candidates = $candidates, class = $class, policy = $policy, status = 'open', \
+             opened_at = time::now() RETURN VALUE record::id(id)",
+            vec![
+                ("id", op_id.to_owned()),
+                ("peer", peer),
+                (
+                    "items",
+                    serde_json::json!([{ "op_id": op_id, "class": class, "reason": reason }])
+                        .to_string(),
+                ),
+                ("candidates", format!("[{item}]")),
+                ("class", class.to_owned()),
+                ("policy", policy.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
 }

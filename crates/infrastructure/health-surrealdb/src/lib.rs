@@ -63,5 +63,5 @@ pub use store::{SharedRegistry, SurrealStore, SurrealTx};
 pub use sync::{
     ConflictRecord, DOWN_GLOBAL, LEDGERS, Outgoing, Resolution, SNAPSHOT_PAGE, STOCK_LEDGER,
     SnapshotPart, SurrealAuthority, SurrealReplica, SyncScope, TransferMatch, TransferRefused,
-    UP_GLOBAL, class_of,
+    UP_GLOBAL, WORKFLOW_CANDIDATES, class_of,
 };

@@ -1706,6 +1706,15 @@ DEFINE TABLE value_set_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON value_set_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON value_set_history TYPE int PERMISSIONS FULL
   DEFINE INDEX value_set_history_last_updated ON value_set_history FIELDS last_updated, version_seq
+DEFINE TABLE workflow_candidate TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON workflow_candidate TYPE string PERMISSIONS FULL
+  DEFINE FIELD instance ON workflow_candidate TYPE string PERMISSIONS FULL
+  DEFINE FIELD item ON workflow_candidate TYPE string PERMISSIONS FULL
+  DEFINE FIELD peer ON workflow_candidate TYPE string PERMISSIONS FULL
+  DEFINE FIELD reason ON workflow_candidate TYPE none | string PERMISSIONS FULL
+  DEFINE FIELD received_at ON workflow_candidate TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD status ON workflow_candidate TYPE string ASSERT $value INSIDE ['pending', 'applied', 'conflict'] PERMISSIONS FULL
+  DEFINE INDEX workflow_candidate_status ON workflow_candidate FIELDS status, received_at
 DEFINE TABLE workflow_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON workflow_history TYPE string READONLY PERMISSIONS FULL
   DEFINE FIELD instance ON workflow_history TYPE string READONLY PERMISSIONS FULL

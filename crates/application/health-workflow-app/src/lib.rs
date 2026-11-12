@@ -353,12 +353,22 @@ where
         if !record.state.running {
             return Err(WorkflowError::Ended(instance.to_owned()));
         }
+        let before = record.clone();
         let Some(next) = self
             .advance(&mut tx, record, event, actor, op_id, now)
             .await?
         else {
             return Err(WorkflowError::NotEnabled(event.name.clone()));
         };
+        // On a replica, away from the instance's authority, the move is a candidate the
+        // authority judges when it arrives (#100).
+        if next.authority != self.authority {
+            let candidate =
+                sync::Candidate::of(&before, &next, event.clone(), actor, op_id, &self.authority);
+            let json = serde_json::to_string(&candidate)
+                .map_err(|e| WorkflowError::Store(e.to_string()))?;
+            tx.send_candidate(&next.id, &json).await?;
+        }
         tx.commit().await?;
         Ok(Outcome::Applied(next))
     }
