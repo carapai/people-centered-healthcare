@@ -173,7 +173,13 @@ mod tests {
                 }
             }
         });
-        let stopped = tokio::time::timeout(Duration::from_millis(300), supervisor.failed()).await;
+        // Until the third run, however slow the machine (a busy Windows runner took over 300 ms):
+        // then the node must still be running.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while runs.load(Ordering::SeqCst) < 3 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let stopped = tokio::time::timeout(Duration::from_millis(100), supervisor.failed()).await;
         assert!(stopped.is_err(), "a recovering task never stops the node");
         assert_eq!(runs.load(Ordering::SeqCst), 3);
         assert_eq!(supervisor.restarts().recent(), vec![("flaky", 2)]);
