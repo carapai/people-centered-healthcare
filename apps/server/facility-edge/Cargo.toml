@@ -22,10 +22,6 @@ health-provisioning = { workspace = true }
 health-observability = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
-http-body-util = { workspace = true }
-hyper = { workspace = true }
-hyper-rustls = { workspace = true }
-hyper-util = { workspace = true }
 p256 = { workspace = true }
 rand_core = { workspace = true }
 rustls = { workspace = true }

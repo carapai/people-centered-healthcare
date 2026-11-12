@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use health_edge_runtime::EdgeConfig;
 use health_node_identity::encryption::{Exemption, Gate, gate, probe, system_root};
 use health_node_identity::keystore::Keystore;
-use health_pki::{Authority, KeyPair, Tier, Trust, new_key, request};
+use health_pki::{Authority, KeyPair, Tier, new_key, request};
 use health_time::Timestamp;
 
 /// The facility intermediate's key in the keystore; the unit's `LoadCredentialEncrypted=`
@@ -198,40 +198,18 @@ fn online(config: &EdgeConfig, keystore: &Keystore, args: &[String]) -> Result<(
     let csr = request(&key, "facility-edge").map_err(|e| e.to_string())?;
 
     // 3. Central.
-    let url = format!("{central}/api/provisioning/nodes");
-    let (status, answer) = crate::central::post_json(
-        &url,
-        &serde_json::json!({ "code": code, "request": csr, "encrypted": encrypted }),
-        central_ca.as_deref(),
+    use health_edge_runtime::sync::provisioning::{RedeemError, redeem};
+    let redeemed = redeem(&central, &code, &csr, encrypted, central_ca.as_deref()).map_err(
+        |error| match error {
+            RedeemError::Refused(_) => Failure::Refused(error.to_string()),
+            RedeemError::Code(_) | RedeemError::Failed(_) => Failure::Failed(error.to_string()),
+        },
     )?;
-    let detail = || answer["detail"].as_str().unwrap_or("").to_owned();
-    match status {
-        201 => {}
-        422 => return Err(Failure::Refused(format!("central refused: {}", detail()))),
-        403 => {
-            return Err(Failure::Failed(format!(
-                "central refused the code: {}",
-                detail()
-            )));
-        }
-        status => {
-            return Err(Failure::Failed(format!(
-                "central answered {status}: {}",
-                answer["error"].as_str().unwrap_or("no reason")
-            )));
-        }
-    }
-    let field = |name: &str| {
-        answer[name]
-            .as_str()
-            .map(str::to_owned)
-            .ok_or_else(|| format!("central's answer has no {name}"))
-    };
     let (node_id, short_code, facility, chain) = (
-        field("node_id")?,
-        field("short_code")?,
-        field("facility")?,
-        field("chain")?,
+        redeemed.node_id,
+        redeemed.short_code,
+        redeemed.facility,
+        redeemed.chain,
     );
 
     // 4. The chain, checked as `install` checks it, for the node ID central gave.
@@ -322,26 +300,9 @@ fn install_pem(
     root_pem: &str,
     node_id: &str,
 ) -> Result<(), String> {
-    let authority = authority(keystore, chain_pem)?;
-    // The chain must serve: a leaf it issues for the node's name verifies against the root.
-    let name = format!("{node_id}.local");
-    let leaf = authority
-        .issue_server(
-            &new_key().map_err(|e| e.to_string())?,
-            std::slice::from_ref(&name),
-            &[],
-            Timestamp::now(),
-        )
-        .map_err(|e| format!("the intermediate cannot certify {name}: {e}"))?;
-    Trust::new(root_pem)
-        .and_then(|trust| {
-            trust.verify_server(
-                &format!("{}{chain_pem}", leaf.pem()),
-                &name,
-                Timestamp::now(),
-            )
-        })
-        .map_err(|e| format!("the chain does not verify against the root: {e}"))?;
+    let key = sealed_key(keystore)?;
+    let authority =
+        health_edge_runtime::sync::provisioning::verify_chain(chain_pem, &key, root_pem, node_id)?;
     std::fs::create_dir_all(&config.pki_dir).map_err(|e| e.to_string())?;
     replace(&config.pki_dir.join(ROOT), root_pem)?;
     replace(&config.pki_dir.join(CHAIN), chain_pem)?;
@@ -352,14 +313,19 @@ fn install_pem(
     Ok(())
 }
 
-/// The facility intermediate, from the chain's first certificate and the sealed key.
-fn authority(keystore: &Keystore, chain_pem: &str) -> Result<Authority, String> {
+/// The facility intermediate's key, as sealed at `provision request`.
+fn sealed_key(keystore: &Keystore) -> Result<String, String> {
     let key = keystore
         .unseal(KEY)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("{KEY} is not sealed: run `provision request` first"))?;
-    let key = String::from_utf8(key).map_err(|_| format!("{KEY} is not PEM"))?;
-    let authority = Authority::from_pem(chain_pem, &key).map_err(|e| e.to_string())?;
+    String::from_utf8(key).map_err(|_| format!("{KEY} is not PEM"))
+}
+
+/// The facility intermediate, from the chain's first certificate and the sealed key.
+fn authority(keystore: &Keystore, chain_pem: &str) -> Result<Authority, String> {
+    let authority =
+        Authority::from_pem(chain_pem, &sealed_key(keystore)?).map_err(|e| e.to_string())?;
     if authority.tier() != Tier::Facility {
         return Err("the chain's first certificate is not a facility intermediate".into());
     }
