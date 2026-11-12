@@ -50,10 +50,20 @@ impl Api {
             DeviceConfig::new(config.origins.clone(), config.node_id.clone()),
             Arc::clone(&clock),
         );
+        // Authority Leases over outreach stores, granted here to enrolled desktops (#135).
+        let leases = crate::leases::Leases::new(
+            SurrealStore::new(connection.clone(), Arc::clone(&clock)),
+            store.clone(),
+            Arc::clone(&clock),
+            config.node_id.clone(),
+        );
+        leases.spawn_freezer();
         let mut api = gate
             .enrollment_router()
             .merge(admin::local_only(gate.admin_router()))
-            .merge(gate.device_router());
+            .merge(admin::local_only(leases.admin_router()))
+            .merge(gate.device_router())
+            .merge(leases.device_router(&gate));
         // The desktops under this edge sync with it, as it does with central (#133).
         if let Some(facility) = &config.facility {
             let data = SurrealStore::new(connection.clone(), Arc::clone(&clock));
@@ -258,6 +268,8 @@ mod tests {
             "/api/admin/devices".to_owned(),
             format!("/api/admin/devices/{id}/revoke"),
             "/api/admin/provision/accounts".to_owned(),
+            "/api/admin/leases".to_owned(),
+            format!("/api/admin/leases/{id}/recover"),
         ];
         // An enrolled device first.
         let gated = [
@@ -284,6 +296,8 @@ mod tests {
             "/sync/v1/snapshot".to_owned(),
             "/sync/v1/events".to_owned(),
             "/api/desktop/accounts".to_owned(),
+            "/api/device/leases".to_owned(),
+            format!("/api/device/leases/{id}/return"),
         ];
         let lan = "192.168.1.20:5000";
         let mut problems = Vec::new();
@@ -472,5 +486,119 @@ mod tests {
                 .is_some_and(|b| b.split('.').count() == 3)
         );
         assert_eq!(accounts["snapshot_keys"].as_array().map(Vec::len), Some(1));
+    }
+
+    /// An Authority Lease over the edge's API (#135): the admin, on this machine only, grants an
+    /// enrolled desktop an outreach store; the desktop sees it and returns it once its outbox has
+    /// drained; a store is under one lease at a time, and only a frozen lease is recovered.
+    #[tokio::test]
+    async fn an_outreach_store_is_leased_to_a_desktop_and_returned_once_drained() {
+        let (_dir, api) = signed_in_edge().await;
+        let lan = "192.168.1.20:5000";
+        let console = "127.0.0.1:1";
+        let desktop = p256::ecdsa::SigningKey::from_bytes(&[7; 32].into()).expect("key");
+        let (_, request) = call(
+            &api,
+            lan,
+            "POST",
+            "/api/enrollment",
+            Some(&desktop),
+            serde_json::json!({ "label": "Outreach laptop" }),
+        )
+        .await;
+        let (_, device) = call(
+            &api,
+            console,
+            "POST",
+            "/api/admin/enrollments/approve",
+            None,
+            serde_json::json!({ "code": request["code"], "name": "Outreach", "location": "OPD" }),
+        )
+        .await;
+        let holder = device["id"].as_str().expect("id").to_owned();
+        let grant = serde_json::json!({
+            "holder": holder, "stores": ["Location/outreach-bag"], "hours": 8,
+        });
+
+        let (status, _) = call(&api, lan, "POST", "/api/admin/leases", None, grant.clone()).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "this machine only");
+        let (status, lease) = call(
+            &api,
+            console,
+            "POST",
+            "/api/admin/leases",
+            None,
+            grant.clone(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{lease}");
+        assert_eq!(lease["state"]["state"], "active");
+        let (status, _) = call(&api, console, "POST", "/api/admin/leases", None, grant).await;
+        assert_eq!(status, StatusCode::CONFLICT, "one lease per store");
+        let (status, _) = call(
+            &api,
+            console,
+            "POST",
+            "/api/admin/leases",
+            None,
+            serde_json::json!({ "holder": uuid::Uuid::now_v7().to_string(), "stores": ["Location/other"], "hours": 8 }),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "not an enrolled device"
+        );
+
+        // The holder sees it.
+        let (status, held) = call(
+            &api,
+            lan,
+            "GET",
+            "/api/device/leases",
+            Some(&desktop),
+            serde_json::Value::Null,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(held.as_array().map(Vec::len), Some(1));
+        let id = lease["id"].as_str().expect("id");
+
+        // Not frozen: no recovery.
+        let (status, body) = call(
+            &api,
+            console,
+            "POST",
+            &format!("/api/admin/leases/{id}/recover"),
+            None,
+            serde_json::json!({ "reason": "laptop lost" }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+
+        // Returned in two steps: asked, then acknowledged once drained.
+        let path = format!("/api/device/leases/{id}/return");
+        let (status, returning) = call(
+            &api,
+            lan,
+            "POST",
+            &path,
+            Some(&desktop),
+            serde_json::json!({ "drained": false }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{returning}");
+        assert_eq!(returning["state"]["state"], "returning");
+        let (status, returned) = call(
+            &api,
+            lan,
+            "POST",
+            &path,
+            Some(&desktop),
+            serde_json::json!({ "drained": true }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{returned}");
+        assert_eq!(returned["state"]["state"], "returned");
     }
 }
