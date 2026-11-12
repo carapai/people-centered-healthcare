@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod encryption;
+mod provision;
 
 use axum::Router;
 use axum::routing::get;
@@ -141,7 +142,52 @@ async fn open() -> Result<Api, String> {
     })
 }
 
+/// Provisions this machine against central, with the volumes' encryption reported to it.
+fn provision_here(args: &[String]) -> Result<health_sync_client::provisioning::Redeemed, String> {
+    let args = provision::Args::parse(args)?;
+    let dir = data_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("cannot create the data directory {}: {e}", dir.display()))?;
+    let state = health_node_identity::encryption::probe(
+        &health_node_identity::encryption::system_root(),
+        &dir,
+        health_time::Timestamp::now(),
+    );
+    let report = encryption::Report::of(state, encryption::Policy::Warn);
+    if !report.encrypted {
+        eprintln!(
+            "health-desktop: not encrypted ({}); central accepts this only under an exemption on \
+             the code",
+            report.shortfalls.join("; ")
+        );
+    }
+    provision::provision(
+        &args,
+        &dir,
+        &OsKeystore,
+        report.encrypted,
+        health_sync_client::provisioning::redeem,
+    )
+}
+
 fn main() -> std::process::ExitCode {
+    // `health-desktop provision …`: once, by an admin, before the client is used (#134).
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("provision") {
+        return match provision_here(&args[1..]) {
+            Ok(redeemed) => {
+                eprintln!(
+                    "health-desktop: provisioned as {} ({}) at {}",
+                    redeemed.short_code, redeemed.node_id, redeemed.facility
+                );
+                std::process::ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("health-desktop: {e}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     // SurrealDB 4 needs a larger stack than Tokio's default (`health_surrealdb::THREAD_STACK`),
     // so Tauri runs on this runtime.
     let runtime = match tokio::runtime::Builder::new_multi_thread()
