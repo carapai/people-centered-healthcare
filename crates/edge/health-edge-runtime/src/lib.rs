@@ -33,7 +33,8 @@ mod node;
 mod notify;
 pub mod seed;
 mod supervisor;
-pub mod sync;
+/// The node's sync with central: `health-sync-client`, shared with the standalone desktop (#134).
+pub use health_sync_client as sync;
 mod tls;
 pub mod update;
 mod ups;

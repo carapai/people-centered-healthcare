@@ -36,11 +36,8 @@ health-registries-app = { workspace = true }
 health-identifiers = { workspace = true }
 health-inventory = { workspace = true }
 health-provisioning = { workspace = true }
+health-sync-client = { workspace = true }
 health-sync-protocol = { workspace = true }
-http-body-util = { workspace = true }
-hyper = { workspace = true }
-hyper-rustls = { workspace = true }
-hyper-util = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded"] }
 health-time = { workspace = true }
 if-addrs = { workspace = true }
@@ -49,7 +46,6 @@ p256 = { workspace = true, features = ["pkcs8", "pem"] }
 reqwest = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
-futures-util = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
