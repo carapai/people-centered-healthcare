@@ -42,7 +42,7 @@ pub mod fhir;
 pub mod gates;
 pub mod sync;
 pub mod tasks;
-mod timers;
+pub mod timers;
 
 pub use gates::GatePort;
 pub use sync::{Candidate, Judged};
