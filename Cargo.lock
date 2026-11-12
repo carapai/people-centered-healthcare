@@ -2579,7 +2579,6 @@ dependencies = [
  "axum",
  "flate2",
  "fs4",
- "futures-util",
  "health-access-policy",
  "health-activation",
  "health-audit",
@@ -2601,13 +2600,10 @@ dependencies = [
  "health-provisioning",
  "health-registries-app",
  "health-surrealdb",
+ "health-sync-client",
  "health-sync-protocol",
  "health-sync-server",
  "health-time",
- "http-body-util",
- "hyper",
- "hyper-rustls",
- "hyper-util",
  "if-addrs",
  "mdns-sd",
  "p256",
@@ -3326,6 +3322,33 @@ dependencies = [
  "surrealdb",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "health-sync-client"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "health-activation",
+ "health-files",
+ "health-identifiers",
+ "health-inventory",
+ "health-persistence",
+ "health-provisioning",
+ "health-surrealdb",
+ "health-sync-protocol",
+ "health-time",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "p256",
+ "rustls",
+ "rustls-pki-types",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

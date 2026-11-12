@@ -977,6 +977,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#134, part 1: the sync client is shared (2026-11-12).**
+  - **What:** the edge's sync client moved out of `health-edge-runtime` into a new infrastructure crate, `health-sync-client`, so the standalone desktop can sync with central too. A runtime library may not depend on another. `health_edge_runtime::sync` re-exports it, so the edge and its tests are unchanged.
+  - **Tidied:** five HTTP dependencies the edge runtime no longer uses are dropped.
+  - **Next for #134:** provisioning a desktop with a one-time code, its node certificate, seeding over the network or from USB, facility-scope authority, and hourly backups.
 - **#132, part 1: the desktop runtime's IPC dispatch (2026-11-11).**
   - **What:** a new crate, `health-desktop-runtime` (runtime layer):
     - `ipc::dispatch` takes the envelope the client's `TauriIpcTransport` sends and answers through the shared router with `tower` `oneshot`. Bodies cross as text so decimals stay lossless, query pairs keep their order, and only origin-relative paths are dispatched.
