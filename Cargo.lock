@@ -2590,6 +2590,7 @@ dependencies = [
  "health-activation",
  "health-audit",
  "health-auth",
+ "health-authority-leases",
  "health-backup",
  "health-client-registry",
  "health-configuration",

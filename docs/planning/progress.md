@@ -982,6 +982,23 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#135, part 3: the edge's lease routes (2026-11-12).**
+  - **What:**
+    - **Admin routes (this machine only):** `GET` and `POST /api/admin/leases`, and `POST /api/admin/leases/{id}/recover`. A grant needs an enrolled, active device as holder; overlapping grants are refused (409). Recovery works on a frozen lease only, with a reason.
+    - **Holder routes (behind the device gate):** `GET /api/device/leases` lists the holder's leases. `POST /api/device/leases/{id}/return` starts a return, and with `drained: true` the edge acknowledges it.
+    - **Audit:** grants, completed returns and recoveries commit with their AuditEvent.
+    - **Freeze:** a task freezes expired, unreturned leases every minute and raises `lease-frozen`.
+  - **Tested:**
+    - **Through the edge's API:**
+      - a grant from the LAN is refused (403), and from this machine it is created;
+      - a second grant on the same store is refused (409);
+      - a holder that isn't enrolled is refused (422);
+      - the desktop sees its lease;
+      - recovery of an active lease is refused;
+      - the return goes returning, then returned once drained.
+    - **With a fixed clock:** a lease freezes once, past its expiry, and is recovered with its audit.
+    - **The LAN-surface test:** the new routes are gated or this-machine-only.
+  - **Next:** the desktop keeping its leases from the edge and returning them after a drained round.
 - **#135, part 2: leases on the stock ledger (2026-11-12).**
   - **What:**
     - Leases are stored in `authority_lease` (migration `0053_authority_leases`). An edge keeps the leases it granted; a desktop keeps the ones it holds.

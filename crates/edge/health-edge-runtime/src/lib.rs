@@ -29,6 +29,7 @@ pub use health_backup::node as backup;
 mod config;
 mod discovery;
 mod enrollment;
+mod leases;
 mod node;
 mod notify;
 /// Seeding from removable media: `health-sync-client`'s, shared with the standalone desktop.

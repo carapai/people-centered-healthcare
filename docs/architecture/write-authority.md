@@ -101,7 +101,11 @@ stateDiagram-v2
     - while a lease the node granted holds the store, the node is refused;
     - under a lease the node holds, it may write only while that lease is active and unexpired.
   - Pushed stock operations on a store under a lease the edge granted are taken from the holder alone; another desktop's are rejected. Once the lease is returned or recovered, the store is the edge's again, and the holder's late operations are appended as any late operation is.
-  - Still to come: the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **In code (#135, part 3): the edge's lease routes** (`health-edge-runtime::leases`).
+  - `GET` / `POST /api/admin/leases` and `POST /api/admin/leases/{id}/recover` answer this machine only. A grant needs an enrolled, active device as holder, and overlapping grants are refused (409). Recovery needs a reason and works on a frozen lease only.
+  - `GET /api/device/leases` (the holder's leases, frozen as of now if expired) and `POST /api/device/leases/{id}/return` sit behind the device gate. A return with `drained: false` starts it, so the holder writes no more. With `drained: true`, the edge acknowledges and holds the store again.
+  - Every grant, completed return and recovery commits with its AuditEvent. A task checks every minute and freezes leases that expired unreturned, raising `alert = "lease-frozen"`.
+  - Still to come: the desktop keeping its leases from the edge and returning them after a drained round.
 
 ## Validation on ingest
 
