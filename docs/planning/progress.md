@@ -969,6 +969,10 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
   - **Resolution:** the store resolves a record with a new version on the head (or keeps the head) and records who resolved it. The resolution syncs down.
   - **Ageing:** central alerts hourly on records open for more than 7 days.
   - **Next:** the review queue's API and screen, with the conflict-resolution permission.
+- **#134, part 1: the sync client is shared (2026-11-12).**
+  - **What:** the edge's sync client moved out of `health-edge-runtime` into a new infrastructure crate, `health-sync-client`, so the standalone desktop can sync with central too. A runtime library may not depend on another. `health_edge_runtime::sync` re-exports it, so the edge and its tests are unchanged.
+  - **Tidied:** five HTTP dependencies the edge runtime no longer uses are dropped.
+  - **Next for #134:** provisioning a desktop with a one-time code, its node certificate, seeding over the network or from USB, facility-scope authority, and hourly backups.
 - **#132, part 1: the desktop runtime's IPC dispatch (2026-11-11).**
   - **What:** a new crate, `health-desktop-runtime` (runtime layer):
     - `ipc::dispatch` takes the envelope the client's `TauriIpcTransport` sends and answers through the shared router with `tower` `oneshot`. Bodies cross as text so decimals stay lossless, query pairs keep their order, and only origin-relative paths are dispatched.

@@ -1,4 +1,5 @@
-//! The edge's sync with central (#81; synchronization.md § Session, § Wake-up; ADR 0062).
+//! A node's sync with its upstream over `/sync/v1` (#81; synchronization.md § Session, § Wake-up;
+//! ADR 0062): the edge's with central, and a standalone desktop's in mode B (#134).
 //!
 //! A round:
 //! 1. **Handshake.** The node says hello and learns central's node id and verdict. Central is
@@ -14,7 +15,7 @@
 //! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
 //! 6. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
-//! 7. **Activation.** With an [`Activator`](crate::activation::Activator), the node stages the
+//! 7. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
 //!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
 //!    does not have yet go up to `/sync/v1/activation-reports`.
@@ -102,7 +103,7 @@ pub struct Round {
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
     /// The package switch, or failed activation, this round brought (#89).
-    pub activation: Option<crate::activation::Outcome>,
+    pub activation: Option<health_activation::Outcome>,
 }
 
 type Https = hyper_rustls::HttpsConnector<HttpConnector>;
@@ -116,7 +117,7 @@ pub struct Sync {
     client: Client<Https, Full<VecDeque<u8>>>,
     software: SoftwareVersion,
     blobs: Option<health_files::FsBlobStore>,
-    activator: Option<crate::activation::Activator>,
+    activator: Option<health_activation::Activator>,
 }
 
 fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
@@ -167,7 +168,7 @@ impl Sync {
 
     /// Stages and activates the packages the activation records want after each round (#89).
     #[must_use]
-    pub fn with_activator(mut self, activator: crate::activation::Activator) -> Self {
+    pub fn with_activator(mut self, activator: health_activation::Activator) -> Self {
         self.activator = Some(activator);
         self
     }
@@ -523,7 +524,7 @@ impl Sync {
             }
         }
         if let Some(activator) = &self.activator {
-            round.activation = crate::activation::activate(
+            round.activation = health_activation::activate(
                 &self.store,
                 self.blobs.as_ref(),
                 activator,

@@ -1,0 +1,36 @@
+[package]
+name = "health-sync-client"
+description = "A node's sync with its upstream over /sync/v1 (synchronization.md; ADR 0062): handshake, push, attachments, pull, re-seed and activation, shared by the edge and the standalone desktop."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+futures-util = { workspace = true }
+health-activation = { workspace = true }
+health-files = { workspace = true }
+health-identifiers = { workspace = true }
+health-inventory = { workspace = true }
+health-persistence = { workspace = true }
+health-provisioning = { workspace = true }
+health-surrealdb = { workspace = true }
+health-sync-protocol = { workspace = true }
+health-time = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true }
+hyper-util = { workspace = true }
+p256 = { workspace = true, features = ["pkcs8", "pem"] }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true }
