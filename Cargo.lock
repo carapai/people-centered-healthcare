@@ -2589,6 +2589,7 @@ dependencies = [
  "health-identifiers",
  "health-identity",
  "health-inventory",
+ "health-node-api",
  "health-observability",
  "health-packages",
  "health-persistence",
@@ -2948,6 +2949,25 @@ dependencies = [
  "surrealdb",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "health-node-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "health-access-policy",
+ "health-audit",
+ "health-auth",
+ "health-client-registry",
+ "health-fhir-search",
+ "health-fhir-server",
+ "health-identifiers",
+ "health-registries-app",
+ "health-surrealdb",
+ "health-time",
+ "tower",
+ "tracing",
 ]
 
 [[package]]

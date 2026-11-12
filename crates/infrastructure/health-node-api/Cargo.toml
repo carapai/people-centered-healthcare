@@ -1,0 +1,28 @@
+[package]
+name = "health-node-api"
+description = "The clinical API a node serves over its own store, under central's rules from the provisioning bundle: FHIR, reception, consultation and notes. Shared by the edge and the standalone desktop."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "infrastructure"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { workspace = true }
+health-access-policy = { workspace = true }
+health-audit = { workspace = true }
+health-auth = { workspace = true }
+health-client-registry = { workspace = true }
+health-fhir-search = { workspace = true }
+health-fhir-server = { workspace = true }
+health-identifiers = { workspace = true }
+health-registries-app = { workspace = true }
+health-surrealdb = { workspace = true }
+health-time = { workspace = true }
+tower = { workspace = true }
+tracing = { workspace = true }
