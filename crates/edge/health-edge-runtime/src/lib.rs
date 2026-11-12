@@ -31,7 +31,8 @@ mod discovery;
 mod enrollment;
 mod node;
 mod notify;
-pub mod seed;
+/// Seeding from removable media: `health-sync-client`'s, shared with the standalone desktop.
+pub use health_sync_client::seed;
 mod supervisor;
 /// The node's sync with central: `health-sync-client`, shared with the standalone desktop (#134).
 pub use health_sync_client as sync;

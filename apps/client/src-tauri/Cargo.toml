@@ -17,7 +17,11 @@ layer = "runtime"
 
 [dependencies]
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
+health-activation = { path = "../../../crates/infrastructure/health-activation" }
+health-configuration = { path = "../../../crates/domains/health-configuration" }
 health-desktop-runtime = { path = "../../../crates/desktop/health-desktop-runtime" }
+health-fhir-server = { path = "../../../crates/infrastructure/health-fhir-server" }
+health-files = { path = "../../../crates/infrastructure/health-files" }
 health-http = { path = "../../../crates/infrastructure/health-http" }
 health-node-identity = { path = "../../../crates/edge/health-node-identity" }
 health-pki = { path = "../../../crates/infrastructure/health-pki" }
@@ -25,6 +29,7 @@ health-sync-client = { path = "../../../crates/infrastructure/health-sync-client
 health-surrealdb = { path = "../../../crates/infrastructure/health-surrealdb", features = ["embedded"] }
 health-time = { path = "../../../crates/foundation/health-time" }
 keyring = "=4.2.0"
+p256 = { version = "0.13.2", features = ["ecdsa", "jwk", "pkcs8", "pem"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tauri = { version = "=2.12.5", default-features = false, features = ["wry", "compression"] }

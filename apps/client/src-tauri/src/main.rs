@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod encryption;
+mod node;
 mod provision;
 
 use axum::Router;
@@ -82,6 +83,23 @@ fn data_dir() -> PathBuf {
     )
 }
 
+/// The embedded store in `dir`, opened and migrated.
+async fn connect(dir: &std::path::Path) -> Result<Connection, String> {
+    let connection = Connection::open(&Settings {
+        target: Target::SurrealKv {
+            path: dir.join("store"),
+        },
+        namespace: "ug".into(),
+        database: "main".into(),
+    })
+    .await
+    .map_err(|e| format!("cannot open the store in {}: {e}", dir.display()))?;
+    migrate(&connection, MIGRATIONS)
+        .await
+        .map_err(|e| format!("cannot migrate the store: {e:?}"))?;
+    Ok(connection)
+}
+
 /// Opens and migrates the embedded store, and builds the router over it.
 async fn open() -> Result<Api, String> {
     // No keystore, no client (desktop-client.md § Secrets): there is no file fallback.
@@ -116,18 +134,19 @@ async fn open() -> Result<Api, String> {
             report.shortfalls.join("; ")
         );
     }
-    let connection = Connection::open(&Settings {
-        target: Target::SurrealKv {
-            path: dir.join("store"),
-        },
-        namespace: "ug".into(),
-        database: "main".into(),
-    })
-    .await
-    .map_err(|e| format!("cannot open the store in {}: {e}", dir.display()))?;
-    migrate(&connection, MIGRATIONS)
-        .await
-        .map_err(|e| format!("cannot migrate the store: {e:?}"))?;
+    let connection = connect(&dir).await?;
+    // Once provisioned, the desktop syncs with central for its facility (#134).
+    match node::sync(connection.clone(), &dir, &OsKeystore) {
+        Ok(Some(sync)) => {
+            tokio::spawn(async move {
+                if let Err(e) = sync.run(node::interval()).await {
+                    eprintln!("health-desktop: sync stopped: {e}");
+                }
+            });
+        }
+        Ok(None) => eprintln!("health-desktop: not provisioned: no sync with central"),
+        Err(e) => eprintln!("health-desktop: cannot sync with central: {e}"),
+    }
     let readiness = Readiness::new(Vec::new());
     let report = Arc::new(report);
     let desktop = Router::new().route(
@@ -202,6 +221,27 @@ fn main() -> std::process::ExitCode {
         }
     };
     tauri::async_runtime::set(runtime.handle().clone());
+    // `health-desktop seed import <file>`: with the client closed, since the store is locked.
+    if let [seed, import, file] = args.as_slice()
+        && seed == "seed"
+        && import == "import"
+    {
+        let dir = data_dir();
+        let seeded = runtime.block_on(async {
+            let connection = connect(&dir).await?;
+            node::seed_import(connection, &dir, std::path::Path::new(file)).await
+        });
+        return match seeded {
+            Ok(applied) => {
+                eprintln!("health-desktop: seeded {applied} records; sync resumes after the seed");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("health-desktop: {e}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     let api = match runtime.block_on(open()) {
         Ok(api) => api,
         Err(e) => {

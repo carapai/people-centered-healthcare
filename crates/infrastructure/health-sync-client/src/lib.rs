@@ -27,6 +27,7 @@
 
 pub mod central;
 pub mod provisioning;
+pub mod seed;
 
 use std::collections::VecDeque;
 use std::path::Path;

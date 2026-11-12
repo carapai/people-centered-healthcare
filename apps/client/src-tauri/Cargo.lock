@@ -485,6 +485,7 @@ checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
  "axum-core",
  "bytes",
+ "form_urlencoded",
  "futures-util",
  "http",
  "http-body",
@@ -500,6 +501,7 @@ dependencies = [
  "serde_core",
  "serde_json",
  "serde_path_to_error",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tower",
@@ -1788,6 +1790,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "document-features"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
+dependencies = [
+ "litrs",
+]
+
+[[package]]
 name = "dom_query"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1998,6 +2009,26 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "enum-iterator"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4549325971814bda7a44061bf3fe7e487d447cba01e4220a4b454d630d7a016"
+dependencies = [
+ "enum-iterator-derive",
+]
+
+[[package]]
+name = "enum-iterator-derive"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "685adfa4d6f3d765a26bc5dbc936577de9abf756c1feeb3089b01dd395034842"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "enumflags2"
@@ -2941,6 +2972,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-care-journeys"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "health-care-journeys-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-care-journeys",
+ "serde_json",
+]
+
+[[package]]
+name = "health-care-plans"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-care-plans-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-care-plans",
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-client-registry"
 version = "0.1.0"
 dependencies = [
@@ -3008,7 +3077,11 @@ name = "health-desktop"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "health-activation",
+ "health-configuration",
  "health-desktop-runtime",
+ "health-fhir-server",
+ "health-files",
  "health-http",
  "health-node-identity",
  "health-pki",
@@ -3016,6 +3089,7 @@ dependencies = [
  "health-sync-client",
  "health-time",
  "keyring",
+ "p256",
  "serde",
  "serde_json",
  "tauri",
@@ -3049,6 +3123,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-encounters-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-encounters",
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-fhir-extraction"
 version = "0.1.0"
 dependencies = [
@@ -3068,6 +3155,64 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "unicode-normalization",
+]
+
+[[package]]
+name = "health-fhir-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "form_urlencoded",
+ "health-access-policy",
+ "health-audit",
+ "health-care-journeys-app",
+ "health-care-plans",
+ "health-care-plans-app",
+ "health-client-registry",
+ "health-clinical-documentation",
+ "health-clinical-documentation-app",
+ "health-encounters",
+ "health-encounters-app",
+ "health-fhir-extraction",
+ "health-fhir-search",
+ "health-fhir-validation",
+ "health-financial-ledger",
+ "health-identifiers",
+ "health-identity-app",
+ "health-inventory",
+ "health-inventory-app",
+ "health-laboratory",
+ "health-laboratory-app",
+ "health-medications",
+ "health-medications-app",
+ "health-patient-engagement",
+ "health-patient-engagement-app",
+ "health-patient-flow",
+ "health-patient-flow-app",
+ "health-payments",
+ "health-payments-app",
+ "health-persistence",
+ "health-pricing",
+ "health-pricing-app",
+ "health-product-registry",
+ "health-product-registry-app",
+ "health-programs",
+ "health-programs-app",
+ "health-registries-app",
+ "health-shared-record-app",
+ "health-surrealdb",
+ "health-terminology",
+ "health-time",
+ "health-workflow",
+ "health-workflow-app",
+ "jiff",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3137,6 +3282,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-identity-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-consent",
+ "health-fhir-search",
+ "health-identifiers",
+ "health-identity",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-inventory"
 version = "0.1.0"
 dependencies = [
@@ -3175,6 +3335,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-laboratory-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-identifiers",
+ "health-laboratory",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-medications"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-medications-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-identifiers",
+ "health-medications",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-node-identity"
 version = "0.1.0"
 dependencies = [
@@ -3207,6 +3402,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-patient-engagement"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-patient-engagement-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-client-registry",
+ "health-identifiers",
+ "health-patient-engagement",
+ "health-persistence",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-patient-flow"
 version = "0.1.0"
 dependencies = [
@@ -3218,6 +3434,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-patient-flow-app"
+version = "0.1.0"
+dependencies = [
+ "health-encounters",
+ "health-patient-flow",
+ "health-persistence",
+ "health-time",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-payments"
 version = "0.1.0"
 dependencies = [
@@ -3225,6 +3452,20 @@ dependencies = [
  "health-time",
  "rust_decimal",
  "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-payments-app"
+version = "0.1.0"
+dependencies = [
+ "health-financial-ledger",
+ "health-identifiers",
+ "health-payments",
+ "health-persistence",
+ "health-time",
+ "jiff",
+ "rust_decimal",
  "thiserror 2.0.21",
 ]
 
@@ -3267,6 +3508,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-pricing-app"
+version = "0.1.0"
+dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-pricing",
+ "health-time",
+ "rust_decimal",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "health-product-registry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-product-registry-app"
+version = "0.1.0"
+dependencies = [
+ "health-identifiers",
+ "health-persistence",
+ "health-product-registry",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-programs"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-programs-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-programs",
+ "health-time",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-provisioning"
 version = "0.1.0"
 dependencies = [
@@ -3287,6 +3584,35 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "health-registries-app"
+version = "0.1.0"
+dependencies = [
+ "health-client-registry",
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "rphonetic",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "health-shared-record"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "health-shared-record-app"
+version = "0.1.0"
+dependencies = [
+ "health-shared-record",
+ "serde_json",
 ]
 
 [[package]]
@@ -3335,6 +3661,7 @@ dependencies = [
  "health-files",
  "health-identifiers",
  "health-inventory",
+ "health-packages",
  "health-persistence",
  "health-pki",
  "health-provisioning",
@@ -3350,6 +3677,7 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -3399,6 +3727,21 @@ name = "health-workflow-actions"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "health-workflow-app"
+version = "0.1.0"
+dependencies = [
+ "health-billing-contract",
+ "health-identifiers",
+ "health-persistence",
+ "health-time",
+ "health-workflow",
+ "health-workflow-actions",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
 ]
 
 [[package]]
@@ -4343,6 +4686,12 @@ name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
+
+[[package]]
+name = "litrs"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 
 [[package]]
 name = "lock_api"
@@ -6383,6 +6732,21 @@ name = "robust"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e27ee8bb91ca0adcf0ecb116293afa12d393f9c2b9b9cd54d33e8078fe19839"
+
+[[package]]
+name = "rphonetic"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff25b017e5fc22fd7b340d08779112a2a2fe2f448a9fb53cb629258f342ee018"
+dependencies = [
+ "document-features",
+ "either",
+ "enum-iterator",
+ "nom 8.0.0",
+ "regex",
+ "serde",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "rsa"
