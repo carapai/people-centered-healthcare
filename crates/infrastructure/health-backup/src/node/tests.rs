@@ -38,7 +38,7 @@ async fn a_backup_is_verified_recorded_and_test_restored() {
     let backups = Backups::new(temp.path().join("backups"), "edge-1");
     let now = at("2026-11-01T10:00:00Z");
     let dir = backups.take(&db, &key(), now).await.expect("a backup");
-    health_backup::verify(&dir, &key()).expect("it verifies");
+    crate::verify(&dir, &key()).expect("it verifies");
     let status = backups.status();
     assert_eq!(status.last_attempt, Some(now));
     assert_eq!(
@@ -89,7 +89,7 @@ async fn a_failed_test_restore_is_recorded_for_the_alert() {
         .await
         .expect("a backup");
     assert!(backups.test(&other, now).await.is_err());
-    assert!(health_backup::verify(&dir, &key()).is_ok());
+    assert!(crate::verify(&dir, &key()).is_ok());
 }
 
 #[tokio::test]

@@ -23,7 +23,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use health_backup::{BackupError, BackupKey, Manifest};
+use crate::{BackupError, BackupKey, Manifest};
 use health_files::FsBlobStore;
 use health_surrealdb::{Connection, Settings, Target};
 use health_time::Timestamp;
@@ -58,7 +58,7 @@ pub struct KeyError;
 /// The node's backup key, from its file: 64 hex characters.
 pub fn read_key(path: &Path) -> Result<BackupKey, KeyError> {
     let text = fs::read_to_string(path).map_err(|_| KeyError)?;
-    let bytes = crate::update::hex(text.trim()).ok_or(KeyError)?;
+    let bytes = hex(text.trim()).ok_or(KeyError)?;
     let bytes: [u8; 32] = bytes.try_into().map_err(|_| KeyError)?;
     Ok(BackupKey::from_bytes(bytes))
 }
@@ -134,7 +134,7 @@ impl Backups {
         now: Timestamp,
     ) -> Result<PathBuf, BackupError> {
         fs::create_dir_all(&self.root)?;
-        match health_backup::create(db, None, &self.root, &self.node, key, now).await {
+        match crate::create(db, None, &self.root, &self.node, key, now).await {
             Ok(dir) => {
                 let backup = file_name(&dir);
                 tracing::info!(outcome = "backed-up", backup = %backup, "backup taken");
@@ -268,7 +268,7 @@ impl Backups {
     ) -> Result<(), BackupError> {
         let db = open_store(store, "restore", "test").await?;
         let blobs = FsBlobStore::open(store.with_file_name("files"))?;
-        health_backup::restore(&entry.dir, key, &db, Some(&blobs)).await?;
+        crate::restore(&entry.dir, key, &db, Some(&blobs)).await?;
         let migrations: Option<i64> = db
             .query("RETURN count(SELECT * FROM _migration)")
             .await
@@ -306,7 +306,7 @@ impl Backups {
                 copy_durably(&self.root.join("blobs").join(&name), &to)?;
             }
         }
-        health_backup::verify(&dir, key)?;
+        crate::verify(&dir, key)?;
         Ok(dir)
     }
 
@@ -321,18 +321,23 @@ impl Backups {
 
 /// The hourly backups and the weekly test restore, as one supervised task.
 #[derive(Debug, Clone)]
-pub(crate) struct Schedule {
-    pub(crate) backups: Backups,
-    pub(crate) key_file: PathBuf,
-    pub(crate) every: Duration,
-    pub(crate) test_every: Duration,
-    pub(crate) data_dir: PathBuf,
+pub struct Schedule {
+    /// Where the backups are kept, and their retention.
+    pub backups: Backups,
+    /// The backup key's file, read at each round so a rotated key is used at once.
+    pub key_file: PathBuf,
+    /// How often a backup is taken.
+    pub every: Duration,
+    /// How often the newest backup is test-restored.
+    pub test_every: Duration,
+    /// The node's data directory, whose attachments go with each backup.
+    pub data_dir: PathBuf,
 }
 
 impl Schedule {
     /// Runs until the node stops. A failure is recorded and alerted, never returned: a full
     /// backup drive must not stop clinical work.
-    pub(crate) async fn run(self, db: Connection) -> Result<(), String> {
+    pub async fn run(self, db: Connection) -> Result<(), String> {
         if let Err(error) = fs::create_dir_all(self.backups.root()) {
             tracing::error!(alert = "backup-failed", error.kind = %error, "no backup directory");
         }
@@ -350,7 +355,7 @@ impl Schedule {
     }
 
     /// One backup, and the test restore when one is due.
-    pub(crate) async fn round(&self, db: &Connection, now: Timestamp) {
+    pub async fn round(&self, db: &Connection, now: Timestamp) {
         let key = match read_key(&self.key_file) {
             Ok(key) => key,
             Err(error) => return self.backups.failed(now, &error),
@@ -407,7 +412,7 @@ pub async fn restore_into(
         )));
     }
     let db = open_store(data_dir, namespace, database).await?;
-    health_backup::restore(backup, key, &db, None).await
+    crate::restore(backup, key, &db, None).await
 }
 
 /// Removes a scratch store once its engine has let go of it: on Windows the store's files stay
@@ -461,3 +466,17 @@ fn same_volume(a: &Path, b: &Path) -> Option<bool> {
 
 #[cfg(test)]
 mod tests;
+
+/// `text` as hex bytes; `None` unless it is an even number of hex digits.
+fn hex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| {
+            text.get(i..i + 2)
+                .and_then(|h| u8::from_str_radix(h, 16).ok())
+        })
+        .collect()
+}
