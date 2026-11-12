@@ -3140,6 +3140,7 @@ dependencies = [
  "form_urlencoded",
  "health-activation",
  "health-auth",
+ "health-authority-leases",
  "health-backup",
  "health-configuration",
  "health-desktop-runtime",

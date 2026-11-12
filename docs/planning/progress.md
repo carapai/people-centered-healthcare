@@ -982,6 +982,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#135, part 4: the desktop keeps and returns its leases (2026-11-12).** With this, #135's scope is built.
+  - **What:** after every sync round that reaches its edge, the desktop does two things:
+    - it acknowledges the returns it asked for, since the round has just drained its outbox;
+    - it keeps the edge's view of its leases as `held` rows, so its stock path allows writes only while a lease is active.
+
+    `GET /api/desktop/leases` and `POST /api/desktop/leases/{id}/return` serve the webview.
+  - **Tested:**
+    - only leases being returned are acknowledged after a drained round;
+    - the edge's side of the cycle is covered by the API tests of part 3;
+    - the stock rules on both nodes are covered by part 2's tests.
+  - **Left to the user:** #135's acceptance, an outreach session with a sub-store that returns cleanly, on real hardware.
 - **#135, part 3: the edge's lease routes (2026-11-12).**
   - **What:**
     - **Admin routes (this machine only):** `GET` and `POST /api/admin/leases`, and `POST /api/admin/leases/{id}/recover`. A grant needs an enrolled, active device as holder; overlapping grants are refused (409). Recovery works on a frozen lease only, with a reason.

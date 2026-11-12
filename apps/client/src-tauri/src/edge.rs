@@ -10,9 +10,11 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use health_authority_leases::{Lease, LeaseState};
 use health_desktop_runtime::ipc::{Envelope, Reply};
 use health_desktop_runtime::keystore::Keystore;
 use health_desktop_runtime::link::{Link, Mode, Route};
+use health_surrealdb::{LeaseRole, SurrealStore};
 use health_sync_client::Sync;
 use health_sync_client::edge::{Answer, Edge, Request, Unreachable};
 
@@ -170,8 +172,15 @@ impl EdgeLink {
     /// Syncs with the edge until the process ends: each round that reaches it tells the link the
     /// edge is there and the outbox has gone up; each that fails, that it was missed. While the
     /// edge is missed it is tried every 5 seconds, otherwise every `interval`. Hourly, after a
-    /// round that reached it, the edge's staff are taken and handed to `accounts`.
-    pub(crate) async fn sync(&self, sync: Sync, interval: Duration, accounts: Accounts) {
+    /// round that reached it, the edge's staff are taken and handed to `accounts`. After every
+    /// round that reached it, the desktop's Authority Leases are brought up to date in `store`.
+    pub(crate) async fn sync(
+        &self,
+        sync: Sync,
+        store: SurrealStore,
+        interval: Duration,
+        accounts: Accounts,
+    ) {
         let mut taken: Option<Instant> = None;
         loop {
             let reached = match sync.round().await {
@@ -190,6 +199,9 @@ impl EdgeLink {
                     false
                 }
             };
+            if reached && let Err(e) = self.keep_leases(&store).await {
+                eprintln!("health-desktop: the leases were not brought up to date: {e}");
+            }
             if reached && taken.is_none_or(|at| at.elapsed() >= ACCOUNTS_EVERY) {
                 match self.accounts().await {
                     Ok(answer) => {
@@ -207,6 +219,138 @@ impl EdgeLink {
             tokio::time::sleep(wait).await;
         }
     }
+}
+
+impl EdgeLink {
+    /// Sends `method` to the edge's `path` with `body`, as the device; the JSON answer, or why
+    /// there is none.
+    async fn device_call(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value, String> {
+        let answer = self
+            .edge
+            .send(
+                Request {
+                    method: method.into(),
+                    path: path.into(),
+                    query: None,
+                    headers: vec![("content-type".into(), "application/json".into())],
+                    body: body.map(|b| b.to_string().into_bytes()).unwrap_or_default(),
+                },
+                None,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        if answer.status != 200 {
+            return Err(format!(
+                "the edge answered {}: {}",
+                answer.status,
+                String::from_utf8_lossy(&answer.body)
+            ));
+        }
+        serde_json::from_slice(&answer.body).map_err(|e| e.to_string())
+    }
+
+    /// Brings the desktop's leases up to date after a round that reached the edge (#135). A
+    /// return the holder asked for completes now: the round just drained its outbox, and it has
+    /// written nothing in the scope since asking. Then the edge's view of its leases is kept.
+    pub(crate) async fn keep_leases(&self, store: &SurrealStore) -> Result<(), String> {
+        for id in returning(
+            &store
+                .leases(LeaseRole::Held)
+                .await
+                .map_err(|e| e.to_string())?,
+        ) {
+            let lease: Lease = serde_json::from_value(
+                self.device_call(
+                    "POST",
+                    &format!("/api/device/leases/{id}/return"),
+                    Some(serde_json::json!({ "drained": true })),
+                )
+                .await?,
+            )
+            .map_err(|e| e.to_string())?;
+            store
+                .put_lease(LeaseRole::Held, &lease)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        let held: Vec<Lease> =
+            serde_json::from_value(self.device_call("GET", "/api/device/leases", None).await?)
+                .map_err(|e| e.to_string())?;
+        for lease in &held {
+            store
+                .put_lease(LeaseRole::Held, lease)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Asks the edge to take lease `id` back: the desktop writes no more in its scope, and the
+    /// return completes after the next round that drains its outbox.
+    pub(crate) async fn give_back(&self, store: &SurrealStore, id: &str) -> Result<Lease, String> {
+        let lease: Lease = serde_json::from_value(
+            self.device_call(
+                "POST",
+                &format!("/api/device/leases/{id}/return"),
+                Some(serde_json::json!({ "drained": false })),
+            )
+            .await?,
+        )
+        .map_err(|e| e.to_string())?;
+        store
+            .put_lease(LeaseRole::Held, &lease)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(lease)
+    }
+}
+
+/// The leases whose return the holder asked for and the edge has yet to acknowledge.
+fn returning(leases: &[Lease]) -> Vec<String> {
+    leases
+        .iter()
+        .filter(|lease| matches!(lease.state, LeaseState::Returning { .. }))
+        .map(|lease| lease.id.to_string())
+        .collect()
+}
+
+/// The desktop's lease routes, answered here (the webview's `/api/desktop/…`):
+/// `GET /api/desktop/leases` lists the leases it holds, and
+/// `POST /api/desktop/leases/{id}/return` asks the edge to take one back.
+pub(crate) fn lease_routes(link: std::sync::Arc<EdgeLink>, store: SurrealStore) -> axum::Router {
+    use axum::extract::{Path, State};
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse as _;
+    use axum::routing::{get, post};
+
+    type Leases = (std::sync::Arc<EdgeLink>, SurrealStore);
+    axum::Router::new()
+        .route(
+            "/api/desktop/leases",
+            get(|State((_, store)): State<Leases>| async move {
+                match store.leases(LeaseRole::Held).await {
+                    Ok(leases) => axum::Json(leases).into_response(),
+                    Err(e) => (StatusCode::SERVICE_UNAVAILABLE, e.to_string()).into_response(),
+                }
+            }),
+        )
+        .route(
+            "/api/desktop/leases/{id}/return",
+            post(
+                |State((link, store)): State<Leases>, Path(id): Path<String>| async move {
+                    match link.give_back(&store, &id).await {
+                        Ok(lease) => axum::Json(lease).into_response(),
+                        Err(e) => (StatusCode::BAD_GATEWAY, e).into_response(),
+                    }
+                },
+            ),
+        )
+        .with_state((link, store))
 }
 
 /// Sign-in's requests to the edge: proved by the device key, with no user token yet.
@@ -340,6 +484,30 @@ mod tests {
         // Offline: commands stay local without trying the edge, and so does sign-in.
         assert!(after.forward(&command()).await.is_none());
         assert!(after.sign_in("auma", "secret").await.is_none());
+    }
+
+    #[test]
+    fn only_leases_being_returned_are_acknowledged_after_a_drained_round() {
+        let lease = |state: LeaseState| Lease {
+            id: uuid::Uuid::now_v7(),
+            holder: "desktop".into(),
+            stores: ["Location/outreach-bag".to_owned()].into(),
+            granted_by: "admin".into(),
+            granted_at: health_time::Timestamp::UNIX_EPOCH,
+            expires_at: health_time::Timestamp::UNIX_EPOCH,
+            state,
+        };
+        let asked = lease(LeaseState::Returning {
+            requested_at: health_time::Timestamp::UNIX_EPOCH,
+        });
+        let leases = [
+            lease(LeaseState::Active),
+            asked.clone(),
+            lease(LeaseState::Returned {
+                at: health_time::Timestamp::UNIX_EPOCH,
+            }),
+        ];
+        assert_eq!(returning(&leases), vec![asked.id.to_string()]);
     }
 
     #[test]

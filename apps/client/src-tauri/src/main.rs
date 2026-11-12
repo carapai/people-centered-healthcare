@@ -57,6 +57,7 @@ fn compose(
     connection: &Connection,
     dir: &std::path::Path,
     report: &Arc<encryption::Report>,
+    edge: Option<&Arc<edge::EdgeLink>>,
 ) -> Local {
     let signed = match auth::routes(connection, dir, &OsKeystore) {
         Ok(routes) => routes,
@@ -78,6 +79,14 @@ fn compose(
             async move { axum::Json((*report).clone()) }
         }),
     );
+    // Under an edge, the Authority Leases it holds (#135).
+    let desktop = match edge {
+        Some(edge) => desktop.merge(edge::lease_routes(
+            Arc::clone(edge),
+            node::store(connection.clone()),
+        )),
+        None => desktop,
+    };
     let sign_in = signed.is_some();
     let desktop = match signed {
         Some(routes) => desktop.merge(routes),
@@ -264,11 +273,6 @@ async fn open() -> Result<Api, String> {
     }
     let connection = connect(&dir).await?;
     let report = Arc::new(report);
-    let local = Arc::new(tokio::sync::RwLock::new(compose(
-        &connection,
-        &dir,
-        &report,
-    )));
     // Once provisioned, the desktop syncs with central for its facility (#134). Once enrolled
     // with an edge, it syncs with the edge, its rounds tell the link whether the edge is there,
     // and it takes the edge's staff for sign-in while the edge cannot be reached (#133).
@@ -279,10 +283,18 @@ async fn open() -> Result<Api, String> {
             None
         }
     };
+    let local = Arc::new(tokio::sync::RwLock::new(compose(
+        &connection,
+        &dir,
+        &report,
+        edge.as_ref(),
+    )));
     match node::sync(connection.clone(), &dir, &OsKeystore) {
         Ok(Some(sync)) => match &edge {
             Some(edge) => {
                 let edge = Arc::clone(edge);
+                let link = Arc::clone(&edge);
+                let leases = node::store(connection.clone());
                 let (connection, dir, report, local) = (
                     connection.clone(),
                     dir.clone(),
@@ -290,17 +302,19 @@ async fn open() -> Result<Api, String> {
                     Arc::clone(&local),
                 );
                 let accounts: edge::Accounts = Arc::new(move |answer| {
-                    let (connection, dir, report, local) = (
+                    let (connection, dir, report, local, link) = (
                         connection.clone(),
                         dir.clone(),
                         Arc::clone(&report),
                         Arc::clone(&local),
+                        Arc::clone(&link),
                     );
                     Box::pin(async move {
                         match auth::import_from_edge(&connection, &dir, &OsKeystore, &answer).await
                         {
                             Ok(imported) => {
-                                *local.write().await = compose(&connection, &dir, &report);
+                                *local.write().await =
+                                    compose(&connection, &dir, &report, Some(&link));
                                 eprintln!(
                                     "health-desktop: {imported} staff can sign in here while the edge cannot be reached"
                                 );
@@ -311,7 +325,9 @@ async fn open() -> Result<Api, String> {
                         }
                     })
                 });
-                tokio::spawn(async move { edge.sync(sync, node::interval(), accounts).await });
+                tokio::spawn(
+                    async move { edge.sync(sync, leases, node::interval(), accounts).await },
+                );
             }
             None => {
                 tokio::spawn(async move {

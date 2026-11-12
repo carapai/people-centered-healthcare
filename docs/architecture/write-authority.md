@@ -105,7 +105,9 @@ stateDiagram-v2
   - `GET` / `POST /api/admin/leases` and `POST /api/admin/leases/{id}/recover` answer this machine only. A grant needs an enrolled, active device as holder, and overlapping grants are refused (409). Recovery needs a reason and works on a frozen lease only.
   - `GET /api/device/leases` (the holder's leases, frozen as of now if expired) and `POST /api/device/leases/{id}/return` sit behind the device gate. A return with `drained: false` starts it, so the holder writes no more. With `drained: true`, the edge acknowledges and holds the store again.
   - Every grant, completed return and recovery commits with its AuditEvent. A task checks every minute and freezes leases that expired unreturned, raising `alert = "lease-frozen"`.
-  - Still to come: the desktop keeping its leases from the edge and returning them after a drained round.
+- **In code (#135, part 4): the desktop's side.**
+  - After every sync round that reaches its edge, the desktop finishes any return it asked for: the round has just drained its outbox, and it has written nothing in the scope since asking. It then keeps the edge's view of its leases as `held` rows, so its stock path allows writes only while a lease is active.
+  - The webview lists the desktop's leases at `GET /api/desktop/leases` and asks for a return at `POST /api/desktop/leases/{id}/return`, both answered on the desktop.
 
 ## Validation on ingest
 
