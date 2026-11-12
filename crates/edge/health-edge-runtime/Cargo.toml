@@ -28,6 +28,7 @@ health-fhir-server = { workspace = true }
 health-files = { workspace = true }
 health-http = { workspace = true }
 health-identity = { workspace = true }
+health-node-api = { workspace = true }
 health-observability = { workspace = true }
 health-packages = { workspace = true }
 health-persistence = { workspace = true }

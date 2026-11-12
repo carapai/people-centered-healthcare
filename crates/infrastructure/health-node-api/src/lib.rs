@@ -1,9 +1,10 @@
-//! The clinical API on the edge (#106; deployment-topology.md § Mode D): what LAN browsers use
-//! to register, check in, triage and consult with the WAN down, over the edge's own store.
+//! The clinical API a node serves over its own store (#106; #134): on an edge, what LAN browsers
+//! use to register, check in, triage and consult with the WAN down (deployment-topology.md § Mode
+//! D); on a standalone desktop, what its webview uses over IPC. Shared by both runtimes.
 //!
 //! - **`/api/fhir`** (the client's FHIR base on an edge), **`/api/reception`**,
-//!   **`/api/consultation`** and **`/api/notes`**, behind the device gate (an enrolled device's
-//!   DPoP proof) and the subject layer (the signed-in user's permissions for the facility).
+//!   **`/api/consultation`** and **`/api/notes`**, behind the subject layer (the signed-in user's
+//!   permissions for the facility). An edge also puts them behind its device gate.
 //! - **The rules are central's,** from the provisioning bundle: the role → permission mappings
 //!   turn each user's snapshot into permissions, and the sensitivity labels restrict records in
 //!   the policy decision point, as at central. They are read per request, and the routes are
@@ -42,7 +43,7 @@ use tower::ServiceExt as _;
 
 /// The clinical routes, built from the provisioning bundle's rules.
 #[derive(Clone)]
-pub(crate) struct Clinical {
+pub struct Clinical {
     store: SurrealStore,
     auth: SurrealAuthStore,
     verifier: AccessVerifier<SurrealAuthStore>,
@@ -66,7 +67,7 @@ fn registry_rules(nin: &str) -> (RegistryConfig, MatchingRules) {
 
 impl Clinical {
     /// The clinical API over `connection`, authenticating with `verifier` against `auth`.
-    pub(crate) fn new(
+    pub fn new(
         connection: &Connection,
         auth: SurrealAuthStore,
         verifier: AccessVerifier<SurrealAuthStore>,
@@ -102,7 +103,7 @@ impl Clinical {
             .iter()
             .map(|l| (l.system.clone(), l.code.clone()))
             .collect();
-        // The edge's own scope: facility records, and the shared records it holds (ADR 0057).
+        // The node's own scope: facility records, and the shared records it holds (ADR 0057).
         let fhir = FhirServer::new(
             self.store.clone(),
             self.base.clone(),
@@ -169,7 +170,7 @@ impl Clinical {
 
     /// `/api/fhir`, `/api/reception`, `/api/consultation` and `/api/notes`, to be put behind
     /// the device gate.
-    pub(crate) fn routes(self) -> Router {
+    pub fn routes(self) -> Router {
         let mut router = Router::new();
         for prefix in [
             "/api/fhir",
@@ -191,7 +192,7 @@ async fn serve(State(clinical): State<Clinical>, request: Request) -> Response {
         Ok(None) => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "this edge is not provisioned yet: import central's bundle",
+                "this node has no rules yet: import central's bundle",
             )
                 .into_response();
         }

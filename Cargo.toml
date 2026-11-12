@@ -69,6 +69,7 @@ members = [
     "crates/infrastructure/health-publication",
     "crates/infrastructure/health-activation",
     "crates/infrastructure/health-surrealdb",
+    "crates/infrastructure/health-node-api",
     "crates/infrastructure/health-sync-client",
     "crates/infrastructure/health-sync-server",
     "crates/testing/health-persistence-memory",
@@ -129,6 +130,7 @@ health-terminology = { path = "crates/domains/health-terminology" }
 health-workflow-actions = { path = "crates/contracts/health-workflow-actions" }
 health-billing-contract = { path = "crates/contracts/health-billing-contract" }
 health-sync-protocol = { path = "crates/contracts/health-sync-protocol" }
+health-node-api = { path = "crates/infrastructure/health-node-api" }
 health-sync-client = { path = "crates/infrastructure/health-sync-client" }
 health-sync-server = { path = "crates/infrastructure/health-sync-server" }
 health-identity = { path = "crates/domains/health-identity" }

@@ -170,7 +170,7 @@ pub(crate) fn routes(
     };
     let local_admin = LocalAdmin::new(server.verifier(), grant_signer, config.node_id.clone());
     // The clinical API (#106), under the bundle's role mappings and label rules.
-    let clinical = crate::clinical::Clinical::new(
+    let clinical = health_node_api::Clinical::new(
         connection,
         provisioning_store,
         server.verifier(),
