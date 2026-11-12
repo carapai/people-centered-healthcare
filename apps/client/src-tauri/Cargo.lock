@@ -2983,6 +2983,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-authority-leases"
+version = "0.1.0"
+dependencies = [
+ "health-time",
+ "serde",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
 name = "health-backup"
 version = "0.1.0"
 dependencies = [
@@ -3699,6 +3709,7 @@ dependencies = [
  "futures-util",
  "health-access-policy",
  "health-audit",
+ "health-authority-leases",
  "health-billing",
  "health-client-registry",
  "health-clinical-documentation-app",
