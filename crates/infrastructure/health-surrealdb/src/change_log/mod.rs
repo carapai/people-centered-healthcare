@@ -153,7 +153,13 @@ pub(crate) async fn append(
              committed_at: time::now() }}"
         ));
         let resource = sql.str(format!("{}/{}", change.resource_type, change.resource_id));
-        for peer in &peers {
+        // Down-only operations are logged for the nodes below to pull, never queued up.
+        let up = if crate::sync::DOWN_ONLY.contains(&change.resource_type.as_str()) {
+            &[][..]
+        } else {
+            &peers[..]
+        };
+        for peer in up {
             let peer = sql.str(peer.as_str());
             sql.push(format!(
                 "CREATE type::record('sync_outbox', [{peer}, {seq}]) SET tx_id = {tx_text}, \

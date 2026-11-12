@@ -65,6 +65,7 @@ pub const INFRASTRUCTURE_TABLES: &[&str] = &[
     "sync_transfer_state",
     "ledger_claim",
     "authority_lease",
+    "workflow_candidate",
     "patient_facility",
     "idx_token",
     "idx_string",

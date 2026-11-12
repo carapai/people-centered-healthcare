@@ -98,9 +98,22 @@ pub const DOWN_GLOBAL: &[&str] = &[
 /// (write-authority.md § Data authority matrix).
 pub const STOCK_LEDGER: &str = "stock";
 
+/// Workflow candidates on the change log: transitions made on a replica go up to the instance's
+/// authority as operations (#100; workflow-engine.md § Offline and sync).
+pub const WORKFLOW_CANDIDATES: &str = "workflow-candidate";
+
+/// Workflow instances on the change log: each change to an instance goes down, as an operation,
+/// to the desktops that keep a replica of it, which run the engine on it while their edge cannot
+/// be reached (#100). Never queued up: central keeps no instances of a facility's.
+pub const WORKFLOW_INSTANCES: &str = "workflow-instance";
+
+/// Operations that only ever go down: they are not queued for this node's upstreams.
+pub(crate) const DOWN_ONLY: &[&str] = &[WORKFLOW_INSTANCES];
+
 /// The ledgers whose operations sync: up only, from the facility that keeps them.
 pub const LEDGERS: &[&str] = &[
     STOCK_LEDGER,
+    WORKFLOW_CANDIDATES,
     finance::CHARGE,
     finance::DEFERRAL,
     finance::SETTLEMENT,
@@ -139,6 +152,7 @@ impl SyncScope {
     pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
         resource_type != ACTIVATIONS
             && resource_type != RESOLUTIONS
+            && !DOWN_ONLY.contains(&resource_type)
             && (LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL))
     }
 
@@ -148,6 +162,7 @@ impl SyncScope {
     pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
         resource_type == ACTIVATIONS
             || resource_type == RESOLUTIONS
+            || resource_type == WORKFLOW_INSTANCES
             || (!LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL))
     }
 
@@ -1734,6 +1749,27 @@ impl SurrealAuthority<'_> {
         {
             return Ok(refused(format!("{}: {why}", item.op_id)));
         }
+        // A workflow candidate waits for the engine to judge it (#100): kept once, as pushed.
+        if item.resource_type == WORKFLOW_CANDIDATES {
+            let pushed = serde_json::to_string(item)
+                .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;
+            tx.tx()?
+                .query(
+                    "IF (SELECT VALUE id FROM ONLY type::record('workflow_candidate', $id)) = NONE { \
+                     CREATE type::record('workflow_candidate', $id) SET peer = $peer, \
+                     instance = $instance, data = $data, item = $item, status = 'pending', \
+                     received_at = time::now(); };",
+                )
+                .bind(("id", item.op_id.to_string()))
+                .bind(("peer", self.peer.to_string()))
+                .bind(("instance", item.resource_id.clone()))
+                .bind(("data", item.body.to_string()))
+                .bind(("item", pushed))
+                .await
+                .and_then(surrealdb::IndexedResults::check)
+                .map_err(write_error)?;
+            return Ok(None);
+        }
         if finance::FINANCE.contains(&item.resource_type.as_str()) {
             let facility = match &self.scope {
                 SyncScope::Facility(facility) => Some(facility.as_str()),
@@ -2192,6 +2228,13 @@ impl SurrealTx {
                 }
             }
             return Ok(());
+        }
+        if item.resource_type == WORKFLOW_INSTANCES {
+            // A replica of an instance another node decides: kept at its newest version.
+            let instance: health_workflow::InstanceRecord =
+                serde_json::from_value(item.body.clone())
+                    .map_err(|_| WriteError::Store(corrupt("workflow instance")))?;
+            return self.keep_replica(&instance).await;
         }
         if item.resource_type != ACTIVATIONS {
             return Err(WriteError::Store(corrupt("a ledger operation came down")));

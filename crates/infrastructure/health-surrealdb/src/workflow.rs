@@ -54,6 +54,7 @@ impl WorkflowStore for SurrealTx {
             ],
         )
         .await?;
+        self.replicate(instance)?;
         Ok(())
     }
 
@@ -86,6 +87,9 @@ impl WorkflowStore for SurrealTx {
                 ],
             )
             .await?;
+        if !updated.is_empty() {
+            self.replicate(instance)?;
+        }
         Ok(!updated.is_empty())
     }
 
@@ -214,5 +218,141 @@ impl WorkflowStore for SurrealTx {
             )
             .await?;
         decode(rows)
+    }
+
+    async fn send_candidate(&mut self, instance: &str, candidate: &str) -> Result<(), WriteError> {
+        // Candidates go up to the authority as operations (#100), as the ledgers' do.
+        self.log_op(crate::sync::WORKFLOW_CANDIDATES, instance, candidate);
+        Ok(())
+    }
+
+    async fn pending_candidates(
+        &mut self,
+        limit: u32,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [record::id(id), data] FROM workflow_candidate \
+                 WHERE status = 'pending' ORDER BY received_at LIMIT <int>$limit",
+                vec![("limit", limit.to_string())],
+            )
+            .await?;
+        rows.into_iter()
+            .map(|row| {
+                let [id, data]: [String; 2] = row.try_into().map_err(|_| invalid())?;
+                Ok((id, data))
+            })
+            .collect()
+    }
+
+    async fn settle_candidate(
+        &mut self,
+        op_id: &str,
+        conflict: Option<&str>,
+    ) -> Result<(), WriteError> {
+        let Some(reason) = conflict else {
+            self.run(
+                "UPDATE type::record('workflow_candidate', $id) SET status = 'applied' \
+                 RETURN VALUE record::id(id)",
+                vec![("id", op_id.to_owned())],
+            )
+            .await?;
+            return Ok(());
+        };
+        // The Conflict Record (ADR 0020): the candidate as it was pushed is its candidate branch,
+        // reviewed in the queue like any other; keeping the head discards it.
+        let (class, policy) = crate::sync::class_of("RequestOrchestration");
+        let [peer, item]: [String; 2] = self
+            .rows(
+                "SELECT VALUE [peer, item] FROM type::record('workflow_candidate', $id)",
+                vec![("id", op_id.to_owned())],
+            )
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| WriteError::Store(invalid()))?
+            .try_into()
+            .map_err(|_| WriteError::Store(invalid()))?;
+        self.run(
+            "UPDATE type::record('workflow_candidate', $id) SET status = 'conflict', \
+             reason = $reason RETURN VALUE record::id(id)",
+            vec![("id", op_id.to_owned()), ("reason", reason.to_owned())],
+        )
+        .await?;
+        self.run(
+            "UPSERT type::record('sync_conflict', $id) SET peer = $peer, items = $items, \
+             candidates = $candidates, class = $class, policy = $policy, status = 'open', \
+             opened_at = time::now() RETURN VALUE record::id(id)",
+            vec![
+                ("id", op_id.to_owned()),
+                ("peer", peer),
+                (
+                    "items",
+                    serde_json::json!([{ "op_id": op_id, "class": class, "reason": reason }])
+                        .to_string(),
+                ),
+                ("candidates", format!("[{item}]")),
+                ("class", class.to_owned()),
+                ("policy", policy.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+}
+
+impl SurrealTx {
+    /// Logs `instance` for the desktops below to pull (#100), when this node decides it: a
+    /// replica's own offline moves go up as candidates instead.
+    fn replicate(&mut self, instance: &InstanceRecord) -> Result<(), WriteError> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        self.log_op(
+            crate::sync::WORKFLOW_INSTANCES,
+            &instance.id,
+            &encode(instance)?,
+        );
+        Ok(())
+    }
+
+    /// Keeps `instance`, pulled from upstream, unless this replica already holds it at that
+    /// version or later.
+    pub(crate) async fn keep_replica(
+        &mut self,
+        instance: &InstanceRecord,
+    ) -> Result<(), WriteError> {
+        let held = self
+            .rows(
+                "SELECT VALUE [<string>version] FROM type::record('workflow_instance', $id)",
+                vec![("id", instance.id.clone())],
+            )
+            .await?;
+        let newer = match held.first().and_then(|row| row.first()) {
+            Some(version) => {
+                version
+                    .parse::<u64>()
+                    .map_err(|_| WriteError::Store(invalid()))?
+                    < instance.version
+            }
+            None => true,
+        };
+        if newer {
+            self.run(
+                "UPSERT type::record('workflow_instance', $id) CONTENT { data: $data, \
+                 version: <int>$version, definition: $definition, context: $context, \
+                 running: <bool>$running } RETURN VALUE record::id(id)",
+                vec![
+                    ("id", instance.id.clone()),
+                    ("data", encode(instance)?),
+                    ("version", instance.version.to_string()),
+                    ("definition", instance.definition.clone()),
+                    ("context", instance.context.clone()),
+                    ("running", instance.state.running.to_string()),
+                ],
+            )
+            .await?;
+        }
+        Ok(())
     }
 }

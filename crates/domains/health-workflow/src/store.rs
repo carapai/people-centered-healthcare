@@ -169,4 +169,27 @@ pub trait WorkflowStore {
         &mut self,
         instance: &str,
     ) -> impl Future<Output = Result<Vec<TimerRecord>, StoreError>> + Send;
+
+    /// Queues `candidate`, a transition made here on a replica of `instance` (as JSON), to go up
+    /// to the instance's authority (#100).
+    fn send_candidate(
+        &mut self,
+        instance: &str,
+        candidate: &str,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
+
+    /// Candidates received from other nodes and not yet judged, oldest first, at most `limit`:
+    /// each one's operation id and JSON.
+    fn pending_candidates(
+        &mut self,
+        limit: u32,
+    ) -> impl Future<Output = Result<Vec<(String, String)>, StoreError>> + Send;
+
+    /// Settles received candidate `op_id`: applied, or a conflict for `reason`, which opens its
+    /// Conflict Record.
+    fn settle_candidate(
+        &mut self,
+        op_id: &str,
+        conflict: Option<&str>,
+    ) -> impl Future<Output = Result<(), WriteError>> + Send;
 }
