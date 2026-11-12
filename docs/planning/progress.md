@@ -982,6 +982,17 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#135, part 2: leases on the stock ledger (2026-11-12).**
+  - **What:**
+    - Leases are stored in `authority_lease` (migration `0053_authority_leases`). An edge keeps the leases it granted; a desktop keeps the ones it holds.
+    - Inventory asks `StockStore::may_write_store` before a node moves stock as a store's authority. An edge is refused on a store it has leased out (`Refused::Leased`), and a holder only while its lease is active and unexpired.
+    - The edge takes pushed stock operations on a leased store from the holder alone.
+  - **Tested** in `health-surrealdb`:
+    - the edge is refused on the leased outreach store and allowed on its pharmacy;
+    - the holder records there until expiry;
+    - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
+    - once returned, the edge records there again.
+  - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
 - **#135, part 1: the Authority Lease rules (2026-11-12).**
   - **What:** a new domain crate, `health-authority-leases` (context `write-authority`), holds write-authority.md's hand-over state machine as pure rules:
     - a grant over a set of stores, with a time-box of up to 30 days and no overlapping holding lease;

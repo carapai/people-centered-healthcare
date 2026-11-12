@@ -62,6 +62,14 @@ impl StockStore for SurrealTx {
         Ok(())
     }
 
+    async fn may_write_store(
+        &mut self,
+        store: &str,
+        at: health_time::Timestamp,
+    ) -> Result<bool, StoreError> {
+        self.may_write_leased(store, at).await
+    }
+
     async fn append_movement(&mut self, movement: &Movement) -> Result<(), WriteError> {
         let json = serde_json::to_string(movement)
             .map_err(|e| WriteError::Store(StoreError::Unavailable(e.to_string())))?;

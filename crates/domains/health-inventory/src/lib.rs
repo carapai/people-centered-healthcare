@@ -222,6 +222,10 @@ pub enum Refused {
     /// The store does not allow emergency dispensing.
     #[error("emergency dispensing is blocked at this store")]
     EmergencyBlocked,
+    /// Another node holds write authority over the store under an Authority Lease, or this
+    /// node's own lease on it is no longer active (write-authority.md § Hand-over rules; #135).
+    #[error("store {0} is under an Authority Lease: this node may not move its stock now")]
+    Leased(String),
 }
 
 /// A store's negative-stock configuration (inventory-and-procurement.md § Negative stock).
@@ -392,6 +396,17 @@ pub trait StockStore {
         unit: &StockUnit,
         balance: &Balance,
     ) -> impl Future<Output = Result<(), WriteError>> + Send;
+    /// Whether this node may move stock in `store` at `at` as its authority: not while another
+    /// node holds an Authority Lease over it, nor once this node's own lease on it is no longer
+    /// active (#135). Without leases, always.
+    fn may_write_store(
+        &mut self,
+        store: &str,
+        at: Timestamp,
+    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
+        let _ = (store, at);
+        async { Ok(true) }
+    }
     /// Appends `movement`.
     fn append_movement(
         &mut self,

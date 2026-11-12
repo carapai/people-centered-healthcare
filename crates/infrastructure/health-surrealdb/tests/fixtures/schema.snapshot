@@ -158,6 +158,14 @@ DEFINE TABLE auth_session TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX auth_session_refresh ON auth_session FIELDS refresh_hash UNIQUE
 DEFINE TABLE auth_snapshot TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD jws ON auth_snapshot TYPE string PERMISSIONS FULL
+DEFINE TABLE authority_lease TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON authority_lease TYPE string PERMISSIONS FULL
+  DEFINE FIELD holder ON authority_lease TYPE string PERMISSIONS FULL
+  DEFINE FIELD role ON authority_lease TYPE string ASSERT $value INSIDE ['granted', 'held'] PERMISSIONS FULL
+  DEFINE FIELD state ON authority_lease TYPE string PERMISSIONS FULL
+  DEFINE FIELD stores ON authority_lease TYPE array<string> PERMISSIONS FULL
+  DEFINE FIELD stores.* ON authority_lease TYPE string PERMISSIONS FULL
+  DEFINE INDEX authority_lease_stores ON authority_lease FIELDS stores
 DEFINE TABLE billing_deferral TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD account ON billing_deferral TYPE string PERMISSIONS FULL
   DEFINE FIELD data ON billing_deferral TYPE string PERMISSIONS FULL

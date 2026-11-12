@@ -95,7 +95,13 @@ stateDiagram-v2
   - `edge_may_write` is false for a store while a lease is active, returning or frozen. `holder_may_write` is true only for the holder, in scope, while the lease is active and unexpired.
   - `request_return` (active or frozen, holder only) stops the holder's new writes. `complete_return` needs the holder's outbox for the scope drained.
   - `expire` freezes an unreturned lease once and reports it, for the alert. `recover` takes a frozen lease back for an admin with a reason, for the audit.
-  - Still to come: storing leases, enforcing them on the edge's stock writes and the holder's pushes, the grant and return endpoints, the freeze alert, and the desktop's side.
+- **In code (#135, part 2): leases on the stock ledger.**
+  - `health-surrealdb` keeps leases in `authority_lease` (migration `0053_authority_leases`): `granted` rows on the edge that granted them, `held` rows on the desktop that holds them.
+  - `health_inventory::StockStore::may_write_store` is asked before a node moves stock as a store's authority, and a refusal is `Refused::Leased`:
+    - while a lease the node granted holds the store, the node is refused;
+    - under a lease the node holds, it may write only while that lease is active and unexpired.
+  - Pushed stock operations on a store under a lease the edge granted are taken from the holder alone; another desktop's are rejected. Once the lease is returned or recovered, the store is the edge's again, and the holder's late operations are appended as any late operation is.
+  - Still to come: the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
 
 ## Validation on ingest
 
