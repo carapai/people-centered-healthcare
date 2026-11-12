@@ -1,4 +1,4 @@
-//! `health-desktop enroll --edge URL [--ca FILE] [--label TEXT]` (#133; desktop-client.md, mode A;
+//! `health-desktop enroll --edge URL --ca FILE [--label TEXT]` (#133; desktop-client.md, mode A;
 //! lan-security.md § Device enrollment): a desktop under an edge enrolls there as a LAN device,
 //! as a browser does, and its device key's DPoP proofs are its credential from then on, for sync
 //! too (ADR 0062: desktops under an edge use device enrollment, not node provisioning).
@@ -24,16 +24,17 @@ use crate::provision::pki_dir;
 /// The device key's name in the OS keystore.
 pub(crate) const DEVICE_KEY: &str = "health.device.key";
 
-const USAGE: &str = "usage: health-desktop enroll --edge URL [--ca FILE] [--label TEXT]";
+const USAGE: &str = "usage: health-desktop enroll --edge URL --ca FILE [--label TEXT]";
 
 /// The arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Args {
     /// The edge's origin, as its `HEALTH_ORIGINS` names it.
     pub(crate) edge: String,
-    /// The CA the edge's certificate is verified against: the facility's chain or the national
-    /// root. Without it, the OS trust store.
-    pub(crate) ca: Option<PathBuf>,
+    /// The CA the edge's certificate is verified against: the national root, or the facility's
+    /// chain. Required: the edge's certificates are not in the OS trust store, and the staff the
+    /// edge hands over for offline sign-in are trusted because the edge is (ADR 0063).
+    pub(crate) ca: PathBuf,
     /// What the admin sees the request as.
     pub(crate) label: String,
 }
@@ -54,7 +55,7 @@ impl Args {
         }
         Ok(Self {
             edge: edge.ok_or(USAGE)?,
-            ca,
+            ca: ca.ok_or(USAGE)?,
             label: label.unwrap_or_else(|| format!("health-desktop on {}", std::env::consts::OS)),
         })
     }
@@ -81,7 +82,7 @@ impl Https {
     pub(crate) fn new(args: &Args) -> Result<Self, String> {
         Ok(Self {
             edge: args.edge.clone(),
-            ca_pem: args.ca.as_deref().map(read).transpose()?,
+            ca_pem: Some(read(&args.ca)?),
             label: args.label.clone(),
         })
     }
@@ -132,7 +133,7 @@ pub(crate) fn enroll(
 ) -> Result<String, String> {
     // 1. No keystore, no install.
     keystore::check(keys).map_err(|e| e.to_string())?;
-    let ca_pem = args.ca.as_deref().map(read).transpose()?;
+    let ca_pem = Some(read(&args.ca)?);
     // 2. One role per machine.
     let pki = pki_dir(data_dir);
     if pki.join("chain.pem").is_file() {
@@ -257,7 +258,15 @@ mod tests {
     }
 
     fn args() -> Args {
-        Args::parse(&["--edge".into(), "https://edge.local/".into()]).expect("args")
+        let ca = std::env::temp_dir().join("health-desktop-enroll-test-ca.pem");
+        std::fs::write(&ca, "-----BEGIN CERTIFICATE-----\n").expect("ca");
+        Args::parse(&[
+            "--edge".into(),
+            "https://edge.local/".into(),
+            "--ca".into(),
+            ca.to_string_lossy().into_owned(),
+        ])
+        .expect("args")
     }
 
     fn device() -> String {
@@ -342,5 +351,9 @@ mod tests {
         );
         assert!(refused.is_err_and(|e| e.contains("standalone")));
         assert!(Args::parse(&["--ca".into(), "x".into()]).is_err());
+        assert!(
+            Args::parse(&["--edge".into(), "https://edge.local".into()]).is_err(),
+            "the CA is required"
+        );
     }
 }

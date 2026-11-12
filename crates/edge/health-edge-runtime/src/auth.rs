@@ -22,8 +22,9 @@ use std::sync::Arc;
 use axum::Router;
 use health_auth::jose::EcJwk;
 use health_auth::{
-    AuthConfig, AuthServer, Client, Credentials, DeviceGate, GrantSigner, LocalAdmin, Provisioning,
-    RecipientKey, SnapshotGate, SnapshotVerifier, SurrealAuthStore, TokenSigner,
+    AuthConfig, AuthServer, Client, Credentials, DeviceGate, EnrolledDevice, GrantSigner,
+    LocalAdmin, Provisioning, RecipientKey, SnapshotGate, SnapshotSigner, SnapshotVerifier,
+    SurrealAuthStore, TokenSigner,
 };
 use health_identity::snapshot::SnapshotPolicy;
 use health_time::Clock;
@@ -82,6 +83,89 @@ fn snapshot_keys(path: &Path) -> Result<SnapshotVerifier, String> {
         .map_err(|_| "HEALTH_SNAPSHOT_KEYS_FILE holds an invalid key".into())
 }
 
+/// Central's snapshot public keys, as the file holds them.
+fn snapshot_jwks(path: &Path) -> Result<Vec<EcJwk>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read HEALTH_SNAPSHOT_KEYS_FILE: {e}"))?;
+    serde_json::from_str(&text)
+        .map_err(|_| "HEALTH_SNAPSHOT_KEYS_FILE is not a JSON array of JWKs".to_owned())
+}
+
+/// What the edge gives its enrolled desktops for sign-in while it cannot be reached (#133).
+#[derive(Clone)]
+struct DesktopAccounts {
+    provisioning: Provisioning,
+    /// The facility intermediate key, as a bundle signer. Blocking: it unseals the key.
+    signer: Arc<dyn Fn() -> Result<SnapshotSigner, String> + Send + Sync>,
+    snapshot_keys: Arc<Vec<EcJwk>>,
+    facility: String,
+    clock: Arc<dyn Clock>,
+}
+
+/// `POST /api/desktop/accounts` with `{"jwk": <the device's public key>}`, behind the gate: a
+/// bundle of the staff at the desktop's location, their hashes encrypted to the device key and
+/// signed with the facility intermediate key, with central's snapshot keys to check their
+/// snapshots by (#133). The key must be the enrolled device's own, the one its proof is by.
+async fn desktop_accounts(
+    axum::extract::State(desktops): axum::extract::State<DesktopAccounts>,
+    axum::Extension(enrolled): axum::Extension<EnrolledDevice>,
+    axum::Json(body): axum::Json<serde_json::Value>,
+) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse as _;
+
+    let problem = |status: StatusCode, detail: &str| {
+        (status, axum::Json(serde_json::json!({ "error": detail }))).into_response()
+    };
+    let Some(jwk) = serde_json::from_value::<EcJwk>(body["jwk"].clone())
+        .ok()
+        .filter(|jwk| jwk.thumbprint() == enrolled.device.thumbprint)
+    else {
+        return problem(StatusCode::FORBIDDEN, "not-this-device's-key");
+    };
+    let Ok(recipient) = jwk.key().map(|key| p256::PublicKey::from(&key)) else {
+        return problem(StatusCode::UNPROCESSABLE_ENTITY, "not-a-p256-key");
+    };
+    let unseal = Arc::clone(&desktops.signer);
+    let signer = match tokio::task::spawn_blocking(move || unseal()).await {
+        Ok(Ok(signer)) => signer,
+        Ok(Err(why)) => return problem(StatusCode::SERVICE_UNAVAILABLE, &why),
+        Err(_) => {
+            return problem(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the facility key is unavailable",
+            );
+        }
+    };
+    let device = &enrolled.device;
+    match desktops
+        .provisioning
+        .export(
+            &device.id.to_string(),
+            &device.location,
+            &recipient,
+            &signer,
+            desktops.clock.now(),
+        )
+        .await
+    {
+        Ok(bundle) => {
+            tracing::info!(outcome = "desktop-accounts", device = %device.id, "a desktop took its staff for offline sign-in");
+            (
+                [(axum::http::header::CACHE_CONTROL, "no-store")],
+                axum::Json(serde_json::json!({
+                    "facility": desktops.facility,
+                    "snapshot_keys": *desktops.snapshot_keys,
+                    "signer": signer.public(),
+                    "bundle": bundle,
+                })),
+            )
+                .into_response()
+        }
+        Err(why) => problem(StatusCode::SERVICE_UNAVAILABLE, &why.to_string()),
+    }
+}
+
 fn secret(secrets: &Secrets, name: &str) -> Result<Vec<u8>, String> {
     secrets(name)?
         .ok_or_else(|| format!("{name} is not sealed: run `facility-edge provision request`"))
@@ -131,6 +215,7 @@ pub(crate) fn routes(
     // Sessions lock after 15 minutes idle, and a PIN resumes or switches users on a shared
     // device (offline-auth.md § Tokens and sessions).
     auth.idle_lock = true;
+    let clock_for_desktops = Arc::clone(&clock);
     let server = AuthServer::new(auth, signer, credentials.clone(), store.clone(), clock);
 
     let recipient: RecipientKey = {
@@ -181,8 +266,35 @@ pub(crate) fn routes(
             .clone()
             .zip(config.node_code.clone()),
     );
+    // Its desktops' staff, for sign-in while the edge cannot be reached (#133).
+    let desktops = DesktopAccounts {
+        provisioning: provisioning.clone(),
+        signer: {
+            let secrets = Arc::clone(secrets);
+            Arc::new(move || {
+                let pem = String::from_utf8(secret(&secrets, INTERMEDIATE_KEY)?)
+                    .map_err(|_| format!("{INTERMEDIATE_KEY} is not PEM"))?;
+                p256::ecdsa::SigningKey::from_pkcs8_pem(&pem)
+                    .map(SnapshotSigner::new)
+                    .map_err(|_| format!("{INTERMEDIATE_KEY} is not a P-256 key"))
+            })
+        },
+        snapshot_keys: Arc::new(snapshot_jwks(keys_file)?),
+        facility: facility.clone(),
+        clock: Arc::clone(&clock_for_desktops),
+    };
     Ok(Router::new()
         .nest("/auth", server.router())
+        .merge(
+            gate.layer(
+                Router::new()
+                    .route(
+                        "/api/desktop/accounts",
+                        axum::routing::post(desktop_accounts),
+                    )
+                    .with_state(desktops),
+            ),
+        )
         .merge(
             gate.layer(
                 Router::new().nest("/api", server.session_route().merge(local_admin.router())),

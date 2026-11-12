@@ -100,6 +100,17 @@ fn signer(keys: &dyn Keystore) -> Result<TokenSigner, String> {
 /// The node's identity from `pki/node.json`: its node ID and facility.
 fn identity(data_dir: &Path) -> Result<(String, String), String> {
     let path = pki_dir(data_dir).join("node.json");
+    if !path.is_file() {
+        // Under an edge: the enrolled device, at the facility the edge named (#133).
+        let edge = pki_dir(data_dir).join("edge.json");
+        let text = std::fs::read_to_string(&edge)
+            .map_err(|_| "this desktop is neither provisioned nor enrolled".to_owned())?;
+        let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        return match (value["device_id"].as_str(), value["facility"].as_str()) {
+            (Some(device), Some(facility)) => Ok((device.to_owned(), facility.to_owned())),
+            _ => Err("the edge has not yet handed over its staff".into()),
+        };
+    }
     let text = std::fs::read_to_string(&path)
         .map_err(|_| "this desktop is not provisioned: provision it first".to_owned())?;
     let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
@@ -150,6 +161,79 @@ pub(crate) async fn import(
     // Kept for sign-in, which checks every snapshot against them.
     std::fs::copy(snapshot_keys, snapshot_keys_path(data_dir))
         .map_err(|e| format!("cannot keep the snapshot keys: {e}"))?;
+    Ok(imported.accounts)
+}
+
+/// The edge's staff for this enrolled desktop (#133), its answer to `POST /api/desktop/accounts`:
+/// the bundle, signed with the edge's facility intermediate key (`signer`), its hashes encrypted
+/// to the device key; and central's snapshot keys, which every snapshot inside must verify
+/// against, kept for sign-in. The facility is the edge's, and stays: an answer for another is
+/// refused. Returns the accounts imported.
+pub(crate) async fn import_from_edge(
+    connection: &Connection,
+    data_dir: &Path,
+    keys: &(dyn Keystore + 'static),
+    answer: &serde_json::Value,
+) -> Result<usize, String> {
+    let edge_file = pki_dir(data_dir).join("edge.json");
+    let mut edge: serde_json::Value = std::fs::read_to_string(&edge_file)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .ok_or("this desktop is not enrolled with an edge")?;
+    let device = edge["device_id"]
+        .as_str()
+        .ok_or("edge.json names no device")?
+        .to_owned();
+    let facility = answer["facility"]
+        .as_str()
+        .ok_or("the edge's answer names no facility")?
+        .to_owned();
+    if let Some(known) = edge["facility"].as_str()
+        && known != facility
+    {
+        return Err(format!("the edge now names {facility}, not {known}"));
+    }
+    let signer: EcJwk = serde_json::from_value(answer["signer"].clone())
+        .map_err(|_| "the edge's answer has no signer key")?;
+    let snapshot_keys: Vec<EcJwk> = serde_json::from_value(answer["snapshot_keys"].clone())
+        .map_err(|_| "the edge's answer has no snapshot keys")?;
+    let bundle = answer["bundle"]
+        .as_str()
+        .ok_or("the edge's answer has no bundle")?;
+    let verifier = SnapshotVerifier::new(&snapshot_keys)
+        .map_err(|_| "the edge's snapshot keys are invalid")?;
+    let bundle_verifier =
+        SnapshotVerifier::new(&[signer]).map_err(|_| "the edge's signer key is invalid")?;
+    let pem = keys
+        .get(crate::enroll::DEVICE_KEY)
+        .map_err(|e| e.to_string())?
+        .ok_or("the device key is not in the keystore")?;
+    let pem = String::from_utf8(pem).map_err(|_| "the device key is not PEM".to_owned())?;
+    let recipient: RecipientKey = Arc::new(move || {
+        p256::SecretKey::from_pkcs8_pem(&pem)
+            .map_err(|_| "the device key is not a P-256 key".into())
+    });
+    let imported = Provisioning::new(
+        auth_store(connection),
+        credentials(keys)?,
+        verifier,
+        device,
+        facility.clone(),
+        recipient,
+    )
+    .with_bundle_verifier(bundle_verifier)
+    .import(bundle)
+    .await
+    .map_err(|e| e.to_string())?;
+    // Kept for sign-in, which checks every snapshot against them; the facility last, since its
+    // presence is what lets local sign-in start.
+    std::fs::write(
+        snapshot_keys_path(data_dir),
+        serde_json::to_string(&snapshot_keys).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| format!("cannot keep the snapshot keys: {e}"))?;
+    edge["facility"] = serde_json::Value::String(facility);
+    std::fs::write(&edge_file, edge.to_string()).map_err(|e| format!("edge.json: {e}"))?;
     Ok(imported.accounts)
 }
 
@@ -475,5 +559,94 @@ mod tests {
                 .expect("routes")
                 .is_none()
         );
+    }
+
+    /// Under an edge (#133): the edge's staff for this desktop's location arrive encrypted to its
+    /// device key, are kept under its own pepper, and sign in here while the edge cannot be
+    /// reached. An answer naming another facility afterwards is refused.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_edges_staff_sign_in_here_while_it_cannot_be_reached() {
+        // The edge, holding a clinician of KLA001 with a snapshot central signed.
+        let (edge_connection, edge_dir, edge_keys) = desktop().await;
+        let central_keys: Vec<EcJwk> = serde_json::from_str(
+            &std::fs::read_to_string(snapshot_keys_path(edge_dir.path())).expect("keys"),
+        )
+        .expect("keys");
+        let intermediate = SnapshotSigner::generate();
+        let device_pem = health_pki::new_key().expect("key").serialize_pem();
+        let device_key = p256::SecretKey::from_pkcs8_pem(&device_pem).expect("device key");
+        let device = "0193a000-0000-7000-8000-000000000002";
+        let unused: RecipientKey = Arc::new(|| Err("not importing".into()));
+        let bundle = Provisioning::new(
+            auth_store(&edge_connection),
+            credentials(&edge_keys).expect("credentials"),
+            SnapshotVerifier::new(&central_keys).expect("verifier"),
+            "edge",
+            "KLA001",
+            unused,
+        )
+        .export(
+            device,
+            "OPD",
+            &device_key.public_key(),
+            &intermediate,
+            health_time::Timestamp::now(),
+        )
+        .await
+        .expect("export");
+        let answer = |facility: &str| {
+            serde_json::json!({
+                "facility": facility,
+                "snapshot_keys": central_keys,
+                "signer": intermediate.public(),
+                "bundle": bundle,
+            })
+        };
+
+        // The desktop, enrolled with that edge.
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "enrolled".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let dir = tempfile::tempdir().expect("dir");
+        let pki = pki_dir(dir.path());
+        std::fs::create_dir_all(&pki).expect("pki");
+        std::fs::write(
+            pki.join("edge.json"),
+            serde_json::json!({ "edge": "https://edge.local", "device_id": device }).to_string(),
+        )
+        .expect("edge");
+        let keys = MemoryKeystore::default();
+        keys.set(crate::enroll::DEVICE_KEY, device_pem.as_bytes())
+            .expect("device key");
+        assert!(
+            routes(&connection, dir.path(), &keys)
+                .expect("routes")
+                .is_none()
+        );
+
+        let imported = import_from_edge(&connection, dir.path(), &keys, &answer("KLA001"))
+            .await
+            .expect("import");
+        assert_eq!(imported, 1);
+        let router = routes(&connection, dir.path(), &keys)
+            .expect("routes")
+            .expect("set up");
+        assert_eq!(
+            sign_in(&router, "nakato", "wrong").await,
+            Err(SignInError::Refused)
+        );
+        assert!(
+            sign_in(&router, "nakato", "correct horse battery")
+                .await
+                .is_ok()
+        );
+
+        let moved = import_from_edge(&connection, dir.path(), &keys, &answer("GUL002")).await;
+        assert!(moved.is_err_and(|e| e.contains("GUL002")));
     }
 }

@@ -283,6 +283,7 @@ mod tests {
             "/sync/v1/pull".to_owned(),
             "/sync/v1/snapshot".to_owned(),
             "/sync/v1/events".to_owned(),
+            "/api/desktop/accounts".to_owned(),
         ];
         let lan = "192.168.1.20:5000";
         let mut problems = Vec::new();
@@ -437,5 +438,39 @@ mod tests {
             welcome["verdict"],
             serde_json::to_value(Verdict::Compatible).expect("json")
         );
+
+        // Its staff for offline sign-in, encrypted to its own key only (#133).
+        let jwk = |key: &p256::ecdsa::SigningKey| serde_json::json!({ "jwk": health_auth::jose::EcJwk::of(key.verifying_key()) });
+        let (status, _) = call(
+            &api,
+            lan,
+            "POST",
+            "/api/desktop/accounts",
+            Some(&desktop),
+            jwk(&stranger),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::FORBIDDEN,
+            "another key than the device's"
+        );
+        let (status, accounts) = call(
+            &api,
+            lan,
+            "POST",
+            "/api/desktop/accounts",
+            Some(&desktop),
+            jwk(&desktop),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{accounts}");
+        assert_eq!(accounts["facility"], "KLA001");
+        assert!(
+            accounts["bundle"]
+                .as_str()
+                .is_some_and(|b| b.split('.').count() == 3)
+        );
+        assert_eq!(accounts["snapshot_keys"].as_array().map(Vec::len), Some(1));
     }
 }

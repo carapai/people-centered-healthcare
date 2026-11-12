@@ -37,12 +37,56 @@ const APP: &str = "health-desktop";
 
 /// The node's API, as the webview reaches it, and the signed-in session, held in Rust.
 struct Api {
-    router: Router,
-    /// Whether local sign-in is set up: provisioned, with the accounts imported.
-    sign_in: bool,
+    /// The node's own API: rebuilt when the edge hands over its staff for offline sign-in.
+    local: Arc<tokio::sync::RwLock<Local>>,
     session: tokio::sync::Mutex<Option<String>>,
     /// Under an edge: the link commands pass through while it can be reached (#133).
     edge: Option<Arc<edge::EdgeLink>>,
+}
+
+/// The node's own router, and whether local sign-in is set up behind it.
+struct Local {
+    router: Router,
+    /// Provisioned or enrolled, with the accounts imported.
+    sign_in: bool,
+}
+
+/// The node's own API over `connection`: the desktop's routes and, once accounts are imported,
+/// local sign-in with the clinical API behind it.
+fn compose(
+    connection: &Connection,
+    dir: &std::path::Path,
+    report: &Arc<encryption::Report>,
+) -> Local {
+    let signed = match auth::routes(connection, dir, &OsKeystore) {
+        Ok(routes) => routes,
+        Err(e) => {
+            eprintln!("health-desktop: no sign-in: {e}");
+            None
+        }
+    };
+    if signed.is_none() {
+        eprintln!(
+            "health-desktop: no accounts imported: no local sign-in, and no records served here"
+        );
+    }
+    let report = Arc::clone(report);
+    let desktop = Router::new().route(
+        "/api/desktop/encryption",
+        get(move || {
+            let report = Arc::clone(&report);
+            async move { axum::Json((*report).clone()) }
+        }),
+    );
+    let sign_in = signed.is_some();
+    let desktop = match signed {
+        Some(routes) => desktop.merge(routes),
+        None => desktop,
+    };
+    Local {
+        router: health_http::app(desktop, Readiness::new(Vec::new())),
+        sign_in,
+    }
 }
 
 /// `invoke('api_request', { envelope })`: the client's TauriIpcTransport. The session's token is
@@ -65,7 +109,8 @@ async fn api_request(api: tauri::State<'_, Api>, mut envelope: Envelope) -> Resu
             .headers
             .insert("authorization".into(), format!("Bearer {token}"));
     }
-    Ok(ipc::dispatch(&api.router, envelope).await)
+    let router = api.local.read().await.router.clone();
+    Ok(ipc::dispatch(&router, envelope).await)
 }
 
 /// `invoke('sign_in', { username, password })`: local sign-in (#134). On success the session is
@@ -85,10 +130,14 @@ async fn sign_in(
     if let Some(signed) = at_edge {
         return signed.map_err(|refused| reason(refused).into());
     }
-    if !api.sign_in {
+    let local = {
+        let local = api.local.read().await;
+        local.sign_in.then(|| local.router.clone())
+    };
+    let Some(router) = local else {
         return Err("unavailable".into());
-    }
-    match auth::sign_in(&api.router, &username, &password).await {
+    };
+    match auth::sign_in(&router, &username, &password).await {
         Ok(token) => {
             *api.session.lock().await = Some(token);
             Ok(())
@@ -214,9 +263,15 @@ async fn open() -> Result<Api, String> {
         );
     }
     let connection = connect(&dir).await?;
+    let report = Arc::new(report);
+    let local = Arc::new(tokio::sync::RwLock::new(compose(
+        &connection,
+        &dir,
+        &report,
+    )));
     // Once provisioned, the desktop syncs with central for its facility (#134). Once enrolled
-    // with an edge, it syncs with the edge, and its rounds tell the link whether the edge is
-    // there (#133).
+    // with an edge, it syncs with the edge, its rounds tell the link whether the edge is there,
+    // and it takes the edge's staff for sign-in while the edge cannot be reached (#133).
     let edge = match edge::EdgeLink::open(&dir, &OsKeystore) {
         Ok(link) => link.map(Arc::new),
         Err(e) => {
@@ -228,7 +283,35 @@ async fn open() -> Result<Api, String> {
         Ok(Some(sync)) => match &edge {
             Some(edge) => {
                 let edge = Arc::clone(edge);
-                tokio::spawn(async move { edge.sync(sync, node::interval()).await });
+                let (connection, dir, report, local) = (
+                    connection.clone(),
+                    dir.clone(),
+                    Arc::clone(&report),
+                    Arc::clone(&local),
+                );
+                let accounts: edge::Accounts = Arc::new(move |answer| {
+                    let (connection, dir, report, local) = (
+                        connection.clone(),
+                        dir.clone(),
+                        Arc::clone(&report),
+                        Arc::clone(&local),
+                    );
+                    Box::pin(async move {
+                        match auth::import_from_edge(&connection, &dir, &OsKeystore, &answer).await
+                        {
+                            Ok(imported) => {
+                                *local.write().await = compose(&connection, &dir, &report);
+                                eprintln!(
+                                    "health-desktop: {imported} staff can sign in here while the edge cannot be reached"
+                                );
+                            }
+                            Err(e) => {
+                                eprintln!("health-desktop: the edge's staff were not taken: {e}")
+                            }
+                        }
+                    })
+                });
+                tokio::spawn(async move { edge.sync(sync, node::interval(), accounts).await });
             }
             None => {
                 tokio::spawn(async move {
@@ -255,34 +338,8 @@ async fn open() -> Result<Api, String> {
         }
         Err(why) => eprintln!("health-desktop: warning: backups are off: {why}"),
     }
-    // Local sign-in and, behind it, the clinical API, once the accounts are imported.
-    let signed = match auth::routes(&connection, &dir, &OsKeystore) {
-        Ok(routes) => routes,
-        Err(e) => {
-            eprintln!("health-desktop: no sign-in: {e}");
-            None
-        }
-    };
-    if signed.is_none() {
-        eprintln!("health-desktop: no accounts imported: no sign-in, and no records served");
-    }
-    let readiness = Readiness::new(Vec::new());
-    let report = Arc::new(report);
-    let desktop = Router::new().route(
-        "/api/desktop/encryption",
-        get(move || {
-            let report = Arc::clone(&report);
-            async move { axum::Json((*report).clone()) }
-        }),
-    );
-    let sign_in = signed.is_some();
-    let desktop = match signed {
-        Some(routes) => desktop.merge(routes),
-        None => desktop,
-    };
     Ok(Api {
-        router: health_http::app(desktop, readiness),
-        sign_in,
+        local,
         session: tokio::sync::Mutex::new(None),
         edge,
     })

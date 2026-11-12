@@ -27,10 +27,21 @@ const EDGE_REDIRECT_PATH: &str = "/callback";
 const TIMEOUT: Duration = Duration::from_secs(15);
 /// How often the edge is tried while it is missed.
 const PROBE: Duration = Duration::from_secs(5);
+/// How often the edge's staff are taken for sign-in while it cannot be reached.
+const ACCOUNTS_EVERY: Duration = Duration::from_secs(3600);
+
+/// What to do with the edge's answer to `POST /api/desktop/accounts`: import it.
+pub(crate) type Accounts = std::sync::Arc<
+    dyn Fn(serde_json::Value) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + std::marker::Sync,
+>;
 
 /// The desktop's link to its edge.
 pub(crate) struct EdgeLink {
     edge: Edge,
+    /// The device's public key, as a JWK: what the edge encrypts its staff's hashes to.
+    jwk: serde_json::Value,
     link: Mutex<Link>,
     /// The signed-in user's token at the edge.
     session: tokio::sync::Mutex<Option<String>>,
@@ -44,21 +55,16 @@ impl EdgeLink {
         };
         let key = enroll::device_key(keys)?
             .ok_or("enrolled, but the device key is not in the keystore")?;
-        Ok(Some(Self::new(Edge::new(
-            &upstream.origin,
-            upstream.ca_pem.as_deref(),
-            key,
-            TIMEOUT,
-        )?)))
+        let jwk = serde_json::to_value(health_auth::jose::EcJwk::of(key.verifying_key()))
+            .map_err(|e| e.to_string())?;
+        let edge = Edge::new(&upstream.origin, upstream.ca_pem.as_deref(), key, TIMEOUT)?;
+        Ok(Some(Self::with_link(edge, jwk, Link::default())))
     }
 
-    pub(crate) fn new(edge: Edge) -> Self {
-        Self::with_link(edge, Link::default())
-    }
-
-    fn with_link(edge: Edge, link: Link) -> Self {
+    fn with_link(edge: Edge, jwk: serde_json::Value, link: Link) -> Self {
         Self {
             edge,
+            jwk,
             link: Mutex::new(link),
             session: tokio::sync::Mutex::new(None),
         }
@@ -132,16 +138,48 @@ impl EdgeLink {
         *self.session.lock().await = None;
     }
 
+    /// The edge's staff for this desktop's location, for sign-in while the edge cannot be
+    /// reached: its answer to `POST /api/desktop/accounts`.
+    pub(crate) async fn accounts(&self) -> Result<serde_json::Value, String> {
+        let answer = self
+            .edge
+            .send(
+                Request {
+                    method: "POST".into(),
+                    path: "/api/desktop/accounts".into(),
+                    query: None,
+                    headers: vec![("content-type".into(), "application/json".into())],
+                    body: serde_json::json!({ "jwk": self.jwk })
+                        .to_string()
+                        .into_bytes(),
+                },
+                None,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        if answer.status != 200 {
+            return Err(format!(
+                "the edge answered {}: {}",
+                answer.status,
+                String::from_utf8_lossy(&answer.body)
+            ));
+        }
+        serde_json::from_slice(&answer.body).map_err(|e| e.to_string())
+    }
+
     /// Syncs with the edge until the process ends: each round that reaches it tells the link the
     /// edge is there and the outbox has gone up; each that fails, that it was missed. While the
-    /// edge is missed it is tried every 5 seconds, otherwise every `interval`.
-    pub(crate) async fn sync(&self, sync: Sync, interval: Duration) {
+    /// edge is missed it is tried every 5 seconds, otherwise every `interval`. Hourly, after a
+    /// round that reached it, the edge's staff are taken and handed to `accounts`.
+    pub(crate) async fn sync(&self, sync: Sync, interval: Duration, accounts: Accounts) {
+        let mut taken: Option<Instant> = None;
         loop {
-            match sync.round().await {
+            let reached = match sync.round().await {
                 Ok(_) => {
                     let mut link = self.link();
                     link.reached(Instant::now());
                     link.drained();
+                    true
                 }
                 Err(why) => {
                     let mut link = self.link();
@@ -149,6 +187,16 @@ impl EdgeLink {
                     if link.mode() != Mode::PassThrough {
                         eprintln!("health-desktop: the edge is unreachable: {why}");
                     }
+                    false
+                }
+            };
+            if reached && taken.is_none_or(|at| at.elapsed() >= ACCOUNTS_EVERY) {
+                match self.accounts().await {
+                    Ok(answer) => {
+                        accounts(answer).await;
+                        taken = Some(Instant::now());
+                    }
+                    Err(e) => eprintln!("health-desktop: the edge's staff were not taken: {e}"),
                 }
             }
             let wait = if self.mode() == Mode::PassThrough {
@@ -260,7 +308,7 @@ mod tests {
         let key = p256::ecdsa::SigningKey::from_bytes(&[3; 32].into()).expect("key");
         let edge =
             Edge::new("https://localhost:1", None, key, Duration::from_secs(5)).expect("edge");
-        EdgeLink::with_link(edge, Link::new(grace))
+        EdgeLink::with_link(edge, serde_json::Value::Null, Link::new(grace))
     }
 
     fn command() -> Envelope {
