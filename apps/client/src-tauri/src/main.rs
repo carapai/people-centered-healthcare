@@ -7,14 +7,17 @@
 //! blocks the client unless the country lets it warn, and `GET /api/desktop/encryption` reports
 //! it to the app either way.
 //!
-//! The FHIR and application routes join the router with local sign-in (#133, #134): until a
-//! session can be checked here, the router serves only the system routes, never records.
+//! Once provisioned and its accounts imported, the desktop is its facility's authorization server
+//! ([`auth`]): staff sign in over IPC (`sign_in`), the session stays in Rust and is attached to
+//! every request, and the clinical API answers behind it. Before that, the router serves only the
+//! system routes, never records.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
+mod auth;
 mod encryption;
 mod node;
 mod provision;
@@ -30,15 +33,60 @@ use tauri::Manager as _;
 /// The app's name: its keystore service and its per-machine directory.
 const APP: &str = "health-desktop";
 
-/// The node's API, as the webview reaches it.
+/// The node's API, as the webview reaches it, and the signed-in session, held in Rust.
 struct Api {
     router: Router,
+    /// Whether local sign-in is set up: provisioned, with the accounts imported.
+    sign_in: bool,
+    session: tokio::sync::Mutex<Option<String>>,
 }
 
-/// `invoke('api_request', { envelope })`: the client's TauriIpcTransport.
+/// `invoke('api_request', { envelope })`: the client's TauriIpcTransport. The session's token is
+/// attached here; any credential the webview put in the envelope is dropped.
 #[tauri::command]
-async fn api_request(api: tauri::State<'_, Api>, envelope: Envelope) -> Result<Reply, ()> {
+async fn api_request(api: tauri::State<'_, Api>, mut envelope: Envelope) -> Result<Reply, ()> {
+    envelope.headers.retain(|name, _| {
+        !name.eq_ignore_ascii_case("authorization") && !name.eq_ignore_ascii_case("dpop")
+    });
+    if let Some(token) = api.session.lock().await.as_ref() {
+        envelope
+            .headers
+            .insert("authorization".into(), format!("Bearer {token}"));
+    }
     Ok(ipc::dispatch(&api.router, envelope).await)
+}
+
+/// `invoke('sign_in', { username, password })`: local sign-in (#134). On success the session is
+/// held here; the answer says only whether it worked, and why not.
+#[tauri::command]
+async fn sign_in(
+    api: tauri::State<'_, Api>,
+    username: String,
+    password: String,
+) -> Result<(), String> {
+    if !api.sign_in {
+        return Err("unavailable".into());
+    }
+    match auth::sign_in(&api.router, &username, &password).await {
+        Ok(token) => {
+            *api.session.lock().await = Some(token);
+            Ok(())
+        }
+        Err(auth::SignInError::Refused) => Err("refused".into()),
+        Err(auth::SignInError::Facility) => Err("facility".into()),
+        Err(auth::SignInError::ChangePassword) => Err("change_password".into()),
+        Err(auth::SignInError::Unavailable(why)) => {
+            eprintln!("health-desktop: sign-in unavailable: {why}");
+            Err("unavailable".into())
+        }
+    }
+}
+
+/// `invoke('sign_out')`: ends the session held here.
+#[tauri::command]
+async fn sign_out(api: tauri::State<'_, Api>) -> Result<(), ()> {
+    *api.session.lock().await = None;
+    Ok(())
 }
 
 /// The OS keystore (Windows Credential Manager, the Linux Secret Service) through `keyring`.
@@ -147,6 +195,17 @@ async fn open() -> Result<Api, String> {
         Ok(None) => eprintln!("health-desktop: not provisioned: no sync with central"),
         Err(e) => eprintln!("health-desktop: cannot sync with central: {e}"),
     }
+    // Local sign-in and, behind it, the clinical API, once the accounts are imported.
+    let signed = match auth::routes(&connection, &dir, &OsKeystore) {
+        Ok(routes) => routes,
+        Err(e) => {
+            eprintln!("health-desktop: no sign-in: {e}");
+            None
+        }
+    };
+    if signed.is_none() {
+        eprintln!("health-desktop: no accounts imported: no sign-in, and no records served");
+    }
     let readiness = Readiness::new(Vec::new());
     let report = Arc::new(report);
     let desktop = Router::new().route(
@@ -156,8 +215,15 @@ async fn open() -> Result<Api, String> {
             async move { axum::Json((*report).clone()) }
         }),
     );
+    let sign_in = signed.is_some();
+    let desktop = match signed {
+        Some(routes) => desktop.merge(routes),
+        None => desktop,
+    };
     Ok(Api {
         router: health_http::app(desktop, readiness),
+        sign_in,
+        session: tokio::sync::Mutex::new(None),
     })
 }
 
@@ -222,6 +288,36 @@ fn main() -> std::process::ExitCode {
     };
     tauri::async_runtime::set(runtime.handle().clone());
     // `health-desktop seed import <file>`: with the client closed, since the store is locked.
+    // `health-desktop accounts import <bundle> --snapshot-keys <keys>`: central's staff bundle.
+    if let [accounts, import, bundle, flag, keys_file] = args.as_slice()
+        && accounts == "accounts"
+        && import == "import"
+        && flag == "--snapshot-keys"
+    {
+        let dir = data_dir();
+        let imported = runtime.block_on(async {
+            let bundle = std::fs::read_to_string(bundle).map_err(|e| format!("{bundle}: {e}"))?;
+            let connection = connect(&dir).await?;
+            auth::import(
+                &connection,
+                &dir,
+                &OsKeystore,
+                &bundle,
+                std::path::Path::new(keys_file),
+            )
+            .await
+        });
+        return match imported {
+            Ok(accounts) => {
+                eprintln!("health-desktop: {accounts} accounts imported; staff can sign in");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("health-desktop: {e}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     if let [seed, import, file] = args.as_slice()
         && seed == "seed"
         && import == "import"
@@ -257,7 +353,7 @@ fn main() -> std::process::ExitCode {
             }
         }))
         .manage(api)
-        .invoke_handler(tauri::generate_handler![api_request])
+        .invoke_handler(tauri::generate_handler![api_request, sign_in, sign_out])
         .run(tauri::generate_context!());
     match result {
         Ok(()) => std::process::ExitCode::SUCCESS,

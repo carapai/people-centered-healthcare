@@ -2,9 +2,8 @@
 //! capability grants (desktop-client.md § Platforms and packaging).
 
 fn main() {
-    tauri_build::try_build(
-        tauri_build::Attributes::new()
-            .app_manifest(tauri_build::AppManifest::new().commands(&["api_request"])),
-    )
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&["api_request", "sign_in", "sign_out"]),
+    ))
     .unwrap_or_else(|error| panic!("tauri build: {error}"));
 }
