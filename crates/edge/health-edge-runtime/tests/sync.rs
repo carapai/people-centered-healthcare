@@ -708,9 +708,12 @@ async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
         software: env!("CARGO_PKG_VERSION").parse().expect("version"),
         approved: BTreeSet::new(),
     };
-    let app = gate.enrollment_router().merge(
-        gate.layer(SyncServer::with_auth(edge.clone(), Arc::new(Desktops), compatibility).router()),
-    );
+    let app =
+        gate.enrollment_router()
+            .merge(gate.device_router())
+            .merge(gate.layer(
+                SyncServer::with_auth(edge.clone(), Arc::new(Desktops), compatibility).router(),
+            ));
     tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
@@ -768,6 +771,49 @@ async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
         Enrollment::Enrolled {
             device: device.to_string()
         }
+    );
+
+    // Its commands reach the edge's gated routes as the enrolled device (pass-through).
+    let client = health_sync_client::edge::Edge::new(
+        &origin,
+        Some(&cert_pem),
+        key.clone(),
+        std::time::Duration::from_secs(10),
+    )
+    .expect("edge client");
+    let answer = client
+        .send(
+            health_sync_client::edge::Request {
+                method: "GET".into(),
+                path: "/api/device".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .expect("answer");
+    assert_eq!(answer.status, 200);
+    let shown: Value = serde_json::from_slice(&answer.body).expect("json");
+    assert_eq!(shown["id"], device.to_string());
+    let gone = health_sync_client::edge::Edge::new(
+        "https://localhost:1",
+        Some(&cert_pem),
+        key.clone(),
+        std::time::Duration::from_secs(10),
+    )
+    .expect("edge client");
+    assert!(
+        gone.send(
+            health_sync_client::edge::Request {
+                method: "GET".into(),
+                path: "/api/device".into(),
+                ..Default::default()
+            },
+            None
+        )
+        .await
+        .is_err(),
+        "an edge that cannot be reached gives no answer"
     );
 
     let desktop = store("desktop").await;

@@ -982,6 +982,20 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#133, part 3: commands pass through to the edge, with failover (2026-11-12).**
+  - **What:**
+    - `health_desktop_runtime::link` is the state machine of desktop-client.md. It passes through to the edge until the edge has been missed for 30 s, then goes offline; once the edge is back it drains before passing through again.
+    - `health_sync_client::edge::Edge` sends a command to the edge with a DPoP proof by the device key. The proof is bound to the user's edge token (`ath`) when one is sent (`health_provisioning::dpop_proof_with_token`).
+    - In `health-desktop`, `api_request` passes commands through while the link does, dropping any credential from the webview. A miss inside the grace answers 503 with `retry-after`, so a write that may have reached the edge is never also made locally. After the grace, commands are answered locally, and `/api/desktop/…` is always local.
+    - `sign_in` runs the same authorization-code flow against the edge as against the local server, through a transport. The token is bound to the device key and held in Rust.
+    - The desktop's sync rounds with the edge drive the link: a round that reaches the edge ends the drain; while the edge is missed, it is tried every 5 seconds.
+  - **Tested:**
+    - the link's rules, with injected instants;
+    - over TLS, the edge client reaches a gated route as the enrolled device, and an unreachable edge gives no answer;
+    - in the desktop, a missed edge is answered 503 inside the grace, and locally after it, as is sign-in;
+    - a command crosses with its query and headers, without the webview's credentials.
+  - **Left to the user's hardware testing:** signing in at a real edge from the desktop, and pulling the network cable mid-shift.
+  - **Next:** local sign-in while offline, from snapshots for staff at the desktop's service points, and edge-owned timers.
 - **#133, part 2: a desktop enrolls with its edge and syncs as that device (2026-11-12).**
   - **What:**
     - `health_provisioning::dpop_proof` signs an RFC 9449 proof for one request.
