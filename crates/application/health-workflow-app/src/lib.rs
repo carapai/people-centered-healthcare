@@ -40,10 +40,12 @@ use uuid::Uuid;
 
 pub mod fhir;
 pub mod gates;
+pub mod sync;
 pub mod tasks;
 pub mod timers;
 
 pub use gates::GatePort;
+pub use sync::{Candidate, Judged};
 pub use timers::{Fired, SCHEDULER_INTERVAL, TimeFloor};
 
 /// Who acts for domain events and timers: the workflow principal, whose permissions are
