@@ -161,3 +161,107 @@ async fn an_edge_imports_its_staff_with_their_hashes_under_its_own_key() {
         .expect("stored");
     assert_eq!(again.lockout.failures, 3);
 }
+
+/// A desktop under an edge (#133): the edge exports the staff at the desktop's location, their
+/// hashes encrypted to the desktop's device key and the bundle signed with the edge's facility
+/// intermediate key; the desktop imports them under its own pepper, checking the bundle against
+/// the edge's key and every snapshot against central's.
+#[tokio::test]
+async fn an_edge_gives_a_desktop_the_staff_at_its_location() {
+    let central = SnapshotSigner::generate();
+    let edge_store = store().await;
+    let edge_credentials = Credentials::new([3; 32].to_vec()).expect("credentials");
+    let at = |locations: &[&str]| {
+        let account = AccountId(Uuid::now_v7());
+        let mut snapshot = snapshot(account, FACILITY);
+        snapshot.roles[0].locations = locations.iter().map(|l| (*l).to_owned()).collect();
+        (account, central.sign(&snapshot, &roles()).expect("sign"))
+    };
+    let everywhere = at(&[]);
+    let opd = at(&["OPD"]);
+    let ward = at(&["Ward 3"]);
+    for (i, (account, jws)) in [&everywhere, &opd, &ward].into_iter().enumerate() {
+        let credential = edge_credentials
+            .seal(
+                *account,
+                &Credentials::hash("correct horse battery").expect("hash"),
+            )
+            .expect("seal");
+        edge_store
+            .put_account(&health_identity::LoginAccount {
+                id: *account,
+                username: format!("staff{i}"),
+                credential,
+                status: AccountStatus::Active,
+                lockout: Lockout::default(),
+            })
+            .await
+            .expect("account");
+        edge_store
+            .put_snapshot(*account, FACILITY, jws)
+            .await
+            .expect("snapshot");
+    }
+    let unused: health_auth::RecipientKey = Arc::new(|| Err("not importing".into()));
+    let edge = Provisioning::new(
+        edge_store,
+        edge_credentials,
+        SnapshotVerifier::new(&[central.public()]).expect("verifier"),
+        NODE,
+        FACILITY,
+        unused,
+    );
+    let intermediate = SnapshotSigner::generate();
+    let device_key = SecretKey::random(&mut rand_core::OsRng);
+    let device = Uuid::now_v7().to_string();
+    let bundle = edge
+        .export(
+            &device,
+            "OPD",
+            &device_key.public_key(),
+            &intermediate,
+            Timestamp::now(),
+        )
+        .await
+        .expect("export");
+
+    let desktop_store = store().await;
+    let desktop_credentials = Credentials::new([9; 32].to_vec()).expect("credentials");
+    let desktop = |bundle_signer: &SnapshotSigner| {
+        let key = device_key.clone();
+        Provisioning::new(
+            desktop_store.clone(),
+            desktop_credentials.clone(),
+            SnapshotVerifier::new(&[central.public()]).expect("verifier"),
+            device.clone(),
+            FACILITY,
+            Arc::new(move || Ok(key.clone())),
+        )
+        .with_bundle_verifier(SnapshotVerifier::new(&[bundle_signer.public()]).expect("verifier"))
+    };
+    // Signed by another key: refused.
+    assert!(
+        desktop(&SnapshotSigner::generate())
+            .import(&bundle)
+            .await
+            .is_err()
+    );
+    let imported = desktop(&intermediate)
+        .import(&bundle)
+        .await
+        .expect("import");
+    assert_eq!(
+        (imported.accounts, imported.snapshots),
+        (2, 2),
+        "not the ward's"
+    );
+    for (account, _) in [&everywhere, &opd] {
+        let stored = desktop_store
+            .account(*account)
+            .await
+            .expect("read")
+            .expect("stored");
+        assert!(desktop_credentials.verify(*account, "correct horse battery", &stored.credential));
+    }
+    assert_eq!(desktop_store.account(ward.0).await.expect("read"), None);
+}

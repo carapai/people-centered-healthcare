@@ -33,6 +33,8 @@ Whether PIN plus an enrolled device counts as MFA for MoH policy is tracked in t
 
 **Provisioning an edge** (ADR 0059): central exports a facility's provisioning bundle, signed with its snapshot key. It holds the staff's Login Accounts and their signed snapshots, with each hash encrypted to the edge's facility intermediate key (ECDH P-256, HKDF-SHA-256, XChaCha20-Poly1305). The edge verifies, decrypts and re-encrypts each hash under its own pepper key. Sync carries the same records later; the bundle is the path for a first install.
 
+**A desktop under an edge** (ADR 0063) gets its staff from the edge: `POST /api/desktop/accounts`, behind the device gate, returns the staff at the desktop's location in the same bundle format. Their hashes are encrypted to the enrolled device key, their snapshots are as central signed them, and the bundle is signed with the edge's facility intermediate key. The desktop re-encrypts each hash under its own pepper, and signs staff in itself while the edge cannot be reached.
+
 ## Permission snapshots (ADR 0011)
 
 - **Contents.** One snapshot per user per facility: roles, ABAC attributes (facility, locations/wards, program assignments), `issued_at` (central time), `not_after` and `snapshot_version`. Central signs it.

@@ -18,9 +18,9 @@ use health_identity::{Lockout, LoginAccount};
 use p256::SecretKey;
 use serde_json::json;
 
-use crate::bundle::{Bundle, BundleError};
+use crate::bundle::{Bundle, BundleAccount, BundleError};
 use crate::credentials::Credentials;
-use crate::snapshot::SnapshotVerifier;
+use crate::snapshot::{SnapshotSigner, SnapshotVerifier};
 use crate::store::AuthStore;
 use crate::surreal::SurrealAuthStore;
 
@@ -60,6 +60,8 @@ pub struct Provisioning {
     store: SurrealAuthStore,
     credentials: Credentials,
     verifier: SnapshotVerifier,
+    /// Who may sign the bundle, when not the snapshot keys: the edge, for its desktops.
+    bundle_verifier: Option<SnapshotVerifier>,
     node_id: String,
     facility: String,
     recipient: RecipientKey,
@@ -79,10 +81,82 @@ impl Provisioning {
             store,
             credentials,
             verifier,
+            bundle_verifier: None,
             node_id: node_id.into(),
             facility: facility.into(),
             recipient,
         }
+    }
+
+    /// Accepts bundles signed by `bundle_verifier`'s keys rather than central's snapshot keys,
+    /// which still verify every snapshot inside: a desktop under an edge, whose bundle the edge
+    /// signs with its facility intermediate key (#133).
+    #[must_use]
+    pub fn with_bundle_verifier(mut self, bundle_verifier: SnapshotVerifier) -> Self {
+        self.bundle_verifier = Some(bundle_verifier);
+        self
+    }
+
+    /// A bundle for the enrolled desktop `node_id` at `location`, its hashes encrypted to the
+    /// desktop's device key `recipient`, signed with `signer` (the edge's facility intermediate
+    /// key): the staff whose snapshots here hold a facility-wide role or one at `location`, with
+    /// those snapshots as central signed them (#133; desktop-client.md: a desktop under an edge
+    /// gets snapshots for staff assigned to its service points).
+    pub async fn export(
+        &self,
+        node_id: &str,
+        location: &str,
+        recipient: &p256::PublicKey,
+        signer: &SnapshotSigner,
+        now: health_time::Timestamp,
+    ) -> Result<String, ImportError> {
+        let unavailable = |e: crate::store::StoreError| ImportError::Unavailable(e.to_string());
+        let mut accounts = Vec::new();
+        let mut snapshots = Vec::new();
+        for (id, jws) in self
+            .store
+            .snapshots_at(&self.facility)
+            .await
+            .map_err(unavailable)?
+        {
+            let Ok(snapshot) = self.verifier.verify(&jws) else {
+                continue;
+            };
+            let here = snapshot.roles.iter().any(|role| {
+                role.locations.is_empty() || role.locations.iter().any(|l| l == location)
+            });
+            if snapshot.account != id || snapshot.not_after <= now || !here {
+                continue;
+            }
+            let Some(account) = self.store.account(id).await.map_err(unavailable)? else {
+                continue;
+            };
+            let Some(phc) = self.credentials.open(id, &account.credential) else {
+                continue;
+            };
+            accounts.push(BundleAccount {
+                id,
+                username: account.username,
+                status: account.status,
+                phc,
+            });
+            snapshots.push(jws);
+        }
+        let local = self
+            .store
+            .local_config()
+            .await
+            .map_err(unavailable)?
+            .unwrap_or_default();
+        Ok(Bundle {
+            facility: self.facility.clone(),
+            node_id: node_id.to_owned(),
+            issued_at: now,
+            accounts,
+            snapshots,
+            local,
+        }
+        .seal(signer, recipient)?)
     }
 
     /// Imports the bundle in `jws`.
@@ -92,7 +166,8 @@ impl Provisioning {
             .await
             .map_err(|e| ImportError::Unavailable(e.to_string()))?
             .map_err(ImportError::Unavailable)?;
-        let bundle = Bundle::open(jws.trim(), &self.verifier, &self.node_id, &key)?;
+        let signers = self.bundle_verifier.as_ref().unwrap_or(&self.verifier);
+        let bundle = Bundle::open(jws.trim(), signers, &self.node_id, &key)?;
         if bundle.facility != self.facility {
             return Err(ImportError::WrongFacility(bundle.facility));
         }

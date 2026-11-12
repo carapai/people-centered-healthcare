@@ -982,6 +982,19 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#133, part 4: offline sign-in under an edge (2026-11-12).** ADR 0063, chosen by the maintainer. With this, #133's scope is built.
+  - **What:**
+    - The edge serves `POST /api/desktop/accounts` behind its device gate. For the enrolled desktop's own key, it returns the staff whose snapshots hold a facility-wide role or one at the device's location. Their hashes are re-encrypted to the device key, and the bundle (ADR 0059's format) is signed with the facility intermediate key. The answer also carries central's snapshot keys.
+    - `health-auth` gains `Provisioning::export` and `with_bundle_verifier`, so the bundle and the snapshots are checked against different keys.
+    - The desktop imports the bundle after enrollment, and hourly after a sync round that reached the edge, under its own pepper. It keeps the facility, refuses an answer naming another, and rebuilds its local router so sign-in starts without a restart.
+    - While the edge cannot be reached, `sign_in` signs staff in locally.
+    - `health-desktop enroll` now requires `--ca`.
+  - **Tested:**
+    - `health-auth`: a desktop at OPD gets the facility-wide and OPD staff but not the ward's, a bundle signed by another key is refused, and the passwords verify under the desktop's pepper.
+    - On the edge, through the gated API: only the device's own key gets a bundle, and the path is gated.
+    - On the desktop: the edge's clinician cannot sign in before the import, signs in after it, a wrong password is refused, and an answer naming another facility is refused.
+  - **Already built:** timers never fire for edge-owned instances. `Workflows::fire_due` skips instances another node is authority for, tested with a desktop replica (#98).
+  - **Left to the user:** #133's acceptance, a desktop working through a LAN outage and reconciling afterwards, on real hardware.
 - **#133, part 3: commands pass through to the edge, with failover (2026-11-12).**
   - **What:**
     - `health_desktop_runtime::link` is the state machine of desktop-client.md. It passes through to the edge until the edge has been missed for 30 s, then goes offline; once the edge is back it drains before passing through again.
