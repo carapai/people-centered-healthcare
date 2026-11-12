@@ -159,6 +159,9 @@ stateDiagram-v2
   - The node key is made in the OS keystore and never written to disk. An unfinished attempt's key is reused.
   - It redeems the code at central with a request for that key, through `health-sync-client`, as the edge does.
   - It keeps the chain only once it verifies against the national root, then writes the root, the chain and the node's identity under the data directory's `pki/`.
+- **#134, part 3: the provisioned desktop syncs.**
+  - Once provisioned, it runs `health-sync-client`'s sync with central as an edge does. Requests are signed with the node key from the OS keystore. It pushes what it wrote, pulls its facility's records into a store indexed as the clinical API searches, and re-seeds from central's streamed snapshot when told to. Attachments go to `files/` beside the store, and it activates the packages its activation records name for its facility. `HEALTH_SYNC_INTERVAL_SECS` sets the polling interval (default 300).
+  - `health-desktop seed import <file>`, with the client closed, applies a signed seed for its facility from removable media (`health_sync_client::seed`, moved there from the edge runtime and shared).
 - **Not yet:**
   - local sign-in and the FHIR and application routes (#133, #134);
   - packaging and signing (#136);

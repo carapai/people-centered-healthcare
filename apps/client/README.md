@@ -60,4 +60,4 @@ bun run build:tauri               # desktop webview bundle (--mode tauri)
 HEALTH_DESKTOP_DATA_DIR=~/health-desktop-data HEALTH_DESKTOP_ENCRYPTION=warn cargo run
 ```
 
-A standalone desktop (mode B) is provisioned once, with a one-time code from central: `cargo run -- provision --code XXXX-XXXX --central https://central… --root root.pem` (desktop-client.md § Provisioning).
+A standalone desktop (mode B) is provisioned once, with a one-time code from central: `cargo run -- provision --code XXXX-XXXX --central https://central… --root root.pem` (desktop-client.md § Provisioning). Once provisioned it syncs with central; a first install the link cannot carry is seeded from removable media with the client closed: `cargo run -- seed import KLA001.seed`, with `KLA001.seed.jws` beside it (`central-server seed export`).
