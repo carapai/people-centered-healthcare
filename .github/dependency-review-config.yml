@@ -66,3 +66,11 @@ allow-dependencies-licenses:
   - pkg:cargo/xxhash-rust
   # tokio-tungstenite-wasm is MIT, but declares it as a license-file that GitHub cannot classify.
   - pkg:cargo/tokio-tungstenite-wasm
+  # Exceptions deny.toml already approves, mirrored here once the desktop's lock (#132) listed
+  # them as new: ext-sort (Unlicense, through SurrealDB) and webpki-root-certs
+  # (CDLA-Permissive-2.0, approved 2026-11-06).
+  - pkg:cargo/ext-sort
+  - pkg:cargo/webpki-root-certs
+  # brotli-decompressor is BSD-3-Clause or MIT, both allowed, written in the old "BSD-3-Clause/MIT"
+  # form GitHub cannot parse (through Tauri's asset compression).
+  - pkg:cargo/brotli-decompressor
