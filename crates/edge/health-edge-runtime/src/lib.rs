@@ -24,7 +24,8 @@
 pub mod activation;
 pub mod admin;
 mod auth;
-pub mod backup;
+/// The node's scheduled backups: `health-backup`'s, shared with the standalone desktop (#134).
+pub use health_backup::node as backup;
 mod config;
 mod discovery;
 mod enrollment;

@@ -20,6 +20,8 @@
 //! - **Restore** imports into an empty database in memory (the decrypted export never touches
 //!   disk), gives the node a new sync epoch, and puts the blobs back into the node's store.
 
+pub mod node;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

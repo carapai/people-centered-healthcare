@@ -20,14 +20,18 @@ health-time = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
+# The node's store (SurrealKV), for the scheduled backups' tests.
+health-surrealdb = { workspace = true, features = ["embedded"] }
 health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
-tempfile = { workspace = true }
 tokio = { workspace = true }
