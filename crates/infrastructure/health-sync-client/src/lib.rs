@@ -25,6 +25,9 @@
 //! minutes, with jitter. Every request is signed with the facility intermediate's key (ADR 0062)
 //! and goes over HTTPS only, verified against central's CA when provisioning named one.
 
+pub mod central;
+pub mod provisioning;
+
 use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Arc;

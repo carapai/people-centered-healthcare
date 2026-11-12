@@ -977,6 +977,12 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - It serves only the system routes until local sign-in (#133, #134).
   - **Dependencies:** licences, bans and sources pass under the repository's policy, with no licence exception. Four unmaintained crates in Tauri's Linux stack (no vulnerability) are ignored with reasons. The lock file was seeded from the main workspace's, after a separate resolution had picked SurrealDB 4.0.1 against the main workspace's 4.0.0, and the main workspace's crate patches are copied.
   - **Tested:** it builds, and passes clippy and its tests (IPC into the router: the system routes answer and no record route exists), with `cargo deny` clean. Running it is left to the user's own testing, per the instruction to skip hardware checks.
+- **#134, part 2a: online provisioning is shared (2026-11-12).**
+  - **What:** the edge's HTTPS calls to central (`central::post`, `post_json`) and the core of online provisioning move into `health-sync-client`, so a standalone desktop can be provisioned the same way.
+    - `provisioning::redeem` sends the code and a certificate request, and maps central's answers: 422 is the machine refused, 403 is the code refused.
+    - `provisioning::verify_chain` keeps a chain only if its first certificate is a facility intermediate for the node's key, and a leaf it issues verifies against the national root.
+  - `facility-edge provision` and its recovery-key escrow now call them, with their key still in the edge's keystore. Four HTTP dependencies the edge app no longer uses are dropped.
+  - **Tested:** the edge's online provisioning test, against central over TLS, passes through the shared code.
 - **#134, part 1: the sync client is shared (2026-11-12).**
   - **What:** the edge's sync client moved out of `health-edge-runtime` into a new infrastructure crate, `health-sync-client`, so the standalone desktop can sync with central too. A runtime library may not depend on another. `health_edge_runtime::sync` re-exports it, so the edge and its tests are unchanged.
   - **Tidied:** five HTTP dependencies the edge runtime no longer uses are dropped.

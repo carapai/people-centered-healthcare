@@ -191,7 +191,7 @@ pub(crate) fn rotate_here(
         Timestamp::now(),
         |jws| {
             let endpoint = format!("{}/api/provisioning/recovery", url.trim_end_matches('/'));
-            match crate::central::post(
+            match health_edge_runtime::sync::central::post(
                 &endpoint,
                 "application/jose",
                 jws.into_bytes(),

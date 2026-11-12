@@ -1,7 +1,8 @@
-//! The edge's calls to central (#268): redeeming its provisioning code, and escrowing its disk
-//! recovery keys. HTTPS only. Central's certificate is verified against the operating system's trust
-//! store, or, when the installer names one, against that CA alone (an in-country private CA).
-//! There is no bundled root store, and no way to skip verification.
+//! A node's one-off calls to central (#268; #134): redeeming its provisioning code, and escrowing
+//! its disk recovery keys. Blocking, for the node's commands. HTTPS only. Central's certificate
+//! is verified against the operating system's trust store, or, when the installer names one,
+//! against that CA alone (an in-country private CA). There is no bundled root store, and no way
+//! to skip verification.
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -51,11 +52,7 @@ fn tls(
 }
 
 /// POSTs `body` as JSON to `url`; returns the status and the JSON answer (`null` if none).
-pub(crate) fn post_json(
-    url: &str,
-    body: &Value,
-    ca_pem: Option<&str>,
-) -> Result<(u16, Value), String> {
+pub fn post_json(url: &str, body: &Value, ca_pem: Option<&str>) -> Result<(u16, Value), String> {
     post(
         url,
         "application/json",
@@ -66,7 +63,7 @@ pub(crate) fn post_json(
 
 /// POSTs `body` of `content_type` to `url`; returns the status and the JSON answer (`null` if
 /// none).
-pub(crate) fn post(
+pub fn post(
     url: &str,
     content_type: &str,
     body: Vec<u8>,

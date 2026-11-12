@@ -30,7 +30,6 @@
 //! | 1 | anything else (the listener, telemetry, serving) |
 
 mod backup;
-mod central;
 mod encryption;
 mod provision;
 mod recovery;
