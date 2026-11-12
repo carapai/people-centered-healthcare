@@ -28,6 +28,7 @@
 //! and goes over HTTPS only, verified against central's CA when provisioning named one.
 
 pub mod central;
+pub mod edge;
 pub mod enrollment;
 pub mod provisioning;
 pub mod seed;
@@ -113,7 +114,7 @@ pub struct Round {
     pub activation: Option<health_activation::Outcome>,
 }
 
-type Https = hyper_rustls::HttpsConnector<HttpConnector>;
+pub(crate) type Https = hyper_rustls::HttpsConnector<HttpConnector>;
 
 /// How a node proves itself to its upstream.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,7 +139,7 @@ pub struct Sync {
     activator: Option<health_activation::Activator>,
 }
 
-fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
+pub(crate) fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let builder = hyper_rustls::HttpsConnectorBuilder::new();
     let builder = match ca_pem {

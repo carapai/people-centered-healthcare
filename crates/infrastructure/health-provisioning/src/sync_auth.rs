@@ -59,6 +59,28 @@ pub fn sync_jws(
 /// syncs with these rather than [`sync_jws`]: it is an enrolled device there, not a provisioned
 /// node (ADR 0062). The proof does not cover the body; the LAN's TLS does.
 pub fn dpop_proof(method: &str, htu: &str, key: &SigningKey, at: Timestamp) -> String {
+    proof(method, htu, key, at, None)
+}
+
+/// [`dpop_proof`] for a request that carries `access_token`, a DPoP-bound token: the proof's
+/// `ath` is the token's hash (RFC 9449 § 4.2).
+pub fn dpop_proof_with_token(
+    method: &str,
+    htu: &str,
+    key: &SigningKey,
+    at: Timestamp,
+    access_token: &str,
+) -> String {
+    proof(method, htu, key, at, Some(access_token))
+}
+
+fn proof(
+    method: &str,
+    htu: &str,
+    key: &SigningKey,
+    at: Timestamp,
+    access_token: Option<&str>,
+) -> String {
     let point = key.verifying_key().to_encoded_point(false);
     let coordinate = |c: Option<&p256::FieldBytes>| {
         URL_SAFE_NO_PAD.encode(c.map(|c| c.as_slice()).unwrap_or_default())
@@ -71,15 +93,16 @@ pub fn dpop_proof(method: &str, htu: &str, key: &SigningKey, at: Timestamp) -> S
         })
         .to_string(),
     );
-    let payload = URL_SAFE_NO_PAD.encode(
-        json!({
-            "jti": uuid::Uuid::now_v7().to_string(),
-            "htm": method,
-            "htu": htu,
-            "iat": at.as_second(),
-        })
-        .to_string(),
-    );
+    let mut claims = json!({
+        "jti": uuid::Uuid::now_v7().to_string(),
+        "htm": method,
+        "htu": htu,
+        "iat": at.as_second(),
+    });
+    if let Some(token) = access_token {
+        claims["ath"] = json!(URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(token.as_bytes())));
+    }
+    let payload = URL_SAFE_NO_PAD.encode(claims.to_string());
     let signature: Signature = key.sign(format!("{header}.{payload}").as_bytes());
     format!(
         "{header}.{payload}.{}",

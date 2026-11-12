@@ -174,6 +174,7 @@ stateDiagram-v2
   - `health-desktop enroll --edge URL [--ca FILE] [--label TEXT]` makes the device key in the OS keystore, asks the edge (`health_sync_client::enrollment`), shows the pairing code for a facility admin to type on the edge, and waits for approval. It then writes `pki/edge.json`. A standalone node, or a desktop already enrolled, is refused.
   - Once enrolled, the desktop syncs with its edge (`Sync::device`): each request carries a DPoP proof by the device key (`health_provisioning::dpop_proof`), and its node in sync is its device id.
   - The edge serves `/sync/v1` behind its device gate, with the logic central serves it (`health_sync_server::PeerAuth`).
+- **#133, part 3: pass-through and failover.** `health_desktop_runtime::link` holds the state machine above. Under an edge, `api_request` passes commands through with the device's DPoP proof and the user's edge token (bound to the device key, held in Rust). A miss inside the 30 s grace answers 503 for the client to retry. After the grace, commands are answered locally until a sync round reaches the edge and drains the outbox. `sign_in` goes to the edge while it can be reached.
 - **Not yet:**
   - packaging and signing (#136);
   - end-to-end tests on WebView2 and WebKitGTK.

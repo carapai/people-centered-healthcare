@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod auth;
+mod edge;
 mod encryption;
 mod enroll;
 mod node;
@@ -40,6 +41,8 @@ struct Api {
     /// Whether local sign-in is set up: provisioned, with the accounts imported.
     sign_in: bool,
     session: tokio::sync::Mutex<Option<String>>,
+    /// Under an edge: the link commands pass through while it can be reached (#133).
+    edge: Option<Arc<edge::EdgeLink>>,
 }
 
 /// `invoke('api_request', { envelope })`: the client's TauriIpcTransport. The session's token is
@@ -49,6 +52,14 @@ async fn api_request(api: tauri::State<'_, Api>, mut envelope: Envelope) -> Resu
     envelope.headers.retain(|name, _| {
         !name.eq_ignore_ascii_case("authorization") && !name.eq_ignore_ascii_case("dpop")
     });
+    // Under an edge, commands pass through to it while it can be reached; the desktop's own
+    // routes are always answered here.
+    if let Some(edge) = &api.edge
+        && !envelope.path.starts_with("/api/desktop/")
+        && let Some(reply) = edge.forward(&envelope).await
+    {
+        return Ok(reply);
+    }
     if let Some(token) = api.session.lock().await.as_ref() {
         envelope
             .headers
@@ -65,6 +76,15 @@ async fn sign_in(
     username: String,
     password: String,
 ) -> Result<(), String> {
+    // Under an edge, staff sign in there while it can be reached (desktop-client.md: online
+    // under an edge, the edge is the authorization server).
+    let at_edge = match &api.edge {
+        Some(edge) => edge.sign_in(&username, &password).await,
+        None => None,
+    };
+    if let Some(signed) = at_edge {
+        return signed.map_err(|refused| reason(refused).into());
+    }
     if !api.sign_in {
         return Err("unavailable".into());
     }
@@ -73,20 +93,30 @@ async fn sign_in(
             *api.session.lock().await = Some(token);
             Ok(())
         }
-        Err(auth::SignInError::Refused) => Err("refused".into()),
-        Err(auth::SignInError::Facility) => Err("facility".into()),
-        Err(auth::SignInError::ChangePassword) => Err("change_password".into()),
-        Err(auth::SignInError::Unavailable(why)) => {
+        Err(refused) => Err(reason(refused).into()),
+    }
+}
+
+/// What the sign-in screen is told for `refused`.
+fn reason(refused: auth::SignInError) -> &'static str {
+    match refused {
+        auth::SignInError::Refused => "refused",
+        auth::SignInError::Facility => "facility",
+        auth::SignInError::ChangePassword => "change_password",
+        auth::SignInError::Unavailable(why) => {
             eprintln!("health-desktop: sign-in unavailable: {why}");
-            Err("unavailable".into())
+            "unavailable"
         }
     }
 }
 
-/// `invoke('sign_out')`: ends the session held here.
+/// `invoke('sign_out')`: ends the session held here, and at the edge.
 #[tauri::command]
 async fn sign_out(api: tauri::State<'_, Api>) -> Result<(), ()> {
     *api.session.lock().await = None;
+    if let Some(edge) = &api.edge {
+        edge.sign_out().await;
+    }
     Ok(())
 }
 
@@ -184,16 +214,30 @@ async fn open() -> Result<Api, String> {
         );
     }
     let connection = connect(&dir).await?;
-    // Once provisioned, the desktop syncs with central for its facility (#134); once enrolled
-    // with an edge, with the edge (#133).
-    match node::sync(connection.clone(), &dir, &OsKeystore) {
-        Ok(Some(sync)) => {
-            tokio::spawn(async move {
-                if let Err(e) = sync.run(node::interval()).await {
-                    eprintln!("health-desktop: sync stopped: {e}");
-                }
-            });
+    // Once provisioned, the desktop syncs with central for its facility (#134). Once enrolled
+    // with an edge, it syncs with the edge, and its rounds tell the link whether the edge is
+    // there (#133).
+    let edge = match edge::EdgeLink::open(&dir, &OsKeystore) {
+        Ok(link) => link.map(Arc::new),
+        Err(e) => {
+            eprintln!("health-desktop: cannot reach the edge: {e}");
+            None
         }
+    };
+    match node::sync(connection.clone(), &dir, &OsKeystore) {
+        Ok(Some(sync)) => match &edge {
+            Some(edge) => {
+                let edge = Arc::clone(edge);
+                tokio::spawn(async move { edge.sync(sync, node::interval()).await });
+            }
+            None => {
+                tokio::spawn(async move {
+                    if let Err(e) = sync.run(node::interval()).await {
+                        eprintln!("health-desktop: sync stopped: {e}");
+                    }
+                });
+            }
+        },
         Ok(None) => eprintln!("health-desktop: neither provisioned nor enrolled: no sync"),
         Err(e) => eprintln!("health-desktop: cannot sync: {e}"),
     }
@@ -240,6 +284,7 @@ async fn open() -> Result<Api, String> {
         router: health_http::app(desktop, readiness),
         sign_in,
         session: tokio::sync::Mutex::new(None),
+        edge,
     })
 }
 

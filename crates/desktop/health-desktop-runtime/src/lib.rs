@@ -5,6 +5,7 @@
 //!   contract.
 //! - [`data_dir`]: the per-machine data directory every user's session on the PC shares.
 //! - [`keystore`]: the OS keystore port. Secrets never reach JavaScript.
+//! - [`link`]: under an edge, whether commands pass through to it or are answered locally.
 //!
 //! The Tauri binary (`apps/client/src-tauri`) composes these with the embedded store and the
 //! application crates.
@@ -12,3 +13,4 @@
 pub mod data_dir;
 pub mod ipc;
 pub mod keystore;
+pub mod link;

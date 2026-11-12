@@ -218,10 +218,50 @@ pub(crate) enum SignInError {
     Unavailable(String),
 }
 
+/// An authorization server's client, as the desktop signs in to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OAuthClient<'a> {
+    /// Its `client_id`.
+    pub(crate) id: &'a str,
+    /// Its registered `redirect_uri`.
+    pub(crate) redirect: &'a str,
+}
+
+/// The desktop's own authorization server's client.
+pub(crate) const LOCAL: OAuthClient<'static> = OAuthClient {
+    id: CLIENT_ID,
+    redirect: REDIRECT,
+};
+
 /// Signs `username` in with `password` through `router`'s authorization server, in process:
 /// authorization code with PKCE, then the token. Returns the access token, which stays in Rust.
 pub(crate) async fn sign_in(
     router: &Router,
+    username: &str,
+    password: &str,
+) -> Result<String, SignInError> {
+    sign_in_with(LOCAL, router, username, password).await
+}
+
+/// Where sign-in's requests go.
+pub(crate) trait Transport: Sync {
+    /// Sends `envelope`; the answer.
+    fn send(&self, envelope: Envelope) -> impl Future<Output = ipc::Reply> + Send;
+}
+
+/// The local authorization server, in process.
+impl Transport for Router {
+    fn send(&self, envelope: Envelope) -> impl Future<Output = ipc::Reply> + Send {
+        ipc::dispatch(self, envelope)
+    }
+}
+
+/// Signs `username` in with `password` at the authorization server `send` reaches, as `client`:
+/// the local one in process, or the edge's over the LAN (#133), through `transport`. Returns the
+/// access token.
+pub(crate) async fn sign_in_with(
+    client: OAuthClient<'_>,
+    transport: &impl Transport,
     username: &str,
     password: &str,
 ) -> Result<String, SignInError> {
@@ -248,14 +288,13 @@ pub(crate) async fn sign_in(
         .into(),
         body: Some(body),
     };
-    let authorized = ipc::dispatch(
-        router,
-        post(
+    let authorized = transport
+        .send(post(
             "/auth/authorize",
             form(&[
                 ("response_type", "code"),
-                ("client_id", CLIENT_ID),
-                ("redirect_uri", REDIRECT),
+                ("client_id", client.id),
+                ("redirect_uri", client.redirect),
                 ("scope", "openid"),
                 ("state", &state),
                 ("code_challenge", &challenge),
@@ -263,9 +302,8 @@ pub(crate) async fn sign_in(
                 ("username", username),
                 ("password", password),
             ]),
-        ),
-    )
-    .await;
+        ))
+        .await;
     let location = authorized
         .headers
         .get("location")
@@ -297,20 +335,18 @@ pub(crate) async fn sign_in(
             "the authorization answered another request".into(),
         ));
     }
-    let token = ipc::dispatch(
-        router,
-        post(
+    let token = transport
+        .send(post(
             "/auth/token",
             form(&[
                 ("grant_type", "authorization_code"),
                 ("code", &code),
-                ("redirect_uri", REDIRECT),
-                ("client_id", CLIENT_ID),
+                ("redirect_uri", client.redirect),
+                ("client_id", client.id),
                 ("code_verifier", &verifier),
             ]),
-        ),
-    )
-    .await;
+        ))
+        .await;
     if token.status != 200 {
         return Err(SignInError::Refused);
     }
