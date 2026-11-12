@@ -1,5 +1,7 @@
 //! A node's sync with its upstream over `/sync/v1` (#81; synchronization.md § Session, § Wake-up;
-//! ADR 0062): the edge's with central, and a standalone desktop's in mode B (#134).
+//! ADR 0062): the edge's with central, and a standalone desktop's in mode B (#134). A desktop
+//! under an edge syncs with the edge the same way, proving each request by its enrolled device
+//! key's DPoP proof instead (#133).
 //!
 //! A round:
 //! 1. **Handshake.** The node says hello and learns central's node id and verdict. Central is
@@ -36,7 +38,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures_util::StreamExt as _;
 use health_identifiers::NodeId;
-use health_provisioning::{SYNC_SCHEME, sync_jws};
+use health_provisioning::{SYNC_SCHEME, dpop_proof, sync_jws};
 use health_surrealdb::{Outgoing, SurrealReplica, SurrealStore};
 use health_sync_protocol::{
     BlobStatus, GroupResult, Hello, Lane, PROTOCOL, PullRequest, PullResponse, SnapshotEvent,
@@ -112,12 +114,23 @@ pub struct Round {
 
 type Https = hyper_rustls::HttpsConnector<HttpConnector>;
 
+/// How a node proves itself to its upstream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Credential {
+    /// A provisioned node to central: each request signed with its facility intermediate's key
+    /// (ADR 0062).
+    Node,
+    /// A desktop to its edge: a DPoP proof by its enrolled device key (lan-security.md).
+    Device,
+}
+
 /// The node's sync with central.
 #[derive(Clone)]
 pub struct Sync {
     store: SurrealStore,
     upstream: Arc<Upstream>,
     key: Arc<SigningKey>,
+    credential: Credential,
     client: Client<Https, Full<VecDeque<u8>>>,
     software: SoftwareVersion,
     blobs: Option<health_files::FsBlobStore>,
@@ -155,12 +168,32 @@ fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
 impl Sync {
     /// Syncs `store` with `upstream`, signing with the facility intermediate's `key`.
     pub fn new(store: SurrealStore, upstream: Upstream, key: SigningKey) -> Result<Self, String> {
+        Self::with_credential(store, upstream, key, Credential::Node)
+    }
+
+    /// Syncs a desktop's `store` with its edge, `upstream`, whose node is the desktop's enrolled
+    /// device id, proving each request with a DPoP proof by the device's `key` (#133).
+    pub fn device(
+        store: SurrealStore,
+        upstream: Upstream,
+        key: SigningKey,
+    ) -> Result<Self, String> {
+        Self::with_credential(store, upstream, key, Credential::Device)
+    }
+
+    fn with_credential(
+        store: SurrealStore,
+        upstream: Upstream,
+        key: SigningKey,
+        credential: Credential,
+    ) -> Result<Self, String> {
         let client =
             Client::builder(TokioExecutor::new()).build(connector(upstream.ca_pem.as_deref())?);
         Ok(Self {
             store,
             upstream: Arc::new(upstream),
             key: Arc::new(key),
+            credential,
             client,
             software: env!("CARGO_PKG_VERSION")
                 .parse()
@@ -373,18 +406,28 @@ impl Sync {
         path: &str,
         body: Vec<u8>,
     ) -> Result<hyper::Request<Full<VecDeque<u8>>>, String> {
-        let token = sync_jws(
-            &self.upstream.node.to_string(),
-            method,
-            path,
-            &body,
-            &self.key,
-            Timestamp::now(),
-        );
+        let uri = format!("{}{path}", self.upstream.origin);
+        let (name, value) = match self.credential {
+            Credential::Node => {
+                let token = sync_jws(
+                    &self.upstream.node.to_string(),
+                    method,
+                    path,
+                    &body,
+                    &self.key,
+                    Timestamp::now(),
+                );
+                ("authorization", format!("{SYNC_SCHEME} {token}"))
+            }
+            Credential::Device => (
+                "dpop",
+                dpop_proof(method, &uri, &self.key, Timestamp::now()),
+            ),
+        };
         let mut request = hyper::Request::builder()
             .method(method)
-            .uri(format!("{}{path}", self.upstream.origin))
-            .header("authorization", format!("{SYNC_SCHEME} {token}"))
+            .uri(&uri)
+            .header(name, value)
             .header("accept-encoding", ZSTD)
             .header(
                 "content-type",

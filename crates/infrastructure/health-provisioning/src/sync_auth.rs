@@ -54,6 +54,39 @@ pub fn sync_jws(
     )
 }
 
+/// A DPoP proof (RFC 9449) for one request by an enrolled LAN device: `method` to `htu` (the
+/// origin and path as sent) at `at`, signed with the device's `key`. A desktop under an edge
+/// syncs with these rather than [`sync_jws`]: it is an enrolled device there, not a provisioned
+/// node (ADR 0062). The proof does not cover the body; the LAN's TLS does.
+pub fn dpop_proof(method: &str, htu: &str, key: &SigningKey, at: Timestamp) -> String {
+    let point = key.verifying_key().to_encoded_point(false);
+    let coordinate = |c: Option<&p256::FieldBytes>| {
+        URL_SAFE_NO_PAD.encode(c.map(|c| c.as_slice()).unwrap_or_default())
+    };
+    let header = URL_SAFE_NO_PAD.encode(
+        json!({
+            "typ": "dpop+jwt",
+            "alg": "ES256",
+            "jwk": { "kty": "EC", "crv": "P-256", "x": coordinate(point.x()), "y": coordinate(point.y()) },
+        })
+        .to_string(),
+    );
+    let payload = URL_SAFE_NO_PAD.encode(
+        json!({
+            "jti": uuid::Uuid::now_v7().to_string(),
+            "htm": method,
+            "htu": htu,
+            "iat": at.as_second(),
+        })
+        .to_string(),
+    );
+    let signature: Signature = key.sign(format!("{header}.{payload}").as_bytes());
+    format!(
+        "{header}.{payload}.{}",
+        URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    )
+}
+
 impl NodeRegistry {
     /// The active node that signed this sync request, after checking the JWS against the
     /// node's key on record, the signing time against central's clock, and the method, path and
