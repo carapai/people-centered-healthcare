@@ -62,6 +62,33 @@ async fn store(namespace: &str) -> SurrealStore {
     SurrealStore::new(connection, Arc::new(SystemClock))
 }
 
+/// A TLS listener on localhost with a self-signed certificate: the listener, its origin and the
+/// certificate's PEM.
+async fn tls() -> (Tls, String, String) {
+    let certified =
+        rcgen::generate_simple_self_signed(vec!["localhost".to_owned()]).expect("certificate");
+    let cert_pem = certified.cert.pem();
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .expect("versions")
+    .with_no_client_auth()
+    .with_single_cert(
+        vec![CertificateDer::from_pem_slice(cert_pem.as_bytes()).expect("cert")],
+        PrivateKeyDer::from_pem_slice(certified.signing_key.serialize_pem().as_bytes())
+            .expect("key"),
+    )
+    .expect("config");
+    let tcp = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let port = tcp.local_addr().expect("address").port();
+    let listener = Tls {
+        tcp,
+        acceptor: TlsAcceptor::from(Arc::new(config)),
+    };
+    (listener, format!("https://localhost:{port}"), cert_pem)
+}
+
 struct Central {
     store: SurrealStore,
     files: health_files::FsBlobStore,
@@ -116,27 +143,7 @@ async fn central() -> Central {
     let app = SyncServer::new(store.clone(), registry, compatibility)
         .with_blobs(files.clone())
         .router();
-    let certified =
-        rcgen::generate_simple_self_signed(vec!["localhost".to_owned()]).expect("certificate");
-    let cert_pem = certified.cert.pem();
-    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .expect("versions")
-    .with_no_client_auth()
-    .with_single_cert(
-        vec![CertificateDer::from_pem_slice(cert_pem.as_bytes()).expect("cert")],
-        PrivateKeyDer::from_pem_slice(certified.signing_key.serialize_pem().as_bytes())
-            .expect("key"),
-    )
-    .expect("config");
-    let tcp = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let port = tcp.local_addr().expect("address").port();
-    let listener = Tls {
-        tcp,
-        acceptor: TlsAcceptor::from(Arc::new(config)),
-    };
+    let (listener, origin, cert_pem) = tls().await;
     tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
@@ -144,7 +151,7 @@ async fn central() -> Central {
         store,
         files,
         _dir: dir,
-        origin: format!("https://localhost:{port}"),
+        origin,
         cert_pem,
         node: node.id.to_string().parse().expect("node id"),
         key: SigningKey::from_pkcs8_pem(&edge_key.serialize_pem()).expect("p256 key"),
@@ -642,4 +649,157 @@ async fn an_activated_package_is_fetched_verified_staged_and_switched_to() {
             .any(|p| p.starts_with("ug.moh.anc@1.0.0: ")),
         "{report:?}"
     );
+}
+
+/// The edge's peers in this test: the enrolled device its gate verified, in the facility's scope
+/// (as `health_edge_runtime`'s own, #133).
+struct Desktops;
+
+impl health_sync_server::PeerAuth for Desktops {
+    fn authenticate<'a>(
+        &'a self,
+        _method: &'a axum::http::Method,
+        _uri: &'a axum::http::Uri,
+        _headers: &'a axum::http::HeaderMap,
+        extensions: &'a axum::http::Extensions,
+        _body: &'a [u8],
+    ) -> std::pin::Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        health_sync_server::AuthenticatedPeer,
+                        health_sync_server::PeerRefused,
+                    >,
+                > + Send
+                + 'a,
+        >,
+    > {
+        let peer = extensions
+            .get::<health_auth::EnrolledDevice>()
+            .map(|enrolled| health_sync_server::AuthenticatedPeer {
+                id: enrolled.device.id.to_string().parse().expect("node id"),
+                scope: health_surrealdb::SyncScope::Facility(FACILITY.into()),
+            })
+            .ok_or_else(|| health_sync_server::PeerRefused::Unauthorized("no device".into()));
+        Box::pin(std::future::ready(peer))
+    }
+}
+
+/// A desktop under an edge (#133): it asks to enroll over HTTPS and learns once it is approved;
+/// then its sync client proves each request with a DPoP proof by its enrolled device key, the
+/// edge's gate admits it, and records move both ways over TLS.
+#[tokio::test]
+async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
+    use health_auth::{DeviceConfig, DeviceGate, DeviceStore as _, SurrealAuthStore};
+    use health_identity::{DeviceId, SessionPolicy};
+    use health_sync_client::enrollment::{self, Enrollment};
+
+    let edge = store("edge").await;
+    let (listener, origin, cert_pem) = tls().await;
+    let devices = SurrealAuthStore::new(edge.clone(), SessionPolicy::default().hard_cap);
+    let key = SigningKey::from_bytes(&[11; 32].into()).expect("key");
+    let gate = DeviceGate::new(
+        devices.clone(),
+        DeviceConfig::new(vec![origin.clone()], "edge"),
+        Arc::new(SystemClock),
+    );
+    let compatibility = Compatibility {
+        protocol: PROTOCOL,
+        software: env!("CARGO_PKG_VERSION").parse().expect("version"),
+        approved: BTreeSet::new(),
+    };
+    let app = gate.enrollment_router().merge(
+        gate.layer(SyncServer::with_auth(edge.clone(), Arc::new(Desktops), compatibility).router()),
+    );
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).await;
+    });
+
+    // The desktop asks over HTTPS and is shown a code; the admin approves it on the edge.
+    let ask = |key: SigningKey, first: bool| {
+        let (origin, ca) = (origin.clone(), cert_pem.clone());
+        tokio::task::spawn_blocking(move || {
+            if first {
+                enrollment::request(&origin, "health-desktop on linux", &key, Some(&ca))
+            } else {
+                enrollment::status(&origin, &key, Some(&ca))
+            }
+        })
+    };
+    let code = match ask(key.clone(), true)
+        .await
+        .expect("join")
+        .expect("request")
+    {
+        Enrollment::Pending { code } => code,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(
+        ask(key.clone(), false)
+            .await
+            .expect("join")
+            .expect("status"),
+        Enrollment::Pending { code: code.clone() }
+    );
+    let request = devices
+        .enrollment_by_code(&code)
+        .await
+        .expect("read")
+        .expect("pending");
+    let device = DeviceId(uuid::Uuid::now_v7());
+    let approved = request
+        .approve(device, "Reception", "OPD", "admin", Timestamp::now())
+        .expect("approve");
+    assert!(
+        devices
+            .enroll(
+                request.id,
+                &approved,
+                &json!({"resourceType": "AuditEvent"})
+            )
+            .await
+            .expect("enroll")
+    );
+    assert_eq!(
+        ask(key.clone(), false)
+            .await
+            .expect("join")
+            .expect("status"),
+        Enrollment::Enrolled {
+            device: device.to_string()
+        }
+    );
+
+    let desktop = store("desktop").await;
+    let registered = patient_seen_here(&edge).await;
+    let recorded = write(&desktop, &observation()).await;
+    let upstream = |key: SigningKey| {
+        Sync::device(
+            desktop.clone(),
+            Upstream {
+                origin: origin.clone(),
+                ca_pem: Some(cert_pem.clone()),
+                node: device.to_string().parse().expect("node id"),
+            },
+            key,
+        )
+        .expect("sync")
+    };
+
+    // Another key is not the enrolled device.
+    let stranger = SigningKey::from_bytes(&[12; 32].into()).expect("key");
+    assert!(upstream(stranger).round().await.is_err());
+
+    let sync = upstream(key);
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.verdict, Some(Verdict::Compatible));
+    assert_eq!(round.pushed, 1, "the desktop's observation goes up");
+    assert_eq!(round.pulled, 2, "the patient and their visit come down");
+    for (resource_type, id) in [("Observation", recorded), ("Patient", registered)] {
+        let at_desktop = version(&desktop, resource_type, id).await;
+        assert!(at_desktop.is_some(), "{resource_type}/{id} at the desktop");
+        assert_eq!(at_desktop, version(&edge, resource_type, id).await);
+    }
+    let again = sync.round().await.expect("round");
+    assert_eq!((again.pushed, again.pulled), (0, 0));
 }

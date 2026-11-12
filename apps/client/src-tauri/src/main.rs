@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 mod auth;
 mod encryption;
+mod enroll;
 mod node;
 mod provision;
 
@@ -183,7 +184,8 @@ async fn open() -> Result<Api, String> {
         );
     }
     let connection = connect(&dir).await?;
-    // Once provisioned, the desktop syncs with central for its facility (#134).
+    // Once provisioned, the desktop syncs with central for its facility (#134); once enrolled
+    // with an edge, with the edge (#133).
     match node::sync(connection.clone(), &dir, &OsKeystore) {
         Ok(Some(sync)) => {
             tokio::spawn(async move {
@@ -192,8 +194,8 @@ async fn open() -> Result<Api, String> {
                 }
             });
         }
-        Ok(None) => eprintln!("health-desktop: not provisioned: no sync with central"),
-        Err(e) => eprintln!("health-desktop: cannot sync with central: {e}"),
+        Ok(None) => eprintln!("health-desktop: neither provisioned nor enrolled: no sync"),
+        Err(e) => eprintln!("health-desktop: cannot sync: {e}"),
     }
     // Hourly encrypted backups, as an edge takes them (#134).
     match node::backups(&dir, |name| {
@@ -269,6 +271,21 @@ fn provision_here(args: &[String]) -> Result<health_sync_client::provisioning::R
     )
 }
 
+/// Enrolls this machine with its edge, showing the pairing code for the admin.
+fn enroll_here(args: &[String]) -> Result<String, String> {
+    let args = enroll::Args::parse(args)?;
+    let dir = data_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("cannot create the data directory {}: {e}", dir.display()))?;
+    let mut edge = enroll::Https::new(&args)?;
+    enroll::enroll(&args, &dir, &OsKeystore, &mut edge, |code| {
+        eprintln!(
+            "health-desktop: ask a facility admin to approve this desktop on the edge with the \
+             pairing code {code}; waiting…"
+        );
+    })
+}
+
 fn main() -> std::process::ExitCode {
     // `health-desktop provision …`: once, by an admin, before the client is used (#134).
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -279,6 +296,19 @@ fn main() -> std::process::ExitCode {
                     "health-desktop: provisioned as {} ({}) at {}",
                     redeemed.short_code, redeemed.node_id, redeemed.facility
                 );
+                std::process::ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("health-desktop: {e}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    // `health-desktop enroll …`: once, under an edge, with an admin there to approve it (#133).
+    if args.first().map(String::as_str) == Some("enroll") {
+        return match enroll_here(&args[1..]) {
+            Ok(device) => {
+                eprintln!("health-desktop: enrolled with the edge as device {device}");
                 std::process::ExitCode::SUCCESS
             }
             Err(e) => {

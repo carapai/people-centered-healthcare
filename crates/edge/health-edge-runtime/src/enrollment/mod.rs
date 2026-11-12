@@ -324,7 +324,6 @@ mod tests {
         key: Option<&p256::ecdsa::SigningKey>,
         body: serde_json::Value,
     ) -> (StatusCode, serde_json::Value) {
-        use health_auth::jose::{EcJwk, sign};
         use http_body_util::BodyExt;
 
         let peer: SocketAddr = peer.parse().expect("peer");
@@ -334,18 +333,13 @@ mod tests {
             .uri(path)
             .header("content-type", "application/json");
         if let Some(key) = key {
-            let claims = serde_json::json!({
-                "jti": uuid::Uuid::now_v7().to_string(),
-                "htm": method,
-                "htu": format!("https://edge.test{path}"),
-                "iat": SystemClock.now().as_second(),
-            });
-            let header = serde_json::json!({
-                "typ": "dpop+jwt",
-                "alg": "ES256",
-                "jwk": EcJwk::of(key.verifying_key()),
-            });
-            request = request.header("dpop", sign(key, &header, &claims));
+            let proof = health_provisioning::dpop_proof(
+                method,
+                &format!("https://edge.test{path}"),
+                key,
+                SystemClock.now(),
+            );
+            request = request.header("dpop", proof);
         }
         let request = request.body(Body::from(body.to_string())).expect("request");
         let response = router.oneshot(request).await.expect("response");

@@ -54,7 +54,7 @@ use uuid::Uuid;
 
 pub use kms::{KeyWrap, LocalKeyWrap};
 pub use routes::{recovery_router, router};
-pub use sync_auth::{SYNC_SCHEME, SYNC_SKEW_SECS, SYNC_TYP, sync_jws};
+pub use sync_auth::{SYNC_SCHEME, SYNC_SKEW_SECS, SYNC_TYP, dpop_proof, sync_jws};
 
 /// What issues facility intermediates: central's issuing CA, whose key is held in the HSM or KMS
 /// (security.md § Keys), so issuance is a port.

@@ -39,7 +39,7 @@ pub(crate) fn store(connection: Connection) -> SurrealStore {
         .with_registry(health_fhir_server::search_registry())
 }
 
-/// The sync task, once this machine is provisioned; `None` before, with why.
+/// The sync task, once this machine is provisioned, or enrolled with an edge; `None` before.
 pub(crate) fn sync(
     connection: Connection,
     data_dir: &Path,
@@ -47,7 +47,8 @@ pub(crate) fn sync(
 ) -> Result<Option<Sync>, String> {
     let pki = pki_dir(data_dir);
     let Some(upstream) = Upstream::from_identity(&pki) else {
-        return Ok(None);
+        // Under an edge, it syncs with the edge as its enrolled device instead (#133).
+        return crate::enroll::sync(store(connection), data_dir, keys);
     };
     let pem = keys
         .get(KEY)
