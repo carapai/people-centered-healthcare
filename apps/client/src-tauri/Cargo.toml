@@ -18,6 +18,7 @@ layer = "runtime"
 [dependencies]
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "matched-path", "tokio"] }
 health-backup = { path = "../../../crates/infrastructure/health-backup" }
+health-authority-leases = { path = "../../../crates/domains/health-authority-leases" }
 health-auth = { path = "../../../crates/infrastructure/health-auth" }
 health-activation = { path = "../../../crates/infrastructure/health-activation" }
 health-configuration = { path = "../../../crates/domains/health-configuration" }
