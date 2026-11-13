@@ -111,7 +111,14 @@ stateDiagram-v2
   - **Facilities.** Each provider reference records its facility (`provider_request`, migration `0056_provider_requests`) before the request goes out. A callback and the minute poller settle each payment in its own facility's ledger, and the poller also expires the overdue.
   - **Balances.** `Payments::balances` builds a facility's ledger from that facility's postings only. Central keeps every facility's postings in one store, so the balances refused once a second facility had posted.
 - **Mobile money, #124 part 4: statements.** `POST /api/payments/momo/statements` `{from, until, lines}` (supervise permission) takes MTN's statement for a period, as exported from its partner portal. The pending payments it shows are confirmed. A different amount or an unknown line is queued, and so is a payment requested in the period and posted here that the statement does not show (`missing`: money the ledger counts in the merchant account that MTN does not). The exception kind is added by migration `0057_missing_payment_exceptions`.
-  - **Still to come:** an edge asking central to initiate, and Airtel after its API is verified.
+- **Mobile money, #124 part 5: edges, through central's relay** (`mobile_money::relay`; the maintainer's choice, 2026-11-13).
+  - **Central** holds the facility's MTN keys and serves two node-signed routes beside `/sync/v1`, checked as sync is:
+    - `POST /sync/v1/momo/requests` sends the request to pay for the edge's facility, once per reference: a repeat is not sent again.
+    - `POST /sync/v1/momo/status` reads MTN's status, only for a reference that facility made.
+
+    It keeps no copy of the edge's payment. Its requests go uncompressed, signed over the body as sent.
+  - **The edge** keeps its facility's ledger. It runs the same `Collections` flow over a `RelayTransport` (through a `CentralLink`): it records the pending payment and its reference first, polls through central, and confirms or voids in its own ledger.
+  - **Still to come:** the edge's payment routes, which it does not serve yet, with a `CentralLink` over its sync client; and Airtel after its API is verified.
 
 ## Other flows
 

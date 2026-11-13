@@ -165,6 +165,11 @@ impl<T: MomoTransport + Clone + 'static> MomoService<T> {
         Ok(Self { store, collections })
     }
 
+    /// The store.
+    pub(crate) fn store(&self) -> &SurrealStore {
+        &self.store
+    }
+
     /// The facility's collections, if it has an account.
     pub fn collections(&self, facility: &str) -> Option<&Collections<T>> {
         self.collections.get(facility)

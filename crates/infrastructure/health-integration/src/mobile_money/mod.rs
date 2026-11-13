@@ -32,8 +32,10 @@ mod central;
 mod collections;
 mod https;
 mod mtn;
+mod relay;
 
 pub use central::{MomoAccounts, MomoService};
 pub use collections::{CollectionError, Collections, Settled};
 pub use https::HttpsTransport;
 pub use mtn::{Initiated, MomoError, MomoTransport, MtnConfig, MtnMomo, ProviderStatus, Request};
+pub use relay::{CentralLink, RelayTransport};

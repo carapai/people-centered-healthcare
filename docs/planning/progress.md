@@ -1021,6 +1021,18 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 5: edges collect MoMo through central's relay (2026-11-13).** Chosen by the maintainer.
+  - **What:**
+    - **Central** relays: it holds the keys, sends each reference's request to pay once, and answers status only to the facility that made the reference. It uses node-signed routes beside `/sync/v1`, checked by central's node registry.
+    - **The edge** runs the same flow over `RelayTransport`, keeping the payment in its own ledger.
+  - **Tested** in process:
+    - an edge's payment is requested through central and confirmed in the edge's ledger, with no copy at central;
+    - a repeat is not sent again;
+    - another facility cannot read or reuse the reference;
+    - an unsigned caller is refused.
+  - **Still open:**
+    - the edge's payment routes, which edges do not serve yet;
+    - Airtel, after its API is verified.
 - **#124, part 4: statement import (2026-11-13).**
   - **What:** `POST /api/payments/momo/statements` `{from, until, lines}` (supervise permission) reconciles MTN's statement for a period. It confirms the pending payments the statement shows, and queues mismatches, unknown lines and posted payments of the period it does not show (`missing`, migration `0057_missing_payment_exceptions`).
   - **Tested:** a statement confirms the pending payment it shows and queues the callback-confirmed one it does not; it is refused to a cashier and for an empty period.

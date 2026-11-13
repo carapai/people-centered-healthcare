@@ -2876,6 +2876,7 @@ dependencies = [
  "health-payments-app",
  "health-persistence",
  "health-surrealdb",
+ "health-sync-server",
  "health-time",
  "http-body-util",
  "hyper",
