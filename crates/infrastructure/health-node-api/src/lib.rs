@@ -61,6 +61,9 @@ pub struct Clinical {
     registry: Option<(String, ShortCode)>,
     /// The workflows it runs, at `/api/workflow`, if any.
     workflows: Option<WorkflowConfig>,
+    /// Payments and cashier shifts at `/api/payments` (#254), with any routes beside them such
+    /// as MoMo collections (#124).
+    payments: Option<(health_fhir_server::PaymentConfig, Router)>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
 }
 
@@ -102,6 +105,7 @@ impl Clinical {
             node: node.to_owned(),
             registry,
             workflows: None,
+            payments: None,
             built: Arc::new(RwLock::new(None)),
         }
     }
@@ -110,6 +114,18 @@ impl Clinical {
     #[must_use]
     pub fn with_workflows(mut self, config: WorkflowConfig) -> Self {
         self.workflows = Some(config);
+        self
+    }
+
+    /// Takes payments at `/api/payments` with `config` (#254), with `beside` merged in, behind
+    /// the same sign-in: the routes of MoMo collections (#124), or an empty router.
+    #[must_use]
+    pub fn with_payments(
+        mut self,
+        config: health_fhir_server::PaymentConfig,
+        beside: Router,
+    ) -> Self {
+        self.payments = Some((config, beside));
         self
     }
 
@@ -155,6 +171,14 @@ impl Clinical {
             Some(workflows) => fhir.with_workflows(workflows.clone()),
             None => fhir,
         };
+        let fhir = match &self.payments {
+            Some((config, _)) => fhir.with_payments(config.clone()),
+            None => fhir,
+        };
+        let payments = match &self.payments {
+            Some((_, beside)) => fhir.payments_router().merge(beside.clone()),
+            None => fhir.payments_router(),
+        };
         let subjects = Subjects::new(self.verifier.clone(), config.roles.clone());
         let layer =
             axum::middleware::from_fn_with_state(subjects, subject_layer::<SurrealAuthStore>);
@@ -169,6 +193,7 @@ impl Clinical {
             )
             .nest("/api/notes", fhir.notes_router().layer(signed()))
             .nest("/api/workflow", fhir.workflow_router().layer(signed()))
+            .nest("/api/payments", payments.layer(signed()))
             .layer(layer)
     }
 
@@ -195,8 +220,9 @@ impl Clinical {
         Ok(Some(router))
     }
 
-    /// `/api/fhir`, `/api/reception`, `/api/consultation`, `/api/notes` and `/api/workflow`, to
-    /// be put behind the device gate. Without workflows, `/api/workflow` answers 404.
+    /// `/api/fhir`, `/api/reception`, `/api/consultation`, `/api/notes`, `/api/workflow` and
+    /// `/api/payments`, to be put behind the device gate. Without workflows or payments, those
+    /// answer 404.
     pub fn routes(self) -> Router {
         let mut router = Router::new();
         for prefix in [
@@ -205,6 +231,7 @@ impl Clinical {
             "/api/consultation",
             "/api/notes",
             "/api/workflow",
+            "/api/payments",
         ] {
             router = router
                 .route(prefix, any(serve))

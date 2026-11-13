@@ -48,6 +48,8 @@ Deploying an edge to a facility waits for the power-loss spike, [Does embedded S
 | `HEALTH_FACILITY` | none | The facility this edge serves. With `HEALTH_SNAPSHOT_KEYS_FILE`, the node serves staff sign-in (#75) |
 | `HEALTH_NODE_CODE` | none | This edge's short code in the numbers it mints (`A–Z`, `0–9`, up to 8), unique among the facility's nodes, e.g. `E1`. With `HEALTH_REGISTRY_NIN_SYSTEM`, the edge registers patients, their MRNs under this code (#106) |
 | `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID's identifier system, which registration matches on, as at central |
+| `HEALTH_PAYMENT_TILLS` | none | The tills, comma-separated. With `HEALTH_NODE_CODE`, `/api/payments` takes payments and runs cashier shifts in this edge's ledger (#254). Once the edge is provisioned, it also collects MTN MoMo (`/api/payments/momo`) through central's relay, which holds the facility's MTN keys (#124) |
+| `HEALTH_CURRENCY` | `UGX` | The ledger's functional currency (ISO 4217) |
 | `HEALTH_DISTRICT` | none | The facility's district, whose package activations apply here (#89) |
 | `HEALTH_PROGRAMS` | none | The programs the facility runs, comma-separated, whose package activations apply here (#89) |
 | `HEALTH_SNAPSHOT_KEYS_FILE` | none | Central's snapshot public keys, a JSON array of JWKs (`central-server provision snapshot-keys`) |

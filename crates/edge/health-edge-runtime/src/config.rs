@@ -101,6 +101,12 @@ pub struct EdgeConfig {
     /// `HEALTH_REGISTRY_NIN_SYSTEM`: the national ID's identifier system, which registration
     /// matches on.
     pub registry_nin_system: Option<String>,
+    /// `HEALTH_PAYMENT_TILLS`: the tills, comma-separated. With them and `HEALTH_NODE_CODE`,
+    /// `/api/payments` takes payments and runs cashier shifts (#254), and MTN MoMo is collected
+    /// through central's relay once the edge is provisioned (#124).
+    pub payment_tills: Vec<String>,
+    /// `HEALTH_CURRENCY`, default `UGX`: the ledger's functional currency.
+    pub currency: String,
     /// `HEALTH_DISTRICT`: the facility's district, whose package activations apply here (#89).
     pub district: Option<String>,
     /// `HEALTH_PROGRAMS`: the programs the facility runs, comma-separated, whose package
@@ -218,6 +224,17 @@ impl EdgeConfig {
             registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM")
                 .map(|s| s.trim().to_owned())
                 .filter(|s| !s.is_empty()),
+            payment_tills: get("HEALTH_PAYMENT_TILLS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .map(str::to_owned)
+                .collect(),
+            currency: get("HEALTH_CURRENCY")
+                .map(|c| c.trim().to_owned())
+                .filter(|c| !c.is_empty())
+                .unwrap_or_else(|| "UGX".to_owned()),
             district: get("HEALTH_DISTRICT")
                 .map(|d| d.trim().to_owned())
                 .filter(|d| !d.is_empty()),
@@ -312,6 +329,21 @@ mod tests {
         );
         let none = config(&[("HEALTH_DATA_DIR", "/d")]).expect("config");
         assert_eq!((none.district, none.programs.len()), (None, 0));
+    }
+
+    #[test]
+    fn payments_take_the_tills_and_the_currency() {
+        let c = EdgeConfig::from_lookup(|name| match name {
+            "HEALTH_DATA_DIR" => Some("/d".into()),
+            "HEALTH_PAYMENT_TILLS" => Some(" till-1, ,till-2 ".into()),
+            _ => None,
+        })
+        .expect("config");
+        assert_eq!(c.payment_tills, ["till-1", "till-2"]);
+        assert_eq!(c.currency, "UGX", "the default");
+        let none = EdgeConfig::from_lookup(|name| (name == "HEALTH_DATA_DIR").then(|| "/d".into()))
+            .expect("config");
+        assert!(none.payment_tills.is_empty(), "no tills, no payments");
     }
 
     #[test]
