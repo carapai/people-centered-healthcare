@@ -377,19 +377,31 @@ where
         Ok(shift)
     }
 
-    /// Reconciles a provider statement with the pending payments: those it confirms are
-    /// confirmed by the statement; mismatched amounts and unknown lines come back as exceptions
-    /// for a person. (Posted payments missing from a statement are central's daily check, #124.)
+    /// Reconciles a provider statement with the payments: the pending ones it shows are confirmed
+    /// by the statement; mismatched amounts and lines no payment has come back as exceptions for
+    /// a person. A line for a payment already posted (by its callback or a poll) is matched, not
+    /// an exception. Posted payments missing from a statement need the period's payments, which
+    /// the statement import does not yet bring.
     pub async fn reconcile_statement(
         &self,
         lines: &[StatementLine],
         at: Timestamp,
     ) -> Result<Reconciliation, PaymentsError> {
-        let pending = {
+        // The pending payments, and those the lines name whatever their status: a payment its
+        // callback already confirmed is on the statement too, and is neither confirmed again nor
+        // an unknown line.
+        let payments = {
             let mut tx = self.store.begin().await?;
-            tx.pending_payments().await?
+            let mut payments = tx.pending_payments().await?;
+            let references: Vec<String> = lines.iter().map(|l| l.reference.clone()).collect();
+            for payment in tx.payments_with_references(&references).await? {
+                if !payments.iter().any(|p| p.id == payment.id) {
+                    payments.push(payment);
+                }
+            }
+            payments
         };
-        let result = reconcile(&pending, lines);
+        let result = reconcile(&payments, lines);
         for id in &result.confirm {
             self.confirm(id, Evidence::Statement, at).await?;
         }

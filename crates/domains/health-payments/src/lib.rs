@@ -484,6 +484,11 @@ pub trait PaymentStore {
         &mut self,
         shift: &str,
     ) -> impl std::future::Future<Output = Result<Vec<Payment>, health_persistence::StoreError>> + Send;
+    /// The payments with any of `references` as their provider reference, whatever their status.
+    fn payments_with_references(
+        &mut self,
+        references: &[String],
+    ) -> impl std::future::Future<Output = Result<Vec<Payment>, health_persistence::StoreError>> + Send;
     /// The payments still pending (or pending unverified), oldest first.
     fn pending_payments(
         &mut self,

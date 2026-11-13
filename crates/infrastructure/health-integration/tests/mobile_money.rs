@@ -127,6 +127,7 @@ impl MomoTransport for Mock {
 struct Fixture {
     collections: Collections<Mock>,
     payments: Payments<SurrealStore>,
+    store: SurrealStore,
     mock: Mock,
     clock: Arc<FixedClock>,
 }
@@ -179,12 +180,14 @@ async fn fixture() -> Fixture {
     );
     Fixture {
         collections: Collections::new(
-            Payments::new(store.clone(), settings()),
+            store.clone(),
+            settings(),
             mtn,
             Arc::clone(&clock) as Arc<dyn Clock>,
             SignedDuration::from_hours(1),
         ),
-        payments: Payments::new(store, settings()),
+        payments: Payments::new(store.clone(), settings()),
+        store,
         mock,
         clock,
     }
@@ -227,19 +230,13 @@ async fn a_callback_posts_once_however_often_it_comes() {
     let reference = payment.reference.clone().expect("reference");
     assert_eq!(f.balances().await, (Decimal::from(15_000), Decimal::ZERO));
 
-    let body = f.mock.answer(&reference, "SUCCESSFUL", "15000");
+    f.mock.answer(&reference, "SUCCESSFUL", "15000");
     assert_eq!(
-        f.collections
-            .callback(&reference, &body)
-            .await
-            .expect("callback"),
+        f.collections.callback(&reference).await.expect("callback"),
         Settled::Confirmed
     );
     assert_eq!(
-        f.collections
-            .callback(&reference, &body)
-            .await
-            .expect("again"),
+        f.collections.callback(&reference).await.expect("again"),
         Settled::AlreadySettled
     );
     let posted = f.payments.payment("pay-1").await.expect("payment");
@@ -331,14 +328,14 @@ async fn refusals_and_failures_void_the_payment() {
         .initiate(&new("pay-2"), "256772000001", "OPD visit", None)
         .await
         .expect("initiate");
-    let body = f.mock.answer(
+    f.mock.answer(
         declined.reference.as_deref().expect("reference"),
         "FAILED",
         "15000",
     );
     let settled = f
         .collections
-        .callback(declined.reference.as_deref().expect("reference"), &body)
+        .callback(declined.reference.as_deref().expect("reference"))
         .await
         .expect("callback");
     assert!(matches!(settled, Settled::Voided(why) if why.contains("APPROVAL_REJECTED")));
@@ -358,12 +355,9 @@ async fn a_wrong_amount_is_never_posted() {
         .await
         .expect("initiate");
     let reference = payment.reference.expect("reference");
-    let body = f.mock.answer(&reference, "SUCCESSFUL", "1500");
+    f.mock.answer(&reference, "SUCCESSFUL", "1500");
     assert_eq!(
-        f.collections
-            .callback(&reference, &body)
-            .await
-            .expect("callback"),
+        f.collections.callback(&reference).await.expect("callback"),
         Settled::AmountMismatch {
             recorded: Decimal::from(15_000),
             provider: Decimal::from(1_500),
@@ -373,6 +367,10 @@ async fn a_wrong_amount_is_never_posted() {
         f.payments.payment("pay-1").await.expect("payment").status,
         Status::Pending
     );
+    let queued = f.store.open_payment_exceptions().await.expect("exceptions");
+    assert_eq!(queued.len(), 1, "for a person");
+    assert_eq!(queued[0].kind, "amount");
+    assert_eq!(queued[0].provider.as_deref(), Some("1500"));
 }
 
 #[tokio::test]
@@ -407,10 +405,7 @@ async fn an_unknown_reference_is_not_settled() {
     let f = fixture().await;
     assert_eq!(
         f.collections
-            .callback(
-                "8f0e3c6a-1111-4c4c-9999-000000000000",
-                &json!({ "status": "SUCCESSFUL", "amount": "100" })
-            )
+            .callback("8f0e3c6a-1111-4c4c-9999-000000000000")
             .await
             .expect("callback"),
         Settled::AlreadySettled
@@ -426,11 +421,8 @@ async fn a_callback_racing_a_poll_posts_once() {
         .await
         .expect("initiate");
     let reference = payment.reference.expect("reference");
-    let body = f.mock.answer(&reference, "SUCCESSFUL", "15000");
-    let (callback, poll) = tokio::join!(
-        f.collections.callback(&reference, &body),
-        f.collections.poll()
-    );
+    f.mock.answer(&reference, "SUCCESSFUL", "15000");
+    let (callback, poll) = tokio::join!(f.collections.callback(&reference), f.collections.poll());
     // Whichever loses the race sees it settled (or retries later on a store conflict).
     let confirmed = usize::from(matches!(callback, Ok(Settled::Confirmed)))
         + poll
@@ -442,4 +434,89 @@ async fn a_callback_racing_a_poll_posts_once() {
     // Whatever the race left, a later poll settles it, and the money lands once.
     f.collections.poll().await.expect("poll");
     assert_eq!(f.balances().await, (Decimal::ZERO, Decimal::from(15_000)));
+}
+
+#[tokio::test]
+async fn a_forged_callback_settles_nothing() {
+    let f = fixture().await;
+    let payment = f
+        .collections
+        .initiate(&new("pay-1"), "256772000001", "OPD visit", None)
+        .await
+        .expect("initiate");
+    // Someone calls the public callback route; MTN still says the payer has not paid.
+    assert_eq!(
+        f.collections
+            .callback(payment.reference.as_deref().expect("reference"))
+            .await
+            .expect("callback"),
+        Settled::Waiting
+    );
+    assert_eq!(f.balances().await, (Decimal::from(15_000), Decimal::ZERO));
+}
+
+#[tokio::test]
+async fn a_statement_confirms_what_it_shows_and_queues_the_rest() {
+    use health_payments::StatementLine;
+
+    let f = fixture().await;
+    let shown = f
+        .collections
+        .initiate(&new("pay-1"), "256772000001", "OPD visit", None)
+        .await
+        .expect("initiate");
+    let differs = f
+        .collections
+        .initiate(&new("pay-2"), "256772000002", "OPD visit", None)
+        .await
+        .expect("initiate");
+    let line = |payment: &health_payments::Payment, amount: i64| StatementLine {
+        reference: payment.reference.clone().expect("reference"),
+        amount: Decimal::from(amount),
+    };
+    let lines = [
+        line(&shown, 15_000),
+        line(&differs, 14_000),
+        StatementLine {
+            reference: "nobody-has-this".into(),
+            amount: Decimal::from(500),
+        },
+    ];
+    let result = f
+        .collections
+        .reconcile_statement(&lines)
+        .await
+        .expect("reconcile");
+    assert_eq!(result.confirm, vec!["pay-1".to_owned()]);
+    assert_eq!(
+        f.payments.payment("pay-1").await.expect("payment").evidence,
+        Some(Evidence::Statement)
+    );
+    // Reconciled again (the same statement twice): the queue holds each exception once.
+    f.collections
+        .reconcile_statement(&lines)
+        .await
+        .expect("again");
+    let queued = f.store.open_payment_exceptions().await.expect("exceptions");
+    let kinds: Vec<(&str, &str)> = queued
+        .iter()
+        .map(|e| (e.kind.as_str(), e.reference.as_str()))
+        .collect();
+    assert_eq!(queued.len(), 2, "{kinds:?}");
+    assert!(kinds.contains(&(
+        "mismatched",
+        differs.reference.as_deref().expect("reference")
+    )));
+    assert!(kinds.contains(&("unknown", "nobody-has-this")));
+    // A person resolves one; it leaves the queue.
+    assert!(
+        f.store
+            .resolve_payment_exception(&queued[0].id, "supervisor", "checked with MTN")
+            .await
+            .expect("resolve")
+    );
+    assert_eq!(
+        f.store.open_payment_exceptions().await.expect("open").len(),
+        1
+    );
 }

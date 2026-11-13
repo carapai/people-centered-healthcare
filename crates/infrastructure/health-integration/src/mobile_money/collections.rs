@@ -1,7 +1,9 @@
 //! Collecting a payment by MTN MoMo, over the payment use cases.
 
-use health_payments::{Evidence, Method, NewPayment, Payment, PaymentRefused, Status};
-use health_payments_app::{Payments, PaymentsError};
+use health_payments::{
+    Evidence, Method, NewPayment, Payment, PaymentRefused, Reconciliation, StatementLine, Status,
+};
+use health_payments_app::{Payments, PaymentsError, Settings};
 use health_surrealdb::SurrealStore;
 use health_time::{Clock, SignedDuration};
 use std::sync::Arc;
@@ -45,6 +47,8 @@ pub enum Settled {
 /// MTN MoMo collections for one facility's merchant account.
 pub struct Collections<T> {
     payments: Payments<SurrealStore>,
+    /// The store, for the exceptions queue.
+    store: SurrealStore,
     mtn: MtnMomo<T>,
     clock: Arc<dyn Clock>,
     /// How long a payment waits for the payer before it expires.
@@ -54,16 +58,18 @@ pub struct Collections<T> {
 }
 
 impl<T: MomoTransport> Collections<T> {
-    /// Collections into `mtn`'s account, recorded through `payments`; a payment expires after
-    /// `pending_for` without evidence.
+    /// Collections into `mtn`'s account, recorded in `store` under the facility's `settings`; a
+    /// payment expires after `pending_for` without evidence.
     pub fn new(
-        payments: Payments<SurrealStore>,
+        store: SurrealStore,
+        settings: Settings,
         mtn: MtnMomo<T>,
         clock: Arc<dyn Clock>,
         pending_for: SignedDuration,
     ) -> Self {
         Self {
-            payments,
+            payments: Payments::new(store.clone(), settings),
+            store,
             mtn,
             clock,
             pending_for,
@@ -108,17 +114,73 @@ impl<T: MomoTransport> Collections<T> {
         }
     }
 
-    /// MTN's callback for `reference` with its `body`.
-    pub async fn callback(
+    /// MTN's callback for `reference`: a hint only, since it reaches a public route. The status is
+    /// read back from MTN, and the payment settled on that, with the callback as its evidence.
+    pub async fn callback(&self, reference: &str) -> Result<Settled, CollectionError> {
+        let Some(payment) = self.pending_with(reference).await? else {
+            return Ok(Settled::AlreadySettled);
+        };
+        let status = self.mtn.status(reference, self.clock.now()).await?;
+        self.settle(&payment, status, Evidence::Callback).await
+    }
+
+    /// Reconciles MTN's statement `lines` with the pending payments: those it shows are
+    /// confirmed by the statement, and a different amount or a line no payment has opens an
+    /// exception in the queue.
+    pub async fn reconcile_statement(
         &self,
-        reference: &str,
-        body: &serde_json::Value,
-    ) -> Result<Settled, CollectionError> {
-        let status = ProviderStatus::from_body(body)?;
-        match self.pending_with(reference).await? {
-            Some(payment) => self.settle(&payment, status, Evidence::Callback).await,
-            None => Ok(Settled::AlreadySettled),
+        lines: &[StatementLine],
+    ) -> Result<Reconciliation, CollectionError> {
+        let result = self
+            .payments
+            .reconcile_statement(lines, self.clock.now())
+            .await?;
+        for (payment, recorded, provider) in &result.mismatched {
+            let reference = self.payments.payment(payment).await?.reference;
+            self.exception(
+                "mismatched",
+                reference.as_deref().unwrap_or(payment),
+                Some(payment),
+                Some(*recorded),
+                Some(*provider),
+            )
+            .await?;
         }
+        for reference in &result.unknown {
+            let amount = lines
+                .iter()
+                .find(|line| line.reference == *reference)
+                .map(|line| line.amount);
+            self.exception("unknown", reference, None, None, amount)
+                .await?;
+        }
+        Ok(result)
+    }
+
+    async fn exception(
+        &self,
+        kind: &str,
+        reference: &str,
+        payment: Option<&str>,
+        recorded: Option<rust_decimal::Decimal>,
+        provider: Option<rust_decimal::Decimal>,
+    ) -> Result<(), CollectionError> {
+        tracing::warn!(
+            alert = "payment-exception",
+            kind,
+            reference,
+            "a payment needs a person"
+        );
+        self.store
+            .open_payment_exception(
+                kind,
+                reference,
+                payment,
+                recorded.map(|a| a.to_string()).as_deref(),
+                provider.map(|a| a.to_string()).as_deref(),
+            )
+            .await
+            .map_err(|e| CollectionError::Payments(PaymentsError::Store(e.to_string())))
     }
 
     /// Asks MTN about every pending MoMo payment, settling those it has an answer for: what a
@@ -173,6 +235,16 @@ impl<T: MomoTransport> Collections<T> {
                     provider = %amount,
                     "MTN reports another amount: the payment stays pending for review"
                 );
+                if let Some(reference) = &payment.reference {
+                    self.exception(
+                        "amount",
+                        reference,
+                        Some(&payment.id),
+                        Some(payment.amount),
+                        Some(amount),
+                    )
+                    .await?;
+                }
                 return Ok(Settled::AmountMismatch {
                     recorded: payment.amount,
                     provider: amount,

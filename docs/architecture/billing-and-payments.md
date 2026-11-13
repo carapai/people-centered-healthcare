@@ -97,7 +97,12 @@ stateDiagram-v2
     - **Callback or poll:** SUCCESSFUL confirms it with that evidence, only when the amount is the payment's. A different amount stays pending and raises `momo-amount-mismatch`. FAILED voids it.
     - **Never received:** a request MTN never got is voided once five minutes have passed.
     - **Once:** a payment already settled by the other path, or by a repeat, is reported as such, so it posts once.
-  - **Still to come:** central's initiation and callback routes, the polling task, statement import with the exceptions queue, and Airtel after its API is verified.
+- **Mobile money, #124 part 2:**
+  - **Callbacks.** A callback is only a hint. It reaches a public route, so its body is never trusted: the status is read back from MTN by the reference, and the payment is settled on that.
+  - **The exceptions queue.** `payment_exception` (migration `0055_payment_exceptions`) holds a different statement amount, a statement line no payment has, and a provider amount that is not the payment's. Each is opened once, until a person resolves it.
+  - **Statements.** `Collections::reconcile_statement` matches each line against its payment by reference, whatever the payment's status. A payment its callback already confirmed is matched, not reported as unknown. That was a gap in `Payments::reconcile_statement` (`PaymentStore::payments_with_references`).
+  - **Transport.** `HttpsTransport` reaches the provider over HTTPS only, verified against the OS trust store.
+  - **Still to come:** central's routes and per-facility accounts, the polling task, posted payments missing from a statement, and Airtel after its API is verified.
 
 ## Other flows
 

@@ -113,6 +113,28 @@ impl PaymentStore for SurrealTx {
         decode(rows)
     }
 
+    async fn payments_with_references(
+        &mut self,
+        references: &[String],
+    ) -> Result<Vec<Payment>, StoreError> {
+        if references.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Binds are strings: the references cross joined by the unit separator, which no
+        // reference holds, and are split back into a list.
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM payment \
+                 WHERE reference IN string::split($wanted, $separator) ORDER BY recorded_at, id",
+                vec![
+                    ("wanted", references.join("\u{1f}")),
+                    ("separator", "\u{1f}".to_owned()),
+                ],
+            )
+            .await?;
+        decode(rows)
+    }
+
     async fn pending_payments(&mut self) -> Result<Vec<Payment>, StoreError> {
         let rows = self
             .rows(
@@ -163,5 +185,129 @@ impl PaymentStore for SurrealTx {
             )
             .await?;
         Ok(decode(rows)?.into_iter().next())
+    }
+}
+
+/// One entry of the payment exceptions queue (#124): what a provider statement or answer shows
+/// that a person must look at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaymentException {
+    /// `kind|reference`.
+    pub id: String,
+    /// `mismatched`, `unknown` or `amount`.
+    pub kind: String,
+    /// The provider reference.
+    pub reference: String,
+    /// The payment, when one has the reference.
+    pub payment: Option<String>,
+    /// The amount recorded here, if any.
+    pub recorded: Option<String>,
+    /// The amount the provider shows, if any.
+    pub provider: Option<String>,
+    /// `open` or `resolved`.
+    pub status: String,
+    /// When it was opened.
+    pub opened_at: String,
+    /// Who resolved it, and how.
+    pub resolution: Option<(String, String)>,
+}
+
+impl crate::store::SurrealStore {
+    /// Opens the exception `kind` for `reference`, unless it is already in the queue.
+    pub async fn open_payment_exception(
+        &self,
+        kind: &str,
+        reference: &str,
+        payment: Option<&str>,
+        recorded: Option<&str>,
+        provider: Option<&str>,
+    ) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query(
+                "IF (SELECT VALUE id FROM ONLY type::record('payment_exception', $id)) = NONE { \
+                 CREATE type::record('payment_exception', $id) SET kind = $kind, \
+                 reference = $reference, payment = $payment, recorded = $recorded, \
+                 provider = $provider, status = 'open', opened_at = time::now(); };",
+            )
+            .bind(("id", format!("{kind}|{reference}")))
+            .bind(("kind", kind.to_owned()))
+            .bind(("reference", reference.to_owned()))
+            .bind(("payment", payment.map(str::to_owned)))
+            .bind(("recorded", recorded.map(str::to_owned)))
+            .bind(("provider", provider.map(str::to_owned)))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?;
+        Ok(())
+    }
+
+    /// The exceptions still open, oldest first.
+    pub async fn open_payment_exceptions(&self) -> Result<Vec<PaymentException>, StoreError> {
+        let rows: Vec<Vec<Option<String>>> = self
+            .connection
+            .db()
+            .query(
+                "SELECT VALUE [record::id(id), kind, reference, payment, recorded, provider, \
+                 status, <string>opened_at, resolved_by, note] FROM payment_exception \
+                 WHERE status = 'open' ORDER BY opened_at",
+            )
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?
+            .take(0)
+            .map_err(crate::store::unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                let [
+                    id,
+                    kind,
+                    reference,
+                    payment,
+                    recorded,
+                    provider,
+                    status,
+                    opened_at,
+                    by,
+                    note,
+                ]: [Option<String>; 10] = row.try_into().map_err(|_| invalid())?;
+                Ok(PaymentException {
+                    id: id.ok_or_else(invalid)?,
+                    kind: kind.ok_or_else(invalid)?,
+                    reference: reference.ok_or_else(invalid)?,
+                    payment,
+                    recorded,
+                    provider,
+                    status: status.ok_or_else(invalid)?,
+                    opened_at: opened_at.ok_or_else(invalid)?,
+                    resolution: by.zip(note),
+                })
+            })
+            .collect()
+    }
+
+    /// Resolves the open exception `id`, by `by`, with `note`; false if no such open one.
+    pub async fn resolve_payment_exception(
+        &self,
+        id: &str,
+        by: &str,
+        note: &str,
+    ) -> Result<bool, StoreError> {
+        let resolved: Vec<String> = self
+            .connection
+            .db()
+            .query(
+                "UPDATE type::record('payment_exception', $id) SET status = 'resolved', \
+                 resolved_by = $by, note = $note WHERE status = 'open' RETURN VALUE record::id(id)",
+            )
+            .bind(("id", id.to_owned()))
+            .bind(("by", by.to_owned()))
+            .bind(("note", note.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?
+            .take(0)
+            .map_err(crate::store::unavailable)?;
+        Ok(!resolved.is_empty())
     }
 }
