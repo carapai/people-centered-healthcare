@@ -396,6 +396,12 @@ where
         Ok(result)
     }
 
+    /// The payments waiting for provider evidence: pending, or reported by the customer.
+    pub async fn pending(&self) -> Result<Vec<Payment>, PaymentsError> {
+        let mut tx = self.store.begin().await?;
+        Ok(tx.pending_payments().await?)
+    }
+
     /// The open shift of `till`, if any.
     pub async fn open_shift_of(&self, till: &str) -> Result<Option<Shift>, PaymentsError> {
         let mut tx = self.store.begin().await?;

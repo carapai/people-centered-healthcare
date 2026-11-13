@@ -13,20 +13,27 @@ layer = "infrastructure"
 workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 health-audit = { workspace = true }
 health-coverage = { workspace = true }
 health-fhir-validation = { workspace = true }
+health-payments = { workspace = true }
+health-payments-app = { workspace = true }
 health-persistence = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
 jiff = { workspace = true }
+rand_core = { workspace = true }
 rust_decimal = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
 axum = { workspace = true }
+health-financial-ledger = { workspace = true }
+health-identifiers = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
 http-body-util = { workspace = true }

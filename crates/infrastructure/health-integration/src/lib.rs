@@ -13,8 +13,10 @@
 //! retention ends (90 days by default). At rest they are protected like the rest of the node's
 //! data: full-disk encryption and encrypted backups (security.md).
 //!
-//! [`payers`] holds the outbound payer adapters (#126).
+//! [`payers`] holds the outbound payer adapters (#126), and [`mobile_money`] MTN MoMo
+//! collections (#124).
 
+pub mod mobile_money;
 pub mod payers;
 
 use std::future::Future;
