@@ -242,6 +242,47 @@ impl crate::store::SurrealStore {
         Ok(())
     }
 
+    /// Records that the provider request `reference` (to `provider`) is for `facility`'s
+    /// `payment`: written before the request goes out.
+    pub async fn put_provider_request(
+        &self,
+        reference: &str,
+        facility: &str,
+        payment: &str,
+        provider: &str,
+    ) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query(
+                "CREATE type::record('provider_request', $reference) SET facility = $facility, \
+                 payment = $payment, provider = $provider, requested_at = time::now();",
+            )
+            .bind(("reference", reference.to_owned()))
+            .bind(("facility", facility.to_owned()))
+            .bind(("payment", payment.to_owned()))
+            .bind(("provider", provider.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?;
+        Ok(())
+    }
+
+    /// The facility whose payment the provider request `reference` is for, if any.
+    pub async fn provider_request_facility(
+        &self,
+        reference: &str,
+    ) -> Result<Option<String>, StoreError> {
+        self.connection
+            .db()
+            .query("SELECT VALUE facility FROM ONLY type::record('provider_request', $reference)")
+            .bind(("reference", reference.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?
+            .take(0)
+            .map_err(crate::store::unavailable)
+    }
+
     /// The exceptions still open, oldest first.
     pub async fn open_payment_exceptions(&self) -> Result<Vec<PaymentException>, StoreError> {
         let rows: Vec<Vec<Option<String>>> = self

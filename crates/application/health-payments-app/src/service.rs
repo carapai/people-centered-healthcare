@@ -437,7 +437,20 @@ where
     /// The balance of each account in `codes`, from the stored postings.
     pub async fn balances(&self, codes: &[&str]) -> Result<Vec<(String, Decimal)>, PaymentsError> {
         let mut tx = self.store.begin().await?;
-        let postings = tx.postings().await?;
+        // Central keeps every facility's postings in one store: this facility's ledger is built
+        // from its own.
+        let facility = self.settings.facility.as_str();
+        let postings: Vec<_> = tx
+            .postings()
+            .await?
+            .into_iter()
+            .filter(|posting| {
+                posting
+                    .lines
+                    .iter()
+                    .all(|line| line.dimensions.facility == facility)
+            })
+            .collect();
         let chart = ChartOfAccounts::from_template(&self.settings.chart)
             .map_err(|e| PaymentsError::Store(e.to_string()))?;
         let ledger = Ledger::from_postings(

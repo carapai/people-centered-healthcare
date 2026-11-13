@@ -2,127 +2,22 @@
 //! payment is stored before the request goes out; dropped callbacks resolve by polling; a lost
 //! answer is polled, never re-sent; duplicate callbacks post once; a wrong amount is never posted.
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+mod common;
+
+use common::{Mock, Next};
 
 use health_financial_ledger::{ChartTemplate, Currency, IN_TRANSIT};
 use health_identifiers::NumberFormat;
-use health_integration::mobile_money::{
-    Collections, MomoError, MomoTransport, MtnConfig, MtnMomo, Request, Settled,
-};
+use health_integration::mobile_money::{Collections, MtnConfig, MtnMomo, Settled};
 use health_payments::{Evidence, Method, NewPayment, Purpose, Status};
 use health_payments_app::{Accounts, Payments, Settings};
 use health_surrealdb::{Connection, MIGRATIONS, Settings as Db, SurrealStore, Target, migrate};
 use health_time::{Clock, FixedClock, SignedDuration, Timestamp};
 use rust_decimal::Decimal;
-use serde_json::{Value, json};
 
 const MERCHANT: &str = "cash/merchant-mtn";
-
-/// How the mock answers the next request to pay.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Next {
-    Accept,
-    /// Takes it, but the answer is lost on the way back.
-    LoseAnswer,
-    Refuse,
-}
-
-/// MTN as the tests see it: the requests to pay it holds, by reference, and every call.
-#[derive(Clone)]
-struct Mock {
-    held: Arc<Mutex<BTreeMap<String, Value>>>,
-    calls: Arc<Mutex<Vec<String>>>,
-    next: Arc<Mutex<Next>>,
-}
-
-impl Mock {
-    fn new() -> Self {
-        Self {
-            held: Arc::default(),
-            calls: Arc::default(),
-            next: Arc::new(Mutex::new(Next::Accept)),
-        }
-    }
-
-    fn next(&self, next: Next) {
-        *self.next.lock().expect("next") = next;
-    }
-
-    /// The payer answers the request `reference`: MTN's status body for it now.
-    fn answer(&self, reference: &str, status: &str, amount: &str) -> Value {
-        let mut held = self.held.lock().expect("held");
-        let request = held.get_mut(reference).expect("held request");
-        request["status"] = json!(status);
-        request["amount"] = json!(amount);
-        if status == "SUCCESSFUL" {
-            request["financialTransactionId"] = json!("123456789");
-        } else if status == "FAILED" {
-            request["reason"] = json!("APPROVAL_REJECTED");
-        }
-        request.clone()
-    }
-
-    fn count(&self, prefix: &str) -> usize {
-        self.calls
-            .lock()
-            .expect("calls")
-            .iter()
-            .filter(|c| c.starts_with(prefix))
-            .count()
-    }
-}
-
-impl MomoTransport for Mock {
-    async fn send(&self, request: Request) -> Result<(u16, Value), MomoError> {
-        self.calls
-            .lock()
-            .expect("calls")
-            .push(format!("{} {}", request.method, request.path));
-        let header = |name: &str| {
-            request
-                .headers
-                .iter()
-                .find(|(n, _)| *n == name)
-                .map(|(_, v)| v.clone())
-        };
-        if request.path == "/collection/token/" {
-            assert!(header("Authorization").is_some_and(|a| a.starts_with("Basic ")));
-            return Ok((
-                200,
-                json!({ "access_token": "token-1", "expires_in": 3600 }),
-            ));
-        }
-        assert_eq!(header("Authorization").as_deref(), Some("Bearer token-1"));
-        assert_eq!(header("X-Target-Environment").as_deref(), Some("sandbox"));
-        if request.method == "POST" {
-            let reference = header("X-Reference-Id").expect("reference");
-            assert_eq!(
-                uuid::Uuid::parse_str(&reference)
-                    .expect("uuid")
-                    .get_version_num(),
-                4
-            );
-            let next = *self.next.lock().expect("next");
-            if next == Next::Refuse {
-                return Ok((400, json!({ "code": "PAYER_NOT_FOUND" })));
-            }
-            let body = request.body.expect("body");
-            let mut held = body.clone();
-            held["status"] = json!("PENDING");
-            self.held.lock().expect("held").insert(reference, held);
-            return match next {
-                Next::LoseAnswer => Err(MomoError::Unreachable),
-                _ => Ok((202, Value::Null)),
-            };
-        }
-        let reference = request.path.rsplit('/').next().expect("reference");
-        match self.held.lock().expect("held").get(reference) {
-            Some(held) => Ok((200, held.clone())),
-            None => Ok((404, json!({ "code": "RESOURCE_NOT_FOUND" }))),
-        }
-    }
-}
 
 struct Fixture {
     collections: Collections<Mock>,

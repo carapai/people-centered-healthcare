@@ -1374,6 +1374,11 @@ DEFINE TABLE provenance_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON provenance_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON provenance_history TYPE int PERMISSIONS FULL
   DEFINE INDEX provenance_history_last_updated ON provenance_history FIELDS last_updated, version_seq
+DEFINE TABLE provider_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD facility ON provider_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD payment ON provider_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD provider ON provider_request TYPE string PERMISSIONS FULL
+  DEFINE FIELD requested_at ON provider_request TYPE datetime PERMISSIONS FULL
 DEFINE TABLE published_package TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD data ON published_package TYPE string PERMISSIONS FULL
   DEFINE FIELD package ON published_package TYPE string PERMISSIONS FULL

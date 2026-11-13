@@ -72,6 +72,11 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_PAYMENT_TILLS`: the tills, comma-separated (#254). With them, `/api/payments`
     /// takes payments.
     pub(crate) payment_tills: Vec<String>,
+    /// `HEALTH_MOMO_ACCOUNTS_FILE` (#124): the facilities' MTN MoMo merchant accounts, a secrets
+    /// file (`health_integration::mobile_money::MomoAccounts`). With it and the tills,
+    /// `/api/payments/momo` collects by MoMo, and MTN calls back at
+    /// `/api/payments/momo/callback`.
+    pub(crate) momo_accounts_file: Option<PathBuf>,
     /// `HEALTH_CURRENCY`, default `UGX`: the ledger's functional currency.
     pub(crate) currency: String,
     /// `HEALTH_ISSUING_CA_CERT_FILE` and `HEALTH_ISSUING_CA_KEY_FILE` (#268): the facility
@@ -166,6 +171,7 @@ impl Config {
                                 .collect()
                         })
                         .unwrap_or_default(),
+                    momo_accounts_file: get("HEALTH_MOMO_ACCOUNTS_FILE").map(PathBuf::from),
                     currency: get("HEALTH_CURRENCY").unwrap_or_else(|| "UGX".to_owned()),
                     kms_key_file: get("HEALTH_KMS_KEY_FILE").map(PathBuf::from),
                     files_dir: get("HEALTH_FILES_DIR").map(PathBuf::from),

@@ -1021,6 +1021,24 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 3: MoMo at central (2026-11-13).**
+  - **What:**
+    - **Accounts:** `HEALTH_MOMO_ACCOUNTS_FILE` holds the facilities' MTN merchant accounts, with the keys hidden from logs.
+    - **Routes:**
+      - `POST /api/payments/momo` (cash permission, the session's facility);
+      - the exceptions queue's list and resolve (supervise permission);
+      - MTN's public `POST /api/payments/momo/callback`, which only triggers a status read.
+    - **Each facility's own ledger:** each reference records its facility (`provider_request`, migration `0056_provider_requests`) before the request goes out, and a callback or the minute poller settles it there. The poller also expires the overdue.
+    - **A fix:** `Payments::balances` refused at central once two facilities had posted. It now builds each facility's ledger from that facility's postings.
+  - **Tested** with two facilities on one store:
+    - a till collects into its own facility's account;
+    - the callback (its forged body ignored) settles it there and not in the other;
+    - unknown and malformed references tell the caller nothing;
+    - the poller settles each facility in its own ledger, once;
+    - permissions, a facility without an account, and a bad phone number are refused;
+    - a supervisor lists and resolves an exception;
+    - the accounts file is https only and its keys are never printed.
+  - **Left to the user:** the merchant accounts and their keys, the public callback URL, and testing against MTN's sandbox.
 - **#124, part 2: callbacks verified, exceptions kept, statements matched by reference (2026-11-13).**
   - **What:**
     - **Callbacks:** a callback reaches a public route, so `Collections::callback` reads the status back from MTN instead of trusting the body.
