@@ -29,6 +29,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
+use health_persistence::Store as _;
 use health_surrealdb::{SurrealStore, SurrealTx};
 use health_time::{Clock, SystemClock};
 use health_workflow::definition::WorkflowDefinition;
@@ -46,6 +47,15 @@ use crate::FhirServer;
 pub const WORK_PERMISSION: &str = "workflow.work";
 /// The permission to reassign and escalate tasks and cancel workflows.
 pub const SUPERVISE_PERMISSION: &str = "workflow.supervise";
+
+/// The clock floor as read for one upkeep round.
+struct Floor(Option<health_time::Timestamp>);
+
+impl health_workflow_app::TimeFloor for Floor {
+    fn floor(&self) -> Option<health_time::Timestamp> {
+        self.0
+    }
+}
 
 /// Candidates judged per upkeep round; the rest wait for the next.
 const UPKEEP_BATCH: u32 = 200;
@@ -141,6 +151,12 @@ impl WorkflowConfig {
     /// the instances this node decides, then judges the candidates other nodes sent it, opening
     /// a Conflict Record for each that does not apply.
     pub async fn upkeep(&self, store: &SurrealStore) -> Result<Upkeep, WorkflowError> {
+        // The clock floor (offline-auth.md): the last central time this node knows. A clock that
+        // reads before it fires no timer; candidates are still judged.
+        let floor = {
+            let mut tx = store.begin().await?;
+            tx.auth_clock_floor().await?
+        };
         let service: Service = Workflows::new(
             store.clone(),
             self.definitions(),
@@ -149,11 +165,24 @@ impl WorkflowConfig {
             Arc::new(SystemClock),
             Vec::new(),
             &self.authority,
-        );
-        let fired = service.fire_due().await?;
+        )
+        .with_floor(Arc::new(Floor(floor)));
+        let fired = match service.fire_due().await {
+            Ok(fired) => fired.fired.len(),
+            Err(WorkflowError::ClockBroken { local, floor }) => {
+                tracing::error!(
+                    alert = "clock-behind-floor",
+                    %local,
+                    %floor,
+                    "the node clock reads before the last known central time: no workflow timer fires"
+                );
+                0
+            }
+            Err(error) => return Err(error),
+        };
         let judged = service.apply_candidates(UPKEEP_BATCH).await?;
         Ok(Upkeep {
-            fired: fired.fired.len(),
+            fired,
             applied: judged
                 .iter()
                 .filter(|(_, verdict)| matches!(verdict, Judged::Applied(_)))

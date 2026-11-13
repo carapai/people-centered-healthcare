@@ -1021,6 +1021,26 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#100: workflow transitions sync as candidates (2026-11-12 to 2026-11-13).** Parts 1–5 (#438–#442); its scope is built.
+  - **Part 1, the rule:** a `Candidate` is a transition made on a replica: its event, base version and configuration, and the states it left. `Workflows::apply_candidate` re-runs it at the authority with the authority's guards. It applies when the instance hasn't moved, or when every state it left is still active (moves in parallel regions commute). Anything else is a conflict with its reason, and a candidate applies once.
+  - **Part 2, up:** on a replica, a command on another node's instance queues its candidate as a `workflow-candidate` operation (up only). The authority keeps each once (`workflow_candidate`, migration `0054_workflow_candidates`). `Workflows::apply_candidates` judges them, opening a `workflow` Conflict Record, with the pushed candidate kept, for each that does not apply.
+  - **Part 3, down:** each change to an instance a node decides goes down as a `workflow-instance` operation, never queued up. Desktops keep the newest version, so the engine runs on their replicas offline and the authority's verdict comes back.
+  - **Part 4, at runtime:** `health-node-api` serves `/api/workflow` with a 30-second upkeep. The upkeep runs the active packages' definitions when the active set changes, fires due timers and judges candidates. The edge runs it as its facility's authority, the desktop under its node or device id, and central fires its own timers (#441).
+  - **Part 5, the clock floor:** timers do not fire while the node's clock reads before the last known central time (`clock-behind-floor`); candidates are still judged.
+  - **Tested:**
+    - **Candidates:**
+      - a candidate from the current version applies, once;
+      - one from a state the instance left is a conflict;
+      - moves in parallel regions commute;
+      - a failing guard at the authority is a conflict.
+    - **End to end, over the real outbox, sync applier and pull:**
+      - an offline move is applied once even when resent;
+      - a stale one opens a Conflict Record;
+      - the replica follows the edge, and nothing goes up to central.
+    - **The upkeep:**
+      - a due timer fires once;
+      - no timer fires before the floor.
+  - **Left to the user's hardware testing:** a desktop moving a workflow offline under an edge, with a package that carries a Workflow Definition.
 - **#135, part 1: the Authority Lease rules (2026-11-12).**
   - **What:** a new domain crate, `health-authority-leases` (context `write-authority`), holds write-authority.md's hand-over state machine as pure rules:
     - a grant over a set of stores, with a time-box of up to 30 days and no overlapping holding lease;
