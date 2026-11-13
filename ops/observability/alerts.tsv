@@ -1,0 +1,49 @@
+# code	area	severity	summary
+sync-failing	sync	warning	Sync with the upstream is failing
+sync-off	sync	critical	Sync is not running on this node
+sync-reseed	sync	warning	The node was beyond the upstream's horizon and is re-seeding
+sync-quarantined	sync	warning	A peer is out of the compatible range: its pushes are quarantined
+sync-conflicts-ageing	sync	warning	Conflict Records have been open for more than 7 days
+desktop-sync-off	sync	warning	Desktops cannot sync with this edge
+workflow-conflicts	workflow	warning	Offline workflow moves opened Conflict Records
+transfer-undispatched	sync	warning	An inter-facility transfer has not been dispatched
+transfer-unreceived	sync	warning	An inter-facility transfer has not been received
+backup-failed	storage	critical	The last backup failed
+backup-stale	storage	critical	No backup within the expected interval
+backup-test-failed	storage	critical	The weekly test restore failed
+backups-off	storage	critical	This node takes no backups
+backup-on-data-volume	storage	warning	Backups are written to the data volume itself
+disk-full	storage	critical	A volume is nearly full
+package-activation-failed	storage	warning	The active packages could not all be applied
+disk-unencrypted	platform	critical	A volume is not encrypted
+secure-boot-off	platform	warning	Secure Boot is off
+encryption-exempt	platform	info	The facility runs under an encryption exemption
+identity-invalid	platform	critical	The node's identity or chain does not verify
+not-provisioned	platform	warning	The node is not provisioned
+certificate-expiring	platform	warning	The TLS certificate expires soon
+certificate-renewal-failed	platform	critical	The TLS certificate could not be renewed
+intermediate-expiring	platform	warning	The facility intermediate expires soon
+address-changed	platform	info	The node's address changed
+clock-behind-floor	platform	critical	The clock reads before the last known central time: no timer fires
+ups-on-battery	platform	warning	The UPS is on battery
+ups-low-battery	platform	critical	The UPS battery is low: the node will shut down
+ups-unreachable	platform	warning	The UPS cannot be read
+task-restarts	platform	warning	A supervised task keeps restarting
+telemetry-unshipped	platform	warning	Telemetry cannot be shipped to the collector
+telemetry-unbuffered	platform	warning	Telemetry cannot be buffered on disk
+sign-in-off	platform	critical	Staff sign-in is not served on this edge
+bundle-refused	platform	warning	A provisioning bundle was refused
+recovery-key-used	platform	warning	A disk recovery key was read out of escrow
+payment-exception	finance	warning	A payment needs a person (exceptions queue)
+momo-amount-mismatch	finance	warning	MTN confirmed another amount than recorded
+momo-off	finance	critical	MTN MoMo collections are off
+payments-off	finance	warning	Payments are configured but cannot run
+lease-frozen	stock	critical	An Authority Lease expired unreturned: its stores are frozen
+device-revoked	security	info	A device was revoked
+unenrolled-device	security	warning	A request came from a device that is not enrolled
+enrollment-refused	security	info	An enrolment request was refused
+enrollment-rate-limited	security	warning	Too many enrolment requests from one address
+pin-exhausted	security	warning	A PIN was locked after too many attempts
+local-grant	security	info	A role was granted offline, pending ratification
+local-revocation	security	info	Access was revoked offline
+provisional-account	security	info	A provisional account was created offline

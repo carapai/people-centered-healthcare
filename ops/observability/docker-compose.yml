@@ -1,0 +1,58 @@
+# The in-country observability stack for staging (#139; ADR 0047): OTel collector, Prometheus,
+# Loki, Tempo, Alertmanager and Grafana, each pinned. Production runs the same configuration on
+# the in-country site, sized and retained as operations decide.
+#
+#   docker compose -f ops/observability/docker-compose.yml up -d
+#
+# Central's container logs are mounted for the collector at /var/log/central (set
+# CENTRAL_LOG_DIR); edges ship to http://<host>:4318.
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+      - ${CENTRAL_LOG_DIR:-./central-logs}:/var/log/central:ro
+    ports: ["4317:4317", "4318:4318"]
+    depends_on: [loki, tempo, prometheus]
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --storage.tsdb.retention.time=90d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+  loki:
+    image: grafana/loki:3.2.0
+    command: [-config.file=/etc/loki/config.yaml]
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - ./loki/rules:/etc/loki/rules:ro
+      - loki:/loki
+  tempo:
+    image: grafana/tempo:2.6.0
+    command: [-config.file=/etc/tempo/config.yaml]
+    volumes:
+      - ./tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo:/var/tempo
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    ports: ["3000:3000"]
+volumes:
+  prometheus: {}
+  loki: {}
+  tempo: {}
+  grafana: {}
