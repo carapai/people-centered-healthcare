@@ -130,7 +130,7 @@ sequenceDiagram
   - Timers due on the instances the node decides are fired (`WorkflowConfig::upkeep`).
   - Candidates other nodes sent are judged, and `workflow-conflicts` is raised when any opened a Conflict Record.
 
-  The edge runs it as its facility's authority, behind its device gate. The desktop runs it under its node id, or under its enrolled device id on the replicas of its edge's instances, with one engine kept across rebuilds of its local router. Central's `/api/workflow` does not run the upkeep yet.
+  The edge runs it as its facility's authority, behind its device gate. The desktop runs it under its node id, or under its enrolled device id on the replicas of its edge's instances, with one engine kept across rebuilds of its local router. Central fires the timers of its own instances on the same 30-second round.
 
 ## Versioning and migration
 

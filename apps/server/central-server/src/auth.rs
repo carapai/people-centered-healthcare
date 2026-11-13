@@ -521,6 +521,24 @@ fn sync_routes(
     .router())
 }
 
+/// Fires the timers due on central's own workflow instances every 30 seconds (#98; #100), with
+/// the definitions activation runs; a failed round is logged and the next one tries again.
+fn workflow_upkeep(workflows: health_fhir_server::WorkflowConfig, store: SurrealStore) {
+    tokio::spawn(async move {
+        let mut every = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            every.tick().await;
+            match workflows.upkeep(&store).await {
+                Ok(done) if done.fired > 0 => {
+                    tracing::info!(fired = done.fired, "workflow timers fired")
+                }
+                Ok(_) => {}
+                Err(error) => tracing::warn!(%error, "workflow upkeep failed; it runs again"),
+            }
+        }
+    });
+}
+
 /// Hourly sync upkeep: raises `sync-conflicts-ageing` while any Conflict Record has been open for
 /// more than 7 days (#82), and prunes the change log and receipts older than the 180-day horizon,
 /// after which a node that was offline longer re-seeds (#83; synchronization.md § Tombstones,
@@ -775,6 +793,8 @@ fn fhir(
             .with_terminology(definitions.terminology.clone());
     }
     if let Some(workflows) = settings.workflows.clone() {
+        // Central decides its own instances: their timers fire here (#98; #100).
+        workflow_upkeep(workflows.clone(), fhir.store().clone());
         fhir = fhir.with_workflows(workflows);
     }
     // Workflows, tasks and worklists (#99), from the development definitions.
