@@ -394,3 +394,48 @@ async fn the_upkeep_fires_a_due_timer_once() {
         "once"
     );
 }
+
+/// A node whose clock reads before the last known central time fires no workflow timer
+/// (offline-auth.md § clock floor; #98): the round still succeeds.
+#[tokio::test]
+async fn no_timer_fires_while_the_clock_reads_before_the_floor() {
+    use health_persistence::{Store as _, Transaction as _};
+
+    let connection = Connection::open(&Settings {
+        target: Target::Memory,
+        namespace: "workflow-floor".into(),
+        database: "main".into(),
+    })
+    .await
+    .expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let store = SurrealStore::new(connection, Arc::new(SystemClock));
+    let mut chart = opd();
+    chart["statechart"]["states"][0]["timers"] = json!([{ "after": "PT1S", "event": "overdue" }]);
+    chart["statechart"]["states"][0]["transitions"]
+        .as_array_mut()
+        .expect("transitions")
+        .push(json!({ "events": ["overdue"], "targets": ["done"] }));
+    let config = WorkflowConfig::new(vec![definition(chart)], "edge").expect("config");
+    let server = FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
+        .with_workflows(config.clone());
+    let nurse = as_(&server, "Practitioner/nurse", &[WORKFLOW_PERMISSION]);
+    let (status, _) = send(
+        &nurse,
+        "POST",
+        "/instances",
+        Some(json!({ "definition": OPD, "context": "Encounter/e-1", "opId": "op-start" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    // Central was last seen a day ahead of this node's clock.
+    let ahead = health_time::Timestamp::now()
+        .checked_add(health_time::SignedDuration::from_hours(24))
+        .expect("time");
+    let mut tx = store.begin().await.expect("begin");
+    tx.raise_auth_clock_floor(ahead).await.expect("floor");
+    tx.commit().await.expect("commit");
+
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    assert_eq!(config.upkeep(&store).await.expect("upkeep").fired, 0);
+}
