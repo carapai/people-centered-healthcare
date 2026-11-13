@@ -89,6 +89,16 @@ stateDiagram-v2
   - `health-payments-app`: `Ledgering`, the postings. A pending payment sits in payments in transit, and only provider evidence moves it to the merchant account. A void or expiry returns it to the patient's account.
   - Storage (#254): payments, shifts and the ledger's postings in migration `0018_payments`, each step one transaction (`health-payments-app::Payments`). The API (`/api/payments`) and the till screens (`/till`, `/till/supervise`) complete #254.
 
+- **Mobile money, #124 part 1** (`health_integration::mobile_money`):
+  - **The client.** `MtnMomo` speaks MTN MoMo's Collection API through a `MomoTransport` port, bound to an HTTP client when a facility's merchant account is onboarded. It gets and reuses the access token, sends a request to pay under a fresh UUIDv4 `X-Reference-Id` (with the callback URL carrying the reference), and reads its status back.
+  - **The flow.** `Collections` runs it over `Payments`:
+    - **Before the request:** the pending payment is stored with its reference.
+    - **Refused or lost:** a refused request voids the payment. One whose answer was lost stays pending and is polled, never sent again.
+    - **Callback or poll:** SUCCESSFUL confirms it with that evidence, only when the amount is the payment's. A different amount stays pending and raises `momo-amount-mismatch`. FAILED voids it.
+    - **Never received:** a request MTN never got is voided once five minutes have passed.
+    - **Once:** a payment already settled by the other path, or by a repeat, is reported as such, so it posts once.
+  - **Still to come:** central's initiation and callback routes, the polling task, statement import with the exceptions queue, and Airtel after its API is verified.
+
 ## Other flows
 
 | Flow | Posting pattern |

@@ -1021,6 +1021,26 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 1: the MTN MoMo adapter (2026-11-13).**
+  - **What:** `health_integration::mobile_money`.
+    - **`MtnMomo`:** the Collection API through a transport port: token, request to pay under a UUIDv4 reference, and status.
+    - **`Collections`:** the flow over `Payments`.
+      - The pending payment is stored before the request goes out.
+      - A refusal voids it; a lost answer is polled, never re-sent.
+      - Callback or poll confirms only the right amount (`momo-amount-mismatch` otherwise) and voids failures.
+      - A request MTN never got is voided after five minutes.
+      - Repeats and races settle once.
+    - `Payments::pending` lists the payments waiting for evidence.
+  - **Tested** against a mock MTN, checking the ledger every time:
+    - a callback posts once however often it comes;
+    - a dropped callback resolves by polling;
+    - a lost answer is polled, and the request goes out once;
+    - a refusal and a declined payment are voided, with nothing left in transit;
+    - a wrong amount stays pending;
+    - an unknown reference settles nothing;
+    - a callback racing a poll posts once.
+  - **Left to the user:** the merchant account, sandbox credentials and the production environment name.
+  - **Next:** central's routes and polling, statement import with the exceptions queue.
 - **#100: workflow transitions sync as candidates (2026-11-12 to 2026-11-13).** Parts 1–5 (#438–#442); its scope is built.
   - **Part 1, the rule:** a `Candidate` is a transition made on a replica: its event, base version and configuration, and the states it left. `Workflows::apply_candidate` re-runs it at the authority with the authority's guards. It applies when the instance hasn't moved, or when every state it left is still active (moves in parallel regions commute). Anything else is a conflict with its reason, and a candidate applies once.
   - **Part 2, up:** on a replica, a command on another node's instance queues its candidate as a `workflow-candidate` operation (up only). The authority keeps each once (`workflow_candidate`, migration `0054_workflow_candidates`). `Workflows::apply_candidates` judges them, opening a `workflow` Conflict Record, with the pushed candidate kept, for each that does not apply.
