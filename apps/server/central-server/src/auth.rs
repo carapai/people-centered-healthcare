@@ -283,6 +283,7 @@ pub(crate) fn routes(
     // signature, is the only credential, so they are outside the gates.
     let mut provisioning = None;
     let mut sync = None;
+    let mut nodes: Option<NodeRegistry> = None;
     // One hint hub for `/api/events`: the subjects' grants and the grants edges sync up (#224).
     let events = health_http::Events::default();
     if settings.issuing_ca.is_some() || settings.kms.is_some() {
@@ -296,6 +297,7 @@ pub(crate) fn routes(
             settings.definitions.as_ref(),
         )?);
         alert_hourly(registry.clone());
+        nodes = Some(registry.clone());
         let mut routes = Router::new();
         if let Some(issuer) = &settings.issuing_ca {
             let issuer: Arc<dyn Issuer> = issuer.clone();
@@ -376,6 +378,7 @@ pub(crate) fn routes(
             portal,
             stock,
             payments,
+            momo,
             workflows,
             pricing,
             reception,
@@ -398,6 +401,11 @@ pub(crate) fn routes(
         api = api.nest("/inbox", inbox);
         api = api.nest("/care-plans", care_plans);
         api = api.nest("/requests", requests);
+        // Edges whose facility has an MTN account collect through central's relay (#124),
+        // signed as their sync requests are.
+        if let (Some(registry), Some(momo)) = (&nodes, &momo) {
+            router = router.merge(momo.relay_routes(Arc::new(registry.clone())));
+        }
         if let Some(payments) = payments {
             api = api.nest("/payments", payments);
         }
@@ -740,6 +748,14 @@ struct Routes {
     stock: Router,
     /// Payments, with tills.
     payments: Option<Router>,
+    /// MTN MoMo collections, with the facilities' accounts (#124).
+    momo: Option<
+        Arc<
+            health_integration::mobile_money::MomoService<
+                health_integration::mobile_money::HttpsTransport,
+            >,
+        >,
+    >,
     /// Workflows, with development definitions.
     workflows: Option<Router>,
     /// Price Books and rules.
@@ -891,6 +907,7 @@ fn fhir(
         portal,
         stock,
         payments,
+        momo,
         workflows,
         pricing,
         reception,
