@@ -529,7 +529,9 @@ fn workflow_upkeep(workflows: health_fhir_server::WorkflowConfig, store: Surreal
         loop {
             every.tick().await;
             match workflows.upkeep(&store).await {
-                Ok(done) if done.fired > 0 => tracing::info!(fired = done.fired, "workflow timers fired"),
+                Ok(done) if done.fired > 0 => {
+                    tracing::info!(fired = done.fired, "workflow timers fired")
+                }
                 Ok(_) => {}
                 Err(error) => tracing::warn!(%error, "workflow upkeep failed; it runs again"),
             }
