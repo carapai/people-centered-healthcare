@@ -17,6 +17,7 @@ axum = { workspace = true }
 health-access-policy = { workspace = true }
 health-audit = { workspace = true }
 health-auth = { workspace = true }
+health-backup = { workspace = true }
 health-consent = { workspace = true }
 health-financial-ledger = { workspace = true }
 health-client-registry = { workspace = true }

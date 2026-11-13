@@ -730,6 +730,7 @@ dependencies = [
  "health-activation",
  "health-audit",
  "health-auth",
+ "health-backup",
  "health-client-registry",
  "health-configuration",
  "health-consent",
