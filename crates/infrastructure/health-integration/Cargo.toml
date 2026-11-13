@@ -13,7 +13,9 @@ layer = "infrastructure"
 workspace = true
 
 [dependencies]
+axum = { workspace = true }
 base64 = { workspace = true }
+health-access-policy = { workspace = true }
 health-audit = { workspace = true }
 health-coverage = { workspace = true }
 health-fhir-validation = { workspace = true }
@@ -25,6 +27,7 @@ health-time = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true }
 hyper-rustls = { workspace = true }
+serde = { workspace = true }
 hyper-util = { workspace = true }
 jiff = { workspace = true }
 rand_core = { workspace = true }
@@ -37,9 +40,9 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
-axum = { workspace = true }
 health-financial-ledger = { workspace = true }
 health-identifiers = { workspace = true }
+http-body-util = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }

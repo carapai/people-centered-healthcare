@@ -56,6 +56,8 @@ pub(crate) struct AuthSettings {
     pub(crate) portal: Option<PortalSettings>,
     /// Payments and cashier shifts (#254), with the access policy.
     pub(crate) payments: Option<health_fhir_server::PaymentConfig>,
+    /// The facilities' MTN MoMo merchant accounts (#124), with the payments.
+    pub(crate) momo: Option<health_integration::mobile_money::MomoAccounts>,
     /// The facility issuing CA (#268), with its key at hand until the KMS adapter.
     pub(crate) issuing_ca: Option<Arc<health_pki::Authority>>,
     /// What wraps escrowed recovery keys (#268): the local adapter until the KMS.
@@ -521,6 +523,47 @@ fn sync_routes(
     .router())
 }
 
+/// MoMo collections for the facilities in `accounts` (#124), polling every minute; `None`,
+/// logged, when they cannot run.
+fn momo_service(
+    store: &SurrealStore,
+    payments: &health_fhir_server::PaymentConfig,
+    accounts: &health_integration::mobile_money::MomoAccounts,
+) -> Option<
+    Arc<
+        health_integration::mobile_money::MomoService<
+            health_integration::mobile_money::HttpsTransport,
+        >,
+    >,
+> {
+    use health_integration::mobile_money::{HttpsTransport, MomoService};
+
+    let built = HttpsTransport::new(&accounts.base_url).and_then(|transport| {
+        MomoService::new(
+            store.clone(),
+            accounts,
+            transport,
+            |facility| payments.settings_for(facility),
+            Arc::new(SystemClock),
+        )
+    });
+    match built {
+        Ok(service) => {
+            let service = Arc::new(service);
+            service.spawn_poller();
+            tracing::info!(
+                facilities = accounts.facilities.len(),
+                "MTN MoMo collections are on"
+            );
+            Some(service)
+        }
+        Err(error) => {
+            tracing::error!(alert = "momo-off", %error, "MTN MoMo collections are off");
+            None
+        }
+    }
+}
+
 /// Fires the timers due on central's own workflow instances every 30 seconds (#98; #100), with
 /// the definitions activation runs; a failed round is logged and the next one tries again.
 fn workflow_upkeep(workflows: health_fhir_server::WorkflowConfig, store: SurrealStore) {
@@ -825,11 +868,23 @@ fn fhir(
         .layer(layer.clone());
     let requests = fhir.requests_router().layer(signed()).layer(layer.clone());
     let stock = fhir.inventory_router().layer(signed()).layer(layer.clone());
-    // Payments and cashier shifts (#254), for the session's facility.
-    let payments = settings
-        .payments
-        .as_ref()
-        .map(|_| fhir.payments_router().layer(signed()).layer(layer.clone()));
+    // Payments and cashier shifts (#254), for the session's facility; with the facilities' MTN
+    // accounts, MoMo collections (#124), whose public callback route is outside the sign-in.
+    let momo = match (&settings.payments, &settings.momo) {
+        (Some(payments), Some(accounts)) => momo_service(fhir.store(), payments, accounts),
+        _ => None,
+    };
+    let payments = settings.payments.as_ref().map(|_| {
+        let authed = match &momo {
+            Some(service) => fhir.payments_router().merge(service.routes()),
+            None => fhir.payments_router(),
+        };
+        let routes = authed.layer(signed()).layer(layer.clone());
+        match &momo {
+            Some(service) => routes.merge(service.callback_route()),
+            None => routes,
+        }
+    });
     Routes {
         fhir: fhir.router().layer(layer),
         reviews,
@@ -934,6 +989,7 @@ mod tests {
             registry_nin_system: None,
             portal: None,
             payments: None,
+            momo: None,
             issuing_ca: None,
             kms: None,
             files: None,

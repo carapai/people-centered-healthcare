@@ -43,8 +43,8 @@ pub trait MomoTransport: Send + Sync {
     ) -> impl Future<Output = Result<(u16, Value), MomoError>> + Send;
 }
 
-/// A facility's MTN merchant account, as onboarded.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A facility's MTN merchant account, as onboarded. Its `Debug` hides the keys.
+#[derive(Clone, PartialEq, Eq)]
 pub struct MtnConfig {
     /// The Collection product's subscription key (`Ocp-Apim-Subscription-Key`).
     pub subscription_key: String,
@@ -59,6 +59,19 @@ pub struct MtnConfig {
     pub currency: String,
     /// Where MTN sends its callback; the reference is appended as `?reference=`.
     pub callback_url: Option<String>,
+}
+
+impl std::fmt::Debug for MtnConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MtnConfig")
+            .field("subscription_key", &"[hidden]")
+            .field("api_user", &self.api_user)
+            .field("api_key", &"[hidden]")
+            .field("environment", &self.environment)
+            .field("currency", &self.currency)
+            .field("callback_url", &self.callback_url)
+            .finish()
+    }
 }
 
 /// What became of a request to pay.

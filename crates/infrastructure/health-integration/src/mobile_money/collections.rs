@@ -47,8 +47,10 @@ pub enum Settled {
 /// MTN MoMo collections for one facility's merchant account.
 pub struct Collections<T> {
     payments: Payments<SurrealStore>,
-    /// The store, for the exceptions queue.
+    /// The store, for the exceptions queue and the provider requests.
     store: SurrealStore,
+    /// The facility whose merchant account and ledger these are.
+    facility: String,
     mtn: MtnMomo<T>,
     clock: Arc<dyn Clock>,
     /// How long a payment waits for the payer before it expires.
@@ -68,6 +70,7 @@ impl<T: MomoTransport> Collections<T> {
         pending_for: SignedDuration,
     ) -> Self {
         Self {
+            facility: settings.facility.to_string(),
             payments: Payments::new(store.clone(), settings),
             store,
             mtn,
@@ -97,6 +100,12 @@ impl<T: MomoTransport> Collections<T> {
             .checked_add(self.pending_for)
             .map_err(|e| CollectionError::Provider(MomoError::Unexpected(e.to_string())))?;
         let reference = reference();
+        // Which facility the reference is for, before anything goes out: a callback or a poll
+        // finds its ledger and merchant account by it.
+        self.store
+            .put_provider_request(&reference, &self.facility, new.id, "mtn-momo")
+            .await
+            .map_err(|e| CollectionError::Payments(PaymentsError::Store(e.to_string())))?;
         let payment = self
             .payments
             .record_pending(new, &reference, shift, now, expires)
@@ -196,6 +205,10 @@ impl<T: MomoTransport> Collections<T> {
             else {
                 continue;
             };
+            // Another facility's payment, with its own merchant account.
+            if !self.is_ours(&reference).await? {
+                continue;
+            }
             let status = match self.mtn.status(&reference, now).await {
                 Ok(status) => status,
                 // Unreachable now: the next poll asks again.
@@ -206,6 +219,26 @@ impl<T: MomoTransport> Collections<T> {
             settled.push((payment.id.clone(), outcome));
         }
         Ok(settled)
+    }
+
+    /// The facility these collections are for.
+    pub fn facility(&self) -> &str {
+        &self.facility
+    }
+
+    /// Expires the pending payments whose time has passed: no evidence came.
+    pub async fn expire_due(&self) -> Result<Vec<String>, CollectionError> {
+        Ok(self.payments.expire_due(self.clock.now()).await?)
+    }
+
+    async fn is_ours(&self, reference: &str) -> Result<bool, CollectionError> {
+        Ok(self
+            .store
+            .provider_request_facility(reference)
+            .await
+            .map_err(|e| CollectionError::Payments(PaymentsError::Store(e.to_string())))?
+            .as_deref()
+            == Some(self.facility.as_str()))
     }
 
     async fn pending_with(&self, reference: &str) -> Result<Option<Payment>, CollectionError> {

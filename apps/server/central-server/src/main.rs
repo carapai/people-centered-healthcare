@@ -238,6 +238,18 @@ fn auth_settings(
                 pending_for: health_time::SignedDuration::from_hours(24),
             })
         },
+        momo: match (&files.momo_accounts_file, files.payment_tills.is_empty()) {
+            (Some(path), false) => Some(health_integration::mobile_money::MomoAccounts::from_file(
+                path,
+            )?),
+            (Some(_), true) => {
+                return Err(
+                    "HEALTH_MOMO_ACCOUNTS_FILE needs HEALTH_PAYMENT_TILLS: MoMo collects through the payments"
+                        .into(),
+                );
+            }
+            (None, _) => None,
+        },
         portal: files.portal.as_ref().map(|portal| auth::PortalSettings {
             country_code: portal.country_code.clone(),
             otp_outbox: portal.otp_outbox.clone(),

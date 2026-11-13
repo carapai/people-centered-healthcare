@@ -58,6 +58,14 @@ pub struct PaymentConfig {
 }
 
 impl PaymentConfig {
+    /// The payment settings of `facility` (its short code): the ledger, tills, merchant accounts
+    /// and receipt numbers this node uses for it. For services beside the routes, such as mobile
+    /// money collections (#124).
+    pub fn settings_for(&self, facility: &str) -> Result<Settings, String> {
+        self.settings(facility)
+            .map_err(|_| format!("{facility} is not a short code, or the node code is invalid"))
+    }
+
     fn settings(&self, facility: &str) -> Result<Settings, Box<Response>> {
         let merchant = |name: &str| format!("merchant-{name}");
         let methods = [

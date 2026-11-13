@@ -146,6 +146,7 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("price_rule", "pricing"),
     ("cash_shift", "payments"),
     ("payment_exception", "payments"),
+    ("provider_request", "payments"),
     ("break_glass", "identity"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),

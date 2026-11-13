@@ -102,7 +102,15 @@ stateDiagram-v2
   - **The exceptions queue.** `payment_exception` (migration `0055_payment_exceptions`) holds a different statement amount, a statement line no payment has, and a provider amount that is not the payment's. Each is opened once, until a person resolves it.
   - **Statements.** `Collections::reconcile_statement` matches each line against its payment by reference, whatever the payment's status. A payment its callback already confirmed is matched, not reported as unknown. That was a gap in `Payments::reconcile_statement` (`PaymentStore::payments_with_references`).
   - **Transport.** `HttpsTransport` reaches the provider over HTTPS only, verified against the OS trust store.
-  - **Still to come:** central's routes and per-facility accounts, the polling task, posted payments missing from a statement, and Airtel after its API is verified.
+- **Mobile money, #124 part 3: at central.**
+  - **Accounts.** The facilities' merchant accounts come from a secrets file, `HEALTH_MOMO_ACCOUNTS_FILE`. `MtnConfig`'s `Debug` hides the keys.
+  - **Routes.** `MomoService` runs one `Collections` per facility, mounted under `/api/payments`:
+    - `POST /momo` (cash permission, for the session's facility);
+    - `GET /exceptions` and `POST /exceptions/{id}/resolve` (supervise permission);
+    - the public `POST /momo/callback`, which always answers 200 with no body.
+  - **Facilities.** Each provider reference records its facility (`provider_request`, migration `0056_provider_requests`) before the request goes out. A callback and the minute poller settle each payment in its own facility's ledger, and the poller also expires the overdue.
+  - **Balances.** `Payments::balances` builds a facility's ledger from that facility's postings only. Central keeps every facility's postings in one store, so the balances refused once a second facility had posted.
+  - **Still to come:** an edge asking central to initiate, posted payments missing from a statement, a statement import route, and Airtel after its API is verified.
 
 ## Other flows
 

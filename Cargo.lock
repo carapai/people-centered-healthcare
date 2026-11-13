@@ -741,6 +741,7 @@ dependencies = [
  "health-http",
  "health-identifiers",
  "health-identity",
+ "health-integration",
  "health-observability",
  "health-packages",
  "health-persistence",
@@ -2863,6 +2864,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "health-access-policy",
  "health-audit",
  "health-coverage",
  "health-fhir-search",
@@ -2883,6 +2885,7 @@ dependencies = [
  "rand_core 0.6.4",
  "rust_decimal",
  "rustls",
+ "serde",
  "serde_json",
  "surrealdb",
  "thiserror 2.0.21",
