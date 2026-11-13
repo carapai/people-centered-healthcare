@@ -1021,6 +1021,9 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 4: statement import (2026-11-13).**
+  - **What:** `POST /api/payments/momo/statements` `{from, until, lines}` (supervise permission) reconciles MTN's statement for a period. It confirms the pending payments the statement shows, and queues mismatches, unknown lines and posted payments of the period it does not show (`missing`, migration `0057_missing_payment_exceptions`).
+  - **Tested:** a statement confirms the pending payment it shows and queues the callback-confirmed one it does not; it is refused to a cashier and for an empty period.
 - **#124, part 3: MoMo at central (2026-11-13).**
   - **What:**
     - **Accounts:** `HEALTH_MOMO_ACCOUNTS_FILE` holds the facilities' MTN merchant accounts, with the keys hidden from logs.

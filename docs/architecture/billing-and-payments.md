@@ -110,7 +110,8 @@ stateDiagram-v2
     - the public `POST /momo/callback`, which always answers 200 with no body.
   - **Facilities.** Each provider reference records its facility (`provider_request`, migration `0056_provider_requests`) before the request goes out. A callback and the minute poller settle each payment in its own facility's ledger, and the poller also expires the overdue.
   - **Balances.** `Payments::balances` builds a facility's ledger from that facility's postings only. Central keeps every facility's postings in one store, so the balances refused once a second facility had posted.
-  - **Still to come:** an edge asking central to initiate, posted payments missing from a statement, a statement import route, and Airtel after its API is verified.
+- **Mobile money, #124 part 4: statements.** `POST /api/payments/momo/statements` `{from, until, lines}` (supervise permission) takes MTN's statement for a period, as exported from its partner portal. The pending payments it shows are confirmed. A different amount or an unknown line is queued, and so is a payment requested in the period and posted here that the statement does not show (`missing`: money the ledger counts in the merchant account that MTN does not). The exception kind is added by migration `0057_missing_payment_exceptions`.
+  - **Still to come:** an edge asking central to initiate, and Airtel after its API is verified.
 
 ## Other flows
 

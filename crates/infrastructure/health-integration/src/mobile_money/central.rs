@@ -6,6 +6,10 @@
 //!   The answer is the payment, pending until MTN confirms it.
 //! - `GET /exceptions` and `POST /exceptions/{id}/resolve` `{note}` (with the supervise
 //!   permission): the payment exceptions queue.
+//! - `POST /momo/statements` `{from, until, lines: [{reference, amount}]}` (with the supervise
+//!   permission, for the session's facility): MTN's statement for a period, as exported from its
+//!   partner portal. The payments it shows are confirmed; a different amount, a line no payment
+//!   has, and a posted payment of the period it does not show go to the exceptions queue.
 //! - `POST /momo/callback?reference=` (public, for MTN): only a hint. The status is read back
 //!   from MTN by the reference, for the facility that reference was made for. It always answers
 //!   200 with nothing in the body, so it tells a caller nothing.
@@ -24,7 +28,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
-use health_payments::{Method, NewPayment, Purpose};
+use health_payments::{Method, NewPayment, Purpose, StatementLine};
 use health_payments_app::Settings;
 use health_surrealdb::SurrealStore;
 use health_time::{Clock, SignedDuration};
@@ -216,6 +220,7 @@ impl<T: MomoTransport + Clone + 'static> MomoService<T> {
     pub fn routes(self: &Arc<Self>) -> Router {
         Router::new()
             .route("/momo", post(initiate::<T>))
+            .route("/momo/statements", post(statement::<T>))
             .route("/exceptions", get(exceptions::<T>))
             .route("/exceptions/{id}/resolve", post(resolve::<T>))
             .with_state(Arc::clone(self))
@@ -317,6 +322,71 @@ async fn initiate<T: MomoTransport + Clone + 'static>(
         )
             .into_response(),
         Err(error) => refused(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+struct Statement {
+    from: String,
+    until: String,
+    lines: Vec<StatementRow>,
+}
+
+#[derive(Deserialize)]
+struct StatementRow {
+    reference: String,
+    amount: String,
+}
+
+async fn statement<T: MomoTransport + Clone + 'static>(
+    State(service): State<Arc<MomoService<T>>>,
+    subject: Option<Extension<Subject>>,
+    Json(body): Json<Statement>,
+) -> Response {
+    let subject = match subject_with(subject, SUPERVISE_PERMISSION) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let Some(collections) = service.collections(&subject.facility) else {
+        return refused(
+            StatusCode::NOT_FOUND,
+            "this facility has no MTN MoMo merchant account",
+        );
+    };
+    let (Ok(from), Ok(until)) = (
+        body.from.parse::<health_time::Timestamp>(),
+        body.until.parse::<health_time::Timestamp>(),
+    ) else {
+        return refused(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "from and until are RFC 3339 times",
+        );
+    };
+    if until <= from {
+        return refused(StatusCode::UNPROCESSABLE_ENTITY, "until comes after from");
+    }
+    let mut lines = Vec::with_capacity(body.lines.len());
+    for row in body.lines {
+        let Ok(amount) = row.amount.trim().parse::<Decimal>() else {
+            return refused(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &format!("the amount of {} is not a number", row.reference),
+            );
+        };
+        lines.push(StatementLine {
+            reference: row.reference.trim().to_owned(),
+            amount,
+        });
+    }
+    match collections.reconcile_period(&lines, from, until).await {
+        Ok(result) => Json(json!({
+            "confirmed": result.confirm,
+            "mismatched": result.mismatched.iter().map(|(id, _, _)| id).collect::<Vec<_>>(),
+            "unknown": result.unknown,
+            "missing": result.missing,
+        }))
+        .into_response(),
+        Err(error) => refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     }
 }
 

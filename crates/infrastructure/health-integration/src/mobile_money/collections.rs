@@ -140,10 +140,11 @@ impl<T: MomoTransport> Collections<T> {
         &self,
         lines: &[StatementLine],
     ) -> Result<Reconciliation, CollectionError> {
-        let result = self
+        let mut result = self
             .payments
             .reconcile_statement(lines, self.clock.now())
             .await?;
+        result.missing.clear();
         for (payment, recorded, provider) in &result.mismatched {
             let reference = self.payments.payment(payment).await?.reference;
             self.exception(
@@ -162,6 +163,42 @@ impl<T: MomoTransport> Collections<T> {
                 .map(|line| line.amount);
             self.exception("unknown", reference, None, None, amount)
                 .await?;
+        }
+        Ok(result)
+    }
+
+    /// Reconciles MTN's statement `lines` for the period from `from` until `until`, as
+    /// [`Self::reconcile_statement`] does, and also queues each payment requested in that period
+    /// and posted here that the statement does not show (`missing`): money the ledger counts in
+    /// the merchant account that MTN does not.
+    pub async fn reconcile_period(
+        &self,
+        lines: &[StatementLine],
+        from: health_time::Timestamp,
+        until: health_time::Timestamp,
+    ) -> Result<Reconciliation, CollectionError> {
+        let mut result = self.reconcile_statement(lines).await?;
+        let requested = self
+            .store
+            .provider_requests_between(&self.facility, from, until)
+            .await
+            .map_err(|e| CollectionError::Payments(PaymentsError::Store(e.to_string())))?;
+        for (reference, payment) in requested {
+            if lines.iter().any(|line| line.reference == reference) {
+                continue;
+            }
+            let found = self.payments.payment(&payment).await?;
+            if found.status == Status::Posted {
+                self.exception(
+                    "missing",
+                    &reference,
+                    Some(&payment),
+                    Some(found.amount),
+                    None,
+                )
+                .await?;
+                result.missing.push(payment);
+            }
         }
         Ok(result)
     }

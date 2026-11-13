@@ -312,3 +312,55 @@ async fn the_routes_need_the_permissions_and_an_account() {
     let (_, listed) = send(&supervisor, "GET", "/exceptions", Value::Null).await;
     assert_eq!(listed, json!([]));
 }
+
+#[tokio::test]
+async fn a_statement_for_a_period_queues_posted_payments_it_does_not_show() {
+    let (service, mock, _) = service().await;
+    let cashier = as_(&service, "KAM013", &["payments.cash"]);
+    let supervisor = as_(&service, "KAM013", &["payments.supervise"]);
+    let before = health_time::Timestamp::now()
+        .checked_sub(health_time::SignedDuration::from_mins(1))
+        .expect("time");
+    let take = |amount: &str| json!({ "amount": amount, "payer": "Account/acc-1", "msisdn": "256772000001" });
+    // One is confirmed by its callback but never shows on the statement; one is still pending
+    // and the statement shows it.
+    let (_, posted) = send(&cashier, "POST", "/momo", take("7000")).await;
+    let posted_ref = posted["reference"].as_str().expect("reference").to_owned();
+    mock.answer(&posted_ref, "SUCCESSFUL", "7000");
+    send(
+        &service.callback_route(),
+        "POST",
+        &format!("/momo/callback?reference={posted_ref}"),
+        Value::Null,
+    )
+    .await;
+    let (_, pending) = send(&cashier, "POST", "/momo", take("3000")).await;
+    let pending_ref = pending["reference"].as_str().expect("reference").to_owned();
+    let after = health_time::Timestamp::now()
+        .checked_add(health_time::SignedDuration::from_mins(1))
+        .expect("time");
+
+    let statement = json!({
+        "from": before.to_string(), "until": after.to_string(),
+        "lines": [{ "reference": pending_ref, "amount": "3000" }],
+    });
+    let (status, _) = send(&cashier, "POST", "/momo/statements", statement.clone()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "a supervisor's");
+    let (status, result) = send(&supervisor, "POST", "/momo/statements", statement).await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(result["confirmed"], json!([pending["id"]]));
+    assert_eq!(result["missing"], json!([posted["id"]]));
+    let (_, queued) = send(&supervisor, "GET", "/exceptions", Value::Null).await;
+    assert_eq!(queued.as_array().map(Vec::len), Some(1));
+    assert_eq!(queued[0]["kind"], "missing");
+    assert_eq!(queued[0]["reference"], posted_ref.as_str());
+
+    let (status, _) = send(
+        &supervisor,
+        "POST",
+        "/momo/statements",
+        json!({ "from": after.to_string(), "until": before.to_string(), "lines": [] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "an empty period");
+}
