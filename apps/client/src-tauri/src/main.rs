@@ -58,8 +58,9 @@ fn compose(
     dir: &std::path::Path,
     report: &Arc<encryption::Report>,
     edge: Option<&Arc<edge::EdgeLink>>,
+    workflows: Option<&health_node_api::WorkflowConfig>,
 ) -> Local {
-    let signed = match auth::routes(connection, dir, &OsKeystore) {
+    let signed = match auth::routes(connection, dir, &OsKeystore, workflows) {
         Ok(routes) => routes,
         Err(e) => {
             eprintln!("health-desktop: no sign-in: {e}");
@@ -283,17 +284,38 @@ async fn open() -> Result<Api, String> {
             None
         }
     };
+    // Workflows (#100), once provisioned or enrolled: one engine, kept across rebuilds of the
+    // local router, with its timers, candidates and package definitions in the upkeep.
+    let workflows = node::authority(&dir).and_then(|authority| {
+        match health_node_api::WorkflowConfig::new(Vec::new(), &authority) {
+            Ok(config) => Some(config),
+            Err(e) => {
+                eprintln!("health-desktop: no workflows: {e}");
+                None
+            }
+        }
+    });
+    if let Some(workflows) = &workflows {
+        let blobs = health_files::FsBlobStore::open(dir.join("files")).ok();
+        health_node_api::workflows::spawn_upkeep(
+            workflows.clone(),
+            node::store(connection.clone()),
+            blobs,
+        );
+    }
     let local = Arc::new(tokio::sync::RwLock::new(compose(
         &connection,
         &dir,
         &report,
         edge.as_ref(),
+        workflows.as_ref(),
     )));
     match node::sync(connection.clone(), &dir, &OsKeystore) {
         Ok(Some(sync)) => match &edge {
             Some(edge) => {
                 let edge = Arc::clone(edge);
                 let link = Arc::clone(&edge);
+                let flows = workflows.clone();
                 let leases = node::store(connection.clone());
                 let (connection, dir, report, local) = (
                     connection.clone(),
@@ -302,19 +324,25 @@ async fn open() -> Result<Api, String> {
                     Arc::clone(&local),
                 );
                 let accounts: edge::Accounts = Arc::new(move |answer| {
-                    let (connection, dir, report, local, link) = (
+                    let (connection, dir, report, local, link, flows) = (
                         connection.clone(),
                         dir.clone(),
                         Arc::clone(&report),
                         Arc::clone(&local),
                         Arc::clone(&link),
+                        flows.clone(),
                     );
                     Box::pin(async move {
                         match auth::import_from_edge(&connection, &dir, &OsKeystore, &answer).await
                         {
                             Ok(imported) => {
-                                *local.write().await =
-                                    compose(&connection, &dir, &report, Some(&link));
+                                *local.write().await = compose(
+                                    &connection,
+                                    &dir,
+                                    &report,
+                                    Some(&link),
+                                    flows.as_ref(),
+                                );
                                 eprintln!(
                                     "health-desktop: {imported} staff can sign in here while the edge cannot be reached"
                                 );

@@ -32,6 +32,17 @@ pub(crate) fn facility(data_dir: &Path) -> Option<String> {
     value["facility"].as_str().map(str::to_owned)
 }
 
+/// The name this node decides workflow instances under (#100): its node id once provisioned, or
+/// its enrolled device id under an edge; `None` before either.
+pub(crate) fn authority(data_dir: &Path) -> Option<String> {
+    let read = |file: &str, field: &str| {
+        let text = std::fs::read_to_string(pki_dir(data_dir).join(file)).ok()?;
+        let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+        value[field].as_str().map(str::to_owned)
+    };
+    read("node.json", "node_id").or_else(|| read("edge.json", "device_id"))
+}
+
 /// The store sync writes to: indexed as the clinical API searches, so what central sends down is
 /// found here.
 pub(crate) fn store(connection: Connection) -> SurrealStore {
@@ -152,6 +163,36 @@ pub(crate) async fn seed_import(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workflows_are_decided_under_the_node_or_the_enrolled_device() {
+        let dir = tempfile::tempdir().expect("dir");
+        assert_eq!(
+            authority(dir.path()),
+            None,
+            "neither provisioned nor enrolled"
+        );
+        std::fs::create_dir_all(pki_dir(dir.path())).expect("pki");
+        std::fs::write(
+            pki_dir(dir.path()).join("edge.json"),
+            r#"{"edge":"https://edge.local","device_id":"0193a000-0000-7000-8000-000000000001"}"#,
+        )
+        .expect("edge");
+        assert_eq!(
+            authority(dir.path()).as_deref(),
+            Some("0193a000-0000-7000-8000-000000000001")
+        );
+        std::fs::write(
+            pki_dir(dir.path()).join("node.json"),
+            r#"{"node_id":"018f0000-0000-7000-8000-000000000000"}"#,
+        )
+        .expect("node");
+        assert_eq!(
+            authority(dir.path()).as_deref(),
+            Some("018f0000-0000-7000-8000-000000000000"),
+            "a provisioned node decides its own"
+        );
+    }
 
     #[test]
     fn an_unprovisioned_desktop_has_no_facility_and_no_sync() {

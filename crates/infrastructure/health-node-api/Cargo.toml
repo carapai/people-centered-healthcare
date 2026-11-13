@@ -15,14 +15,22 @@ workspace = true
 [dependencies]
 axum = { workspace = true }
 health-access-policy = { workspace = true }
+health-activation = { workspace = true }
 health-audit = { workspace = true }
 health-auth = { workspace = true }
 health-client-registry = { workspace = true }
+health-configuration = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
+health-files = { workspace = true }
 health-identifiers = { workspace = true }
+health-persistence = { workspace = true }
+health-publication = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
+health-workflow-app = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 tower = { workspace = true }
 tracing = { workspace = true }

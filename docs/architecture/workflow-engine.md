@@ -125,7 +125,12 @@ sequenceDiagram
   - **At the authority.** Sync keeps each arriving candidate once in `workflow_candidate` (migration `0054_workflow_candidates`). `Workflows::apply_candidates` judges them in order.
   - **Conflicts.** Each candidate that does not apply opens a Conflict Record of class `workflow`, with the pushed candidate as its candidate branch, in the review queue. Keeping the head discards it.
 - **In code (#100, part 3): replicas down.** Each change to an instance a node decides is logged as a `workflow-instance` operation. It goes down only, and is never queued for the node's upstreams. Its desktops pull it, keep the newest version of each instance, and run the engine on those replicas offline. A candidate the authority applies, or a conflict it keeps its own version for, comes back down the same way.
-  - **Still to come:** the edge and the desktop running the engine and the drain at runtime.
+- **In code (#100, part 4): the engine on the edge and the desktop.** `health-node-api` serves `/api/workflow` (the routes central serves), and `workflows::spawn_upkeep` runs every 30 seconds:
+  - When the active package set has changed, the active packages' Workflow Definitions are run from then on. On any problem the previous ones keep running and `package-activation-failed` is raised.
+  - Timers due on the instances the node decides are fired (`WorkflowConfig::upkeep`).
+  - Candidates other nodes sent are judged, and `workflow-conflicts` is raised when any opened a Conflict Record.
+
+  The edge runs it as its facility's authority, behind its device gate. The desktop runs it under its node id, or under its enrolled device id on the replicas of its edge's instances, with one engine kept across rebuilds of its local router. Central's `/api/workflow` does not run the upkeep yet.
 
 ## Versioning and migration
 

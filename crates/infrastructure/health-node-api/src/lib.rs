@@ -12,6 +12,9 @@
 //! - **Registration** (`Patient/$register`), with `HEALTH_NODE_CODE` and
 //!   `HEALTH_REGISTRY_NIN_SYSTEM`: the same matching as central, and MRNs minted under this node's
 //!   own code, so they never collide with another node's.
+//! - **Workflows** (#100): with [`Clinical::with_workflows`], **`/api/workflow`** runs the engine
+//!   over the node's store, and [`workflows::spawn_upkeep`] fires its timers, judges the
+//!   candidates other nodes send, and runs the active packages' definitions.
 //! - **Search** uses the parameters central does (`health_fhir_server::search_registry`), and a
 //!   submitted form is re-validated against its Questionnaire and extracted (#103), with the
 //!   definitions central sends down.
@@ -41,6 +44,10 @@ use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use tower::ServiceExt as _;
 
+pub mod workflows;
+
+pub use health_fhir_server::WorkflowConfig;
+
 /// The clinical routes, built from the provisioning bundle's rules.
 #[derive(Clone)]
 pub struct Clinical {
@@ -52,6 +59,8 @@ pub struct Clinical {
     node: String,
     /// Registration (#106): the national ID system and this node's MRN code, when configured.
     registry: Option<(String, ShortCode)>,
+    /// The workflows it runs, at `/api/workflow`, if any.
+    workflows: Option<WorkflowConfig>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
 }
 
@@ -92,8 +101,21 @@ impl Clinical {
             base: format!("{origin}/api/fhir"),
             node: node.to_owned(),
             registry,
+            workflows: None,
             built: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Runs workflows at `/api/workflow` with `config`, whose authority is this node.
+    #[must_use]
+    pub fn with_workflows(mut self, config: WorkflowConfig) -> Self {
+        self.workflows = Some(config);
+        self
+    }
+
+    /// The store the API serves, for the node's upkeep.
+    pub fn store(&self) -> &SurrealStore {
+        &self.store
     }
 
     /// The routes for `config`'s rules.
@@ -129,6 +151,10 @@ impl Clinical {
             }
             None => fhir,
         };
+        let fhir = match &self.workflows {
+            Some(workflows) => fhir.with_workflows(workflows.clone()),
+            None => fhir,
+        };
         let subjects = Subjects::new(self.verifier.clone(), config.roles.clone());
         let layer =
             axum::middleware::from_fn_with_state(subjects, subject_layer::<SurrealAuthStore>);
@@ -142,6 +168,7 @@ impl Clinical {
                 fhir.consultation_router().layer(signed()),
             )
             .nest("/api/notes", fhir.notes_router().layer(signed()))
+            .nest("/api/workflow", fhir.workflow_router().layer(signed()))
             .layer(layer)
     }
 
@@ -168,8 +195,8 @@ impl Clinical {
         Ok(Some(router))
     }
 
-    /// `/api/fhir`, `/api/reception`, `/api/consultation` and `/api/notes`, to be put behind
-    /// the device gate.
+    /// `/api/fhir`, `/api/reception`, `/api/consultation`, `/api/notes` and `/api/workflow`, to
+    /// be put behind the device gate. Without workflows, `/api/workflow` answers 404.
     pub fn routes(self) -> Router {
         let mut router = Router::new();
         for prefix in [
@@ -177,6 +204,7 @@ impl Clinical {
             "/api/reception",
             "/api/consultation",
             "/api/notes",
+            "/api/workflow",
         ] {
             router = router
                 .route(prefix, any(serve))

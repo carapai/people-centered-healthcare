@@ -296,6 +296,8 @@ mod tests {
             "/sync/v1/snapshot".to_owned(),
             "/sync/v1/events".to_owned(),
             "/api/desktop/accounts".to_owned(),
+            "/api/workflow/instances".to_owned(),
+            "/api/workflow/worklists/triage".to_owned(),
             "/api/device/leases".to_owned(),
             format!("/api/device/leases/{id}/return"),
         ];
