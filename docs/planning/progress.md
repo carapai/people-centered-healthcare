@@ -1078,6 +1078,19 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
       - lets a person resolve an exception.
     - **A wrong amount** from MTN opens an exception.
   - **Next:** central's routes, per-facility merchant accounts, and the polling task.
+- **#139: the observability stack's configuration (2026-11-13).**
+  - **What:** `ops/observability/`.
+    - **The collector** takes OTLP from edges and central's JSON log files. It enforces the telemetry allowlist again and clears every log body.
+    - **The stack:** Prometheus (span metrics), Loki (logs, with the ruler), Tempo, and Alertmanager routing to central operations. Grafana has an indicators dashboard.
+    - **The rules:** `alerts.tsv` catalogues the 48 alert codes by area and severity, and one Loki rule per code fires while it is raised and not cleared.
+    - **Images:** a pinned staging compose file.
+  - **Verified locally:**
+    - every config passes its own validator;
+    - end to end, an edge's `ups-on-battery` and central's `sync-failing` reached Alertmanager, and the edge's clear resolved its alert;
+    - a `patient_name` attribute and a `phone` field never reached Loki.
+  - **Found and fixed:** a file-read line kept the raw line, with any field, as its body. The collector now clears bodies.
+  - **Left to operations:** the in-country site, sizing, the paging address, and watching each alert fire in staging.
+  - **Indicators without a code yet:** sync lag and outbox depth, pending-payment age, stock drift, overdue timers, queue waits, and the software version.
 - **#124, part 1: the MTN MoMo adapter (2026-11-13).**
   - **What:** `health_integration::mobile_money`.
     - **`MtnMomo`:** the Collection API through a transport port: token, request to pay under a UUIDv4 reference, and status.

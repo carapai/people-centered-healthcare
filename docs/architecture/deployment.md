@@ -170,6 +170,7 @@ flowchart LR
   | Workflow | Stuck or overdue timers; queue wait times |
 
   Alerts go to central operations and are shown on the edge admin page.
+- **In code (#139):** `ops/observability/` holds the stack's configuration: the collector, Prometheus, Loki, Tempo, Alertmanager, Grafana and a staging compose file. Its `alerts.tsv` catalogues every alert code the nodes emit, and a Loki rule is generated per code. `check-alerts.sh` keeps the catalogue, the code and the rules in step. The collector enforces the allowlist again, and clears log bodies. See its README for what was verified and which indicators have no alert code yet.
 
 ## Disaster recovery (§92–94; ADR 0046)
 

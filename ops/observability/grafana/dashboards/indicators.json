@@ -1,0 +1,298 @@
+{
+  "title": "Health platform: indicators",
+  "uid": "health-indicators",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "tags": [
+    "health",
+    "#139"
+  ],
+  "panels": [
+    {
+      "type": "alertlist",
+      "title": "Firing now",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "stateFilter": {
+          "firing": true,
+          "pending": true
+        },
+        "showInstances": true,
+        "maxItems": 50
+      },
+      "id": 1
+    },
+    {
+      "type": "timeseries",
+      "title": "Sync: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"sync-failing|sync-off|sync-reseed|sync-quarantined|sync-conflicts-ageing|desktop-sync-off|transfer-undispatched|transfer-unreceived\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "timeseries",
+      "title": "Storage: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"backup-failed|backup-stale|backup-test-failed|backups-off|backup-on-data-volume|disk-full|package-activation-failed\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "Platform: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"disk-unencrypted|secure-boot-off|encryption-exempt|identity-invalid|not-provisioned|certificate-expiring|certificate-renewal-failed|intermediate-expiring|address-changed|clock-behind-floor|ups-on-battery|ups-low-battery|ups-unreachable|task-restarts|telemetry-unshipped|telemetry-unbuffered|sign-in-off|bundle-refused|recovery-key-used\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "Finance: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"payment-exception|momo-amount-mismatch|momo-off|payments-off\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "Stock: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"lease-frozen\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Workflow: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"workflow-conflicts\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 7
+    },
+    {
+      "type": "timeseries",
+      "title": "Security: alerts raised",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (alert, service_instance_id) (count_over_time({service_name=~\".+\"} | alert=~\"device-revoked|unenrolled-device|enrollment-refused|enrollment-rate-limited|pin-exhausted|local-grant|local-revocation|provisional-account\" | outcome!=\"cleared\" [$__interval]))",
+          "legendFormat": "{{alert}} {{service_instance_id}}"
+        }
+      ],
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Edges: backup age (seconds)",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max by (service_instance_id) (max_over_time({service_name=\"facility-edge\"} | backup_age_seconds != \"\" | unwrap backup_age_seconds [$__interval]))",
+          "legendFormat": "{{service_instance_id}}"
+        }
+      ],
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "Edges: task restarts",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 57,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "max by (service_instance_id) (max_over_time({service_name=\"facility-edge\"} | restart_count != \"\" | unwrap restart_count [$__interval]))",
+          "legendFormat": "{{service_instance_id}}"
+        }
+      ],
+      "id": 10
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests by route (rate)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (http_route) (rate(traces_span_metrics_calls_total[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ],
+      "id": 11
+    }
+  ],
+  "description": "The indicators of deployment.md \u00a7 Observability, from the allowlisted alert codes the nodes log. Generated from ops/observability/alerts.tsv."
+}

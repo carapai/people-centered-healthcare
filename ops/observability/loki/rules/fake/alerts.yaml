@@ -1,0 +1,746 @@
+# Generated from alerts.tsv (#139): one rule per alert code the nodes emit. A rule fires while
+# the code has been raised and not cleared within the last 24 hours, per node and per subject
+# (`check`: a volume or a task), from the log records alone. Telemetry carries no personal data:
+# only the allowlisted fields reach these logs (deployment.md § Observability).
+groups:
+  - name: finance
+    interval: 1m
+    rules:
+      - alert: PaymentException
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payment-exception" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payment-exception" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payment-exception" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: finance
+          code: payment-exception
+        annotations:
+          summary: "A payment needs a person (exceptions queue)"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A payment needs a person (exceptions queue) (payment-exception)."
+      - alert: MomoAmountMismatch
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-amount-mismatch" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-amount-mismatch" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-amount-mismatch" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: finance
+          code: momo-amount-mismatch
+        annotations:
+          summary: "MTN confirmed another amount than recorded"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: MTN confirmed another amount than recorded (momo-amount-mismatch)."
+      - alert: MomoOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="momo-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: finance
+          code: momo-off
+        annotations:
+          summary: "MTN MoMo collections are off"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: MTN MoMo collections are off (momo-off)."
+      - alert: PaymentsOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payments-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payments-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="payments-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: finance
+          code: payments-off
+        annotations:
+          summary: "Payments are configured but cannot run"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Payments are configured but cannot run (payments-off)."
+  - name: platform
+    interval: 1m
+    rules:
+      - alert: DiskUnencrypted
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-unencrypted" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-unencrypted" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-unencrypted" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: disk-unencrypted
+        annotations:
+          summary: "A volume is not encrypted"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A volume is not encrypted (disk-unencrypted)."
+      - alert: SecureBootOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="secure-boot-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="secure-boot-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="secure-boot-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: secure-boot-off
+        annotations:
+          summary: "Secure Boot is off"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Secure Boot is off (secure-boot-off)."
+      - alert: EncryptionExempt
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="encryption-exempt" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="encryption-exempt" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="encryption-exempt" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: platform
+          code: encryption-exempt
+        annotations:
+          summary: "The facility runs under an encryption exemption"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The facility runs under an encryption exemption (encryption-exempt)."
+      - alert: IdentityInvalid
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="identity-invalid" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="identity-invalid" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="identity-invalid" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: identity-invalid
+        annotations:
+          summary: "The node's identity or chain does not verify"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The node's identity or chain does not verify (identity-invalid)."
+      - alert: NotProvisioned
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="not-provisioned" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="not-provisioned" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="not-provisioned" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: not-provisioned
+        annotations:
+          summary: "The node is not provisioned"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The node is not provisioned (not-provisioned)."
+      - alert: CertificateExpiring
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-expiring" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-expiring" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-expiring" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: certificate-expiring
+        annotations:
+          summary: "The TLS certificate expires soon"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The TLS certificate expires soon (certificate-expiring)."
+      - alert: CertificateRenewalFailed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-renewal-failed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-renewal-failed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="certificate-renewal-failed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: certificate-renewal-failed
+        annotations:
+          summary: "The TLS certificate could not be renewed"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The TLS certificate could not be renewed (certificate-renewal-failed)."
+      - alert: IntermediateExpiring
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="intermediate-expiring" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="intermediate-expiring" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="intermediate-expiring" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: intermediate-expiring
+        annotations:
+          summary: "The facility intermediate expires soon"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The facility intermediate expires soon (intermediate-expiring)."
+      - alert: AddressChanged
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="address-changed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="address-changed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="address-changed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: platform
+          code: address-changed
+        annotations:
+          summary: "The node's address changed"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The node's address changed (address-changed)."
+      - alert: ClockBehindFloor
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="clock-behind-floor" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="clock-behind-floor" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="clock-behind-floor" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: clock-behind-floor
+        annotations:
+          summary: "The clock reads before the last known central time: no timer fires"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The clock reads before the last known central time: no timer fires (clock-behind-floor)."
+      - alert: UpsOnBattery
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-on-battery" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-on-battery" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-on-battery" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: ups-on-battery
+        annotations:
+          summary: "The UPS is on battery"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The UPS is on battery (ups-on-battery)."
+      - alert: UpsLowBattery
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-low-battery" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-low-battery" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-low-battery" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: ups-low-battery
+        annotations:
+          summary: "The UPS battery is low: the node will shut down"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The UPS battery is low: the node will shut down (ups-low-battery)."
+      - alert: UpsUnreachable
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-unreachable" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-unreachable" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="ups-unreachable" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: ups-unreachable
+        annotations:
+          summary: "The UPS cannot be read"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The UPS cannot be read (ups-unreachable)."
+      - alert: TaskRestarts
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="task-restarts" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="task-restarts" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="task-restarts" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: task-restarts
+        annotations:
+          summary: "A supervised task keeps restarting"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A supervised task keeps restarting (task-restarts)."
+      - alert: TelemetryUnshipped
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unshipped" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unshipped" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unshipped" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: telemetry-unshipped
+        annotations:
+          summary: "Telemetry cannot be shipped to the collector"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Telemetry cannot be shipped to the collector (telemetry-unshipped)."
+      - alert: TelemetryUnbuffered
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unbuffered" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unbuffered" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="telemetry-unbuffered" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: telemetry-unbuffered
+        annotations:
+          summary: "Telemetry cannot be buffered on disk"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Telemetry cannot be buffered on disk (telemetry-unbuffered)."
+      - alert: SignInOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sign-in-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sign-in-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sign-in-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: platform
+          code: sign-in-off
+        annotations:
+          summary: "Staff sign-in is not served on this edge"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Staff sign-in is not served on this edge (sign-in-off)."
+      - alert: BundleRefused
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="bundle-refused" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="bundle-refused" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="bundle-refused" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: bundle-refused
+        annotations:
+          summary: "A provisioning bundle was refused"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A provisioning bundle was refused (bundle-refused)."
+      - alert: RecoveryKeyUsed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="recovery-key-used" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="recovery-key-used" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="recovery-key-used" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: platform
+          code: recovery-key-used
+        annotations:
+          summary: "A disk recovery key was read out of escrow"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A disk recovery key was read out of escrow (recovery-key-used)."
+  - name: security
+    interval: 1m
+    rules:
+      - alert: DeviceRevoked
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="device-revoked" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="device-revoked" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="device-revoked" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: security
+          code: device-revoked
+        annotations:
+          summary: "A device was revoked"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A device was revoked (device-revoked)."
+      - alert: UnenrolledDevice
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="unenrolled-device" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="unenrolled-device" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="unenrolled-device" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: security
+          code: unenrolled-device
+        annotations:
+          summary: "A request came from a device that is not enrolled"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A request came from a device that is not enrolled (unenrolled-device)."
+      - alert: EnrollmentRefused
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-refused" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-refused" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-refused" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: security
+          code: enrollment-refused
+        annotations:
+          summary: "An enrolment request was refused"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: An enrolment request was refused (enrollment-refused)."
+      - alert: EnrollmentRateLimited
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-rate-limited" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-rate-limited" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="enrollment-rate-limited" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: security
+          code: enrollment-rate-limited
+        annotations:
+          summary: "Too many enrolment requests from one address"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Too many enrolment requests from one address (enrollment-rate-limited)."
+      - alert: PinExhausted
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="pin-exhausted" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="pin-exhausted" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="pin-exhausted" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: security
+          code: pin-exhausted
+        annotations:
+          summary: "A PIN was locked after too many attempts"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A PIN was locked after too many attempts (pin-exhausted)."
+      - alert: LocalGrant
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-grant" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-grant" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-grant" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: security
+          code: local-grant
+        annotations:
+          summary: "A role was granted offline, pending ratification"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A role was granted offline, pending ratification (local-grant)."
+      - alert: LocalRevocation
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-revocation" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-revocation" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="local-revocation" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: security
+          code: local-revocation
+        annotations:
+          summary: "Access was revoked offline"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Access was revoked offline (local-revocation)."
+      - alert: ProvisionalAccount
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="provisional-account" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="provisional-account" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="provisional-account" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: info
+          area: security
+          code: provisional-account
+        annotations:
+          summary: "A provisional account was created offline"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A provisional account was created offline (provisional-account)."
+  - name: stock
+    interval: 1m
+    rules:
+      - alert: LeaseFrozen
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="lease-frozen" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="lease-frozen" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="lease-frozen" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: stock
+          code: lease-frozen
+        annotations:
+          summary: "An Authority Lease expired unreturned: its stores are frozen"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: An Authority Lease expired unreturned: its stores are frozen (lease-frozen)."
+  - name: storage
+    interval: 1m
+    rules:
+      - alert: BackupFailed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-failed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-failed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-failed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: storage
+          code: backup-failed
+        annotations:
+          summary: "The last backup failed"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The last backup failed (backup-failed)."
+      - alert: BackupStale
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-stale" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-stale" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-stale" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: storage
+          code: backup-stale
+        annotations:
+          summary: "No backup within the expected interval"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: No backup within the expected interval (backup-stale)."
+      - alert: BackupTestFailed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-test-failed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-test-failed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-test-failed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: storage
+          code: backup-test-failed
+        annotations:
+          summary: "The weekly test restore failed"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The weekly test restore failed (backup-test-failed)."
+      - alert: BackupsOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backups-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backups-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backups-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: storage
+          code: backups-off
+        annotations:
+          summary: "This node takes no backups"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: This node takes no backups (backups-off)."
+      - alert: BackupOnDataVolume
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-on-data-volume" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-on-data-volume" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="backup-on-data-volume" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: storage
+          code: backup-on-data-volume
+        annotations:
+          summary: "Backups are written to the data volume itself"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Backups are written to the data volume itself (backup-on-data-volume)."
+      - alert: DiskFull
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-full" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-full" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="disk-full" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: storage
+          code: disk-full
+        annotations:
+          summary: "A volume is nearly full"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A volume is nearly full (disk-full)."
+      - alert: PackageActivationFailed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="package-activation-failed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="package-activation-failed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="package-activation-failed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: storage
+          code: package-activation-failed
+        annotations:
+          summary: "The active packages could not all be applied"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The active packages could not all be applied (package-activation-failed)."
+  - name: sync
+    interval: 1m
+    rules:
+      - alert: SyncFailing
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-failing" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-failing" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-failing" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: sync-failing
+        annotations:
+          summary: "Sync with the upstream is failing"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Sync with the upstream is failing (sync-failing)."
+      - alert: SyncOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: critical
+          area: sync
+          code: sync-off
+        annotations:
+          summary: "Sync is not running on this node"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Sync is not running on this node (sync-off)."
+      - alert: SyncReseed
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-reseed" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-reseed" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-reseed" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: sync-reseed
+        annotations:
+          summary: "The node was beyond the upstream's horizon and is re-seeding"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: The node was beyond the upstream's horizon and is re-seeding (sync-reseed)."
+      - alert: SyncQuarantined
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-quarantined" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-quarantined" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-quarantined" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: sync-quarantined
+        annotations:
+          summary: "A peer is out of the compatible range: its pushes are quarantined"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: A peer is out of the compatible range: its pushes are quarantined (sync-quarantined)."
+      - alert: SyncConflictsAgeing
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-conflicts-ageing" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-conflicts-ageing" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="sync-conflicts-ageing" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: sync-conflicts-ageing
+        annotations:
+          summary: "Conflict Records have been open for more than 7 days"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Conflict Records have been open for more than 7 days (sync-conflicts-ageing)."
+      - alert: DesktopSyncOff
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="desktop-sync-off" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="desktop-sync-off" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="desktop-sync-off" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: desktop-sync-off
+        annotations:
+          summary: "Desktops cannot sync with this edge"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Desktops cannot sync with this edge (desktop-sync-off)."
+      - alert: TransferUndispatched
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-undispatched" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-undispatched" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-undispatched" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: transfer-undispatched
+        annotations:
+          summary: "An inter-facility transfer has not been dispatched"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: An inter-facility transfer has not been dispatched (transfer-undispatched)."
+      - alert: TransferUnreceived
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-unreceived" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-unreceived" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="transfer-unreceived" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: sync
+          code: transfer-unreceived
+        annotations:
+          summary: "An inter-facility transfer has not been received"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: An inter-facility transfer has not been received (transfer-unreceived)."
+  - name: workflow
+    interval: 1m
+    rules:
+      - alert: WorkflowConflicts
+        expr: |
+          (
+            sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="workflow-conflicts" | outcome!="cleared" [24h]))
+            -
+            (sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="workflow-conflicts" | outcome="cleared" [24h])) or sum by (service_name, service_instance_id, check) (count_over_time({service_name=~".+"} | alert="workflow-conflicts" | outcome!="cleared" [24h])) * 0)
+          ) > 0
+        for: 1m
+        labels:
+          severity: warning
+          area: workflow
+          code: workflow-conflicts
+        annotations:
+          summary: "Offline workflow moves opened Conflict Records"
+          description: "{{ $labels.service_name }} {{ $labels.service_instance_id }}: Offline workflow moves opened Conflict Records (workflow-conflicts)."

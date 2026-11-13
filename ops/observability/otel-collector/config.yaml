@@ -1,0 +1,96 @@
+# The in-country OpenTelemetry collector (ADR 0047; #139).
+#
+# - Edges ship OTLP/HTTP log records from their on-disk buffer (`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`
+#   = http://<collector>:4318/v1/logs) and spans (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`).
+# - Central writes JSON log lines to stdout; its container log files are read here (filelog).
+# - Defence in depth: the nodes already export only allowlisted fields
+#   (health-observability). The `allowlist` processor drops any other attribute again before
+#   anything is stored, so a node on an older release cannot leak a field it should not send.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  filelog/central:
+    include: [/var/log/central/*.log]
+    start_at: end
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.ts
+          layout_type: gotime
+          layout: "2006-01-02T15:04:05.999999999Z07:00"
+        severity:
+          parse_from: attributes.level
+      - type: flatten
+        field: attributes.fields
+        if: attributes.fields != nil
+      - type: flatten
+        field: attributes.span_fields
+        if: attributes.span_fields != nil
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch: {}
+  resource/central:
+    attributes:
+      - key: service.name
+        value: central-server
+        action: upsert
+  # The telemetry allowlist (health_observability::allowlist), again: names and shapes of the
+  # fields that may be stored. Everything else is dropped.
+  transform/allowlist:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # Event messages are never exported, and a file-read line keeps the raw line as its
+          # body: the body goes, and only the allowlisted attributes stay.
+          - set(body, "")
+          - keep_matching_keys(attributes, "^(level|target|span|operation|outcome|error\\.kind|resource_type|http\\.method|http\\.route|http\\.status_code|facility_id|tenant|engine|check|alert|state|code|count|attempt|telemetry\\.redacted_fields|.*_id|.*_ms|.*_count|.*_bytes|.*_seconds|.*_total|.*_depth|.*_lag)$")
+    trace_statements:
+      - context: span
+        statements:
+          - keep_matching_keys(attributes, "^(operation|outcome|error\\.kind|resource_type|http\\.method|http\\.route|http\\.status_code|facility_id|tenant|engine|check|alert|state|code|count|attempt|.*_id|.*_ms|.*_count|.*_bytes|.*_seconds|.*_total|.*_depth|.*_lag)$")
+
+connectors:
+  # Request rate, errors and duration per route, from the spans, for Prometheus.
+  spanmetrics:
+    dimensions:
+      - name: http.route
+      - name: http.method
+      - name: http.status_code
+
+exporters:
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+
+service:
+  pipelines:
+    logs/nodes:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/allowlist, batch]
+      exporters: [otlphttp/loki]
+    logs/central:
+      receivers: [filelog/central]
+      processors: [memory_limiter, resource/central, transform/allowlist, batch]
+      exporters: [otlphttp/loki]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/allowlist, batch]
+      exporters: [otlp/tempo, spanmetrics]
+    metrics:
+      receivers: [spanmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
