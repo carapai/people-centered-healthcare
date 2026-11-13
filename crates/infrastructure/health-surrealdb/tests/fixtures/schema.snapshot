@@ -1229,7 +1229,7 @@ DEFINE TABLE payment TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE INDEX payment_shift ON payment FIELDS shift, recorded_at
   DEFINE INDEX payment_status ON payment FIELDS status, recorded_at
 DEFINE TABLE payment_exception TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
-  DEFINE FIELD kind ON payment_exception TYPE string ASSERT $value INSIDE ['mismatched', 'unknown', 'amount'] PERMISSIONS FULL
+  DEFINE FIELD kind ON payment_exception TYPE string ASSERT $value INSIDE ['mismatched', 'unknown', 'amount', 'missing'] PERMISSIONS FULL
   DEFINE FIELD note ON payment_exception TYPE none | string PERMISSIONS FULL
   DEFINE FIELD opened_at ON payment_exception TYPE datetime PERMISSIONS FULL
   DEFINE FIELD payment ON payment_exception TYPE none | string PERMISSIONS FULL

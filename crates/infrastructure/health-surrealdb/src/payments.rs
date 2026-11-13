@@ -267,6 +267,38 @@ impl crate::store::SurrealStore {
         Ok(())
     }
 
+    /// The provider requests `facility` made from `from` until `until`: each reference and the
+    /// payment it is for, oldest first.
+    pub async fn provider_requests_between(
+        &self,
+        facility: &str,
+        from: health_time::Timestamp,
+        until: health_time::Timestamp,
+    ) -> Result<Vec<(String, String)>, StoreError> {
+        let rows: Vec<Vec<String>> = self
+            .connection
+            .db()
+            .query(
+                "SELECT VALUE [record::id(id), payment] FROM provider_request \
+                 WHERE facility = $facility AND requested_at >= <datetime>$from \
+                 AND requested_at < <datetime>$until ORDER BY requested_at",
+            )
+            .bind(("facility", facility.to_owned()))
+            .bind(("from", from.to_string()))
+            .bind(("until", until.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(crate::store::unavailable)?
+            .take(0)
+            .map_err(crate::store::unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                let [reference, payment]: [String; 2] = row.try_into().map_err(|_| invalid())?;
+                Ok((reference, payment))
+            })
+            .collect()
+    }
+
     /// The facility whose payment the provider request `reference` is for, if any.
     pub async fn provider_request_facility(
         &self,
