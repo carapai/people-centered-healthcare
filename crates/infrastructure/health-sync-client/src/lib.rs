@@ -402,11 +402,46 @@ impl Sync {
             .map_err(|e| format!("{path}: {e}"))
     }
 
+    /// POSTs `body` as JSON to the upstream's `path`, signed as this node's sync requests are
+    /// but not compressed: for the routes beside `/sync/v1` that read the body as sent, such as
+    /// central's MoMo relay (#124). The status and the JSON answer (`null` if none).
+    pub async fn call(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> Result<(u16, serde_json::Value), String> {
+        let request = self.build("POST", path, body.to_string().into_bytes(), false)?;
+        let response = tokio::time::timeout(TIMEOUT, self.client.request(request))
+            .await
+            .map_err(|_| format!("{path}: the upstream did not answer in time"))?
+            .map_err(|e| format!("{path}: cannot reach the upstream: {e}"))?;
+        let status = response.status().as_u16();
+        let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
+            .await
+            .map_err(|_| format!("{path}: the upstream did not answer in time"))?
+            .map_err(|e| format!("{path}: {e}"))?
+            .to_bytes();
+        Ok((
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+        ))
+    }
+
     fn request(
         &self,
         method: &str,
         path: &str,
         body: Vec<u8>,
+    ) -> Result<hyper::Request<Full<VecDeque<u8>>>, String> {
+        self.build(method, path, body, true)
+    }
+
+    fn build(
+        &self,
+        method: &str,
+        path: &str,
+        body: Vec<u8>,
+        compressed: bool,
     ) -> Result<hyper::Request<Full<VecDeque<u8>>>, String> {
         let uri = format!("{}{path}", self.upstream.origin);
         let (name, value) = match self.credential {
@@ -440,7 +475,7 @@ impl Sync {
                 },
             );
         // JSON and NDJSON go compressed, signed over their content; attachment chunks as they are.
-        let body = if method == "POST" && !body.is_empty() {
+        let body = if compressed && method == "POST" && !body.is_empty() {
             request = request.header("content-encoding", ZSTD);
             compress(&body)
         } else {

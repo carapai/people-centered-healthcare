@@ -118,7 +118,8 @@ stateDiagram-v2
 
     It keeps no copy of the edge's payment. Its requests go uncompressed, signed over the body as sent.
   - **The edge** keeps its facility's ledger. It runs the same `Collections` flow over a `RelayTransport` (through a `CentralLink`): it records the pending payment and its reference first, polls through central, and confirms or voids in its own ledger.
-  - **Still to come:** the edge's payment routes, which it does not serve yet, with a `CentralLink` over its sync client; and Airtel after its API is verified.
+- **Mobile money, #124 part 6: tills on the edge.** With `HEALTH_PAYMENT_TILLS` and `HEALTH_NODE_CODE`, an edge serves `/api/payments` (`health-node-api`, behind its device gate and sign-in), the routes central serves, in its own ledger. Once it is provisioned, it collects MoMo at `/api/payments/momo` through central's relay. Its `CentralLink` is its sync client's signed, uncompressed `Sync::call`, and a poller runs every minute.
+  - **Still to come:** Airtel, after its API is verified.
 
 ## Other flows
 

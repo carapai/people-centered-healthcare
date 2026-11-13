@@ -83,6 +83,106 @@ fn snapshot_keys(path: &Path) -> Result<SnapshotVerifier, String> {
         .map_err(|_| "HEALTH_SNAPSHOT_KEYS_FILE holds an invalid key".into())
 }
 
+/// This edge's payments (#254), with the MoMo routes beside them when the edge is provisioned
+/// (#124): MoMo goes through central's relay, which holds the facility's MTN keys, and the
+/// payment lives in this edge's ledger. `None` without tills.
+fn payments(
+    config: &EdgeConfig,
+    clinical: &health_node_api::Clinical,
+    secrets: &Secrets,
+) -> Option<(health_fhir_server::PaymentConfig, Router)> {
+    if config.payment_tills.is_empty() {
+        return None;
+    }
+    let (Some(node), Ok(currency)) = (
+        config.node_code.as_ref(),
+        health_financial_ledger::Currency::from_code(&config.currency),
+    ) else {
+        tracing::warn!(
+            alert = "payments-off",
+            "HEALTH_PAYMENT_TILLS needs HEALTH_NODE_CODE and an ISO 4217 HEALTH_CURRENCY"
+        );
+        return None;
+    };
+    let payments = health_fhir_server::PaymentConfig {
+        currency,
+        tills: config.payment_tills.clone(),
+        node: node.to_string(),
+        pending_for: health_time::SignedDuration::from_hours(24),
+    };
+    let momo = momo(config, clinical, secrets, &payments);
+    Some((payments, momo.unwrap_or_default()))
+}
+
+/// MoMo collections through central's relay, once this edge is provisioned (`node.json` names
+/// central, and the facility intermediate's key signs the relay's requests as it does sync's).
+fn momo(
+    config: &EdgeConfig,
+    clinical: &health_node_api::Clinical,
+    secrets: &Secrets,
+    payments: &health_fhir_server::PaymentConfig,
+) -> Option<Router> {
+    use health_integration::mobile_money::{MomoAccounts, MomoService, MtnConfig, RelayTransport};
+
+    let facility = config.facility.clone()?;
+    let upstream = crate::sync::Upstream::from_identity(&config.pki_dir)?;
+    let key = {
+        let pem = secret(secrets, INTERMEDIATE_KEY).ok()?;
+        p256::ecdsa::SigningKey::from_pkcs8_pem(std::str::from_utf8(&pem).ok()?).ok()?
+    };
+    let central = crate::sync::Sync::new(clinical.store().clone(), upstream, key)
+        .map_err(|e| tracing::warn!(error = %e, "no MoMo: the relay link cannot be built"))
+        .ok()?;
+    // The relay holds the keys: this edge's account names nothing secret.
+    let accounts = MomoAccounts {
+        base_url: "relay".into(),
+        callback_url: None,
+        pending_for: health_time::SignedDuration::from_hours(1),
+        facilities: [(
+            facility,
+            MtnConfig {
+                subscription_key: String::new(),
+                api_user: String::new(),
+                api_key: String::new(),
+                environment: "relay".into(),
+                currency: config.currency.clone(),
+                callback_url: None,
+            },
+        )]
+        .into(),
+    };
+    let service = MomoService::new(
+        clinical.store().clone(),
+        &accounts,
+        RelayTransport::new(CentralRelay(central)),
+        |facility| payments.settings_for(facility),
+        Arc::new(health_time::SystemClock),
+    )
+    .map_err(|e| tracing::warn!(error = %e, "no MoMo"))
+    .ok()?;
+    let service = Arc::new(service);
+    service.spawn_poller();
+    tracing::info!("MTN MoMo is collected through central's relay");
+    Some(service.routes())
+}
+
+/// This edge's signed link to central, for the MoMo relay.
+#[derive(Clone)]
+struct CentralRelay(crate::sync::Sync);
+
+impl health_integration::mobile_money::CentralLink for CentralRelay {
+    async fn post(
+        &self,
+        path: &str,
+        body: serde_json::Value,
+    ) -> Result<(u16, serde_json::Value), health_integration::mobile_money::MomoError> {
+        self.0
+            .call(path, &body)
+            .await
+            .map_err(|_| health_integration::mobile_money::MomoError::Unreachable)
+    }
+}
+
 /// Central's snapshot public keys, as the file holds them.
 fn snapshot_jwks(path: &Path) -> Result<Vec<EcJwk>, String> {
     let text = std::fs::read_to_string(path)
@@ -266,6 +366,11 @@ pub(crate) fn routes(
             .clone()
             .zip(config.node_code.clone()),
     );
+    // Payments (#254), and MTN MoMo through central's relay (#124).
+    let clinical = match payments(config, &clinical, secrets) {
+        Some((payments, beside)) => clinical.with_payments(payments, beside),
+        None => clinical,
+    };
     // Workflows (#100): the active packages' definitions, run here as this facility's
     // authority; its desktops' offline moves are judged here, and its timers fire here.
     let workflows = health_node_api::WorkflowConfig::new(Vec::new(), &config.node_id)

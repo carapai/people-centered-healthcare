@@ -1021,6 +1021,16 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 6: tills on the edge (2026-11-13).**
+  - **What:**
+    - **Payments:** with `HEALTH_PAYMENT_TILLS` and `HEALTH_NODE_CODE`, an edge serves `/api/payments` (cash, shifts, pending payments, statements), the routes central serves, in its own ledger and behind its device gate.
+    - **MoMo:** once provisioned, the edge collects MoMo through central's relay, over its sync client's new signed, uncompressed `Sync::call`, with a poller every minute.
+  - **Tested:**
+    - the payment routes are behind the edge's device gate (LAN-surface test);
+    - the tills and the currency are read from the configuration;
+    - the relay flow itself was tested end to end in part 5.
+  - **Left to the user:** a till taking cash and MoMo on a real edge, with a facility account at central.
+  - **Still open on #124:** Airtel, after its API is verified.
 - **#124, part 5: edges collect MoMo through central's relay (2026-11-13).** Chosen by the maintainer.
   - **What:**
     - **Central** relays: it holds the keys, sends each reference's request to pay once, and answers status only to the facility that made the reference. It uses node-signed routes beside `/sync/v1`, checked by central's node registry.

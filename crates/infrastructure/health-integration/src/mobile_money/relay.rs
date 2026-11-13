@@ -47,6 +47,7 @@ pub trait CentralLink: Send + Sync {
 }
 
 /// MTN's API as an edge reaches it: through central's relay.
+#[derive(Clone)]
 pub struct RelayTransport<C> {
     central: C,
 }
