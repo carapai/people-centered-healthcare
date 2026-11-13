@@ -524,6 +524,11 @@ async fn task_command(
 }
 
 impl FhirServer {
+    /// The store it serves, for the node's upkeep ([`WorkflowConfig::upkeep`]).
+    pub fn store(&self) -> &SurrealStore {
+        &self.store
+    }
+
     /// This server, running `config`'s workflows ([`Self::workflow_router`]).
     #[must_use]
     pub fn with_workflows(mut self, config: WorkflowConfig) -> Self {
