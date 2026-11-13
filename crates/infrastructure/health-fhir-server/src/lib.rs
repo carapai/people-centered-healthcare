@@ -142,8 +142,8 @@ pub use search_parameters::{registry_with, search_registry};
 pub use terminology::ActiveTerminology;
 pub use validation::{ActiveProfiles, Profiles};
 pub use workflow::{
-    SUPERVISE_PERMISSION as WORKFLOW_SUPERVISE_PERMISSION, WORK_PERMISSION as WORKFLOW_PERMISSION,
-    WorkflowConfig, WorkflowConfigError,
+    SUPERVISE_PERMISSION as WORKFLOW_SUPERVISE_PERMISSION, Upkeep as WorkflowUpkeep,
+    WORK_PERMISSION as WORKFLOW_PERMISSION, WorkflowConfig, WorkflowConfigError,
 };
 
 /// The FHIR REST server for one node.

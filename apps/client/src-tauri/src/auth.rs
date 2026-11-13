@@ -243,6 +243,7 @@ pub(crate) fn routes(
     connection: &Connection,
     data_dir: &Path,
     keys: &dyn Keystore,
+    workflows: Option<&health_node_api::WorkflowConfig>,
 ) -> Result<Option<Router>, String> {
     let keys_file = snapshot_keys_path(data_dir);
     if !keys_file.is_file() {
@@ -281,6 +282,11 @@ pub(crate) fn routes(
         &node,
         None,
     );
+    // Workflows (#100): on this node's own instances, or on its replicas of its edge's.
+    let clinical = match workflows {
+        Some(workflows) => clinical.with_workflows(workflows.clone()),
+        None => clinical,
+    };
     Ok(Some(
         Router::new()
             .nest("/auth", server.router())
@@ -518,7 +524,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn staff_sign_in_in_process_and_the_token_never_leaves_rust() {
         let (connection, dir, keys) = desktop().await;
-        let router = routes(&connection, dir.path(), &keys)
+        let router = routes(&connection, dir.path(), &keys, None)
             .expect("routes")
             .expect("set up");
         // The keystore now holds the pepper and the token key, made on first use.
@@ -555,7 +561,7 @@ mod tests {
         let (connection, dir, keys) = desktop().await;
         std::fs::remove_file(snapshot_keys_path(dir.path())).expect("remove");
         assert!(
-            routes(&connection, dir.path(), &keys)
+            routes(&connection, dir.path(), &keys, None)
                 .expect("routes")
                 .is_none()
         );
@@ -624,7 +630,7 @@ mod tests {
         keys.set(crate::enroll::DEVICE_KEY, device_pem.as_bytes())
             .expect("device key");
         assert!(
-            routes(&connection, dir.path(), &keys)
+            routes(&connection, dir.path(), &keys, None)
                 .expect("routes")
                 .is_none()
         );
@@ -633,7 +639,7 @@ mod tests {
             .await
             .expect("import");
         assert_eq!(imported, 1);
-        let router = routes(&connection, dir.path(), &keys)
+        let router = routes(&connection, dir.path(), &keys, None)
             .expect("routes")
             .expect("set up");
         assert_eq!(

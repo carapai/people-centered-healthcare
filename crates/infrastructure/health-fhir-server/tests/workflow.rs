@@ -347,3 +347,50 @@ fn the_opd_reference_definition_runs_on_a_node() {
     .expect("json");
     assert!(WorkflowConfig::new(vec![definition(source)], "central").is_ok());
 }
+
+/// The node's upkeep (#100): a timer due on an instance this node decides fires in the next
+/// round, once.
+#[tokio::test]
+async fn the_upkeep_fires_a_due_timer_once() {
+    let connection = Connection::open(&Settings {
+        target: Target::Memory,
+        namespace: "workflow-upkeep".into(),
+        database: "main".into(),
+    })
+    .await
+    .expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let store = SurrealStore::new(connection, Arc::new(SystemClock));
+    let mut chart = opd();
+    chart["statechart"]["states"][0]["timers"] = json!([{ "after": "PT1S", "event": "overdue" }]);
+    chart["statechart"]["states"][0]["transitions"]
+        .as_array_mut()
+        .expect("transitions")
+        .push(json!({ "events": ["overdue"], "targets": ["done"] }));
+    let config = WorkflowConfig::new(vec![definition(chart)], "edge").expect("config");
+    let server = FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
+        .with_workflows(config.clone());
+    let nurse = as_(&server, "Practitioner/nurse", &[WORKFLOW_PERMISSION]);
+    let (status, started) = send(
+        &nurse,
+        "POST",
+        "/instances",
+        Some(json!({ "definition": OPD, "context": "Encounter/e-1", "opId": "op-start" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{started}");
+    assert_eq!(config.authority(), "edge");
+
+    assert_eq!(
+        config.upkeep(&store).await.expect("upkeep").fired,
+        0,
+        "not yet due"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    assert_eq!(config.upkeep(&store).await.expect("upkeep").fired, 1);
+    assert_eq!(
+        config.upkeep(&store).await.expect("upkeep").fired,
+        0,
+        "once"
+    );
+}

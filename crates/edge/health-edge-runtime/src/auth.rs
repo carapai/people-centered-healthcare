@@ -266,6 +266,13 @@ pub(crate) fn routes(
             .clone()
             .zip(config.node_code.clone()),
     );
+    // Workflows (#100): the active packages' definitions, run here as this facility's
+    // authority; its desktops' offline moves are judged here, and its timers fire here.
+    let workflows = health_node_api::WorkflowConfig::new(Vec::new(), &config.node_id)
+        .map_err(|e| e.to_string())?;
+    let clinical = clinical.with_workflows(workflows.clone());
+    let blobs = health_files::FsBlobStore::open(config.data_dir.with_file_name("files")).ok();
+    health_node_api::workflows::spawn_upkeep(workflows, clinical.store().clone(), blobs);
     // Its desktops' staff, for sign-in while the edge cannot be reached (#133).
     let desktops = DesktopAccounts {
         provisioning: provisioning.clone(),

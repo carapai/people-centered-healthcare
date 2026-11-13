@@ -35,7 +35,7 @@ use health_workflow::definition::WorkflowDefinition;
 use health_workflow::worklists::{TaskView, human_tasks, priority};
 use health_workflow::{Action, DataModel, Event, Guards, State as ChartState, Statechart};
 use health_workflow_app::{
-    ActionCall, ActionFailed, Actions, Compiled, Outcome, WorkflowError, Workflows,
+    ActionCall, ActionFailed, Actions, Compiled, Judged, Outcome, WorkflowError, Workflows,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -46,6 +46,20 @@ use crate::FhirServer;
 pub const WORK_PERMISSION: &str = "workflow.work";
 /// The permission to reassign and escalate tasks and cancel workflows.
 pub const SUPERVISE_PERMISSION: &str = "workflow.supervise";
+
+/// Candidates judged per upkeep round; the rest wait for the next.
+const UPKEEP_BATCH: u32 = 200;
+
+/// What one upkeep round did.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Upkeep {
+    /// Timers fired.
+    pub fired: usize,
+    /// Candidates applied.
+    pub applied: usize,
+    /// Candidates that opened a Conflict Record.
+    pub conflicts: usize,
+}
 
 /// The definitions this node runs, compiled, and the node that decides their instances.
 #[derive(Debug, Clone)]
@@ -116,6 +130,39 @@ impl WorkflowConfig {
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = compiled;
         Ok(count)
+    }
+
+    /// The node that decides the instances started here.
+    pub fn authority(&self) -> &str {
+        &self.authority
+    }
+
+    /// One round of the node's workflow upkeep over `store` (#98; #100): fires the timers due on
+    /// the instances this node decides, then judges the candidates other nodes sent it, opening
+    /// a Conflict Record for each that does not apply.
+    pub async fn upkeep(&self, store: &SurrealStore) -> Result<Upkeep, WorkflowError> {
+        let service: Service = Workflows::new(
+            store.clone(),
+            self.definitions(),
+            NoActions,
+            NoGuards,
+            Arc::new(SystemClock),
+            Vec::new(),
+            &self.authority,
+        );
+        let fired = service.fire_due().await?;
+        let judged = service.apply_candidates(UPKEEP_BATCH).await?;
+        Ok(Upkeep {
+            fired: fired.fired.len(),
+            applied: judged
+                .iter()
+                .filter(|(_, verdict)| matches!(verdict, Judged::Applied(_)))
+                .count(),
+            conflicts: judged
+                .iter()
+                .filter(|(_, verdict)| matches!(verdict, Judged::Conflict(_)))
+                .count(),
+        })
     }
 
     /// The definitions running now.
