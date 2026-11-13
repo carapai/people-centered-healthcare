@@ -1021,6 +1021,20 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - another desktop's operation on the store is rejected at the edge while the holder's is accepted;
     - once returned, the edge records there again.
   - **Next:** the grant, return and recovery endpoints, the freeze alert, and the desktop receiving its leases.
+- **#124, part 2: callbacks verified, exceptions kept, statements matched by reference (2026-11-13).**
+  - **What:**
+    - **Callbacks:** a callback reaches a public route, so `Collections::callback` reads the status back from MTN instead of trusting the body.
+    - **The exceptions queue** (`payment_exception`, migration `0055_payment_exceptions`) keeps statement mismatches, unknown lines and provider amount mismatches, each once, until resolved.
+    - **Statements:** reconciliation now matches lines against payments by reference whatever their status. Before, a payment confirmed by its callback showed up as an unknown statement line.
+    - **`HttpsTransport`:** reaches MTN over HTTPS, verified against the OS trust store.
+  - **Tested:**
+    - **A forged callback** settles nothing.
+    - **A statement:**
+      - confirms the payment it shows;
+      - queues a different amount and an unknown line once each, even when imported twice;
+      - lets a person resolve an exception.
+    - **A wrong amount** from MTN opens an exception.
+  - **Next:** central's routes, per-facility merchant accounts, and the polling task.
 - **#124, part 1: the MTN MoMo adapter (2026-11-13).**
   - **What:** `health_integration::mobile_money`.
     - **`MtnMomo`:** the Collection API through a transport port: token, request to pay under a UUIDv4 reference, and status.
