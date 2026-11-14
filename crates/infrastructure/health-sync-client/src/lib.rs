@@ -64,6 +64,8 @@ const TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_BACKOFF: Duration = Duration::from_secs(30 * 60);
 /// Items per push or pull request.
 const BATCH: usize = 500;
+/// The wait after a `429` that named none.
+const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
 
 /// Where the node syncs to, from its provisioning record (`node.json`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,6 +139,9 @@ pub struct Sync {
     software: SoftwareVersion,
     blobs: Option<health_files::FsBlobStore>,
     activator: Option<health_activation::Activator>,
+    /// The `Retry-After` of central's last `429`: it is re-syncing as many nodes as it can
+    /// (ADR 0046), so the next round waits that long, and no alert is raised.
+    busy: Arc<std::sync::Mutex<Option<Duration>>>,
 }
 
 pub(crate) fn connector(ca_pem: Option<&str>) -> Result<Https, String> {
@@ -202,6 +207,7 @@ impl Sync {
                 .map_err(|_| "the package version is not major.minor.patch".to_owned())?,
             blobs: None,
             activator: None,
+            busy: Arc::default(),
         })
     }
 
@@ -243,6 +249,7 @@ impl Sync {
             .map_err(|_| format!("{path}: central did not answer in time"))?
             .map_err(|e| format!("{path}: cannot reach central: {e}"))?;
         let status = response.status().as_u16();
+        self.note_busy(status, response.headers().get("retry-after"));
         let compressed = response
             .headers()
             .get("content-encoding")
@@ -486,6 +493,21 @@ impl Sync {
             .map_err(|e| format!("{path}: {e}"))
     }
 
+    /// Keeps central's `Retry-After` when it answered `429`, for [`Self::run`] to wait out.
+    fn note_busy(&self, status: u16, retry_after: Option<&hyper::header::HeaderValue>) {
+        if status != 429 {
+            return;
+        }
+        let wait = retry_after
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse::<u64>().ok())
+            .map_or(DEFAULT_RETRY_AFTER, Duration::from_secs)
+            .min(MAX_BACKOFF);
+        if let Ok(mut busy) = self.busy.lock() {
+            *busy = Some(wait);
+        }
+    }
+
     /// POSTs `body` to `path`; the answer's body, or why there is none.
     async fn post(&self, path: &str, body: Vec<u8>) -> Result<Vec<u8>, String> {
         let (status, bytes) = self.send("POST", path, body).await?;
@@ -707,6 +729,7 @@ impl Sync {
             .is_some_and(|v| v.as_bytes() == ZSTD.as_bytes());
         if !response.status().is_success() {
             let status = response.status();
+            self.note_busy(status.as_u16(), response.headers().get("retry-after"));
             let bytes = tokio::time::timeout(TIMEOUT, response.into_body().collect())
                 .await
                 .map_err(|_| format!("{PATH}: central did not answer in time"))?
@@ -842,6 +865,12 @@ impl Sync {
                     }
                 }
                 Err(error) => {
+                    if let Some(wait) = self.busy.lock().ok().and_then(|mut b| b.take()) {
+                        // Central is re-syncing as many nodes as it can: a queue, not a fault.
+                        tracing::info!(%error, ?wait, "central is busy; trying again");
+                        tokio::time::sleep(wait).await;
+                        continue;
+                    }
                     if failures == 0 {
                         tracing::warn!(alert = "sync-failing", %error, "cannot sync with central");
                     }

@@ -86,6 +86,10 @@ pub(crate) struct AuthFiles {
     /// `HEALTH_REGISTRY_NIN_SYSTEM`: the national ID identifier system. Optional: with it, the
     /// client registry's reviewer operations are served under `/fhir` (#197).
     pub(crate) registry_nin_system: Option<String>,
+    /// `HEALTH_SYNC_MAX_CONCURRENT_PUSHES`, default 8: pushes and snapshots central's sync
+    /// server takes at once, across all nodes (one per node), so the re-sync after a restore
+    /// queues (ADR 0046).
+    pub(crate) sync_concurrent: usize,
     /// `HEALTH_NODE_CODE`, default `C1`: this node's short code in the numbers it mints, such as
     /// MRNs (ADR 0014).
     pub(crate) node_code: String,
@@ -209,6 +213,15 @@ impl Config {
                     snapshot_keys_file: get("HEALTH_AUTH_SNAPSHOT_KEYS_FILE").map(PathBuf::from),
                     access_policy_file: get("HEALTH_ACCESS_POLICY_FILE").map(PathBuf::from),
                     registry_nin_system: get("HEALTH_REGISTRY_NIN_SYSTEM"),
+                    sync_concurrent: match get("HEALTH_SYNC_MAX_CONCURRENT_PUSHES") {
+                        None => health_sync_server::DEFAULT_CONCURRENT,
+                        Some(text) => text
+                            .trim()
+                            .parse::<usize>()
+                            .ok()
+                            .filter(|n| *n > 0)
+                            .ok_or(ConfigError::Invalid("HEALTH_SYNC_MAX_CONCURRENT_PUSHES"))?,
+                    },
                     node_code: get("HEALTH_NODE_CODE").unwrap_or_else(|| "C1".to_owned()),
                     payment_tills: get("HEALTH_PAYMENT_TILLS")
                         .map(|tills| {
@@ -307,6 +320,26 @@ mod tests {
         assert_eq!(with_auth.client_id, "health-client");
         assert_eq!(with_auth.redirect_uris.len(), 2);
         assert_eq!(with_auth.portal, None);
+        assert_eq!(
+            with_auth.sync_concurrent,
+            health_sync_server::DEFAULT_CONCURRENT
+        );
+        let limited = |n: &'static str| {
+            Config::from_lookup(lookup(&[
+                ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
+                ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),
+                ("HEALTH_AUTH_ISSUER", "https://central.ug/auth"),
+                ("HEALTH_AUTH_KEYS_FILE", "/k"),
+                ("HEALTH_AUTH_REDIRECT_URIS", "https://central.ug/callback"),
+                ("HEALTH_SYNC_MAX_CONCURRENT_PUSHES", n),
+            ]))
+            .map(|c| c.auth.map(|a| a.sync_concurrent))
+        };
+        assert_eq!(limited("3"), Ok(Some(3)));
+        assert_eq!(
+            limited("0"),
+            Err(ConfigError::Invalid("HEALTH_SYNC_MAX_CONCURRENT_PUSHES"))
+        );
         let auth = [
             ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
             ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),

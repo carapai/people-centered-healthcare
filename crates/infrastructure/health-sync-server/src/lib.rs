@@ -36,7 +36,12 @@
 //! `Content-Encoding: zstd` is decompressed before its signature is checked (the signature
 //! covers the content), and an answer is compressed for a peer that sends `Accept-Encoding: zstd`.
 //! The event stream and attachment bytes are sent as they are.
+//!
+//! Pushes and snapshots are taken a limited number at a time, and one per peer, so the burst of
+//! re-syncs after a central restore queues instead of overwhelming it (ADR 0046): the rest are
+//! answered `429` with a `Retry-After` ([`SyncServer::with_concurrent_resyncs`]).
 
+mod limit;
 mod review;
 mod seed;
 
@@ -63,6 +68,7 @@ use health_sync_protocol::{
 };
 use serde_json::json;
 
+pub use limit::DEFAULT_CONCURRENT;
 pub use review::{CONFLICT_PERMISSION, review_router};
 pub use seed::write_seed;
 
@@ -93,6 +99,7 @@ pub struct SyncServer {
     blobs: Option<health_files::FsBlobStore>,
     events: Option<health_http::Events>,
     check: Option<Arc<dyn GroupCheck>>,
+    limit: Arc<limit::Limit>,
 }
 
 struct Inner {
@@ -127,7 +134,17 @@ impl SyncServer {
             blobs: None,
             events: None,
             check: None,
+            limit: Arc::new(limit::Limit::default()),
         }
+    }
+
+    /// Takes at most `concurrent` pushes and snapshots at once across all peers, and one per
+    /// peer, answering the rest `429` with a `Retry-After` (ADR 0046: the re-sync after a
+    /// restore). The default is [`DEFAULT_CONCURRENT`].
+    #[must_use]
+    pub fn with_concurrent_resyncs(mut self, concurrent: usize) -> Self {
+        self.limit = Arc::new(limit::Limit::new(concurrent));
+        self
     }
 
     /// Holds every pushed group to `check` before it is applied.
@@ -472,6 +489,10 @@ async fn push(
         Ok(peer) => peer,
         Err(response) => return *response,
     };
+    let _admitted = match server.limit.admit(peer.id) {
+        Ok(admitted) => admitted,
+        Err(response) => return *response,
+    };
     let verdict = match server.verdict(&peer).await {
         Ok(verdict) => verdict,
         Err(response) => return *response,
@@ -606,6 +627,10 @@ async fn snapshot(
         }
         Err(response) => return *response,
     }
+    let admitted = match server.limit.admit(peer.id) {
+        Ok(admitted) => admitted,
+        Err(response) => return *response,
+    };
     let node = match server.inner.store.node_id().await {
         Ok(node) => node,
         Err(error) => return failed(error),
@@ -628,6 +653,7 @@ async fn snapshot(
         head: Some(format!(r#"{{"cursor":{cursor},"items":["#)),
         first: true,
         done: false,
+        _admitted: admitted,
     }
     .into_stream();
     let mut response = Response::new(Body::from_stream(stream));
@@ -652,6 +678,8 @@ struct SnapshotBody {
     head: Option<String>,
     first: bool,
     done: bool,
+    /// The re-sync slot, held until the answer has been written.
+    _admitted: limit::Admitted,
 }
 
 impl SnapshotBody {

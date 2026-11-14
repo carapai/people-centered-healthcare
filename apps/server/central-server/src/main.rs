@@ -311,6 +311,7 @@ fn auth_settings(
             .transpose()?
             .map(|key| Arc::new(health_provisioning::LocalKeyWrap::new(&key))),
         definitions: None,
+        sync_concurrent: files.sync_concurrent,
         pricing: health_fhir_server::PricingConfig {
             currency: health_financial_ledger::Currency::from_code(&files.currency)
                 .map_err(|_| "HEALTH_CURRENCY is not an ISO 4217 code")?
