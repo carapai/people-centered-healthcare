@@ -3,8 +3,11 @@
 //! - **Hourly** while the node runs: an encrypted export, verified after writing
 //!   ([`Backups::take`]). The first one is due one interval after the last attempt, so a restart
 //!   neither skips nor repeats one.
-//! - **Retention:** the 48 newest, and the newest of each of the last 14 days. Pruning removes
-//!   the rest, unfinished backups, and blobs no kept backup refers to.
+//! - **Retention** ([`Retention`]): on a node the 48 newest and the newest of each of the last 14
+//!   days; at central also weeklies and monthlies (ADR 0046). Pruning removes the rest,
+//!   unfinished backups, and blobs no kept backup refers to.
+//! - **Attachments** go with each backup when the node's blob store is given
+//!   ([`Backups::with_blobs`]).
 //! - **Weekly test restore** of the newest backup into a scratch store beside it
 //!   ([`Backups::test`]).
 //! - **Status and alerts:** every outcome is written to `status.json` ([`Status`]). A failed
@@ -17,6 +20,8 @@
 //! § Updates and migrations). The key's escrow at central is #138.
 
 mod retention;
+
+pub use retention::Retention;
 mod status;
 
 use std::fs;
@@ -68,6 +73,9 @@ pub fn read_key(path: &Path) -> Result<BackupKey, KeyError> {
 pub struct Backups {
     root: PathBuf,
     node: String,
+    retention: Retention,
+    /// The node's attachments, which go with each backup.
+    blobs: Option<FsBlobStore>,
 }
 
 impl Backups {
@@ -76,7 +84,23 @@ impl Backups {
         Self {
             root: root.into(),
             node: node.into(),
+            retention: Retention::NODE,
+            blobs: None,
         }
+    }
+
+    /// Keeps backups under `retention` (central's, ADR 0046) rather than a node's.
+    #[must_use]
+    pub fn with_retention(mut self, retention: Retention) -> Self {
+        self.retention = retention;
+        self
+    }
+
+    /// Takes the attachments in `blobs` with each backup: added once each, encrypted.
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: FsBlobStore) -> Self {
+        self.blobs = Some(blobs);
+        self
     }
 
     /// The root.
@@ -134,7 +158,7 @@ impl Backups {
         now: Timestamp,
     ) -> Result<PathBuf, BackupError> {
         fs::create_dir_all(&self.root)?;
-        match crate::create(db, None, &self.root, &self.node, key, now).await {
+        match crate::create(db, self.blobs.as_ref(), &self.root, &self.node, key, now).await {
             Ok(dir) => {
                 let backup = file_name(&dir);
                 tracing::info!(outcome = "backed-up", backup = %backup, "backup taken");
@@ -174,7 +198,7 @@ impl Backups {
     pub fn prune(&self, now: Timestamp) -> std::io::Result<Pruned> {
         let entries = self.list()?;
         let created: Vec<_> = entries.iter().map(|entry| entry.created).collect();
-        let keep = retention::keep(&created, now);
+        let keep = self.retention.keep(&created, now);
         let mut kept = std::collections::BTreeSet::new();
         let mut pruned = Pruned::default();
         for (entry, keep) in entries.iter().zip(keep) {
@@ -330,7 +354,7 @@ pub struct Schedule {
     pub every: Duration,
     /// How often the newest backup is test-restored.
     pub test_every: Duration,
-    /// The node's data directory, whose attachments go with each backup.
+    /// The volume the backups must not share: the node's data directory (central's attachments).
     pub data_dir: PathBuf,
 }
 

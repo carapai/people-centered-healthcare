@@ -64,6 +64,23 @@ async fn a_backup_is_verified_recorded_and_test_restored() {
 }
 
 #[tokio::test]
+async fn a_backup_carries_the_attachments() {
+    let temp = tempfile::tempdir().expect("temp");
+    let db = store(temp.path()).await;
+    let files = health_files::FsBlobStore::open(temp.path().join("files")).expect("files");
+    let stored = files.put(&b"a scanned referral"[..]).expect("put");
+    let backups = Backups::new(temp.path().join("backups"), "central")
+        .with_retention(Retention::CENTRAL)
+        .with_blobs(files);
+    let dir = backups
+        .take(&db, &key(), at("2026-11-01T10:00:00Z"))
+        .await
+        .expect("a backup");
+    let manifest = crate::verify(&dir, &key()).expect("it verifies");
+    assert_eq!(manifest.blobs, vec![stored.blob.hash.to_string()]);
+}
+
+#[tokio::test]
 async fn a_failed_test_restore_is_recorded_for_the_alert() {
     let temp = tempfile::tempdir().expect("temp");
     let db = store(temp.path()).await;

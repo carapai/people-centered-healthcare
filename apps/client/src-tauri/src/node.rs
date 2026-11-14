@@ -120,7 +120,14 @@ pub(crate) fn backups(
         }
     };
     Ok(health_backup::node::Schedule {
-        backups: health_backup::node::Backups::new(dir, node),
+        backups: {
+            let backups = health_backup::node::Backups::new(dir, node);
+            // The attachments go with each backup (#138).
+            match health_files::FsBlobStore::open(data_dir.join("files")) {
+                Ok(blobs) => backups.with_blobs(blobs),
+                Err(_) => backups,
+            }
+        },
         key_file: key_file.into(),
         every: seconds("HEALTH_BACKUP_INTERVAL_SECS", 3600)?,
         test_every: seconds("HEALTH_BACKUP_TEST_SECS", 604_800)?,

@@ -34,6 +34,24 @@ pub(crate) struct Config {
     /// packages are verified against before central activates them. With `HEALTH_FILES_DIR`,
     /// central activates the national set and serves its definitions.
     pub(crate) national_root_file: Option<PathBuf>,
+    /// Central's hourly encrypted backups (#138; ADR 0046), when `HEALTH_BACKUP_DIR` is set.
+    pub(crate) backup: Option<BackupFiles>,
+}
+
+/// Central's backups: where they go, the key, and how often.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BackupFiles {
+    /// `HEALTH_BACKUP_DIR`: the backup volume (not the database's), copied offsite in-country by
+    /// operations.
+    pub(crate) dir: PathBuf,
+    /// `HEALTH_BACKUP_KEY_FILE`: the backup key, 64 hex characters, under 3-of-5 Shamir custody
+    /// (`central-server backup-key`). Required with the directory.
+    pub(crate) key_file: PathBuf,
+    /// `HEALTH_BACKUP_INTERVAL_SECS`, default 3600: the RPO for global records.
+    pub(crate) every: std::time::Duration,
+    /// `HEALTH_BACKUP_TEST_SECS`, default 604800: how often the newest backup is test-restored
+    /// (the quarterly drill into staging is the runbook's).
+    pub(crate) test_every: std::time::Duration,
 }
 
 /// Where the authorization server's settings and secrets are.
@@ -142,6 +160,27 @@ impl Config {
             log: get("HEALTH_LOG").unwrap_or_else(|| "info".to_owned()),
             dev_fhir_seed: get("HEALTH_DEV_FHIR_SEED").map(PathBuf::from),
             national_root_file: get("HEALTH_NATIONAL_ROOT_FILE").map(PathBuf::from),
+            backup: match get("HEALTH_BACKUP_DIR") {
+                None => None,
+                Some(dir) => {
+                    let seconds = |name: &'static str, default: u64| match get(name) {
+                        None => Ok(std::time::Duration::from_secs(default)),
+                        Some(text) => text
+                            .trim()
+                            .parse::<u64>()
+                            .ok()
+                            .filter(|s| *s > 0)
+                            .map(std::time::Duration::from_secs)
+                            .ok_or(ConfigError::Invalid(name)),
+                    };
+                    Some(BackupFiles {
+                        dir: dir.into(),
+                        key_file: required("HEALTH_BACKUP_KEY_FILE")?.into(),
+                        every: seconds("HEALTH_BACKUP_INTERVAL_SECS", 3600)?,
+                        test_every: seconds("HEALTH_BACKUP_TEST_SECS", 604_800)?,
+                    })
+                }
+            },
             auth: match get("HEALTH_AUTH_ISSUER") {
                 None => None,
                 Some(issuer) => Some(AuthFiles {
@@ -303,6 +342,36 @@ mod tests {
                 ("HEALTH_BIND", "not an address"),
             ])),
             Err(ConfigError::Invalid("HEALTH_BIND"))
+        );
+    }
+
+    #[test]
+    fn backups_need_a_key_and_default_to_hourly() {
+        let base = [
+            ("HEALTH_SURREALDB_ENDPOINT", "ws://x"),
+            ("HEALTH_SURREALDB_PASSWORD_FILE", "/p"),
+        ];
+        assert_eq!(
+            Config::from_lookup(lookup(&base)).expect("config").backup,
+            None
+        );
+        let mut dir = base.to_vec();
+        dir.push(("HEALTH_BACKUP_DIR", "/backups"));
+        assert_eq!(
+            Config::from_lookup(lookup(&dir)),
+            Err(ConfigError::Missing("HEALTH_BACKUP_KEY_FILE"))
+        );
+        dir.push(("HEALTH_BACKUP_KEY_FILE", "/run/secrets/backup-key"));
+        let backup = Config::from_lookup(lookup(&dir))
+            .expect("config")
+            .backup
+            .expect("backup");
+        assert_eq!(backup.every, std::time::Duration::from_secs(3600));
+        assert_eq!(backup.test_every, std::time::Duration::from_secs(604_800));
+        dir.push(("HEALTH_BACKUP_INTERVAL_SECS", "0"));
+        assert_eq!(
+            Config::from_lookup(lookup(&dir)),
+            Err(ConfigError::Invalid("HEALTH_BACKUP_INTERVAL_SECS"))
         );
     }
 }

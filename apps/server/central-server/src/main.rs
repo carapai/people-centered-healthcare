@@ -81,6 +81,37 @@ async fn open_database(
         };
         match opened {
             Ok(connection) => {
+                // Hourly encrypted backups (#138; ADR 0046), with the attachments.
+                if let Some(backup) = &config.backup {
+                    let mut backups =
+                        health_backup::node::Backups::new(backup.dir.clone(), "central")
+                            .with_retention(health_backup::node::Retention::CENTRAL);
+                    let files = config.auth.as_ref().and_then(|a| a.files_dir.clone());
+                    if let Some(files) = &files {
+                        match health_files::FsBlobStore::open(files) {
+                            Ok(blobs) => backups = backups.with_blobs(blobs),
+                            Err(error) => tracing::error!(
+                                alert = "backup-failed",
+                                error.kind = %error,
+                                "attachments are not backed up"
+                            ),
+                        }
+                    }
+                    let schedule = health_backup::node::Schedule {
+                        backups,
+                        key_file: backup.key_file.clone(),
+                        every: backup.every,
+                        test_every: backup.test_every,
+                        // The database is remote: the attachments are the volume to keep apart.
+                        data_dir: files.unwrap_or_else(|| backup.dir.join(".database-is-remote")),
+                    };
+                    let db = connection.clone();
+                    tokio::spawn(async move {
+                        if let Err(error) = schedule.run(db).await {
+                            tracing::error!(alert = "backups-off", error.kind = %error, "backups stopped");
+                        }
+                    });
+                }
                 if let Some(path) = &config.dev_fhir_seed {
                     // With central's search registry, so seeded resources are indexed.
                     let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock))

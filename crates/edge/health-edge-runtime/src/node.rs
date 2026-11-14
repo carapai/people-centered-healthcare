@@ -165,10 +165,14 @@ pub async fn run(
     let serving = Serving(Arc::new(AtomicBool::new(true)));
     let readiness = Readiness::new(vec![Arc::new(store.clone()), Arc::new(serving.clone())]);
     let mut supervisor = Supervisor::new(RestartPolicy::default());
-    let backups = config
-        .backup_dir
-        .as_ref()
-        .map(|root| Backups::new(root, &config.node_id));
+    let backups = config.backup_dir.as_ref().map(|root| {
+        let backups = Backups::new(root, &config.node_id);
+        // The attachments beside the store go with each backup (#138).
+        match health_files::FsBlobStore::open(config.data_dir.with_file_name("files")) {
+            Ok(blobs) => backups.with_blobs(blobs),
+            Err(_) => backups,
+        }
+    });
     let monitor = Monitor {
         node_id: config.node_id.clone(),
         started: health_time::Timestamp::now(),
