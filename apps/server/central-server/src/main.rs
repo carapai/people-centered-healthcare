@@ -83,9 +83,15 @@ async fn open_database(
             Ok(connection) => {
                 // Hourly encrypted backups (#138; ADR 0046), with the attachments.
                 if let Some(backup) = &config.backup {
+                    // Test restores go into a scratch database on the same server: central has
+                    // no embedded engine, and the drill is then the real restore path.
                     let mut backups =
                         health_backup::node::Backups::new(backup.dir.clone(), "central")
-                            .with_retention(health_backup::node::Retention::CENTRAL);
+                            .with_retention(health_backup::node::Retention::CENTRAL)
+                            .with_scratch_database(Settings {
+                                database: config::SCRATCH_DATABASE.to_owned(),
+                                ..settings.clone()
+                            });
                     let files = config.auth.as_ref().and_then(|a| a.files_dir.clone());
                     if let Some(files) = &files {
                         match health_files::FsBlobStore::open(files) {

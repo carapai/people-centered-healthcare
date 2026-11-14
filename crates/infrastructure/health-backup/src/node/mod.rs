@@ -9,7 +9,8 @@
 //! - **Attachments** go with each backup when the node's blob store is given
 //!   ([`Backups::with_blobs`]).
 //! - **Weekly test restore** of the newest backup into a scratch store beside it
-//!   ([`Backups::test`]).
+//!   ([`Backups::test`]), or, at central, into a scratch database on its own server
+//!   ([`Backups::with_scratch_database`]).
 //! - **Status and alerts:** every outcome is written to `status.json` ([`Status`]). A failed
 //!   backup or test restore is logged with an `alert` field, and the status page reports it.
 //! - **Second volume:** the node warns when the backup directory shares the data volume.
@@ -76,6 +77,8 @@ pub struct Backups {
     retention: Retention,
     /// The node's attachments, which go with each backup.
     blobs: Option<FsBlobStore>,
+    /// Where test restores go when not into an embedded store beside the backups.
+    scratch: Option<Settings>,
 }
 
 impl Backups {
@@ -86,6 +89,7 @@ impl Backups {
             node: node.into(),
             retention: Retention::NODE,
             blobs: None,
+            scratch: None,
         }
     }
 
@@ -100,6 +104,15 @@ impl Backups {
     #[must_use]
     pub fn with_blobs(mut self, blobs: FsBlobStore) -> Self {
         self.blobs = Some(blobs);
+        self
+    }
+
+    /// Test-restores into `scratch`, a database emptied before and removed after each test,
+    /// instead of an embedded store: central, whose engine is a server. It must never be the
+    /// live database.
+    #[must_use]
+    pub fn with_scratch_database(mut self, scratch: Settings) -> Self {
+        self.scratch = Some(scratch);
         self
     }
 
@@ -280,19 +293,46 @@ impl Backups {
         let scratch = tempfile::Builder::new()
             .prefix(".restore-test-")
             .tempdir_in(&self.root)?;
-        let outcome = Self::check_restore(&scratch.path().join("store"), entry, key).await;
+        let blobs = FsBlobStore::open(scratch.path().join("files"))?;
+        let outcome = match &self.scratch {
+            None => match open_store(&scratch.path().join("store"), "restore", "test").await {
+                Ok(db) => Self::check_restore(&db, &blobs, entry, key).await,
+                Err(error) => Err(error),
+            },
+            Some(settings) => Self::check_restore_remote(settings, &blobs, entry, key).await,
+        };
+        drop(blobs);
         remove_scratch(scratch.keep()).await;
         outcome
     }
 
-    async fn check_restore(
-        store: &Path,
+    /// Restores into the scratch database on a server: emptied first (a crashed test may have
+    /// left it), and removed after, whatever the outcome.
+    async fn check_restore_remote(
+        settings: &Settings,
+        blobs: &FsBlobStore,
         entry: &Entry,
         key: &BackupKey,
     ) -> Result<(), BackupError> {
-        let db = open_store(store, "restore", "test").await?;
-        let blobs = FsBlobStore::open(store.with_file_name("files"))?;
-        crate::restore(&entry.dir, key, &db, Some(&blobs)).await?;
+        let db = Connection::open(settings)
+            .await
+            .map_err(|e| BackupError::Database(e.to_string()))?;
+        remove_database(&db, &settings.database).await?;
+        db.query(&format!("DEFINE DATABASE `{}`", settings.database))
+            .await
+            .map_err(|e| BackupError::Database(e.to_string()))?;
+        let outcome = Self::check_restore(&db, blobs, entry, key).await;
+        let removed = remove_database(&db, &settings.database).await;
+        outcome.and(removed)
+    }
+
+    async fn check_restore(
+        db: &Connection,
+        blobs: &FsBlobStore,
+        entry: &Entry,
+        key: &BackupKey,
+    ) -> Result<(), BackupError> {
+        crate::restore(&entry.dir, key, db, Some(blobs)).await?;
         let migrations: Option<i64> = db
             .query("RETURN count(SELECT * FROM _migration)")
             .await
@@ -401,6 +441,13 @@ fn due_in(last: Option<Timestamp>, now: Timestamp, every: Duration) -> Duration 
     };
     let elapsed = Duration::try_from(now.duration_since(last)).unwrap_or(Duration::ZERO);
     every.saturating_sub(elapsed)
+}
+
+async fn remove_database(db: &Connection, name: &str) -> Result<(), BackupError> {
+    db.query(&format!("REMOVE DATABASE IF EXISTS `{name}`"))
+        .await
+        .map(|_| ())
+        .map_err(|e| BackupError::Database(e.to_string()))
 }
 
 /// Opens (creating) an embedded store at `path`. Fails while another process holds it.
