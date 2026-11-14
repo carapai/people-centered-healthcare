@@ -42,7 +42,7 @@ This document names the single **Owner** (a Module inside a Bounded Context) of 
 | Care Coordination | referrals, care-plans |
 | Programs & Public Health | programs, surveillance, population |
 | Finance | pricing, coverage, billing, payments, financial-ledger |
-| Supply Chain | inventory, procurement |
+| Supply Chain | inventory, procurement, equipment |
 | Identity & Access | identity, consent, audit |
 | Workflow | workflow, decision-support, worklists (Read Model) |
 | Patient Engagement | patient-access, patient-requests, patient-engagement, care-journeys (Read Model) |
@@ -124,6 +124,7 @@ Solid arrows: synchronous dependency (caller → callee). Dotted arrows: domain 
 | NutritionOrder, DeviceRequest | orders | |
 | MedicationRequest, MedicationStatement | medications | Prescribing is the ordering side for medication |
 | MedicationDispense, MedicationAdministration | medications | Stock movement is posted by Supply Chain on the dispense event |
+| Device (category *patient-assigned*), DeviceAssociation | clinical-data | Patient-assigned Devices, and loans of Equipment to a patient (ADR 0064) |
 | QuestionnaireResponse (staff-captured) | clinical-documentation | |
 | Composition, DocumentReference | clinical-documentation | Signing and amendment |
 | Longitudinal patient summary | shared-record | Read Model |
@@ -173,6 +174,7 @@ Solid arrows: synchronous dependency (caller → callee). Dotted arrows: domain 
 | Stock ledger movements, batches held, reservations, stock counts | inventory |
 | InventoryReport, SupplyDelivery (exchange) | inventory |
 | Supplier terms, requisitions, quotations, purchase orders, goods received, supplier invoices, SupplyRequest | procurement |
+| Device (category *equipment*): Equipment, with its location, status and maintenance history (ADR 0064) | equipment |
 
 ### Identity & Access
 
@@ -224,7 +226,7 @@ Solid arrows: synchronous dependency (caller → callee). Dotted arrows: domain 
 | Provenance | Owner of its target resource |
 | Binary / attachments | Owner of the referencing resource |
 
-FHIR `Device` for medical equipment instances is not yet assigned (see the map's Not yet specified).
+FHIR `Device` means medical devices only and is split by category (ADR 0064). The edge's enrolled LAN client devices are the platform record `EnrolledDevice`, not a FHIR resource.
 
 ## Deployables
 
