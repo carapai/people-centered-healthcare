@@ -28,7 +28,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 # The node's store (SurrealKV), for the scheduled backups' tests.
-health-surrealdb = { workspace = true, features = ["embedded"] }
+health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
 health-client-registry = { workspace = true }
 health-fhir-search = { workspace = true }
 health-identifiers = { workspace = true }
