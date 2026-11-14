@@ -69,6 +69,55 @@ pub fn read_key(path: &Path) -> Result<BackupKey, KeyError> {
     Ok(BackupKey::from_bytes(bytes))
 }
 
+/// Writes a new random backup key to `path`, readable by its owner only. Refuses a path that
+/// exists, so a key in use is never overwritten.
+pub fn write_new_key(path: &Path) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    writeln!(file, "{}", BackupKey::generate().to_hex())?;
+    file.sync_all()
+}
+
+/// Restores `backup` into the database `settings` names on a SurrealDB server, with its
+/// attachments into `blobs`: central's restore. The database must hold no tables, so a live
+/// database is never restored over.
+pub async fn restore_into_database(
+    backup: &Path,
+    key: &BackupKey,
+    settings: &Settings,
+    blobs: Option<&FsBlobStore>,
+) -> Result<Manifest, BackupError> {
+    let db = Connection::open(settings)
+        .await
+        .map_err(|e| BackupError::Database(e.to_string()))?;
+    unused(&db).await?;
+    crate::restore(backup, key, &db, blobs).await
+}
+
+/// Refuses a database that holds any table: one in use. (A new database has none, not even
+/// the migration ledger.)
+async fn unused(db: &Connection) -> Result<(), BackupError> {
+    let migrations: Option<i64> = db
+        .query("RETURN array::len(object::keys((INFO FOR DB).tables))")
+        .await
+        .and_then(|mut response| response.take(0))
+        .map_err(|e| BackupError::Database(e.to_string()))?;
+    if migrations.unwrap_or(0) > 0 {
+        return Err(BackupError::Io(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "the target database is in use; restore into a new one",
+        )));
+    }
+    Ok(())
+}
+
 /// The backups under one root, on the second volume.
 #[derive(Debug, Clone)]
 pub struct Backups {

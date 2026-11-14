@@ -261,3 +261,50 @@ fn a_backup_key_file_is_64_hex_characters() {
     assert!(read_key(&path).is_err());
     assert!(read_key(&temp.path().join("none")).is_err());
 }
+
+#[test]
+fn a_new_key_is_random_owner_only_and_never_overwritten() {
+    let temp = tempfile::tempdir().expect("temp");
+    let path = temp.path().join("backup-key");
+    write_new_key(&path).expect("written");
+    let first = read_key(&path).expect("a usable key").to_hex();
+    assert_eq!(first.len(), 64);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let mode = fs::metadata(&path).expect("meta").permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    assert!(write_new_key(&path).is_err(), "an existing key is kept");
+    assert_eq!(read_key(&path).expect("key").to_hex(), first);
+    let other = temp.path().join("other-key");
+    write_new_key(&other).expect("written");
+    assert_ne!(read_key(&other).expect("key").to_hex(), first);
+}
+
+#[tokio::test]
+async fn a_server_restore_refuses_a_database_in_use() {
+    let temp = tempfile::tempdir().expect("temp");
+    let db = store(temp.path()).await;
+    let backups = Backups::new(temp.path().join("backups"), "central");
+    let dir = backups
+        .take(&db, &key(), at("2026-11-01T10:00:00Z"))
+        .await
+        .expect("a backup");
+    // The live store holds a migration ledger: restoring over it is refused.
+    let refused = unused(&db).await;
+    assert!(
+        matches!(&refused, Err(BackupError::Io(e)) if e.kind() == std::io::ErrorKind::AlreadyExists),
+        "{refused:?}"
+    );
+    // A new database takes it.
+    let fresh = Settings {
+        target: Target::Memory,
+        namespace: "ug".into(),
+        database: "restored".into(),
+    };
+    let manifest = restore_into_database(&dir, &key(), &fresh, None)
+        .await
+        .expect("restored");
+    assert_eq!(manifest.node, "central");
+}
