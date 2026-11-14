@@ -72,6 +72,8 @@ pub(crate) struct AuthSettings {
     /// writes are validated against them (tiers 3–4) and the terminology operations answer
     /// from them.
     pub(crate) definitions: Option<crate::activation::Definitions>,
+    /// Pushes and snapshots the sync server takes at once (ADR 0046).
+    pub(crate) sync_concurrent: usize,
 }
 
 /// The patient portal's phone sign-in.
@@ -295,6 +297,7 @@ pub(crate) fn routes(
             settings.files.clone(),
             events.clone(),
             settings.definitions.as_ref(),
+            settings.sync_concurrent,
         )?);
         alert_hourly(registry.clone());
         nodes = Some(registry.clone());
@@ -501,6 +504,7 @@ fn sync_routes(
     files: Option<health_files::FsBlobStore>,
     events: health_http::Events,
     definitions: Option<&crate::activation::Definitions>,
+    concurrent: usize,
 ) -> Result<Router, &'static str> {
     // Completed responses are re-derived here, the authority, before their group applies (ADR
     // 0022), with the mappings central holds and searches as the FHIR server does.
@@ -523,7 +527,8 @@ fn sync_routes(
     conflicts_hourly(store.clone());
     let server = health_sync_server::SyncServer::new(store, registry, compatibility)
         .with_events(events)
-        .with_check(rederive);
+        .with_check(rederive)
+        .with_concurrent_resyncs(concurrent);
     Ok(match files {
         Some(files) => server.with_blobs(files),
         None => server,
@@ -1012,6 +1017,7 @@ mod tests {
             files: None,
             workflows: None,
             definitions: None,
+            sync_concurrent: health_sync_server::DEFAULT_CONCURRENT,
             pricing: health_fhir_server::PricingConfig {
                 currency: "UGX".into(),
             },
