@@ -112,6 +112,11 @@ pub struct Hello {
     pub snapshot_version: u64,
     /// Where it has read the upstream's log to, if anywhere.
     pub cursor: Option<Cursor>,
+    /// The last `seq` of its own log, in `epoch`, that the upstream has acknowledged. The
+    /// upstream keeps it with the handshake, so a restored upstream can say what it still holds
+    /// (ADR 0065).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushed: Option<u64>,
 }
 
 /// What the upstream supports.
@@ -217,6 +222,10 @@ pub struct Welcome {
     /// Where the upstream has read the peer's log to. `None` means it holds nothing for the
     /// peer's current epoch, so the peer pushes everything still in its outbox.
     pub expected: Option<Cursor>,
+    /// The upstream's own log epoch. A peer that sees it change knows the upstream was restored
+    /// and re-queues its log after `expected` (ADR 0065).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<String>,
 }
 
 /// The checkpoint a side holds for a peer's log, if it is still valid: it belongs to that peer

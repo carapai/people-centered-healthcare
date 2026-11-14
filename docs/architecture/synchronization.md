@@ -344,7 +344,7 @@ stateDiagram-v2
 | Crash mid-push | Unacknowledged groups are resent; receipts make them idempotent |
 | Crash mid-pull | Each applied group is atomic with its checkpoint advance; resume from the checkpoint |
 | Partial batch failure | Results are per group; failed groups do not block independent groups; dependants go to `held` |
-| Node restored from backup | New epoch; peers re-sync from their checkpoints; the outbox re-sends anything not acknowledged |
+| Node restored from backup | New epoch; peers re-sync from their checkpoints; the outbox re-sends anything not acknowledged. A restored upstream answers each Hello with its new epoch and what its backup kept of the peer's log (the peer's last reported `pushed`), and the peer re-queues its log after that point (ADR 0065) |
 | Offline beyond the horizon | `reseed_required`, with the outbox kept |
 | Incompatible metadata or software | Push quarantined, no pull until upgrade |
 | Remote revocation | Session refused; scope purge on the next contact, or a local wipe on a revoked desktop |

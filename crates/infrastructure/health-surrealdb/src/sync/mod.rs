@@ -451,6 +451,11 @@ impl SurrealStore {
         sql.push(format!(
             "DELETE sync_outbox:[{peer_text}]..=[{peer_text}, {through}]"
         ));
+        // What the upstream has acknowledged, sent in the next Hello (ADR 0065).
+        sql.push(format!(
+            "UPDATE type::record('sync_upstream', {peer_text}) \
+             SET pushed = <int> math::max([pushed ?? 0, {through}])"
+        ));
         let tx = self.begin().await?;
         sql.run(tx.tx()?).await.map_err(unavailable)?;
         tx.commit().await.map_err(|e| match e {
@@ -1131,6 +1136,39 @@ impl SurrealStore {
         node.ok_or_else(|| corrupt("node id"))?
             .parse()
             .map_err(|_| corrupt("node id"))
+    }
+
+    /// Where this node holds `peer`'s log to, for the Welcome to `hello` (ADR 0065): what the
+    /// peer said it had acknowledged in its last recorded handshake, when that was in the same
+    /// epoch. Read before [`Self::record_peer`] keeps the new one, so after a restore it is what
+    /// the restored store still holds.
+    pub async fn expected_for(
+        &self,
+        peer: NodeId,
+        hello: &Hello,
+    ) -> Result<Option<Cursor>, StoreError> {
+        let stored: Option<String> = self
+            .connection
+            .db()
+            .query("SELECT VALUE hello FROM ONLY type::record('sync_peer', $peer)")
+            .bind(("peer", peer.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        let Some(previous) = stored.and_then(|text| serde_json::from_str::<Hello>(&text).ok())
+        else {
+            return Ok(None);
+        };
+        Ok(previous
+            .pushed
+            .filter(|_| previous.epoch == hello.epoch)
+            .map(|seq| Cursor {
+                node: peer,
+                epoch: previous.epoch,
+                seq,
+            }))
     }
 
     /// Records `peer`'s handshake and the verdict on it.

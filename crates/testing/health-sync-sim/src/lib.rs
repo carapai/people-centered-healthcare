@@ -18,7 +18,9 @@ use health_surrealdb::{
     Connection, MIGRATIONS, Settings, SurrealAuthority, SurrealReplica, SurrealStore, SyncScope,
     Target, migrate, new_epoch,
 };
-use health_sync_protocol::{Lane, Outcome, PullRequest, PullResponse, apply_pull, receive};
+use health_sync_protocol::{
+    Hello, Lane, Outcome, PROTOCOL, PullRequest, PullResponse, Verdict, apply_pull, receive,
+};
 use health_time::{FixedClock, SignedDuration, Timestamp};
 use serde_json::Value;
 
@@ -110,6 +112,27 @@ impl Node {
         new_epoch(&self.connection).await.expect("new epoch");
     }
 
+    /// A backup of the node: its database, exported as a backup takes it.
+    pub async fn backup(&self) -> String {
+        String::from_utf8(self.connection.export_sql().await.expect("export")).expect("UTF-8")
+    }
+
+    /// Restores the node from `backup` into a new, empty store, as `health-backup` does:
+    /// everything written since is gone, and the log takes a new epoch.
+    pub async fn restore_from(&mut self, backup: &str) {
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: self.name.into(),
+            database: "sim".into(),
+        })
+        .await
+        .expect("a new store");
+        connection.import_sql(backup).await.expect("import");
+        new_epoch(&connection).await.expect("new epoch");
+        self.store = SurrealStore::new(connection.clone(), self.clock.clone());
+        self.connection = connection;
+    }
+
     /// Moves the node's clock by `by`.
     pub fn advance(&self, by: SignedDuration) {
         self.clock.advance(by);
@@ -159,6 +182,8 @@ pub struct Sim {
     pub outcomes: Vec<Outcome>,
     /// Re-seeds that happened, as `(downstream, heads applied)`.
     pub reseeds: Vec<(&'static str, usize)>,
+    /// Logs queued again for a restored upstream, as `(downstream, entries queued)`.
+    pub repushes: Vec<(&'static str, usize)>,
 }
 
 impl Sim {
@@ -205,6 +230,38 @@ impl Sim {
         }
         let (down, up_node) = (&self.nodes[downstream], &self.nodes[upstream]);
         let peer = up_node.id.to_string();
+        // The handshake (ADR 0065): the downstream says what the upstream acknowledged, and
+        // re-queues its log when the upstream's epoch changed.
+        let own_epoch = down.store.cursor().await.expect("cursor").epoch;
+        let hello = Hello {
+            protocol: PROTOCOL,
+            software: "1.0.0".parse().expect("version"),
+            node: down.id,
+            epoch: own_epoch.clone(),
+            packages: Vec::new(),
+            snapshot_version: 0,
+            cursor: None,
+            pushed: down.store.pushed_through().await.expect("pushed"),
+        };
+        let expected = up_node
+            .store
+            .expected_for(down.id, &hello)
+            .await
+            .expect("expected");
+        up_node
+            .store
+            .record_peer(down.id, &hello, &Verdict::Compatible)
+            .await
+            .expect("record peer");
+        let epoch = up_node.store.cursor().await.expect("cursor").epoch;
+        if let Some(requeued) = down
+            .store
+            .upstream_welcome(&peer, Some(&epoch), expected.as_ref(), &own_epoch)
+            .await
+            .expect("welcome")
+        {
+            self.repushes.push((down.name, requeued));
+        }
         loop {
             let sent = down
                 .store
@@ -296,6 +353,11 @@ impl Sim {
             }
         }
         panic!("the deployment did not settle in 20 passes");
+    }
+
+    /// The node at `index`, to restore it.
+    pub fn node_mut(&mut self, index: usize) -> &mut Node {
+        &mut self.nodes[index]
     }
 
     /// The node at `index`.
