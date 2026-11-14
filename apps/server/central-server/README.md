@@ -23,6 +23,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_AUTH_SNAPSHOT_KEYS_FILE` | none | Central's permission-snapshot signing keys, in the same format as the keys file. With it, each session acts for one facility, chosen at sign-in (ADR 0056) |
 | `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID identifier system. With it, `/fhir` serves `Patient/$match` and the client registry's reviewer operations (`Patient/$merge`, `$link`, `$unlink`), source Patients carry their blocking keys, and block counts are recomputed hourly. `/api/registry/reviews` serves the review queue to reviewers |
 | `HEALTH_NODE_CODE` | `C1` | This node's short code in the numbers it mints. With the registry on, `/fhir/Patient/$register` mints MRNs as `{facility}-{node}-{sequence}` (ADR 0014) |
+| `HEALTH_SYNC_MAX_CONCURRENT_PUSHES` | `8` | Pushes and snapshots the sync server takes at once, across all nodes and one per node. The rest are answered `429` with a `Retry-After`, so the re-sync after a restore queues (ADR 0046) |
 | `HEALTH_PORTAL_REDIRECT_URIS` | none | The patient portal's redirect URIs, comma-separated (#111). With it, a patient client signs patients in with a one-time code to their phone, and, with the registry and access policy, `/api/portal` serves self-registration |
 | `HEALTH_PORTAL_CLIENT_ID` | `health-portal` | The patient portal's client |
 | `HEALTH_PORTAL_COUNTRY_CODE` | `256` | The country code of national phone numbers (`0772…`) |

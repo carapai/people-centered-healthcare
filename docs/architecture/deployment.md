@@ -184,6 +184,6 @@ flowchart LR
 | Keys | Backup master key under 3-of-5 Shamir custody, custodians named in the runbook | Per-node backup key, wrapped and escrowed in central KMS |
 | Drills | Quarterly restore into staging, with integrity validation | Weekly automatic test restore into a temporary directory; restore drill at commissioning, then yearly |
 
-- **After a central restore,** the sync servers rate-limit edge re-pushes.
+- **After a central restore,** the sync servers rate-limit edge re-pushes. In code (#138): central's sync server takes at most `HEALTH_SYNC_MAX_CONCURRENT_PUSHES` (default 8) pushes and snapshots at once across all nodes, and one per node. It answers the rest `429` with a `Retry-After` of 15–30 s. A node's sync client waits that long and tries again without raising `sync-failing`.
 - **Post-recovery reconciliation** compares the ledger digests and receipt counts for each node.
 - **Enterprise or TiKV high availability** and the BSL "Database Service" question remain in the map's legal fog.
