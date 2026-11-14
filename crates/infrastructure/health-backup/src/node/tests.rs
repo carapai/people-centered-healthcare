@@ -81,6 +81,32 @@ async fn a_backup_carries_the_attachments() {
 }
 
 #[tokio::test]
+async fn central_test_restores_into_a_scratch_database() {
+    let temp = tempfile::tempdir().expect("temp");
+    let db = store(temp.path()).await;
+    let backups =
+        Backups::new(temp.path().join("backups"), "central").with_scratch_database(Settings {
+            target: Target::Memory,
+            namespace: "ug".into(),
+            database: "restore_test".into(),
+        });
+    let now = at("2026-11-01T10:00:00Z");
+    let dir = backups.take(&db, &key(), now).await.expect("a backup");
+    let tested = backups
+        .test(&key(), now)
+        .await
+        .expect("the test restore passes");
+    assert_eq!(tested, file_name(&dir));
+    // No scratch store was made beside the backups.
+    assert!(fs::read_dir(backups.root()).expect("root").all(|e| {
+        !e.expect("entry")
+            .file_name()
+            .to_string_lossy()
+            .starts_with('.')
+    }));
+}
+
+#[tokio::test]
 async fn a_failed_test_restore_is_recorded_for_the_alert() {
     let temp = tempfile::tempdir().expect("temp");
     let db = store(temp.path()).await;

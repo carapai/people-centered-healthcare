@@ -17,7 +17,7 @@ pub(crate) struct Config {
     pub(crate) surrealdb_password_file: PathBuf,
     /// `HEALTH_TENANT`, the SurrealDB namespace, default `ug`.
     pub(crate) tenant: String,
-    /// `HEALTH_DATABASE`, default `main`.
+    /// `HEALTH_DATABASE`, default `main`; never [`SCRATCH_DATABASE`].
     pub(crate) database: String,
     /// `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, the in-country collector. Optional: without it
     /// only logs are written.
@@ -37,6 +37,10 @@ pub(crate) struct Config {
     /// Central's hourly encrypted backups (#138; ADR 0046), when `HEALTH_BACKUP_DIR` is set.
     pub(crate) backup: Option<BackupFiles>,
 }
+
+/// The database on central's server that test restores and drills restore into, emptied
+/// before and removed after each: never the live one.
+pub(crate) const SCRATCH_DATABASE: &str = "restore_test";
 
 /// Central's backups: where they go, the key, and how often.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -155,7 +159,13 @@ impl Config {
             surrealdb_user: get("HEALTH_SURREALDB_USER").unwrap_or_else(|| "root".to_owned()),
             surrealdb_password_file: required("HEALTH_SURREALDB_PASSWORD_FILE")?.into(),
             tenant: get("HEALTH_TENANT").unwrap_or_else(|| "ug".to_owned()),
-            database: get("HEALTH_DATABASE").unwrap_or_else(|| "main".to_owned()),
+            database: match get("HEALTH_DATABASE") {
+                Some(name) if name == SCRATCH_DATABASE => {
+                    return Err(ConfigError::Invalid("HEALTH_DATABASE"));
+                }
+                Some(name) => name,
+                None => "main".to_owned(),
+            },
             otlp_endpoint: get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
             log: get("HEALTH_LOG").unwrap_or_else(|| "info".to_owned()),
             dev_fhir_seed: get("HEALTH_DEV_FHIR_SEED").map(PathBuf::from),
@@ -368,6 +378,12 @@ mod tests {
             .expect("backup");
         assert_eq!(backup.every, std::time::Duration::from_secs(3600));
         assert_eq!(backup.test_every, std::time::Duration::from_secs(604_800));
+        let mut scratch = base.to_vec();
+        scratch.push(("HEALTH_DATABASE", SCRATCH_DATABASE));
+        assert_eq!(
+            Config::from_lookup(lookup(&scratch)),
+            Err(ConfigError::Invalid("HEALTH_DATABASE"))
+        );
         dir.push(("HEALTH_BACKUP_INTERVAL_SECS", "0"));
         assert_eq!(
             Config::from_lookup(lookup(&dir)),
