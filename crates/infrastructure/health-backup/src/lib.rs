@@ -53,6 +53,20 @@ impl BackupKey {
         Self(bytes)
     }
 
+    /// A new random key, from the OS's generator.
+    pub fn generate() -> Self {
+        Self(XChaCha20Poly1305::generate_key(&mut OsRng).into())
+    }
+
+    /// The key as 64 hex characters, the key file's format. Only for writing that file.
+    pub fn to_hex(&self) -> String {
+        use std::fmt::Write as _;
+        self.0.iter().fold(String::with_capacity(64), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
+    }
+
     fn cipher(&self) -> XChaCha20Poly1305 {
         XChaCha20Poly1305::new((&self.0).into())
     }
