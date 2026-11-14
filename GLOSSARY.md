@@ -158,6 +158,14 @@ _Avoid_: Item, SKU, stock
 Quantities of a Product held in a store, by batch, funding source and status, as recorded in the stock ledger.
 _Avoid_: Inventory item, balance
 
+**Equipment**:
+A physical, individually identified item a facility holds and uses repeatedly without using it up, such as a blood-pressure machine, an analyser or a fridge; anything used up is Stock instead, and a device that stays with a patient is a Patient-assigned Device instead.
+_Avoid_: Asset, device, fixed asset
+
+**Patient-assigned Device**:
+A device that becomes part of a specific patient's care and does not come back, such as a pacemaker or an IUD, recorded as part of that patient's care; Equipment lent to a patient stays Equipment.
+_Avoid_: Patient device, implant record
+
 **Patient-originated Record**:
 Information submitted by a patient or caregiver that is kept with its provenance and becomes clinical data only when staff accept it.
 _Avoid_: Patient data, self-reported observation
