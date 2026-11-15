@@ -164,6 +164,7 @@ impl Setup {
             packages: Vec::new(),
             snapshot_version: 0,
             cursor: None,
+            pushed: None,
         };
         let (status, body) = self
             .send(

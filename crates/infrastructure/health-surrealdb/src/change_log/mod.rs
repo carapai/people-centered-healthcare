@@ -234,6 +234,98 @@ impl SurrealStore {
         Ok(())
     }
 
+    /// The last `seq` of this node's log its upstream has acknowledged, for the next Hello
+    /// (ADR 0065). A node has one upstream; with several, the highest.
+    pub async fn pushed_through(&self) -> Result<Option<u64>, StoreError> {
+        let pushed: Vec<i64> = self
+            .connection
+            .db()
+            .query(
+                "SELECT VALUE pushed FROM sync_upstream WHERE pushed != NONE \
+                 ORDER BY pushed DESC LIMIT 1",
+            )
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        Ok(pushed.first().and_then(|p| u64::try_from(*p).ok()))
+    }
+
+    /// Takes `peer`'s answer to a Hello (ADR 0065): its log `epoch`, and `expected`, the last
+    /// `seq` of this node's log it holds, if it holds any of this node's current epoch
+    /// (`own_epoch`). When the upstream's epoch differs from the one seen last time, it was
+    /// restored: everything on this node's log after `expected` (all of it, without one) that
+    /// would have been queued for it is queued again, and the number queued is returned. The
+    /// first handshake only notes the epoch: [`Self::add_upstream`] queued the backlog.
+    pub async fn upstream_welcome(
+        &self,
+        peer: &str,
+        epoch: Option<&str>,
+        expected: Option<&health_sync_protocol::Cursor>,
+        own_epoch: &str,
+    ) -> Result<Option<usize>, StoreError> {
+        let Some(epoch) = epoch else {
+            return Ok(None);
+        };
+        let after = expected
+            .filter(|c| c.epoch == own_epoch)
+            .map_or(0, |c| c.seq);
+        let after =
+            i64::try_from(after).map_err(|_| StoreError::Unavailable("seq out of range".into()))?;
+        let seen: Vec<Option<String>> = self
+            .connection
+            .db()
+            .query("SELECT VALUE upstream_epoch FROM type::record('sync_upstream', $peer)")
+            .bind(("peer", peer.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        let restored = matches!(seen.first(), Some(Some(seen)) if seen != epoch);
+        let mut response = self
+            .connection
+            .db()
+            .query(
+                "BEGIN; \
+                 UPDATE type::record('sync_upstream', $peer) SET upstream_epoch = $epoch; \
+                 LET $entries = IF $restored { \
+                   (SELECT record::id(id) AS seq, tx_id, resource_type, resource_id \
+                    FROM change_log WHERE record::id(id) > $after \
+                      AND origin != $peer AND resource_type NOTINSIDE $down) \
+                 } ELSE { [] }; \
+                 FOR $entry IN $entries { \
+                   UPSERT type::record('sync_outbox', [$peer, $entry.seq]) \
+                     SET tx_id = $entry.tx_id, \
+                         resource = string::concat($entry.resource_type, '/', $entry.resource_id); \
+                 }; \
+                 IF $restored { UPDATE type::record('sync_upstream', $peer) SET pushed = $after; }; \
+                 COMMIT; \
+                 RETURN array::len($entries);",
+            )
+            .bind(("peer", peer.to_owned()))
+            .bind(("epoch", epoch.to_owned()))
+            .bind(("after", after))
+            .bind(("restored", restored))
+            .bind((
+                "down",
+                crate::sync::DOWN_ONLY
+                    .iter()
+                    .map(|t| (*t).to_owned())
+                    .collect::<Vec<_>>(),
+            ))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?;
+        if !restored {
+            return Ok(None);
+        }
+        let last = response.num_statements().saturating_sub(1);
+        let queued: Option<i64> = response.take(last).map_err(unavailable)?;
+        Ok(queued.and_then(|q| usize::try_from(q).ok()))
+    }
+
     /// Removes an upstream peer and its queue (re-pointing a drained node).
     pub async fn remove_upstream(&self, peer: &str) -> Result<(), StoreError> {
         self.connection
@@ -274,7 +366,11 @@ impl SurrealStore {
             .map_err(|_| StoreError::Unavailable("seq out of range".into()))?;
         self.connection
             .db()
-            .query("DELETE sync_outbox:[$peer]..=[$peer, $through]")
+            .query(
+                "BEGIN; DELETE sync_outbox:[$peer]..=[$peer, $through]; \
+                 UPDATE type::record('sync_upstream', $peer) \
+                   SET pushed = <int> math::max([pushed ?? 0, $through]); COMMIT;",
+            )
             .bind(("peer", peer.to_owned()))
             .bind(("through", through))
             .await

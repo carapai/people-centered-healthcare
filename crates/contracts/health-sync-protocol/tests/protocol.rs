@@ -130,6 +130,7 @@ fn hello(protocol_major: u16, software: &str, packages: &[(&str, &str)]) -> Hell
             .collect(),
         snapshot_version: 4,
         cursor: None,
+        pushed: None,
     }
 }
 

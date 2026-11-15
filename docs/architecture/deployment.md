@@ -178,7 +178,7 @@ flowchart LR
 |---|---|---|
 | Backup | Snapshot-consistent logical export **hourly** | Encrypted logical export hourly (ADR 0007) |
 | Recovery path | Restore onto a **warm standby VM** at a second in-country site | Restore in place, or onto a cold spare |
-| RPO | **1 h** for global records; facility records are re-pushed by edges after the epoch change (ADR 0019) | One backup interval (1 h) for unsynced work |
+| RPO | **1 h** for global records; facility records are re-pushed by edges after the epoch change (ADR 0019, ADR 0065) | One backup interval (1 h) for unsynced work |
 | RTO | **4 h** | < 1 h with a spare |
 | Retention | 35 daily, 12 weekly, 12 monthly, plus an offsite in-country copy | 48 hourly, 14 daily |
 | Keys | Backup master key under 3-of-5 Shamir custody, custodians named in the runbook | Per-node backup key, wrapped and escrowed in central KMS |

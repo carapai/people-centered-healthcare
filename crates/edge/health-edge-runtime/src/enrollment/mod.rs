@@ -416,6 +416,7 @@ mod tests {
                 packages: Vec::new(),
                 snapshot_version: 0,
                 cursor: None,
+                pushed: None,
             })
             .expect("json")
         };

@@ -531,10 +531,15 @@ impl Sync {
             protocol: PROTOCOL,
             software: self.software,
             node: self.upstream.node,
-            epoch: cursor.epoch,
+            epoch: cursor.epoch.clone(),
             packages: Vec::new(),
             snapshot_version: 0,
             cursor: None,
+            pushed: self
+                .store
+                .pushed_through()
+                .await
+                .map_err(|e| e.to_string())?,
         };
         let body = serde_json::to_vec(&hello).map_err(|e| e.to_string())?;
         let welcome: Welcome = serde_json::from_slice(&self.post("/sync/v1/hello", body).await?)
@@ -549,6 +554,25 @@ impl Sync {
             .add_upstream(&peer)
             .await
             .map_err(|e| e.to_string())?;
+        // Central was restored: queue again what it no longer holds (ADR 0065).
+        if let Some(requeued) = self
+            .store
+            .upstream_welcome(
+                &peer,
+                welcome.epoch.as_deref(),
+                welcome.expected.as_ref(),
+                &cursor.epoch,
+            )
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            tracing::warn!(
+                alert = "sync-repush",
+                requeued,
+                after = welcome.expected.as_ref().map(|c| c.seq),
+                "central was restored; pushing again what it no longer holds"
+            );
+        }
 
         loop {
             let pending = self

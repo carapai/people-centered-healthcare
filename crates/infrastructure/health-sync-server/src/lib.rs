@@ -431,6 +431,16 @@ async fn hello(
         Err(error) => return failed(error),
     };
     let verdict = server.inner.compatibility.judge(&hello);
+    // Read before the new handshake is kept: after a restore, what the store still holds of the
+    // peer's log (ADR 0065).
+    let expected = match server.inner.store.expected_for(peer.id, &hello).await {
+        Ok(expected) => expected,
+        Err(error) => return failed(error),
+    };
+    let epoch = match server.inner.store.cursor().await {
+        Ok(cursor) => cursor.epoch,
+        Err(error) => return failed(error),
+    };
     if let Err(error) = server
         .inner
         .store
@@ -447,7 +457,8 @@ async fn hello(
         verdict,
         scope_version: server.inner.scope_version,
         snapshot_version: 0,
-        expected: None,
+        expected,
+        epoch: Some(epoch),
     })
     .into_response()
 }
