@@ -131,6 +131,12 @@ export const messages = defineMessages({
   stAddLine: { id: 'app.stock.addLine', defaultMessage: 'Add another line', description: 'Goods received action' },
   stReceiveSubmit: { id: 'app.stock.receiveSubmit', defaultMessage: 'Receive', description: 'Goods received action' },
   stReceiveFailed: { id: 'app.stock.receiveFailed', defaultMessage: 'The goods were not received.', description: 'Goods received: failed' },
+  stSerials: { id: 'app.stock.serials', defaultMessage: 'Serial numbers (equipment only)', description: 'Goods received: serial numbers of an equipment line' },
+  stSerialsHelp: {
+    id: 'app.stock.serialsHelp',
+    defaultMessage: 'For a product tracked as equipment: one serial number or asset tag per unit, one per line or separated by commas, as many as the quantity. Leave batch and expiry empty.',
+    description: 'Goods received: help for serial numbers',
+  },
   stReceived: { id: 'app.stock.received', defaultMessage: 'Received. The stock is on hand.', description: 'Goods received: success' },
   rqTitle: { id: 'app.requisitions.title', defaultMessage: 'Requisitions', description: 'Requisitions page heading and link' },
   rqThisStore: { id: 'app.requisitions.thisStore', defaultMessage: 'Your store', description: 'Requisitions: the store working on the page' },
@@ -1315,6 +1321,9 @@ type ProductValues = {
   pdSave: {}
   pdSaved: { name: string }
   pdSaveFailed: { reason: string }
+  pdEquipment: {}
+  pdEquipmentHint: {}
+  pdIsEquipment: {}
 }
 
 // The product master (#128 follow-up): stock products and the medicines they fill (features/stock).
@@ -1344,6 +1353,90 @@ export const productMessages = defineMessages<ProductValues>({
   pdSave: { id: 'app.products.save', defaultMessage: 'Save product', description: 'Products action: save' },
   pdSaved: { id: 'app.products.saved', defaultMessage: 'Saved {name}.', description: 'Products: saved' },
   pdSaveFailed: { id: 'app.products.saveFailed', defaultMessage: 'That did not work. {reason}', description: 'Products: save failed' },
+  pdEquipment: { id: 'app.products.equipment', defaultMessage: 'Tracked as equipment', description: 'Products: the product is equipment, not stock' },
+  pdEquipmentHint: {
+    id: 'app.products.equipmentHint',
+    defaultMessage: 'Each unit is recorded by its serial number, not counted as stock. This cannot be changed later.',
+    description: 'Products: hint for tracked as equipment',
+  },
+  pdIsEquipment: { id: 'app.products.isEquipment', defaultMessage: 'equipment', description: 'Products: listed product is equipment' },
+})
+
+type EquipmentValues = {
+  eqTitle: {}
+  eqIntro: {}
+  eqNone: {}
+  eqFailed: {}
+  eqCaption: {}
+  eqName: {}
+  eqSerial: {}
+  eqLocation: {}
+  eqStatus: {}
+  eqLastChange: {}
+  eqChange: { by: string; at: string; note: string }
+  eqInTransit: { from: string }
+  eqUnit: {}
+  eqSelected: { name: string; serial: string }
+  eqStatusField: {}
+  eqNote: {}
+  eqNoteHint: {}
+  eqSetStatus: {}
+  eqNewLocation: {}
+  eqMove: {}
+  eqFacility: {}
+  eqFacilityHint: {}
+  eqDispatch: {}
+  eqReceiveInto: {}
+  eqReceive: {}
+  eqDone: { name: string; serial: string }
+  eqRefused: { reason: string }
+  eqRetired: {}
+  eqAvailable: {}
+  eqFaulty: {}
+  eqUnderMaintenance: {}
+}
+
+// Equipment (ADR 0064; #453): the facility's units, their status, moves and transfers (features/stock).
+export const equipmentMessages = defineMessages<EquipmentValues>({
+  eqTitle: { id: 'app.equipment.title', defaultMessage: 'Equipment', description: 'Equipment page heading and link' },
+  eqIntro: {
+    id: 'app.equipment.intro',
+    defaultMessage: 'Each unit of equipment this facility holds, where it is and whether it works. Every change is kept as its history.',
+    description: 'Equipment: what the page is for',
+  },
+  eqNone: { id: 'app.equipment.none', defaultMessage: 'This facility holds no equipment yet. Equipment is added by receiving goods.', description: 'Equipment: empty' },
+  eqFailed: { id: 'app.equipment.failed', defaultMessage: 'The equipment could not be loaded.', description: 'Equipment: failed to load' },
+  eqCaption: { id: 'app.equipment.caption', defaultMessage: 'Equipment held', description: 'Equipment: table caption' },
+  eqName: { id: 'app.equipment.name', defaultMessage: 'Equipment', description: 'Equipment column: the product name' },
+  eqSerial: { id: 'app.equipment.serial', defaultMessage: 'Serial number', description: 'Equipment column: serial number or asset tag' },
+  eqLocation: { id: 'app.equipment.location', defaultMessage: 'Location', description: 'Equipment column: where it is' },
+  eqStatus: { id: 'app.equipment.status', defaultMessage: 'Status', description: 'Equipment column: its status' },
+  eqLastChange: { id: 'app.equipment.lastChange', defaultMessage: 'Last change', description: 'Equipment column: the latest change' },
+  eqChange: { id: 'app.equipment.change', defaultMessage: '{note} ({by}, {at})', description: 'Equipment: the latest change' },
+  eqInTransit: { id: 'app.equipment.inTransit', defaultMessage: 'In transit from {from}', description: 'Equipment: a unit being sent to this facility' },
+  eqUnit: { id: 'app.equipment.unit', defaultMessage: 'Unit to change', description: 'Equipment: choose a unit to change' },
+  eqSelected: { id: 'app.equipment.selected', defaultMessage: '{name}, serial number {serial}', description: 'Equipment: heading of the chosen unit' },
+  eqStatusField: { id: 'app.equipment.statusField', defaultMessage: 'New status', description: 'Equipment: status field' },
+  eqNote: { id: 'app.equipment.note', defaultMessage: 'What was done or found', description: 'Equipment: note of a status change' },
+  eqNoteHint: { id: 'app.equipment.noteHint', defaultMessage: 'Needed unless it is available again.', description: 'Equipment: hint for the note' },
+  eqSetStatus: { id: 'app.equipment.setStatus', defaultMessage: 'Save status', description: 'Equipment action: save status' },
+  eqNewLocation: { id: 'app.equipment.newLocation', defaultMessage: 'Move to location', description: 'Equipment: location field to move to' },
+  eqMove: { id: 'app.equipment.move', defaultMessage: 'Move', description: 'Equipment action: move' },
+  eqFacility: { id: 'app.equipment.facility', defaultMessage: 'Send to facility (code)', description: 'Equipment: the facility to send a unit to' },
+  eqFacilityHint: {
+    id: 'app.equipment.facilityHint',
+    defaultMessage: 'Once sent, it belongs to that facility and you can no longer change it.',
+    description: 'Equipment: hint for sending to another facility',
+  },
+  eqDispatch: { id: 'app.equipment.dispatch', defaultMessage: 'Send', description: 'Equipment action: send to another facility' },
+  eqReceiveInto: { id: 'app.equipment.receiveInto', defaultMessage: 'Receive into location', description: 'Equipment: location a unit in transit is received into' },
+  eqReceive: { id: 'app.equipment.receive', defaultMessage: 'Receive', description: 'Equipment action: receive a unit in transit' },
+  eqDone: { id: 'app.equipment.done', defaultMessage: 'Saved {name} {serial}.', description: 'Equipment: a change was saved' },
+  eqRefused: { id: 'app.equipment.refused', defaultMessage: 'That did not work. {reason}', description: 'Equipment: a change was refused' },
+  eqRetired: { id: 'app.equipment.retired', defaultMessage: 'Retired', description: 'Equipment status' },
+  eqAvailable: { id: 'app.equipment.available', defaultMessage: 'Available', description: 'Equipment status' },
+  eqFaulty: { id: 'app.equipment.faulty', defaultMessage: 'Faulty', description: 'Equipment status' },
+  eqUnderMaintenance: { id: 'app.equipment.underMaintenance', defaultMessage: 'Under maintenance', description: 'Equipment status' },
 })
 
 type TriageValues = {

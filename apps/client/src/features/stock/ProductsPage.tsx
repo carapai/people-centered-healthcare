@@ -17,6 +17,8 @@ export interface StockProduct {
   packSizes: number[]
   synonyms: string[]
   active: boolean
+  /** Tracked as Equipment, one record per unit, rather than stocked (ADR 0064). */
+  equipment?: boolean
 }
 
 const PRODUCTS = ['stock', 'products'] as const
@@ -34,7 +36,7 @@ async function list(transport: Transport): Promise<StockProduct[]> {
   return response.body as StockProduct[]
 }
 
-const empty = { code: '', name: '', baseUnit: '', packSize: '', synonyms: '' }
+const empty = { code: '', name: '', baseUnit: '', packSize: '', synonyms: '', equipment: false }
 
 /**
  * The product master (#128 follow-up): each stock product, its base unit and pack size, and the
@@ -45,11 +47,11 @@ export function ProductsPage() {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
-  const ids = { code: useId(), codeHint: useId(), name: useId(), unit: useId(), pack: useId(), synonyms: useId(), synonymsHint: useId() }
+  const ids = { code: useId(), codeHint: useId(), name: useId(), unit: useId(), pack: useId(), synonyms: useId(), synonymsHint: useId(), equipment: useId(), equipmentHint: useId() }
   const products = useQuery({ queryKey: PRODUCTS, queryFn: () => list(platform.transport) })
   const [form, setForm] = useState(empty)
   const [saved, setSaved] = useState('')
-  const set = (key: keyof typeof form) => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value })
+  const set = (key: 'code' | 'name' | 'baseUnit' | 'packSize' | 'synonyms') => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value })
   const pack = Number.parseInt(form.packSize, 10)
   const ready = form.code.trim() !== '' && form.name.trim() !== '' && form.baseUnit.trim() !== '' && pack > 0
   const save = useMutation({
@@ -60,6 +62,7 @@ export function ProductsPage() {
         baseUnit: form.baseUnit.trim(),
         packSizes: [pack],
         synonyms: form.synonyms.split(',').map((s) => s.trim()).filter((s) => s !== ''),
+        equipment: form.equipment,
       }
       const response = await platform.transport.request({ method: 'POST', path: '/stock/products', body })
       if (response.status !== 201) throw new SaveFailed(((response.body ?? {}) as { error?: string }).error ?? String(response.status))
@@ -86,6 +89,7 @@ export function ProductsPage() {
           <li key={p.id}>
             <span>{intl.formatMessage(m.pdListed, { name: p.name, code: p.code, unit: p.baseUnit })}</span>
             {p.synonyms.length === 0 ? null : <span> · {intl.formatMessage(m.pdSynonyms, { names: p.synonyms.join(', ') })}</span>}
+            {p.equipment === true ? <span> · {intl.formatMessage(m.pdIsEquipment)}</span> : null}
           </li>
         ))}
       </ul>
@@ -118,6 +122,20 @@ export function ProductsPage() {
           <label htmlFor={ids.synonyms}>{intl.formatMessage(m.pdSynonymsField)}</label>
           <input id={ids.synonyms} aria-describedby={ids.synonymsHint} value={form.synonyms} onChange={set('synonyms')} className={control} autoComplete="off" />
           <span id={ids.synonymsHint}>{intl.formatMessage(m.pdSynonymsHint)}</span>
+        </div>
+        <div className={css({ display: 'flex', gap: '2', alignItems: 'flex-start' })}>
+          <input
+            id={ids.equipment}
+            type="checkbox"
+            aria-describedby={ids.equipmentHint}
+            checked={form.equipment}
+            onChange={(event) => setForm({ ...form, equipment: event.target.checked })}
+            className={css({ width: '5', height: '5', mt: '0.5' })}
+          />
+          <div className={css({ display: 'flex', flexDirection: 'column' })}>
+            <label htmlFor={ids.equipment}>{intl.formatMessage(m.pdEquipment)}</label>
+            <span id={ids.equipmentHint}>{intl.formatMessage(m.pdEquipmentHint)}</span>
+          </div>
         </div>
         <div>
           <button type="submit" className={button} disabled={!ready || save.isPending}>

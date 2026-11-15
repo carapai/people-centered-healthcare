@@ -10,6 +10,11 @@ export interface ReceivedLine {
   pack_size: number
   /** A decimal, e.g. `1.50`. */
   unit_cost: string
+  /**
+   * For a Product tracked as Equipment (ADR 0064): one serial number or asset tag per unit, and
+   * no batch or expiry. Each unit becomes an Equipment record, not stock.
+   */
+  serials?: string[]
 }
 
 /** A goods received note against a supplier delivery (#130). */
@@ -105,16 +110,23 @@ export async function readGs1(transport: Transport, data: string): Promise<Gs1> 
   return response.body as Gs1
 }
 
-/** Whether a line is complete enough to send. */
+/** The serial numbers typed for a line: one per line or comma, blanks left out. */
+export function parseSerials(text: string): string[] {
+  return text
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+}
+
+/**
+ * Whether a line is complete enough to send. A stock line needs its batch and expiry; an
+ * equipment line one distinct serial number per unit instead.
+ */
 export function lineComplete(line: ReceivedLine): boolean {
-  return (
-    line.product.trim() !== '' &&
-    line.batch.trim() !== '' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(line.expiry) &&
-    line.quantity > 0 &&
-    line.pack_size > 0 &&
-    /^\d+(\.\d+)?$/.test(line.unit_cost.trim())
-  )
+  const serials = line.serials ?? []
+  const common = line.product.trim() !== '' && line.quantity > 0 && line.pack_size > 0 && /^\d+(\.\d+)?$/.test(line.unit_cost.trim())
+  if (serials.length > 0) return common && serials.length === line.quantity && new Set(serials).size === serials.length
+  return common && line.batch.trim() !== '' && /^\d{4}-\d{2}-\d{2}$/.test(line.expiry)
 }
 
 /** A ward's requisition (SupplyRequest), as `/api/stock/requisitions` reports it. */
@@ -176,3 +188,56 @@ export async function fulfilRequisition(transport: Transport, id: string, lines:
   if (response.status !== 200) throw new StockError(response.status, reason(response.body))
   return response.body as Requisition
 }
+
+/** A unit's operational status (ADR 0064). */
+export type EquipmentStatus = 'available' | 'faulty' | 'under-maintenance' | 'retired'
+
+export const EQUIPMENT_STATUSES: readonly EquipmentStatus[] = ['available', 'faulty', 'under-maintenance', 'retired']
+
+/** One unit of Equipment, as `/api/stock/equipment` reports it. */
+export interface Equipment {
+  id: string
+  product: string
+  name: string
+  serial: string
+  location: string
+  status: EquipmentStatus
+  /** The goods received note it arrived on. */
+  received: string | null
+  /** Its latest change. */
+  change: { note: string; by: string; at: string } | null
+  /** Its transfer to this facility, while it is in transit. */
+  transfer: { from: string; to: string; by: string; at: string } | null
+}
+
+export const equipmentKey = ['stock', 'equipment'] as const
+
+/** The facility's Equipment, by name then serial. */
+export function equipmentQuery(transport: Transport) {
+  return {
+    queryKey: equipmentKey,
+    queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<Equipment[]> => {
+      const response = await transport.request({ method: 'GET', path: '/stock/equipment', ...(signal === undefined ? {} : { signal }) })
+      if (response.status !== 200 || !Array.isArray(response.body)) throw new StockError(response.status, reason(response.body))
+      return response.body as Equipment[]
+    },
+  }
+}
+
+async function changeEquipment(transport: Transport, id: string, action: 'status' | 'move' | 'dispatch' | 'receive', body: Record<string, string>): Promise<Equipment> {
+  const response = await transport.request({ method: 'POST', path: `/stock/equipment/${encodeURIComponent(id)}/${action}`, body })
+  if (response.status !== 200) throw new StockError(response.status, reason(response.body))
+  return response.body as Equipment
+}
+
+/** Sets a unit's status, with a note of what was done or found (needed unless available). */
+export const setEquipmentStatus = (transport: Transport, id: string, status: EquipmentStatus, note: string) => changeEquipment(transport, id, 'status', { status, note })
+
+/** Moves a unit to another location of the facility. */
+export const moveEquipment = (transport: Transport, id: string, location: string) => changeEquipment(transport, id, 'move', { location })
+
+/** Sends a unit to another facility: from then on it is theirs, in transit until they receive it. */
+export const dispatchEquipment = (transport: Transport, id: string, to: string) => changeEquipment(transport, id, 'dispatch', { to })
+
+/** Receives a unit in transit to this facility into one of its locations. */
+export const receiveEquipment = (transport: Transport, id: string, location: string) => changeEquipment(transport, id, 'receive', { location })

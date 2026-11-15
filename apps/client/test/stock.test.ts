@@ -1,6 +1,23 @@
 import { describe, expect, test } from 'vitest'
 
-import { StockError, decideRequisition, fulfilRequisition, lineComplete, onHandQuery, readGs1, receiveGoods, reorderQuery, requestStock, requisitionsQuery } from '../src/features/stock/api'
+import {
+  StockError,
+  decideRequisition,
+  dispatchEquipment,
+  equipmentQuery,
+  fulfilRequisition,
+  lineComplete,
+  moveEquipment,
+  onHandQuery,
+  parseSerials,
+  readGs1,
+  receiveEquipment,
+  receiveGoods,
+  reorderQuery,
+  requestStock,
+  requisitionsQuery,
+  setEquipmentStatus,
+} from '../src/features/stock/api'
 import { fakeTransport } from './fake'
 
 const line = { product: 'amox', batch: 'B42', expiry: '2027-06-30', quantity: 1000, pack_size: 100, unit_cost: '1.50' }
@@ -48,5 +65,34 @@ describe('stock', () => {
       ['POST', '/stock/requisitions/req-1/fulfil'],
     ])
     expect(transport.sent[1]?.body).toEqual({ requesting_store: 'Location/ward', supplying_store: 'Location/pharmacy', lines: [{ product: 'ors', quantity: 50 }] })
+  })
+
+  test('an equipment line needs one distinct serial per unit, and no batch or expiry', () => {
+    const bp = { product: 'bp-machine', batch: '', expiry: '', quantity: 2, pack_size: 1, unit_cost: '250000', serials: parseSerials('BP-1,\n BP-2 \n') }
+    expect(bp.serials).toEqual(['BP-1', 'BP-2'])
+    expect(lineComplete(bp)).toBe(true)
+    expect(lineComplete({ ...bp, quantity: 3 })).toBe(false)
+    expect(lineComplete({ ...bp, serials: ['BP-1', 'BP-1'] })).toBe(false)
+    expect(lineComplete({ ...bp, serials: [] })).toBe(false)
+  })
+
+  test('equipment is listed, changed, sent and received', async () => {
+    const unit = { id: 'u 1', name: 'BP machine', serial: 'BP-1' }
+    const transport = fakeTransport((request) => (request.method === 'GET' ? { body: [unit] } : { body: unit }))
+    await expect(equipmentQuery(transport).queryFn({})).resolves.toEqual([unit])
+    await setEquipmentStatus(transport, 'u 1', 'faulty', 'cuff leaks')
+    await moveEquipment(transport, 'u 1', 'Location/workshop')
+    await dispatchEquipment(transport, 'u 1', 'GUL02')
+    await receiveEquipment(transport, 'u 1', 'Location/lab')
+    expect(transport.sent.map((r) => [r.method, r.path, r.body])).toEqual([
+      ['GET', '/stock/equipment', undefined],
+      ['POST', '/stock/equipment/u%201/status', { status: 'faulty', note: 'cuff leaks' }],
+      ['POST', '/stock/equipment/u%201/move', { location: 'Location/workshop' }],
+      ['POST', '/stock/equipment/u%201/dispatch', { to: 'GUL02' }],
+      ['POST', '/stock/equipment/u%201/receive', { location: 'Location/lab' }],
+    ])
+    await expect(setEquipmentStatus(fakeTransport(() => ({ status: 422, body: { error: 'say why BP-1 is faulty' } })), 'u', 'faulty', '')).rejects.toEqual(
+      new StockError(422, 'say why BP-1 is faulty'),
+    )
   })
 })
