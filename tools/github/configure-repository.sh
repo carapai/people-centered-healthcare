@@ -12,7 +12,8 @@
 #   protection.
 # - The `main` ruleset: no deletion or force push, linear history, a PR with one approval and
 #   code-owner review, resolved conversations, and every required check passing on an
-#   up-to-date branch. ADR changes need a second approval (adr-approvals.yml).
+#   up-to-date branch. ADR changes need a second approval (adr-approvals.yml; the count is
+#   the ADR_APPROVALS_REQUIRED variable, 0 while there is one maintainer).
 # - Bypass: repository admins, through a PR only. While the maintainer is the only reviewer,
 #   GitHub does not let them approve their own PR, so merging uses this bypass, which GitHub
 #   records. Remove it once a second reviewer exists.
