@@ -51,14 +51,13 @@ pub enum SyncScope {
 }
 
 /// The global (not facility-scope) types a facility creates and sends up, sorted: provisional
-/// Patients and their relations, captured Consents, audit, provenance, its own Locations and
-/// devices, and requests for central to act on.
+/// Patients and their relations, captured Consents, audit, provenance, its own Locations, and
+/// requests for central to act on. Equipment is facility-scope (ADR 0064).
 pub const UP_GLOBAL: &[&str] = &[
     "AuditEvent",
     "CommunicationRequest",
     "Consent",
     "CoverageEligibilityRequest",
-    "Device",
     "Location",
     "Patient",
     "Person",
@@ -75,7 +74,6 @@ pub const DOWN_GLOBAL: &[&str] = &[
     "ConceptMap",
     "Consent",
     "Coverage",
-    "Device",
     "HealthcareService",
     "InventoryItem",
     "Library",
@@ -2062,7 +2060,7 @@ pub fn class_of(resource_type: &str) -> (&'static str, &'static str) {
             "questionnaire-response",
             "created once; later edits are handled like Observation",
         ),
-        "Device" => ("device", "revocation wins"),
+        "EnrolledDevice" => ("device", "revocation wins"),
         _ => (
             "clinical",
             "version-safe correction: both branches are kept, and the resolver writes the \

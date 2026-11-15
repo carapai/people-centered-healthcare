@@ -96,7 +96,7 @@ Every item on the wire, in either direction:
   - **Applied versions:** a version received by sync keeps its `op_id` and the `lastUpdated` its origin stamped. It is logged with its origin node (`change_log.origin`) and never queued back toward the peer it came from.
   - **`SyncScope::Facility`**, from the data authority matrix (write-authority.md):
     - **Both ways:** facility-scope records tagged with the node's facility (ADR 0057).
-    - **Up:** the global types a facility creates (`UP_GLOBAL`): provisional Patients, Consents, AuditEvents, Provenance, its Locations and Devices, and requests.
+    - **Up:** the global types a facility creates (`UP_GLOBAL`): provisional Patients, Consents, AuditEvents, Provenance, its Locations, and requests. Equipment is facility-scope, so it goes up with the facility's other records (ADR 0064).
     - **Down:** the global replicas (`DOWN_GLOBAL`): registries and golden records, definitions and terminology, price masters, coverage and consent.
     - **Never:** another facility's records, and central's own audit.
   - **Not yet:** HLC and package fields from the writer.
@@ -177,7 +177,7 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
 
   A slow link therefore delivers what matters first.
 - **In code (#81, lanes).** `Lane::of` puts each type in a lane:
-  - **Revocations:** `Device`.
+  - **Revocations:** `EnrolledDevice`, the enrolled LAN client devices (ADR 0064). FHIR `Device` is clinical.
   - **Packages:** definitional types (StructureDefinition, ValueSet, CodeSystem, ConceptMap, Questionnaire, PlanDefinition, ActivityDefinition, Library, SearchParameter), and package activation records (#89). Activation records are operations central sends down to every node, never up; each node applies those its scope chain covers.
   - **Audit:** AuditEvent and Provenance.
   - **Clinical:** everything else.
@@ -239,7 +239,7 @@ stateDiagram-v2
 | Charges, invoices, payments | Operation | Idempotent by `op_id` and external transaction id. Reversals only, never edits. Provisional until confirmed by a later op |
 | Metadata and configuration | Immutable package version, downward only | No conflicts: only approved versions are activated, and incompatible peers are refused |
 | AuditEvent | Version, append-only | None (immutable) |
-| Device registry, revocations | Version | Revocation wins |
+| Enrolled devices (`EnrolledDevice`), revocations | Version | Revocation wins |
 
 ### Conflict Record and review queue
 

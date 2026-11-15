@@ -517,6 +517,29 @@ DEFINE TABLE detected_issue_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON detected_issue_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON detected_issue_history TYPE int PERMISSIONS FULL
   DEFINE INDEX detected_issue_history_last_updated ON detected_issue_history FIELDS last_updated, version_seq
+DEFINE TABLE device TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON device TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON device TYPE record PERMISSIONS FULL
+  DEFINE FIELD json ON device TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device TYPE int PERMISSIONS FULL
+DEFINE TABLE device_association TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_association TYPE bool PERMISSIONS FULL
+  DEFINE FIELD index_keys ON device_association TYPE array<record> DEFAULT [] PERMISSIONS FULL
+  DEFINE FIELD index_keys.* ON device_association TYPE record PERMISSIONS FULL
+  DEFINE FIELD json ON device_association TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_association TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_association TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_association TYPE int PERMISSIONS FULL
+DEFINE TABLE device_association_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_association_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_association_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_association_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_association_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_association_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX device_association_history_last_updated ON device_association_history FIELDS last_updated, version_seq
 DEFINE TABLE device_definition TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON device_definition TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON device_definition TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -532,6 +555,13 @@ DEFINE TABLE device_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON device_definition_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON device_definition_history TYPE int PERMISSIONS FULL
   DEFINE INDEX device_definition_history_last_updated ON device_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE device_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD deleted ON device_history TYPE bool PERMISSIONS FULL
+  DEFINE FIELD json ON device_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD last_updated ON device_history TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD version_id ON device_history TYPE string PERMISSIONS FULL
+  DEFINE FIELD version_seq ON device_history TYPE int PERMISSIONS FULL
+  DEFINE INDEX device_history_last_updated ON device_history FIELDS last_updated, version_seq
 DEFINE TABLE device_request TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON device_request TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON device_request TYPE array<record> DEFAULT [] PERMISSIONS FULL

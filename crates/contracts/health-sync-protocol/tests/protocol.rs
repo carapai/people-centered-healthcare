@@ -536,7 +536,9 @@ fn a_resource_names_its_blobs_and_an_upload_resumes_where_it_stopped() {
 #[test]
 fn each_type_has_its_lane_and_lanes_are_pulled_most_urgent_first() {
     use health_sync_protocol::Lane;
-    assert_eq!(Lane::of("Device"), Lane::Revocations);
+    assert_eq!(Lane::of("EnrolledDevice"), Lane::Revocations);
+    // FHIR Device is medical devices only (ADR 0064): Equipment syncs in the clinical lane.
+    assert_eq!(Lane::of("Device"), Lane::Clinical);
     assert_eq!(Lane::of("ValueSet"), Lane::Packages);
     assert_eq!(Lane::of("Questionnaire"), Lane::Packages);
     assert_eq!(Lane::of("activation"), Lane::Packages);

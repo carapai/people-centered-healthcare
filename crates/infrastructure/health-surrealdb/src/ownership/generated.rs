@@ -2,7 +2,7 @@
 // and history table in migrations/0001_resource_tables.surql; tests/ownership.rs checks the
 // registry, the schema and the matrix stay in step.
 
-use super::{Partition, ResourceOwnership};
+use super::{DEVICE_CATEGORY, Partition, ResourceOwnership};
 
 /// One entry per FHIR resource type with a head table, sorted by type.
 pub(super) const RESOURCES: &[ResourceOwnership] = &[
@@ -148,6 +148,23 @@ pub(super) const RESOURCES: &[ResourceOwnership] = &[
         resource_type: "DetectedIssue",
         table: "detected_issue",
         owner: "decision-support",
+        partitions: &[],
+    },
+    ResourceOwnership {
+        resource_type: "Device",
+        table: "device",
+        // Patient-assigned Devices; Equipment by its category (ADR 0064).
+        owner: "clinical-data",
+        partitions: &[Partition {
+            system: DEVICE_CATEGORY,
+            code: "equipment",
+            owner: "equipment",
+        }],
+    },
+    ResourceOwnership {
+        resource_type: "DeviceAssociation",
+        table: "device_association",
+        owner: "clinical-data",
         partitions: &[],
     },
     ResourceOwnership {
