@@ -54,6 +54,7 @@ fn received(id: &str, ownership: Ownership, cost: i64) -> GoodsReceived {
             quantity: 100,
             pack_size: 1,
             unit_cost: Decimal::from(cost),
+            serials: vec![],
         }],
     }
 }

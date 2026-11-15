@@ -185,12 +185,13 @@ stateDiagram-v2
 ## Receiving, requisitions and reorder
 
 - **Goods received.** A goods-received note is recorded at the facility authority against a supplier delivery (NMS or JMS). It is entered by hand, or pre-filled from a supplier advance shipping notice where an adapter in `health-integration` exists.
+- **Equipment** (ADR 0064). A Product is either stocked or tracked as Equipment, set when it is created and never changed. A line of a Product tracked as Equipment gives one serial number or asset tag per unit, and no batch or expiry. Receiving it creates one Equipment record (a FHIR Device of category *equipment*, at the receiving store) per unit, in the note's transaction, and posts no stock balance. A unit already registered refuses the whole note.
 - **Scanning.** GS1 DataMatrix (GTIN `01`, expiry `17`, batch `10`, serial `21`) is supported where barcodes exist, but never required.
 - **Requisitions:**
   - **within the facility** (ward → pharmacy): SupplyRequest;
   - **upward** to the district or NMS: through procurement adapters at central.
 - **Reorder.** Min/max policy per store and product. Suggested order quantities are computed at the edge from consumption.
-- **Code** (#130): `health-inventory::receiving` (`GoodsReceived`, `parse_gs1`, `Requisition`, `suggest`), and `Inventory::receive_goods`, `request`, `decide_requisition`, `fulfil_requisition` and `reorder`. Min and max default to 1 and 3 months of average monthly consumption.
+- **Code** (#130): `health-inventory::receiving` (`GoodsReceived`, `parse_gs1`, `Requisition`, `suggest`), and `Inventory::receive_goods` (`receive_goods_with` takes the `EquipmentIntake` port, which the FHIR server fills from `health-equipment-app`), `request`, `decide_requisition`, `fulfil_requisition` and `reorder`. Min and max default to 1 and 3 months of average monthly consumption.
 
 ## Offline and leases
 

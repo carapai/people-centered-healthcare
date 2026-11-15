@@ -1,6 +1,6 @@
 //! Receiving, requisitions and reorder over SurrealDB (memory engine).
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use health_inventory::receiving::{
     GoodsReceived, ReceivedLine, ReorderPolicy, RequestedLine, Requisition, RequisitionStatus,
@@ -9,7 +9,9 @@ use health_inventory::transfers::{TransferLine, TransferStatus};
 use health_inventory::{
     Movement, MovementKind, Origin, Ownership, Policy, Status, StockStore, StockUnit,
 };
-use health_inventory_app::{Inventory, InventoryError, Sender, supply_requests};
+use health_inventory_app::{
+    EquipmentIntake, IntakeError, Inventory, InventoryError, ReceivedUnit, Sender, supply_requests,
+};
 use health_persistence::Store;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{SignedDuration, SystemClock, Timestamp};
@@ -65,6 +67,7 @@ fn note() -> GoodsReceived {
             quantity: 1000,
             pack_size: 100,
             unit_cost: Decimal::new(1_50, 2),
+            serials: vec![],
         }],
     }
 }
@@ -221,4 +224,134 @@ async fn reorder_suggestions_follow_the_last_months_consumption() {
     assert_eq!(suggestions.len(), 1);
     let s = &suggestions[0];
     assert_eq!((s.on_hand, s.min, s.max, s.order), (200, 300, 900, 700));
+}
+
+/// The equipment module as receiving sees it: `bp-machine` is tracked as Equipment, and a unit
+/// with serial `TAKEN` is already registered.
+#[derive(Default)]
+struct Intake {
+    registered: Mutex<Vec<ReceivedUnit>>,
+}
+
+impl<T: Send> EquipmentIntake<T> for Intake {
+    fn tracked(&self, product: &str) -> bool {
+        product == "bp-machine"
+    }
+
+    async fn register(&self, _tx: &mut T, unit: ReceivedUnit) -> Result<(), IntakeError> {
+        if unit.serial == "TAKEN" {
+            return Err(IntakeError::Refused(
+                "bp-machine TAKEN is already registered".into(),
+            ));
+        }
+        self.registered.lock().expect("lock").push(unit);
+        Ok(())
+    }
+}
+
+fn with_bp_machines(id: &str, serials: &[&str]) -> GoodsReceived {
+    let mut note = note();
+    note.id = id.into();
+    note.lines.push(ReceivedLine {
+        product: "bp-machine".into(),
+        batch: String::new(),
+        expiry: String::new(),
+        funding_source: "government".into(),
+        ownership: Ownership::Owned,
+        quantity: i64::try_from(serials.len()).expect("small"),
+        pack_size: 1,
+        unit_cost: Decimal::new(250_000, 0),
+        serials: serials.iter().map(|s| (*s).to_owned()).collect(),
+    });
+    note
+}
+
+#[tokio::test]
+async fn equipment_is_received_as_one_record_per_unit_never_as_stock() {
+    let (inventory, _) = setup().await;
+    let intake = Intake::default();
+    inventory
+        .receive_goods_with(
+            &with_bp_machines("grn-eq", &["BP-1", "BP-2"]),
+            &sender(),
+            now(),
+            &intake,
+        )
+        .await
+        .expect("received");
+    let registered = intake.registered.lock().expect("lock").clone();
+    assert_eq!(
+        registered,
+        ["BP-1", "BP-2"]
+            .map(|serial| ReceivedUnit {
+                product: "bp-machine".into(),
+                serial: serial.into(),
+                location: "Location/pharmacy".into(),
+                facility: "E1".into(),
+                note: "grn-eq".into(),
+            })
+            .to_vec()
+    );
+    // The note's Stock line was received as Stock; the Equipment posted no balance.
+    let stock = unit("Location/pharmacy").key();
+    assert_eq!(
+        inventory.balance(&stock).await.expect("balance").on_hand,
+        1000
+    );
+    let mut bp = unit("Location/pharmacy");
+    bp.product = "bp-machine".into();
+    bp.batch = String::new();
+    bp.expiry = String::new();
+    assert_eq!(
+        inventory.balance(&bp.key()).await.expect("balance").on_hand,
+        0
+    );
+
+    // Receiving a tracked Product by batch is refused, as is Stock without the equipment module.
+    let mut by_batch = note();
+    by_batch.id = "grn-batch".into();
+    by_batch.lines[0].product = "bp-machine".into();
+    assert!(matches!(
+        inventory
+            .receive_goods_with(&by_batch, &sender(), now(), &intake)
+            .await,
+        Err(InventoryError::Receiving(_))
+    ));
+    assert!(matches!(
+        inventory
+            .receive_goods(&with_bp_machines("grn-none", &["BP-3"]), &sender(), now())
+            .await,
+        Err(InventoryError::Receiving(_))
+    ));
+}
+
+#[tokio::test]
+async fn a_refused_unit_refuses_the_whole_receipt() {
+    let (inventory, _) = setup().await;
+    let intake = Intake::default();
+    assert_eq!(
+        inventory
+            .receive_goods_with(
+                &with_bp_machines("grn-dup", &["TAKEN"]),
+                &sender(),
+                now(),
+                &intake
+            )
+            .await,
+        Err(InventoryError::Equipment(
+            "bp-machine TAKEN is already registered".into()
+        ))
+    );
+    // Nothing of the note was kept: its Stock line posted nothing, and it can be received again.
+    let stock = unit("Location/pharmacy").key();
+    assert_eq!(inventory.balance(&stock).await.expect("balance").on_hand, 0);
+    inventory
+        .receive_goods_with(
+            &with_bp_machines("grn-dup", &["BP-9"]),
+            &sender(),
+            now(),
+            &intake,
+        )
+        .await
+        .expect("received once corrected");
 }

@@ -8,27 +8,99 @@ use health_inventory::receiving::{
 };
 use health_inventory::transfers::{Transfer, TransferLine};
 use health_inventory::{Movement, MovementKind, Origin, Status, StockStore};
-use health_persistence::Store;
+use health_persistence::{Store, WriteError};
 use health_time::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 
 use crate::transfers::Step;
 use crate::{ATTEMPTS, Attempt, Inventory, InventoryError, Sender};
 
+/// One unit of Equipment a goods receipt brings (ADR 0064).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceivedUnit {
+    /// The Product, by code.
+    pub product: String,
+    /// Its serial number or asset tag.
+    pub serial: String,
+    /// The receiving store, where it now is.
+    pub location: String,
+    /// The receiving facility.
+    pub facility: String,
+    /// The goods received note.
+    pub note: String,
+}
+
+/// Why a unit of Equipment was not registered.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum IntakeError {
+    /// The unit was refused, e.g. it is already registered.
+    #[error("{0}")]
+    Refused(String),
+    /// The write failed; a conflict reruns the receipt.
+    #[error(transparent)]
+    Write(#[from] WriteError),
+}
+
+/// The equipment module, as receiving sees it (ADR 0064; dependency-rules.md rule 2: a port
+/// the composition root fills with the equipment module): which Products are tracked as
+/// Equipment, and the registration of each unit in the receipt's transaction.
+pub trait EquipmentIntake<T>: Send + Sync {
+    /// Whether `product` is tracked as Equipment rather than stocked.
+    fn tracked(&self, product: &str) -> bool;
+
+    /// Registers `unit` in `tx`.
+    fn register(
+        &self,
+        tx: &mut T,
+        unit: ReceivedUnit,
+    ) -> impl Future<Output = Result<(), IntakeError>> + Send;
+}
+
+/// No Product is tracked as Equipment: every line is Stock.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoEquipment;
+
+impl<T: Send> EquipmentIntake<T> for NoEquipment {
+    fn tracked(&self, _product: &str) -> bool {
+        false
+    }
+
+    async fn register(&self, _tx: &mut T, unit: ReceivedUnit) -> Result<(), IntakeError> {
+        Err(IntakeError::Refused(format!(
+            "{} is not tracked as Equipment",
+            unit.product
+        )))
+    }
+}
+
 impl<S> Inventory<S>
 where
     S: Store,
     S::Tx: StockStore,
 {
-    /// Receives a goods received note in one transaction: a receipt of each line at its unit
-    /// cost, and the note. A note is received once.
+    /// Receives a goods received note of Stock only ([`NoEquipment`]).
     pub async fn receive_goods(
         &self,
         note: &GoodsReceived,
         sender: &Sender,
         now: Timestamp,
     ) -> Result<(), InventoryError> {
+        self.receive_goods_with(note, sender, now, &NoEquipment)
+            .await
+    }
+
+    /// Receives a goods received note in one transaction: a receipt of each Stock line at its
+    /// unit cost, one Equipment record for each serial on a line of a Product tracked as
+    /// Equipment (no stock movement, ADR 0064), and the note. A note is received once.
+    pub async fn receive_goods_with(
+        &self,
+        note: &GoodsReceived,
+        sender: &Sender,
+        now: Timestamp,
+        equipment: &impl EquipmentIntake<S::Tx>,
+    ) -> Result<(), InventoryError> {
         note.validate()?;
+        note.check_tracking(|product| equipment.tracked(product))?;
         let _turn = crate::queue::stores([note.store.as_str()]).await;
         for attempt in 0..ATTEMPTS {
             crate::pause(attempt).await;
@@ -41,6 +113,26 @@ where
                     ));
                 }
                 for (index, line) in note.lines.iter().enumerate() {
+                    if line.is_equipment() {
+                        for serial in &line.serials {
+                            let unit = ReceivedUnit {
+                                product: line.product.clone(),
+                                serial: serial.clone(),
+                                location: note.store.clone(),
+                                facility: sender.node.clone(),
+                                note: note.id.clone(),
+                            };
+                            equipment.register(&mut tx, unit).await.map_err(
+                                |error| match error {
+                                    IntakeError::Write(write) => Attempt::from(write),
+                                    IntakeError::Refused(why) => {
+                                        Attempt::Fail(InventoryError::Equipment(why))
+                                    }
+                                },
+                            )?;
+                        }
+                        continue;
+                    }
                     let id = format!("{}-{index}", note.id);
                     let movement = Movement {
                         op_id: id.clone(),

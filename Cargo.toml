@@ -25,6 +25,7 @@ members = [
     "crates/domains/health-encounters",
     "crates/domains/health-financial-ledger",
     "crates/domains/health-identity",
+    "crates/domains/health-equipment",
     "crates/domains/health-inventory",
     "crates/domains/health-laboratory",
     "crates/domains/health-medications",
@@ -45,6 +46,7 @@ members = [
     "crates/application/health-encounters-app",
     "crates/application/health-identity-app",
     "crates/application/health-patient-flow-app",
+    "crates/application/health-equipment-app",
     "crates/application/health-inventory-app",
     "crates/application/health-laboratory-app",
     "crates/application/health-medications-app",
@@ -136,6 +138,7 @@ health-node-api = { path = "crates/infrastructure/health-node-api" }
 health-sync-client = { path = "crates/infrastructure/health-sync-client" }
 health-sync-server = { path = "crates/infrastructure/health-sync-server" }
 health-identity = { path = "crates/domains/health-identity" }
+health-equipment = { path = "crates/domains/health-equipment" }
 health-inventory = { path = "crates/domains/health-inventory" }
 health-laboratory = { path = "crates/domains/health-laboratory" }
 health-medications = { path = "crates/domains/health-medications" }
@@ -144,6 +147,7 @@ health-payments = { path = "crates/domains/health-payments" }
 health-pricing = { path = "crates/domains/health-pricing" }
 health-workflow = { path = "crates/domains/health-workflow" }
 health-identity-app = { path = "crates/application/health-identity-app" }
+health-equipment-app = { path = "crates/application/health-equipment-app" }
 health-inventory-app = { path = "crates/application/health-inventory-app" }
 health-laboratory-app = { path = "crates/application/health-laboratory-app" }
 health-medications-app = { path = "crates/application/health-medications-app" }

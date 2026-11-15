@@ -10,6 +10,7 @@ use axum::{Extension, Router};
 use health_access_policy::{Permissions, Subject};
 use health_fhir_search::Unrestricted;
 use health_fhir_server::{FhirServer, STOCK_PERMISSION};
+use health_persistence::{ResourceType, Store, Transaction};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::SystemClock;
 use http_body_util::BodyExt;
@@ -17,6 +18,10 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 
 async fn app(permissions: &[&str]) -> Router {
+    app_and_store(permissions).await.0
+}
+
+async fn app_and_store(permissions: &[&str]) -> (Router, SurrealStore) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "stock-http".into(),
@@ -26,7 +31,7 @@ async fn app(permissions: &[&str]) -> Router {
     .expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
     let store = SurrealStore::new(connection, Arc::new(SystemClock));
-    FhirServer::new(store, "http://test/fhir", Arc::new(Unrestricted))
+    let router = FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
         .inventory_router()
         .layer(Extension(Subject {
             account: "storekeeper-1".into(),
@@ -35,7 +40,8 @@ async fn app(permissions: &[&str]) -> Router {
             programs: BTreeSet::new(),
             purpose: Some("TREAT".into()),
             break_glass: None,
-        }))
+        }));
+    (router, store)
 }
 
 async fn send(app: &Router, method: &str, path: &str, body: Option<Value>) -> (StatusCode, Value) {
@@ -227,5 +233,76 @@ async fn a_ward_requisition_is_approved_and_fulfilled_from_the_pharmacy() {
         .0,
         StatusCode::UNPROCESSABLE_ENTITY,
         "fulfilled once"
+    );
+}
+
+#[tokio::test]
+async fn equipment_is_received_by_serial_as_devices_never_as_stock() {
+    let (app, store) = app_and_store(&[STOCK_PERMISSION]).await;
+    let product = json!({
+        "code": "bp-machine", "name": "BP machine, digital", "baseUnit": "unit",
+        "packSizes": [1], "equipment": true,
+    });
+    let (status, saved) = send(&app, "POST", "/products", Some(product)).await;
+    assert_eq!(status, StatusCode::CREATED, "{saved}");
+    assert_eq!(saved["equipment"], true);
+
+    let note = json!({
+        "store": "Location/opd", "supplier": "JMS", "delivery": "INV-77",
+        "lines": [{ "product": "bp-machine", "quantity": 2, "unit_cost": "250000", "serials": ["BP-1", " BP-2 "] }],
+    });
+    let (status, created) = send(&app, "POST", "/goods-received", Some(note.clone())).await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let (_, on_hand) = send(&app, "GET", "/on-hand?store=Location%2Fopd", None).await;
+    assert_eq!(on_hand, json!([]), "no stock balance for Equipment");
+
+    let mut tx = store.begin().await.expect("begin");
+    let devices: ResourceType = "Device".parse().expect("type");
+    for serial in ["BP-1", "BP-2"] {
+        let id = health_equipment::identity("bp-machine", serial)
+            .to_string()
+            .parse()
+            .expect("id");
+        let head = tx
+            .read(&devices, id)
+            .await
+            .expect("read")
+            .expect("a Device");
+        let device: Value = serde_json::from_str(head.json.as_str()).expect("json");
+        let unit = health_equipment_app::equipment(&device).expect("Equipment");
+        assert_eq!(
+            (
+                unit.serial.as_str(),
+                unit.facility.as_str(),
+                unit.location.as_str()
+            ),
+            (serial, "KAM013", "Location/opd")
+        );
+        assert_eq!(unit.name, "BP machine, digital");
+    }
+    drop(tx);
+
+    // The same units cannot arrive twice, and a tracked Product is not received by batch.
+    let mut again = note.clone();
+    again["id"] = json!("grn-again");
+    let (status, refused) = send(&app, "POST", "/goods-received", Some(again)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        refused["error"]
+            .as_str()
+            .is_some_and(|e| e.contains("already registered")),
+        "{refused}"
+    );
+    let by_batch = json!({
+        "store": "Location/opd", "supplier": "JMS", "delivery": "INV-78",
+        "lines": [{ "product": "bp-machine", "batch": "B1", "expiry": "2030-01-01", "quantity": 1, "unit_cost": "250000" }],
+    });
+    let (status, refused) = send(&app, "POST", "/goods-received", Some(by_batch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        refused["error"]
+            .as_str()
+            .is_some_and(|e| e.contains("tracked as Equipment")),
+        "{refused}"
     );
 }

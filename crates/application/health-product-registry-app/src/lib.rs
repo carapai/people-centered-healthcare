@@ -5,8 +5,8 @@
 //! - `identifier`: the product's code ([`PRODUCT_SYSTEM`]) and its GTIN ([`GTIN_SYSTEM`]);
 //! - `code`: the medicine codings it fills, and its name as `text`;
 //! - `status`: `active` or `inactive`;
-//! - extensions: the base unit ([`BASE_UNIT`]), each pack size ([`PACK_SIZE`]) and each synonym
-//!   ([`SYNONYM`]).
+//! - extensions: the base unit ([`BASE_UNIT`]), each pack size ([`PACK_SIZE`]), each synonym
+//!   ([`SYNONYM`]), and [`TRACKED_AS_EQUIPMENT`] when its units are Equipment (ADR 0064).
 //!
 //! [`medication`] writes one, [`product`] reads one back (`None` for a Medication that is not a
 //! stock product), and [`products`] reads them all from what a search found. [`Products::save`]
@@ -26,6 +26,9 @@ pub const PACK_SIZE: &str = "https://carapai.github.io/people-centered-healthcar
 /// The synonym extension, one per name.
 pub const SYNONYM: &str =
     "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-synonym";
+
+/// The extension marking a product tracked as Equipment, `valueBoolean: true` (ADR 0064).
+pub const TRACKED_AS_EQUIPMENT: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-tracked-as-equipment";
 
 /// `product` as a Medication with `id`.
 #[must_use]
@@ -47,6 +50,9 @@ pub fn medication(product: &Product, id: &str) -> Value {
             .iter()
             .map(|name| json!({ "url": SYNONYM, "valueString": name })),
     );
+    if product.equipment {
+        extension.push(json!({ "url": TRACKED_AS_EQUIPMENT, "valueBoolean": true }));
+    }
     let mut code = json!({ "text": product.name });
     if !product.medicines.is_empty() {
         code["coding"] = product
@@ -113,6 +119,7 @@ pub fn product(resource: &Value) -> Option<Product> {
             .filter_map(|e| e["valueString"].as_str().map(str::to_owned))
             .collect(),
         active: resource["status"] != "inactive",
+        equipment: extensions(resource, TRACKED_AS_EQUIPMENT).any(|e| e["valueBoolean"] == true),
     })
 }
 

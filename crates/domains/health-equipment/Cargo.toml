@@ -1,0 +1,19 @@
+[package]
+name = "health-equipment"
+description = "Equipment: individually identified items a facility holds and uses again, each one record per unit with its location and operational status (ADR 0064)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "equipment"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
