@@ -111,7 +111,7 @@ async fn run(
             rest.insert("search".into(), json!({ "mode": "match" }));
             Entry {
                 full_url: Some(server.url(&format!("{}/{}", r.resource_type, r.id))),
-                resource: Some(r.json.as_str().to_owned()),
+                resource: Some(crate::interactions::with_pending(server, &r.json).0),
                 rest,
             }
         })

@@ -823,6 +823,10 @@ fn fhir(
         // Submitted QuestionnaireResponses are re-validated against their Questionnaire (#92).
         .with_questionnaire_checks()
         .with_extraction();
+    // Attachments whose blob has not arrived read as pending (ADR 0021).
+    if let Some(files) = &settings.files {
+        fhir = fhir.with_attachments(files.clone());
+    }
     if let Some(rules) = registry_rules(settings) {
         fhir = fhir
             .with_client_registry(rules.0, rules.1)

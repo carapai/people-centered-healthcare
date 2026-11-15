@@ -17,7 +17,10 @@
 //! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
 //! 6. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
-//! 7. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
+//! 7. **Pre-fetch.** The attachments of pulled records whose type is pre-fetched
+//!    (`health_sync_protocol::PREFETCH`, e.g. signed consent scans) are fetched now rather than
+//!    when first opened. One central cannot serve yet stays queued for the next round.
+//! 8. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
 //!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
 //!    does not have yet go up to `/sync/v1/activation-reports`.
@@ -106,6 +109,8 @@ pub struct Round {
     pub seeded: usize,
     /// Attachments whose upload completed.
     pub blobs: usize,
+    /// Attachments of pre-fetch types fetched ahead of need (ADR 0021).
+    pub fetched: usize,
     /// Break-glass grants, and acknowledgements of them, sent for review (#224).
     pub grants: usize,
     /// Inter-facility transfers sent up, and those addressed here taken in (#247).
@@ -383,6 +388,42 @@ impl Sync {
         Ok((queued.len(), taken))
     }
 
+    /// Fetches the attachments queued ahead of need: those of pulled records of a pre-fetch
+    /// type (ADR 0021). One already held is taken off the queue; one central cannot serve now
+    /// (its upload from the facility that took it has not finished, or the link dropped) stays
+    /// queued for the next round. Returns blobs fetched.
+    pub async fn prefetch(&self, central: NodeId) -> Result<usize, String> {
+        let Some(blobs) = self.blobs.clone() else {
+            return Ok(0);
+        };
+        let peer = central.to_string();
+        let mut fetched = 0;
+        for blob in self
+            .store
+            .queued_fetches(&peer)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            let held = blob
+                .hash
+                .to_string()
+                .parse::<health_files::BlobHash>()
+                .is_ok_and(|hash| blobs.contains(&hash));
+            if !held {
+                if let Err(error) = self.fetch_blob(&blob).await {
+                    tracing::info!(%error, hash = %blob.hash, "a pre-fetched attachment stays queued");
+                    continue;
+                }
+                fetched += 1;
+            }
+            self.store
+                .blob_fetched(&peer, &blob.hash)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(fetched)
+    }
+
     /// Fetches an attachment from central on demand and keeps it, verified, in this node's store.
     pub async fn fetch_blob(&self, blob: &health_sync_protocol::BlobRef) -> Result<(), String> {
         let blobs = self
@@ -653,6 +694,7 @@ impl Sync {
                 }
             }
         }
+        round.fetched = self.prefetch(central).await?;
         if let Some(activator) = &self.activator {
             round.activation = health_activation::activate(
                 &self.store,

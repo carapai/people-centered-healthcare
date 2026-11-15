@@ -1251,7 +1251,11 @@ Total: 72 of 136 implementation tasks done (counted from the GitHub milestones).
     - it is the tarball an activation record names.
   - Anything else answers 404, as for an unknown blob.
   - **Tested:** over HTTP, a blob no record references, or only another facility's record, is 404, and one referenced by a record in the node's facility is served. The edge's on-demand download and package activation still work end to end.
-  - **Still open on #84:** the pre-fetch flag and the pending marker.
+  - **Still open on #84:** the pre-fetch flag and the pending marker (done in part 3).
+- **#84, part 3: pre-fetch and pending attachments (2026-11-16).** This completes #84.
+  - **Pre-fetch:** the attachments of pulled or re-seeded records whose type is in `health_sync_protocol::PREFETCH` (`Consent`) are queued (`sync_blob_fetch`, migration `0060_sync_blob_fetch`) and fetched after the pull. One central cannot serve yet stays queued.
+  - **Pending:** a FHIR read, vread, search or history at central, the edge or the desktop marks each attachment whose blob is not held with `PENDING_EXTENSION`, sends it `Cache-Control: no-store`, and never answers 304 for it.
+  - **Tested:** over HTTPS, a signed consent's scan comes down in the round that brings the record, a wound photo does not, and a scan that reaches central late comes down the round after. Over HTTP, a DocumentReference reads as pending until its blob is put, then as stored and 304 again; a history bundle marks it too.
 - **#141, part 3: long outages at volume (2026-11-11).**
   - **What:** `health-sync-sim`'s `outage` scenarios, nightly with the other simulations. An edge is cut off from central while both write facility records (`HEALTH_OUTAGE_RECORDS` each, 200 by default), then reconnected.
     - After 30 days, it catches up without re-seeding.

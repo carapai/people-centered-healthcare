@@ -167,6 +167,7 @@ pub struct FhirServer {
     dispensing: Arc<dispensing::Dispensing>,
     questionnaire_checks: bool,
     extraction: bool,
+    attachments: Option<health_files::FsBlobStore>,
 }
 
 impl FhirServer {
@@ -196,6 +197,7 @@ impl FhirServer {
             dispensing: Arc::new(dispensing::Dispensing::default()),
             questionnaire_checks: false,
             extraction: false,
+            attachments: None,
         }
     }
 
@@ -248,6 +250,15 @@ impl FhirServer {
             return Err(FhirError::invalid_resource(&found));
         }
         validation::check(self, self.fhirpath.clone(), resource).await
+    }
+
+    /// This server, marking on read each attachment whose blob `blobs` does not hold yet as
+    /// pending (ADR 0021; `health_sync_protocol::PENDING_EXTENSION`): the record was accepted
+    /// before its blob arrived.
+    #[must_use]
+    pub fn with_attachments(mut self, blobs: health_files::FsBlobStore) -> Self {
+        self.attachments = Some(blobs);
+        self
     }
 
     /// This server, re-validating every submitted QuestionnaireResponse against its

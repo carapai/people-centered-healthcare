@@ -385,6 +385,66 @@ async fn an_attachment_follows_its_record_and_comes_down_on_demand() {
 }
 
 #[tokio::test]
+async fn a_signed_consent_scan_comes_down_ahead_of_need_and_other_attachments_wait() {
+    use health_sync_protocol::{ContentHash, blob_url};
+    let central = central().await;
+    let edge = store("edge").await;
+    let dir = tempfile::tempdir().expect("edge files");
+    let files = health_files::FsBlobStore::open(dir.path()).expect("edge blob store");
+    let sync = central
+        .sync(&edge, &central.origin)
+        .with_blobs(files.clone());
+    let patient = patient_seen_here(&central.store).await;
+    let attachment = |hash: &health_files::BlobHash, size: usize, kind: &str| {
+        let hash: ContentHash = hash.to_string().parse().expect("hash");
+        json!({"url": blob_url(&hash), "size": size, "contentType": kind})
+    };
+
+    // A signed consent whose scan central holds, and one whose scan has not reached it yet.
+    let signed = b"a signed consent".to_vec();
+    let held = central.files.put(signed.as_slice()).expect("put").blob;
+    let late = b"a consent scan still uploading".to_vec();
+    let late_hash = health_files::BlobHash::of(&late);
+    for (hash, size) in [(&held.hash, signed.len()), (&late_hash, late.len())] {
+        write(
+            &central.store,
+            &json!({
+                "resourceType": "Consent",
+                "status": "active",
+                "subject": {"reference": format!("Patient/{patient}")},
+                "sourceAttachment": [attachment(hash, size, "application/pdf")]
+            }),
+        )
+        .await;
+    }
+    // A wound photo: fetched only when first opened.
+    let photo = b"a wound photo".to_vec();
+    let photo_hash = central.files.put(photo.as_slice()).expect("put").blob.hash;
+    write(
+        &central.store,
+        &json!({
+            "resourceType": "DocumentReference",
+            "status": "current",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+            "content": [{"attachment": attachment(&photo_hash, photo.len(), "image/jpeg")}]
+        }),
+    )
+    .await;
+
+    let round = sync.round().await.expect("round");
+    assert_eq!(round.fetched, 1, "{round:?}");
+    assert_eq!(files.read(&held.hash).expect("pre-fetched"), signed);
+    assert!(!files.contains(&photo_hash), "on demand only");
+    assert!(!files.contains(&late_hash));
+
+    // The late scan reaches central; the next round brings it down, and nothing is fetched twice.
+    central.files.put(late.as_slice()).expect("put");
+    assert_eq!(sync.round().await.expect("round").fetched, 1);
+    assert_eq!(files.read(&late_hash).expect("pre-fetched"), late);
+    assert_eq!(sync.round().await.expect("round").fetched, 0);
+}
+
+#[tokio::test]
 async fn a_grant_made_offline_reaches_central_s_review_queue_due_from_arrival() {
     let central = central().await;
     let edge = store("edge").await;

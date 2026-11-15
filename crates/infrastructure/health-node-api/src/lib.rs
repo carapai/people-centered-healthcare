@@ -64,6 +64,8 @@ pub struct Clinical {
     /// Payments and cashier shifts at `/api/payments` (#254), with any routes beside them such
     /// as MoMo collections (#124).
     payments: Option<(health_fhir_server::PaymentConfig, Router)>,
+    /// The node's attachment store: attachments not held there read as pending (ADR 0021).
+    attachments: Option<health_files::FsBlobStore>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
 }
 
@@ -106,8 +108,16 @@ impl Clinical {
             registry,
             workflows: None,
             payments: None,
+            attachments: None,
             built: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Marks attachments whose blob `blobs` does not hold yet as pending on read (ADR 0021).
+    #[must_use]
+    pub fn with_attachments(mut self, blobs: health_files::FsBlobStore) -> Self {
+        self.attachments = Some(blobs);
+        self
     }
 
     /// Runs workflows at `/api/workflow` with `config`, whose authority is this node.
@@ -151,6 +161,10 @@ impl Clinical {
         .with_audit(Auditor::new(self.node.clone(), sensitive))
         .with_questionnaire_checks()
         .with_extraction();
+        let fhir = match &self.attachments {
+            Some(blobs) => fhir.with_attachments(blobs.clone()),
+            None => fhir,
+        };
         // Registration with this node's own MRNs, which never collide with another node's.
         let fhir = match &self.registry {
             Some((nin, node)) => {
