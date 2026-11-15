@@ -27,7 +27,7 @@ pub(crate) async fn metadata(State(server): State<FhirServer>) -> Response {
 
 /// `json` as served: with each attachment whose blob is not held here marked pending (ADR
 /// 0021), and whether any was. The marker is not part of the version.
-fn with_pending(server: &FhirServer, json: &RawJson) -> (String, bool) {
+pub(crate) fn with_pending(server: &FhirServer, json: &RawJson) -> (String, bool) {
     let Some(blobs) = &server.attachments else {
         return (json.as_str().to_owned(), false);
     };

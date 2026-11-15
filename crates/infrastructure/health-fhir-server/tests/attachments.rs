@@ -110,6 +110,12 @@ async fn an_attachment_reads_as_pending_until_its_blob_arrives() {
         versioned["content"][0]["attachment"]["extension"],
         attachment["extension"]
     );
+    let (_, _, history) = get(&router, &format!("{uri}/_history"), None).await;
+    assert_eq!(
+        history["entry"][0]["resource"]["content"][0]["attachment"]["extension"],
+        attachment["extension"],
+        "and in a history bundle"
+    );
 
     // Once the blob is here it reads as stored.
     blobs.put(scan.as_slice()).expect("put");

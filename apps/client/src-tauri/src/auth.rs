@@ -287,6 +287,11 @@ pub(crate) fn routes(
         Some(workflows) => clinical.with_workflows(workflows.clone()),
         None => clinical,
     };
+    // Attachments whose blob has not arrived read as pending (ADR 0021).
+    let clinical = match health_files::FsBlobStore::open(data_dir.join("files")) {
+        Ok(blobs) => clinical.with_attachments(blobs),
+        Err(_) => clinical,
+    };
     Ok(Some(
         Router::new()
             .nest("/auth", server.router())

@@ -77,7 +77,8 @@ fn entry(server: &FhirServer, e: HistoryEntry) -> Entry {
     );
     Entry {
         full_url: Some(server.url(&path)),
-        resource: (!e.version.deleted).then(|| e.json.as_str().to_owned()),
+        resource: (!e.version.deleted)
+            .then(|| crate::interactions::with_pending(server, &e.json).0),
         rest,
     }
 }
