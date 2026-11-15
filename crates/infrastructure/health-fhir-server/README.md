@@ -37,7 +37,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
   - `GET /reorder?store=&days=`.
   - `POST /gs1`: reads a scanned or printed DataMatrix.
   - `GET /requisitions?store=` (newest first), `POST /requisitions`, `/requisitions/{id}/decision` and `/requisitions/{id}/fulfil` (the picked batches, dispatched as a transfer).
-  - `GET /equipment?location=`, `POST /equipment/{id}/status` (`{status, note}`) and `POST /equipment/{id}/move` (`{location}`): the facility's Equipment, over `health-equipment-app`.
+  - `GET /equipment?location=`, `POST /equipment/{id}/status` (`{status, note}`) and `POST /equipment/{id}/move` (`{location}`): the facility's Equipment, over `health-equipment-app`. `POST /equipment/{id}/dispatch` (`{to}`) sends a unit to another facility, handed over at once by central; that facility then `POST /equipment/{id}/receive`s it (`{location}`).
   - Over `health-inventory-app`.
 - **Questionnaire submissions (#92):** with `with_questionnaire_checks()`, a QuestionnaireResponse written `completed` or `amended` is re-validated against its Questionnaire (`health_fhir_validation::check_response`).
   - **Finding the Questionnaire:** by `Questionnaire?url=&version=`. If the node does not have it, the submission is refused (422).

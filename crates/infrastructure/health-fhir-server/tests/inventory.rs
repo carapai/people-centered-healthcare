@@ -33,17 +33,27 @@ async fn app_and_store(permissions: &[&str]) -> (Router, SurrealStore) {
     // Searches as central's (Device by its facility `_tag`).
     let store = SurrealStore::new(connection, Arc::new(SystemClock))
         .with_registry(health_fhir_server::search_registry());
-    let router = FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
+    let router = at_facility(&store, "KAM013", "storekeeper-1", permissions);
+    (router, store)
+}
+
+/// The routes over `store`, for `account` at `facility`.
+fn at_facility(
+    store: &SurrealStore,
+    facility: &str,
+    account: &str,
+    permissions: &[&str],
+) -> Router {
+    FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
         .inventory_router()
         .layer(Extension(Subject {
-            account: "storekeeper-1".into(),
-            facility: "KAM013".into(),
+            account: account.into(),
+            facility: facility.into(),
             permissions: Permissions(permissions.iter().map(|p| (*p).to_owned()).collect()),
             programs: BTreeSet::new(),
             purpose: Some("TREAT".into()),
             break_glass: None,
-        }));
-    (router, store)
+        }))
 }
 
 async fn send(app: &Router, method: &str, path: &str, body: Option<Value>) -> (StatusCode, Value) {
@@ -388,5 +398,81 @@ async fn the_facility_lists_its_equipment_and_changes_its_status_and_location() 
         .await
         .0,
         StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn a_unit_dispatched_to_another_facility_is_theirs_once_received() {
+    let (kam, store) = app_and_store(&[STOCK_PERMISSION]).await;
+    let gul = at_facility(&store, "GUL02", "storekeeper-2", &[STOCK_PERMISSION]);
+    let product = json!({
+        "code": "bp-machine", "name": "BP machine, digital", "baseUnit": "unit",
+        "packSizes": [1], "equipment": true,
+    });
+    assert_eq!(
+        send(&kam, "POST", "/products", Some(product)).await.0,
+        StatusCode::CREATED
+    );
+    let note = json!({
+        "store": "Location/opd", "supplier": "JMS", "delivery": "INV-78",
+        "lines": [{ "product": "bp-machine", "quantity": 1, "unit_cost": "250000", "serials": ["BP-7"] }],
+    });
+    assert_eq!(
+        send(&kam, "POST", "/goods-received", Some(note)).await.0,
+        StatusCode::CREATED
+    );
+    let (_, list) = send(&kam, "GET", "/equipment", None).await;
+    let id = list[0]["id"].as_str().expect("id").to_owned();
+
+    // Another facility cannot send it away, and it is not sent to where it is.
+    let dispatch = |to: &str| Some(json!({ "to": to }));
+    let path = format!("/equipment/{id}/dispatch");
+    assert_eq!(
+        send(&gul, "POST", &path, dispatch("MBR03")).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        send(&kam, "POST", &path, dispatch("KAM013")).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (status, sent) = send(&kam, "POST", &path, dispatch("GUL02")).await;
+    assert_eq!(status, StatusCode::OK, "{sent}");
+    assert_eq!(sent["transfer"]["from"], "KAM013");
+    assert_eq!(sent["transfer"]["to"], "GUL02");
+
+    // Handed over at once: the sender no longer holds it, the receiver holds it in transit.
+    let (_, at_kam) = send(&kam, "GET", "/equipment", None).await;
+    assert_eq!(at_kam, json!([]));
+    let (_, at_gul) = send(&gul, "GET", "/equipment", None).await;
+    assert_eq!(at_gul.as_array().map(Vec::len), Some(1), "{at_gul}");
+    assert_eq!(at_gul[0]["transfer"]["to"], "GUL02");
+    let faulty = Some(json!({ "status": "faulty", "note": "dropped" }));
+    assert_eq!(
+        send(
+            &gul,
+            "POST",
+            &format!("/equipment/{id}/status"),
+            faulty.clone()
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "in transit"
+    );
+    let (status, received) = send(
+        &gul,
+        "POST",
+        &format!("/equipment/{id}/receive"),
+        Some(json!({ "location": "Location/lab" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{received}");
+    assert_eq!(received["location"], "Location/lab");
+    assert_eq!(received["transfer"], Value::Null);
+    assert_eq!(
+        send(&gul, "POST", &format!("/equipment/{id}/status"), faulty)
+            .await
+            .0,
+        StatusCode::OK
     );
 }

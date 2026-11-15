@@ -576,6 +576,68 @@ async fn equipment_syncs_up_in_the_clinical_lane_under_version_check() {
 }
 
 #[tokio::test]
+async fn a_dispatched_unit_is_handed_over_by_central_and_the_sender_writes_it_no_more() {
+    let (central, edge) = pair().await;
+    let mut unit = health_equipment::Equipment::received(
+        "bp-machine",
+        "BP machine",
+        "BP-0042",
+        "KLA01",
+        "Location/opd",
+        "grn-1",
+    )
+    .expect("unit");
+    let id = ResourceId::from_uuid(unit.id).expect("id");
+    let registered = write(
+        &edge,
+        id,
+        &health_equipment_app::device(&unit),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let at = Timestamp::from_second(1_800_000_000).expect("time");
+    unit.dispatch("GUL02", "store-1", at).expect("dispatched");
+    let dispatched = write(
+        &edge,
+        id,
+        &health_equipment_app::device(&unit),
+        Precondition::IfMatch(registered.version_id),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert!(
+        round.outcomes.iter().all(|o| *o == Outcome::Accepted),
+        "{:?}",
+        round.outcomes
+    );
+    // Central handed it over: GUL02's now, still in transit, a version of central's own.
+    let (version, at_central) = head(&central, "Device", id).await.expect("at central");
+    assert_ne!(version, dispatched.version_id);
+    let handed = health_equipment_app::equipment(&at_central).expect("equipment");
+    assert_eq!(handed.facility, "GUL02");
+    assert!(handed.in_transit());
+
+    // An edit the sender makes afterwards is not taken: it is not built on the head.
+    let mut late = health_equipment_app::device(&unit);
+    late["status"] = json!("inactive");
+    write(
+        &edge,
+        id,
+        &late,
+        Precondition::IfMatch(dispatched.version_id),
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(round.outcomes.as_slice(), [Outcome::Conflict { .. }]),
+        "{:?}",
+        round.outcomes
+    );
+    let (_, still) = head(&central, "Device", id).await.expect("at central");
+    assert_eq!(still, at_central);
+}
+
+#[tokio::test]
 async fn central_audit_never_goes_down_and_registries_never_go_up() {
     let (central, edge) = pair().await;
     let audit = ResourceId::new();

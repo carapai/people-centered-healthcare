@@ -1609,6 +1609,7 @@ impl Authority for SurrealAuthority<'_> {
             origin,
         });
         let (mut outcome, merges) = self.judge(&mut tx, group).await?;
+        let mut hand_overs = Vec::new();
         if outcome == Outcome::Accepted {
             for item in &group.items {
                 if item.kind == Kind::Op {
@@ -1637,8 +1638,37 @@ impl Authority for SurrealAuthority<'_> {
                             .and_then(surrealdb::IndexedResults::check)
                             .map_err(write_error)?;
                     }
+                    // A unit of Equipment a facility dispatched is handed over to the facility
+                    // it goes to (ADR 0064).
+                    if item.resource_type == "Device"
+                        && matches!(self.scope, SyncScope::Facility(_))
+                        && let Some(handed) = health_equipment_app::handed_over(&item.body)
+                    {
+                        hand_overs.push((item, handed));
+                    }
                 }
             }
+        }
+        if outcome == Outcome::Accepted && !hand_overs.is_empty() {
+            // Central's own versions, so they go down to the facility the units now belong to.
+            let source = tx.source.take();
+            for (item, handed) in hand_overs {
+                tx.write(health_persistence::WriteRequest {
+                    resource_type: item
+                        .resource_type
+                        .parse()
+                        .map_err(|_| WriteError::Store(corrupt("resource_type")))?,
+                    id: item
+                        .resource_id
+                        .parse()
+                        .map_err(|_| WriteError::Store(corrupt("resource_id")))?,
+                    json: RawJson::from_validated(handed.to_string()),
+                    op_id: OpId::new(),
+                    precondition: health_persistence::Precondition::IfMatch(item.op_id),
+                })
+                .await?;
+            }
+            tx.source = source;
         }
         if outcome == Outcome::Accepted && !merges.is_empty() {
             // Written as this node's own versions, so they go back down to the pushing node too.

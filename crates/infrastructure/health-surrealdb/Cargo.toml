@@ -27,6 +27,7 @@ health-billing = { workspace = true }
 health-client-registry = { workspace = true }
 health-clinical-documentation-app = { workspace = true }
 health-encounters = { workspace = true }
+health-equipment-app = { workspace = true }
 health-laboratory = { workspace = true }
 health-consent = { workspace = true }
 health-financial-ledger = { workspace = true }
@@ -54,6 +55,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
+health-equipment = { workspace = true }
 uuid = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }

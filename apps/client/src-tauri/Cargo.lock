@@ -3779,6 +3779,7 @@ dependencies = [
  "health-consent",
  "health-coverage",
  "health-encounters",
+ "health-equipment-app",
  "health-fhir-search",
  "health-financial-ledger",
  "health-identifiers",

@@ -17,7 +17,11 @@
 //! - `GET /equipment?location=`: the facility's Equipment (ADR 0064), each a Device;
 //! - `POST /equipment/{id}/status` `{status, note}` and `POST /equipment/{id}/move` `{location}`:
 //!   a change to one of its units, kept as a new version (its maintenance history is
-//!   `Device/{id}/_history`). Only the facility that holds a unit changes it.
+//!   `Device/{id}/_history`). Only the facility that holds a unit changes it;
+//! - `POST /equipment/{id}/dispatch` `{to}`: a unit sent to facility `to`. Central hands it over
+//!   at once, so `to` holds it, in transit, and the sender no longer does;
+//! - `POST /equipment/{id}/receive` `{location}`: a unit in transit received by the facility it
+//!   was handed over to.
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -489,6 +493,8 @@ impl FhirServer {
             .route("/equipment", get(list_equipment))
             .route("/equipment/{id}/status", post(equipment_status))
             .route("/equipment/{id}/move", post(equipment_move))
+            .route("/equipment/{id}/dispatch", post(equipment_dispatch))
+            .route("/equipment/{id}/receive", post(equipment_receive))
             .with_state(self.clone())
     }
 }
@@ -609,6 +615,9 @@ fn equipment_json(unit: &health_equipment::Equipment) -> Value {
         "change": unit.change.as_ref().map(|c| json!({
             "note": c.note, "by": c.by, "at": c.at.to_string(),
         })),
+        "transfer": unit.transfer.as_ref().map(|t| json!({
+            "from": t.from, "to": t.to, "by": t.by, "at": t.at.to_string(),
+        })),
     })
 }
 
@@ -674,15 +683,23 @@ async fn change_equipment(
         return refused(StatusCode::NOT_FOUND, "no such equipment");
     };
     let by = subject.account.clone();
-    match health_equipment_app::Equipments::new(server.store.clone())
-        .change(id, &subject.facility, |unit| {
-            apply(unit, &by, Timestamp::now())
-        })
-        .await
-    {
+    answer(
+        health_equipment_app::Equipments::new(server.store.clone())
+            .change(id, &subject.facility, |unit| {
+                apply(unit, &by, Timestamp::now())
+            })
+            .await,
+    )
+}
+
+/// The unit as changed, or why it was not.
+fn answer(
+    changed: Result<health_equipment::Equipment, health_equipment_app::EquipmentError>,
+) -> Response {
+    use health_equipment_app::EquipmentError as E;
+    match changed {
         Ok(unit) => Json(equipment_json(&unit)).into_response(),
         Err(error) => {
-            use health_equipment_app::EquipmentError as E;
             let status = match &error {
                 E::NotFound(_) => StatusCode::NOT_FOUND,
                 E::OtherFacility(_) => StatusCode::FORBIDDEN,
@@ -721,6 +738,51 @@ async fn equipment_move(
 ) -> Response {
     change_equipment(&server, subject, &id, |unit, by, at| {
         unit.move_to(&body.location, by, at)
+    })
+    .await
+}
+
+#[derive(Debug, Deserialize)]
+struct DispatchBody {
+    to: String,
+}
+
+/// Dispatches a unit to another facility. The inventory routes are served by central, the
+/// authority that hands a dispatched unit over (ADR 0064), so it is handed over at once.
+async fn equipment_dispatch(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(body): Json<DispatchBody>,
+) -> Response {
+    let subject = match staff(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let Ok(id) = id.parse::<health_identifiers::ResourceId>() else {
+        return refused(StatusCode::NOT_FOUND, "no such equipment");
+    };
+    answer(
+        health_equipment_app::Equipments::new(server.store.clone())
+            .dispatch(
+                id,
+                &subject.facility,
+                &body.to,
+                &subject.account,
+                Timestamp::now(),
+            )
+            .await,
+    )
+}
+
+async fn equipment_receive(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(body): Json<MoveBody>,
+) -> Response {
+    change_equipment(&server, subject, &id, |unit, by, at| {
+        unit.receive(&body.location, by, at)
     })
     .await
 }
