@@ -13,7 +13,7 @@ Status: **accepted** (ADRs 0045, 0046, 0047). Produced while resolving the Wayfi
 - **Reviews:**
   - one approval;
   - **CODEOWNERS** review for `docs/adr/`, `docs/architecture/`, `tools/architecture-checks/`, security, sync crates and `.github/`;
-  - ADR changes need **two** approvals.
+  - ADR changes need **two** approvals (`adr-approvals.yml`). The count is the repository variable `ADR_APPROVALS_REQUIRED`, 2 when unset; it is 0 while the project has one maintainer, since an author cannot approve their own pull request.
 - **Dependencies:**
   - lockfiles are committed (`Cargo.lock`, `bun.lock`);
   - Renovate groups updates weekly, auto-merges dev-dependency patches after checks, and raises security updates immediately.
