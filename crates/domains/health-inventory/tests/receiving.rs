@@ -17,6 +17,7 @@ fn line() -> ReceivedLine {
         quantity: 1000,
         pack_size: 100,
         unit_cost: Decimal::new(150, 0),
+        serials: vec![],
     }
 }
 
@@ -147,4 +148,59 @@ fn reorder_suggestions_order_up_to_the_maximum_at_the_minimum() {
     // No consumption: nothing to suggest from.
     assert_eq!(suggest("new", 0, 0, 30, policy).order, 0);
     assert_eq!(suggest("x", 0, 10, 0, policy).order, 0);
+}
+
+fn bp_machines(serials: &[&str]) -> ReceivedLine {
+    ReceivedLine {
+        product: "bp-machine".into(),
+        batch: String::new(),
+        expiry: String::new(),
+        quantity: i64::try_from(serials.len()).expect("small"),
+        pack_size: 1,
+        serials: serials.iter().map(|s| (*s).to_owned()).collect(),
+        ..line()
+    }
+}
+
+#[test]
+fn equipment_is_received_by_serial_one_per_unit() {
+    assert_eq!(
+        note(vec![bp_machines(&["BP-1", "BP-2"])]).validate(),
+        Ok(())
+    );
+    let short = ReceivedLine {
+        quantity: 3,
+        ..bp_machines(&["BP-1", "BP-2"])
+    };
+    assert!(matches!(
+        note(vec![short]).validate(),
+        Err(ReceivingRefused::Invalid(m)) if m.contains("one serial number for each")
+    ));
+    assert!(matches!(
+        note(vec![bp_machines(&["BP-1"]), bp_machines(&["BP-1"])]).validate(),
+        Err(ReceivingRefused::Invalid(m)) if m.contains("repeats serial number BP-1")
+    ));
+}
+
+#[test]
+fn a_product_is_stocked_or_tracked_as_equipment_never_both() {
+    let tracked = |product: &str| product == "bp-machine";
+    let mixed = note(vec![line(), bp_machines(&["BP-1"])]);
+    assert_eq!(mixed.check_tracking(tracked), Ok(()));
+    let as_stock = note(vec![ReceivedLine {
+        product: "bp-machine".into(),
+        ..line()
+    }]);
+    assert!(matches!(
+        as_stock.check_tracking(tracked),
+        Err(ReceivingRefused::Invalid(m)) if m.contains("tracked as Equipment")
+    ));
+    let by_serial = note(vec![ReceivedLine {
+        product: "amoxicillin-500".into(),
+        ..bp_machines(&["X-1"])
+    }]);
+    assert!(matches!(
+        by_serial.check_tracking(tracked),
+        Err(ReceivingRefused::Invalid(m)) if m.contains("receive it by batch")
+    ));
 }

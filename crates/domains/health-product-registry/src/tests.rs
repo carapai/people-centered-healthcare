@@ -17,6 +17,7 @@ fn product(code: &str, name: &str, medicines: &[&str], synonyms: &[&str]) -> Pro
         medicines: medicines.iter().map(|m| coding(m)).collect(),
         synonyms: synonyms.iter().map(|s| (*s).to_owned()).collect(),
         active: true,
+        equipment: false,
     }
 }
 

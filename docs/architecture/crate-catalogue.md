@@ -40,7 +40,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Care Coordination | `health-referrals`, `health-care-plans` | — |
 | Programs & Public Health | `health-programs`, `health-surveillance`, `health-population` | — |
 | Finance | `health-pricing`, `health-coverage`, `health-billing`, `health-payments`, `health-financial-ledger` | — |
-| Supply Chain | `health-inventory`, `health-procurement` | — |
+| Supply Chain | `health-inventory`, `health-procurement`, `health-equipment` (Equipment, one record per unit; ADR 0064) | — |
 | Identity & Access | `health-identity`, `health-access-policy` (the PDP's rules), `health-consent`, `health-audit-domain` | — |
 | Workflow | `health-workflow`, `health-decision-support` | `health-worklists` (Read Model) → `health-workflow` |
 | Write Authority | `health-authority-leases` (Authority Leases: grant, refusal of edge writes in scope, return after drain, freeze, admin recovery; #135) | — |
@@ -57,6 +57,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-<context>-app` | One per Bounded Context, e.g. `health-clinical-records-app`, `health-finance-app`; created with the context's first use case |
 | `health-billing-app` | Billing: charge capture from clinical events, priced, kept once and posted to the ledger, with reversals on cancellation (#121) |
 | `health-encounters-app` | Encounters: check-in and the Encounter's status, each with its guard, FHIR Encounter and outbox event (#102) |
+| `health-equipment-app` | Equipment as FHIR Device resources of category *equipment*, registered once per unit; receiving reaches it through inventory's `EquipmentIntake` port (#453; ADR 0064) |
 | `health-identity-app` | Identity & Access: the PDP applied to searches (`SubjectSearchPolicy`) |
 | `health-patient-flow-app` | Patient flow: queue entries from encounter events, once each, and the queue steps (#102) |
 | `health-pricing-app` | Pricing: drafting, approving and retiring Price Books and rules at central, and pricing charges from them (ADR 0031; #120) |

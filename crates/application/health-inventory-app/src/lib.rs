@@ -32,7 +32,9 @@ mod valuation;
 
 pub use counts::{Cause, inventory_report};
 pub use dispensing::{Completion, DISPENSED_EVENT, PatientReturn, Preparation, Record};
-pub use receiving::{OnHand, supply_requests};
+pub use receiving::{
+    EquipmentIntake, IntakeError, NoEquipment, OnHand, ReceivedUnit, supply_requests,
+};
 pub use transfers::Sender;
 pub use valuation::{StoreValuation, inventory_postings};
 
@@ -72,6 +74,9 @@ pub enum InventoryError {
     /// No such transfer, Reconciliation Record or prepared dispense.
     #[error("{0} is not known")]
     NotFound(String),
+    /// A unit of Equipment on a goods received note could not be registered (ADR 0064).
+    #[error("{0}")]
+    Equipment(String),
     /// The store failed.
     #[error("{0}")]
     Store(String),

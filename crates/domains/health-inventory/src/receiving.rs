@@ -2,7 +2,9 @@
 //! and reorder; #130).
 //!
 //! - **Goods received notes** are recorded at the facility authority against a supplier
-//!   delivery: each line a receipt of a Stock Unit at its unit cost.
+//!   delivery: each line a receipt of a Stock Unit at its unit cost. A line of a Product
+//!   tracked as Equipment carries one serial per unit instead, and creates Equipment, never
+//!   Stock ([`GoodsReceived::check_tracking`]; ADR 0064).
 //! - **GS1 DataMatrix** ([`parse_gs1`]) fills a line from a barcode where one exists; it is
 //!   never required.
 //! - **Requisitions** within the facility (ward → pharmacy) are SupplyRequests, fulfilled by a
@@ -34,9 +36,19 @@ pub struct ReceivedLine {
     pub pack_size: u32,
     /// The cost of one base unit.
     pub unit_cost: Decimal,
+    /// The serial number or asset tag of each unit, when the Product is tracked as Equipment:
+    /// one per unit. Empty for Stock.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub serials: Vec<String>,
 }
 
 impl ReceivedLine {
+    /// Whether the line is Equipment: it names its units by serial.
+    #[must_use]
+    pub fn is_equipment(&self) -> bool {
+        !self.serials.is_empty()
+    }
+
     /// The Stock Unit it is received into at `store`.
     pub fn unit(&self, store: &str) -> StockUnit {
         StockUnit {
@@ -96,11 +108,24 @@ impl GoodsReceived {
         if self.lines.is_empty() {
             return invalid("a goods received note has at least one line");
         }
+        let mut serials = std::collections::BTreeSet::new();
         for (i, line) in self.lines.iter().enumerate() {
-            if line.product.trim().is_empty()
-                || line.batch.trim().is_empty()
-                || line.expiry.trim().is_empty()
-            {
+            if line.product.trim().is_empty() {
+                return invalid(&format!("line {i} needs its product"));
+            }
+            if line.is_equipment() {
+                if usize::try_from(line.quantity).ok() != Some(line.serials.len()) {
+                    return invalid(&format!(
+                        "line {i} needs one serial number for each of its {} units",
+                        line.quantity
+                    ));
+                }
+                for serial in &line.serials {
+                    if !serials.insert((line.product.as_str(), serial.as_str())) {
+                        return invalid(&format!("line {i} repeats serial number {serial}"));
+                    }
+                }
+            } else if line.batch.trim().is_empty() || line.expiry.trim().is_empty() {
                 return invalid(&format!("line {i} needs its product, batch and expiry"));
             }
             if line.quantity <= 0 || line.pack_size == 0 {
@@ -108,6 +133,30 @@ impl GoodsReceived {
             }
             if line.unit_cost.is_sign_negative() {
                 return invalid(&format!("line {i} has a negative cost"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks each line against how its Product is kept: a Product tracked as Equipment
+    /// (`tracked`) is received by serial, and any other by batch, never the other way round
+    /// (ADR 0064: a Product is stocked or tracked as Equipment, never both).
+    pub fn check_tracking(&self, tracked: impl Fn(&str) -> bool) -> Result<(), ReceivingRefused> {
+        for (i, line) in self.lines.iter().enumerate() {
+            match (tracked(&line.product), line.is_equipment()) {
+                (true, false) => {
+                    return Err(ReceivingRefused::Invalid(format!(
+                        "line {i}: {} is tracked as Equipment; give each unit's serial number",
+                        line.product
+                    )));
+                }
+                (false, true) => {
+                    return Err(ReceivingRefused::Invalid(format!(
+                        "line {i}: {} is stocked, not tracked as Equipment; receive it by batch",
+                        line.product
+                    )));
+                }
+                _ => {}
             }
         }
         Ok(())

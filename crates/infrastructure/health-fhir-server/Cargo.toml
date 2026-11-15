@@ -25,6 +25,8 @@ health-clinical-documentation = { workspace = true }
 health-clinical-documentation-app = { workspace = true }
 health-encounters = { workspace = true }
 health-encounters-app = { workspace = true }
+health-equipment = { workspace = true }
+health-equipment-app = { workspace = true }
 health-fhir-extraction = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-validation = { workspace = true }

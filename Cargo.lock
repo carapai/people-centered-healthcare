@@ -2670,6 +2670,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-equipment"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "health-equipment-app"
+version = "0.1.0"
+dependencies = [
+ "health-access-policy",
+ "health-equipment",
+ "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
+ "serde_json",
+ "surrealdb",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "health-errors"
 version = "0.1.0"
 
@@ -2721,6 +2748,8 @@ dependencies = [
  "health-clinical-documentation-app",
  "health-encounters",
  "health-encounters-app",
+ "health-equipment",
+ "health-equipment-app",
  "health-fhir-extraction",
  "health-fhir-search",
  "health-fhir-validation",

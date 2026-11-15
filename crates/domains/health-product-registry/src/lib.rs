@@ -41,6 +41,10 @@ pub struct Product {
     pub synonyms: Vec<String>,
     /// Whether it may be chosen.
     pub active: bool,
+    /// Whether each unit is tracked as Equipment, one record per serial, instead of stocked
+    /// (ADR 0064). Never both, and it never changes once the product exists.
+    #[serde(default)]
+    pub equipment: bool,
 }
 
 /// Why a product is not valid.

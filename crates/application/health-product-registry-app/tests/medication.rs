@@ -19,6 +19,7 @@ fn al() -> Product {
         }],
         synonyms: vec!["Coartem".into()],
         active: true,
+        equipment: false,
     }
 }
 
@@ -43,6 +44,25 @@ fn a_product_is_a_valid_medication_and_reads_back_the_same() {
         "{resource}"
     );
     assert_eq!(product(&resource), Some(retired));
+    // A product tracked as Equipment (ADR 0064) says so, and reads back the same.
+    let bp = Product {
+        code: "bp-machine".into(),
+        name: "BP machine, digital".into(),
+        base_unit: "unit".into(),
+        pack_sizes: vec![1],
+        medicines: vec![],
+        synonyms: vec![],
+        gtin: None,
+        equipment: true,
+        ..al()
+    };
+    let resource = medication(&bp, "0190f1a2-7c3d-7e4f-8a5b-00000000a003");
+    assert_eq!(
+        validate_structure(&resource.to_string()),
+        vec![],
+        "{resource}"
+    );
+    assert_eq!(product(&resource), Some(bp));
 }
 
 #[test]

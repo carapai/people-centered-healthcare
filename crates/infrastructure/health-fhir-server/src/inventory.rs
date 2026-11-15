@@ -1,7 +1,8 @@
 //! Inventory over HTTP for staff (#130; inventory-and-procurement.md), behind `subject_layer`,
 //! needing [`STOCK_PERMISSION`]:
 //!
-//! - `POST /goods-received`: a goods received note, every line a receipt at its unit cost;
+//! - `POST /goods-received`: a goods received note, every Stock line a receipt at its unit cost,
+//!   and every line of a Product tracked as Equipment one Device per serial (ADR 0064);
 //! - `GET /on-hand?store=`: the store's Stock Units, balances and last unit costs;
 //! - `GET /reorder?store=&days=`: min/max reorder suggestions from recent consumption;
 //! - `POST /gs1`: a scanned or printed GS1 DataMatrix, read into its GTIN, expiry, batch and
@@ -11,9 +12,10 @@
 //!   pharmacy's approval or refusal;
 //! - `POST /requisitions/{id}/fulfil`: the batches picked, dispatched as a transfer to the ward;
 //! - `GET /products`, `POST /products` `{id?, code, name, baseUnit, packSizes, synonyms?,
-//!   medicines?, gtin?, active?}`: the product master (#128 follow-up), each product a Medication,
-//!   its code unique and unchanging.
+//!   medicines?, gtin?, active?, equipment?}`: the product master (#128 follow-up), each product a
+//!   Medication, its code unique and unchanging, and stocked or tracked as Equipment for good.
 
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use axum::extract::{Path, Query, State};
@@ -27,7 +29,10 @@ use health_inventory::receiving::{
 };
 use health_inventory::transfers::TransferLine;
 use health_inventory::{Ownership, Policy, Status};
-use health_inventory_app::{Inventory, InventoryError, Sender, supply_requests};
+use health_inventory_app::{
+    EquipmentIntake, IntakeError, Inventory, InventoryError, ReceivedUnit, Sender, supply_requests,
+};
+use health_persistence::Transaction;
 use health_time::Timestamp;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -70,6 +75,54 @@ fn inventory(server: &FhirServer) -> Inventory<health_surrealdb::SurrealStore> {
     Inventory::new(server.store.clone(), Policy::default())
 }
 
+/// The equipment module behind receiving (ADR 0064): the Products tracked as Equipment, by
+/// code with their names, and each received unit registered as a Device.
+struct Equipment {
+    tracked: BTreeMap<String, String>,
+}
+
+impl Equipment {
+    /// The Products tracked as Equipment in the product master.
+    async fn of(server: &FhirServer) -> Self {
+        let tracked = health_product_registry_app::products(
+            &crate::programs::found(server, "Medication", &[]).await,
+        )
+        .into_iter()
+        .filter(|p| p.equipment)
+        .map(|p| (p.code, p.name))
+        .collect();
+        Self { tracked }
+    }
+}
+
+impl<T: Transaction> EquipmentIntake<T> for Equipment {
+    fn tracked(&self, product: &str) -> bool {
+        self.tracked.contains_key(product)
+    }
+
+    async fn register(&self, tx: &mut T, unit: ReceivedUnit) -> Result<(), IntakeError> {
+        let name = self
+            .tracked
+            .get(&unit.product)
+            .map_or(unit.product.as_str(), String::as_str);
+        let equipment = health_equipment::Equipment::received(
+            &unit.product,
+            name,
+            &unit.serial,
+            &unit.facility,
+            &unit.location,
+            &unit.note,
+        )
+        .map_err(|e| IntakeError::Refused(format!("serial {}: {e}", unit.serial)))?;
+        health_equipment_app::register(tx, &equipment)
+            .await
+            .map_err(|error| match error {
+                health_equipment_app::RegisterError::Write(write) => IntakeError::Write(write),
+                refused => IntakeError::Refused(refused.to_string()),
+            })
+    }
+}
+
 fn sender(subject: &Subject) -> Sender {
     Sender {
         actor: subject.account.clone(),
@@ -80,7 +133,10 @@ fn sender(subject: &Subject) -> Sender {
 #[derive(Debug, Deserialize)]
 struct LineBody {
     product: String,
+    /// Empty for Equipment, which is received by serial instead.
+    #[serde(default)]
     batch: String,
+    #[serde(default)]
     expiry: String,
     #[serde(default = "government")]
     funding_source: String,
@@ -91,6 +147,9 @@ struct LineBody {
     pack_size: u32,
     /// A decimal, e.g. `"1.50"`.
     unit_cost: String,
+    /// One serial number or asset tag per unit, for a Product tracked as Equipment (ADR 0064).
+    #[serde(default)]
+    serials: Vec<String>,
 }
 
 fn government() -> String {
@@ -140,6 +199,7 @@ async fn goods_received(
             quantity: line.quantity,
             pack_size: line.pack_size,
             unit_cost,
+            serials: line.serials.iter().map(|s| s.trim().to_owned()).collect(),
         });
     }
     let note = GoodsReceived {
@@ -151,8 +211,9 @@ async fn goods_received(
         delivery: body.delivery.trim().to_owned(),
         lines,
     };
+    let equipment = Equipment::of(&server).await;
     match inventory(&server)
-        .receive_goods(&note, &sender(&subject), Timestamp::now())
+        .receive_goods_with(&note, &sender(&subject), Timestamp::now(), &equipment)
         .await
     {
         Ok(()) => (StatusCode::CREATED, Json(json!({ "id": note.id }))).into_response(),
@@ -442,6 +503,9 @@ struct ProductBody {
     gtin: Option<String>,
     #[serde(default = "active")]
     active: bool,
+    /// Tracked as Equipment, one record per serial, instead of stocked (ADR 0064).
+    #[serde(default)]
+    equipment: bool,
 }
 
 fn active() -> bool {
@@ -452,7 +516,7 @@ fn product_json(id: &str, product: &health_product_registry::Product) -> Value {
     json!({
         "id": id, "code": product.code, "name": product.name, "baseUnit": product.base_unit,
         "packSizes": product.pack_sizes, "synonyms": product.synonyms, "medicines": product.medicines,
-        "gtin": product.gtin, "active": product.active,
+        "gtin": product.gtin, "active": product.active, "equipment": product.equipment,
     })
 }
 
@@ -509,6 +573,7 @@ async fn save_product(
             .filter(|s| !s.is_empty())
             .collect(),
         active: body.active,
+        equipment: body.equipment,
     };
     match health_product_registry_app::Products::new(server.store.clone())
         .save(id, &product)

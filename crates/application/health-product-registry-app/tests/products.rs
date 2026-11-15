@@ -32,6 +32,7 @@ fn al(code: &str) -> Product {
         medicines: vec![],
         synonyms: vec![],
         active: true,
+        equipment: false,
     }
 }
 
@@ -51,7 +52,7 @@ async fn a_product_is_kept_with_a_unique_unchanging_code() {
     let mut renamed = al("al-20-120");
     renamed.synonyms = vec!["Coartem".into()];
     products.save(id, &renamed).await.expect("updated");
-    assert_eq!(read(&store, id).await, Some(renamed));
+    assert_eq!(read(&store, id).await.as_ref(), Some(&renamed));
 
     assert_eq!(
         products.save(ResourceId::new(), &al("al-20-120")).await,
@@ -61,6 +62,13 @@ async fn a_product_is_kept_with_a_unique_unchanging_code() {
     assert_eq!(
         products.save(id, &al("al-24")).await,
         Err(ProductError::CodeChanged("al-20-120".into()))
+    );
+    let mut tracked = renamed.clone();
+    tracked.equipment = true;
+    assert_eq!(
+        products.save(id, &tracked).await,
+        Err(ProductError::TrackingChanged("al-20-120".into())),
+        "a stocked product does not become Equipment (ADR 0064)"
     );
     let mut bad = al("al-6");
     bad.pack_sizes = vec![0];

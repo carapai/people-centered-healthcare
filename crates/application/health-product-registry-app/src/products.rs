@@ -4,6 +4,7 @@
 //! - it is validated first ([`Product::validate`]);
 //! - a new product claims its code (`product|{code}`), so no two products share one;
 //! - an existing one keeps its code: Stock Units name products by code, so a code never changes;
+//! - and it stays stocked or tracked as Equipment, whichever it was created as (ADR 0064);
 //! - an update is `If-Match` the head read in the same transaction.
 
 use health_identifiers::{OpId, ResourceId};
@@ -27,6 +28,9 @@ pub enum ProductError {
     /// A product's code never changes.
     #[error("a product's code never changes (it is {0})")]
     CodeChanged(String),
+    /// Whether a product is tracked as Equipment never changes.
+    #[error("whether {0} is tracked as Equipment or stocked never changes")]
+    TrackingChanged(String),
     /// Someone saved it at the same time; read it again.
     #[error("the product changed meanwhile; try again")]
     Conflict,
@@ -79,10 +83,13 @@ impl<S: Store> Products<S> {
             Some(head) => {
                 let stored: serde_json::Value = serde_json::from_str(head.json.as_str())
                     .map_err(|e| ProductError::Store(e.to_string()))?;
-                if let Some(before) = crate::product(&stored)
-                    && before.code != product.code
-                {
-                    return Err(ProductError::CodeChanged(before.code));
+                if let Some(before) = crate::product(&stored) {
+                    if before.code != product.code {
+                        return Err(ProductError::CodeChanged(before.code));
+                    }
+                    if before.equipment != product.equipment {
+                        return Err(ProductError::TrackingChanged(before.code));
+                    }
                 }
                 Precondition::IfMatch(head.version.version_id)
             }
