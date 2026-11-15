@@ -365,7 +365,7 @@ async fn the_capability_statement_matches_behaviour() {
         "application/fhir+json".to_owned(),
     )];
     let resources = rest["resource"].as_array().expect("resources");
-    assert_eq!(resources.len(), 85);
+    assert_eq!(resources.len(), 87);
     for resource in resources {
         let t = resource["type"].as_str().expect("type");
         let codes: Vec<&str> = resource["interaction"]

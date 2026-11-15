@@ -104,6 +104,15 @@ fn category_decides_the_owner_of_split_types() {
         owner_of("Patient", &serde_json::json!({})),
         Some("client-registry")
     );
+    // Device by its platform category (ADR 0064).
+    let equipment = serde_json::json!({"resourceType":"Device","category":[{"coding":[{"system":"urn:health:device-category","code":"equipment"}]}]});
+    let implant = serde_json::json!({"resourceType":"Device","category":[{"coding":[{"system":"urn:health:device-category","code":"patient-assigned"}]}]});
+    assert_eq!(owner_of("Device", &equipment), Some("equipment"));
+    assert_eq!(owner_of("Device", &implant), Some("clinical-data"));
+    assert_eq!(
+        owner_of("DeviceAssociation", &serde_json::json!({})),
+        Some("clinical-data")
+    );
     assert_eq!(owner_of("Basic", &serde_json::json!({})), None);
 }
 

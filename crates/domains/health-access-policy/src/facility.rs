@@ -7,7 +7,8 @@ pub const FACILITY_TAG_SYSTEM: &str = "urn:health:facility";
 
 /// The resource types whose records are facility-scope, sorted: the clinical records, documents
 /// and program records, workflow instances, and charges and invoices of the data authority
-/// matrix. Facility-internal Locations, devices and stock follow with their own contexts.
+/// matrix, and Equipment, patient-assigned Devices and their loans (ADR 0064). Facility-internal
+/// Locations and stock follow with their own contexts.
 pub const FACILITY_SCOPE_TYPES: &[&str] = &[
     "AllergyIntolerance",
     "CarePlan",
@@ -17,6 +18,8 @@ pub const FACILITY_SCOPE_TYPES: &[&str] = &[
     "Communication",
     "Composition",
     "Condition",
+    "Device",
+    "DeviceAssociation",
     "DeviceRequest",
     "DiagnosticReport",
     "DocumentReference",

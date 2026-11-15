@@ -32,6 +32,10 @@ pub struct ResourceOwnership {
     pub partitions: &'static [Partition],
 }
 
+/// The platform category of a FHIR `Device` (ADR 0064): `equipment`, owned by the equipment
+/// module, or `patient-assigned`, owned by clinical-data.
+pub const DEVICE_CATEGORY: &str = "urn:health:device-category";
+
 /// The Owner of a Provenance: its target's (resource-ownership.md rule 7). Each Provenance row
 /// carries the actual Owner in its `owner` column ([`provenance_owner`]).
 pub const TARGET_OWNER: &str = "target";

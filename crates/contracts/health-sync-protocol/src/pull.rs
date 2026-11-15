@@ -34,7 +34,8 @@ impl Lane {
     /// The lane a version of `resource_type` travels in.
     pub fn of(resource_type: &str) -> Lane {
         match resource_type {
-            "Device" => Lane::Revocations,
+            // Enrolled LAN client devices (ADR 0064); FHIR `Device` is clinical.
+            "EnrolledDevice" => Lane::Revocations,
             "ActivityDefinition"
             | "CodeSystem"
             | "ConceptMap"

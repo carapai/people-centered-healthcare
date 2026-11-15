@@ -11,7 +11,7 @@ use health_persistence::{
 };
 use health_surrealdb::{
     Connection, DOWN_GLOBAL, MIGRATIONS, Resolution, Settings, SurrealAuthority, SurrealReplica,
-    SurrealStore, SyncScope, Target, UP_GLOBAL, migrate,
+    SurrealStore, SyncScope, Target, UP_GLOBAL, class_of, migrate,
 };
 use health_sync_protocol::{Lane, Outcome, PullRequest, PullResponse, Reason, apply_pull, receive};
 use health_time::{FixedClock, Timestamp};
@@ -517,6 +517,62 @@ fn the_scope_lists_are_sorted_for_lookup() {
     for list in [UP_GLOBAL, DOWN_GLOBAL] {
         assert!(list.windows(2).all(|w| w[0] < w[1]), "{list:?}");
     }
+}
+
+/// A piece of Equipment (ADR 0064): a FHIR Device with the platform category *equipment*.
+fn equipment(facility: &str, status: &str) -> Value {
+    json!({
+        "resourceType": "Device",
+        "status": status,
+        "category": [{"coding": [{"system": "urn:health:device-category", "code": "equipment"}]}],
+        "serialNumber": "BP-0042",
+        "meta": {"tag": [{"system": "urn:health:facility", "code": facility}]}
+    })
+}
+
+#[tokio::test]
+async fn equipment_syncs_up_in_the_clinical_lane_under_version_check() {
+    // FHIR Device is medical devices only; enrolled LAN devices are `EnrolledDevice` (ADR 0064).
+    assert_eq!(Lane::of("Device"), Lane::Clinical);
+    assert_eq!(class_of("Device").0, "clinical");
+    assert_eq!(Lane::of("EnrolledDevice"), Lane::Revocations);
+    assert_eq!(class_of("EnrolledDevice"), ("device", "revocation wins"));
+
+    let (central, edge) = pair().await;
+    let bp = ResourceId::new();
+    write(
+        &edge,
+        bp,
+        &equipment("KLA01", "active"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    // Another facility's Equipment does not go up from this edge.
+    let other = ResourceId::new();
+    write(
+        &edge,
+        other,
+        &equipment("GUL02", "active"),
+        Precondition::MustNotExist,
+    )
+    .await;
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.outcomes.len(), 2, "{:?}", round.outcomes);
+    assert_eq!(round.outcomes[0], Outcome::Accepted);
+    assert!(
+        matches!(
+            round.outcomes[1],
+            Outcome::Rejected {
+                reason: Reason::Unauthorized,
+                ..
+            }
+        ),
+        "{:?}",
+        round.outcomes
+    );
+    let (_, at_central) = head(&central, "Device", bp).await.expect("at central");
+    assert_eq!(at_central["serialNumber"], "BP-0042");
+    assert!(head(&central, "Device", other).await.is_none());
 }
 
 #[tokio::test]
