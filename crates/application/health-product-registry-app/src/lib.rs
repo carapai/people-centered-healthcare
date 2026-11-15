@@ -6,7 +6,8 @@
 //! - `code`: the medicine codings it fills, and its name as `text`;
 //! - `status`: `active` or `inactive`;
 //! - extensions: the base unit ([`BASE_UNIT`]), each pack size ([`PACK_SIZE`]), each synonym
-//!   ([`SYNONYM`]), and [`TRACKED_AS_EQUIPMENT`] when its units are Equipment (ADR 0064).
+//!   ([`SYNONYM`]), and [`TRACKED_AS_EQUIPMENT`] when its units are Equipment (ADR 0064), with
+//!   their [`USEFUL_LIFE`] if set.
 //!
 //! [`medication`] writes one, [`product`] reads one back (`None` for a Medication that is not a
 //! stock product), and [`products`] reads them all from what a search found. [`Products::save`]
@@ -27,6 +28,8 @@ pub const PACK_SIZE: &str = "https://carapai.github.io/people-centered-healthcar
 pub const SYNONYM: &str =
     "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-synonym";
 
+/// The extension of an equipment product's useful life, in years (valueUnsignedInt; #453).
+pub const USEFUL_LIFE: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-useful-life";
 /// The extension marking a product tracked as Equipment, `valueBoolean: true` (ADR 0064).
 pub const TRACKED_AS_EQUIPMENT: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/product-tracked-as-equipment";
 
@@ -52,6 +55,9 @@ pub fn medication(product: &Product, id: &str) -> Value {
     );
     if product.equipment {
         extension.push(json!({ "url": TRACKED_AS_EQUIPMENT, "valueBoolean": true }));
+    }
+    if let Some(years) = product.useful_life_years {
+        extension.push(json!({ "url": USEFUL_LIFE, "valueUnsignedInt": years }));
     }
     let mut code = json!({ "text": product.name });
     if !product.medicines.is_empty() {
@@ -120,6 +126,8 @@ pub fn product(resource: &Value) -> Option<Product> {
             .collect(),
         active: resource["status"] != "inactive",
         equipment: extensions(resource, TRACKED_AS_EQUIPMENT).any(|e| e["valueBoolean"] == true),
+        useful_life_years: extensions(resource, USEFUL_LIFE)
+            .find_map(|e| u32::try_from(e["valueUnsignedInt"].as_u64()?).ok()),
     })
 }
 

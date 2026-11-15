@@ -15,8 +15,12 @@
 //!   another facility, and it changes no more where it was. Central, the authority for the
 //!   hand-over, then gives the record to the receiving facility ([`Equipment::hand_over`]), which
 //!   [`Equipment::receive`]s it into one of its locations. Until then the unit is in transit.
+//! - **Valuation** (#453): a unit keeps its [`Acquisition`] cost from the goods receipt, and its
+//!   book value ([`Equipment::book_value`]) is that cost less straight-line depreciation over its
+//!   Product's useful life: a projection, never stored. A retired unit is worth nothing.
 
 use health_time::Timestamp;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -91,7 +95,22 @@ pub struct Equipment {
     /// The transfer it is on, while it is in transit to another facility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transfer: Option<Transfer>,
+    /// What it cost and when it was acquired, if it arrived on a costed receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquired: Option<Acquisition>,
 }
+
+/// A unit's acquisition: its cost (in the facility's currency) and when it was received.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Acquisition {
+    /// What one unit cost.
+    pub cost: Decimal,
+    /// When it was received, from when it depreciates.
+    pub at: Timestamp,
+}
+
+/// Seconds in a year of 365.25 days, the depreciation year.
+const YEAR: i64 = 31_557_600;
 
 /// A unit's transfer to another facility: dispatched by `from`, handed over by central to `to`,
 /// and over once `to` receives it.
@@ -184,9 +203,38 @@ impl Equipment {
             received: Some(note.to_owned()),
             change: None,
             transfer: None,
+            acquired: None,
         };
         unit.validate()?;
         Ok(unit)
+    }
+
+    /// The unit, acquired at `cost` on `at`.
+    #[must_use]
+    pub fn with_acquisition(mut self, cost: Decimal, at: Timestamp) -> Self {
+        self.acquired = Some(Acquisition { cost, at });
+        self
+    }
+
+    /// Its book value on `on`: its cost less straight-line depreciation over `life_years`, never
+    /// below zero; its cost when its Product has no useful life set; nothing once retired.
+    /// `None` when its cost is not known.
+    #[must_use]
+    pub fn book_value(&self, life_years: Option<u32>, on: Timestamp) -> Option<Decimal> {
+        let acquired = self.acquired?;
+        if self.status == Status::Retired {
+            return Some(Decimal::ZERO);
+        }
+        let Some(life) = life_years.filter(|years| *years > 0) else {
+            return Some(acquired.cost);
+        };
+        let elapsed = (on.as_second() - acquired.at.as_second()).max(0);
+        let life = i64::from(life) * YEAR;
+        if elapsed >= life {
+            return Some(Decimal::ZERO);
+        }
+        let remaining = Decimal::from(life - elapsed) / Decimal::from(life);
+        Some((acquired.cost * remaining).round_dp(2))
     }
 
     /// Sets the unit's status, with a note of what was done or found. A note is needed for any
@@ -526,6 +574,45 @@ mod tests {
         );
         unit.set_status(Status::Faulty, "dropped", "store-2", at(4))
             .expect("its own now");
+    }
+
+    #[test]
+    fn a_unit_depreciates_straight_line_and_is_worth_nothing_retired() {
+        let unit = Equipment::received(
+            "bp-machine",
+            "BP machine",
+            "BP-1",
+            "KLA01",
+            "Location/opd",
+            "g",
+        )
+        .expect("valid");
+        assert_eq!(unit.book_value(Some(5), at(0)), None, "no cost known");
+        let unit = unit.with_acquisition(Decimal::new(1_000_000, 0), at(0));
+        assert_eq!(
+            unit.book_value(None, at(10 * YEAR)),
+            Some(Decimal::new(1_000_000, 0)),
+            "no useful life: at cost"
+        );
+        assert_eq!(
+            unit.book_value(Some(4), at(0)),
+            Some(Decimal::new(1_000_000, 0))
+        );
+        assert_eq!(
+            unit.book_value(Some(4), at(YEAR)),
+            Some(Decimal::new(750_000, 0))
+        );
+        assert_eq!(
+            unit.book_value(Some(4), at(-YEAR)),
+            Some(Decimal::new(1_000_000, 0)),
+            "not before it was acquired"
+        );
+        assert_eq!(unit.book_value(Some(4), at(5 * YEAR)), Some(Decimal::ZERO));
+        let mut retired = unit;
+        retired
+            .set_status(Status::Retired, "beyond repair", "tech-1", at(1))
+            .expect("retired");
+        assert_eq!(retired.book_value(Some(4), at(2)), Some(Decimal::ZERO));
     }
 
     #[test]

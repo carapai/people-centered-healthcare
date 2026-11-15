@@ -4,9 +4,9 @@
 use std::str::FromStr;
 
 use health_financial_ledger::{
-    COST_OF_GOODS, ChartOfAccounts, ChartTemplate, Currency, Dimensions, INVENTORY, Ledger, Line,
-    Money, MoneyError, Original, PAYABLE, Posting, PostingRefused, ROUNDING, STOCK_ADJUSTMENT,
-    Side,
+    COST_OF_GOODS, ChartOfAccounts, ChartTemplate, Currency, Dimensions, EQUIPMENT,
+    EQUIPMENT_WRITE_OFF, INVENTORY, Ledger, Line, Money, MoneyError, Original, PAYABLE, Posting,
+    PostingRefused, ROUNDING, STOCK_ADJUSTMENT, Side,
 };
 use health_time::Timestamp;
 use rust_decimal::Decimal;
@@ -200,7 +200,14 @@ fn the_template_gives_the_chart_of_accounts() {
         ..ChartTemplate::default()
     })
     .expect("chart");
-    for code in [INVENTORY, COST_OF_GOODS, STOCK_ADJUSTMENT, PAYABLE] {
+    for code in [
+        INVENTORY,
+        COST_OF_GOODS,
+        STOCK_ADJUSTMENT,
+        PAYABLE,
+        EQUIPMENT,
+        EQUIPMENT_WRITE_OFF,
+    ] {
         assert!(with_inventory.account(code).is_some(), "{code}");
     }
 }

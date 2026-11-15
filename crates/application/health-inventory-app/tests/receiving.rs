@@ -289,6 +289,8 @@ async fn equipment_is_received_as_one_record_per_unit_never_as_stock() {
                 location: "Location/pharmacy".into(),
                 facility: "E1".into(),
                 note: "grn-eq".into(),
+                unit_cost: Decimal::new(250_000, 0),
+                received_at: now(),
             })
             .to_vec()
     );

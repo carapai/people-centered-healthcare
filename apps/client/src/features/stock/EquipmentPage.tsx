@@ -16,6 +16,7 @@ import {
   moveEquipment,
   receiveEquipment,
   setEquipmentStatus,
+  totalBookValue,
   type Equipment,
   type EquipmentStatus,
 } from './api'
@@ -45,6 +46,7 @@ export function EquipmentPage() {
   const [done, setDone] = useState('')
   const ids = { unit: useId(), status: useId(), note: useId(), noteHint: useId(), location: useId(), facility: useId(), facilityHint: useId() }
   const unit = equipment.data?.find((u) => u.id === chosen)
+  const total = equipment.data === undefined ? null : totalBookValue(equipment.data)
   const statuses = EQUIPMENT_STATUSES.filter((s) => s !== unit?.status)
   const next = statuses.includes(status) ? status : (statuses[0] ?? 'available')
 
@@ -74,6 +76,8 @@ export function EquipmentPage() {
       cell: (u) => (u.transfer === null ? statusName(intl, u.status) : intl.formatMessage(m.eqInTransit, { from: u.transfer.from })),
       sortValue: (u) => u.status,
     },
+    { id: 'cost', header: intl.formatMessage(m.eqCost), cell: (u) => u.cost ?? '' },
+    { id: 'bookValue', header: intl.formatMessage(m.eqBookValue), cell: (u) => u.bookValue ?? '' },
     {
       id: 'change',
       header: intl.formatMessage(m.eqLastChange),
@@ -93,6 +97,7 @@ export function EquipmentPage() {
         <p role="status">{intl.formatMessage(m.eqNone)}</p>
       ) : equipment.data === undefined ? null : (
         <>
+          {total === null ? null : <p>{intl.formatMessage(m.eqTotal, { value: total })}</p>}
           <DataTable caption={intl.formatMessage(m.eqCaption)} columns={columns} data={equipment.data} getRowId={(u) => u.id} view={view} onViewChange={setView} height="18rem" onRowActivate={(u) => setChosen(u.id)} />
           <div className={field}>
             <label htmlFor={ids.unit}>{intl.formatMessage(m.eqUnit)}</label>

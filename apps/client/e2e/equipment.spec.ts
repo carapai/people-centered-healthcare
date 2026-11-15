@@ -42,6 +42,9 @@ test('equipment is received by serial, changed, and sent to another facility', a
   const row = page.getByRole('grid', { name: 'Equipment held' }).getByRole('row').filter({ hasText: serial })
   await expect(row).toContainText('Available')
   await expect(row).toContainText('Location/pharmacy')
+  // Its cost, and with no useful life set its book value, are what it cost.
+  await expect(row).toContainText('250000')
+  await expect(page.getByText('Book value of the equipment held:')).toBeVisible()
   await noViolations(page)
 
   await page.getByLabel('Unit to change').selectOption({ label: `BP machine ${family}, serial number ${serial}` })

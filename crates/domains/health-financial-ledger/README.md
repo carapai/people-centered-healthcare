@@ -10,7 +10,7 @@ Layer: **domain** (financial-ledger). The facility's double-entry ledger, the fi
   - patient deposits (a liability) and payments in transit (clearing);
   - cash per till and revenue per service class;
   - rounding and till variance.
-- **Inventory accounting** (#131): with `ChartTemplate::inventory`, the chart gains `INVENTORY`, `COST_OF_GOODS`, `STOCK_ADJUSTMENT` and `PAYABLE`; it is off by default for public facilities. `health-inventory-app::inventory_postings` gives the postings.
+- **Inventory accounting** (#131): with `ChartTemplate::inventory`, the chart gains `INVENTORY`, `COST_OF_GOODS`, `STOCK_ADJUSTMENT` and `PAYABLE`, and `EQUIPMENT` (at cost) and `EQUIPMENT_WRITE_OFF` (#453); it is off by default for public facilities. `health-inventory-app::inventory_postings` and `health-equipment-app::equipment_postings` give the postings.
 - **Storage:** `PostingStore` is the port (append once; `health-surrealdb`, migration `0018_payments`), and `Ledger::from_postings` rebuilds a ledger from them, checking each again.
 - **Postings** (`Ledger::post`) need at least two lines with positive amounts in the functional currency, on accounts in the chart and at the ledger's facility, with equal debits and credits.
   - **Dimensions:** every line carries them: facility, department, service, program, funding source, fund, encounter, and price versions.

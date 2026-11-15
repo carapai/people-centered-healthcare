@@ -18,6 +18,7 @@ fn product(code: &str, name: &str, medicines: &[&str], synonyms: &[&str]) -> Pro
         synonyms: synonyms.iter().map(|s| (*s).to_owned()).collect(),
         active: true,
         equipment: false,
+        useful_life_years: None,
     }
 }
 
@@ -136,4 +137,17 @@ fn products_are_validated() {
     );
     assert!(valid_gtin("4006381333931"), "a GTIN-13");
     assert!(!valid_gtin("40063813339a1"));
+}
+
+#[test]
+fn a_useful_life_is_only_for_equipment_and_at_least_a_year() {
+    let mut bp = product("bp-machine", "BP machine", &[], &[]);
+    bp.equipment = true;
+    bp.useful_life_years = Some(5);
+    assert_eq!(bp.validate(), Ok(()));
+    bp.useful_life_years = Some(0);
+    assert_eq!(bp.validate(), Err(ProductRefused::UsefulLife));
+    let mut stocked = product("amox", "Amoxicillin", &[], &[]);
+    stocked.useful_life_years = Some(5);
+    assert_eq!(stocked.validate(), Err(ProductRefused::UsefulLife));
 }

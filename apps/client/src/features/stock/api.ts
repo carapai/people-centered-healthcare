@@ -208,6 +208,24 @@ export interface Equipment {
   change: { note: string; by: string; at: string } | null
   /** Its transfer to this facility, while it is in transit. */
   transfer: { from: string; to: string; by: string; at: string } | null
+  /** What it cost, a decimal, when it arrived on a costed receipt. */
+  cost: string | null
+  /** Its cost less straight-line depreciation over its product's useful life; nothing once retired. */
+  bookValue?: string | null
+}
+
+/** The total book value of `units`, to two places; `null` when none is known. */
+export function totalBookValue(units: readonly Equipment[]): string | null {
+  const known = units.map((u) => u.bookValue).filter((v): v is string => typeof v === 'string')
+  if (known.length === 0) return null
+  // Cents as integers, so the sum is exact.
+  const cents = known.reduce((sum, v) => {
+    const [whole = '0', fraction = ''] = v.split('.')
+    return sum + BigInt(whole) * 100n + BigInt((fraction + '00').slice(0, 2))
+  }, 0n)
+  const whole = cents / 100n
+  const rest = (cents % 100n).toString().padStart(2, '0')
+  return rest === '00' ? whole.toString() : `${whole}.${rest}`
 }
 
 export const equipmentKey = ['stock', 'equipment'] as const

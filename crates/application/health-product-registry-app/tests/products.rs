@@ -33,6 +33,7 @@ fn al(code: &str) -> Product {
         synonyms: vec![],
         active: true,
         equipment: false,
+        useful_life_years: None,
     }
 }
 

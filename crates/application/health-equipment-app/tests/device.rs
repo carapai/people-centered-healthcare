@@ -5,12 +5,15 @@ use std::sync::Arc;
 
 use health_equipment::{Change, Equipment, EquipmentRefused, Status};
 use health_equipment_app::{
-    EquipmentError, Equipments, RegisterError, device, equipment, handed_over, register,
+    EquipmentError, Equipments, RegisterError, device, equipment, equipment_postings, handed_over,
+    register,
 };
 use health_fhir_validation::validate_structure;
+use health_financial_ledger::{Currency, EQUIPMENT, EQUIPMENT_WRITE_OFF, PAYABLE, Side};
 use health_persistence::{ResourceType, Store, Transaction};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{SystemClock, Timestamp};
+use rust_decimal::Decimal;
 
 fn bp(serial: &str) -> Equipment {
     Equipment::received(
@@ -232,4 +235,83 @@ async fn central_hands_a_dispatched_unit_to_the_facility_that_receives_it() {
     let devices: ResourceType = "Device".parse().expect("type");
     let head = tx.read(&devices, id).await.expect("read").expect("there");
     assert_eq!(head.version.version_seq, 4);
+}
+
+#[test]
+fn a_unit_keeps_its_cost_and_posts_its_receipt_retirement_and_hand_over_at_cost() {
+    let at = Timestamp::from_second(1_800_000_000).expect("time");
+    let unit = bp("BP-0060").with_acquisition(Decimal::new(125_000_070, 2), at);
+    let resource = device(&unit);
+    assert_eq!(
+        validate_structure(&resource.to_string()),
+        vec![],
+        "{resource}"
+    );
+    assert_eq!(
+        equipment(&resource),
+        Some(unit.clone()),
+        "the cost reads back exactly"
+    );
+
+    let ugx = Currency::from_code("UGX").expect("currency");
+    let accounts = |posting: &health_financial_ledger::Posting| {
+        posting
+            .lines
+            .iter()
+            .map(|l| (l.account.clone(), l.side, l.dimensions.facility.clone()))
+            .collect::<Vec<_>>()
+    };
+    let received = equipment_postings(None, &unit, ugx, at).expect("received");
+    assert_eq!(
+        accounts(&received),
+        vec![
+            (EQUIPMENT.to_owned(), Side::Debit, "KLA01".to_owned()),
+            (PAYABLE.to_owned(), Side::Credit, "KLA01".to_owned()),
+        ]
+    );
+    assert_eq!(
+        received.lines[0].amount.amount(),
+        Decimal::new(1_250_001, 0),
+        "UGX has no cents"
+    );
+
+    // Moving it within the facility moves no value.
+    let mut moved = unit.clone();
+    moved.move_to("Location/ward", "x", at).expect("moved");
+    assert_eq!(equipment_postings(Some(&unit), &moved, ugx, at), None);
+
+    let mut sent = unit.clone();
+    sent.dispatch("GUL02", "x", at).expect("dispatched");
+    assert_eq!(
+        equipment_postings(Some(&unit), &sent, ugx, at),
+        None,
+        "not yet handed over"
+    );
+    let mut handed = sent.clone();
+    handed.hand_over();
+    assert_eq!(
+        accounts(&equipment_postings(Some(&sent), &handed, ugx, at).expect("handed over")),
+        vec![
+            (EQUIPMENT.to_owned(), Side::Debit, "GUL02".to_owned()),
+            (EQUIPMENT.to_owned(), Side::Credit, "KLA01".to_owned()),
+        ]
+    );
+
+    let mut retired = unit.clone();
+    retired
+        .set_status(Status::Retired, "beyond repair", "x", at)
+        .expect("retired");
+    assert_eq!(
+        accounts(&equipment_postings(Some(&unit), &retired, ugx, at).expect("retired")),
+        vec![
+            (
+                EQUIPMENT_WRITE_OFF.to_owned(),
+                Side::Debit,
+                "KLA01".to_owned()
+            ),
+            (EQUIPMENT.to_owned(), Side::Credit, "KLA01".to_owned()),
+        ]
+    );
+    // A unit whose cost is not known posts nothing.
+    assert_eq!(equipment_postings(None, &bp("BP-0061"), ugx, at), None);
 }

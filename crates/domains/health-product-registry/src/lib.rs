@@ -45,6 +45,10 @@ pub struct Product {
     /// (ADR 0064). Never both, and it never changes once the product exists.
     #[serde(default)]
     pub equipment: bool,
+    /// For Equipment: the years over which a unit depreciates to nothing, straight-line (#453).
+    /// Without it a unit is carried at cost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub useful_life_years: Option<u32>,
 }
 
 /// Why a product is not valid.
@@ -62,6 +66,9 @@ pub enum ProductRefused {
     /// The GTIN is not 8, 12, 13 or 14 digits with a valid check digit.
     #[error("{0} is not a valid GTIN")]
     Gtin(String),
+    /// A useful life is for Equipment, and at least a year.
+    #[error("a useful life is set only on equipment, in whole years, at least one")]
+    UsefulLife,
 }
 
 /// Whether `gtin` is a GTIN-8, -12, -13 or -14 with a valid GS1 check digit.
@@ -105,6 +112,11 @@ impl Product {
             && !valid_gtin(gtin)
         {
             return Err(ProductRefused::Gtin(gtin.clone()));
+        }
+        if let Some(years) = self.useful_life_years
+            && (years == 0 || !self.equipment)
+        {
+            return Err(ProductRefused::UsefulLife);
         }
         Ok(())
     }

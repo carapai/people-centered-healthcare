@@ -1324,6 +1324,8 @@ type ProductValues = {
   pdEquipment: {}
   pdEquipmentHint: {}
   pdIsEquipment: {}
+  pdUsefulLife: {}
+  pdUsefulLifeHint: {}
 }
 
 // The product master (#128 follow-up): stock products and the medicines they fill (features/stock).
@@ -1360,6 +1362,12 @@ export const productMessages = defineMessages<ProductValues>({
     description: 'Products: hint for tracked as equipment',
   },
   pdIsEquipment: { id: 'app.products.isEquipment', defaultMessage: 'equipment', description: 'Products: listed product is equipment' },
+  pdUsefulLife: { id: 'app.products.usefulLife', defaultMessage: 'Useful life in years (optional)', description: 'Products: years equipment depreciates over' },
+  pdUsefulLifeHint: {
+    id: 'app.products.usefulLifeHint',
+    defaultMessage: 'Each unit loses value evenly over these years. Without it, a unit is valued at what it cost.',
+    description: 'Products: hint for useful life',
+  },
 })
 
 type EquipmentValues = {
@@ -1394,6 +1402,9 @@ type EquipmentValues = {
   eqAvailable: {}
   eqFaulty: {}
   eqUnderMaintenance: {}
+  eqCost: {}
+  eqBookValue: {}
+  eqTotal: { value: string }
 }
 
 // Equipment (ADR 0064; #453): the facility's units, their status, moves and transfers (features/stock).
@@ -1437,6 +1448,9 @@ export const equipmentMessages = defineMessages<EquipmentValues>({
   eqAvailable: { id: 'app.equipment.available', defaultMessage: 'Available', description: 'Equipment status' },
   eqFaulty: { id: 'app.equipment.faulty', defaultMessage: 'Faulty', description: 'Equipment status' },
   eqUnderMaintenance: { id: 'app.equipment.underMaintenance', defaultMessage: 'Under maintenance', description: 'Equipment status' },
+  eqCost: { id: 'app.equipment.cost', defaultMessage: 'Cost', description: 'Equipment column: what a unit cost' },
+  eqBookValue: { id: 'app.equipment.bookValue', defaultMessage: 'Book value', description: 'Equipment column: cost less depreciation' },
+  eqTotal: { id: 'app.equipment.total', defaultMessage: 'Book value of the equipment held: {value}', description: 'Equipment: total book value' },
 })
 
 type TriageValues = {

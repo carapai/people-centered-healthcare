@@ -19,6 +19,8 @@ export interface StockProduct {
   active: boolean
   /** Tracked as Equipment, one record per unit, rather than stocked (ADR 0064). */
   equipment?: boolean
+  /** For equipment: the years it depreciates over. */
+  usefulLifeYears?: number | null
 }
 
 const PRODUCTS = ['stock', 'products'] as const
@@ -36,7 +38,7 @@ async function list(transport: Transport): Promise<StockProduct[]> {
   return response.body as StockProduct[]
 }
 
-const empty = { code: '', name: '', baseUnit: '', packSize: '', synonyms: '', equipment: false }
+const empty = { code: '', name: '', baseUnit: '', packSize: '', synonyms: '', equipment: false, usefulLife: '' }
 
 /**
  * The product master (#128 follow-up): each stock product, its base unit and pack size, and the
@@ -47,13 +49,14 @@ export function ProductsPage() {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
-  const ids = { code: useId(), codeHint: useId(), name: useId(), unit: useId(), pack: useId(), synonyms: useId(), synonymsHint: useId(), equipment: useId(), equipmentHint: useId() }
+  const ids = { code: useId(), codeHint: useId(), name: useId(), unit: useId(), pack: useId(), synonyms: useId(), synonymsHint: useId(), equipment: useId(), equipmentHint: useId(), life: useId(), lifeHint: useId() }
   const products = useQuery({ queryKey: PRODUCTS, queryFn: () => list(platform.transport) })
   const [form, setForm] = useState(empty)
   const [saved, setSaved] = useState('')
-  const set = (key: 'code' | 'name' | 'baseUnit' | 'packSize' | 'synonyms') => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value })
+  const set = (key: 'code' | 'name' | 'baseUnit' | 'packSize' | 'synonyms' | 'usefulLife') => (event: { target: { value: string } }) => setForm({ ...form, [key]: event.target.value })
   const pack = Number.parseInt(form.packSize, 10)
-  const ready = form.code.trim() !== '' && form.name.trim() !== '' && form.baseUnit.trim() !== '' && pack > 0
+  const life = form.usefulLife.trim() === '' ? null : Number.parseInt(form.usefulLife, 10)
+  const ready = form.code.trim() !== '' && form.name.trim() !== '' && form.baseUnit.trim() !== '' && pack > 0 && (life === null || life > 0)
   const save = useMutation({
     mutationFn: async () => {
       const body = {
@@ -63,6 +66,7 @@ export function ProductsPage() {
         packSizes: [pack],
         synonyms: form.synonyms.split(',').map((s) => s.trim()).filter((s) => s !== ''),
         equipment: form.equipment,
+        ...(form.equipment && life !== null ? { usefulLifeYears: life } : {}),
       }
       const response = await platform.transport.request({ method: 'POST', path: '/stock/products', body })
       if (response.status !== 201) throw new SaveFailed(((response.body ?? {}) as { error?: string }).error ?? String(response.status))
@@ -137,6 +141,13 @@ export function ProductsPage() {
             <span id={ids.equipmentHint}>{intl.formatMessage(m.pdEquipmentHint)}</span>
           </div>
         </div>
+        {form.equipment ? (
+          <div className={field}>
+            <label htmlFor={ids.life}>{intl.formatMessage(m.pdUsefulLife)}</label>
+            <input id={ids.life} aria-describedby={ids.lifeHint} inputMode="numeric" value={form.usefulLife} onChange={set('usefulLife')} className={control} />
+            <span id={ids.lifeHint}>{intl.formatMessage(m.pdUsefulLifeHint)}</span>
+          </div>
+        ) : null}
         <div>
           <button type="submit" className={button} disabled={!ready || save.isPending}>
             {intl.formatMessage(m.pdSave)}

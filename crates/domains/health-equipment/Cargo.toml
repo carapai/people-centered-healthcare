@@ -14,6 +14,7 @@ context = "equipment"
 workspace = true
 
 [dependencies]
+rust_decimal = { workspace = true }
 health-time = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
