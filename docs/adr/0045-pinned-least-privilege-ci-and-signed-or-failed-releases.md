@@ -1,7 +1,7 @@
 # CI runs pinned, least-privilege workflows behind a merge queue, and a release is either fully signed with provenance or it fails
 
 **Workflows.** The nine workflows of §111 gate `main` through a merge queue, with squash merges and Conventional Commit PR titles.
-- **Approvals:** one approval, plus CODEOWNERS for ADRs, architecture docs, architecture checks, security, sync and `.github/`. ADR changes need two approvals.
+- **Approvals:** one approval, plus CODEOWNERS for ADRs, architecture docs, architecture checks, security, sync and `.github/`. ADR changes need two approvals. While the project has one maintainer, who authors every pull request and so cannot approve it, the repository variable `ADR_APPROVALS_REQUIRED` lowers this to 0; it goes back to 2 when a second reviewer joins.
 - **Actions** are pinned to full commit SHAs by tooling (Renovate or `pinact`), never by hand.
 - **Permissions** default to `contents: read` per job.
 - **`pull_request_target`** never checks out PR code.

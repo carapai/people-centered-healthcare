@@ -1,6 +1,10 @@
 # ADR changes need two approvals (ADR 0045; deployment.md § Git and merge rules). The
 # ruleset requires one approval and code-owner review; this check adds the second for
 # docs/adr/.
+#
+# The count is the repository variable ADR_APPROVALS_REQUIRED, 2 when unset. While the project
+# has one maintainer it is 0: the author cannot approve their own pull request, so no ADR could
+# pass (ADR 0045). Set it back to 2 when a second reviewer joins.
 name: adr-approvals
 
 on:
@@ -25,6 +29,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
+          REQUIRED: ${{ vars.ADR_APPROVALS_REQUIRED || '2' }}
         run: |
           adr_files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename | select(startswith("docs/adr/"))')
           if [[ -z "$adr_files" ]]; then
@@ -36,8 +41,15 @@ jobs:
             | awk -F'\t' -v author="$AUTHOR" '$1 != author { latest[$1] = $2 } END { n = 0; for (u in latest) if (latest[u] == "APPROVED") n++; print n }')
           echo "ADR files changed:"
           echo "$adr_files"
-          echo "Approvals: $approvals"
-          if (( approvals < 2 )); then
-            echo "::error::ADR changes need two approvals; this PR has $approvals."
+          if [[ ! "$REQUIRED" =~ ^[0-9]+$ ]]; then
+            echo "::error::ADR_APPROVALS_REQUIRED must be a whole number, not '$REQUIRED'."
+            exit 1
+          fi
+          echo "Approvals: $approvals of $REQUIRED required"
+          if (( REQUIRED < 2 )); then
+            echo "::warning::ADR approvals are lowered to $REQUIRED (ADR_APPROVALS_REQUIRED) while the project has one maintainer."
+          fi
+          if (( approvals < REQUIRED )); then
+            echo "::error::ADR changes need $REQUIRED approvals; this PR has $approvals."
             exit 1
           fi
