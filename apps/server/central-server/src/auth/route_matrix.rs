@@ -137,6 +137,9 @@ const INVENTORY: &[Mounted] = &[
             "/requisitions/{id}/decision",
             "/requisitions/{id}/fulfil",
             "/products",
+            "/equipment",
+            "/equipment/{id}/status",
+            "/equipment/{id}/move",
         ],
     },
     Mounted {
