@@ -11,6 +11,10 @@
 //! - **[`Equipment::set_status`]** and **[`Equipment::move_to`]**: the facility's changes, each
 //!   kept as the unit's latest [`Change`]. Its maintenance history is the record's versions.
 //!   A retired unit changes no more.
+//! - **Transfers between facilities** (ADR 0064): [`Equipment::dispatch`] sends a unit to
+//!   another facility, and it changes no more where it was. Central, the authority for the
+//!   hand-over, then gives the record to the receiving facility ([`Equipment::hand_over`]), which
+//!   [`Equipment::receive`]s it into one of its locations. Until then the unit is in transit.
 
 use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -84,6 +88,23 @@ pub struct Equipment {
     /// The latest change, if it was changed since it was registered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change: Option<Change>,
+    /// The transfer it is on, while it is in transit to another facility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer: Option<Transfer>,
+}
+
+/// A unit's transfer to another facility: dispatched by `from`, handed over by central to `to`,
+/// and over once `to` receives it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Transfer {
+    /// The facility that dispatched it.
+    pub from: String,
+    /// The facility it is going to.
+    pub to: String,
+    /// Who dispatched it.
+    pub by: String,
+    /// When.
+    pub at: Timestamp,
 }
 
 /// One change to a unit: what was done or found, by whom and when.
@@ -115,6 +136,15 @@ pub enum EquipmentRefused {
     /// Taking a unit out of use needs a note of why.
     #[error("say why {0} is {1}")]
     NoteRequired(String, String),
+    /// A unit in transit changes no more until the receiving facility receives it.
+    #[error("{0} is in transit to {1}")]
+    InTransit(String, String),
+    /// Only a unit handed over to the facility is received by it.
+    #[error("{0} is not in transit to this facility")]
+    NotInTransit(String),
+    /// A unit is dispatched to another facility.
+    #[error("{0} is already at {1}")]
+    SameFacility(String, String),
 }
 
 /// The id of the unit of `product` with `serial`: a UUIDv5, so it is the same at every node.
@@ -153,6 +183,7 @@ impl Equipment {
             status: Status::Available,
             received: Some(note.to_owned()),
             change: None,
+            transfer: None,
         };
         unit.validate()?;
         Ok(unit)
@@ -221,9 +252,88 @@ impl Equipment {
         Ok(())
     }
 
+    /// Dispatches the unit to facility `to`. It changes no more here: central hands it over to
+    /// `to` ([`Equipment::hand_over`]), which receives it.
+    pub fn dispatch(&mut self, to: &str, by: &str, at: Timestamp) -> Result<(), EquipmentRefused> {
+        self.changeable()?;
+        let to = to.trim();
+        if to.is_empty() {
+            return Err(EquipmentRefused::Missing("facility it goes to"));
+        }
+        if to == self.facility {
+            return Err(EquipmentRefused::SameFacility(
+                self.serial.clone(),
+                to.to_owned(),
+            ));
+        }
+        self.change = Some(Change {
+            note: format!("dispatched to {to}"),
+            by: by.to_owned(),
+            at,
+        });
+        self.transfer = Some(Transfer {
+            from: self.facility.clone(),
+            to: to.to_owned(),
+            by: by.to_owned(),
+            at,
+        });
+        Ok(())
+    }
+
+    /// Gives a dispatched unit's record to the facility it was dispatched to: central's step of a
+    /// transfer, once the dispatch has reached it. `false` when there is nothing to hand over.
+    pub fn hand_over(&mut self) -> bool {
+        match &self.transfer {
+            Some(transfer) if transfer.to != self.facility => {
+                self.facility.clone_from(&transfer.to);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Receives a unit handed over to its facility into `location`, ending its transfer.
+    pub fn receive(
+        &mut self,
+        location: &str,
+        by: &str,
+        at: Timestamp,
+    ) -> Result<(), EquipmentRefused> {
+        let Some(transfer) = self
+            .transfer
+            .take_if(|transfer| transfer.to == self.facility)
+        else {
+            return Err(EquipmentRefused::NotInTransit(self.serial.clone()));
+        };
+        let location = location.trim();
+        if location.is_empty() {
+            self.transfer = Some(transfer);
+            return Err(EquipmentRefused::Missing("location"));
+        }
+        self.change = Some(Change {
+            note: format!("received from {} into {location}", transfer.from),
+            by: by.to_owned(),
+            at,
+        });
+        location.clone_into(&mut self.location);
+        Ok(())
+    }
+
+    /// Whether the unit is on a transfer to another facility.
+    #[must_use]
+    pub fn in_transit(&self) -> bool {
+        self.transfer.is_some()
+    }
+
     fn changeable(&self) -> Result<(), EquipmentRefused> {
         if self.status == Status::Retired {
             return Err(EquipmentRefused::Retired(self.serial.clone()));
+        }
+        if let Some(transfer) = &self.transfer {
+            return Err(EquipmentRefused::InTransit(
+                self.serial.clone(),
+                transfer.to.clone(),
+            ));
         }
         Ok(())
     }
@@ -354,6 +464,68 @@ mod tests {
             unit.move_to("Location/store", "tech-1", at(6)),
             Err(EquipmentRefused::Retired("BP-1".into()))
         );
+    }
+
+    #[test]
+    fn a_dispatched_unit_is_handed_over_and_changes_only_once_received() {
+        let mut unit = Equipment::received(
+            "bp-machine",
+            "BP machine",
+            "BP-1",
+            "KLA01",
+            "Location/opd",
+            "g",
+        )
+        .expect("valid");
+        assert_eq!(
+            unit.dispatch("KLA01", "store-1", at(0)),
+            Err(EquipmentRefused::SameFacility(
+                "BP-1".into(),
+                "KLA01".into()
+            ))
+        );
+        // Not received where it is not in transit to.
+        assert_eq!(
+            unit.receive("Location/ward", "store-1", at(0)),
+            Err(EquipmentRefused::NotInTransit("BP-1".into()))
+        );
+        unit.dispatch(" GUL02 ", "store-1", at(1))
+            .expect("dispatched");
+        assert!(unit.in_transit());
+        assert_eq!(
+            unit.change.as_ref().map(|c| c.note.as_str()),
+            Some("dispatched to GUL02")
+        );
+        // In transit it changes no more, and the sender does not receive it.
+        let in_transit = Err(EquipmentRefused::InTransit("BP-1".into(), "GUL02".into()));
+        assert_eq!(
+            unit.set_status(Status::Faulty, "dropped", "store-1", at(2)),
+            in_transit
+        );
+        assert_eq!(unit.move_to("Location/ward", "store-1", at(2)), in_transit);
+        assert_eq!(unit.dispatch("MBR03", "store-1", at(2)), in_transit);
+        assert_eq!(
+            unit.receive("Location/ward", "store-1", at(2)),
+            Err(EquipmentRefused::NotInTransit("BP-1".into()))
+        );
+        // Central hands it over once.
+        assert!(unit.hand_over());
+        assert_eq!(unit.facility, "GUL02");
+        assert!(!unit.hand_over());
+        assert_eq!(
+            unit.receive(" ", "store-2", at(3)),
+            Err(EquipmentRefused::Missing("location"))
+        );
+        unit.receive("Location/lab", "store-2", at(3))
+            .expect("received");
+        assert!(!unit.in_transit());
+        assert_eq!(unit.location, "Location/lab");
+        assert_eq!(
+            unit.change.as_ref().map(|c| c.note.as_str()),
+            Some("received from KLA01 into Location/lab")
+        );
+        unit.set_status(Status::Faulty, "dropped", "store-2", at(4))
+            .expect("its own now");
     }
 
     #[test]

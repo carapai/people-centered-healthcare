@@ -11,18 +11,27 @@
 //!   retired;
 //! - the [`RECEIVED`] extension: the goods received note it arrived on;
 //! - `note`: its latest change, by whom and when. Its versions (`_history`) are its maintenance
-//!   history.
+//!   history;
+//! - the [`TRANSFER`] extension while it is in transit to another facility: `from`, `to`, `by`
+//!   and `at`.
 //!
 //! [`device`] writes one, [`equipment`] reads one back, and [`register`] creates one in the
 //! caller's transaction, refusing a unit already registered. [`Equipments::change`] applies a
 //! facility's change to one of its units.
+//!
+//! **Transfers between facilities.** Central hands a dispatched unit over to the facility it goes
+//! to (ADR 0064): [`Equipments::dispatch`] when the dispatch is made at central, in the same
+//! transaction, and [`handed_over`] when an edge's dispatch reaches central by sync. As the edge
+//! pushes its outbox in order, everything it wrote of the unit before the dispatch is at central
+//! by then.
 
 use health_access_policy::FACILITY_TAG_SYSTEM;
-use health_equipment::{Change, Equipment, EquipmentRefused, Status};
+use health_equipment::{Change, Equipment, EquipmentRefused, Status, Transfer};
 use health_identifiers::{OpId, ResourceId};
 use health_persistence::{
     Precondition, RawJson, ResourceType, Store, StoreError, Transaction, WriteError, WriteRequest,
 };
+use health_time::Timestamp;
 use serde_json::{Value, json};
 
 /// The platform category system of a FHIR Device (ADR 0064).
@@ -33,6 +42,8 @@ pub const PRODUCT_SYSTEM: &str = "urn:health:product";
 pub const STATUS_SYSTEM: &str = "urn:health:equipment-status";
 /// The extension naming the goods received note a unit arrived on.
 pub const RECEIVED: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/equipment-received";
+/// The extension of a unit's transfer to another facility, while it is in transit.
+pub const TRANSFER: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/equipment-transfer";
 
 /// `unit` as a Device.
 #[must_use]
@@ -51,8 +62,23 @@ pub fn device(unit: &Equipment) -> Value {
         "category": [{ "coding": [{ "system": DEVICE_CATEGORY, "code": "equipment" }] }],
         "location": { "reference": unit.location },
     });
+    let mut extensions = Vec::new();
     if let Some(note) = &unit.received {
-        resource["extension"] = json!([{ "url": RECEIVED, "valueString": note }]);
+        extensions.push(json!({ "url": RECEIVED, "valueString": note }));
+    }
+    if let Some(transfer) = &unit.transfer {
+        extensions.push(json!({
+            "url": TRANSFER,
+            "extension": [
+                { "url": "from", "valueString": transfer.from },
+                { "url": "to", "valueString": transfer.to },
+                { "url": "by", "valueString": transfer.by },
+                { "url": "at", "valueDateTime": transfer.at.to_string() },
+            ],
+        }));
+    }
+    if !extensions.is_empty() {
+        resource["extension"] = Value::Array(extensions);
     }
     if let Some(change) = &unit.change {
         resource["note"] = json!([{
@@ -109,13 +135,24 @@ pub fn equipment(resource: &Value) -> Option<Equipment> {
         facility: facility.to_owned(),
         location: resource["location"]["reference"].as_str()?.to_owned(),
         status,
-        received: resource["extension"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|e| e["url"] == RECEIVED)
+        received: extension(resource, RECEIVED)
             .and_then(|e| e["valueString"].as_str())
             .map(str::to_owned),
+        transfer: extension(resource, TRANSFER).and_then(|e| {
+            let part = |name: &str| {
+                e["extension"]
+                    .as_array()?
+                    .iter()
+                    .find(|p| p["url"] == name)
+                    .and_then(|p| p["valueString"].as_str().or(p["valueDateTime"].as_str()))
+            };
+            Some(Transfer {
+                from: part("from")?.to_owned(),
+                to: part("to")?.to_owned(),
+                by: part("by")?.to_owned(),
+                at: part("at")?.parse().ok()?,
+            })
+        }),
         change: resource["note"]
             .as_array()
             .and_then(|notes| notes.last())
@@ -127,6 +164,22 @@ pub fn equipment(resource: &Value) -> Option<Equipment> {
                 })
             }),
     })
+}
+
+/// The extension `url` of `resource`, if it has it.
+fn extension<'a>(resource: &'a Value, url: &str) -> Option<&'a Value> {
+    resource["extension"]
+        .as_array()?
+        .iter()
+        .find(|e| e["url"] == url)
+}
+
+/// The Device as central hands it over, if it is a unit dispatched to another facility: the
+/// same unit, now the receiving facility's (ADR 0064). `None` for anything else.
+#[must_use]
+pub fn handed_over(resource: &Value) -> Option<Value> {
+    let mut unit = equipment(resource)?;
+    unit.hand_over().then(|| device(&unit))
 }
 
 /// Why a unit could not be registered.
@@ -245,17 +298,55 @@ impl<S: Store> Equipments<S> {
         }
         apply(&mut unit)?;
         unit.validate()?;
-        tx.write(WriteRequest {
+        write(&mut tx, id, &unit, version).await?;
+        tx.commit().await?;
+        Ok(unit)
+    }
+
+    /// Dispatches the unit `id` held by `facility` to facility `to`, and as central hands it over
+    /// to `to` in the same transaction (ADR 0064): two versions, the dispatch and the hand-over.
+    /// Returns the unit as `to` now holds it, in transit until it receives it.
+    pub async fn dispatch(
+        &self,
+        id: ResourceId,
+        facility: &str,
+        to: &str,
+        by: &str,
+        at: Timestamp,
+    ) -> Result<Equipment, EquipmentError> {
+        let mut tx = self.store.begin().await?;
+        let (mut unit, version) = read(&mut tx, id)
+            .await?
+            .ok_or_else(|| EquipmentError::NotFound(id.to_string()))?;
+        if unit.facility != facility {
+            return Err(EquipmentError::OtherFacility(unit.serial));
+        }
+        unit.dispatch(to, by, at)?;
+        let dispatched = write(&mut tx, id, &unit, version).await?;
+        unit.hand_over();
+        write(&mut tx, id, &unit, dispatched).await?;
+        tx.commit().await?;
+        Ok(unit)
+    }
+}
+
+/// Writes `unit` as the next version of `id`, `If-Match` `version`, and returns the new one.
+async fn write<T: Transaction>(
+    tx: &mut T,
+    id: ResourceId,
+    unit: &Equipment,
+    version: OpId,
+) -> Result<OpId, EquipmentError> {
+    let written = tx
+        .write(WriteRequest {
             resource_type: device_type()?,
             id,
-            json: RawJson::from_validated(device(&unit).to_string()),
+            json: RawJson::from_validated(device(unit).to_string()),
             op_id: OpId::new(),
             precondition: Precondition::IfMatch(version),
         })
         .await?;
-        tx.commit().await?;
-        Ok(unit)
-    }
+    Ok(written.version_id)
 }
 
 fn device_type() -> Result<ResourceType, EquipmentError> {

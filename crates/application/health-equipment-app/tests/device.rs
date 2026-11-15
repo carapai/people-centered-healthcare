@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use health_equipment::{Change, Equipment, EquipmentRefused, Status};
 use health_equipment_app::{
-    EquipmentError, Equipments, RegisterError, device, equipment, register,
+    EquipmentError, Equipments, RegisterError, device, equipment, handed_over, register,
 };
 use health_fhir_validation::validate_structure;
 use health_persistence::{ResourceType, Store, Transaction};
@@ -51,6 +51,25 @@ fn a_unit_is_a_valid_device_and_reads_back_the_same() {
     let resource = device(&retired);
     assert_eq!(resource["status"], "inactive");
     assert_eq!(equipment(&resource), Some(retired));
+    let mut dispatched = bp("BP-0043");
+    dispatched
+        .dispatch(
+            "GUL02",
+            "store-1",
+            Timestamp::from_second(1_800_000_000).expect("time"),
+        )
+        .expect("dispatched");
+    let resource = device(&dispatched);
+    assert_eq!(
+        validate_structure(&resource.to_string()),
+        vec![],
+        "{resource}"
+    );
+    assert_eq!(equipment(&resource), Some(dispatched.clone()));
+    let handed = handed_over(&resource).expect("handed over");
+    assert_eq!(handed["meta"]["tag"][0]["code"], "GUL02");
+    assert_eq!(handed_over(&handed), None, "handed over once");
+    assert_eq!(handed_over(&device(&bp("BP-0044"))), None, "not in transit");
     let implant = serde_json::json!({
         "resourceType": "Device",
         "category": [{"coding": [{"system": "urn:health:device-category", "code": "patient-assigned"}]}]
@@ -158,4 +177,59 @@ async fn its_facility_changes_a_unit_and_each_change_is_a_version() {
     let devices: ResourceType = "Device".parse().expect("type");
     let head = tx.read(&devices, id).await.expect("read").expect("there");
     assert_eq!(head.version.version_seq, 3);
+}
+
+#[tokio::test]
+async fn central_hands_a_dispatched_unit_to_the_facility_that_receives_it() {
+    let store = store().await;
+    let unit = bp("BP-0050");
+    let mut tx = store.begin().await.expect("begin");
+    register(&mut tx, &unit).await.expect("registered");
+    tx.commit().await.expect("commit");
+    let id = unit.id.to_string().parse().expect("id");
+    let equipments = Equipments::new(store.clone());
+    let at = Timestamp::from_second(1_800_000_000).expect("time");
+
+    assert_eq!(
+        equipments.dispatch(id, "GUL02", "MBR03", "x", at).await,
+        Err(EquipmentError::OtherFacility("BP-0050".into()))
+    );
+    let arriving = equipments
+        .dispatch(id, "KLA01", "GUL02", "store-1", at)
+        .await
+        .expect("dispatched");
+    assert_eq!(arriving.facility, "GUL02");
+    assert!(arriving.in_transit());
+    // The sender has let it go; the receiver changes it only once received.
+    assert_eq!(
+        equipments
+            .change(id, "KLA01", |u| u.move_to("Location/ward", "x", at))
+            .await,
+        Err(EquipmentError::OtherFacility("BP-0050".into()))
+    );
+    assert_eq!(
+        equipments
+            .change(id, "GUL02", |u| u.set_status(
+                Status::Faulty,
+                "bent",
+                "x",
+                at
+            ))
+            .await,
+        Err(EquipmentError::Refused(EquipmentRefused::InTransit(
+            "BP-0050".into(),
+            "GUL02".into()
+        )))
+    );
+    let received = equipments
+        .change(id, "GUL02", |u| u.receive("Location/lab", "store-2", at))
+        .await
+        .expect("received");
+    assert_eq!(received.location, "Location/lab");
+    assert!(!received.in_transit());
+    // Registered, dispatched, handed over, received.
+    let mut tx = store.begin().await.expect("begin");
+    let devices: ResourceType = "Device".parse().expect("type");
+    let head = tx.read(&devices, id).await.expect("read").expect("there");
+    assert_eq!(head.version.version_seq, 4);
 }

@@ -53,7 +53,7 @@ Abbreviations: **FA** = Facility Authority Node, **C** = central.
 | Consent (consent) | global | C; FA records Consents captured at the facility | Capture | C | up; down to facilities in scope | Version check; review | Validity, scope |
 | AuditEvent (audit) | wherever it occurred | Any node | Yes | Origin node (append-only) | up | None (immutable) | Completeness |
 | Device registry: `EnrolledDevice` (edge admin) | facility | FA admin | Yes | FA | up; revocations down from C | Revocation wins | — |
-| Equipment: Device, category *equipment* (equipment) | facility | FA | Yes | FA; moved to another facility only by an explicit transfer that drains the outbox first (ADR 0064) | up | Version check; review on conflict | References, Product tracked as Equipment |
+| Equipment: Device, category *equipment* (equipment) | facility | FA | Yes | FA; moved to another facility only by an explicit transfer: dispatched by the sender, handed over by central when the dispatch reaches it (the outbox drained before it), received by the destination (ADR 0064) | up | Version check; review on conflict | References, Product tracked as Equipment |
 | Patient-originated Records, portal (Patient Engagement) | global | C (the portal is online) | — | C | down to the target facility for acceptance | Accepted through the owning clinical context at the FA | Identity, consent |
 | Analytics, reporting | global | C | — | C | — | — | — |
 | Communications (communications) | global | C sends; FA queues CommunicationRequests | Queue only | C | up | Idempotent by `op_id` | Channel policy |
