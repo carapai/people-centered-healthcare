@@ -8,7 +8,11 @@
 //!   tracked as Equipment, in the receipt's transaction. No stock balance is posted for it.
 //! - **[`identity`]**: a unit's id follows from its Product and serial, so the same unit cannot
 //!   be registered twice.
+//! - **[`Equipment::set_status`]** and **[`Equipment::move_to`]**: the facility's changes, each
+//!   kept as the unit's latest [`Change`]. Its maintenance history is the record's versions.
+//!   A retired unit changes no more.
 
+use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -77,6 +81,20 @@ pub struct Equipment {
     pub status: Status,
     /// The goods received note it arrived on, if it arrived on one.
     pub received: Option<String>,
+    /// The latest change, if it was changed since it was registered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<Change>,
+}
+
+/// One change to a unit: what was done or found, by whom and when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Change {
+    /// What was done or found, e.g. "cuff replaced" or "screen cracked".
+    pub note: String,
+    /// Who made the change.
+    pub by: String,
+    /// When.
+    pub at: Timestamp,
 }
 
 /// Why a unit is not valid.
@@ -88,6 +106,15 @@ pub enum EquipmentRefused {
     /// The serial number is too long or has control characters.
     #[error("a serial number or asset tag is at most {SERIAL_MAX} printable characters")]
     Serial,
+    /// A retired unit changes no more.
+    #[error("{0} is retired")]
+    Retired(String),
+    /// The change changes nothing.
+    #[error("{0} is already {1}")]
+    Unchanged(String, String),
+    /// Taking a unit out of use needs a note of why.
+    #[error("say why {0} is {1}")]
+    NoteRequired(String, String),
 }
 
 /// The id of the unit of `product` with `serial`: a UUIDv5, so it is the same at every node.
@@ -125,9 +152,80 @@ impl Equipment {
             location: location.to_owned(),
             status: Status::Available,
             received: Some(note.to_owned()),
+            change: None,
         };
         unit.validate()?;
         Ok(unit)
+    }
+
+    /// Sets the unit's status, with a note of what was done or found. A note is needed for any
+    /// status but available; a retired unit changes no more.
+    pub fn set_status(
+        &mut self,
+        status: Status,
+        note: &str,
+        by: &str,
+        at: Timestamp,
+    ) -> Result<(), EquipmentRefused> {
+        self.changeable()?;
+        if status == self.status {
+            return Err(EquipmentRefused::Unchanged(
+                self.serial.clone(),
+                status.code().to_owned(),
+            ));
+        }
+        let note = note.trim();
+        if note.is_empty() && status != Status::Available {
+            return Err(EquipmentRefused::NoteRequired(
+                self.serial.clone(),
+                status.code().to_owned(),
+            ));
+        }
+        self.status = status;
+        self.change = Some(Change {
+            note: if note.is_empty() {
+                format!("now {}", status.code())
+            } else {
+                note.to_owned()
+            },
+            by: by.to_owned(),
+            at,
+        });
+        Ok(())
+    }
+
+    /// Moves the unit to `location` within its facility.
+    pub fn move_to(
+        &mut self,
+        location: &str,
+        by: &str,
+        at: Timestamp,
+    ) -> Result<(), EquipmentRefused> {
+        self.changeable()?;
+        let location = location.trim();
+        if location.is_empty() {
+            return Err(EquipmentRefused::Missing("location"));
+        }
+        if location == self.location {
+            return Err(EquipmentRefused::Unchanged(
+                self.serial.clone(),
+                format!("at {location}"),
+            ));
+        }
+        self.change = Some(Change {
+            note: format!("moved from {} to {location}", self.location),
+            by: by.to_owned(),
+            at,
+        });
+        location.clone_into(&mut self.location);
+        Ok(())
+    }
+
+    fn changeable(&self) -> Result<(), EquipmentRefused> {
+        if self.status == Status::Retired {
+            return Err(EquipmentRefused::Retired(self.serial.clone()));
+        }
+        Ok(())
     }
 
     /// Checks the record is complete.
@@ -192,6 +290,70 @@ mod tests {
         );
         assert!(!valid_serial(&"x".repeat(SERIAL_MAX + 1)));
         assert!(!valid_serial("A\tB"));
+    }
+
+    fn at(second: i64) -> Timestamp {
+        Timestamp::from_second(1_800_000_000 + second).expect("time")
+    }
+
+    #[test]
+    fn a_unit_s_status_changes_with_a_note_until_it_is_retired() {
+        let mut unit = Equipment::received(
+            "bp-machine",
+            "BP machine",
+            "BP-1",
+            "KLA01",
+            "Location/opd",
+            "g",
+        )
+        .expect("valid");
+        assert_eq!(
+            unit.set_status(Status::Faulty, " ", "nurse-1", at(0)),
+            Err(EquipmentRefused::NoteRequired(
+                "BP-1".into(),
+                "faulty".into()
+            ))
+        );
+        unit.set_status(Status::Faulty, "cuff leaks", "nurse-1", at(0))
+            .expect("faulty");
+        assert_eq!(
+            unit.change,
+            Some(Change {
+                note: "cuff leaks".into(),
+                by: "nurse-1".into(),
+                at: at(0)
+            })
+        );
+        assert_eq!(
+            unit.set_status(Status::Faulty, "still", "nurse-1", at(1)),
+            Err(EquipmentRefused::Unchanged("BP-1".into(), "faulty".into()))
+        );
+        unit.set_status(Status::Available, "", "tech-1", at(2))
+            .expect("repaired");
+        assert_eq!(
+            unit.change.as_ref().map(|c| c.note.as_str()),
+            Some("now available")
+        );
+        unit.move_to("Location/ward-2", "nurse-1", at(3))
+            .expect("moved");
+        assert_eq!(unit.location, "Location/ward-2");
+        assert_eq!(
+            unit.move_to("Location/ward-2", "nurse-1", at(4)),
+            Err(EquipmentRefused::Unchanged(
+                "BP-1".into(),
+                "at Location/ward-2".into()
+            ))
+        );
+        unit.set_status(Status::Retired, "beyond repair", "tech-1", at(5))
+            .expect("retired");
+        assert_eq!(
+            unit.set_status(Status::Available, "", "tech-1", at(6)),
+            Err(EquipmentRefused::Retired("BP-1".into()))
+        );
+        assert_eq!(
+            unit.move_to("Location/store", "tech-1", at(6)),
+            Err(EquipmentRefused::Retired("BP-1".into()))
+        );
     }
 
     #[test]

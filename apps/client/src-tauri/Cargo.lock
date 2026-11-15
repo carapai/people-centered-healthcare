@@ -3209,6 +3209,7 @@ dependencies = [
 name = "health-equipment"
 version = "0.1.0"
 dependencies = [
+ "health-time",
  "serde",
  "thiserror 2.0.21",
  "uuid",
@@ -3222,6 +3223,7 @@ dependencies = [
  "health-equipment",
  "health-identifiers",
  "health-persistence",
+ "health-time",
  "serde_json",
  "thiserror 2.0.21",
  "uuid",

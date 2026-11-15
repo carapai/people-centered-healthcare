@@ -2673,6 +2673,7 @@ dependencies = [
 name = "health-equipment"
 version = "0.1.0"
 dependencies = [
+ "health-time",
  "serde",
  "thiserror 2.0.21",
  "uuid",

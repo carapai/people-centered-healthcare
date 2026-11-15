@@ -30,7 +30,9 @@ async fn app_and_store(permissions: &[&str]) -> (Router, SurrealStore) {
     .await
     .expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
-    let store = SurrealStore::new(connection, Arc::new(SystemClock));
+    // Searches as central's (Device by its facility `_tag`).
+    let store = SurrealStore::new(connection, Arc::new(SystemClock))
+        .with_registry(health_fhir_server::search_registry());
     let router = FhirServer::new(store.clone(), "http://test/fhir", Arc::new(Unrestricted))
         .inventory_router()
         .layer(Extension(Subject {
@@ -304,5 +306,87 @@ async fn equipment_is_received_by_serial_as_devices_never_as_stock() {
             .as_str()
             .is_some_and(|e| e.contains("tracked as Equipment")),
         "{refused}"
+    );
+}
+
+#[tokio::test]
+async fn the_facility_lists_its_equipment_and_changes_its_status_and_location() {
+    let (app, _) = app_and_store(&[STOCK_PERMISSION]).await;
+    let product = json!({
+        "code": "bp-machine", "name": "BP machine, digital", "baseUnit": "unit",
+        "packSizes": [1], "equipment": true,
+    });
+    assert_eq!(
+        send(&app, "POST", "/products", Some(product)).await.0,
+        StatusCode::CREATED
+    );
+    let note = json!({
+        "store": "Location/opd", "supplier": "JMS", "delivery": "INV-77",
+        "lines": [{ "product": "bp-machine", "quantity": 2, "unit_cost": "250000", "serials": ["BP-2", "BP-1"] }],
+    });
+    assert_eq!(
+        send(&app, "POST", "/goods-received", Some(note)).await.0,
+        StatusCode::CREATED
+    );
+
+    let (status, list) = send(&app, "GET", "/equipment", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(list.as_array().map(Vec::len), Some(2), "{list}");
+    assert_eq!(list[0]["serial"], "BP-1", "sorted by name, then serial");
+    assert_eq!(list[0]["status"], "available");
+    let id = list[0]["id"].as_str().expect("id").to_owned();
+
+    let (status, refused) = send(
+        &app,
+        "POST",
+        &format!("/equipment/{id}/status"),
+        Some(json!({ "status": "faulty" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+    let (status, faulty) = send(
+        &app,
+        "POST",
+        &format!("/equipment/{id}/status"),
+        Some(json!({ "status": "faulty", "note": "cuff leaks" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{faulty}");
+    assert_eq!(faulty["status"], "faulty");
+    assert_eq!(faulty["change"]["note"], "cuff leaks");
+    assert_eq!(faulty["change"]["by"], "storekeeper-1");
+    let (status, moved) = send(
+        &app,
+        "POST",
+        &format!("/equipment/{id}/move"),
+        Some(json!({ "location": "Location/workshop" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{moved}");
+    let (_, at_workshop) = send(&app, "GET", "/equipment?location=Location%2Fworkshop", None).await;
+    assert_eq!(at_workshop.as_array().map(Vec::len), Some(1));
+    assert_eq!(at_workshop[0]["status"], "faulty");
+
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            &format!("/equipment/{id}/status"),
+            Some(json!({ "status": "lost" }))
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/equipment/0190f1a2-7c3d-7e4f-8a5b-00000000a001/status",
+            Some(json!({ "status": "faulty", "note": "x" }))
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
     );
 }
