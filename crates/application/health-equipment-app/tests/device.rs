@@ -3,12 +3,14 @@
 
 use std::sync::Arc;
 
-use health_equipment::{Equipment, Status};
-use health_equipment_app::{RegisterError, device, equipment, register};
+use health_equipment::{Change, Equipment, EquipmentRefused, Status};
+use health_equipment_app::{
+    EquipmentError, Equipments, RegisterError, device, equipment, register,
+};
 use health_fhir_validation::validate_structure;
 use health_persistence::{ResourceType, Store, Transaction};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
-use health_time::SystemClock;
+use health_time::{SystemClock, Timestamp};
 
 fn bp(serial: &str) -> Equipment {
     Equipment::received(
@@ -39,6 +41,11 @@ fn a_unit_is_a_valid_device_and_reads_back_the_same() {
     let retired = Equipment {
         status: Status::Retired,
         received: None,
+        change: Some(Change {
+            note: "beyond repair".into(),
+            by: "tech-1".into(),
+            at: Timestamp::from_second(1_800_000_000).expect("time"),
+        }),
         ..unit
     };
     let resource = device(&retired);
@@ -51,8 +58,7 @@ fn a_unit_is_a_valid_device_and_reads_back_the_same() {
     assert_eq!(equipment(&implant), None, "a patient-assigned Device");
 }
 
-#[tokio::test]
-async fn a_unit_is_registered_once() {
+async fn store() -> SurrealStore {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "equipment".into(),
@@ -61,7 +67,12 @@ async fn a_unit_is_registered_once() {
     .await
     .expect("open");
     migrate(&connection, MIGRATIONS).await.expect("migrate");
-    let store = SurrealStore::new(connection, Arc::new(SystemClock));
+    SurrealStore::new(connection, Arc::new(SystemClock))
+}
+
+#[tokio::test]
+async fn a_unit_is_registered_once() {
+    let store = store().await;
     let unit = bp("BP-0042");
 
     let mut tx = store.begin().await.expect("begin");
@@ -81,4 +92,70 @@ async fn a_unit_is_registered_once() {
             serial: "BP-0042".into()
         })
     );
+}
+
+#[tokio::test]
+async fn its_facility_changes_a_unit_and_each_change_is_a_version() {
+    let store = store().await;
+    let unit = bp("BP-0042");
+    let mut tx = store.begin().await.expect("begin");
+    register(&mut tx, &unit).await.expect("registered");
+    tx.commit().await.expect("commit");
+    let id = unit.id.to_string().parse().expect("id");
+    let equipments = Equipments::new(store.clone());
+    let at = Timestamp::from_second(1_800_000_000).expect("time");
+
+    let faulty = equipments
+        .change(id, "KLA01", |u| {
+            u.set_status(Status::Faulty, "cuff leaks", "nurse-1", at)
+        })
+        .await
+        .expect("changed");
+    assert_eq!(faulty.status, Status::Faulty);
+    let moved = equipments
+        .change(id, "KLA01", |u| {
+            u.move_to("Location/workshop", "tech-1", at)
+        })
+        .await
+        .expect("moved");
+    assert_eq!(equipments.get(id).await.expect("read"), Some(moved.clone()));
+    assert_eq!(moved.status, Status::Faulty);
+    assert_eq!(moved.location, "Location/workshop");
+
+    assert_eq!(
+        equipments
+            .change(id, "GUL02", |u| u.set_status(
+                Status::Available,
+                "",
+                "x",
+                at
+            ))
+            .await,
+        Err(EquipmentError::OtherFacility("BP-0042".into()))
+    );
+    assert_eq!(
+        equipments
+            .change(id, "KLA01", |u| u.set_status(
+                Status::Faulty,
+                "again",
+                "x",
+                at
+            ))
+            .await,
+        Err(EquipmentError::Refused(EquipmentRefused::Unchanged(
+            "BP-0042".into(),
+            "faulty".into()
+        )))
+    );
+    assert!(matches!(
+        equipments
+            .change(health_identifiers::ResourceId::new(), "KLA01", |_| Ok(()))
+            .await,
+        Err(EquipmentError::NotFound(_))
+    ));
+    // Registered, made faulty, moved: three versions, the maintenance history.
+    let mut tx = store.begin().await.expect("begin");
+    let devices: ResourceType = "Device".parse().expect("type");
+    let head = tx.read(&devices, id).await.expect("read").expect("there");
+    assert_eq!(head.version.version_seq, 3);
 }

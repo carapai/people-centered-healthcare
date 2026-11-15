@@ -13,7 +13,11 @@
 //! - `POST /requisitions/{id}/fulfil`: the batches picked, dispatched as a transfer to the ward;
 //! - `GET /products`, `POST /products` `{id?, code, name, baseUnit, packSizes, synonyms?,
 //!   medicines?, gtin?, active?, equipment?}`: the product master (#128 follow-up), each product a
-//!   Medication, its code unique and unchanging, and stocked or tracked as Equipment for good.
+//!   Medication, its code unique and unchanging, and stocked or tracked as Equipment for good;
+//! - `GET /equipment?location=`: the facility's Equipment (ADR 0064), each a Device;
+//! - `POST /equipment/{id}/status` `{status, note}` and `POST /equipment/{id}/move` `{location}`:
+//!   a change to one of its units, kept as a new version (its maintenance history is
+//!   `Device/{id}/_history`). Only the facility that holds a unit changes it.
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -482,6 +486,9 @@ impl FhirServer {
             .route("/requisitions/{id}/decision", post(decide))
             .route("/requisitions/{id}/fulfil", post(fulfil))
             .route("/products", get(list_products).post(save_product))
+            .route("/equipment", get(list_equipment))
+            .route("/equipment/{id}/status", post(equipment_status))
+            .route("/equipment/{id}/move", post(equipment_move))
             .with_state(self.clone())
     }
 }
@@ -592,4 +599,128 @@ async fn save_product(
         }
         Err(error) => refused(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string()),
     }
+}
+
+fn equipment_json(unit: &health_equipment::Equipment) -> Value {
+    json!({
+        "id": unit.id.to_string(), "product": unit.product, "name": unit.name,
+        "serial": unit.serial, "location": unit.location, "status": unit.status.code(),
+        "received": unit.received,
+        "change": unit.change.as_ref().map(|c| json!({
+            "note": c.note, "by": c.by, "at": c.at.to_string(),
+        })),
+    })
+}
+
+#[derive(Debug, Deserialize)]
+struct EquipmentQuery {
+    location: Option<String>,
+}
+
+async fn list_equipment(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Query(query): Query<EquipmentQuery>,
+) -> Response {
+    let subject = match staff(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let tag = format!(
+        "{}|{}",
+        health_access_policy::FACILITY_TAG_SYSTEM,
+        subject.facility
+    );
+    let mut list: Vec<health_equipment::Equipment> =
+        crate::programs::found(&server, "Device", &[("_tag", tag.as_str())])
+            .await
+            .iter()
+            .filter_map(health_equipment_app::equipment)
+            .filter(|unit| unit.facility == subject.facility)
+            .filter(|unit| query.location.as_ref().is_none_or(|l| *l == unit.location))
+            .collect();
+    list.sort_by(|a, b| (&a.name, &a.serial).cmp(&(&b.name, &b.serial)));
+    Json(list.iter().map(equipment_json).collect::<Vec<_>>()).into_response()
+}
+
+#[derive(Debug, Deserialize)]
+struct StatusBody {
+    status: String,
+    #[serde(default)]
+    note: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MoveBody {
+    location: String,
+}
+
+/// Applies `apply` to the unit `id` held by the member of staff's facility.
+async fn change_equipment(
+    server: &FhirServer,
+    subject: Option<Extension<Subject>>,
+    id: &str,
+    apply: impl FnOnce(
+        &mut health_equipment::Equipment,
+        &str,
+        Timestamp,
+    ) -> Result<(), health_equipment::EquipmentRefused>,
+) -> Response {
+    let subject = match staff(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let Ok(id) = id.parse::<health_identifiers::ResourceId>() else {
+        return refused(StatusCode::NOT_FOUND, "no such equipment");
+    };
+    let by = subject.account.clone();
+    match health_equipment_app::Equipments::new(server.store.clone())
+        .change(id, &subject.facility, |unit| {
+            apply(unit, &by, Timestamp::now())
+        })
+        .await
+    {
+        Ok(unit) => Json(equipment_json(&unit)).into_response(),
+        Err(error) => {
+            use health_equipment_app::EquipmentError as E;
+            let status = match &error {
+                E::NotFound(_) => StatusCode::NOT_FOUND,
+                E::OtherFacility(_) => StatusCode::FORBIDDEN,
+                E::Conflict => StatusCode::CONFLICT,
+                E::Store(_) => return refused(StatusCode::SERVICE_UNAVAILABLE, "try again"),
+                E::Refused(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            refused(status, &error.to_string())
+        }
+    }
+}
+
+async fn equipment_status(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(body): Json<StatusBody>,
+) -> Response {
+    let Some(status) = health_equipment::Status::from_code(body.status.trim()) else {
+        return refused(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "status is available, faulty, under-maintenance or retired",
+        );
+    };
+    change_equipment(&server, subject, &id, |unit, by, at| {
+        unit.set_status(status, &body.note, by, at)
+    })
+    .await
+}
+
+async fn equipment_move(
+    State(server): State<FhirServer>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(body): Json<MoveBody>,
+) -> Response {
+    change_equipment(&server, subject, &id, |unit, by, at| {
+        unit.move_to(&body.location, by, at)
+    })
+    .await
 }
