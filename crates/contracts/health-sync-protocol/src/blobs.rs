@@ -60,6 +60,56 @@ fn collect(value: &Value, found: &mut Vec<BlobRef>) {
     }
 }
 
+/// The resource types whose attachments a node fetches as soon as it receives the record,
+/// rather than when first opened (ADR 0021): signed consent scans, which are needed at the
+/// bedside without waiting on the uplink. Every other type's attachments come on demand.
+pub const PREFETCH: &[&str] = &["Consent"];
+
+/// Whether a record of `resource_type` has its attachments fetched ahead of need.
+pub fn prefetched(resource_type: &str) -> bool {
+    PREFETCH.contains(&resource_type)
+}
+
+/// The extension a node adds, when it serves a resource, to an `Attachment` whose blob it does
+/// not hold yet (ADR 0021): the record was accepted before its blob arrived. It is never stored;
+/// the record reads without it once the blob is here.
+pub const PENDING_EXTENSION: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/attachment-pending";
+
+/// Marks, in `body`, each `Attachment` naming a blob for which `held` is false with
+/// [`PENDING_EXTENSION`] (`valueBoolean: true`). Whether any was marked.
+pub fn mark_pending(body: &mut Value, held: &impl Fn(&ContentHash) -> bool) -> bool {
+    match body {
+        Value::Object(map) => {
+            let blob = map
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url| url.strip_prefix(BLOB_URL_PREFIX))
+                .and_then(|hex| hex.parse::<ContentHash>().ok());
+            let mut marked = false;
+            if let Some(hash) = blob
+                && !held(&hash)
+            {
+                let pending = serde_json::json!({"url": PENDING_EXTENSION, "valueBoolean": true});
+                match map.get_mut("extension").and_then(Value::as_array_mut) {
+                    Some(extensions) => extensions.push(pending),
+                    None => {
+                        map.insert("extension".to_owned(), Value::Array(vec![pending]));
+                    }
+                }
+                marked = true;
+            }
+            for value in map.values_mut() {
+                marked |= mark_pending(value, held);
+            }
+            marked
+        }
+        Value::Array(values) => values
+            .iter_mut()
+            .fold(false, |marked, v| mark_pending(v, held) | marked),
+        _ => false,
+    }
+}
+
 /// How much of a blob the receiver holds: `received == size` once it is stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlobStatus {

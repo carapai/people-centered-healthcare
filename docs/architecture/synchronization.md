@@ -321,10 +321,9 @@ stateDiagram-v2
   - **Download:** on demand (`Sync::fetch_blob`, `GET /sync/v1/blobs/{hash}/content`), verified against its reference.
   - **Scope on download (#84, part 2):** every version that references a blob records it in `blob_owner` (migration `0052_blob_owner`). Central serves a blob only when some record's current, non-deleted version still references it and would be sent down to the node's scope, by the same rules as pull (`SurrealStore::blob_admitted`). A package tarball an activation record names is served to any node, as the records are. Otherwise it answers 404, as for an unknown blob, so a node cannot fetch another facility's attachment by its hash. Blobs referenced only by records written before the migration have no owner yet and are not served; there is no production data before it.
   - **Storage:** central's store is `HEALTH_FILES_DIR`; the edge's is `files/` beside its data directory, where backups take it from.
-  - **Not yet:**
-    - the pre-fetch flag per type;
-    - the pending marker on an attachment whose blob has not arrived;
-    - checking a download against the requesting node's scope (today a node can only ask for hashes it has seen in records within its scope).
+  - **Pre-fetch (#84, part 3):** `health_sync_protocol::PREFETCH` lists the types whose attachments come down ahead of need: `Consent`, for signed consent scans. When a pull or re-seed applies a record of such a type, each blob it references is queued (`sync_blob_fetch`, migration `0060_sync_blob_fetch`). After the pull, the node fetches the queue (`Sync::prefetch`). A blob central cannot serve yet, because the upload from the facility that took it has not finished, stays queued for the next round. Every other type's attachments still come on demand.
+  - **Pending (#84, part 3):** a FHIR read or vread at central or the edge (`FhirServer::with_attachments`) adds the extension `health_sync_protocol::PENDING_EXTENSION` (`valueBoolean: true`) to each `Attachment` whose blob that node does not hold. The marker is not stored and not part of the version. A response that carries one is sent with `Cache-Control: no-store` and never answered 304, so a client sees the attachment once it arrives.
+  - **Not yet:** the desktop's own FHIR API does not mark pending attachments; search results are not marked.
 
 ## Desktop reconnect (§90)
 

@@ -323,6 +323,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0059_device_tables",
         sql: include_str!("../migrations/0059_device_tables.surql"),
     },
+    Migration {
+        version: 60,
+        name: "0060_sync_blob_fetch",
+        sql: include_str!("../migrations/0060_sync_blob_fetch.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.

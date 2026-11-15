@@ -550,3 +550,36 @@ fn each_type_has_its_lane_and_lanes_are_pulled_most_urgent_first() {
     );
     assert!(!Lane::PULLED.contains(&Lane::Blobs), "blobs come on demand");
 }
+
+#[test]
+fn an_attachment_whose_blob_is_not_held_is_marked_pending() {
+    use health_sync_protocol::{PENDING_EXTENSION, blob_url, mark_pending, prefetched};
+    let held = ContentHash::of_bytes(b"held");
+    let missing = ContentHash::of_bytes(b"missing");
+    let mut body = json!({
+        "resourceType": "DocumentReference",
+        "content": [
+            {"attachment": {"url": blob_url(&held), "size": 4}},
+            {"attachment": {"url": blob_url(&missing), "size": 7,
+                            "extension": [{"url": "https://example.org/other", "valueString": "x"}]}},
+            {"attachment": {"url": "https://example.org/elsewhere.pdf"}}
+        ]
+    });
+    assert!(mark_pending(&mut body, &|hash| *hash == held));
+    assert!(body["content"][0]["attachment"].get("extension").is_none());
+    assert_eq!(
+        body["content"][1]["attachment"]["extension"][1],
+        json!({"url": PENDING_EXTENSION, "valueBoolean": true}),
+        "added beside the extensions it had"
+    );
+    assert!(body["content"][2]["attachment"].get("extension").is_none());
+
+    let mut all_held = json!({"content": [{"attachment": {"url": blob_url(&held)}}]});
+    assert!(!mark_pending(&mut all_held, &|_| true));
+
+    assert!(
+        prefetched("Consent"),
+        "signed consent scans are fetched ahead"
+    );
+    assert!(!prefetched("DocumentReference"), "the rest on demand");
+}

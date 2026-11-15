@@ -377,6 +377,10 @@ pub(crate) fn routes(
         .map_err(|e| e.to_string())?;
     let clinical = clinical.with_workflows(workflows.clone());
     let blobs = health_files::FsBlobStore::open(config.data_dir.with_file_name("files")).ok();
+    let clinical = match &blobs {
+        Some(blobs) => clinical.with_attachments(blobs.clone()),
+        None => clinical,
+    };
     health_node_api::workflows::spawn_upkeep(workflows, clinical.store().clone(), blobs);
     // Its desktops' staff, for sign-in while the edge cannot be reached (#133).
     let desktops = DesktopAccounts {

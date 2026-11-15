@@ -25,9 +25,38 @@ pub(crate) async fn metadata(State(server): State<FhirServer>) -> Response {
     fhir_json(StatusCode::OK, statement.to_string())
 }
 
-fn ok_resource(stored: &StoredResource) -> Response {
-    let mut response = fhir_json(StatusCode::OK, stored.json.as_str().to_owned());
-    version_headers(&mut response, &stored.version);
+/// `json` as served: with each attachment whose blob is not held here marked pending (ADR
+/// 0021), and whether any was. The marker is not part of the version.
+fn with_pending(server: &FhirServer, json: &RawJson) -> (String, bool) {
+    let Some(blobs) = &server.attachments else {
+        return (json.as_str().to_owned(), false);
+    };
+    let Ok(mut body) = serde_json::from_str::<Value>(json.as_str()) else {
+        return (json.as_str().to_owned(), false);
+    };
+    let held = |hash: &health_sync_protocol::ContentHash| {
+        hash.to_string()
+            .parse::<health_files::BlobHash>()
+            .is_ok_and(|hash| blobs.contains(&hash))
+    };
+    if health_sync_protocol::mark_pending(&mut body, &held) {
+        (body.to_string(), true)
+    } else {
+        (json.as_str().to_owned(), false)
+    }
+}
+
+/// 200 with `json` at `version`. A body with a pending attachment is not to be cached: it reads
+/// differently, at the same version, once the blob arrives.
+fn ok_json((body, pending): (String, bool), version: &VersionMeta) -> Response {
+    let mut response = fhir_json(StatusCode::OK, body);
+    version_headers(&mut response, version);
+    if pending {
+        response.headers_mut().insert(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        );
+    }
     response
 }
 
@@ -52,17 +81,20 @@ pub(crate) async fn read(
     {
         tx.commit().await?;
     }
-    if headers
-        .get("if-none-match")
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.trim() == crate::etag(stored.version.version_id))
+    let (body, pending) = with_pending(&server, &stored.json);
+    // A pending attachment may have arrived since: the body is sent again.
+    if !pending
+        && headers
+            .get("if-none-match")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.trim() == crate::etag(stored.version.version_id))
     {
         let mut response = Response::new(axum::body::Body::empty());
         *response.status_mut() = StatusCode::NOT_MODIFIED;
         version_headers(&mut response, &stored.version);
         return Ok(response);
     }
-    Ok(ok_resource(&stored))
+    Ok(ok_json((body, pending), &stored.version))
 }
 
 /// `GET /{type}/{id}/_history/{vid}`: 200, 404 when unknown, 410 for a delete version.
@@ -90,9 +122,7 @@ pub(crate) async fn vread(
     {
         tx.commit().await?;
     }
-    let mut response = fhir_json(StatusCode::OK, entry.json.as_str().to_owned());
-    version_headers(&mut response, &entry.version);
-    Ok(response)
+    Ok(ok_json(with_pending(&server, &entry.json), &entry.version))
 }
 
 /// The request body as a resource of `resource_type` that passed tiers 1 and 2, with the id

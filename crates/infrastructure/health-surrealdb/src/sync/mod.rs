@@ -968,6 +968,11 @@ impl SurrealStore {
                     tx.apply_version(item).await?;
                 }
             }
+            let mut sql = Sql::default();
+            queue_prefetch(&mut sql, &upstream.to_string(), fresh.iter().copied())?;
+            if !sql.is_empty() {
+                sql.run(tx.tx()?).await.map_err(write_error)?;
+            }
             tx.commit().await?;
             applied += fresh.len();
         }
@@ -1111,6 +1116,51 @@ impl SurrealStore {
         self.connection
             .db()
             .query("DELETE type::record('sync_blob_queue', [$peer, $hash])")
+            .bind(("peer", peer.to_owned()))
+            .bind(("hash", hash.to_string()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?;
+        Ok(())
+    }
+
+    /// The blobs queued to fetch ahead of need from `peer`, oldest first (ADR 0021).
+    pub async fn queued_fetches(&self, peer: &str) -> Result<Vec<BlobRef>, StoreError> {
+        #[derive(SurrealValue)]
+        struct Row {
+            hash: String,
+            size: i64,
+            content_type: String,
+        }
+        let rows: Vec<Row> = self
+            .connection
+            .db()
+            .query(
+                "SELECT record::id(id)[1] AS hash, size, content_type, queued_at \
+                 FROM sync_blob_fetch:[$peer]..[$peer, {}] ORDER BY queued_at",
+            )
+            .bind(("peer", peer.to_owned()))
+            .await
+            .and_then(surrealdb::IndexedResults::check)
+            .map_err(unavailable)?
+            .take(0)
+            .map_err(unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(BlobRef {
+                    hash: row.hash.parse().map_err(|_| corrupt("blob hash"))?,
+                    size: u64::try_from(row.size).map_err(|_| corrupt("blob size"))?,
+                    content_type: row.content_type,
+                })
+            })
+            .collect()
+    }
+
+    /// Takes a blob off the fetch queue for `peer` once it is held here.
+    pub async fn blob_fetched(&self, peer: &str, hash: &ContentHash) -> Result<(), StoreError> {
+        self.connection
+            .db()
+            .query("DELETE type::record('sync_blob_fetch', [$peer, $hash])")
             .bind(("peer", peer.to_owned()))
             .bind(("hash", hash.to_string()))
             .await
@@ -2148,6 +2198,35 @@ pub struct SurrealReplica<'a> {
     lane: Lane,
 }
 
+/// Queues, in `sql`, each blob that the `applied` records of pre-fetch types reference, to be
+/// fetched from `upstream` ahead of need (ADR 0021).
+fn queue_prefetch<'a>(
+    sql: &mut Sql,
+    upstream: &str,
+    applied: impl Iterator<Item = &'a Item>,
+) -> Result<(), WriteError> {
+    let upstream = sql.str(upstream);
+    for item in applied.filter(|item| {
+        item.kind != Kind::Op
+            && !item.deleted
+            && health_sync_protocol::prefetched(&item.resource_type)
+    }) {
+        for blob in &item.blobs {
+            let hash = sql.str(blob.hash.to_string());
+            let size = sql.value(Bind::Int(
+                i64::try_from(blob.size).map_err(|_| WriteError::Store(corrupt("blob size")))?,
+            ));
+            let content_type = sql.str(blob.content_type.as_str());
+            sql.push(format!(
+                "UPSERT type::record('sync_blob_fetch', [{upstream}, {hash}]) \
+                 SET size = {size}, content_type = {content_type}, \
+                 queued_at = queued_at ?? time::now()"
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl<'a> SurrealReplica<'a> {
     /// Applies what `upstream` serves in `lane`, checkpointing that lane.
     pub fn new(store: &'a SurrealStore, upstream: NodeId, lane: Lane) -> Self {
@@ -2251,6 +2330,16 @@ impl Replica for SurrealReplica<'_> {
         }
         let mut sql = Sql::default();
         let peer = sql.str(checkpoint.node.to_string());
+        queue_prefetch(
+            &mut sql,
+            &self.upstream.to_string(),
+            group
+                .items
+                .iter()
+                .zip(decisions)
+                .filter(|(_, decision)| !matches!(decision, ApplyDecision::Skip))
+                .map(|(item, _)| item),
+        )?;
         let lane = sql.str(self.lane.key());
         let epoch = sql.str(checkpoint.epoch.as_str());
         let seq = sql.value(Bind::Int(
