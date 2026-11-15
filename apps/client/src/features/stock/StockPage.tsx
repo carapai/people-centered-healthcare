@@ -5,7 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { messages, productMessages } from '../../i18n/messages'
+import { equipmentMessages, messages, productMessages } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { onHandQuery, reorderQuery, type OnHand, type Suggestion } from './api'
 
@@ -50,6 +50,7 @@ export function StockPage() {
       <Link to="/stock/receive">{intl.formatMessage(messages.stReceive)}</Link>
       <Link to="/stock/requisitions">{intl.formatMessage(messages.rqTitle)}</Link>
       <Link to="/stock/products">{intl.formatMessage(productMessages.pdTitle)}</Link>
+      <Link to="/stock/equipment">{intl.formatMessage(equipmentMessages.eqTitle)}</Link>
       {onHand.isError ? (
         <p role="alert" className={css({ color: 'danger.text' })}>
           {intl.formatMessage(messages.stFailed)}

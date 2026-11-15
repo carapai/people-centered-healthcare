@@ -8,7 +8,7 @@ import { useIntl } from 'react-intl'
 import { messages } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { DEFAULT_STORE } from './StockPage'
-import { StockError, lineComplete, readGs1, receiveGoods, type ReceivedLine } from './api'
+import { StockError, lineComplete, parseSerials, readGs1, receiveGoods, type ReceivedLine } from './api'
 
 const button = css({
   minHeight: 'control',
@@ -31,23 +31,29 @@ interface LineForm {
   packSize: string
   unitCost: string
   barcode: string
+  serials: string
 }
 
-const blank: LineForm = { product: '', batch: '', expiry: '', quantity: '', packSize: '1', unitCost: '', barcode: '' }
+const blank: LineForm = { product: '', batch: '', expiry: '', quantity: '', packSize: '1', unitCost: '', barcode: '', serials: '' }
 
-const toLine = (f: LineForm): ReceivedLine => ({
-  product: f.product,
-  batch: f.batch,
-  expiry: f.expiry,
-  quantity: Number(f.quantity),
-  pack_size: Number(f.packSize),
-  unit_cost: f.unitCost,
-})
+const toLine = (f: LineForm): ReceivedLine => {
+  const serials = parseSerials(f.serials)
+  return {
+    product: f.product,
+    batch: serials.length > 0 ? '' : f.batch,
+    expiry: serials.length > 0 ? '' : f.expiry,
+    quantity: Number(f.quantity),
+    pack_size: Number(f.packSize),
+    unit_cost: f.unitCost,
+    ...(serials.length > 0 ? { serials } : {}),
+  }
+}
 
 /**
  * A goods received note (inventory-and-procurement.md § Receiving; #130): the supplier and their
  * delivery number, and a line per batch, each received at its unit cost. A GS1 barcode, where
- * there is one, fills a line's batch and expiry; it is never required.
+ * there is one, fills a line's batch and expiry; it is never required. A line of a product
+ * tracked as equipment gives a serial number per unit instead of a batch and expiry (ADR 0064).
  */
 export function ReceivePage() {
   const intl = useIntl()
@@ -129,11 +135,11 @@ export function ReceivePage() {
               <Field.Label>{intl.formatMessage(messages.stProduct)}</Field.Label>
               <Field.Input value={line.product} onChange={set(index, 'product')} autoComplete="off" />
             </Field.Root>
-            <Field.Root required>
+            <Field.Root required={line.serials.trim() === ''}>
               <Field.Label>{intl.formatMessage(messages.stBatch)}</Field.Label>
               <Field.Input value={line.batch} onChange={set(index, 'batch')} autoComplete="off" />
             </Field.Root>
-            <Field.Root required>
+            <Field.Root required={line.serials.trim() === ''}>
               <Field.Label>{intl.formatMessage(messages.stExpiry)}</Field.Label>
               <Field.Input type="date" value={line.expiry} onChange={set(index, 'expiry')} />
             </Field.Root>
@@ -148,6 +154,11 @@ export function ReceivePage() {
             <Field.Root required>
               <Field.Label>{intl.formatMessage(messages.stUnitCost)}</Field.Label>
               <Field.Input inputMode="decimal" value={line.unitCost} onChange={set(index, 'unitCost')} />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>{intl.formatMessage(messages.stSerials)}</Field.Label>
+              <Field.Textarea value={line.serials} onChange={set(index, 'serials')} rows={3} autoComplete="off" />
+              <Field.HelperText>{intl.formatMessage(messages.stSerialsHelp)}</Field.HelperText>
             </Field.Root>
           </fieldset>
         ))}
