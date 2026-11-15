@@ -13,6 +13,7 @@
 
 mod activation;
 mod auth;
+mod backup;
 mod config;
 mod node;
 mod package;
@@ -358,6 +359,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
+    if std::env::args().nth(1).as_deref() == Some("backup") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return backup::run(&config, &args).await;
+    }
     if std::env::args().nth(1).as_deref() == Some("node") {
         let args: Vec<String> = std::env::args().skip(2).collect();
         return node::run(&config, &args).await;

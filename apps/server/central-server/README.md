@@ -24,6 +24,10 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_REGISTRY_NIN_SYSTEM` | none | The national ID identifier system. With it, `/fhir` serves `Patient/$match` and the client registry's reviewer operations (`Patient/$merge`, `$link`, `$unlink`), source Patients carry their blocking keys, and block counts are recomputed hourly. `/api/registry/reviews` serves the review queue to reviewers |
 | `HEALTH_NODE_CODE` | `C1` | This node's short code in the numbers it mints. With the registry on, `/fhir/Patient/$register` mints MRNs as `{facility}-{node}-{sequence}` (ADR 0014) |
 | `HEALTH_SYNC_MAX_CONCURRENT_PUSHES` | `8` | Pushes and snapshots the sync server takes at once, across all nodes and one per node. The rest are answered `429` with a `Retry-After`, so the re-sync after a restore queues (ADR 0046) |
+| `HEALTH_BACKUP_DIR` | none | Where central's hourly encrypted backups go, on a volume apart from the database (#138; ADR 0046). Without it no backups are taken |
+| `HEALTH_BACKUP_KEY_FILE` | required with the directory | The backup master key, 64 hex characters (`central-server backup key <path>`), under 3-of-5 custody ([runbook](../../../ops/runbooks/central-dr.md)) |
+| `HEALTH_BACKUP_INTERVAL_SECS` | `3600` | The backup interval: the RPO for global records |
+| `HEALTH_BACKUP_TEST_SECS` | `604800` | How often the newest backup is test-restored into the `restore_test` scratch database, which `HEALTH_DATABASE` may never name |
 | `HEALTH_PORTAL_REDIRECT_URIS` | none | The patient portal's redirect URIs, comma-separated (#111). With it, a patient client signs patients in with a one-time code to their phone, and, with the registry and access policy, `/api/portal` serves self-registration |
 | `HEALTH_PORTAL_CLIENT_ID` | `health-portal` | The patient portal's client |
 | `HEALTH_PORTAL_COUNTRY_CODE` | `256` | The country code of national phone numbers (`0772…`) |
@@ -122,6 +126,17 @@ SIGTERM or Ctrl-C shuts the server down gracefully.
 | `package export <id> --out <dir>` | Writes a published package's `<name>-<version>.tgz` and `.tgz.sig` |
 
 Simulation runs the package's workflow scenarios (`tests/` files of type `workflow-scenario`) in `WorkflowSandbox` (#101); any failing scenario returns the package to Draft.
+
+## Backups
+
+The running server takes a backup every `HEALTH_BACKUP_INTERVAL_SECS`, keeps 35 daily, 12 weekly and 12 monthly copies, and test-restores the newest weekly into `restore_test` (ADR 0046). Each backup is a snapshot export of the database with the attachments in `HEALTH_FILES_DIR`, encrypted under the backup key. Outcomes are in `status.json` under `HEALTH_BACKUP_DIR`; failures raise `backup-failed`, `backup-stale` and `backup-test-failed`. On demand (`src/backup.rs`):
+
+- `central-server backup key <path>`: writes a new random key, owner-only, and refuses a path that exists.
+- `central-server backup now | verify | test | status`: a backup now (the server may keep running), verify every backup, run the test restore, or print the status.
+- `central-server backup copy <dir>`: copies the newest backup and its attachments to `dir`, the offsite in-country copy, and verifies the copy.
+- `central-server backup restore <backup> --into <database>`: restores into a new database on the server, and the attachments into `HEALTH_FILES_DIR`. It refuses `HEALTH_DATABASE`, the scratch database and any database that holds a table. Then set `HEALTH_DATABASE` to the new database and start central. Edges re-push what the backup lacks (ADR 0065).
+
+The procedure, roles and drills are in [ops/runbooks/central-dr.md](../../../ops/runbooks/central-dr.md).
 
 ## OpenAPI
 
