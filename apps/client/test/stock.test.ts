@@ -17,8 +17,11 @@ import {
   requestStock,
   requisitionsQuery,
   setEquipmentStatus,
+  totalBookValue,
 } from '../src/features/stock/api'
 import { fakeTransport } from './fake'
+
+const valued = (bookValue: string | null) => ({ id: '', product: '', name: '', serial: '', location: '', status: 'available' as const, received: null, change: null, transfer: null, cost: null, bookValue })
 
 const line = { product: 'amox', batch: 'B42', expiry: '2027-06-30', quantity: 1000, pack_size: 100, unit_cost: '1.50' }
 
@@ -94,5 +97,11 @@ describe('stock', () => {
     await expect(setEquipmentStatus(fakeTransport(() => ({ status: 422, body: { error: 'say why BP-1 is faulty' } })), 'u', 'faulty', '')).rejects.toEqual(
       new StockError(422, 'say why BP-1 is faulty'),
     )
+  })
+
+  test('the total book value is summed exactly, leaving out units of unknown value', () => {
+    expect(totalBookValue([valued('0.10'), valued('0.20'), valued(null)])).toBe('0.30')
+    expect(totalBookValue([valued('250000'), valued('1249999.5')])).toBe('1499999.50')
+    expect(totalBookValue([valued(null)])).toBeNull()
   })
 })

@@ -344,6 +344,18 @@ async fn the_facility_lists_its_equipment_and_changes_its_status_and_location() 
     assert_eq!(list.as_array().map(Vec::len), Some(2), "{list}");
     assert_eq!(list[0]["serial"], "BP-1", "sorted by name, then serial");
     assert_eq!(list[0]["status"], "available");
+    // Its cost from the receipt; with no useful life set, carried at cost (#453).
+    assert_eq!(list[0]["cost"], "250000");
+    assert_eq!(list[0]["bookValue"], "250000");
+    // A useful life is for equipment only.
+    let stocked = json!({
+        "code": "gauze-roll", "name": "Gauze roll", "baseUnit": "roll",
+        "packSizes": [1], "usefulLifeYears": 5,
+    });
+    assert_eq!(
+        send(&app, "POST", "/products", Some(stocked)).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
     let id = list[0]["id"].as_str().expect("id").to_owned();
 
     let (status, refused) = send(

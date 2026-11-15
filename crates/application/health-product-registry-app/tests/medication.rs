@@ -20,6 +20,7 @@ fn al() -> Product {
         synonyms: vec!["Coartem".into()],
         active: true,
         equipment: false,
+        useful_life_years: None,
     }
 }
 
@@ -54,6 +55,7 @@ fn a_product_is_a_valid_medication_and_reads_back_the_same() {
         synonyms: vec![],
         gtin: None,
         equipment: true,
+        useful_life_years: Some(5),
         ..al()
     };
     let resource = medication(&bp, "0190f1a2-7c3d-7e4f-8a5b-00000000a003");

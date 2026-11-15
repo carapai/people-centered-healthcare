@@ -67,7 +67,8 @@ pub struct ChartTemplate {
     /// Tills, each with a cash account.
     pub tills: Vec<String>,
     /// Inventory accounting (typically private facilities; off by default for public ones):
-    /// the inventory asset, cost of goods issued, stock adjustments and supplier payables.
+    /// the inventory asset, cost of goods issued, stock adjustments and supplier payables, and
+    /// equipment at cost with its write-offs.
     pub inventory: bool,
 }
 
@@ -87,6 +88,10 @@ pub const COST_OF_GOODS: &str = "expense/cost-of-goods";
 pub const STOCK_ADJUSTMENT: &str = "expense/stock-adjustment";
 /// What is owed to suppliers for goods received.
 pub const PAYABLE: &str = "payable/suppliers";
+/// Equipment held, at cost (a fixed asset), with inventory accounting (ADR 0064).
+pub const EQUIPMENT: &str = "asset/equipment";
+/// Equipment written off when it is retired.
+pub const EQUIPMENT_WRITE_OFF: &str = "expense/equipment-write-off";
 
 impl ChartOfAccounts {
     /// An empty chart.
@@ -143,6 +148,12 @@ impl ChartOfAccounts {
                 (COST_OF_GOODS, AccountKind::Expense, "Cost of goods issued"),
                 (STOCK_ADJUSTMENT, AccountKind::Expense, "Stock adjustments"),
                 (PAYABLE, AccountKind::Liability, "Supplier payables"),
+                (EQUIPMENT, AccountKind::Asset, "Equipment at cost"),
+                (
+                    EQUIPMENT_WRITE_OFF,
+                    AccountKind::Expense,
+                    "Equipment written off",
+                ),
             ] {
                 chart.add(Account {
                     code: code.to_owned(),

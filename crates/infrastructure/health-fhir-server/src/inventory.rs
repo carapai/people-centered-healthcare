@@ -121,7 +121,8 @@ impl<T: Transaction> EquipmentIntake<T> for Equipment {
             &unit.location,
             &unit.note,
         )
-        .map_err(|e| IntakeError::Refused(format!("serial {}: {e}", unit.serial)))?;
+        .map_err(|e| IntakeError::Refused(format!("serial {}: {e}", unit.serial)))?
+        .with_acquisition(unit.unit_cost, unit.received_at);
         health_equipment_app::register(tx, &equipment)
             .await
             .map_err(|error| match error {
@@ -519,6 +520,9 @@ struct ProductBody {
     /// Tracked as Equipment, one record per serial, instead of stocked (ADR 0064).
     #[serde(default)]
     equipment: bool,
+    /// For Equipment: the years it depreciates over (#453).
+    #[serde(default)]
+    useful_life_years: Option<u32>,
 }
 
 fn active() -> bool {
@@ -530,6 +534,7 @@ fn product_json(id: &str, product: &health_product_registry::Product) -> Value {
         "id": id, "code": product.code, "name": product.name, "baseUnit": product.base_unit,
         "packSizes": product.pack_sizes, "synonyms": product.synonyms, "medicines": product.medicines,
         "gtin": product.gtin, "active": product.active, "equipment": product.equipment,
+        "usefulLifeYears": product.useful_life_years,
     })
 }
 
@@ -587,6 +592,7 @@ async fn save_product(
             .collect(),
         active: body.active,
         equipment: body.equipment,
+        useful_life_years: body.useful_life_years,
     };
     match health_product_registry_app::Products::new(server.store.clone())
         .save(id, &product)
@@ -607,7 +613,8 @@ async fn save_product(
     }
 }
 
-fn equipment_json(unit: &health_equipment::Equipment) -> Value {
+/// `unit` as the API gives it, with its book value when it is known.
+fn equipment_json(unit: &health_equipment::Equipment, book_value: Option<Decimal>) -> Value {
     json!({
         "id": unit.id.to_string(), "product": unit.product, "name": unit.name,
         "serial": unit.serial, "location": unit.location, "status": unit.status.code(),
@@ -618,6 +625,8 @@ fn equipment_json(unit: &health_equipment::Equipment) -> Value {
         "transfer": unit.transfer.as_ref().map(|t| json!({
             "from": t.from, "to": t.to, "by": t.by, "at": t.at.to_string(),
         })),
+        "cost": unit.acquired.map(|a| a.cost.normalize().to_string()),
+        "bookValue": book_value.map(|v| v.normalize().to_string()),
     })
 }
 
@@ -649,7 +658,23 @@ async fn list_equipment(
             .filter(|unit| query.location.as_ref().is_none_or(|l| *l == unit.location))
             .collect();
     list.sort_by(|a, b| (&a.name, &a.serial).cmp(&(&b.name, &b.serial)));
-    Json(list.iter().map(equipment_json).collect::<Vec<_>>()).into_response()
+    // Book value is a projection from each Product's useful life (#453).
+    let lives: BTreeMap<String, u32> = health_product_registry_app::products(
+        &crate::programs::found(&server, "Medication", &[]).await,
+    )
+    .into_iter()
+    .filter_map(|p| Some((p.code, p.useful_life_years?)))
+    .collect();
+    let now = Timestamp::now();
+    Json(
+        list.iter()
+            .map(|unit| {
+                let value = unit.book_value(lives.get(&unit.product).copied(), now);
+                equipment_json(unit, value)
+            })
+            .collect::<Vec<_>>(),
+    )
+    .into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -698,7 +723,7 @@ fn answer(
 ) -> Response {
     use health_equipment_app::EquipmentError as E;
     match changed {
-        Ok(unit) => Json(equipment_json(&unit)).into_response(),
+        Ok(unit) => Json(equipment_json(&unit, None)).into_response(),
         Err(error) => {
             let status = match &error {
                 E::NotFound(_) => StatusCode::NOT_FOUND,

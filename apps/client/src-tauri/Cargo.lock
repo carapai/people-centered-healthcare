@@ -3210,6 +3210,7 @@ name = "health-equipment"
 version = "0.1.0"
 dependencies = [
  "health-time",
+ "rust_decimal",
  "serde",
  "thiserror 2.0.21",
  "uuid",
@@ -3221,9 +3222,11 @@ version = "0.1.0"
 dependencies = [
  "health-access-policy",
  "health-equipment",
+ "health-financial-ledger",
  "health-identifiers",
  "health-persistence",
  "health-time",
+ "rust_decimal",
  "serde_json",
  "thiserror 2.0.21",
  "uuid",

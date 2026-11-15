@@ -13,7 +13,8 @@
 //! - `note`: its latest change, by whom and when. Its versions (`_history`) are its maintenance
 //!   history;
 //! - the [`TRANSFER`] extension while it is in transit to another facility: `from`, `to`, `by`
-//!   and `at`.
+//!   and `at`;
+//! - the [`ACQUISITION`] extension: what it cost (`cost`) and when it was received (`at`).
 //!
 //! [`device`] writes one, [`equipment`] reads one back, and [`register`] creates one in the
 //! caller's transaction, refusing a unit already registered. [`Equipments::change`] applies a
@@ -24,14 +25,25 @@
 //! transaction, and [`handed_over`] when an edge's dispatch reaches central by sync. As the edge
 //! pushes its outbox in order, everything it wrote of the unit before the dispatch is at central
 //! by then.
+//!
+//! **Inventory accounting** (#453): [`equipment_postings`] gives the postings of a change to a
+//! unit, at its cost: its receipt (equipment against supplier payables), its retirement (written
+//! off), and its hand-over to another facility (its cost moved between the two facilities). Book
+//! value is a projection ([`Equipment::book_value`]) and is not posted.
+
+use std::str::FromStr;
 
 use health_access_policy::FACILITY_TAG_SYSTEM;
-use health_equipment::{Change, Equipment, EquipmentRefused, Status, Transfer};
+use health_equipment::{Acquisition, Change, Equipment, EquipmentRefused, Status, Transfer};
+use health_financial_ledger::{
+    Currency, Dimensions, EQUIPMENT, EQUIPMENT_WRITE_OFF, Line, Money, PAYABLE, Posting, Side,
+};
 use health_identifiers::{OpId, ResourceId};
 use health_persistence::{
     Precondition, RawJson, ResourceType, Store, StoreError, Transaction, WriteError, WriteRequest,
 };
 use health_time::Timestamp;
+use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
 /// The platform category system of a FHIR Device (ADR 0064).
@@ -42,6 +54,8 @@ pub const PRODUCT_SYSTEM: &str = "urn:health:product";
 pub const STATUS_SYSTEM: &str = "urn:health:equipment-status";
 /// The extension naming the goods received note a unit arrived on.
 pub const RECEIVED: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/equipment-received";
+/// The extension of a unit's acquisition: its cost and when it was received.
+pub const ACQUISITION: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/equipment-acquisition";
 /// The extension of a unit's transfer to another facility, while it is in transit.
 pub const TRANSFER: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/equipment-transfer";
 
@@ -74,6 +88,17 @@ pub fn device(unit: &Equipment) -> Value {
                 { "url": "to", "valueString": transfer.to },
                 { "url": "by", "valueString": transfer.by },
                 { "url": "at", "valueDateTime": transfer.at.to_string() },
+            ],
+        }));
+    }
+    if let Some(acquired) = &unit.acquired
+        && let Ok(cost) = serde_json::Number::from_str(&acquired.cost.normalize().to_string())
+    {
+        extensions.push(json!({
+            "url": ACQUISITION,
+            "extension": [
+                { "url": "cost", "valueDecimal": cost },
+                { "url": "at", "valueDateTime": acquired.at.to_string() },
             ],
         }));
     }
@@ -138,6 +163,14 @@ pub fn equipment(resource: &Value) -> Option<Equipment> {
         received: extension(resource, RECEIVED)
             .and_then(|e| e["valueString"].as_str())
             .map(str::to_owned),
+        acquired: extension(resource, ACQUISITION).and_then(|e| {
+            let part = |name: &str| e["extension"].as_array()?.iter().find(|p| p["url"] == name);
+            Some(Acquisition {
+                cost: Decimal::from_str(&part("cost")?["valueDecimal"].as_number()?.to_string())
+                    .ok()?,
+                at: part("at")?["valueDateTime"].as_str()?.parse().ok()?,
+            })
+        }),
         transfer: extension(resource, TRANSFER).and_then(|e| {
             let part = |name: &str| {
                 e["extension"]
@@ -180,6 +213,80 @@ fn extension<'a>(resource: &'a Value, url: &str) -> Option<&'a Value> {
 pub fn handed_over(resource: &Value) -> Option<Value> {
     let mut unit = equipment(resource)?;
     unit.hand_over().then(|| device(&unit))
+}
+
+/// The inventory-accounting posting of a unit changing from `before` (`None` when it was just
+/// registered) to `after`, at its cost in `currency`, if the change moves value (ADR 0064):
+/// - **received:** equipment, against supplier payables, at the receiving facility;
+/// - **retired:** its cost written off;
+/// - **handed over** to another facility: its cost out of the sender and into the receiver.
+///
+/// `None` for any other change, for a unit whose cost is not known, and at zero cost.
+#[must_use]
+pub fn equipment_postings(
+    before: Option<&Equipment>,
+    after: &Equipment,
+    currency: Currency,
+    at: Timestamp,
+) -> Option<Posting> {
+    let amount = Money::rounded(after.acquired?.cost, currency);
+    if amount.is_zero() {
+        return None;
+    }
+    let line = |account: &str, side: Side, facility: &str| Line {
+        account: account.to_owned(),
+        side,
+        amount,
+        dimensions: Dimensions {
+            facility: facility.to_owned(),
+            department: None,
+            service: None,
+            program: None,
+            funding_source: None,
+            fund: None,
+            encounter: None,
+            price_versions: std::collections::BTreeSet::new(),
+        },
+        original: None,
+    };
+    let unit = format!("{} {}", after.product, after.serial);
+    let (event, description, lines) = match before {
+        None => (
+            "received",
+            format!("Equipment received: {unit}"),
+            vec![
+                line(EQUIPMENT, Side::Debit, &after.facility),
+                line(PAYABLE, Side::Credit, &after.facility),
+            ],
+        ),
+        Some(before) if before.status != Status::Retired && after.status == Status::Retired => (
+            "retired",
+            format!("Equipment retired: {unit}"),
+            vec![
+                line(EQUIPMENT_WRITE_OFF, Side::Debit, &after.facility),
+                line(EQUIPMENT, Side::Credit, &after.facility),
+            ],
+        ),
+        Some(before) if before.facility != after.facility => (
+            "handed-over",
+            format!(
+                "Equipment handed over from {} to {}: {unit}",
+                before.facility, after.facility
+            ),
+            vec![
+                line(EQUIPMENT, Side::Debit, &after.facility),
+                line(EQUIPMENT, Side::Credit, &before.facility),
+            ],
+        ),
+        Some(_) => return None,
+    };
+    Some(Posting {
+        id: format!("equipment-{}-{event}-{}", after.id, at.as_second()),
+        at,
+        description,
+        lines,
+        reverses: None,
+    })
 }
 
 /// Why a unit could not be registered.

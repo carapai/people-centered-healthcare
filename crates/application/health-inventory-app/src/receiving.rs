@@ -10,6 +10,7 @@ use health_inventory::transfers::{Transfer, TransferLine};
 use health_inventory::{Movement, MovementKind, Origin, Status, StockStore};
 use health_persistence::{Store, WriteError};
 use health_time::{SignedDuration, Timestamp};
+use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
 use crate::transfers::Step;
@@ -28,6 +29,10 @@ pub struct ReceivedUnit {
     pub facility: String,
     /// The goods received note.
     pub note: String,
+    /// What one unit cost, from the note's line: the unit's acquisition cost (#453).
+    pub unit_cost: Decimal,
+    /// When it was received, from when it depreciates.
+    pub received_at: Timestamp,
 }
 
 /// Why a unit of Equipment was not registered.
@@ -121,6 +126,8 @@ where
                                 location: note.store.clone(),
                                 facility: sender.node.clone(),
                                 note: note.id.clone(),
+                                unit_cost: line.unit_cost,
+                                received_at: now,
                             };
                             equipment.register(&mut tx, unit).await.map_err(
                                 |error| match error {

@@ -21,6 +21,7 @@ Stock for staff with `stock.manage` (inventory-and-procurement.md; #130).
   - **Changes:** mark a unit available, faulty, under maintenance or retired, with a note of why (needed unless available); move it to another location; or send it to another facility by its code. Once sent, the unit is that facility's.
   - **Arriving:** a unit sent to this facility shows as in transit, and is received into one of its locations before it can be changed.
   - **History:** each change is a new version of the unit's Device (`Device/{id}/_history`).
+  - **Value:** each unit's cost and book value (straight-line over its product's useful life, set on the product), and the total book value held.
 
 ## Tests
 
