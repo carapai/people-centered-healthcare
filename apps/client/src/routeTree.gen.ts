@@ -29,6 +29,7 @@ import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
+import { Route as PrototypeFormDesignerRouteImport } from './routes/prototype.form-designer'
 import { Route as PrototypeStudioWorkspaceRouteImport } from './routes/prototype.studio-workspace'
 import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
 import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
@@ -143,6 +144,11 @@ const PortalCallbackRoute = PortalCallbackRouteImport.update({
   path: '/portal/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeFormDesignerRoute = PrototypeFormDesignerRouteImport.update({
+  id: '/prototype/form-designer',
+  path: '/prototype/form-designer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrototypeStudioWorkspaceRoute =
   PrototypeStudioWorkspaceRouteImport.update({
     id: '/prototype/studio-workspace',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/form-designer': typeof PrototypeFormDesignerRoute
   '/prototype/studio-workspace': typeof PrototypeStudioWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/form-designer': typeof PrototypeFormDesignerRoute
   '/prototype/studio-workspace': typeof PrototypeStudioWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/form-designer': typeof PrototypeFormDesignerRoute
   '/prototype/studio-workspace': typeof PrototypeStudioWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/form-designer'
     | '/prototype/studio-workspace'
     | '/reception/queues'
     | '/registry/reviews'
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/form-designer'
     | '/prototype/studio-workspace'
     | '/reception/queues'
     | '/registry/reviews'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/form-designer'
     | '/prototype/studio-workspace'
     | '/reception/queues'
     | '/registry/reviews'
@@ -444,6 +456,7 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
+  PrototypeFormDesignerRoute: typeof PrototypeFormDesignerRoute
   PrototypeStudioWorkspaceRoute: typeof PrototypeStudioWorkspaceRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
@@ -602,6 +615,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/form-designer': {
+      id: '/prototype/form-designer'
+      path: '/prototype/form-designer'
+      fullPath: '/prototype/form-designer'
+      preLoaderRoute: typeof PrototypeFormDesignerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prototype/studio-workspace': {
       id: '/prototype/studio-workspace'
       path: '/prototype/studio-workspace'
@@ -716,6 +736,7 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
+  PrototypeFormDesignerRoute: PrototypeFormDesignerRoute,
   PrototypeStudioWorkspaceRoute: PrototypeStudioWorkspaceRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
