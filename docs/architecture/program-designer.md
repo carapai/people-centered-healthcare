@@ -1,6 +1,6 @@
 # Program designer
 
-This page consolidates how clinical programs (ART, TB, ANC, diabetes, hypertension, immunization, …; MASTER_PROMPT §44) are defined and delivered. The definition model is decided; the **Program Designer UX is not**, and stays in the map's Studio fog.
+This page consolidates how clinical programs (ART, TB, ANC, diabetes, hypertension, immunization, …; MASTER_PROMPT §44) are defined and delivered. The definition model is decided; the **Program Designer UX is not**: its scope is in [studio.md](studio.md), and its screens are an open ticket on the map.
 
 ## A program is a package
 
