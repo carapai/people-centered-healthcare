@@ -36,6 +36,7 @@ mod packages;
 mod payments;
 mod phone;
 mod pricing;
+mod releases;
 mod review;
 pub mod search;
 mod stock;

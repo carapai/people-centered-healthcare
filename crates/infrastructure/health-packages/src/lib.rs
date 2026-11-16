@@ -12,11 +12,15 @@
 //!   a USB stick: it checks the sha-256 the activation names, the signature against the national
 //!   root, the archive's safety, the index, and the publication rules and schemas again.
 //!
+//! - [`release`] reads a platform release's signed artifacts at central, and checks one before a
+//!   node stages it (#136).
+//!
 //! A package is identified by `name@version` and its sha-256 ([`Digest`]).
 
 mod archive;
 pub mod bump;
 mod contents;
+pub mod release;
 mod schemas;
 mod signature;
 pub mod terminology;

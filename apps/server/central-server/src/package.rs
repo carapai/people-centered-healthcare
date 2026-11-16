@@ -50,7 +50,10 @@ fn said(error: health_publication::Error) -> Failure {
 }
 
 /// `--flag value` pairs from `args`, refusing any flag not in `allowed`.
-fn flags<'a>(args: &'a [String], allowed: &[&str]) -> Result<Vec<(&'a str, &'a str)>, Failure> {
+pub(crate) fn flags<'a>(
+    args: &'a [String],
+    allowed: &[&str],
+) -> Result<Vec<(&'a str, &'a str)>, Failure> {
     let mut found = Vec::new();
     let mut rest = args.iter();
     while let Some(flag) = rest.next() {
@@ -63,7 +66,7 @@ fn flags<'a>(args: &'a [String], allowed: &[&str]) -> Result<Vec<(&'a str, &'a s
     Ok(found)
 }
 
-fn flag<'a>(found: &[(&str, &'a str)], name: &str) -> Result<&'a str, Failure> {
+pub(crate) fn flag<'a>(found: &[(&str, &'a str)], name: &str) -> Result<&'a str, Failure> {
     found
         .iter()
         .find(|(flag, _)| *flag == name)
@@ -171,7 +174,7 @@ fn record_line(record: &Record) -> String {
 }
 
 /// A scope as the operator writes it.
-fn scope(text: &str) -> Result<Scope, Failure> {
+pub(crate) fn scope(text: &str) -> Result<Scope, Failure> {
     let parts: Vec<&str> = text.split(':').collect();
     let named = |part: &str| (!part.trim().is_empty()).then(|| part.trim().to_owned());
     let scope = match parts.as_slice() {

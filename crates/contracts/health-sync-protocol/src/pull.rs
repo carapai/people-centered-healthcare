@@ -45,8 +45,10 @@ impl Lane {
             | "SearchParameter"
             | "StructureDefinition"
             | "ValueSet"
-            // Package activation records (configuration.md; ADR 0025).
-            | "activation" => Lane::Packages,
+            // Package activation records (configuration.md; ADR 0025), and software roll-out
+            // records (#136; deployment.md § Environments and rollout).
+            | "activation"
+            | "rollout" => Lane::Packages,
             "AuditEvent" | "Provenance" => Lane::Audit,
             _ => Lane::Clinical,
         }

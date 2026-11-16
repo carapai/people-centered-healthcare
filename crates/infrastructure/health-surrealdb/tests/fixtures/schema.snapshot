@@ -1329,6 +1329,9 @@ DEFINE TABLE plan_definition_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON plan_definition_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON plan_definition_history TYPE int PERMISSIONS FULL
   DEFINE INDEX plan_definition_history_last_updated ON plan_definition_history FIELDS last_updated, version_seq
+DEFINE TABLE platform_release TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON platform_release TYPE string PERMISSIONS FULL
+  DEFINE FIELD imported_at ON platform_release TYPE datetime PERMISSIONS FULL
 DEFINE TABLE practitioner TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON practitioner TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON practitioner TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -1480,6 +1483,10 @@ DEFINE TABLE related_person_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON related_person_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON related_person_history TYPE int PERMISSIONS FULL
   DEFINE INDEX related_person_history_last_updated ON related_person_history FIELDS last_updated, version_seq
+DEFINE TABLE release_rollout TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD data ON release_rollout TYPE string PERMISSIONS FULL
+  DEFINE FIELD issued_at ON release_rollout TYPE datetime PERMISSIONS FULL
+  DEFINE INDEX release_rollout_issued ON release_rollout FIELDS issued_at
 DEFINE TABLE request_orchestration TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON request_orchestration TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON request_orchestration TYPE array<record> DEFAULT [] PERMISSIONS FULL

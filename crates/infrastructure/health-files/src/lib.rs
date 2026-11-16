@@ -33,6 +33,10 @@ use sha2::{Digest, Sha256};
 /// The v1 size cap per attachment (ADR 0021).
 pub const MAX_BLOB_SIZE: u64 = 50 * 1024 * 1024;
 
+/// The size cap for a platform release's artifact, which central imports and nodes fetch by
+/// digest (#136): the edge's own limit on an update package.
+pub const MAX_RELEASE_SIZE: u64 = 512 * 1024 * 1024;
+
 /// The upload chunk size (synchronization.md § Attachments). Chunks may be smaller at the end.
 pub const CHUNK_SIZE: u64 = 1024 * 1024;
 
@@ -199,6 +203,14 @@ impl FsBlobStore {
     pub fn put(&self, content: impl Read) -> Result<Stored, BlobError> {
         let mut temp = tempfile_in(&self.root.join("tmp"))?;
         let (hash, size) = copy_hashing(content, &mut temp.file, MAX_BLOB_SIZE)?;
+        self.commit(temp, hash, size)
+    }
+
+    /// Stores `content`, streaming and hashing it; at most `limit` bytes. For what is not an
+    /// attachment, such as a release's artifacts ([`MAX_RELEASE_SIZE`]).
+    pub fn put_limited(&self, content: impl Read, limit: u64) -> Result<Stored, BlobError> {
+        let mut temp = tempfile_in(&self.root.join("tmp"))?;
+        let (hash, size) = copy_hashing(content, &mut temp.file, limit)?;
         self.commit(temp, hash, size)
     }
 
