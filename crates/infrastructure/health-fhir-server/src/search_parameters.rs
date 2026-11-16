@@ -174,6 +174,9 @@ pub fn registry_with(
         .chain(labelled.into_iter().map(|t| (t, "_security")))
         .chain(SUMMARY_PATIENT_PATHS.iter().map(|(t, _)| (*t, "patient")))
         .chain([
+            // Not facility-scope, but a patient's appointment request names its facility by tag,
+            // and the clinical inbox finds the requests there by `_tag` (#114).
+            ("Appointment", "_tag"),
             ("Questionnaire", "status"),
             ("Questionnaire", "url"),
             ("Questionnaire", "version"),
@@ -238,4 +241,16 @@ pub fn registry_with(
         }
     }
     (registry, reindex)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::search_registry;
+
+    #[test]
+    fn appointment_requests_are_found_by_their_facility_tag() {
+        // The clinical inbox searches `Appointment?_tag=urn:health:facility|{facility}`; without
+        // the parameter the search is refused and no appointment request ever shows (#114).
+        assert!(search_registry().get("Appointment", "_tag").is_some());
+    }
 }
