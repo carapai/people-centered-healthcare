@@ -13,6 +13,22 @@ bun run test:e2e:edge             # Playwright against facility-edge, built afte
 bun run build:tauri               # desktop webview bundle (--mode tauri)
 ```
 
+## A seeded local backend
+
+The e2e backend also runs by hand, for exploring the app with data:
+
+```sh
+cargo build -p central-server -p synthetic-data   # from the repository root
+HEALTH_SEED=1 bun e2e/backend.ts                  # central on 18080, SurrealDB in memory on 18000
+export HEALTH_DEV_BACKEND=http://127.0.0.1:18080        # in another shell: the app on 4173, as Playwright serves it
+bun run build && bunx --bun vite preview --port 4173 --strictPort
+```
+
+- **Seed data:** `HEALTH_SEED=1` loads a small synthetic world from `tools/synthetic-data`: about 275 facilities with their stores and stock, 20 medicines, a price book, payers and contracts, and 300 patients by household. `HEALTH_SEED=<n>` loads `n` patients. It takes about 2.5 minutes, most of it stock. Everything is in memory, so it is seeded again each start.
+- **Admin:** sign in at KAM013 as `admin` / `harbour lantern meadow quartz` (`e2e/users.ts`), who holds every right: `*.cruds`, break-glass and every named permission (`ADMIN_PERMISSIONS`). A permission added to the code belongs in that list too. The e2e users are provisioned as well.
+- **Beside another backend:** `HEALTH_E2E_CENTRAL_PORT`, `HEALTH_E2E_DB_PORT` and `HEALTH_DEV_OTP_OUTBOX` move its ports and one-time-code outbox.
+- The e2e suite never sets `HEALTH_SEED`, so its runs start empty as before.
+
 ## Layout
 
 - `src/platform/` is the only place that knows the runtime.
