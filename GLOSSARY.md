@@ -70,6 +70,10 @@ _Avoid_: Service (unqualified), product
 An immutable, versioned artefact that describes how care or configuration should work, such as a Questionnaire, workflow definition, program definition or ValueSet, referenced by canonical URL and version.
 _Avoid_: Template, config, form (for the definition)
 
+**Draft Holder**:
+The one author who may currently edit, check, submit, hand over or withdraw a package's draft; everyone who has held a draft counts as its author, so none of them may review or approve it.
+_Avoid_: Owner, co-author, assignee
+
 **Extraction Mapping**:
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform
