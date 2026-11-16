@@ -5,14 +5,16 @@
 // the workspace's debug build).
 //
 // Run by hand with HEALTH_SEED=1 (or a patient count, e.g. HEALTH_SEED=1000), it also loads a
-// small synthetic world as the admin (e2e/seed.ts; SYNTHETIC_DATA_BIN, default the workspace's
-// debug build of tools/synthetic-data). Everything is in memory: it is seeded again each start.
+// small synthetic world as the admin, with visits, vital signs, stock and appointments at KAM013
+// (e2e/seed.ts, e2e/activity.ts; SYNTHETIC_DATA_BIN, default the workspace's debug build of
+// tools/synthetic-data). Everything is in memory: it is seeded again each start.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+import { activity } from './activity'
 import { seed, signIn } from './seed'
 import { ADMIN_PERMISSIONS, OTP_OUTBOX, USERS } from './users'
 
@@ -166,7 +168,8 @@ if (seedPatients > 0) {
     await new Promise((r) => setTimeout(r, 250))
   }
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
-  seed(syntheticBin, dir, CENTRAL, token, seedPatients)
+  const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)
+  process.stdout.write(`${await activity(CENTRAL, token, generated)}\n`)
   process.stdout.write(`seeded ${seedPatients} patients; sign in as ${USERS.admin.username} / ${USERS.admin.password} at KAM013\n`)
 }
 process.stdout.write('e2e backend ready\n')

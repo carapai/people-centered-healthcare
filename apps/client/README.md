@@ -25,6 +25,10 @@ bun run build && bunx --bun vite preview --port 4173 --strictPort
 ```
 
 - **Seed data:** `HEALTH_SEED=1` loads a small synthetic world from `tools/synthetic-data`: about 275 facilities with their stores and stock, 20 medicines, a price book, payers and contracts, and 300 patients by household. `HEALTH_SEED=<n>` loads `n` patients. It takes about 2.5 minutes, most of it stock. Everything is in memory, so it is seeded again each start.
+- **Activity at KAM013** (`e2e/activity.ts`), through the same APIs the screens use:
+  - **Stock:** 18 products in the product master, received into `Location/pharmacy` (the Stock screen's default store) and `Location/main-store`. Some pharmacy batches expire within three months. A ward's requisition waits for the pharmacy.
+  - **Visits:** 18 patients checked in. 6 wait at triage, 6 are triaged and wait for consultation with their vital signs recorded, and 6 visits are completed.
+  - **Appointments:** 11 booked over the next two weeks, and 5 patients' requests waiting in the clinician's inbox.
 - **Admin:** sign in at KAM013 as `admin` / `harbour lantern meadow quartz` (`e2e/users.ts`), who holds every right: `*.cruds`, break-glass and every named permission (`ADMIN_PERMISSIONS`). A permission added to the code belongs in that list too. The e2e users are provisioned as well.
 - **Beside another backend:** `HEALTH_E2E_CENTRAL_PORT`, `HEALTH_E2E_DB_PORT` and `HEALTH_DEV_OTP_OUTBOX` move its ports and one-time-code outbox.
 - The e2e suite never sets `HEALTH_SEED`, so its runs start empty as before.
