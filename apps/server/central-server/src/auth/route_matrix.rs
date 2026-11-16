@@ -280,6 +280,7 @@ const INVENTORY: &[Mounted] = &[
             "/sync/v1/blobs/{hash}/{size}",
             "/sync/v1/blobs/{hash}/{size}/{offset}",
             "/sync/v1/blobs/{hash}/content",
+            "/sync/v1/releases/{hash}/{offset}",
             "/sync/v1/break-glass",
             "/sync/v1/transfers",
             "/sync/v1/transfers/inbound",

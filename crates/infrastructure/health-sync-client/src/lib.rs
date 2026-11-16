@@ -24,7 +24,7 @@
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
 //!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
 //!    does not have yet go up to `/sync/v1/activation-reports`.
-//! 9. **Releases.** With [`Releases`], the node works out the release its roll-out records allow,
+//! 9. **Releases.** With [`Releases`](releases::Releases), the node works out the release its roll-out records allow,
 //!    keeps its desktops' artifacts if it is an edge, and fetches and stages its own when that
 //!    release is newer than the one it runs, resuming downloads over rounds ([`releases`]; #136).
 //!
