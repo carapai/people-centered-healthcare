@@ -47,6 +47,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
       # The web app first, so the binary embeds it (#76).
       - run: bun install --frozen-lockfile
       - run: bun run codegen && bun run build && bun run scan
@@ -98,6 +99,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
       - run: bun install --frozen-lockfile
       - run: bun run codegen && bun run build && bun run scan
         working-directory: apps/client
@@ -168,6 +170,147 @@ jobs:
           path: out/
           if-no-files-found: error
 
+  # The desktop (ADR 0041; desktop-client.md § Signing and updates). The webview's bundle is built
+  # first, and tauri.conf.json has no beforeBuildCommand, so no Vite runs where a key is present.
+  desktop-windows:
+    name: desktop (Windows)
+    runs-on: windows-2025
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure: Authenticode and the updater key
+    defaults:
+      run:
+        shell: bash
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - run: bunx --bun tauri build --no-bundle --ci
+        working-directory: apps/client
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The app first, so both installers carry the signed binary.
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\apps\client\src-tauri\target\release\health-desktop.exe
+          exclude-environment-credential: true
+      # The standard installer downloads WebView2 if it is missing; the offline one carries it,
+      # for USB installs (ADR 0041).
+      - name: Bundle both installers
+        working-directory: apps/client
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir -p ../../out
+          bunx --bun tauri bundle --bundles nsis --ci
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe "../../out/health-platform-$version-x64-setup.exe"
+          bunx --bun tauri bundle --bundles nsis --ci --config ../../tools/release/tauri.offline.json
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe "../../out/health-platform-$version-x64-offline-setup.exe"
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\out
+          files-folder-filter: exe
+          exclude-environment-credential: true
+      # Bundling must not have rebuilt the app, and every installer is signed.
+      - name: Check the Authenticode signatures
+        shell: pwsh
+        run: |
+          $files = @(Get-Item apps/client/src-tauri/target/release/health-desktop.exe) + @(Get-ChildItem out/*.exe)
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "$($file.Name): $($signature.Status)" }
+          }
+      # Last: Authenticode changed the bytes the updater checks.
+      - name: Sign for the updater
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          UPDATER_KEY_SECRET: ${{ vars.UPDATER_KEY_SECRET }}
+          UPDATER_KEY_PASSWORD_SECRET: ${{ vars.UPDATER_KEY_PASSWORD_SECRET }}
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+        run: tools/release/sign-updater.sh "out/health-platform-${GITHUB_REF_NAME#v}-x64-setup.exe"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-windows
+          path: out/
+          if-no-files-found: error
+
+  # Ubuntu 22.04, so the binaries run on both supported LTS releases.
+  desktop-linux:
+    name: desktop (Linux)
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure: the GPG and updater keys
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - run: tools/release/desktop-linux-deps.sh
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: tools/release/import-gpg-key.sh
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          GPG_KEY_SECRET: ${{ vars.GPG_KEY_SECRET }}
+          GPG_KEY_FINGERPRINT: ${{ vars.GPG_KEY_FINGERPRINT }}
+      - name: Build, GPG-sign the AppImage, and the apt repository
+        env:
+          GPG_KEY_FINGERPRINT: ${{ vars.GPG_KEY_FINGERPRINT }}
+        run: tools/release/desktop-linux.sh "${GITHUB_REF_NAME#v}" out
+      - name: Sign for the updater
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          UPDATER_KEY_SECRET: ${{ vars.UPDATER_KEY_SECRET }}
+          UPDATER_KEY_PASSWORD_SECRET: ${{ vars.UPDATER_KEY_PASSWORD_SECRET }}
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+        run: tools/release/sign-updater.sh "out/health-platform-${GITHUB_REF_NAME#v}-x86_64.AppImage"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux
+          path: out/
+          if-no-files-found: error
+
   web:
     name: web app and SBOMs
     runs-on: ubuntu-24.04
@@ -187,6 +330,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
       - run: bun install --frozen-lockfile
       - run: bun run codegen && bun run build && bun run scan
         working-directory: apps/client
@@ -205,7 +349,7 @@ jobs:
 
   publish:
     name: publish
-    needs: [edge-linux, edge-windows, central, web]
+    needs: [edge-linux, edge-windows, central, desktop-windows, desktop-linux, web]
     runs-on: ubuntu-24.04
     environment: release
     permissions:

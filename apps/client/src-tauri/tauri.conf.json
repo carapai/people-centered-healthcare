@@ -20,7 +20,15 @@
     }
   },
   "bundle": {
-    "active": false,
-    "icon": ["icons/icon.png", "icons/icon.ico"]
+    "active": true,
+    "targets": ["nsis", "appimage", "deb"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "category": "Medical",
+    "shortDescription": "Facility clinical records, offline-first",
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": { "installMode": "perMachine" }
+    }
   }
 }

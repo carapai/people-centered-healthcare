@@ -6,6 +6,8 @@
 // - Every setting the workflow reads is one the gate checks.
 // - `publish` needs every other job, and only it may write to the repository or a registry, or
 //   push, sign into a transparency log or create the release.
+// - The updater key never reaches a step's environment or Vite, and updater signatures are made
+//   after Authenticode (tauri.conf.json creates none at bundle time).
 // - The gate fails, naming them, when any setting is missing, and passes when all are present.
 
 import { readFileSync } from 'node:fs'
@@ -56,6 +58,17 @@ if (publish === undefined) fail('there is no publish job')
 else {
   const needs = new Set([publish.needs ?? []].flat())
   for (const [id] of jobs) if (id !== 'publish' && !needs.has(id)) fail(`publish does not need ${id}`)
+}
+
+// The updater key reaches only tools/release/sign-updater.sh's process: never a step's
+// environment, and never Vite, which tauri.conf.json would run if it had a before-command.
+if (/TAURI_SIGNING/.test(text)) fail('a step sets TAURI_SIGNING_*; only sign-updater.sh may hold the key')
+const tauri = JSON.parse(readFileSync('apps/client/src-tauri/tauri.conf.json', 'utf8'))
+for (const hook of ['beforeBuildCommand', 'beforeBundleCommand', 'beforeDevCommand']) {
+  if (hook in (tauri.build ?? {})) fail(`tauri.conf.json has ${hook}; the webview is built before the keys are fetched`)
+}
+if (tauri.bundle?.createUpdaterArtifacts !== false) {
+  fail('tauri.conf.json creates updater artifacts at bundle time, before Authenticode changes the bytes')
 }
 
 for (const [, name] of text.matchAll(/\bvars\.([A-Z0-9_]+)/g)) {

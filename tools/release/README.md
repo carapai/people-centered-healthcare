@@ -8,8 +8,14 @@ The release pipeline's scripts ([deployment.md](../../docs/architecture/deployme
 | `check-version.sh` | The tag must name the version central, the edge and the desktop carry, and the tagged commit must be on `main` |
 | `sign-edge-package.sh` | Signs an edge update package with the release-signing key in Key Vault, then verifies it with the edge's own `facility-edge update verify` against the pinned public key |
 | `sbom.sh` | CycloneDX SBOMs: `central-server` and `facility-edge` from `cargo-cyclonedx`, the Bun workspace from cdxgen. Each must list what it obviously contains |
-| `check-workflow.ts` | Holds `release.yml` to its rules: every job in the `release` environment and gated, every setting it reads checked by the gate, and only `publish`, which needs every other job, publishing |
-| `test/az` | A stand-in for `az keyvault key sign`, signing with a local P-256 key, for the dry run |
+| `sign-updater.sh` | Signs the desktop's updater artifacts with the Tauri updater key, read from Key Vault into that process alone, after Authenticode and GPG, then checks each against the pinned public key |
+| `verify-updater-signature.sh` | That check: a Tauri (minisign) signature against a public key, with `openssl` |
+| `import-gpg-key.sh` | Imports the release GPG key from Key Vault into the job's keyring, and checks its fingerprint |
+| `desktop-linux.sh`, `desktop-linux-deps.sh` | The AppImage (GPG-signed, the signature checked to be the release key's) and the deb, and the apt repository |
+| `apt-repo.sh` | A flat apt repository for the deb, its `Release` clear-signed and detach-signed, checked with `gpgv` |
+| `tauri.offline.json` | The configuration overlay for the offline Windows installer, which carries WebView2, for USB installs |
+| `check-workflow.ts` | Holds `release.yml` to its rules: every job in the `release` environment and gated, every setting it reads checked by the gate, only `publish`, which needs every other job, publishing, and the updater key never in a step's environment or Vite's |
+| `test/az`, `test/throwaway-keys.sh` | A stand-in for the two Key Vault calls, and throwaway keys in it, for the dry run |
 
 ## What a release publishes
 
@@ -18,10 +24,23 @@ The release pipeline's scripts ([deployment.md](../../docs/architecture/deployme
 | `facility-edge-<v>-linux-x64.tar.gz` and `-windows-x64.tar.gz`, each with `.sig` | The release-signing key (ECDSA P-256 in Key Vault); the Windows binary inside is Authenticode-signed first |
 | The central image, `ghcr.io/<repository>/central-server:<v>` | `cosign` keyless, plus a provenance attestation pushed to the registry |
 | `web-<v>.tar.gz` | Provenance |
-| `central-server.cdx.json`, `facility-edge.cdx.json`, `web.cdx.json` | Provenance |
+| `central-server.cdx.json`, `facility-edge.cdx.json`, `health-desktop.cdx.json`, `web.cdx.json` | Provenance |
+| `health-platform-<v>-x64-setup.exe` | Authenticode (the installer and the app inside it), and the updater key (`.sig`): the Tauri updater installs it |
+| `health-platform-<v>-x64-offline-setup.exe` | Authenticode; it carries WebView2, for USB installs |
+| `health-platform-<v>-x86_64.AppImage` | GPG, embedded, and the updater key (`.sig`) |
+| `health-platform-<v>-amd64.deb`, and `apt-repo-<v>.tar.gz` holding it | The apt repository's `InRelease` and `Release.gpg`, by the GPG key, whose public half it carries |
 | `SHA256SUMS` | Provenance |
 
-Every file has a SLSA provenance attestation (`gh attestation verify <file> --repo <repository>`). The desktop installers and the updater's artifacts join them with #136.
+Every file has a SLSA provenance attestation (`gh attestation verify <file> --repo <repository>`).
+
+### The desktop's order of signing
+
+Authenticode and GPG change a file's bytes, and the updater checks the bytes it downloads, so the updater signs last:
+
+1. `tauri build --no-bundle` builds the app, from a webview bundle built in an earlier step: no Vite runs where a key is present.
+2. Authenticode signs the app, then both NSIS installers are bundled around it and signed in turn. The job checks every signature, which also catches a bundling step that rebuilt the app.
+3. The AppImage is signed with GPG as it is built.
+4. `sign-updater.sh` signs the standard installer and the AppImage for the updater. `tauri.conf.json` keeps `createUpdaterArtifacts` off, so the bundler never signs too early.
 
 ## Setting up the `release` environment
 
@@ -51,4 +70,4 @@ Done once, by people with the accounts. Until every setting exists, a release fa
 ## Not yet
 
 - **release-please:** tags are pushed by hand. Its pull requests, opened with the workflow token, would not run CI, so it needs a GitHub App token first.
-- **Publishing beyond GitHub:** the apt repository and the edge package channel at central are fed from the GitHub release once they exist (#136).
+- **Publishing beyond GitHub:** the apt repository is built and signed but not hosted, and the updater endpoint and the edge package channel at central serve what the GitHub release holds once they exist (#136).

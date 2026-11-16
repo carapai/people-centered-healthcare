@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
-# A stand-in for `az keyvault key sign`, for the release dry run: signs the digest with the
-# throwaway P-256 key in FAKE_KEY_VAULT_KEY (PEM) and answers as Key Vault does, with the raw
-# r || s in base64url.
+# A stand-in for the two Key Vault calls the release makes, for the dry run:
+# - `az keyvault key sign`: signs the digest with the throwaway P-256 key in FAKE_KEY_VAULT_KEY
+#   (PEM) and answers as Key Vault does, with the raw r || s in base64url;
+# - `az keyvault secret show --name <n>`: prints the file FAKE_KEY_VAULT_SECRETS/<n>.
 set -euo pipefail
-[[ "$1 $2 $3" == "keyvault key sign" ]] || { echo "fake az: only keyvault key sign" >&2; exit 2; }
+command="$1 $2 $3"
 shift 3
 while (($#)); do
   case $1 in
     --digest) digest=$2; shift 2 ;;
+    --name) name=$2; shift 2 ;;
     --algorithm) [[ $2 == ES256 ]] || exit 2; shift 2 ;;
-    --vault-name | --name | --query | --output) shift 2 ;;
+    --vault-name | --query | --output) shift 2 ;;
     *) echo "fake az: unexpected $1" >&2; exit 2 ;;
   esac
 done
-printf '%s' "$digest" | openssl base64 -d -A >"${TMPDIR:-/tmp}/fake-az-digest"
-openssl pkeyutl -sign -inkey "$FAKE_KEY_VAULT_KEY" -in "${TMPDIR:-/tmp}/fake-az-digest" |
-  python3 -I -c '
+
+case $command in
+  "keyvault secret show") cat "$FAKE_KEY_VAULT_SECRETS/${name:?}" ;;
+  "keyvault key sign")
+    printf '%s' "${digest:?}" | openssl base64 -d -A >"${TMPDIR:-/tmp}/fake-az-digest"
+    openssl pkeyutl -sign -inkey "$FAKE_KEY_VAULT_KEY" -in "${TMPDIR:-/tmp}/fake-az-digest" |
+      python3 -I -c '
 import base64, sys
 der = sys.stdin.buffer.read()
 assert der[0] == 0x30
@@ -28,3 +34,6 @@ for _ in range(2):
     i += 2 + n
 print(base64.urlsafe_b64encode(out).decode().rstrip("="))
 '
+    ;;
+  *) echo "fake az: only keyvault key sign and keyvault secret show" >&2; exit 2 ;;
+esac
