@@ -10,7 +10,7 @@ This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98:
 | Facility adjustments | Not in the Studio. Facility admins get a separate, small screen that only fills in the override points a package declares (ADR 0026) |
 | Where it runs | Screens of the one React app, reachable only when signed in at central with an author permission. Never on an edge server or a desktop. Drafts never sync (ADR 0025) |
 | Build order | 1. A shared **package workspace** and the **form designer**. 2. The **Program Designer**. 3. The **Workflow Studio** |
-| Workflow editing | A visual canvas of states and transitions (§52), with each element's details edited in a side panel of ordinary form fields. The canvas library is chosen by research |
+| Workflow editing | A visual canvas of states and transitions (§52), with each element's details edited in a side panel of ordinary form fields. The canvas is `@xyflow/react` 13.x with `@dagrejs/dagre` layout, decided in [Which graph-canvas library fits the Workflow Studio?](https://github.com/carapai/people-centered-healthcare/issues/480) |
 | Who may do what | Named permissions granted through roles: `metadata.author`, `metadata.review`, `metadata.approve`, `metadata.publish` and `configuration.activate`. An authoring HTTP API records the signed-in account as the actor, replacing the CLI's `--by <name>` |
 | Importing content | Plain FHIR JSON resources and the R4 conversion (metadata.md). FSH/SUSHI sources and an IG Publisher round-trip are not supported |
 | Translation of authored content | In scope. English is required; other languages are optional, through FHIR's translation extension. The details are an open ticket |
@@ -18,15 +18,22 @@ This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98:
 
 ## The package workspace
 
-Every Studio screen sits inside the package workspace. It lists packages and drafts, and opens a draft's artefacts. It carries a draft through the §45 lifecycle that health-publication already enforces:
+Every Studio screen sits inside the package workspace. It carries a draft through the §45 lifecycle that health-publication already enforces: validation and simulation, submission, review and changes requested, approval under the separation-of-duties rules (ADR 0025), publication, and activation per scope. Its layout was decided in [How does the Studio's package workspace look and flow?](https://github.com/carapai/people-centered-healthcare/issues/478), chosen from three prototypes (branch `prototype/studio-workspace`).
 
-- validation and simulation, with their report;
-- submission, review and changes requested;
-- approval, applying the separation-of-duties rules (ADR 0025);
-- publication;
-- activation per scope.
+- **The package list** is a table with one row per package. Each row shows:
+  - the title, name and kind;
+  - the version and its semver bump;
+  - the status and the author;
+  - **your next step**: the first action the signed-in person may take, or "Nothing for you";
+  - the scopes the package is active in.
+- **A draft is one page, read from top to bottom:**
+  1. **What changed.** Each added, changed or removed artefact compared with the previous version, with a plain summary (the semver diff of metadata.md). Unchanged artefacts are left out.
+  2. **Is it safe?** The validation and simulation results. The heading counts the failing ones.
+  3. **Who must act.** The approvers that the package's kind needs, who has approved so far, and then the actions. An action the signed-in person may not take stays on the page, disabled, with the reason: for example "You wrote this draft, so you cannot review or approve it", or "1 more approval needed".
+  4. **Discussion.** The history (created, edited, submitted, reviewed, approved, handed over) with its comments, and a box for a new comment.
+- **Editors** (the form designer, the Workflow Studio, and the others) open from a changed artefact. They are not embedded in the draft page.
 
-It also shows the semver diff between versions (metadata.md).
+The authoring API therefore gives the following for each package: the actions the signed-in person may take, with the reason for each one refused; the artefact diff against the previous version; the check results; and the history with comments.
 
 ## Previews and simulation
 
@@ -38,9 +45,7 @@ It also shows the semver diff between versions (metadata.md).
 These are tracked on the map:
 
 - [Studio authoring API](https://github.com/carapai/people-centered-healthcare/issues/477)
-- [Package workspace](https://github.com/carapai/people-centered-healthcare/issues/478)
 - [Form designer](https://github.com/carapai/people-centered-healthcare/issues/479)
-- [Canvas library](https://github.com/carapai/people-centered-healthcare/issues/480)
 - [Workflow Studio](https://github.com/carapai/people-centered-healthcare/issues/481)
 - [Program Designer](https://github.com/carapai/people-centered-healthcare/issues/482)
 - [Translation](https://github.com/carapai/people-centered-healthcare/issues/483)
