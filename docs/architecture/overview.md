@@ -69,6 +69,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Authority and sync | [write-authority.md](write-authority.md), [synchronization.md](synchronization.md) |
 | Terminology, metadata, configuration | [terminology.md](terminology.md), [metadata.md](metadata.md), [configuration.md](configuration.md), [facility-configuration.md](facility-configuration.md) |
 | Forms and programs | [questionnaire-extraction.md](questionnaire-extraction.md), [program-designer.md](program-designer.md) |
+| Authoring (Studio) | [studio.md](studio.md) |
 | Workflow | [workflow-engine.md](workflow-engine.md) |
 | Patients | [patient-identity.md](patient-identity.md), [patient-portal.md](patient-portal.md), [care-journeys.md](care-journeys.md) |
 | Health workers | [clinical-workspaces.md](clinical-workspaces.md) |
@@ -160,4 +161,4 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 
 ## Still open
 
-The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, CQL for decision support, Studio and workspace UX, analytics and DHIS2 integration, communications, R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
+The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, CQL for decision support, the Studio's screens ([studio.md](studio.md)) and workspace UX, analytics and DHIS2 integration, communications, R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
