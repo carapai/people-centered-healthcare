@@ -20,6 +20,7 @@ health-pki = { workspace = true }
 health-terminology = { workspace = true }
 health-time = { workspace = true }
 jsonschema = { workspace = true }
+minisign-verify = { workspace = true }
 p256 = { workspace = true }
 rustls-pki-types = { workspace = true }
 serde = { workspace = true }
@@ -29,4 +30,5 @@ tar = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 serde_json = { workspace = true }

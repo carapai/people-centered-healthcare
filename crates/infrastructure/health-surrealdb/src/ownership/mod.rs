@@ -123,6 +123,9 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("package_state", "configuration"),
     ("package_activation_report", "configuration"),
     ("node_activation_report", "configuration"),
+    // Staged software roll-out (#136).
+    ("platform_release", "configuration"),
+    ("release_rollout", "configuration"),
     ("workflow_instance", "workflow"),
     ("workflow_history", "workflow"),
     ("workflow_timer", "workflow"),

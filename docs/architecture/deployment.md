@@ -153,6 +153,8 @@ flowchart LR
 | Production | All facilities, in district waves |
 
 - **Staged rollout.** Each node's allowed version is a per-facility record at central, used by both the desktop updater endpoint and the edge package channel.
+  - **In code (#136, part 2):** roll-out records, set like package activations (decided with the maintainer, 2026-11-16). `central-server release import` checks a downloaded release against the keys nodes pin and keeps its artifacts in central's blob store, and `release rollout` allows it nationally, in a district or at a facility (`health_configuration::rollout`; migration `0061_release_rollout`). Records go down to every node in the packages lane with each artifact's sha-256 and signature. Each node works out its own allowed release along its scope chain, which needs no list of facilities' districts at central, and may download only what a roll-out names. Nodes never move to an older release. Desktops under an edge get theirs through it.
+  - **Not yet:** edges fetching, verifying and staging their package and keeping their desktops' installers, and desktops installing at the next restart.
 - **Promotion between waves** requires the previous wave's telemetry to be within thresholds: error rate, sync lag, failed migrations.
 - **Release block.** A release is blocked if any migration lacks its export → import round-trip test. In code, `health-backup`'s round trip runs over the whole migrated schema in CI, and `tools/release/check-version.sh` refuses a tag that is not on `main`, where the merge queue ran it.
 

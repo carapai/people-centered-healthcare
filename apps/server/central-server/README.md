@@ -43,6 +43,7 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_NATIONAL_ROOT_FILE` | none | The national root certificate (PEM) published packages are verified against. With `HEALTH_FILES_DIR`, central activates the national set every minute, writes its definitions into the store, and validates writes against its profiles and answers terminology from it (#89) |
 | `HEALTH_BLOB_DIR` | none | Read by `package` commands only when `HEALTH_FILES_DIR` is not set (#88) |
 | `HEALTH_PUBLICATION_KEY_FILE`, `HEALTH_PUBLICATION_CHAIN_FILE` | required by `package publish` | The publication-signing key (PKCS#8 PEM) and its certificate with any chain below the national root, until the key moves to the HSM or KMS |
+| `HEALTH_RELEASE_KEY_FILE`, `HEALTH_UPDATER_KEY_FILE` | required by `release import` | The public keys nodes pin, to check a release against before importing it: the edge release-signing key (hex SEC1, as edges hold it in `HEALTH_UPDATE_KEY_FILE`) and the Tauri updater key (as `tauri signer generate` prints it) |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
 ## Image
@@ -147,3 +148,12 @@ The procedure, roles and drills are in [ops/runbooks/central-dr.md](../../../ops
 `central-server openapi` prints central's OpenAPI document (the system routes and `GET /api/session`) and exits, without reading any configuration. The FHIR API is described by its CapabilityStatement. `tools/codegen` generates `@health/api-client` from it (`bun run generate`).
 
 Central's FHIR search supports `_tag` on every facility-scope type, `status` on Questionnaire and QuestionnaireResponse for the forms screen (#92), `type`, `url` and `version` on Library, which completion finds Extraction Mappings by (#93), `family` and `given` on Patient, which reception finds a patient by (#102), and `patient` on the types the patient summary is drawn from (#104). `_security` is indexed on every facility-scope type, Patient and the summary's types: the search policy leaves out the records whose labels a subject may not see by `_security:not`. A node whose records were written before an index existed needs a reindex for it. Central completes submitted QuestionnaireResponses with extraction (#93). Activation (#89) replaces these with the SearchParameters of the active packages.
+
+## Releases and roll-out
+
+`central-server release …` imports platform releases and sets which one each node may install (#136; deployment.md § Environments and rollout):
+
+1. `gh release download v<version> --dir <dir>`, after `gh attestation verify`.
+2. `release import <dir> <version>`: every artifact must match `SHA256SUMS` and verify against `HEALTH_RELEASE_KEY_FILE` and `HEALTH_UPDATER_KEY_FILE`. They then go into `HEALTH_FILES_DIR` (up to 512 MiB each), and nothing is imported if one fails.
+3. `release rollout <version> --scope <scope> --by <operator> [--effective <time>] [--reason <why>]` allows it in `national`, `district:<code>` or `facility:<code>`. The record goes down to every node in the packages lane, with each artifact's sha-256 and signature. Each node works out its own allowed release, as for package activations: the most specific scope wins, then the latest issued. A node may download an artifact a roll-out names, and nothing else outside its scope. Holding a wave back is a roll-out of the version it stays on, and nodes never move to an older release.
+4. `release list` prints the imported releases and every roll-out.

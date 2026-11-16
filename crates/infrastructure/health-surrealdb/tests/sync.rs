@@ -1405,6 +1405,114 @@ async fn activation_records_go_down_to_every_node_and_never_up() {
 }
 
 #[tokio::test]
+async fn roll_out_records_go_down_to_every_node_and_never_up() {
+    let (central, edge) = pair().await;
+    let record = |id: &str, version: &str, scope: Value| {
+        json!({
+            "rollout": {
+                "id": id, "version": version, "scope": scope,
+                "effectiveAt": "2026-11-16T09:00:00Z", "issuedAt": "2026-11-16T08:00:00Z",
+                "by": "release-manager"
+            },
+            "artifacts": [{
+                "target": "edge-linux-x64", "file": "facility-edge-1.1.0-linux-x64.tar.gz",
+                "sha256": "ab".repeat(32), "size": 10, "signature": "cd".repeat(64)
+            }]
+        })
+    };
+    let mut tx = central.store.begin().await.expect("begin");
+    for (id, version, scope) in [
+        ("roll-1", "1.1.0", json!({"level": "national"})),
+        // Another district's wave: sent all the same; the node applies what its chain covers.
+        (
+            "roll-2",
+            "1.2.0",
+            json!({"level": "district", "district": "gulu"}),
+        ),
+    ] {
+        let body = record(id, version, scope);
+        assert!(
+            tx.put_release_rollout(id, "2026-11-16T08:00:00Z", &body.to_string())
+                .await
+                .expect("put")
+        );
+    }
+    // Kept once: a second put of the same record is a no-op.
+    assert!(
+        !tx.put_release_rollout("roll-1", "2026-11-16T08:00:00Z", "{}")
+            .await
+            .expect("again")
+    );
+    tx.commit().await.expect("commit");
+    // A facility node may download what a roll-out names, and only that.
+    assert!(
+        central
+            .store
+            .blob_admitted(&scope(), &"ab".repeat(32))
+            .await
+            .expect("admitted")
+    );
+    assert!(
+        !central
+            .store
+            .blob_admitted(&scope(), &"ef".repeat(32))
+            .await
+            .expect("not admitted")
+    );
+
+    let round = sync(&edge, &central).await;
+    assert_eq!(round.pulled, 2, "{round:?}");
+    let mut tx = edge.store.begin().await.expect("begin");
+    let held = tx.release_rollouts().await.expect("held");
+    drop(tx);
+    assert_eq!(held.len(), 2);
+    let first: Value = serde_json::from_str(&held[0]).expect("json");
+    assert_eq!(
+        first,
+        record("roll-1", "1.1.0", json!({"level": "national"}))
+    );
+    assert_eq!(sync(&edge, &central).await, Round::default());
+
+    // A roll-out an edge makes is never pushed up.
+    let mut tx = edge.store.begin().await.expect("begin");
+    let forged = record("roll-3", "9.0.0", json!({"level": "national"}));
+    tx.put_release_rollout("roll-3", "2026-11-16T08:00:00Z", &forged.to_string())
+        .await
+        .expect("put");
+    tx.commit().await.expect("commit");
+    let round = sync(&edge, &central).await;
+    assert!(
+        matches!(round.outcomes.as_slice(), [Outcome::Rejected { .. }]),
+        "{round:?}"
+    );
+    let mut tx = central.store.begin().await.expect("begin");
+    assert_eq!(tx.release_rollouts().await.expect("held").len(), 2);
+    drop(tx);
+
+    // A re-seed carries them.
+    let (items, cursor) = central
+        .store
+        .snapshot(&scope(), central.id)
+        .await
+        .expect("snapshot");
+    assert_eq!(
+        items
+            .iter()
+            .filter(|i| i.resource_type == "rollout")
+            .count(),
+        2
+    );
+    let fresh = node("2026-11-16T10:00:00Z").await;
+    fresh
+        .store
+        .seed(central.id, &items, &cursor)
+        .await
+        .expect("seed");
+    let mut tx = fresh.store.begin().await.expect("begin");
+    assert_eq!(tx.release_rollouts().await.expect("seeded").len(), 2);
+}
+
+#[tokio::test]
 async fn an_allowed_transition_commutes_with_a_concurrent_edit_and_a_competing_one_does_not() {
     let (central, edge) = pair().await;
     let encounter = |status: &str, note: Option<&str>, end: Option<&str>| {

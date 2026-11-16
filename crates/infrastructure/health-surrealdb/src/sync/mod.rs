@@ -125,6 +125,11 @@ pub const LEDGERS: &[&str] = &[
 /// sent down to every node as operations in the packages lane, never up.
 pub(crate) const ACTIVATIONS: &str = "activation";
 
+/// Software roll-out records on the change log (#136; deployment.md § Environments and rollout):
+/// global records central issues, sent down to every node in the packages lane, never up. Each
+/// node works out its own allowed release along its scope chain.
+pub(crate) const ROLLOUTS: &str = "rollout";
+
 /// How many rows of a table a snapshot reads at a time (#83).
 pub const SNAPSHOT_PAGE: usize = 500;
 
@@ -149,6 +154,7 @@ impl SyncScope {
     /// movement names is not yet checked against the facility's Locations.
     pub fn admits_up(&self, resource_type: &str, body: &Value) -> bool {
         resource_type != ACTIVATIONS
+            && resource_type != ROLLOUTS
             && resource_type != RESOLUTIONS
             && !DOWN_ONLY.contains(&resource_type)
             && (LEDGERS.contains(&resource_type) || self.admits(resource_type, body, UP_GLOBAL))
@@ -156,9 +162,10 @@ impl SyncScope {
 
     /// Whether the peer is sent a version of `resource_type` with this body. Ledger operations
     /// are never sent down: each ledger's authority is the facility that keeps it. Activation
-    /// records go to every node, which applies those its scope chain covers.
+    /// records and roll-out records go to every node, which applies those its scope chain covers.
     pub fn admits_down(&self, resource_type: &str, body: &Value) -> bool {
         resource_type == ACTIVATIONS
+            || resource_type == ROLLOUTS
             || resource_type == RESOLUTIONS
             || resource_type == WORKFLOW_INSTANCES
             || (!LEDGERS.contains(&resource_type) && self.admits(resource_type, body, DOWN_GLOBAL))
@@ -585,14 +592,18 @@ impl SurrealStore {
         if matches!(scope, SyncScope::All) {
             return Ok(true);
         }
-        // A package's tarball goes to the nodes its activation records reach (#89), as do the
-        // records themselves: what a node fetches is the digest one of them names.
+        // A package's tarball goes to the nodes its activation records reach (#89), and a
+        // release's artifacts to those its roll-out records reach (#136), as do the records
+        // themselves: what a node fetches is the digest one of them names.
         let published: Option<String> = self
             .connection
             .db()
             .query(
-                "SELECT VALUE package FROM package_activation \
-                 WHERE string::contains(data, $hash) LIMIT 1",
+                "array::first(array::concat(\
+                 (SELECT VALUE package FROM package_activation \
+                  WHERE string::contains(data, $hash) LIMIT 1), \
+                 (SELECT VALUE <string>record::id(id) FROM release_rollout \
+                  WHERE string::contains(data, $hash) LIMIT 1)))",
             )
             .bind(("hash", hash.to_owned()))
             .await
@@ -800,12 +811,14 @@ impl SurrealStore {
         let mut sql = Sql::default();
         let activations =
             sql.push("SELECT VALUE data FROM package_activation ORDER BY issued_at, id");
+        let rollouts = sql.push("SELECT VALUE data FROM release_rollout ORDER BY issued_at, id");
         let epoch = sql.push("SELECT VALUE epoch FROM ONLY sync_state:node");
         let last = sql.push(crate::change_log::LAST_SEQ);
         let mut results = sql.run(tx.tx()?).await.map_err(unavailable)?;
         let epoch: Option<String> = results.take(epoch).map_err(unavailable)?;
         let last: Option<i64> = results.take(last).map_err(unavailable)?;
         let activations: Vec<String> = results.take(activations).map_err(unavailable)?;
+        let rollouts: Vec<String> = results.take(rollouts).map_err(unavailable)?;
         let cursor = Cursor {
             node,
             epoch: epoch.ok_or_else(|| corrupt("epoch"))?,
@@ -814,20 +827,25 @@ impl SurrealStore {
         if out.send(Ok(SnapshotPart::Cursor(cursor))).await.is_err() {
             return Ok(());
         }
-        // Activation records first, as in the packages lane: every node is sent them all.
+        // Activation and roll-out records first, as in the packages lane: every node is sent
+        // them all.
         let mut items = Vec::new();
-        for data in activations {
-            let body: Value = serde_json::from_str(&data).map_err(|_| corrupt("activation"))?;
-            let id = body["activation"]["id"]
+        let records = activations
+            .into_iter()
+            .map(|data| (ACTIVATIONS, "activation", data))
+            .chain(rollouts.into_iter().map(|data| (ROLLOUTS, "rollout", data)));
+        for (resource_type, field, data) in records {
+            let body: Value = serde_json::from_str(&data).map_err(|_| corrupt(resource_type))?;
+            let id = body[field]["id"]
                 .as_str()
-                .ok_or_else(|| corrupt("activation id"))?
+                .ok_or_else(|| corrupt(resource_type))?
                 .to_owned();
             let op_id = OpId::new();
             items.push(Item {
                 kind: Kind::Op,
                 op_id,
                 tx_id: op_id,
-                resource_type: ACTIVATIONS.to_owned(),
+                resource_type: resource_type.to_owned(),
                 resource_id: id,
                 parent_version_id: None,
                 origin_node: node,
@@ -2367,8 +2385,8 @@ impl Replica for SurrealReplica<'_> {
 }
 
 impl SurrealTx {
-    /// Appends an operation received from upstream: an activation record, kept once. Ledger
-    /// operations only go up, so no other comes down.
+    /// Appends an operation received from upstream: an activation or roll-out record, kept once.
+    /// Ledger operations only go up, so no other comes down.
     pub(crate) async fn receive_op(&mut self, item: &Item) -> Result<(), WriteError> {
         if item.resource_type == RESOLUTIONS {
             // The candidates the upstream resolved are no longer held: the resolution (a new
@@ -2390,6 +2408,18 @@ impl SurrealTx {
                 serde_json::from_value(item.body.clone())
                     .map_err(|_| WriteError::Store(corrupt("workflow instance")))?;
             return self.keep_replica(&instance).await;
+        }
+        if item.resource_type == ROLLOUTS {
+            let rollout = &item.body["rollout"];
+            let (Some(id), Some(issued_at)) =
+                (rollout["id"].as_str(), rollout["issuedAt"].as_str())
+            else {
+                return Err(WriteError::Store(corrupt("roll-out record")));
+            };
+            return self
+                .put_release_rollout(id, issued_at, &item.body.to_string())
+                .await
+                .map(|_| ());
         }
         if item.resource_type != ACTIVATIONS {
             return Err(WriteError::Store(corrupt("a ledger operation came down")));
