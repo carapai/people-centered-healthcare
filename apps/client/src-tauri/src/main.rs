@@ -23,6 +23,7 @@ mod encryption;
 mod enroll;
 mod node;
 mod provision;
+mod update;
 
 use axum::Router;
 use axum::routing::get;
@@ -389,6 +390,42 @@ async fn open() -> Result<Api, String> {
     })
 }
 
+/// Installs the staged release, when one newer than this build verifies (#136): after a backup
+/// when backups are configured, and not at all if that backup fails. `true` when this process
+/// must exit for the installer or the new release.
+async fn update_at_start() -> Result<bool, String> {
+    let Some(key) = update::UPDATER_KEY else {
+        return Ok(false);
+    };
+    let dir = data_dir();
+    let stager = update::DesktopStager::new(&dir, key);
+    let Some((version, installer)) = stager.pending(&update::running()?) else {
+        return Ok(false);
+    };
+    let install = update::install_for(installer, std::env::var_os("APPIMAGE").map(Into::into));
+    if install == update::Install::Apt {
+        return update::install(&install, &stager);
+    }
+    match node::backups(&dir, |name| {
+        std::env::var(name).ok().filter(|v| !v.trim().is_empty())
+    }) {
+        Ok(schedule) => {
+            let key = health_backup::node::read_key(&schedule.key_file)
+                .map_err(|e| format!("no backup key: {e}"))?;
+            let connection = connect(&dir).await?;
+            let taken = schedule
+                .backups
+                .take(&connection, &key, health_time::Timestamp::now())
+                .await;
+            drop(connection);
+            taken.map_err(|e| format!("no backup was taken: {e}"))?;
+        }
+        Err(why) => eprintln!("health-desktop: warning: updating without a backup: {why}"),
+    }
+    eprintln!("health-desktop: installing release {version}");
+    update::install(&install, &stager)
+}
+
 /// Provisions this machine against central, with the volumes' encryption reported to it.
 fn provision_here(args: &[String]) -> Result<health_sync_client::provisioning::Redeemed, String> {
     let args = provision::Args::parse(args)?;
@@ -527,6 +564,12 @@ fn main() -> std::process::ExitCode {
                 std::process::ExitCode::FAILURE
             }
         };
+    }
+    // A release staged by sync installs now, before the store is opened, after a backup.
+    match runtime.block_on(update_at_start()) {
+        Ok(true) => return std::process::ExitCode::SUCCESS,
+        Ok(false) => {}
+        Err(e) => eprintln!("health-desktop: the staged update waits: {e}"),
     }
     let api = match runtime.block_on(open()) {
         Ok(api) => api,

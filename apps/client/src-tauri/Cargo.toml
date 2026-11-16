@@ -29,6 +29,7 @@ health-http = { path = "../../../crates/infrastructure/health-http" }
 health-identity = { path = "../../../crates/domains/health-identity" }
 health-node-api = { path = "../../../crates/infrastructure/health-node-api" }
 health-node-identity = { path = "../../../crates/edge/health-node-identity" }
+health-packages = { path = "../../../crates/infrastructure/health-packages" }
 health-pki = { path = "../../../crates/infrastructure/health-pki" }
 health-sync-client = { path = "../../../crates/infrastructure/health-sync-client" }
 health-surrealdb = { path = "../../../crates/infrastructure/health-surrealdb", features = ["embedded"] }

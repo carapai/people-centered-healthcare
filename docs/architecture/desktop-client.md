@@ -129,7 +129,14 @@ stateDiagram-v2
 - **Version range.** A desktop must stay within N-1 of its upstream (sync handshake). Otherwise it can only push, quarantined.
 - **deb installs** update through apt.
 - **In code (#136, part 1):** `tauri.conf.json` bundles a per-machine NSIS installer, the AppImage and the deb. `release.yml` builds both Windows installers (the offline one with `tools/release/tauri.offline.json`), and signs in this order: Authenticode on the app and then on the installers, GPG on the AppImage, and the updater key last, since the others change the bytes it signs. The updater key is read from Key Vault by `tools/release/sign-updater.sh` alone, and every signature is checked against the key desktops pin before anything is published. `release-check.yml` builds all of it on pull requests with throwaway keys, without Authenticode. See [tools/release](../../tools/release/README.md).
-  - **Not yet:** the desktop fetching the release its roll-out records allow (through its edge, if it has one) and installing it at the next restart, after a backup ([deployment.md](deployment.md) § Environments and rollout); hosting for the apt repository; and installing on real machines.
+- **In code (#136, part 4):** each sync round, the desktop fetches the release its roll-out records allow for its facility, from its edge if it is enrolled with one or from central, in resumable ranges. `update::DesktopStager` verifies it against the updater key baked into the build (`HEALTH_UPDATER_PUBLIC_KEY`, set by `release.yml`; a developer's build has none and never updates itself) and keeps it under `update/` in the data directory.
+  - **At the next start,** before the store is opened, a staged release newer than the running one is verified again. A backup is taken when backups are configured; if it fails, the update waits. Then the release installs:
+    - **Windows:** the NSIS installer runs passive (`/P`) as the client exits; staff start the client again once it finishes.
+    - **AppImage:** the new AppImage replaces the running one and starts.
+    - **deb:** nothing is installed; apt updates it.
+  - **Never backwards:** a staged release that is not newer, or that no longer verifies, is deleted.
+  - **The edge** serves its desktops' installers from its file store.
+  - **Not yet:** hosting for the apt repository, and installing on real machines.
 
 ## Peripherals
 

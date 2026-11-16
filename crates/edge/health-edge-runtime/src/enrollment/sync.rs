@@ -54,11 +54,13 @@ impl PeerAuth for EnrolledDesktops {
 }
 
 /// `/sync/v1` over `store` for the desktops `gate` admits, as members of `facility`; or why
-/// there is none.
+/// there is none. With `blobs`, the edge's file store, it serves its attachments and the
+/// release artifacts it keeps for its desktops (#136).
 pub(crate) fn routes(
     store: SurrealStore,
     gate: &DeviceGate<SurrealAuthStore>,
     facility: &str,
+    blobs: Option<health_files::FsBlobStore>,
 ) -> Result<Router, String> {
     let compatibility = Compatibility {
         protocol: PROTOCOL,
@@ -70,7 +72,12 @@ pub(crate) fn routes(
     let auth = Arc::new(EnrolledDesktops {
         facility: facility.to_owned(),
     });
-    Ok(gate.layer(SyncServer::with_auth(store, auth, compatibility).router()))
+    let server = SyncServer::with_auth(store, auth, compatibility);
+    let server = match blobs {
+        Some(blobs) => server.with_blobs(blobs),
+        None => server,
+    };
+    Ok(gate.layer(server.router()))
 }
 
 #[cfg(test)]
