@@ -3151,6 +3151,7 @@ dependencies = [
  "health-identity",
  "health-node-api",
  "health-node-identity",
+ "health-packages",
  "health-pki",
  "health-surrealdb",
  "health-sync-client",

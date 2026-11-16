@@ -67,7 +67,10 @@ impl Api {
         // The desktops under this edge sync with it, as it does with central (#133).
         if let Some(facility) = &config.facility {
             let data = SurrealStore::new(connection.clone(), Arc::clone(&clock));
-            match sync::routes(data, &gate, facility) {
+            // The edge's file store: attachments, and the releases its desktops update from.
+            let blobs =
+                health_files::FsBlobStore::open(config.data_dir.with_file_name("files")).ok();
+            match sync::routes(data, &gate, facility, blobs) {
                 Ok(routes) => api = api.merge(routes),
                 Err(reason) => {
                     tracing::warn!(alert = "desktop-sync-off", reason = %reason, "desktops cannot sync with this edge");

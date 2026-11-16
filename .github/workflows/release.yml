@@ -86,6 +86,8 @@ jobs:
         shell: bash
     env:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # Baked into the desktop: the key its updates must verify against (#136).
+      HEALTH_UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -184,6 +186,8 @@ jobs:
         shell: bash
     env:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # Baked into the desktop: the key its updates must verify against (#136).
+      HEALTH_UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -266,6 +270,9 @@ jobs:
     permissions:
       contents: read
       id-token: write # Azure: the GPG and updater keys
+    env:
+      # Baked into the desktop: the key its updates must verify against (#136).
+      HEALTH_UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -107,14 +107,34 @@ pub fn verify(bytes: &[u8], artifact: &Artifact, keys: &ReleaseKeys) -> Result<(
             keys.edge.verify(bytes, &signature).map_err(|_| refused())
         }
         Target::DesktopWindows | Target::DesktopLinux => {
-            let key = updater_key(&keys.updater)?;
-            let signature = decoded(&artifact.signature)
-                .and_then(|text| minisign_verify::Signature::decode(&text).ok())
-                .ok_or_else(refused)?;
-            // Tauri's signer hashes first; a legacy (unhashed) signature is refused.
-            key.verify(bytes, &signature, false).map_err(|_| refused())
+            verify_desktop(bytes, artifact, &keys.updater)
         }
     }
+}
+
+/// Checks `bytes`, a desktop artifact, against its sha-256 and its updater signature under
+/// `updater`, the updater key as Tauri prints it: what a desktop does, which pins only that key.
+pub fn verify_desktop(
+    bytes: &[u8],
+    artifact: &Artifact,
+    updater: &str,
+) -> Result<(), ReleaseError> {
+    if sha256(bytes) != artifact.sha256 {
+        return Err(ReleaseError::Digest(artifact.file.clone()));
+    }
+    let refused = || ReleaseError::Signature(artifact.file.clone());
+    if !matches!(
+        artifact.target,
+        Target::DesktopWindows | Target::DesktopLinux
+    ) {
+        return Err(refused());
+    }
+    let key = updater_key(updater.trim())?;
+    let signature = decoded(&artifact.signature)
+        .and_then(|text| minisign_verify::Signature::decode(&text).ok())
+        .ok_or_else(refused)?;
+    // Tauri's signer hashes first; a legacy (unhashed) signature is refused.
+    key.verify(bytes, &signature, false).map_err(|_| refused())
 }
 
 /// The file each target's artifact has in release `version` (release.yml).

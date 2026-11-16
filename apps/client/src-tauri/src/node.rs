@@ -58,8 +58,10 @@ pub(crate) fn sync(
 ) -> Result<Option<Sync>, String> {
     let pki = pki_dir(data_dir);
     let Some(upstream) = Upstream::from_identity(&pki) else {
-        // Under an edge, it syncs with the edge as its enrolled device instead (#133).
-        return crate::enroll::sync(store(connection), data_dir, keys);
+        // Under an edge, it syncs with the edge as its enrolled device instead (#133), and
+        // updates from the release the edge keeps for its desktops.
+        return Ok(crate::enroll::sync(store(connection), data_dir, keys)?
+            .map(|sync| with_releases(sync, data_dir)));
     };
     let pem = keys
         .get(KEY)
@@ -86,7 +88,51 @@ pub(crate) fn sync(
         Ok(activator) => sync = sync.with_activator(activator),
         Err(error) => eprintln!("health-desktop: packages are not activated here: {error}"),
     }
-    Ok(Some(sync))
+    Ok(Some(with_releases(sync, data_dir)))
+}
+
+/// The facility this desktop's roll-out records are resolved for: central's at provisioning,
+/// or the edge's once it handed over its staff.
+fn rollout_facility(data_dir: &Path) -> Option<String> {
+    facility(data_dir).or_else(|| {
+        let text = std::fs::read_to_string(pki_dir(data_dir).join("edge.json")).ok()?;
+        let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+        value["facility"].as_str().map(str::to_owned)
+    })
+}
+
+/// `sync`, fetching and staging the release this desktop's roll-out records allow (#136), when
+/// this build pins an updater key; as it was otherwise.
+fn with_releases(sync: Sync, data_dir: &Path) -> Sync {
+    let Some(key) = crate::update::UPDATER_KEY else {
+        eprintln!("health-desktop: this build pins no updater key: it does not update itself");
+        return sync;
+    };
+    let running = match crate::update::running() {
+        Ok(running) => running,
+        Err(error) => {
+            eprintln!("health-desktop: no updates: {error}");
+            return sync;
+        }
+    };
+    let blobs = match health_files::FsBlobStore::open(data_dir.join("files")) {
+        Ok(blobs) => blobs,
+        Err(error) => {
+            eprintln!("health-desktop: no updates without the file store: {error}");
+            return sync;
+        }
+    };
+    sync.with_blobs(blobs)
+        .with_releases(health_sync_client::releases::Releases {
+            chain: Chain {
+                facility: rollout_facility(data_dir),
+                ..Chain::default()
+            },
+            own: crate::update::target(),
+            running,
+            downstream: Vec::new(),
+            stager: Some(Arc::new(crate::update::DesktopStager::new(data_dir, key))),
+        })
 }
 
 /// The hourly backups (#134; desktop-client.md § Storage and backup; ADR 0040), as an edge takes
