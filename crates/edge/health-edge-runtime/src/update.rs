@@ -212,6 +212,17 @@ pub fn pack(binary: &[u8], name: &str, version: &str) -> Result<Vec<u8>, UpdateE
 }
 
 /// Verifies `package` against `signature` (hex, the 64-byte `r || s`) and the pinned `key`, and
+/// checks the binary against its manifest, without unpacking anything (the release job's check
+/// of what it signed).
+pub fn verify(
+    package: &[u8],
+    signature: &str,
+    key: &VerifyingKey,
+) -> Result<Manifest, UpdateError> {
+    open(package, signature, key).map(|(manifest, _)| manifest)
+}
+
+/// Verifies `package` against `signature` (hex, the 64-byte `r || s`) and the pinned `key`, and
 /// unpacks it into `staged/`, replacing anything staged before. Nothing is unpacked unless the
 /// signature and the binary's digest both verify.
 pub fn stage(
@@ -220,6 +231,24 @@ pub fn stage(
     signature: &str,
     key: &VerifyingKey,
 ) -> Result<Manifest, UpdateError> {
+    let (manifest, binary) = open(package, signature, key)?;
+    let staged = updates.path("staged");
+    let _ = fs::remove_dir_all(&staged);
+    fs::create_dir_all(&staged)?;
+    write_executable(&staged.join(&manifest.binary), &binary)?;
+    fs::write(
+        staged.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest).map_err(|_| UpdateError::Malformed("manifest"))?,
+    )?;
+    Ok(manifest)
+}
+
+/// The verified manifest and binary of a package.
+fn open(
+    package: &[u8],
+    signature: &str,
+    key: &VerifyingKey,
+) -> Result<(Manifest, Vec<u8>), UpdateError> {
     let signature = hex(signature.trim())
         .and_then(|bytes| Signature::from_slice(&bytes).ok())
         .ok_or(UpdateError::Signature)?;
@@ -262,21 +291,13 @@ pub fn stage(
     }
     let manifest = manifest.ok_or(UpdateError::Malformed("no manifest.json"))?;
     let (_, binary) = files
-        .iter()
+        .into_iter()
         .find(|(name, _)| *name == manifest.binary)
         .ok_or(UpdateError::Malformed("the manifest's binary is missing"))?;
-    if to_hex(&Sha256::digest(binary)) != manifest.sha256 {
+    if to_hex(&Sha256::digest(&binary)) != manifest.sha256 {
         return Err(UpdateError::Digest);
     }
-    let staged = updates.path("staged");
-    let _ = fs::remove_dir_all(&staged);
-    fs::create_dir_all(&staged)?;
-    write_executable(&staged.join(&manifest.binary), binary)?;
-    fs::write(
-        staged.join("manifest.json"),
-        serde_json::to_vec_pretty(&manifest).map_err(|_| UpdateError::Malformed("manifest"))?,
-    )?;
-    Ok(manifest)
+    Ok((manifest, binary))
 }
 
 fn write_executable(path: &Path, bytes: &[u8]) -> Result<(), UpdateError> {
@@ -496,6 +517,28 @@ mod tests {
         assert_eq!(
             fs::read(dir.path().join("staged/facility-edge")).expect("binary"),
             b"new binary"
+        );
+    }
+
+    #[test]
+    fn the_release_job_verifies_a_package_without_unpacking_it() {
+        let package = pack(b"new binary", "facility-edge", "0.2.0").expect("pack");
+        let manifest = verify(&package, &signed(&package), &public()).expect("verify");
+        assert_eq!(manifest.version, "0.2.0");
+        assert!(matches!(
+            verify(&package, &signed(b"another package"), &public()),
+            Err(UpdateError::Signature)
+        ));
+        // Key Vault signs with whichever s it draws, the high one included, and the edge
+        // accepts both: the signature is over the package, so the other s cannot change it.
+        let low: Signature = key().sign(&package);
+        let (r, s) = low.split_scalars();
+        let high = Signature::from_scalars(r, -*s).expect("high s");
+        assert!(high.normalize_s().is_some(), "s is high");
+        let high = to_hex(&high.to_bytes());
+        assert_eq!(
+            verify(&package, &high, &public()).expect("high s").version,
+            "0.2.0"
         );
     }
 

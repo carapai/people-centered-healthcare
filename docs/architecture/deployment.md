@@ -136,6 +136,11 @@ flowchart LR
 
 - **Attestations:** SLSA provenance (`actions/attest-build-provenance`), plus CycloneDX SBOMs for Rust (`cargo-cyclonedx`) and Bun, attached to every release.
 - **Signed or failed.** The release job **fails** if any signing configuration is missing. PR builds are labelled `unsigned-dev`.
+- **In code (#137):** `.github/workflows/release.yml` and `tools/release/` (its README lists the environment's settings).
+  - **Gate:** every job is in the `release` environment and runs `check-signing.sh` first, so a missing setting fails all of them before anything is built. Only `publish`, which needs every build job, publishes: the GitHub release, the central image in GHCR (`cosign` keyless), and the provenance attestations.
+  - **Keys stay in Azure,** reached through GitHub OIDC. Edge packages are signed by a non-exportable Key Vault key, then verified by the edge's own `facility-edge update verify` against the pinned public key. The Windows edge binary is Authenticode-signed before it is packed.
+  - **Checked before a tag needs it:** `release-check.yml` runs on pull requests that touch the pipeline, and weekly. It holds `release.yml` to these rules (`check-workflow.ts`), and goes through the release's scripts with throwaway keys: packing, signing through a Key Vault stand-in and verifying an edge package, building and starting the central image, and generating the SBOMs.
+  - **Not yet:** the desktop's installers and updater artifacts (#136), and release-please, whose pull requests would need a GitHub App token to run CI. Tags are pushed by hand.
 
 ## Environments and rollout
 
@@ -148,7 +153,7 @@ flowchart LR
 
 - **Staged rollout.** Each node's allowed version is a per-facility record at central, used by both the desktop updater endpoint and the edge package channel.
 - **Promotion between waves** requires the previous wave's telemetry to be within thresholds: error rate, sync lag, failed migrations.
-- **Release block.** A release is blocked if any migration lacks its export → import round-trip test.
+- **Release block.** A release is blocked if any migration lacks its export → import round-trip test. In code, `health-backup`'s round trip runs over the whole migrated schema in CI, and `tools/release/check-version.sh` refuses a tag that is not on `main`, where the merge queue ran it.
 
 ## Observability (ADR 0047)
 

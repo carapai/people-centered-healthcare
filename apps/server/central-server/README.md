@@ -45,6 +45,10 @@ Layer: **runtime**. Central server composition root (ADR 0001; service-catalogue
 | `HEALTH_PUBLICATION_KEY_FILE`, `HEALTH_PUBLICATION_CHAIN_FILE` | required by `package publish` | The publication-signing key (PKCS#8 PEM) and its certificate with any chain below the national root, until the key moves to the HSM or KMS |
 | `HEALTH_ACCESS_POLICY_FILE` | none | The access policy as JSON: `{"roles": {"clinician": ["Patient.crs", …]}, "labels": [{"system": …, "code": "HIV", "program": "hiv"}]}`. With it and the snapshot keys, `/fhir` is mounted |
 
+## Image
+
+`Dockerfile` puts the release's `central-server` binary on a pinned distroless glibc base, running as `nonroot`. The release job builds it, and `publish` pushes it to GHCR and signs it with `cosign` keyless (`tools/release/`).
+
 ## Startup
 
 1. Telemetry starts through the allowlist.

@@ -83,7 +83,7 @@ On Windows a non-zero code is reported to the SCM as a service-specific error, a
 
 ## Updates
 
-A package is a gzipped tar holding `manifest.json` (`version`, `binary`, `sha256`) and the binary. It comes with a detached ECDSA P-256 signature over the whole package, as hex `r || s`. `health_edge_runtime::update::pack` builds one; the release job signs it.
+A package is a gzipped tar holding `manifest.json` (`version`, `binary`, `sha256`) and the binary. It comes with a detached ECDSA P-256 signature over the whole package, as hex `r || s`. The release job (`tools/release/`) builds one with `facility-edge update pack <out>`, which packs the running binary at its own version, signs it with the release-signing key in Key Vault, and checks the result with `facility-edge update verify <package> <signature>` against `HEALTH_UPDATE_KEY_FILE` before publishing it.
 
 1. `facility-edge update stage <package> <signature>`: verifies the signature against the pinned key and the binary against its digest, then unpacks into `staged/`. The node may keep running.
 2. `facility-edge update apply`, with the service stopped (`systemctl stop`): keeps this binary in `previous/`, swaps in the staged one, and journals the update as pending. Then start the service.
