@@ -276,6 +276,24 @@ impl FsBlobStore {
         Err(BlobError::Corrupt(*hash))
     }
 
+    /// At most `length` bytes of stored blob `hash` from `offset`, unverified: for a download in
+    /// ranges, which the receiver verifies whole. Empty past the end.
+    pub fn read_range(
+        &self,
+        hash: &BlobHash,
+        offset: u64,
+        length: u64,
+    ) -> Result<Vec<u8>, BlobError> {
+        let mut file = File::open(self.path(hash)).map_err(|e| match e.kind() {
+            io::ErrorKind::NotFound => BlobError::NotFound(*hash),
+            _ => BlobError::Io(e),
+        })?;
+        file.seek(SeekFrom::Start(offset))?;
+        let mut bytes = Vec::new();
+        file.take(length).read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+
     fn quarantine(&self, hash: &BlobHash, path: &Path) -> Result<(), BlobError> {
         let dir = self.root.join("quarantine");
         let mut n = 0;
@@ -310,10 +328,20 @@ impl FsBlobStore {
         offset: u64,
         chunk: &[u8],
     ) -> Result<Option<Stored>, BlobError> {
-        if blob.size > MAX_BLOB_SIZE {
-            return Err(BlobError::TooLarge {
-                limit: MAX_BLOB_SIZE,
-            });
+        self.write_chunk_limited(blob, offset, chunk, MAX_BLOB_SIZE)
+    }
+
+    /// [`write_chunk`](Self::write_chunk) for a blob of at most `limit` bytes, such as a
+    /// release's artifact downloaded in ranges ([`MAX_RELEASE_SIZE`]).
+    pub fn write_chunk_limited(
+        &self,
+        blob: &BlobRef,
+        offset: u64,
+        chunk: &[u8],
+        limit: u64,
+    ) -> Result<Option<Stored>, BlobError> {
+        if blob.size > limit {
+            return Err(BlobError::TooLarge { limit });
         }
         if self.contains(&blob.hash) {
             return Ok(Some(Stored {

@@ -7,6 +7,7 @@ use std::time::{Duration, SystemTime};
 
 use health_files::{
     BlobError, BlobHash, BlobRef, BlobReferences, CHUNK_SIZE, FsBlobStore, MAX_BLOB_SIZE,
+    MAX_RELEASE_SIZE,
 };
 
 fn store() -> (tempfile::TempDir, FsBlobStore) {
@@ -238,4 +239,54 @@ fn garbage_collection_removes_only_unreferenced_blobs_past_the_horizon() {
     assert!(store.contains(&kept));
     assert!(!store.contains(&orphan));
     assert_eq!(files_in(&dir.path().join("uploads")), 0);
+}
+
+#[test]
+fn a_release_artifact_larger_than_an_attachment_downloads_in_resumed_ranges() {
+    let (_central_dir, central) = store();
+    let (_node_dir, node) = store();
+    // Past the attachment cap, as an AppImage can be.
+    let bytes = content(
+        usize::try_from(MAX_BLOB_SIZE).expect("size") + 3 * 1024 * 1024 + 5,
+        7,
+    );
+    let stored = central
+        .put_limited(bytes.as_slice(), MAX_RELEASE_SIZE)
+        .expect("put")
+        .blob;
+    assert!(matches!(
+        central.put(bytes.as_slice()),
+        Err(BlobError::TooLarge { .. })
+    ));
+    let range = 4 * 1024 * 1024;
+    let mut offset = node.received(&stored).expect("received");
+    let mut first_session = true;
+    let mut done = None;
+    while done.is_none() {
+        let chunk = central
+            .read_range(&stored.hash, offset, range)
+            .expect("range");
+        done = node
+            .write_chunk_limited(&stored, offset, &chunk, MAX_RELEASE_SIZE)
+            .expect("chunk");
+        offset = node.received(&stored).expect("received");
+        // The link drops after a few ranges; the next session resumes where it stopped.
+        if first_session && offset >= 3 * range {
+            first_session = false;
+            offset = node.received(&stored).expect("resumed");
+            assert_eq!(offset, 3 * range);
+        }
+    }
+    assert_eq!(node.read(&stored.hash).expect("read"), bytes);
+    assert!(
+        central
+            .read_range(&stored.hash, stored.size, range)
+            .expect("past the end")
+            .is_empty()
+    );
+    // The attachment path keeps its cap.
+    assert!(matches!(
+        node.write_chunk(&stored, 0, &[]),
+        Err(BlobError::TooLarge { .. })
+    ));
 }
