@@ -1,32 +1,44 @@
 // The e2e backend (#228): SurrealDB in memory, central-server with sign-in, the access policy,
-// the client registry and the patient portal, and two provisioned users. Playwright starts it (playwright.config.ts) and
-// stops it with the run. Binaries come from SURREAL_BIN (default `surreal`) and
-// CENTRAL_SERVER_BIN (default the workspace's debug build).
+// the client registry and the patient portal, and the provisioned users (e2e/users.ts), among
+// them `admin` with every right. Playwright starts it (playwright.config.ts) and stops it with
+// the run. Binaries come from SURREAL_BIN (default `surreal`) and CENTRAL_SERVER_BIN (default
+// the workspace's debug build).
+//
+// Run by hand with HEALTH_SEED=1 (or a patient count, e.g. HEALTH_SEED=1000), it also loads a
+// small synthetic world as the admin (e2e/seed.ts; SYNTHETIC_DATA_BIN, default the workspace's
+// debug build of tools/synthetic-data). Everything is in memory: it is seeded again each start.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { OTP_OUTBOX, USERS } from './users'
+import { seed, signIn } from './seed'
+import { ADMIN_PERMISSIONS, OTP_OUTBOX, USERS } from './users'
 
 const ORIGIN = 'http://localhost:4173'
-const CENTRAL = 'http://127.0.0.1:18080'
+// Ports may be moved, e.g. to run a second backend beside one already running.
+const CENTRAL_PORT = process.env['HEALTH_E2E_CENTRAL_PORT'] ?? '18080'
+const DB_PORT = process.env['HEALTH_E2E_DB_PORT'] ?? '18000'
+const CENTRAL = `http://127.0.0.1:${CENTRAL_PORT}`
 
 const surrealBin = process.env['SURREAL_BIN'] ?? 'surreal'
 const centralBin = process.env['CENTRAL_SERVER_BIN'] ?? resolve(import.meta.dirname, '../../../target/debug/central-server')
+const syntheticBin = process.env['SYNTHETIC_DATA_BIN'] ?? resolve(import.meta.dirname, '../../../target/debug/synthetic-data')
+const seedPatients = process.env['HEALTH_SEED'] === '1' ? 300 : Number(process.env['HEALTH_SEED'] ?? 0)
 const dir = mkdtempSync(join(tmpdir(), 'health-e2e-'))
 const file = (name: string, content: string) => {
   const path = join(dir, name)
   writeFileSync(path, content, { mode: 0o600 })
   return path
 }
-writeFileSync(OTP_OUTBOX, '', { mode: 0o600 })
+const otpOutbox = process.env['HEALTH_DEV_OTP_OUTBOX'] ?? OTP_OUTBOX
+writeFileSync(otpOutbox, '', { mode: 0o600 })
 const dbPassword = randomBytes(16).toString('hex')
 const env = {
   ...process.env,
-  HEALTH_BIND: '127.0.0.1:18080',
-  HEALTH_SURREALDB_ENDPOINT: 'ws://127.0.0.1:18000',
+  HEALTH_BIND: `127.0.0.1:${CENTRAL_PORT}`,
+  HEALTH_SURREALDB_ENDPOINT: `ws://127.0.0.1:${DB_PORT}`,
   HEALTH_SURREALDB_PASSWORD_FILE: file('db-password', dbPassword),
   HEALTH_LOG: 'warn',
   HEALTH_AUTH_ISSUER: `${ORIGIN}/auth`,
@@ -37,7 +49,7 @@ const env = {
   HEALTH_REGISTRY_NIN_SYSTEM: 'urn:health:nin',
   // The patient portal (#111), sending one-time codes to the development outbox.
   HEALTH_PORTAL_REDIRECT_URIS: `${ORIGIN}/portal/callback`,
-  HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
+  HEALTH_DEV_OTP_OUTBOX: otpOutbox,
   // Payments at one till (#254).
   HEALTH_PAYMENT_TILLS: 'till-1',
   // The ANC visit form (#92), and the OPD triage form with its vital-signs mapping (#103) from
@@ -107,7 +119,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'] },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], admin: ADMIN_PERMISSIONS },
       labels: [],
     }),
   ),
@@ -136,8 +148,8 @@ async function waitFor(url: string, timeoutMs: number): Promise<void> {
   throw new Error(`${url} did not come up`)
 }
 
-children.push(spawn(surrealBin, ['start', '--log', 'warn', '--bind', '127.0.0.1:18000', '--user', 'root', '--pass', dbPassword, 'memory'], { stdio: 'inherit' }))
-await waitFor('http://127.0.0.1:18000/health', 30_000)
+children.push(spawn(surrealBin, ['start', '--log', 'warn', '--bind', `127.0.0.1:${DB_PORT}`, '--user', 'root', '--pass', dbPassword, 'memory'], { stdio: 'inherit' }))
+await waitFor(`http://127.0.0.1:${DB_PORT}/health`, 30_000)
 for (const user of Object.values(USERS)) {
   const provisioned = spawnSync(centralBin, ['provision', user.username, 'KAM013', user.roles], {
     env: { ...env, HEALTH_PROVISION_PASSWORD_FILE: file(`${user.username}-password`, user.password) },
@@ -147,4 +159,14 @@ for (const user of Object.values(USERS)) {
 }
 children.push(spawn(centralBin, [], { env, stdio: 'inherit' }))
 await waitFor(`${CENTRAL}/ready`, 60_000)
+if (seedPatients > 0) {
+  // Sign-in and the FHIR API answer 503 until they are built, just after /ready.
+  for (let tries = 0; (await fetch(`${CENTRAL}/fhir/metadata`).catch(() => undefined))?.status === 503; tries += 1) {
+    if (tries > 120) throw new Error('the FHIR API did not come up')
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
+  seed(syntheticBin, dir, CENTRAL, token, seedPatients)
+  process.stdout.write(`seeded ${seedPatients} patients; sign in as ${USERS.admin.username} / ${USERS.admin.password} at KAM013\n`)
+}
 process.stdout.write('e2e backend ready\n')
