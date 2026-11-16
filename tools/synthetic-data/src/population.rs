@@ -33,12 +33,13 @@ const TWINS: f64 = 0.015;
 /// Muslim households (given names).
 const MUSLIM: f64 = 0.14;
 
-/// The identifier systems the generated patients use.
+/// The identifier systems the generated patients use: the platform's own, so the client finds
+/// them as it finds patients it registered (`registries.ts`, `register.rs`).
 pub mod systems {
-    /// National Identification Number (synthetic).
-    pub const NIN: &str = "urn:health:synthetic-data/nin";
-    /// The registering facility's medical record number.
-    pub const MRN: &str = "urn:health:synthetic-data/mrn";
+    /// National Identification Number (synthetic values).
+    pub const NIN: &str = "urn:health:nin";
+    /// The registering facility's medical record number, followed by `/{facility code}`.
+    pub const MRN: &str = "urn:health:mrn";
 }
 
 struct Member {
@@ -284,7 +285,7 @@ impl<'w> Population<'w> {
         json!({
             "use": "usual",
             "type": { "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "MR" }] },
-            "system": systems::MRN,
+            "system": format!("{}/{code}", systems::MRN),
             "value": value,
             "assigner": { "reference": format!("Organization/{}", self.world.facilities[facility].organization) },
         })
