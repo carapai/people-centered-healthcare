@@ -128,6 +128,8 @@ stateDiagram-v2
   2. Forward-only migrations run before the app reports ready.
 - **Version range.** A desktop must stay within N-1 of its upstream (sync handshake). Otherwise it can only push, quarantined.
 - **deb installs** update through apt.
+- **In code (#136, part 1):** `tauri.conf.json` bundles a per-machine NSIS installer, the AppImage and the deb. `release.yml` builds both Windows installers (the offline one with `tools/release/tauri.offline.json`), and signs in this order: Authenticode on the app and then on the installers, GPG on the AppImage, and the updater key last, since the others change the bytes it signs. The updater key is read from Key Vault by `tools/release/sign-updater.sh` alone, and every signature is checked against the key desktops pin before anything is published. `release-check.yml` builds all of it on pull requests with throwaway keys, without Authenticode. See [tools/release](../../tools/release/README.md).
+  - **Not yet:** the updater endpoint at central with each facility's allowed version, the desktop's updater, hosting for the apt repository, and installing on real machines.
 
 ## Peripherals
 

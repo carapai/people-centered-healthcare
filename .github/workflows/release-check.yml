@@ -1,0 +1,190 @@
+# The release pipeline, checked before a tag needs it (deployment.md § Releases; ADR 0045).
+# release.yml only runs on a tag, so on pull requests that touch it, and weekly:
+# - tools/release/check-workflow.ts holds release.yml to "signed or failed" and tests the gate;
+# - a dry run goes through the release's own scripts with throwaway keys and nothing published:
+#   the edge package is packed, signed through a stand-in for Key Vault (tools/release/test/az)
+#   and verified by the edge; the central image is built and started; the SBOMs are generated;
+#   the desktop's installers, AppImage, deb and apt repository are built, GPG- and
+#   updater-signed, and checked. Its builds are unsigned-dev: there is no Authenticode here.
+name: release-check
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/release-check.yml
+      - tools/release/**
+      - apps/server/central-server/Dockerfile
+      - apps/server/facility-edge/src/update.rs
+      - crates/edge/health-edge-runtime/src/update.rs
+      - apps/client/src-tauri/tauri.conf.json
+      - apps/client/src-tauri/Cargo.lock
+      - Cargo.lock
+      - bun.lock
+  schedule:
+    - cron: "41 4 * * 2" # weekly, Tuesday 04:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+jobs:
+  workflow:
+    name: release.yml is signed or failed
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun tools/release/check-workflow.ts
+
+  dry-run:
+    name: dry run (unsigned-dev)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: cargo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ github.job }}-
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: cargo build --locked -p facility-edge -p central-server
+      - name: Pack, sign and verify an edge package with a throwaway key
+        run: |
+          key="$RUNNER_TEMP/release.pem"
+          openssl ecparam -name prime256v1 -genkey -noout -out "$key"
+          public=$(openssl ec -in "$key" -pubout -outform DER | tail -c 65 | od -An -v -tx1 | tr -d ' \n')
+          export PATH="$PWD/tools/release/test:$PATH" FAKE_KEY_VAULT_KEY=$key
+          export KEY_VAULT_NAME=dry-run EDGE_RELEASE_KEY=dry-run EDGE_RELEASE_PUBLIC_KEY=$public
+          # Stripped: the debug binary is over the 512 MiB a package may hold.
+          edge="$RUNNER_TEMP/bin/facility-edge"
+          install -D target/debug/facility-edge "$edge"
+          strip "$edge"
+          HEALTH_DATA_DIR="$RUNNER_TEMP/store" "$edge" update pack "$RUNNER_TEMP/edge.tar.gz"
+          # Repeatedly: Key Vault's s may be high or low.
+          for _ in 1 2 3 4 5 6 7 8; do
+            tools/release/sign-edge-package.sh "$edge" "$RUNNER_TEMP/edge.tar.gz" "$RUNNER_TEMP/edge.sig"
+          done
+          # Against another pinned key, it is refused.
+          openssl ecparam -name prime256v1 -genkey -noout -out "$RUNNER_TEMP/other.pem"
+          EDGE_RELEASE_PUBLIC_KEY=$(openssl ec -in "$RUNNER_TEMP/other.pem" -pubout -outform DER | tail -c 65 | od -An -v -tx1 | tr -d ' \n')
+          if tools/release/sign-edge-package.sh "$edge" "$RUNNER_TEMP/edge.tar.gz" "$RUNNER_TEMP/edge.sig"; then
+            echo 'a package signed by another key verified'; exit 1
+          fi
+      - name: Build and start the central image
+        run: |
+          mkdir -p "$RUNNER_TEMP/image"
+          cp target/debug/central-server "$RUNNER_TEMP/image/"
+          docker build --file apps/server/central-server/Dockerfile --tag central-server:unsigned-dev "$RUNNER_TEMP/image"
+          docker run --rm central-server:unsigned-dev openapi | jq -e '.openapi' > /dev/null
+          test "$(docker inspect --format '{{.Config.User}}' central-server:unsigned-dev)" = nonroot
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-cyclonedx
+      - run: tools/release/sbom.sh "$RUNNER_TEMP/sbom"
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        run: tools/github/prune-target.sh
+      - if: github.ref == 'refs/heads/main' && steps.cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ github.job }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+
+  desktop-linux:
+    name: desktop dry run (Linux, unsigned-dev)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: tools/release/desktop-linux-deps.sh
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - run: tools/release/test/throwaway-keys.sh
+      - run: tools/release/import-gpg-key.sh
+      - run: |
+          version=$(jq -r .version apps/client/src-tauri/tauri.conf.json)
+          tools/release/desktop-linux.sh "$version" out
+          tools/release/sign-updater.sh "out/health-platform-$version-x86_64.AppImage"
+          # Against another key, the updater signature is refused.
+          other=$(mktemp -d)
+          (cd apps/client && bunx --bun tauri signer generate --ci --password x --write-keys "$other/key" > /dev/null)
+          if tools/release/verify-updater-signature.sh "out/health-platform-$version-x86_64.AppImage" \
+            "out/health-platform-$version-x86_64.AppImage.sig" "$(cat "$other/key.pub")"; then
+            echo 'an updater signature verified against another key'; exit 1
+          fi
+
+  desktop-windows:
+    name: desktop dry run (Windows, unsigned-dev)
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - run: bunx --bun tauri build --no-bundle --ci
+        working-directory: apps/client
+      # As release.yml does, without Authenticode.
+      - name: Bundle both installers
+        working-directory: apps/client
+        run: |
+          mkdir -p ../../out
+          bunx --bun tauri bundle --bundles nsis --ci
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe ../../out/health-platform-x64-setup.exe
+          bunx --bun tauri bundle --bundles nsis --ci --config ../../tools/release/tauri.offline.json
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe ../../out/health-platform-x64-offline-setup.exe
+          ls -l ../../out
+          # The offline installer carries WebView2: it is far larger.
+          test "$(stat -c %s ../../out/health-platform-x64-offline-setup.exe)" -gt \
+            "$(( $(stat -c %s ../../out/health-platform-x64-setup.exe) + 50000000 ))"
+      - run: tools/release/test/throwaway-keys.sh --updater-only
+      - run: tools/release/sign-updater.sh out/health-platform-x64-setup.exe

@@ -1,0 +1,415 @@
+# Releases (deployment.md § Releases; ADR 0045): a `v<version>` tag builds and signs every
+# artifact, then publishes them together, or publishes nothing.
+#
+# - Every job is in the protected `release` environment (two release-manager approvals) and
+#   first runs tools/release/check-signing.sh, so a missing signing setting fails all of them
+#   before anything is built. The build jobs start together, so one approval covers them.
+# - Nothing leaves the run until `publish`, which needs every build job: the GitHub release,
+#   the central image in GHCR and their attestations are made there, after a second approval.
+# - Keys stay in Azure, reached through GitHub OIDC; the settings are environment variables,
+#   listed in tools/release/README.md.
+# - tools/release/check-workflow.ts holds this file to those rules, in the release-check workflow.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  edge-linux:
+    name: edge (Linux)
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure, for the release-signing key
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      # The web app first, so the binary embeds it (#76).
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build && bun run scan
+        working-directory: apps/client
+      - run: cargo build --locked --release -p facility-edge
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Package and sign the edge update
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          EDGE_RELEASE_KEY: ${{ vars.EDGE_RELEASE_KEY }}
+          EDGE_RELEASE_PUBLIC_KEY: ${{ vars.EDGE_RELEASE_PUBLIC_KEY }}
+        run: |
+          mkdir -p out
+          name="facility-edge-${GITHUB_REF_NAME#v}-linux-x64.tar.gz"
+          HEALTH_DATA_DIR="$RUNNER_TEMP/store" target/release/facility-edge update pack "out/$name"
+          tools/release/sign-edge-package.sh target/release/facility-edge "out/$name" "out/$name.sig"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: edge-linux
+          path: out/
+          if-no-files-found: error
+
+  edge-windows:
+    name: edge (Windows)
+    runs-on: windows-2025
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure: Authenticode and the release-signing key
+    defaults:
+      run:
+        shell: bash
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build && bun run scan
+        working-directory: apps/client
+      - run: cargo build --locked --release -p facility-edge
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # Authenticode first, so the package carries the signed binary.
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\target\release\facility-edge.exe
+          exclude-environment-credential: true
+      - name: Check the Authenticode signature
+        shell: pwsh
+        run: |
+          $signature = Get-AuthenticodeSignature target/release/facility-edge.exe
+          if ($signature.Status -ne 'Valid') { throw "facility-edge.exe: $($signature.Status)" }
+      - name: Package and sign the edge update
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          EDGE_RELEASE_KEY: ${{ vars.EDGE_RELEASE_KEY }}
+          EDGE_RELEASE_PUBLIC_KEY: ${{ vars.EDGE_RELEASE_PUBLIC_KEY }}
+        run: |
+          mkdir -p out
+          name="facility-edge-${GITHUB_REF_NAME#v}-windows-x64.tar.gz"
+          HEALTH_DATA_DIR="$RUNNER_TEMP/store" target/release/facility-edge.exe update pack "out/$name"
+          tools/release/sign-edge-package.sh target/release/facility-edge.exe "out/$name" "out/$name.sig"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: edge-windows
+          path: out/
+          if-no-files-found: error
+
+  central:
+    name: central image
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - run: cargo build --locked --release -p central-server
+      # Built here, pushed and signed (cosign keyless) by `publish`.
+      - name: Build the image
+        run: |
+          mkdir -p "$RUNNER_TEMP/image" out
+          cp target/release/central-server "$RUNNER_TEMP/image/"
+          docker build --file apps/server/central-server/Dockerfile \
+            --tag "central-server:${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/image"
+          docker run --rm "central-server:${GITHUB_REF_NAME#v}" openapi > /dev/null
+          docker save --output out/central-server.image.tar "central-server:${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: central
+          path: out/
+          if-no-files-found: error
+
+  # The desktop (ADR 0041; desktop-client.md § Signing and updates). The webview's bundle is built
+  # first, and tauri.conf.json has no beforeBuildCommand, so no Vite runs where a key is present.
+  desktop-windows:
+    name: desktop (Windows)
+    runs-on: windows-2025
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure: Authenticode and the updater key
+    defaults:
+      run:
+        shell: bash
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - run: bunx --bun tauri build --no-bundle --ci
+        working-directory: apps/client
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The app first, so both installers carry the signed binary.
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\apps\client\src-tauri\target\release\health-desktop.exe
+          exclude-environment-credential: true
+      # The standard installer downloads WebView2 if it is missing; the offline one carries it,
+      # for USB installs (ADR 0041).
+      - name: Bundle both installers
+        working-directory: apps/client
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          mkdir -p ../../out
+          bunx --bun tauri bundle --bundles nsis --ci
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe "../../out/health-platform-$version-x64-setup.exe"
+          bunx --bun tauri bundle --bundles nsis --ci --config ../../tools/release/tauri.offline.json
+          mv src-tauri/target/release/bundle/nsis/*-setup.exe "../../out/health-platform-$version-x64-offline-setup.exe"
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\out
+          files-folder-filter: exe
+          exclude-environment-credential: true
+      # Bundling must not have rebuilt the app, and every installer is signed.
+      - name: Check the Authenticode signatures
+        shell: pwsh
+        run: |
+          $files = @(Get-Item apps/client/src-tauri/target/release/health-desktop.exe) + @(Get-ChildItem out/*.exe)
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "$($file.Name): $($signature.Status)" }
+          }
+      # Last: Authenticode changed the bytes the updater checks.
+      - name: Sign for the updater
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          UPDATER_KEY_SECRET: ${{ vars.UPDATER_KEY_SECRET }}
+          UPDATER_KEY_PASSWORD_SECRET: ${{ vars.UPDATER_KEY_PASSWORD_SECRET }}
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+        run: tools/release/sign-updater.sh "out/health-platform-${GITHUB_REF_NAME#v}-x64-setup.exe"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-windows
+          path: out/
+          if-no-files-found: error
+
+  # Ubuntu 22.04, so the binaries run on both supported LTS releases.
+  desktop-linux:
+    name: desktop (Linux)
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # Azure: the GPG and updater keys
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - run: tools/release/desktop-linux-deps.sh
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build:tauri
+        working-directory: apps/client
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: tools/release/import-gpg-key.sh
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          GPG_KEY_SECRET: ${{ vars.GPG_KEY_SECRET }}
+          GPG_KEY_FINGERPRINT: ${{ vars.GPG_KEY_FINGERPRINT }}
+      - name: Build, GPG-sign the AppImage, and the apt repository
+        env:
+          GPG_KEY_FINGERPRINT: ${{ vars.GPG_KEY_FINGERPRINT }}
+        run: tools/release/desktop-linux.sh "${GITHUB_REF_NAME#v}" out
+      - name: Sign for the updater
+        env:
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          UPDATER_KEY_SECRET: ${{ vars.UPDATER_KEY_SECRET }}
+          UPDATER_KEY_PASSWORD_SECRET: ${{ vars.UPDATER_KEY_PASSWORD_SECRET }}
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+        run: tools/release/sign-updater.sh "out/health-platform-${GITHUB_REF_NAME#v}-x86_64.AppImage"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux
+          path: out/
+          if-no-files-found: error
+
+  web:
+    name: web app and SBOMs
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - run: tools/release/check-version.sh "$GITHUB_REF_NAME"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true # nothing cached reaches a release
+      - run: bun install --frozen-lockfile
+      - run: bun run codegen && bun run build && bun run scan
+        working-directory: apps/client
+      - run: |
+          mkdir -p out
+          tar -czf "out/web-${GITHUB_REF_NAME#v}.tar.gz" -C apps/client/dist .
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-cyclonedx
+      - run: tools/release/sbom.sh out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: [edge-linux, edge-windows, central, desktop-windows, desktop-linux, web]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write # the GitHub release
+      packages: write # the central image in GHCR
+      id-token: write # cosign keyless and the provenance attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Signed or failed
+        run: tools/release/check-signing.sh
+        env:
+          RELEASE_VARS: ${{ toJSON(vars) }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          mv central-server.image.tar "$RUNNER_TEMP/"
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Push and sign the central image
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/central-server"
+          version=${GITHUB_REF_NAME#v}
+          docker load --input "$RUNNER_TEMP/central-server.image.tar"
+          docker tag "central-server:$version" "$image:$version"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$image:$version"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:$version")
+          digest=${digest#*@}
+          cosign sign --yes "$image@$digest"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.image.outputs.digest }}
+        run: |
+          {
+            echo "Central image: \`$IMAGE\` (cosign keyless; verify with \`gh attestation verify\`)."
+            echo
+            echo "Edge update packages are signed with the release-signing key: stage one with"
+            echo "\`facility-edge update stage <package> <package>.sig\`."
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --notes-file "$RUNNER_TEMP/notes.md" --title "$GITHUB_REF_NAME" dist/*
