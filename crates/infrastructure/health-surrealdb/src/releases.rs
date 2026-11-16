@@ -13,6 +13,22 @@ fn all(rows: Vec<Vec<String>>) -> Vec<String> {
         .collect()
 }
 
+impl crate::SurrealStore {
+    /// Whether a roll-out record held here names an artifact with sha-256 `hash`: what a node
+    /// may download of a release (#136).
+    pub async fn release_artifact_named(&self, hash: &str) -> Result<bool, StoreError> {
+        let mut tx = health_persistence::Store::begin(self).await?;
+        let named = tx
+            .rows(
+                "SELECT VALUE [<string>record::id(id)] FROM release_rollout \
+                 WHERE string::contains(data, $hash) LIMIT 1",
+                vec![("hash", hash.to_ascii_lowercase())],
+            )
+            .await?;
+        Ok(hash.len() == 64 && !named.is_empty())
+    }
+}
+
 impl SurrealTx {
     /// Keeps imported release `version` as `data`, unless it is here already: a release is
     /// imported once. `true` when it is new.

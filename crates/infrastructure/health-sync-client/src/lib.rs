@@ -24,6 +24,9 @@
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
 //!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
 //!    does not have yet go up to `/sync/v1/activation-reports`.
+//! 9. **Releases.** With [`Releases`], the node works out the release its roll-out records allow,
+//!    keeps its desktops' artifacts if it is an edge, and fetches and stages its own when that
+//!    release is newer than the one it runs, resuming downloads over rounds ([`releases`]; #136).
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
 //! for the polling interval. While central cannot be reached, the interval doubles, up to 30
@@ -34,6 +37,7 @@ pub mod central;
 pub mod edge;
 pub mod enrollment;
 pub mod provisioning;
+pub mod releases;
 pub mod seed;
 
 use std::collections::VecDeque;
@@ -119,6 +123,8 @@ pub struct Round {
     pub verdict: Option<Verdict>,
     /// The package switch, or failed activation, this round brought (#89).
     pub activation: Option<health_activation::Outcome>,
+    /// What the roll-out meant for this node this round (#136).
+    pub release: Option<releases::ReleaseStep>,
 }
 
 pub(crate) type Https = hyper_rustls::HttpsConnector<HttpConnector>;
@@ -144,6 +150,7 @@ pub struct Sync {
     software: SoftwareVersion,
     blobs: Option<health_files::FsBlobStore>,
     activator: Option<health_activation::Activator>,
+    releases: Option<releases::Releases>,
     /// The `Retry-After` of central's last `429`: it is re-syncing as many nodes as it can
     /// (ADR 0046), so the next round waits that long, and no alert is raised.
     busy: Arc<std::sync::Mutex<Option<Duration>>>,
@@ -212,6 +219,7 @@ impl Sync {
                 .map_err(|_| "the package version is not major.minor.patch".to_owned())?,
             blobs: None,
             activator: None,
+            releases: None,
             busy: Arc::default(),
         })
     }
@@ -220,6 +228,13 @@ impl Sync {
     #[must_use]
     pub fn with_activator(mut self, activator: health_activation::Activator) -> Self {
         self.activator = Some(activator);
+        self
+    }
+
+    /// Fetches and stages the software its roll-out records allow after each round (#136).
+    #[must_use]
+    pub fn with_releases(mut self, releases: releases::Releases) -> Self {
+        self.releases = Some(releases);
         self
     }
 
@@ -706,6 +721,14 @@ impl Sync {
             .await?
             .map(|report| report.outcome);
             self.send_activation_reports().await?;
+        }
+        if let Some(releases) = &self.releases {
+            // A download that has not finished, or a package that does not verify, does not
+            // fail the round: the records and data synced all the same.
+            match self.releases(releases).await {
+                Ok(step) => round.release = step,
+                Err(error) => tracing::warn!(%error, "the allowed release is not staged yet"),
+            }
         }
         Ok(round)
     }

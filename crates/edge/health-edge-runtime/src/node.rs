@@ -362,6 +362,37 @@ pub async fn run(
                         facility: config.facility.clone(),
                         programs: config.programs.clone(),
                     };
+                    // The roll-out (#136): this edge's package fetched and staged against the
+                    // pinned release key, and its desktops' installers kept for the LAN.
+                    let stager = config
+                        .update_key_file
+                        .as_ref()
+                        .and_then(|file| std::fs::read_to_string(file).ok())
+                        .and_then(|text| crate::update::release_key(&text))
+                        .map(|key| {
+                            Arc::new(crate::update::ChannelStager::new(
+                                crate::update::Updates::new(&config.update_dir),
+                                key,
+                            ))
+                                as Arc<dyn health_sync_client::releases::Stager>
+                        });
+                    let sync = match env!("CARGO_PKG_VERSION").parse() {
+                        Ok(running) => sync.with_releases(health_sync_client::releases::Releases {
+                            chain: chain.clone(),
+                            own: if cfg!(windows) {
+                                health_configuration::rollout::Target::EdgeWindows
+                            } else {
+                                health_configuration::rollout::Target::EdgeLinux
+                            },
+                            running,
+                            downstream: vec![
+                                health_configuration::rollout::Target::DesktopWindows,
+                                health_configuration::rollout::Target::DesktopLinux,
+                            ],
+                            stager,
+                        }),
+                        Err(_) => sync,
+                    };
                     let sync = match crate::activation::Activator::from_root_file(
                         &config.pki_dir.join(crate::tls::ROOT),
                         chain,

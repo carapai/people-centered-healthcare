@@ -472,6 +472,52 @@ fn copy_dir(from: &Path, to: &Path) -> Result<(), UpdateError> {
     Ok(())
 }
 
+/// The edge's package channel (#136): the sync client hands this the package its roll-out
+/// records allow, once fetched, and it is verified against the pinned release key and staged.
+/// An admin applies it in a maintenance window, as with a package from USB.
+#[derive(Debug, Clone)]
+pub struct ChannelStager {
+    updates: Updates,
+    key: VerifyingKey,
+}
+
+impl ChannelStager {
+    /// Stages into `updates`, verifying against the pinned `key`.
+    pub fn new(updates: Updates, key: VerifyingKey) -> Self {
+        Self { updates, key }
+    }
+}
+
+impl health_sync_client::releases::Stager for ChannelStager {
+    fn staged(&self) -> Option<health_configuration::package::Version> {
+        let staged = self.updates.staged().ok().flatten().map(|m| m.version);
+        let pending = match self.updates.journal().ok().flatten() {
+            Some(Journal::Pending { to, .. }) => Some(to),
+            _ => None,
+        };
+        staged.or(pending).and_then(|v| v.parse().ok())
+    }
+
+    fn stage(
+        &self,
+        version: &health_configuration::package::Version,
+        artifact: &health_configuration::rollout::Artifact,
+        bytes: Vec<u8>,
+    ) -> Result<(), String> {
+        let manifest = stage(&self.updates, &bytes, &artifact.signature, &self.key)
+            .map_err(|e| e.to_string())?;
+        if manifest.version != version.to_string() {
+            let _ = fs::remove_dir_all(self.updates.path("staged"));
+            return Err(format!(
+                "{} holds {}, not the {version} its roll-out names",
+                artifact.file, manifest.version
+            ));
+        }
+        tracing::info!(version = %version, "an update is staged; apply it in a maintenance window");
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use p256::ecdsa::SigningKey;

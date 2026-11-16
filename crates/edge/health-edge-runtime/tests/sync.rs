@@ -749,6 +749,152 @@ impl health_sync_server::PeerAuth for Desktops {
 /// then its sync client proves each request with a DPoP proof by its enrolled device key, the
 /// edge's gate admits it, and records move both ways over TLS.
 #[tokio::test]
+async fn an_allowed_release_is_fetched_in_ranges_verified_and_staged_and_never_older() {
+    use health_configuration::activation::Chain;
+    use health_configuration::rollout::Target;
+    use health_edge_runtime::sync::releases::{ReleaseStep, Releases};
+    use health_edge_runtime::update::{ChannelStager, Updates, pack};
+    use p256::ecdsa::signature::Signer as _;
+
+    let central = central().await;
+    let edge = store("edge").await;
+    let dir = tempfile::tempdir().expect("edge files");
+    let files = health_files::FsBlobStore::open(dir.path().join("files")).expect("edge blob store");
+    let updates = Updates::new(dir.path().join("updates"));
+    let hex = |bytes: &[u8]| bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+
+    // Release 9.9.0: the edge's package, signed with the release key, and a desktop installer
+    // larger than one range.
+    let release_key = SigningKey::from_slice(&[5; 32]).expect("release key");
+    let package = pack(b"the new edge", "facility-edge", "9.9.0").expect("pack");
+    let signature: p256::ecdsa::Signature = release_key.sign(&package);
+    let installer: Vec<u8> = (0..5 * 1024 * 1024 + 17).map(|i| (i % 251) as u8).collect();
+    for bytes in [&package, &installer] {
+        central
+            .files
+            .put_limited(bytes.as_slice(), health_files::MAX_RELEASE_SIZE)
+            .expect("central blob");
+    }
+    let sha = |bytes: &[u8]| health_files::BlobHash::of(bytes).to_string();
+    let rollout = |id: &str, version: &str, scope: Value, issued: &str| {
+        json!({
+            "rollout": {
+                "id": id, "version": version, "scope": scope,
+                "effectiveAt": issued, "issuedAt": issued, "by": "release-manager"
+            },
+            "artifacts": [
+                {"target": "edge-linux-x64", "file": "facility-edge-9.9.0-linux-x64.tar.gz",
+                 "sha256": sha(&package), "size": package.len(), "signature": hex(&signature.to_bytes())},
+                {"target": "desktop-windows-x64", "file": "health-platform-9.9.0-x64-setup.exe",
+                 "sha256": sha(&installer), "size": installer.len(), "signature": "updater"}
+            ]
+        })
+    };
+    let issue = |body: Value| {
+        let store = central.store.clone();
+        async move {
+            let mut tx = store.begin().await.expect("begin");
+            tx.put_release_rollout(
+                body["rollout"]["id"].as_str().expect("id"),
+                body["rollout"]["issuedAt"].as_str().expect("issued"),
+                &body.to_string(),
+            )
+            .await
+            .expect("roll-out");
+            tx.commit().await.expect("commit");
+        }
+    };
+    issue(rollout(
+        "r-1",
+        "9.9.0",
+        json!({"level": "national"}),
+        "2026-01-01T00:00:00Z",
+    ))
+    .await;
+
+    let releases = Releases {
+        chain: Chain {
+            facility: Some(FACILITY.into()),
+            ..Chain::default()
+        },
+        own: Target::EdgeLinux,
+        running: "0.1.0".parse().expect("version"),
+        downstream: vec![Target::DesktopWindows, Target::DesktopLinux],
+        stager: Some(Arc::new(ChannelStager::new(
+            updates.clone(),
+            *release_key.verifying_key(),
+        ))),
+    };
+    let sync = central
+        .sync(&edge, &central.origin)
+        .with_blobs(files.clone())
+        .with_releases(releases.clone());
+    let round = sync.round().await.expect("round");
+    assert_eq!(
+        round.release,
+        Some(ReleaseStep::Staged("9.9.0".parse().expect("version"))),
+        "{round:?}"
+    );
+    assert_eq!(
+        updates
+            .staged()
+            .expect("staged")
+            .map(|m| m.version)
+            .as_deref(),
+        Some("9.9.0")
+    );
+    // The desktops' installer is kept here for the LAN, whole and verified.
+    assert_eq!(
+        files
+            .read(&health_files::BlobHash::of(&installer))
+            .expect("installer"),
+        installer
+    );
+    // Staged already: the next round leaves it.
+    assert_eq!(sync.round().await.expect("round").release, None);
+
+    // This facility is held on an older release: the edge stays, and says so.
+    issue(rollout(
+        "r-2",
+        "0.0.9",
+        json!({"level": "facility", "facility": FACILITY}),
+        "2026-01-02T00:00:00Z",
+    ))
+    .await;
+    assert_eq!(
+        sync.round().await.expect("round").release,
+        Some(ReleaseStep::Held("0.0.9".parse().expect("version")))
+    );
+
+    // A package signed by another key is never staged.
+    let fresh = tempfile::tempdir().expect("fresh");
+    let other = SigningKey::from_slice(&[6; 32]).expect("other key");
+    let edge2 = store("edge2").await;
+    let sync = central
+        .sync(&edge2, &central.origin)
+        .with_blobs(health_files::FsBlobStore::open(fresh.path().join("files")).expect("files"))
+        .with_releases(Releases {
+            chain: Chain::default(),
+            stager: Some(Arc::new(ChannelStager::new(
+                Updates::new(fresh.path().join("updates")),
+                *other.verifying_key(),
+            ))),
+            ..releases
+        });
+    assert_eq!(
+        sync.round().await.expect("round").release,
+        None,
+        "refused, and the round goes on"
+    );
+    assert_eq!(
+        Updates::new(fresh.path().join("updates"))
+            .staged()
+            .expect("staged"),
+        None
+    );
+}
+
+#[tokio::test]
 async fn a_desktop_syncs_with_its_edge_by_its_enrolled_device_key() {
     use health_auth::{DeviceConfig, DeviceGate, DeviceStore as _, SurrealAuthStore};
     use health_identity::{DeviceId, SessionPolicy};

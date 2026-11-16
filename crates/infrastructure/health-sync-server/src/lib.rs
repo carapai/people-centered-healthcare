@@ -19,6 +19,9 @@
 //!   verifies the blob), and `GET /sync/v1/blobs/{hash}/content` serves it on demand, to a node
 //!   with a record in its scope that references it
 //!   (synchronization.md § Attachments).
+//! - `GET /sync/v1/releases/{hash}/{offset}` serves up to [`RELEASE_RANGE`] bytes of a platform
+//!   release's artifact from `offset`, so a slow link resumes a download where it stopped. Only
+//!   an artifact a roll-out record names is served; the node verifies it whole (#136).
 //! - `POST /sync/v1/break-glass` takes the facility's break-glass grants, kept with the privacy
 //!   officer's review due 72 hours after they arrive (#224).
 //! - `POST /sync/v1/transfers` takes the facility's inter-facility transfers, matched once
@@ -181,6 +184,7 @@ impl SyncServer {
                 axum::routing::put(blob_chunk),
             )
             .route("/sync/v1/blobs/{hash}/content", get(blob_content))
+            .route("/sync/v1/releases/{hash}/{offset}", get(release_range))
             .route("/sync/v1/break-glass", post(break_glass))
             .route("/sync/v1/transfers", post(transfers))
             .route("/sync/v1/transfers/inbound", post(inbound_transfers))
@@ -1067,6 +1071,51 @@ async fn blob_content(
             .into_response(),
         Ok(Err(health_files::BlobError::NotFound(_))) => {
             problem(StatusCode::NOT_FOUND, "no such attachment here")
+        }
+        Ok(Err(error)) => failed(error),
+        Err(error) => failed(error),
+    }
+}
+
+/// How much of a release's artifact one request serves (#136).
+pub const RELEASE_RANGE: u64 = 4 * 1024 * 1024;
+
+/// A range of a release's artifact (#136): what a roll-out record names, to any node, since every
+/// node is sent every roll-out record.
+async fn release_range(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    extensions: Extensions,
+    Path((hash, offset)): Path<(String, u64)>,
+) -> Response {
+    if let Err(response) = server
+        .authenticate(&method, &uri, &headers, &extensions, &[])
+        .await
+    {
+        return *response;
+    }
+    let Some(store) = server.blobs.clone() else {
+        return problem(StatusCode::SERVICE_UNAVAILABLE, "this node keeps no files");
+    };
+    let Ok(blob) = hash.parse::<health_files::BlobHash>() else {
+        return problem(StatusCode::BAD_REQUEST, "not a sha-256 hash");
+    };
+    match server.inner.store.release_artifact_named(&hash).await {
+        Ok(true) => {}
+        Ok(false) => return problem(StatusCode::NOT_FOUND, "no such release artifact here"),
+        Err(error) => return failed(error),
+    }
+    match tokio::task::spawn_blocking(move || store.read_range(&blob, offset, RELEASE_RANGE)).await
+    {
+        Ok(Ok(bytes)) => (
+            [(header::CONTENT_TYPE, "application/octet-stream")],
+            Body::from(bytes),
+        )
+            .into_response(),
+        Ok(Err(health_files::BlobError::NotFound(_))) => {
+            problem(StatusCode::NOT_FOUND, "no such release artifact here")
         }
         Ok(Err(error)) => failed(error),
         Err(error) => failed(error),
