@@ -1,7 +1,8 @@
 // Seed data for a local backend (`HEALTH_SEED=1 bun e2e/backend.ts`): a small synthetic world
 // from tools/synthetic-data (facilities with their stores, stock, medicines, a price book,
 // payers and contracts, and patients by household), loaded through central's FHIR API as the
-// admin. The e2e suite never sets HEALTH_SEED, so its runs start empty as before.
+// admin, then a working facility's activity at KAM013 (e2e/activity.ts). The e2e suite never sets
+// HEALTH_SEED, so its runs start empty as before.
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { join } from 'node:path'
@@ -51,8 +52,9 @@ export async function signIn(
   return body.access_token
 }
 
-/** Generates the synthetic world into `dir` and loads it into `central` with `token`. */
-export function seed(syntheticBin: string, dir: string, central: string, token: string, patients: number): void {
+/** Generates the synthetic world into `dir` and loads it into `central` with `token`; gives the
+ * directory it generated into. */
+export function seed(syntheticBin: string, dir: string, central: string, token: string, patients: number): string {
   const out = join(dir, 'seed')
   const run = (args: string[]) => {
     const result = spawnSync(syntheticBin, args, { stdio: 'inherit' })
@@ -60,4 +62,5 @@ export function seed(syntheticBin: string, dir: string, central: string, token: 
   }
   run(['generate', '--out', out, '--seed', '1', '--patients', String(patients)])
   run(['load', '--dir', out, '--base', `${central}/fhir`, '--bearer', token])
+  return out
 }
