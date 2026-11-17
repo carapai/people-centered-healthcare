@@ -19,7 +19,7 @@ const mono = css({ fontFamily: 'mono', fontSize: 'xs' })
 const bad = css({ color: 'danger.text' })
 const ok = css({ color: 'success.text' })
 
-function useTerminology() {
+export function useTerminology() {
   const [systems, setSystems] = useState<CodeSystem[]>(SYSTEMS)
   const [valueSets, setValueSets] = useState<ValueSet[]>(VALUE_SETS)
   const published = useMemo(() => new Map(VALUE_SETS.map((v) => [v.url, expand(SYSTEMS, v)])), [])
@@ -27,10 +27,10 @@ function useTerminology() {
   const editConcepts = (url: string, concepts: Concept[]) => setSystems((all) => all.map((s) => (s.url === url ? { ...s, concepts, total: concepts.length } : s)))
   return { systems, valueSets, published, editValueSet, editConcepts }
 }
-type Model = ReturnType<typeof useTerminology>
+export type Model = ReturnType<typeof useTerminology>
 
 /** What a ValueSet change does to the forms that bind it, against its published expansion. */
-function Reach({ model, vs }: { model: Model; vs: ValueSet }) {
+export function Reach({ model, vs }: { model: Model; vs: ValueSet }) {
   const now = expand(model.systems, vs)
   const before = model.published.get(vs.url) ?? []
   const key = (x: { system: string; code: string }) => `${x.system}|${x.code}`
@@ -293,7 +293,7 @@ function VariantB({ model }: { model: Model }) {
 
 // --- Variant C: a local CodeSystem as a sheet ----------------------------------------------------
 
-function VariantC({ model }: { model: Model }) {
+export function VariantC({ model }: { model: Model }) {
   const locals = model.systems.filter((s) => s.local)
   const [url, setUrl] = useState(locals[0]?.url ?? '')
   const [paste, setPaste] = useState('')

@@ -29,6 +29,7 @@ import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
+import { Route as PrototypeCodesystemEditorRouteImport } from './routes/prototype.codesystem-editor'
 import { Route as PrototypeTerminologyStudioRouteImport } from './routes/prototype.terminology-studio'
 import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
 import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
@@ -143,6 +144,12 @@ const PortalCallbackRoute = PortalCallbackRouteImport.update({
   path: '/portal/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeCodesystemEditorRoute =
+  PrototypeCodesystemEditorRouteImport.update({
+    id: '/prototype/codesystem-editor',
+    path: '/prototype/codesystem-editor',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PrototypeTerminologyStudioRoute =
   PrototypeTerminologyStudioRouteImport.update({
     id: '/prototype/terminology-studio',
@@ -230,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/codesystem-editor': typeof PrototypeCodesystemEditorRoute
   '/prototype/terminology-studio': typeof PrototypeTerminologyStudioRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -265,6 +273,7 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/codesystem-editor': typeof PrototypeCodesystemEditorRoute
   '/prototype/terminology-studio': typeof PrototypeTerminologyStudioRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -301,6 +310,7 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/codesystem-editor': typeof PrototypeCodesystemEditorRoute
   '/prototype/terminology-studio': typeof PrototypeTerminologyStudioRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -338,6 +348,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/codesystem-editor'
     | '/prototype/terminology-studio'
     | '/reception/queues'
     | '/registry/reviews'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/codesystem-editor'
     | '/prototype/terminology-studio'
     | '/reception/queues'
     | '/registry/reviews'
@@ -408,6 +420,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/codesystem-editor'
     | '/prototype/terminology-studio'
     | '/reception/queues'
     | '/registry/reviews'
@@ -444,6 +457,7 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
+  PrototypeCodesystemEditorRoute: typeof PrototypeCodesystemEditorRoute
   PrototypeTerminologyStudioRoute: typeof PrototypeTerminologyStudioRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
@@ -602,6 +616,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/codesystem-editor': {
+      id: '/prototype/codesystem-editor'
+      path: '/prototype/codesystem-editor'
+      fullPath: '/prototype/codesystem-editor'
+      preLoaderRoute: typeof PrototypeCodesystemEditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prototype/terminology-studio': {
       id: '/prototype/terminology-studio'
       path: '/prototype/terminology-studio'
@@ -716,6 +737,7 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
+  PrototypeCodesystemEditorRoute: PrototypeCodesystemEditorRoute,
   PrototypeTerminologyStudioRoute: PrototypeTerminologyStudioRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
