@@ -282,7 +282,7 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
         </label>
       ) : (
         <>
-          <span className={css({ fontSize: 'sm' })}>{within ? `${Unit} in the denominator who match` : `${Unit} with care in the period who match`}</span>
+          <span className={css({ fontSize: 'sm' })}>{within ? `${Unit} in the denominator who match` : ind.cumulative ? `${Unit} with care up to the end of the period who match` : `${Unit} with care in the period who match`}</span>
           <TreeEditor node={tree} onChange={setTree} />
         </>
       )}
@@ -337,6 +337,28 @@ function Calculation({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) =
             ) : null}
           </>
         ) : null}
+        {ind.calc === 'distinct' ? (
+          <>
+            of
+            <select className={input} aria-label="Coded field" value={ind.distinctOf} onChange={(e) => setInd({ ...ind, distinctOf: e.target.value })}>
+              {CODED.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
+        {calc?.value && ind.unit !== 'visits' && ind.unit !== 'observations' ? (
+          <>
+            taking each one's
+            <select className={input} aria-label="Which value" value={ind.pick} onChange={(e) => setInd({ ...ind, pick: e.target.value as 'first' | 'last' })}>
+              <option value="last">last</option>
+              <option value="first">first</option>
+            </select>
+            value in the period
+          </>
+        ) : null}
         {ind.calc === 'rate' ? (
           <>
             per
@@ -359,6 +381,9 @@ function Calculation({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) =
             </option>
           ))}
         </select>
+      </label>
+      <label className={row}>
+        <input type="checkbox" checked={ind.cumulative} onChange={(e) => setInd({ ...ind, cumulative: e.target.checked })} /> Cumulative: from the first record up to the end of the reporting period (e.g. ever enrolled on ART)
       </label>
       <span className={muted}>
         {calc?.hint}

@@ -74,7 +74,7 @@ export type Patient = {
 }
 // --- What an indicator calculates -------------------------------------------------------------------
 
-export type Calc = 'count' | 'percentage' | 'rate' | 'ratio' | 'sum' | 'average' | 'median' | 'min' | 'max'
+export type Calc = 'count' | 'percentage' | 'rate' | 'ratio' | 'sum' | 'average' | 'median' | 'min' | 'max' | 'distinct'
 export const CALCS: { id: Calc; label: string; den: boolean; value: boolean; hint: string }[] = [
   { id: 'count', label: 'Count', den: false, value: false, hint: 'How many, e.g. ANC 1st visits' },
   { id: 'percentage', label: 'Percentage', den: true, value: false, hint: 'Numerator ÷ denominator × 100' },
@@ -85,18 +85,20 @@ export const CALCS: { id: Calc; label: string; den: boolean; value: boolean; hin
   { id: 'median', label: 'Median of a value', den: false, value: true, hint: 'e.g. median days from LMP to 1st visit' },
   { id: 'min', label: 'Minimum of a value', den: false, value: true, hint: '' },
   { id: 'max', label: 'Maximum of a value', den: false, value: true, hint: '' },
+  { id: 'distinct', label: 'Count distinct values', den: false, value: false, hint: 'How many different values of a coded field, e.g. districts patients came from' },
 ]
 /** What one counted thing is: distinct people, distinct enrollments, or each visit. */
-export type CountUnit = 'people' | 'enrollments' | 'visits'
+export type CountUnit = 'people' | 'enrollments' | 'visits' | 'observations'
 export const COUNT_UNITS: { id: CountUnit; label: string }[] = [
   { id: 'people', label: 'People (each person once)' },
   { id: 'enrollments', label: 'Enrollments (each program enrollment once)' },
   { id: 'visits', label: 'Visits (every matching visit)' },
+  { id: 'observations', label: 'Observations (every matching observation)' },
 ]
 export type ValueSpec = { kind: 'input'; input: 'ga' | 'age' } | { kind: 'days'; from: DateField; to: DateField }
 export type Den = { tree: Node; population: number | null }
 
-export type Indicator = { id: string; title: string; version: string; periodDate: DateField; calc: Calc; unit: CountUnit; value: ValueSpec; per: number; numerator: { tree: Node }; den: Den; disaggregations: Disagg[] }
+export type Indicator = { id: string; title: string; version: string; periodDate: DateField; cumulative: boolean; calc: Calc; unit: CountUnit; value: ValueSpec; pick: 'first' | 'last'; distinctOf: string; per: number; numerator: { tree: Node }; den: Den; disaggregations: Disagg[] }
 /** The denominator, or 'one' when the calculation has none. */
 export const denOf = (ind: Indicator): Den | 'one' => (CALCS.find((x) => x.id === ind.calc)?.den ? ind.den : 'one')
 const emptyDen: Den = { tree: { kind: 'group', join: 'all', children: [] }, population: null }
@@ -120,8 +122,8 @@ export const newDate = (): DateCond => inPeriod('start')
 
 /** Published indicators in this package and its dependencies, which a condition can refer to. */
 export const OTHERS: Indicator[] = [
-  { id: 'anc-visits', title: 'ANC visits (all)', version: '2.3.0', periodDate: 'start', calc: 'count', unit: 'visits', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: { kind: 'group', join: 'any', children: [c('type', '=', 'anc-first'), c('type', '=', 'anc-followup')] } }, den: emptyDen, disaggregations: [] },
-  { id: 'anc-first', title: 'ANC 1st visits', version: '2.3.0', periodDate: 'start', calc: 'count', unit: 'people', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: all(c('sex', '=', 'female'), c('type', '=', 'anc-first')) }, den: emptyDen, disaggregations: [] },
+  { id: 'anc-visits', title: 'ANC visits (all)', version: '2.3.0', periodDate: 'start', cumulative: false, pick: 'last', distinctOf: 'district', calc: 'count', unit: 'visits', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: { kind: 'group', join: 'any', children: [c('type', '=', 'anc-first'), c('type', '=', 'anc-followup')] } }, den: emptyDen, disaggregations: [] },
+  { id: 'anc-first', title: 'ANC 1st visits', version: '2.3.0', periodDate: 'start', cumulative: false, pick: 'last', distinctOf: 'district', calc: 'count', unit: 'people', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: all(c('sex', '=', 'female'), c('type', '=', 'anc-first')) }, den: emptyDen, disaggregations: [] },
 ]
 
 export const INITIAL: Indicator = {
@@ -129,6 +131,9 @@ export const INITIAL: Indicator = {
   title: 'ANC 1st visit before 12 weeks',
   version: '2.4.0-draft',
   periodDate: 'start',
+  cumulative: false,
+  pick: 'last',
+  distinctOf: 'district',
   calc: 'percentage',
   unit: 'people',
   value: { kind: 'days', from: 'lmp', to: 'start' },
@@ -162,7 +167,7 @@ export const PATIENTS: Patient[] = [
   P('p2', 'Akello B.', '2008-06-15', 'female', 'anc-first', 16, true, 'unknown', 'Wakiso', { start: '2026-03-11', obs: '2026-03-11', recorded: '2026-03-11', lmp: '2025-11-19', enrolled: '2026-03-11', eocStart: '2026-03-11' }),
   P('p3', 'Namubiru C.', '1994-09-30', 'female', 'anc-first', 9, false, 'positive', 'Kampala', { start: '2026-03-30', obs: '2026-03-30', recorded: '2026-04-03', lmp: '2026-01-26', enrolled: '2026-03-30', eocStart: '2026-03-30', nextVisit: '2026-04-27' }),
   P('p4', 'Auma D.', '1997-12-01', 'female', 'anc-followup', 20, false, 'negative', 'Mukono', { start: '2026-03-18', obs: '2026-03-18', recorded: '2026-03-18', lmp: '2025-10-29', enrolled: '2026-01-07', eocStart: '2026-01-07' }),
-  P('p5', 'Okello E.', '1990-04-22', 'male', 'opd', 0, false, 'negative', 'Kampala', { start: '2026-03-02', obs: '2026-03-02', recorded: '2026-03-02' }),
+  P('p5', 'Okello E.', '1990-04-22', 'male', 'opd', 0, false, 'negative', '', { start: '2026-03-02', obs: '2026-03-02', recorded: '2026-03-02' }),
   P('p6', 'Nabirye F.', '2011-08-09', 'female', 'anc-first', 11, true, 'negative', 'Wakiso', { start: '2026-04-08', obs: '2026-04-08', recorded: '2026-04-08', lmp: '2026-01-21', enrolled: '2026-04-08', eocStart: '2026-04-08' }),
   P('p7', 'Atim G.', '2004-12-19', 'female', 'anc-first', 13, false, 'positive', 'Mukono', { start: '2026-04-15', obs: '2026-04-15', recorded: '2026-04-15', lmp: '2026-01-14', enrolled: '2026-04-15', eocStart: '2026-04-15' }),
   P('p8', 'Nansubuga H.', '1999-07-03', 'female', 'anc-first', 8, true, 'negative', 'Kampala', { start: '2026-03-25', obs: '2026-03-25', recorded: '2026-03-25', lmp: '2026-01-28', enrolled: '2026-03-25', eocStart: '2026-03-25' }),
@@ -249,7 +254,7 @@ export function side(ind: Indicator, s: Side, period: Period, seen: string[] = [
 }
 
 export function baseOf(ind: Indicator, b: Base, period: Period, seen: string[] = []): Patient[] {
-  if (b.kind === 'period') return PATIENTS.filter((p) => holdsDate(inPeriod(ind.periodDate), p, period))
+  if (b.kind === 'period') return PATIENTS.filter((p) => (ind.cumulative ? Boolean(p.dates[ind.periodDate]) && (p.dates[ind.periodDate] ?? '') <= periodEnd(period) : holdsDate(inPeriod(ind.periodDate), p, period)))
   if (b.kind === 'denominator') return denOf(ind) === 'one' ? baseOf(ind, { kind: 'period' }, period, seen) : side(ind, 'denominator', period, seen)
   const other = OTHERS.find((x) => x.id === b.id)
   return other ? side(other, b.side, period, seen) : []
@@ -260,7 +265,7 @@ export function evaluate(ind: Indicator, period: Period) {
 }
 export type Result = ReturnType<typeof evaluate>
 
-const keyOf = (unit: CountUnit, p: Patient) => (unit === 'people' ? p.person : unit === 'enrollments' ? p.enrollment : p.id)
+const keyOf = (unit: CountUnit, p: Patient) => (unit === 'people' ? p.person : unit === 'enrollments' ? p.enrollment : unit === 'observations' ? `${p.id}/obs` : p.id)
 /** The counted things: records deduplicated by the counting unit, keeping the first. */
 export const counted = (unit: CountUnit, list: Patient[]) => list.filter((p, i) => list.findIndex((q) => keyOf(unit, q) === keyOf(unit, p)) === i)
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
@@ -274,6 +279,18 @@ export const valueLabel = (spec: ValueSpec) => (spec.kind === 'input' ? (spec.in
 
 const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
 
+/** One record per counted thing, taking each one's first or last record in the period by the period date. */
+function picked(ind: Indicator, list: Patient[]): Patient[] {
+  const byKey = new Map<string, Patient>()
+  for (const p of list) {
+    const k = keyOf(ind.unit, p)
+    const prev = byKey.get(k)
+    const date = (x: Patient) => x.dates[ind.periodDate] ?? ''
+    if (!prev || (ind.pick === 'last' ? date(p) > date(prev) : date(p) < date(prev))) byKey.set(k, p)
+  }
+  return [...byKey.values()]
+}
+
 /** The indicator's value over a numerator and a denominator (records already filtered, e.g. to one band). */
 export function compute(ind: Indicator, num: Patient[], den: Patient[] | null, period: Period): { text: string; n: number; d: number | null } {
   const n = counted(ind.unit, num)
@@ -283,8 +300,9 @@ export function compute(ind: Indicator, num: Patient[], den: Patient[] | null, p
   if (ind.calc === 'percentage') return { text: d ? `${fmt((100 * n.length) / d)}%` : '–', n: n.length, d }
   if (ind.calc === 'rate') return { text: d ? `${fmt((ind.per * n.length) / d)} per ${ind.per.toLocaleString()}` : '–', n: n.length, d }
   if (ind.calc === 'ratio') return { text: d ? (n.length / d).toFixed(2) : '–', n: n.length, d }
+  if (ind.calc === 'distinct') return { text: String(new Set(n.map((p) => value(p, ind.distinctOf, period)).filter(Boolean)).size), n: n.length, d }
   const values: number[] = []
-  for (const p of n) {
+  for (const p of picked(ind, num)) {
     const x = valueOf(ind.value, p, period)
     if (x === null) continue
     const at = values.findIndex((y) => y > x)
@@ -316,7 +334,7 @@ export function bands(d: Disagg, ind: Indicator, period: Period): { label: strin
   }
   const input = INPUTS.find((i) => i.id === d.input)
   const values = input?.type === 'boolean' ? ['true', 'false'] : (input?.values ?? [])
-  return values.map((v) => ({ label: v, test: (p: Patient) => value(p, d.input, period) === v }))
+  return [...values.map((v) => ({ label: v, test: (p: Patient) => value(p, d.input, period) === v })), { label: 'not recorded', test: (p: Patient) => value(p, d.input, period) === '' }]
 }
 
 // --- FHIRPath ------------------------------------------------------------------------------------------
@@ -351,7 +369,8 @@ export function compiled(ind: Indicator, s: Side): string {
   if (part === 'one') return '1'
   if ('population' in part && part.population !== null) return `${part.population} /* population estimate */`
   const own = fhirpath(part.tree, ind)
-  const base = startOf(ind, s).kind === 'denominator' ? compiled(ind, 'denominator') : dateExpr(inPeriod(ind.periodDate))
+  const pd = DATE_FIELDS.find((x) => x.id === ind.periodDate)?.path ?? ind.periodDate
+  const base = startOf(ind, s).kind === 'denominator' ? compiled(ind, 'denominator') : ind.cumulative ? `${pd} <= %periodEnd` : dateExpr(inPeriod(ind.periodDate))
   return `(${base}) and (${own})`
 }
 
