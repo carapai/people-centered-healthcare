@@ -21,7 +21,9 @@ import {
   evaluate,
   holds,
   display,
+  refOptions,
   type Base,
+  type Ctx,
   type Indicator,
   type Join,
   type Node,
@@ -44,8 +46,23 @@ const bad = css({ color: 'danger.text' })
 const OPS: Op[] = ['=', '!=', '<', '<=', '>', '>=']
 const JOINS: Record<Join, string> = { all: 'all of these', any: 'any of these', not: 'none of these' }
 
-function TreeEditor({ node, onChange, patient, depth = 0 }: { node: Node; onChange: (n: Node) => void; patient?: Patient | undefined; depth?: number }) {
-  const mark = patient ? (holds(node, patient) ? <span className={ok}>✓ </span> : <span className={bad}>✗ </span>) : null
+function TreeEditor({ node, onChange, ind, patient, ctx, depth = 0 }: { node: Node; onChange: (n: Node) => void; ind: Indicator; patient?: Patient | undefined; ctx?: Ctx | undefined; depth?: number }) {
+  const mark = patient && ctx ? (holds(node, patient, ctx) ? <span className={ok}>✓ </span> : <span className={bad}>✗ </span>) : null
+  if (node.kind === 'member') {
+    return (
+      <div className={css({ display: 'flex', gap: '1', alignItems: 'center', flexWrap: 'wrap' })}>
+        {mark}
+        <span className={css({ fontSize: 'sm' })}>is in</span>
+        <select className={input} value={enc(node.ref)} aria-label="Indicator population" onChange={(e) => onChange({ kind: 'member', ref: dec(e.target.value) })}>
+          {refOptions(ind).map((b) => (
+            <option key={enc(b)} value={enc(b)}>
+              {baseLabel(b)}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
   if (node.kind === 'cond') {
     const inp = INPUTS.find((i) => i.id === node.input)
     return (
@@ -98,12 +115,15 @@ function TreeEditor({ node, onChange, patient, depth = 0 }: { node: Node; onChan
         <button type="button" className={small} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'group', join: 'any', children: [] }] })}>
           + group
         </button>
+        <button type="button" className={small} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'member', ref: refOptions(ind)[0] ?? { kind: 'period' } }] })}>
+          + in another indicator
+        </button>
       </div>
       {node.children.length === 0 ? <span className={muted}>Everyone from the step before.</span> : null}
       {node.children.map((ch, i) => (
         <div key={i} className={css({ display: 'flex', gap: '1', alignItems: 'flex-start' })}>
           <div className={css({ flex: '1' })}>
-            <TreeEditor node={ch} onChange={(n) => set(i, n)} patient={patient} depth={depth + 1} />
+            <TreeEditor node={ch} onChange={(n) => set(i, n)} ind={ind} patient={patient} ctx={ctx} depth={depth + 1} />
           </div>
           <button type="button" className={small} aria-label="Remove" onClick={() => set(i, null)}>
             ×
@@ -169,7 +189,7 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
         <>
           <BasePicker ind={ind} side={side} part={part} onChange={(base) => set({ ...part, base })} />
           <span className={css({ fontSize: 'sm' })}>…and of those, keep</span>
-          <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} />
+          <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} ind={ind} />
           <code className={mono}>{compiled(ind, side)}</code>
         </>
       )}
@@ -203,7 +223,8 @@ function Settings({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => v
 }
 
 /** Patients on one side, each opening to that side's conditions marked for them. */
-function Patients({ ind, side, list, setInd }: { ind: Indicator; side: Side; list: Patient[]; setInd: (i: Indicator) => void }) {
+function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: Side; list: Patient[]; setInd: (i: Indicator) => void; period: string }) {
+  const ctx: Ctx = { ind, period, seen: [`${ind.id}.${side}`] }
   const [open, setOpen] = useState<string | null>(null)
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   return (
@@ -218,7 +239,7 @@ function Patients({ ind, side, list, setInd }: { ind: Indicator; side: Side; lis
           {open === p.id && part !== 'one' ? (
             <div className={cx(box, css({ p: '2', mt: '1', bg: 'bg.subtle' }))}>
               <span className={muted}>In “{baseLabel(part.base)}”, and:</span>
-              <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} patient={p} />
+              <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} ind={ind} patient={p} ctx={ctx} />
             </div>
           ) : null}
         </li>
@@ -231,7 +252,7 @@ function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: st
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return null
   const from = baseOf(ind, part.base, period)
-  const out = from.filter((p) => !holds(part.tree, p))
+  const out = from.filter((p) => !holds(part.tree, p, { ind, period, seen: [`${ind.id}.${side}`] }))
   return (
     <p className={muted}>
       Started from {from.length}; dropped {out.length}
@@ -312,7 +333,7 @@ export function IndicatorEditorPrototype() {
           </table>
           <h3 className={css({ fontWeight: 'semibold' })}>{drill === 'numerator' ? 'Numerator' : 'Denominator'}: who and why</h3>
           <Dropped ind={ind} side={sides.includes(drill) ? drill : 'numerator'} period={period} />
-          <Patients ind={ind} side={sides.includes(drill) ? drill : 'numerator'} list={sides.includes(drill) && drill === 'denominator' ? (r.denominator ?? []) : r.numerator} setInd={setInd} />
+          <Patients ind={ind} side={sides.includes(drill) ? drill : 'numerator'} list={sides.includes(drill) && drill === 'denominator' ? (r.denominator ?? []) : r.numerator} setInd={setInd} period={period} />
           <button type="button" className={ghost} onClick={() => setTests([...tests.filter((t) => t.period !== period), { period, expect: expectNow }])}>
             Save as test ({period})
           </button>

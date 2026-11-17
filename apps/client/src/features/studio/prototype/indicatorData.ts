@@ -6,7 +6,9 @@
 export type Input = { id: string; label: string; path: string; type: 'code' | 'number' | 'boolean'; values?: string[] }
 export type Op = '=' | '!=' | '<' | '<=' | '>' | '>='
 export type Join = 'all' | 'any' | 'not'
-export type Node = { kind: 'cond'; input: string; op: Op; value: string } | { kind: 'group'; join: Join; children: Node[] }
+export type Node = { kind: 'cond'; input: string; op: Op; value: string } | { kind: 'group'; join: Join; children: Node[] } | { kind: 'member'; ref: Base }
+/** What a membership condition needs: the indicator being edited, the period, and the sides already being evaluated (to stop loops). */
+export type Ctx = { ind: Indicator; period: string; seen: string[] }
 export type Side = 'numerator' | 'denominator'
 export type Base = { kind: 'period' } | { kind: 'denominator' } | { kind: 'indicator'; id: string; side: Side }
 export type Part = { base: Base; tree: Node }
@@ -94,19 +96,21 @@ function holdsCond(n: Extract<Node, { kind: 'cond' }>, p: Patient): boolean {
   return n.op === '!=' ? raw !== n.value : raw === n.value
 }
 
-export function holds(n: Node, p: Patient): boolean {
+export function holds(n: Node, p: Patient, ctx: Ctx): boolean {
   if (n.kind === 'cond') return holdsCond(n, p)
+  if (n.kind === 'member') return baseOf(ctx.ind, n.ref, ctx.period, ctx.seen).some((x) => x.id === p.id)
   if (n.children.length === 0) return n.join !== 'any'
-  if (n.join === 'all') return n.children.every((ch) => holds(ch, p))
-  if (n.join === 'any') return n.children.some((ch) => holds(ch, p))
-  return !n.children.some((ch) => holds(ch, p))
+  if (n.join === 'all') return n.children.every((ch) => holds(ch, p, ctx))
+  if (n.join === 'any') return n.children.some((ch) => holds(ch, p, ctx))
+  return !n.children.some((ch) => holds(ch, p, ctx))
 }
 
 const lit = (input: string, v: string) => (INPUTS.find((i) => i.id === input)?.type === 'code' ? `'${v}'` : v)
-export function fhirpath(n: Node): string {
+export function fhirpath(n: Node, ind?: Indicator): string {
+  if (n.kind === 'member') return `(${memberExpr(n.ref, ind)})`
   if (n.kind === 'cond') return `${INPUTS.find((i) => i.id === n.input)?.path ?? n.input} ${n.op} ${lit(n.input, n.value)}`
   if (n.children.length === 0) return n.join === 'any' ? 'false' : 'true'
-  const parts = n.children.map((ch) => (ch.kind === 'group' && ch.children.length > 1 ? `(${fhirpath(ch)})` : fhirpath(ch)))
+  const parts = n.children.map((ch) => (ch.kind === 'group' && ch.children.length > 1 ? `(${fhirpath(ch, ind)})` : fhirpath(ch, ind)))
   if (n.join === 'not') return `(${parts.join(' or ')}).not()`
   return parts.join(n.join === 'all' ? ' and ' : ' or ')
 }
@@ -127,8 +131,9 @@ export function side(ind: Indicator, s: Side, period: string, seen: string[] = [
   if (seen.includes(`${ind.id}.${s}`)) return [] // a loop; the real check refuses it at Validation
   const part = s === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return []
-  const from = baseOf(ind, part.base, period, [...seen, `${ind.id}.${s}`])
-  return from.filter((p) => holds(part.tree, p))
+  const next = [...seen, `${ind.id}.${s}`]
+  const from = baseOf(ind, part.base, period, next)
+  return from.filter((p) => holds(part.tree, p, { ind, period, seen: next }))
 }
 
 export function baseOf(ind: Indicator, b: Base, period: string, seen: string[] = []): Patient[] {
@@ -142,7 +147,7 @@ export function baseOf(ind: Indicator, b: Base, period: string, seen: string[] =
 export function compiled(ind: Indicator, s: Side): string {
   const part = s === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return '1'
-  const own = fhirpath(part.tree)
+  const own = fhirpath(part.tree, ind)
   const b = part.base
   const base = b.kind === 'period' ? '' : b.kind === 'denominator' ? (ind.denominator === 'one' ? '' : compiled(ind, 'denominator')) : (() => {
     const o = OTHERS.find((x) => x.id === b.id)
@@ -158,3 +163,22 @@ export function evaluate(ind: Indicator, period: string) {
 }
 export type Result = ReturnType<typeof evaluate>
 export const display = (r: Result) => (r.denominator === null ? `${r.numerator.length}` : r.denominator.length ? `${Math.round((100 * r.numerator.length) / r.denominator.length)}%` : '–')
+
+/** The expression a membership condition stands for: the referenced side's own compiled criteria. */
+function memberExpr(b: Base, ind?: Indicator): string {
+  if (b.kind === 'period') return 'true'
+  if (b.kind === 'denominator') return ind && ind.denominator !== 'one' ? `/* this indicator's denominator */ ${compiled(ind, 'denominator')}` : 'true'
+  const o = OTHERS.find((x) => x.id === b.id)
+  return o ? `/* ${o.title}|${o.version} ${b.side} */ ${compiled(o, b.side)}` : 'false'
+}
+
+/** The sides a membership condition may name. */
+export function refOptions(ind: Indicator): Base[] {
+  const out: Base[] = []
+  if (ind.denominator !== 'one') out.push({ kind: 'denominator' })
+  for (const o of OTHERS) {
+    out.push({ kind: 'indicator', id: o.id, side: 'numerator' })
+    if (o.denominator !== 'one') out.push({ kind: 'indicator', id: o.id, side: 'denominator' })
+  }
+  return out
+}
