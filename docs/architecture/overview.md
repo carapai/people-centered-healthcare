@@ -158,6 +158,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0063](../adr/0063-an-edge-gives-its-desktops-their-staff.md) | An edge gives each enrolled desktop the staff at its location for offline sign-in, hashes encrypted to the device key, the bundle signed with the facility intermediate key (extends 0059) |
 | [0064](../adr/0064-equipment-is-a-supply-chain-module-and-device-means-medical-devices.md) | Equipment is owned by a new Supply Chain `equipment` module, facility-scope and written by the edge; FHIR `Device` is split into equipment and patient-assigned, and enrolled client devices become `EnrolledDevice` |
 | [0065](../adr/0065-edges-re-push-what-a-restored-central-lost.md) | Edges report in each Hello what the upstream acknowledged; a restored upstream answers what its backup kept and its new epoch, and the edge re-queues its log after that point (amends 0019, 0046) |
+| [0066](../adr/0066-translations-ship-as-language-packs.md) | Translations ship as Language Packs (one package per package and language, one approver), merged in when served; stale or missing strings fall back to English; records keep English text and the capture language |
 
 ## Still open
 
