@@ -79,8 +79,12 @@ A published Measure that calculates one figure (a count, percentage, rate, ratio
 _Avoid_: Metric, KPI
 
 **Report**:
-A published table of Indicators, laid out in sections and columns of Disaggregation bands, for one period type and the levels it may be run for; an HMIS form is a Report whose cells are sent to DHIS2.
+A published layout of Indicators for one period type and the levels it may be run for, in sections that are tables (Indicators split by Disaggregation bands in rows and columns) or Line Lists; an HMIS form is a Report whose cells are sent to DHIS2.
 _Avoid_: Dataset, form (for the definition)
+
+**Line List**:
+A section of a Report naming the enrollments or visits behind the figures, one per row, with chosen details about each; seen only at the facility.
+_Avoid_: Register, patient list (for a worklist)
 
 **Disaggregation**:
 A way of splitting an Indicator's figure: by an Age Band Set or by the codes of a coded field, always with a "not recorded" band so the parts add up to the whole.

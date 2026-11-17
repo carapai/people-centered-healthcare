@@ -185,7 +185,7 @@ The decision-table editor opens from the Workflow Studio, from a guard that uses
 The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530), its layout in [How does the indicator editor look: populations, period date, disaggregations and Try?](https://github.com/carapai/people-centered-healthcare/issues/534), and its calculations, dates and disaggregations in [How does the indicator editor filter by dates relative to the reporting period, and author age bands and coded disaggregations?](https://github.com/carapai/people-centered-healthcare/issues/539), from prototypes (branch `prototype/indicator-editor`). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
 
 - **Layout:** the definition on the left (period date and disaggregations, *What it calculates*, the numerator, then the denominator), and *Try* beside it on the right, always visible.
-- **Indicators have no period of their own.** A **Report** groups indicators and chooses the period type (weekly, monthly, quarterly, semi-annual, annual, financial year from July) and the period; every indicator in it is evaluated over that period. How a Report is defined is still open ([#540](https://github.com/carapai/people-centered-healthcare/issues/540)).
+- **Indicators have no period of their own.** A **Report** groups indicators and chooses the period type (weekly, monthly, quarterly, semi-annual, annual, financial year from July) and the period; every indicator in it is evaluated over that period. How a Report is defined is in [analytics.md § Reports](analytics.md#reports) (ADR 0070).
 - **What it calculates:**
 
   | Calculation | Needs a denominator | FHIR `Measure` scoring |
@@ -213,6 +213,17 @@ The indicator editor opens from a changed `Measure` on the draft page; the Progr
   - Every disaggregation has a **not recorded** band, so the bands always add up to the total.
 - **Try** picks a period type and a period as a Report would, and shows the value, the numerator and denominator per disaggregation band, and who is in each side and why. *Save as test* writes the expected value to `tests/`, and submission's checks fail when a later edit changes it.
 - **HMIS mapping** is edited in the Reporting package (ADR 0069). The editor only shows, read-only, where the indicator is mapped (e.g. *HMIS 105, ANC 1st visit*).
+
+## Reports
+
+The Report designer was decided in [How does the Report designer look: sections, rows, crossed column disaggregations, DHIS2 cell mappings and preview?](https://github.com/carapai/people-centered-healthcare/issues/544), from a prototype (branch `prototype/report-designer`). What a Report is: [analytics.md § Reports](analytics.md#reports) (ADR 0070, ADR 0072).
+
+- **Layout:** an outline on the left (title, period type, levels, *sent to DHIS2*, then the sections and Validation), the Report computed on the right for a chosen period and place, and the DHIS2 mapping of every sent cell as one sheet below.
+- **Sections** are an accordion: one open at a time, each closed one showing a one-line summary. Clicking a section's title or a cell in the preview opens it. *+ table section* and *+ line list* add one.
+- **A table section** lists its Disaggregations, each with a *rows / columns* switch, then *column totals*, *row totals*, *% change from previous period* and *send to DHIS2*, then its indicators (label, reorder, remove). Column totals need a Disaggregation on rows, row totals one on columns. A row shows the indicator's `id|version` and calculation, and flags *facility only* (median, distinct count) and *not a count* (in a sent section). An indicator that doesn't list a section's Disaggregation is a note, not an error.
+- **A line list section** picks *one row per enrollment* (program; started in, or active during, the period) or *one row per visit* (program; visit types), optionally *only those counted by* an indicator, then its columns: *+ attribute* (person, enrollment or visit) and *+ concept* (a search over the terminology). On an enrollment list each concept column picks the latest value, the first, all values with dates, or times recorded.
+- **The preview** reads stored Indicator Reports in the product (test patients in the Studio). Medians and distinct counts show *n/a* above facility level with the reason, line lists ask for a facility, and clicking a cell shows its value, numerator and denominator, the previous period, who it counted and its DHIS2 mappings.
+- **DHIS2 mappings** are per cell, with effective dates; *+ new mapping from a date* closes the open one when the form changes. Unmapped count cells in a sent section are Validation errors.
 
 ## Previews and simulation
 

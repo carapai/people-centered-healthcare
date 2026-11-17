@@ -19,10 +19,11 @@ How program indicators are defined, computed, stored and synced. The decision is
 
 ## Reports
 
-Decided in [ADR 0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md); the designer's layout waits on a prototype ([#544](https://github.com/carapai/people-centered-healthcare/issues/544)).
+Decided in [ADR 0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md) and [ADR 0072](../adr/0072-report-sections-carry-their-own-disaggregations-and-line-lists-stay-at-the-facility.md); the designer is in [studio.md § Reports](studio.md#reports).
 
-- A **Report** is configuration in a Reporting package: a title, one period type, the levels it runs for, and sections of rows (indicators by `url|version`).
-- **Columns** are one Disaggregation's bands or two crossed (age band × sex).
+- A **Report** is configuration in a Reporting package: a title, one period type, the levels it runs for, and sections.
+- A **table section** has indicator rows (by `url|version`) and its own Disaggregations, each laid out as rows or columns (several on one side are crossed), with optional column totals, row totals and % change from the previous period.
+- A **line list section** has one row per enrollment or per visit, with any attribute or concept as a column. It is patient-level, so facility only.
 - **Outputs:** screen, print or PDF, CSV.
 - An **HMIS form** is a Report marked *sent to DHIS2*, each cell carrying its DHIS2 mapping.
 
