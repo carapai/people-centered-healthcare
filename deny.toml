@@ -12,6 +12,8 @@ ignore = [
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack via jsonwebtoken in SurrealDB's JWT access methods, which we do not use; no fixed release" },
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained, via surrealmx in the in-memory engine used only by tests" },
     { id = "RUSTSEC-2026-0441", reason = "pin-utils unmaintained (no vulnerability), via wasmtimer in SurrealDB; nothing to upgrade to yet" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained (no vulnerability), via SurrealDB (object_store, revision) and the vendored octofhir-fhirpath; no patched release, jiff or time once upstream moves" },
+    { id = "RUSTSEC-2026-0542", reason = "humantime unmaintained (no vulnerability) because it wraps chrono, via SurrealDB (object_store, surrealdb-rpc); no patched release" },
     # The desktop (apps/client/src-tauri, #132): unmaintained, no vulnerability, deep in Tauri's
     # Linux stack. Reviewed on every Tauri bump.
     { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained (no vulnerability), via gtk-rs 0.18's glib-macros under WebKitGTK in Tauri 2.12; nothing to upgrade to" },
