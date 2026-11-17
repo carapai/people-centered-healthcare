@@ -3,7 +3,8 @@
 // numerator / denominator, the denominator can be 1 (a count), there is no separate exclusion
 // population (a "none of these" group does that), and each side starts from everyone in the
 // period, this indicator's denominator, or another indicator's numerator or denominator, then
-// adds conditions. Round 1's variants B and C are in this branch's history.
+// adds conditions. Round 3 drops "starts from": an "is in another indicator" condition in the
+// tree does the same and more. Round 1's variants B and C are in this branch's history.
 import { css, cx } from '@health/design-system/css'
 import { useState } from 'react'
 
@@ -12,7 +13,6 @@ import {
   HMIS_MAPPING,
   INITIAL,
   INPUTS,
-  OTHERS,
   PERIOD_DATES,
   PERIODS,
   baseLabel,
@@ -140,34 +140,12 @@ const dec = (s: string): Base => {
   return k === 'indicator' && id && side ? { kind: 'indicator', id, side: side as Side } : k === 'denominator' ? { kind: 'denominator' } : { kind: 'period' }
 }
 
-function BasePicker({ ind, side, part, onChange }: { ind: Indicator; side: Side; part: Part; onChange: (b: Base) => void }) {
-  const options: Base[] = [{ kind: 'period' }]
-  if (side === 'numerator' && ind.denominator !== 'one') options.push({ kind: 'denominator' })
-  for (const o of OTHERS) {
-    options.push({ kind: 'indicator', id: o.id, side: 'numerator' })
-    if (o.denominator !== 'one') options.push({ kind: 'indicator', id: o.id, side: 'denominator' })
-  }
-  return (
-    <label className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' })}>
-      Starts from
-      <select className={input} value={enc(part.base)} onChange={(e) => onChange(dec(e.target.value))}>
-        {options.map((b) => (
-          <option key={enc(b)} value={enc(b)}>
-            {baseLabel(b)}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
 function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; setInd: (i: Indicator) => void; count: number | null }) {
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   const set = (p: Part | 'one') => {
     if (side === 'numerator' && p !== 'one') return setInd({ ...ind, numerator: p })
     // Turning the denominator into 1 moves a numerator that started from it back to the period.
-    const numerator = p === 'one' && ind.numerator.base.kind === 'denominator' ? { ...ind.numerator, base: { kind: 'period' } as Base } : ind.numerator
-    return setInd({ ...ind, denominator: p, numerator })
+    return setInd({ ...ind, denominator: p })
   }
   return (
     <section className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2' }))}>
@@ -187,8 +165,7 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
       ) : null}
       {part === 'one' ? null : (
         <>
-          <BasePicker ind={ind} side={side} part={part} onChange={(base) => set({ ...part, base })} />
-          <span className={css({ fontSize: 'sm' })}>…and of those, keep</span>
+          <span className={css({ fontSize: 'sm' })}>Patients with care in the period who match</span>
           <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} ind={ind} />
           <code className={mono}>{compiled(ind, side)}</code>
         </>
@@ -238,8 +215,7 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
           </button>
           {open === p.id && part !== 'one' ? (
             <div className={cx(box, css({ p: '2', mt: '1', bg: 'bg.subtle' }))}>
-              <span className={muted}>In “{baseLabel(part.base)}”, and:</span>
-              <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} ind={ind} patient={p} ctx={ctx} />
+                            <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} ind={ind} patient={p} ctx={ctx} />
             </div>
           ) : null}
         </li>
@@ -255,7 +231,7 @@ function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: st
   const out = from.filter((p) => !holds(part.tree, p, { ind, period, seen: [`${ind.id}.${side}`] }))
   return (
     <p className={muted}>
-      Started from {from.length}; dropped {out.length}
+      {from.length} with care in the period; {out.length} don't match
       {out.length ? `: ${out.map((p) => p.name).join(', ')}` : ''}.
     </p>
   )

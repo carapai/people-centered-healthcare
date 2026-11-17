@@ -62,8 +62,8 @@ export const INITIAL: Indicator = {
   title: 'ANC 1st visit before 12 weeks',
   version: '2.4.0-draft',
   periodDate: 'start',
-  denominator: { base: { kind: 'indicator', id: 'anc-first', side: 'numerator' }, tree: { kind: 'group', join: 'not', children: [c('age', '<', '10')] } },
-  numerator: { base: { kind: 'denominator' }, tree: all(c('ga', '<', '12')) },
+  denominator: { base: everyone, tree: all({ kind: 'member', ref: { kind: 'indicator', id: 'anc-first', side: 'numerator' } }, { kind: 'group', join: 'not', children: [c('age', '<', '10')] }) },
+  numerator: { base: everyone, tree: all({ kind: 'member', ref: { kind: 'denominator' } }, c('ga', '<', '12')) },
   disaggregations: ['moh-age-anc'],
 }
 
