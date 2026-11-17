@@ -1,6 +1,8 @@
 # Reports are configuration that lays out indicators for one period type, and carries the DHIS2 mapping
 
 > Amends [ADR 0068](0068-indicators-are-fhirpath-measures-computed-on-each-edge.md) (what a summary carries, and roll-up) and [ADR 0069](0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md) (what the Reporting package maps).
+>
+> Amended by [ADR 0072](0072-report-sections-carry-their-own-disaggregations-and-line-lists-stay-at-the-facility.md): each section has its own Disaggregations as rows or columns, and a section can be a line list.
 
 Decided in [How is a Report defined: its indicators, period type, places and layout?](https://github.com/carapai/people-centered-healthcare/issues/540). Indicators have no period of their own ([studio.md § Indicators](../architecture/studio.md#indicators)): something has to choose the period, the places and the layout, and an HMIS form is one such thing. FHIR has no resource for a report's layout.
 

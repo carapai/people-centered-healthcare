@@ -164,6 +164,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md) | HMIS forms are signed off by the facility in-charge and sent to DHIS2 by central, through Reporting package mappings with effective dates; corrections are re-signed and resent whole |
 | [0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md) | A Report is configuration laying out indicators for one period type and the levels it runs for; summaries carry what roll-up needs, medians and distinct counts stay at facility level; HMIS forms are Reports whose cells carry the DHIS2 mapping (amends 0068, 0069) |
 | [0071](../adr/0071-population-estimates-ship-as-yearly-population-packages.md) | Population Estimates ship as a yearly Population package with estimate types given per place or derived by percentage, pro-rated to a Report's period; Age Band Sets live in the national core and program packages, a band change being major |
+| [0072](../adr/0072-report-sections-carry-their-own-disaggregations-and-line-lists-stay-at-the-facility.md) | Each Report section is a table with its own Disaggregations as rows or columns, totals and % change, or a line list of enrollments or visits with any attribute or concept as a column, facility only (amends 0070) |
 
 ## Still open
 
