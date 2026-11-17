@@ -22,7 +22,7 @@ import {
   holds,
   display,
   refOptions,
-  stripDenominator,
+  startOf,
   type Base,
   type Ctx,
   type Indicator,
@@ -47,16 +47,8 @@ const bad = css({ color: 'danger.text' })
 const OPS: Op[] = ['=', '!=', '<', '<=', '>', '>=']
 const JOINS: Record<Join, string> = { all: 'all of these', any: 'any of these', not: 'none of these' }
 
-function TreeEditor({ node, onChange, ind, side, patient, ctx, depth = 0 }: { node: Node; onChange: (n: Node) => void; ind: Indicator; side: Side; patient?: Patient | undefined; ctx?: Ctx | undefined; depth?: number }) {
+function TreeEditor({ node, onChange, patient, ctx, depth = 0 }: { node: Node; onChange: (n: Node) => void; patient?: Patient | undefined; ctx?: Ctx | undefined; depth?: number }) {
   const mark = patient && ctx ? (holds(node, patient, ctx) ? <span className={ok}>✓ </span> : <span className={bad}>✗ </span>) : null
-  if (node.kind === 'member' && node.ref.kind === 'denominator') {
-    return (
-      <div className={css({ display: 'flex', gap: '1', alignItems: 'center', fontSize: 'sm' })}>
-        {mark}
-        is in this indicator's denominator
-      </div>
-    )
-  }
   if (node.kind === 'member') {
     return (
       <div className={css({ display: 'flex', gap: '1', alignItems: 'center', flexWrap: 'wrap' })}>
@@ -127,17 +119,12 @@ function TreeEditor({ node, onChange, ind, side, patient, ctx, depth = 0 }: { no
         <button type="button" className={small} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'member', ref: refOptions()[0] ?? { kind: 'period' } }] })}>
           + in another indicator
         </button>
-        {side === 'numerator' && ind.denominator !== 'one' ? (
-          <button type="button" className={small} onClick={() => onChange({ ...node, children: [...node.children, { kind: 'member', ref: { kind: 'denominator' } }] })}>
-            + in the denominator
-          </button>
-        ) : null}
       </div>
       {node.children.length === 0 ? <span className={muted}>Everyone from the step before.</span> : null}
       {node.children.map((ch, i) => (
         <div key={i} className={css({ display: 'flex', gap: '1', alignItems: 'flex-start' })}>
           <div className={css({ flex: '1' })}>
-            <TreeEditor node={ch} onChange={(n) => set(i, n)} ind={ind} side={side} patient={patient} ctx={ctx} depth={depth + 1} />
+            <TreeEditor node={ch} onChange={(n) => set(i, n)} patient={patient} ctx={ctx} depth={depth + 1} />
           </div>
           <button type="button" className={small} aria-label="Remove" onClick={() => set(i, null)}>
             ×
@@ -158,8 +145,7 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   const set = (p: Part | 'one') => {
     if (side === 'numerator' && p !== 'one') return setInd({ ...ind, numerator: p })
-    // Turning the denominator into 1 removes the numerator's "is in the denominator" conditions.
-    return setInd({ ...ind, denominator: p, numerator: p === 'one' ? { ...ind.numerator, tree: stripDenominator(ind.numerator.tree) } : ind.numerator })
+    return setInd({ ...ind, denominator: p })
   }
   if (part === 'one') {
     return (
@@ -187,8 +173,8 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
       {side === 'denominator' ? <span className={muted}>With a denominator, the indicator is a percentage.</span> : null}
       {(
         <>
-          <span className={css({ fontSize: 'sm' })}>Patients with care in the period who match</span>
-          <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} ind={ind} side={side} />
+          <span className={css({ fontSize: 'sm' })}>{side === 'numerator' && ind.denominator !== 'one' ? 'Patients in the denominator who match' : 'Patients with care in the period who match'}</span>
+          <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} />
           <code className={mono}>{compiled(ind, side)}</code>
         </>
       )}
@@ -237,7 +223,7 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
           </button>
           {open === p.id && part !== 'one' ? (
             <div className={cx(box, css({ p: '2', mt: '1', bg: 'bg.subtle' }))}>
-                            <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} ind={ind} side={side} patient={p} ctx={ctx} />
+                            <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { ...part, tree } } : { ...ind, denominator: { ...part, tree } })} patient={p} ctx={ctx} />
             </div>
           ) : null}
         </li>
@@ -249,11 +235,11 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
 function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: string }) {
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return null
-  const from = baseOf(ind, part.base, period)
+  const from = baseOf(ind, startOf(ind, side), period)
   const out = from.filter((p) => !holds(part.tree, p, { ind, period, seen: [`${ind.id}.${side}`] }))
   return (
     <p className={muted}>
-      {from.length} with care in the period; {out.length} don't match
+      {from.length} {side === 'numerator' && ind.denominator !== 'one' ? 'in the denominator' : 'with care in the period'}; {out.length} don't match
       {out.length ? `: ${out.map((p) => p.name).join(', ')}` : ''}.
     </p>
   )

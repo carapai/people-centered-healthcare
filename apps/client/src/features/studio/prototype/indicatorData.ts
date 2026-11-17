@@ -63,7 +63,7 @@ export const INITIAL: Indicator = {
   version: '2.4.0-draft',
   periodDate: 'start',
   denominator: { base: everyone, tree: all({ kind: 'member', ref: { kind: 'indicator', id: 'anc-first', side: 'numerator' } }, { kind: 'group', join: 'not', children: [c('age', '<', '10')] }) },
-  numerator: { base: everyone, tree: all({ kind: 'member', ref: { kind: 'denominator' } }, c('ga', '<', '12')) },
+  numerator: { base: everyone, tree: all(c('ga', '<', '12')) },
   disaggregations: ['moh-age-anc'],
 }
 
@@ -132,7 +132,7 @@ export function side(ind: Indicator, s: Side, period: string, seen: string[] = [
   const part = s === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return []
   const next = [...seen, `${ind.id}.${s}`]
-  const from = baseOf(ind, part.base, period, next)
+  const from = baseOf(ind, startOf(ind, s), period, next)
   return from.filter((p) => holds(part.tree, p, { ind, period, seen: next }))
 }
 
@@ -148,7 +148,7 @@ export function compiled(ind: Indicator, s: Side): string {
   const part = s === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return '1'
   const own = fhirpath(part.tree, ind)
-  const b = part.base
+  const b = startOf(ind, s)
   const base = b.kind === 'period' ? '' : b.kind === 'denominator' ? (ind.denominator === 'one' ? '' : compiled(ind, 'denominator')) : (() => {
     const o = OTHERS.find((x) => x.id === b.id)
     return o ? `/* ${o.title}|${o.version} ${b.side} */ ${compiled(o, b.side)}` : ''
@@ -182,8 +182,5 @@ export function refOptions(): Base[] {
   return out
 }
 
-/** Removes "is in the denominator" conditions, for when the denominator becomes 1. */
-export function stripDenominator(n: Node): Node {
-  if (n.kind !== 'group') return n
-  return { ...n, children: n.children.filter((ch) => !(ch.kind === 'member' && ch.ref.kind === 'denominator')).map(stripDenominator) }
-}
+/** Where a side starts: the numerator is always within the denominator when there is one. */
+export const startOf = (ind: Indicator, s: Side): Base => (s === 'numerator' && ind.denominator !== 'one' ? { kind: 'denominator' } : { kind: 'period' })
