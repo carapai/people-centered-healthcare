@@ -48,12 +48,14 @@ export type Ctx = { ind: Indicator; period: Period; seen: string[] }
 // --- Disaggregations ---------------------------------------------------------------------------------
 
 export type AgeBand = { from: number; to: number | null }
-export type NationalId = 'moh-age-anc' | 'moh-age-hmis'
-export type Disagg = { kind: 'national'; id: NationalId } | { kind: 'age'; label: string; unit: 'years' | 'months'; at: 'periodEnd' | 'periodDate'; bands: AgeBand[] } | { kind: 'coded'; input: string }
-export const NATIONAL: Record<NationalId, { label: string; bands: AgeBand[] }> = {
-  'moh-age-anc': { label: 'MoH age bands, ANC', bands: [{ from: 10, to: 14 }, { from: 15, to: 19 }, { from: 20, to: 24 }, { from: 25, to: null }] },
-  'moh-age-hmis': { label: 'MoH age bands, HMIS 105', bands: [{ from: 0, to: 0 }, { from: 1, to: 4 }, { from: 5, to: 9 }, { from: 10, to: 19 }, { from: 20, to: null }] },
-}
+/** An Age Band Set is its own published configuration (national or in a package); an indicator only picks one. */
+export type AgeBandSet = { id: string; label: string; from: string; unit: 'years' | 'months'; at: 'periodEnd' | 'periodDate'; bands: AgeBand[] }
+export const AGE_SETS: AgeBandSet[] = [
+  { id: 'moh-age-anc', label: 'MoH ANC age bands', from: 'ug.moh.core 1.4.0 (national)', unit: 'years', at: 'periodEnd', bands: [{ from: 10, to: 14 }, { from: 15, to: 19 }, { from: 20, to: 24 }, { from: 25, to: null }] },
+  { id: 'moh-age-hmis105', label: 'MoH HMIS 105 age bands', from: 'ug.moh.core 1.4.0 (national)', unit: 'years', at: 'periodEnd', bands: [{ from: 0, to: 0 }, { from: 1, to: 4 }, { from: 5, to: 9 }, { from: 10, to: 19 }, { from: 20, to: null }] },
+  { id: 'under5-months', label: 'Under-5 in months', from: 'ug.moh.child-health 1.2.0', unit: 'months', at: 'periodEnd', bands: [{ from: 0, to: 11 }, { from: 12, to: 23 }, { from: 24, to: 59 }] },
+]
+export type Disagg = { kind: 'age'; set: string } | { kind: 'coded'; input: string }
 
 export type Patient = {
   id: string
@@ -99,7 +101,7 @@ export const INITIAL: Indicator = {
   periodDate: 'start',
   denominator: { tree: all({ kind: 'member', ref: { kind: 'indicator', id: 'anc-first', side: 'numerator' } }, { kind: 'group', join: 'not', children: [c('age', '<', '10')] }) },
   numerator: { tree: all(c('ga', '<', '12')) },
-  disaggregations: [{ kind: 'national', id: 'moh-age-anc' }, { kind: 'coded', input: 'hiv' }],
+  disaggregations: [{ kind: 'age', set: 'moh-age-anc' }, { kind: 'coded', input: 'hiv' }],
 }
 
 export const HMIS_MAPPING = 'HMIS 105 (2024) · 2.1 ANC 1st visit for women within 12 weeks · from Reporting package ug.moh.hmis 4.1.0'
@@ -224,7 +226,7 @@ export const display = (r: Result) => (r.denominator === null ? `${r.numerator.l
 // --- Bands for the Try table ---------------------------------------------------------------------------
 
 export const bandLabel = (b: AgeBand, unit: string) => (b.to === null ? `${b.from}+ ${unit}` : b.from === b.to ? `${b.from} ${unit}` : `${b.from}–${b.to} ${unit}`)
-export const disaggLabel = (d: Disagg) => (d.kind === 'national' ? `${NATIONAL[d.id].label} (national)` : d.kind === 'age' ? `${d.label} (age bands)` : `${INPUTS.find((i) => i.id === d.input)?.label ?? d.input} (coded)`)
+export const disaggLabel = (d: Disagg) => (d.kind === 'age' ? `${AGE_SETS.find((x) => x.id === d.set)?.label ?? d.set} (age bands)` : `${INPUTS.find((i) => i.id === d.input)?.label ?? d.input} (coded)`)
 
 export function bands(d: Disagg, ind: Indicator, period: Period): { label: string; test: (p: Patient) => boolean }[] {
   const ageBands = (list: AgeBand[], unit: 'years' | 'months', at: 'periodEnd' | 'periodDate') =>
@@ -235,8 +237,10 @@ export function bands(d: Disagg, ind: Indicator, period: Period): { label: strin
         return age >= b.from && (b.to === null || age <= b.to)
       },
     }))
-  if (d.kind === 'national') return ageBands(NATIONAL[d.id].bands, 'years', 'periodEnd')
-  if (d.kind === 'age') return ageBands(d.bands, d.unit, d.at)
+  if (d.kind === 'age') {
+    const set = AGE_SETS.find((x) => x.id === d.set)
+    return set ? ageBands(set.bands, set.unit, set.at) : []
+  }
   const input = INPUTS.find((i) => i.id === d.input)
   const values = input?.type === 'boolean' ? ['true', 'false'] : (input?.values ?? [])
   return values.map((v) => ({ label: v, test: (p: Patient) => value(p, d.input, period) === v }))

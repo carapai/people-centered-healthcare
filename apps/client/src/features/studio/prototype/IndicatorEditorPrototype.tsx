@@ -4,7 +4,7 @@
 // - "+ date" conditions on many kinds of date, relative to the reporting period (in the period,
 //   on, before, after, between, within N days/weeks/months, in the previous N periods, empty,
 //   not empty), and the period date chosen from the same list;
-// - age bands the author defines (from–to, years or months, age at period end or at the period date);
+// - age bands picked from Age Band Sets, which are their own configuration (not edited here);
 // - disaggregation by any coded value, its bands taken from the value's codes.
 // Earlier rounds (variants B and C, "starts from", "+ in the denominator") are in this branch's history.
 import { css, cx } from '@health/design-system/css'
@@ -17,7 +17,7 @@ import {
   HMIS_MAPPING,
   INITIAL,
   INPUTS,
-  NATIONAL,
+  AGE_SETS,
   DEFAULT_PERIOD,
   PERIOD_TYPES,
   bandLabel,
@@ -43,7 +43,6 @@ import {
   type Disagg,
   type Indicator,
   type Join,
-  type NationalId,
   type Node,
   type Op,
   type Patient,
@@ -276,40 +275,6 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
 
 // --- Period date and disaggregations ------------------------------------------------------------------------
 
-function AgeBandsEditor({ d, onChange }: { d: Extract<Disagg, { kind: 'age' }>; onChange: (d: Disagg) => void }) {
-  return (
-    <div className={css({ display: 'flex', flexDirection: 'column', gap: '1', pl: '3' })}>
-      <div className={row}>
-        <input className={input} value={d.label} aria-label="Name" onChange={(e) => onChange({ ...d, label: e.target.value })} />
-        in
-        <select className={input} value={d.unit} aria-label="Unit" onChange={(e) => onChange({ ...d, unit: e.target.value as 'years' | 'months' })}>
-          <option>years</option>
-          <option>months</option>
-        </select>
-        age at
-        <select className={input} value={d.at} aria-label="Age at" onChange={(e) => onChange({ ...d, at: e.target.value as 'periodEnd' | 'periodDate' })}>
-          <option value="periodEnd">the end of the reporting period</option>
-          <option value="periodDate">the period date</option>
-        </select>
-      </div>
-      {d.bands.map((b, i) => (
-        <div key={i} className={row}>
-          <input className={cx(input, css({ width: '4rem' }))} type="number" min={0} value={b.from} aria-label="From" onChange={(e) => onChange({ ...d, bands: d.bands.map((x, j) => (j === i ? { ...x, from: Number(e.target.value) } : x)) })} />
-          to
-          <input className={cx(input, css({ width: '4rem' }))} type="number" min={0} value={b.to ?? ''} placeholder="and over" aria-label="To" onChange={(e) => onChange({ ...d, bands: d.bands.map((x, j) => (j === i ? { ...x, to: e.target.value === '' ? null : Number(e.target.value) } : x)) })} />
-          <span className={muted}>{bandLabel(b, d.unit)}</span>
-          <button type="button" className={small} aria-label="Remove band" onClick={() => onChange({ ...d, bands: d.bands.filter((_, j) => j !== i) })}>
-            ×
-          </button>
-        </div>
-      ))}
-      <button type="button" className={cx(small, css({ alignSelf: 'flex-start' }))} onClick={() => onChange({ ...d, bands: [...d.bands, { from: (d.bands.at(-1)?.to ?? 0) + 1, to: null }] })}>
-        + band
-      </button>
-    </div>
-  )
-}
-
 function Settings({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => void }) {
   const setD = (i: number, d: Disagg | null) => setInd({ ...ind, disaggregations: d ? ind.disaggregations.map((x, j) => (j === i ? d : x)) : ind.disaggregations.filter((_, j) => j !== i) })
   const addD = (d: Disagg) => setInd({ ...ind, disaggregations: [...ind.disaggregations, d] })
@@ -331,27 +296,23 @@ function Settings({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => v
           <div key={i} className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
             <div className={row}>
               <strong>{disaggLabel(d)}</strong>
-              {d.kind === 'national' ? <span className={muted}>{NATIONAL[d.id].bands.map((b) => bandLabel(b, 'y')).join(', ')}</span> : null}
+              {d.kind === 'age' ? <span className={muted}>{ageSummary(d.set)}</span> : null}
               {d.kind === 'coded' ? <span className={muted}>{(INPUTS.find((x) => x.id === d.input)?.values ?? ['true', 'false']).join(', ')}</span> : null}
               <button type="button" className={small} aria-label="Remove disaggregation" onClick={() => setD(i, null)}>
                 ×
               </button>
             </div>
-            {d.kind === 'age' ? <AgeBandsEditor d={d} onChange={(x) => setD(i, x)} /> : null}
           </div>
         ))}
         <div className={row}>
-          <select className={input} value="" aria-label="Add national age bands" onChange={(e) => e.target.value && addD({ kind: 'national', id: e.target.value as NationalId })}>
-            <option value="">+ national age bands…</option>
-            {(Object.keys(NATIONAL) as NationalId[]).map((id) => (
-              <option key={id} value={id}>
-                {NATIONAL[id].label}
+          <select className={input} value="" aria-label="Add age bands" onChange={(e) => e.target.value && addD({ kind: 'age', set: e.target.value })}>
+            <option value="">+ age bands…</option>
+            {AGE_SETS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label} · {a.from}
               </option>
             ))}
           </select>
-          <button type="button" className={small} onClick={() => addD({ kind: 'age', label: 'Under-5 bands', unit: 'months', at: 'periodEnd', bands: [{ from: 0, to: 11 }, { from: 12, to: 59 }] })}>
-            + age bands
-          </button>
           <select className={input} value="" aria-label="Add a coded disaggregation" onChange={(e) => e.target.value && addD({ kind: 'coded', input: e.target.value })}>
             <option value="">+ by a coded value…</option>
             {CODED.map((i) => (
@@ -361,9 +322,15 @@ function Settings({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => v
             ))}
           </select>
         </div>
+        <span className={muted}>Age bands are their own configuration (Age Band Sets, national or in a package). Define or change them there; an indicator only picks one.</span>
       </div>
     </div>
   )
+}
+
+const ageSummary = (id: string) => {
+  const a = AGE_SETS.find((x) => x.id === id)
+  return a ? `${a.bands.map((b) => bandLabel(b, a.unit === 'years' ? 'y' : 'm')).join(', ')} · age at ${a.at === 'periodEnd' ? 'period end' : 'the period date'} · from ${a.from}` : id
 }
 
 // --- Try -----------------------------------------------------------------------------------------------
