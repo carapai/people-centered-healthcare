@@ -158,27 +158,34 @@ function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; se
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   const set = (p: Part | 'one') => {
     if (side === 'numerator' && p !== 'one') return setInd({ ...ind, numerator: p })
-    // Turning the denominator into 1 moves a numerator that started from it back to the period.
     // Turning the denominator into 1 removes the numerator's "is in the denominator" conditions.
     return setInd({ ...ind, denominator: p, numerator: p === 'one' ? { ...ind.numerator, tree: stripDenominator(ind.numerator.tree) } : ind.numerator })
   }
+  if (part === 'one') {
+    return (
+      <div className={css({ display: 'flex', gap: '3', alignItems: 'center' })}>
+        <button type="button" className={ghost} onClick={() => set({ base: { kind: 'period' }, tree: { kind: 'group', join: 'all', children: [] } })}>
+          + Add denominator
+        </button>
+        <span className={muted}>Without one, the indicator is a count of the numerator.</span>
+      </div>
+    )
+  }
   return (
     <section className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2' }))}>
-      <div className={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' })}>
+      <div className={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '2' })}>
         <h2 className={h2}>{side === 'numerator' ? 'Numerator' : 'Denominator'}</h2>
-        {count === null ? null : <span className={muted}>{count} in the period tried</span>}
+        <span className={css({ display: 'flex', gap: '2', alignItems: 'baseline' })}>
+          {count === null ? null : <span className={muted}>{count} in the period tried</span>}
+          {side === 'denominator' ? (
+            <button type="button" className={small} onClick={() => set('one')}>
+              Remove denominator
+            </button>
+          ) : null}
+        </span>
       </div>
-      {side === 'denominator' ? (
-        <div role="radiogroup" aria-label="Denominator" className={css({ display: 'flex', gap: '3', fontSize: 'sm' })}>
-          <label>
-            <input type="radio" checked={part === 'one'} onChange={() => set('one')} /> 1: the indicator is a count of the numerator
-          </label>
-          <label>
-            <input type="radio" checked={part !== 'one'} onChange={() => set({ base: { kind: 'period' }, tree: { kind: 'group', join: 'all', children: [] } })} /> Patients, so the indicator is a percentage
-          </label>
-        </div>
-      ) : null}
-      {part === 'one' ? null : (
+      {side === 'denominator' ? <span className={muted}>With a denominator, the indicator is a percentage.</span> : null}
+      {(
         <>
           <span className={css({ fontSize: 'sm' })}>Patients with care in the period who match</span>
           <TreeEditor node={part.tree} onChange={(tree) => set({ ...part, tree })} ind={ind} side={side} />
