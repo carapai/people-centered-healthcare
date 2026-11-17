@@ -29,7 +29,7 @@ Status: **accepted** (ADRs 0002, 0042, 0043, 0044). Produced while resolving the
 | Human task | Role or performer type, form (Questionnaire `url\|version`), worklist key, priority, claim timeout |
 | Gate | References a Financial Gate configuration. Exits on `pass` / `defer` / `block` |
 | Invoke | Sub-workflow `url\|version`, with a done or error event back to the parent |
-| Decision table | Rows of FHIRPath conditions → outcome value, used in guards |
+| Decision table | Named rows of FHIRPath conditions → outcome value, first match wins, with an optional default; used in guards. The Studio edits each row as an all / any / not tree saved as one expression (studio.md) |
 | Data model | Typed fields (ids, flags, counters). No copies of clinical data |
 | Data requirements | The resources and paths the guards need |
 
