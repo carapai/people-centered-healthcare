@@ -12,7 +12,7 @@ This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98:
 | Build order | 1. A shared **package workspace** and the **form designer**. 2. The **Program Designer**. 3. The **Workflow Studio** |
 | Workflow editing | A visual canvas of states and transitions (§52), with each element's details edited in a side panel of ordinary form fields. The canvas is `@xyflow/react` 13.x with `@dagrejs/dagre` layout, decided in [Which graph-canvas library fits the Workflow Studio?](https://github.com/carapai/people-centered-healthcare/issues/480) |
 | Who may do what | Named permissions granted through roles (see the authoring API below). The API records the signed-in account as the actor |
-| Importing content | Plain FHIR JSON resources and the R4 conversion (metadata.md). FSH/SUSHI sources and an IG Publisher round-trip are not supported |
+| Importing content | Plain FHIR JSON resources and the R4 conversion (metadata.md). FSH/SUSHI sources and an IG Publisher round-trip are not supported. Profiles must arrive with their snapshots, produced outside the product ([profile-snapshots.md](../research/profile-snapshots.md)) |
 | Translation of authored content | In scope. English is required; other languages ship as Language Packs (ADR 0066), edited in the translation editor below |
 | Working on a draft | One author at a time. Others read and comment, and the author can hand the draft over. There is no live co-editing |
 

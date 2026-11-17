@@ -19,7 +19,7 @@
   - `profile` discriminators that need resolution outside the active package set.
 
 **How profiles reach the validator:**
-- **Snapshots come with packages.** Package publication rejects a profile that has only a differential. Generating snapshots is the authoring tool's job: the IG Publisher or SUSHI today, and the Studio's own generator, which is in the map's Studio fog. Nodes and central never generate snapshots, and no Java runs in the product.
+- **Snapshots come with packages.** Package publication rejects a profile that has only a differential. Generating snapshots is the authoring tool's job, outside the product: SUSHI or JSON differentials, then the pinned Java validator's `snapshot` in CI (as `tools/fhir/build-core-package.sh` does), or the IG Publisher snapshots published IGs ship. The Studio has no generator: no TypeScript or Rust candidate agreed with the Java tool on R5 bp or slicing ([profile-snapshots.md](../research/profile-snapshots.md)). Package Validation checks each snapshot against its differential. Nodes and central never generate snapshots, and no Java runs in the product.
 - **Compiled at activation.** Profiles are compiled into validator schemas when a package is activated (ADR 0025) and cached per node. If any profile fails to compile, the activation fails and the previous active set stays in force. Nothing is compiled while a write waits.
 
 **Acceptance and limits:**
