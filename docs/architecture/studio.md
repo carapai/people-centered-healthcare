@@ -155,13 +155,29 @@ The terminology screens open from a changed CodeSystem or ValueSet on the draft 
   - ValueSets that span versions of a code system;
   - ConceptMap authoring.
 
+## Decision tables
+
+The decision-table editor opens from the Workflow Studio, from a guard that uses a table or from the definition's tables. It was decided in [How does the Studio author and test a decision table?](https://github.com/carapai/people-centered-healthcare/issues/513), chosen from four prototypes (branch `prototype/decision-tables`, variant D).
+
+- **The rules list** shows every rule in order. The first rule that holds wins. Each rule has a **name** and an outcome, with markers for *fires for this patient* and *never fires*, reorder buttons and *Add rule*.
+- **Clicking a rule** opens its detail to edit: its name, its outcome, *Delete rule*, and its condition as a **tree**.
+  - Groups join their children with **all of these**, **any of these** or **not** (none of these), and nest to any depth.
+  - Conditions pick an input from the workflow's declared data requirements, an operator and a value.
+  - The tree is saved as **one FHIRPath expression** (`and`, `or`, `.not()`), shown under it. The engine's table keeps its shape: a row's `when` holds that expression, and the row gains an optional `name`.
+- **Try a patient.** The server evaluates the draft table for sample inputs. Every node is marked as holding or not, and the outcome links to the rule that fired. *Save as test* keeps the inputs and today's outcome as a test case in the package's `tests/`, and submission's simulation runs it.
+- **Checks** above the editor, rerun as the author edits:
+  - inputs no rule covers, when the table has no default;
+  - rules that never fire because a rule above always matches first;
+  - failing test cases.
+
+  A default outcome can be set. *Check now* on the draft page remains the authority.
+- **For the build:** the client's lint forbids a property named `then` (`no-thenable`), which is what the engine calls a row's outcome, so the client maps it at its boundary.
+
 ## Previews and simulation
 
 - **Forms** are previewed in the client's own `QuestionnaireRenderer`, the one health workers use, so a preview behaves exactly as the form will.
 - **Workflows** are simulated by the Rust engine's sandbox with stubbed actions (ADR 0042), through the Workflow Studio's sandbox. XState stays local to the UI and never decides a transition.
 
 ## Open
-
-On the map: [How does the Studio author and test a decision table?](https://github.com/carapai/people-centered-healthcare/issues/513).
 
 Still in the fog: the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
