@@ -1,19 +1,20 @@
-// PROTOTYPE (#534), throwaway: one ANC indicator as a FHIR R5 Measure would hold it (populations
-// with condition trees compiled to FHIRPath, a period date, disaggregations), sample test
-// patients, and a tiny evaluator. The real evaluation is the server's FHIRPath engine (ADR 0068).
+// PROTOTYPE (#534), throwaway: an indicator as numerator / denominator, where the denominator can
+// be 1 (a count), and each side starts from something (everyone in the period, this indicator's
+// denominator, or another indicator's numerator or denominator) and adds conditions. Sample test
+// patients and a tiny evaluator; the real evaluation is the server's FHIRPath engine (ADR 0068).
 
 export type Input = { id: string; label: string; path: string; type: 'code' | 'number' | 'boolean'; values?: string[] }
 export type Op = '=' | '!=' | '<' | '<=' | '>' | '>='
 export type Join = 'all' | 'any' | 'not'
 export type Node = { kind: 'cond'; input: string; op: Op; value: string } | { kind: 'group'; join: Join; children: Node[] }
-export type PopKey = 'initial' | 'denominator' | 'exclusion' | 'numerator'
-export type Population = { key: PopKey; label: string; tree: Node }
-export type Kind = 'count' | 'proportion'
+export type Side = 'numerator' | 'denominator'
+export type Base = { kind: 'period' } | { kind: 'denominator' } | { kind: 'indicator'; id: string; side: Side }
+export type Part = { base: Base; tree: Node }
 export type PeriodDate = { id: 'start' | 'recorded' | 'lmp'; label: string; path: string }
 export type Disaggregation = { id: string; label: string; shared: boolean; bands: { label: string; test: (p: Patient) => boolean }[] }
 export type Patient = { id: string; name: string; age: number; sex: 'female' | 'male'; encounterType: string; gestationWeeks: number; firstPregnancy: boolean; start: string; recorded: string; lmp: string }
-export type Indicator = { title: string; url: string; kind: Kind; periodDate: PeriodDate['id']; populations: Population[]; disaggregations: string[] }
-export type SavedTest = { period: string; expect: Record<string, number> }
+export type Indicator = { id: string; title: string; version: string; periodDate: PeriodDate['id']; numerator: Part; denominator: Part | 'one'; disaggregations: string[] }
+export type SavedTest = { period: string; expect: { numerator: number; denominator: number | 'one' } }
 
 export const INPUTS: Input[] = [
   { id: 'type', label: 'Visit type', path: '%encounter.type.coding.code', type: 'code', values: ['anc-first', 'anc-followup', 'opd'] },
@@ -45,23 +46,28 @@ export const DISAGGREGATIONS: Disaggregation[] = [
 ]
 
 const c = (input: string, op: Op, value: string): Node => ({ kind: 'cond', input, op, value })
+const all = (...children: Node[]): Node => ({ kind: 'group', join: 'all', children })
+const everyone: Base = { kind: 'period' }
+
+/** Published indicators in this package and its dependencies, which a side can start from. */
+export const OTHERS: Indicator[] = [
+  { id: 'anc-visits', title: 'ANC visits (all)', version: '2.3.0', periodDate: 'start', numerator: { base: everyone, tree: { kind: 'group', join: 'any', children: [c('type', '=', 'anc-first'), c('type', '=', 'anc-followup')] } }, denominator: 'one', disaggregations: [] },
+  { id: 'anc-first', title: 'ANC 1st visits', version: '2.3.0', periodDate: 'start', numerator: { base: everyone, tree: all(c('sex', '=', 'female'), c('type', '=', 'anc-first')) }, denominator: 'one', disaggregations: ['moh-age-anc'] },
+]
+
 export const INITIAL: Indicator = {
+  id: 'anc-first-12w',
   title: 'ANC 1st visit before 12 weeks',
-  url: 'https://health.go.ug/fhir/Measure/anc-first-visit-12w',
-  kind: 'proportion',
+  version: '2.4.0-draft',
   periodDate: 'start',
-  populations: [
-    { key: 'initial', label: 'Initial population', tree: { kind: 'group', join: 'all', children: [c('sex', '=', 'female'), c('type', '=', 'anc-first')] } },
-    { key: 'denominator', label: 'Denominator', tree: { kind: 'group', join: 'all', children: [] } },
-    { key: 'exclusion', label: 'Denominator exclusion', tree: { kind: 'group', join: 'all', children: [c('age', '<', '10')] } },
-    { key: 'numerator', label: 'Numerator', tree: { kind: 'group', join: 'all', children: [c('ga', '<', '12')] } },
-  ],
+  denominator: { base: { kind: 'indicator', id: 'anc-first', side: 'numerator' }, tree: { kind: 'group', join: 'not', children: [c('age', '<', '10')] } },
+  numerator: { base: { kind: 'denominator' }, tree: all(c('ga', '<', '12')) },
   disaggregations: ['moh-age-anc'],
 }
 
 export const HMIS_MAPPING = 'HMIS 105 (2024) · 2.1 ANC 1st visit for women within 12 weeks · from Reporting package ug.moh.hmis 4.1.0'
-
 export const PERIODS = ['2026-03', '2026-04']
+
 export const PATIENTS: Patient[] = [
   { id: 'p1', name: 'Nakato A.', age: 23, sex: 'female', encounterType: 'anc-first', gestationWeeks: 10, firstPregnancy: true, start: '2026-03-04', recorded: '2026-03-04', lmp: '2025-12-24' },
   { id: 'p2', name: 'Akello B.', age: 17, sex: 'female', encounterType: 'anc-first', gestationWeeks: 16, firstPregnancy: true, start: '2026-03-11', recorded: '2026-03-11', lmp: '2025-11-19' },
@@ -71,6 +77,7 @@ export const PATIENTS: Patient[] = [
   { id: 'p6', name: 'Nabirye F.', age: 14, sex: 'female', encounterType: 'anc-first', gestationWeeks: 11, firstPregnancy: true, start: '2026-04-08', recorded: '2026-04-08', lmp: '2026-01-21' },
   { id: 'p7', name: 'Atim G.', age: 21, sex: 'female', encounterType: 'anc-first', gestationWeeks: 13, firstPregnancy: false, start: '2026-04-15', recorded: '2026-04-15', lmp: '2026-01-14' },
   { id: 'p8', name: 'Nansubuga H.', age: 26, sex: 'female', encounterType: 'anc-first', gestationWeeks: 8, firstPregnancy: true, start: '2026-03-25', recorded: '2026-03-25', lmp: '2026-01-28' },
+  { id: 'p9', name: 'Achen I.', age: 9, sex: 'female', encounterType: 'anc-first', gestationWeeks: 10, firstPregnancy: true, start: '2026-03-20', recorded: '2026-03-20', lmp: '2026-01-09' },
 ]
 
 const value = (p: Patient, input: string): string =>
@@ -106,20 +113,48 @@ export function fhirpath(n: Node): string {
 
 export const condText = (n: Extract<Node, { kind: 'cond' }>) => `${INPUTS.find((i) => i.id === n.input)?.label ?? n.input} ${n.op} ${n.value}`
 
-const dateOf = (p: Patient, d: PeriodDate['id']) => (d === 'start' ? p.start : d === 'recorded' ? p.recorded : p.lmp)
-
-/** Which patients fall in each population for the period: the per-patient membership ADR 0068 keeps. */
-export function evaluate(ind: Indicator, period: string) {
-  const inPeriod = PATIENTS.filter((p) => dateOf(p, ind.periodDate).startsWith(period))
-  const tree = (k: PopKey) => ind.populations.find((x) => x.key === k)?.tree ?? { kind: 'group' as const, join: 'all' as const, children: [] }
-  const initial = inPeriod.filter((p) => holds(tree('initial'), p))
-  if (ind.kind === 'count') return { initial, denominator: initial, exclusion: [] as Patient[], numerator: initial, inPeriod }
-  const denomRaw = initial.filter((p) => holds(tree('denominator'), p))
-  const exclusion = denomRaw.filter((p) => holds(tree('exclusion'), p))
-  const denominator = denomRaw.filter((p) => !exclusion.includes(p))
-  const numerator = denominator.filter((p) => holds(tree('numerator'), p))
-  return { initial, denominator, exclusion, numerator, inPeriod }
+export const baseLabel = (b: Base) => {
+  if (b.kind === 'period') return 'Everyone with care in the period'
+  if (b.kind === 'denominator') return "This indicator's denominator"
+  const o = OTHERS.find((x) => x.id === b.id)
+  return `${o?.title ?? b.id} ${o?.version ?? ''}, its ${b.side}`
 }
 
+const dateOf = (p: Patient, d: PeriodDate['id']) => (d === 'start' ? p.start : d === 'recorded' ? p.recorded : p.lmp)
+
+/** Who is in one side: start from its base, then keep those its own conditions hold for. */
+export function side(ind: Indicator, s: Side, period: string, seen: string[] = []): Patient[] {
+  if (seen.includes(`${ind.id}.${s}`)) return [] // a loop; the real check refuses it at Validation
+  const part = s === 'numerator' ? ind.numerator : ind.denominator
+  if (part === 'one') return []
+  const from = baseOf(ind, part.base, period, [...seen, `${ind.id}.${s}`])
+  return from.filter((p) => holds(part.tree, p))
+}
+
+export function baseOf(ind: Indicator, b: Base, period: string, seen: string[] = []): Patient[] {
+  if (b.kind === 'period') return PATIENTS.filter((p) => dateOf(p, ind.periodDate).startsWith(period))
+  if (b.kind === 'denominator') return ind.denominator === 'one' ? baseOf(ind, { kind: 'period' }, period, seen) : side(ind, 'denominator', period, seen)
+  const other = OTHERS.find((x) => x.id === b.id)
+  return other ? side(other, b.side, period, seen) : []
+}
+
+/** The FHIRPath a side compiles to: its base's expression and its own conditions. */
+export function compiled(ind: Indicator, s: Side): string {
+  const part = s === 'numerator' ? ind.numerator : ind.denominator
+  if (part === 'one') return '1'
+  const own = fhirpath(part.tree)
+  const b = part.base
+  const base = b.kind === 'period' ? '' : b.kind === 'denominator' ? (ind.denominator === 'one' ? '' : compiled(ind, 'denominator')) : (() => {
+    const o = OTHERS.find((x) => x.id === b.id)
+    return o ? `/* ${o.title}|${o.version} ${b.side} */ ${compiled(o, b.side)}` : ''
+  })()
+  return base ? `(${base}) and (${own})` : own
+}
+
+export function evaluate(ind: Indicator, period: string) {
+  const numerator = side(ind, 'numerator', period)
+  const denominator = ind.denominator === 'one' ? null : side(ind, 'denominator', period)
+  return { numerator, denominator }
+}
 export type Result = ReturnType<typeof evaluate>
-export const pct = (r: Result) => (r.denominator.length ? Math.round((100 * r.numerator.length) / r.denominator.length) : 0)
+export const display = (r: Result) => (r.denominator === null ? `${r.numerator.length}` : r.denominator.length ? `${Math.round((100 * r.numerator.length) / r.denominator.length)}%` : '–')
