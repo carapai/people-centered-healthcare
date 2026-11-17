@@ -75,12 +75,24 @@ The one author who may currently edit, check, submit, hand over or withdraw a pa
 _Avoid_: Owner, co-author, assignee
 
 **Indicator**:
-A published Measure that counts patients or events for a facility and period, such as ANC first visits in March, split by the disaggregations it declares.
-_Avoid_: Report, metric, KPI
+A published Measure that calculates one figure (a count, percentage, rate, ratio, or a sum or average of a value) over people, enrollments, visits or observations, for whatever place and period a Report asks for, split by the Disaggregations it declares.
+_Avoid_: Metric, KPI
+
+**Report**:
+A published set of Indicators with a period type (weekly, monthly, quarterly, …), run for a chosen period and place; an HMIS form is a Report whose figures are sent to DHIS2.
+_Avoid_: Dataset, form (for the definition)
 
 **Disaggregation**:
-A shared way of splitting an Indicator's counts, such as MoH's age bands or sex, defined once nationally so every Indicator splits alike and lines up with national reporting categories.
+A way of splitting an Indicator's figure: by an Age Band Set or by the codes of a coded field, always with a "not recorded" band so the parts add up to the whole.
 _Avoid_: Stratifier (in conversation), breakdown, category
+
+**Age Band Set**:
+A published, named list of age ranges with the unit and the date age is taken at, such as MoH's ANC age bands, which Indicators pick to disaggregate by age.
+_Avoid_: Age groups (for the configuration)
+
+**Population Estimate**:
+A published figure for a place and period, such as expected pregnancies in a district for 2026, that a rate or percentage can use as its denominator.
+_Avoid_: Target, census (for the figure itself)
 
 **Indicator Report**:
 The counts for one Indicator, one facility or area and one period; a facility's own report is the figure everyone above it sees.

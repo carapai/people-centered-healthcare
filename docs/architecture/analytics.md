@@ -5,6 +5,7 @@ How program indicators are defined, computed, stored and synced. The decision is
 | Step | Where | What |
 |---|---|---|
 | Define | Configuration package | A FHIR R5 `Measure`: populations with FHIRPath criteria, stratifiers, scoring. Reviewed and activated like any Published Definition |
+| Run | A Report | A Report groups indicators with a period type; the indicators have no period of their own and are evaluated over the Report's period ([studio.md § Indicators](studio.md#indicators)) |
 | Compute | Every Facility Edge Node, and central | The same engine. Each node keeps membership per indicator, period and patient, updated from the change log for changed patients, plus a nightly and period-close run for date-dependent indicators |
 | Store | The node that computed it | A summary `MeasureReport` per indicator, period and facility, owned by the analytics module |
 | Sync | Edge to central | Summary `MeasureReport`s only. Membership and patient lists never leave the node |
