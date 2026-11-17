@@ -66,7 +66,7 @@ impl WorkflowAction for OpenQueueEntry {
 - **Registration.** The workflow application crate calls actions through ports, which the runtime wires to the target context's application crate (dependency-rules.md).
 - **Parameters.** The parameter JSON Schema is generated for the Studio, and publication validates definitions against it.
 - **Idempotency.** Each action invocation is keyed by UUIDv5 of instance + transition sequence + action index.
-- **Guards and expressions** are FHIRPath only, with no side effects, evaluated over the declared context bundle (context resource, patient, encounter, data model, event). There is no scripting and no CQL.
+- **Guards and expressions** are FHIRPath only, with no side effects, evaluated over the declared context bundle (context resource, patient, encounter, data model, event). There is no scripting and no CQL. Indicators use FHIRPath too (ADR 0068).
 - **Authorization:**
   - user-triggered transitions use the user's authorization, evaluated at action time;
   - timer and system transitions run as the **workflow principal**, limited to the permissions declared in the definition and approved at publication.

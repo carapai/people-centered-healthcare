@@ -233,5 +233,5 @@ FHIR `Device` means medical devices only and is split by category (ADR 0064). Th
 | Deployable | Hosts | Notes |
 |---|---|---|
 | `central-server` | All Bounded Contexts as modules, with the gateway | Modular monolith; contexts are extracted into the spec's `apps/server/*` Deployables only when a real need arises |
-| `facility-edge` | Clinical Records, Clinical Operations, Care Coordination, Programs & Public Health, Finance, Supply Chain, Workflow, Patient Engagement, Identity & Access; read-only replicas of Registries and Terminology & Metadata | Analytics and external integrations stay central |
+| `facility-edge` | Clinical Records, Clinical Operations, Care Coordination, Programs & Public Health, Finance, Supply Chain, Workflow, Patient Engagement, Identity & Access, Analytics (facility indicators); read-only replicas of Registries and Terminology & Metadata | Facility indicators are computed here (ADR 0068); external integrations stay central |
 | Tauri desktop host | Desktop roles and offline subset in [desktop-client.md](desktop-client.md) | |
