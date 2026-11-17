@@ -79,7 +79,7 @@ A published Measure that calculates one figure (a count, percentage, rate, ratio
 _Avoid_: Metric, KPI
 
 **Report**:
-A published set of Indicators with a period type (weekly, monthly, quarterly, …), run for a chosen period and place; an HMIS form is a Report whose figures are sent to DHIS2.
+A published table of Indicators, laid out in sections and columns of Disaggregation bands, for one period type and the levels it may be run for; an HMIS form is a Report whose cells are sent to DHIS2.
 _Avoid_: Dataset, form (for the definition)
 
 **Disaggregation**:

@@ -162,6 +162,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0067](../adr/0067-facility-settings-three-classes-of-override-point-set-at-central.md) | Override points come in three classes; presentation and operational changes are applied by the facility admin at once, clinically visible ones wait for a district or central reviewer; set on the Facility settings page at central only; overrides never hide a question (amends 0026) |
 | [0068](../adr/0068-indicators-are-fhirpath-measures-computed-on-each-edge.md) | Indicators are published FHIR R5 Measures with FHIRPath criteria, computed incrementally on each Facility Edge Node and at central; only summary MeasureReports sync up, and central sums facility reports |
 | [0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md) | HMIS forms are signed off by the facility in-charge and sent to DHIS2 by central, through Reporting package mappings with effective dates; corrections are re-signed and resent whole |
+| [0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md) | A Report is configuration laying out indicators for one period type and the levels it runs for; summaries carry what roll-up needs, medians and distinct counts stay at facility level; HMIS forms are Reports whose cells carry the DHIS2 mapping (amends 0068, 0069) |
 
 ## Still open
 
