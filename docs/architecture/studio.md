@@ -7,7 +7,7 @@ This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98:
 | Question | Decision |
 |---|---|
 | Who authors | Central experts only: the MoH standards team, the terminology lead, program clinical leads and the platform admin |
-| Facility adjustments | Not in the Studio. Facility admins get a separate, small screen that only fills in the override points a package declares (ADR 0026) |
+| Facility adjustments | Not in the Studio. Facility admins use the **Facility settings** page at central, which fills in only the override points a package declares (ADR 0026, ADR 0067; configuration.md) |
 | Where it runs | Screens of the one React app, reachable only when signed in at central with an author permission. Never on an edge server or a desktop. Drafts never sync (ADR 0025) |
 | Build order | 1. A shared **package workspace** and the **form designer**. 2. The **Program Designer**. 3. The **Workflow Studio** |
 | Workflow editing | A visual canvas of states and transitions (§52), with each element's details edited in a side panel of ordinary form fields. The canvas is `@xyflow/react` 13.x with `@dagrejs/dagre` layout, decided in [Which graph-canvas library fits the Workflow Studio?](https://github.com/carapai/people-centered-healthcare/issues/480) |
@@ -140,8 +140,6 @@ The translation editor opens from a Language Pack draft (ADR 0066). It was decid
 
 ## Open
 
-These are tracked on the map:
+On the map: [How does the Studio browse terminology and author CodeSystems and ValueSets?](https://github.com/carapai/people-centered-healthcare/issues/512) and [How does the Studio author and test a decision table?](https://github.com/carapai/people-centered-healthcare/issues/513).
 
-- [Facility overrides](https://github.com/carapai/people-centered-healthcare/issues/484)
-
-Still in the fog: terminology browsing and CodeSystem/ValueSet authoring, the decision-table rule builder, the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
+Still in the fog: the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
