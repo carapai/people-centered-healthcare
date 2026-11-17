@@ -1,0 +1,7 @@
+# osv-scanner policy for bun.lock (security.yml). Each ignore names why it does not reach the
+# product and expires, so the scan fails again unless the advisory has been re-reviewed.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "picomatch <= 4.0.7 ReDoS on crafted extglobs; no fixed release. Reached only through build and test tooling (Vite, Vitest, Panda CSS CLI, TanStack Router generator, Babel plugin) matching globs from our own config; nothing ships in the client or server and no outside input becomes a glob. Drop when picomatch ships a fix."
