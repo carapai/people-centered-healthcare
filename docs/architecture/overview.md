@@ -163,6 +163,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0068](../adr/0068-indicators-are-fhirpath-measures-computed-on-each-edge.md) | Indicators are published FHIR R5 Measures with FHIRPath criteria, computed incrementally on each Facility Edge Node and at central; only summary MeasureReports sync up, and central sums facility reports |
 | [0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md) | HMIS forms are signed off by the facility in-charge and sent to DHIS2 by central, through Reporting package mappings with effective dates; corrections are re-signed and resent whole |
 | [0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md) | A Report is configuration laying out indicators for one period type and the levels it runs for; summaries carry what roll-up needs, medians and distinct counts stay at facility level; HMIS forms are Reports whose cells carry the DHIS2 mapping (amends 0068, 0069) |
+| [0071](../adr/0071-population-estimates-ship-as-yearly-population-packages.md) | Population Estimates ship as a yearly Population package with estimate types given per place or derived by percentage, pro-rated to a Report's period; Age Band Sets live in the national core and program packages, a band change being major |
 
 ## Still open
 

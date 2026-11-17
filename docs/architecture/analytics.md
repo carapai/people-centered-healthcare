@@ -26,6 +26,14 @@ Decided in [ADR 0070](../adr/0070-reports-are-configuration-that-lay-out-indicat
 - **Outputs:** screen, print or PDF, CSV.
 - An **HMIS form** is a Report marked *sent to DHIS2*, each cell carrying its DHIS2 mapping.
 
+## Age Band Sets and Population Estimates
+
+Decided in [ADR 0071](../adr/0071-population-estimates-ship-as-yearly-population-packages.md).
+
+- **Age Band Sets** live in the national core package (MoH's) or a program package, edited in a small Studio table (name, unit, the date age is taken at, from–to rows, with gaps and overlaps flagged). Changing the bands is a major version; indicators and Reports pin the version.
+- **Population Estimates** ship as a yearly **Population** package: estimate types given per place or derived as a percentage of another (expected pregnancies = 5% of total), figures at the lowest level available and summed upward, no guessed shares. A Report's period takes the annual figure pro rata (month 1/12, quarter 1/4, week 7/365).
+- **v1 source:** the HMIS lead imports a year's figures at central from a CSV template (UBOS projections), checked against the facility registry and the NHFR, with district totals shown before approval.
+
 ## Reporting to DHIS2
 
 Decided in [ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md).

@@ -91,7 +91,7 @@ A published, named list of age ranges with the unit and the date age is taken at
 _Avoid_: Age groups (for the configuration)
 
 **Population Estimate**:
-A published figure for a place and period, such as expected pregnancies in a district for 2026, that a rate or percentage can use as its denominator.
+A published yearly figure of one type for a place, such as expected pregnancies in a sub-county for 2026, given or derived as a share of another type, that a rate or percentage can use as its denominator, taken pro rata for shorter periods.
 _Avoid_: Target, census (for the figure itself)
 
 **Indicator Report**:
