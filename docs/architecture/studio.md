@@ -83,16 +83,56 @@ The form designer opens from a changed Questionnaire on the draft page. Its layo
   - nested groups and repeating groups;
   - choosing a published ValueSet.
 
+## The Workflow Studio
+
+The Workflow Studio opens from a changed Workflow Definition on the draft page. Its layout was decided in [How does the Workflow Studio edit, simulate and publish a statechart?](https://github.com/carapai/people-centered-healthcare/issues/481), chosen from three prototypes (branch `prototype/workflow-studio`).
+
+- **Three columns:**
+  - **Left: the outline.** The states as a tree that shows their nesting, with each state's exits listed under it (event, guard, target). Timers are marked. Selecting a row selects the same element on the canvas.
+  - **Middle: the canvas.** The statechart drawn on `@xyflow/react`, laid out left to right with `@dagrejs/dagre`. Compound and parallel states are group nodes, and a parallel state's regions are drawn inside it. Dragging from one state to another adds a transition. Problems are outlined in red.
+  - **Right: one panel with two modes,** *Inspect* and *Sandbox*.
+- **Inspect** edits the selected element in ordinary form fields:
+  - **A state:**
+    - its name and its id, which is fixed once published, because running instances and migration maps refer to it;
+    - its kind (atomic, compound, parallel, final), the state it sits inside, and, for a compound state, the child it starts in;
+    - what happens there: wait for an event, a human task (role, worklist, form `url|version`, priority, claim timeout), a payment gate (a Financial Gate configuration), or a sub-workflow `url|version`;
+    - its entry actions;
+    - the transitions that leave it.
+  - **A transition:**
+    - its source and target;
+    - what triggers it: an event, a timer (an ISO 8601 duration, run as the workflow principal), or nothing (eventless);
+    - its guard: always, a FHIRPath expression (the panel lists the declared data it may read), or a decision table's outcome, with the table's rows edited in place;
+    - the other transitions on the same event, in document order, because the first whose guard holds wins;
+    - its actions.
+  - **Typed actions** are picked from the registered list. Each shows the permission it needs and its compensation, and its parameters are fields generated from its parameter schema (ADR 0043).
+- **Sandbox** plays the draft in the Rust engine's simulation at central (`health_workflow::simulation`), with every action stubbed:
+  - the author sets each guard's answer, then sends any event the current configuration accepts, or waits for a timer;
+  - steps can be undone, and the run restarted;
+  - after each step it shows the configuration, the stubbed actions, the open tasks and the pending timers, with the active states lit on the canvas and in the outline, and the history so far;
+  - **Save as scenario** writes the run to the package's `tests/` folder as a `workflow-scenario` file: the guard stubs, the steps, and the configuration reached at each step as its expectation.
+- **Publication checks** are listed above the editor and rerun as the author edits (workflow-engine.md, "Simulation and publication gates"): the scenarios pass, every state can be entered, every non-final state has a way out, actions and their parameters are valid, guards read only declared data, and the workflow principal's permissions cover its timers and eventless steps. Each problem selects the element it is about. A permission the principal lacks can be declared from there, and it is then approved at publication. As with the form designer, *Check now* on the draft page remains the authority.
+- **The canvas keeps React Flow's attribution link.** MIT does not require it, and the maintainers ask that only React Flow Pro subscribers remove it. There is no subscription.
+- **For the build:**
+  - `@xyflow/react` 13.0.1's own type declarations fail `tsc` under the client's `exactOptionalPropertyTypes` with `skipLibCheck: false` (`InternalNode`'s `sourcePosition`). This needs an upstream fix or a local type patch before it is adopted.
+  - v13 names the theme prop `forceColorMode`.
+  - Zooming on scroll is off, so the page scrolls over the canvas.
+- **Not designed yet** (not in the prototype):
+  - editing the data model and the data requirements;
+  - adding a decision table;
+  - opening a saved scenario in the sandbox, and editing its expected actions, tasks and timers;
+  - error exits of a sub-workflow and the cancellation and compensation paths;
+  - the migration map from the previous version;
+  - the PlanDefinition import's review screen.
+
 ## Previews and simulation
 
 - **Forms** are previewed in the client's own `QuestionnaireRenderer`, the one health workers use, so a preview behaves exactly as the form will.
-- **Workflows** are simulated by the Rust engine's sandbox with stubbed actions (ADR 0042). XState stays local to the UI and never decides a transition.
+- **Workflows** are simulated by the Rust engine's sandbox with stubbed actions (ADR 0042), through the Workflow Studio's sandbox. XState stays local to the UI and never decides a transition.
 
 ## Open
 
 These are tracked on the map:
 
-- [Workflow Studio](https://github.com/carapai/people-centered-healthcare/issues/481)
 - [Program Designer](https://github.com/carapai/people-centered-healthcare/issues/482)
 - [Translation](https://github.com/carapai/people-centered-healthcare/issues/483)
 - [Facility overrides](https://github.com/carapai/people-centered-healthcare/issues/484)
