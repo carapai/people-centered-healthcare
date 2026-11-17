@@ -8,6 +8,7 @@ import { css, cx } from '@health/design-system/css'
 import { useEffect, useState } from 'react'
 
 import { CASES, TABLE, conditionText, coverage, describe, evaluate, parseCondition, rowText, type Case, type Condition, type Op, type Row, type Table } from './decisionData'
+import { VariantD } from './DecisionTreeVariant'
 
 const box = css({ border: '1px solid', borderColor: 'border', borderRadius: 'md', bg: 'bg.surface' })
 const muted = css({ color: 'fg.muted', fontSize: 'sm' })
@@ -428,6 +429,7 @@ const VARIANTS = [
   { key: 'A', name: 'A grid, one column per input', View: VariantA },
   { key: 'B', name: 'FHIRPath rules with a patient trace', View: VariantB },
   { key: 'C', name: 'An outcome matrix over two inputs', View: VariantC },
+  { key: 'D', name: 'Each rule as a tree of all / any / not groups', View: VariantD },
 ] as const
 
 export function DecisionTablePrototype() {
@@ -464,7 +466,7 @@ export function DecisionTablePrototype() {
           Used by the guard on “Triage → Consultation” (outcome bypass). Inputs come from the workflow's declared data requirements.
         </span>
       </header>
-      <View key={current.key} model={model} />
+      {current.key === 'D' ? <VariantD /> : <View key={current.key} model={model} />}
       {import.meta.env.PROD ? null : (
         <div role="toolbar" aria-label="Prototype variants" className={css({ position: 'fixed', bottom: '4', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '3', alignItems: 'center', bg: 'fg.default', color: 'bg.canvas', px: '4', py: '2', borderRadius: 'full', boxShadow: 'lg', zIndex: '10' })}>
           <button type="button" aria-label="Previous variant" onClick={() => go(-1)} className={css({ cursor: 'pointer' })}>

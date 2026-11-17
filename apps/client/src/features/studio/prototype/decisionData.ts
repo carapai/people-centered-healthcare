@@ -71,7 +71,7 @@ export function parseCondition(t: Table, text: string): Condition | null {
   return { input: input.id, op: m[2] as Op, value: m[3] }
 }
 
-function holds(t: Table, c: Condition, sample: Record<string, string>): boolean {
+export function holds(t: Table, c: Condition, sample: Record<string, string>): boolean {
   const input = t.inputs.find((i) => i.id === c.input)
   const raw = sample[c.input]
   if (raw === undefined || !input) return false
@@ -111,3 +111,50 @@ export function coverage(t: Table): { gaps: Record<string, string>[]; neverFires
 }
 
 export const describe = (t: Table, s: Record<string, string>) => t.inputs.map((i) => `${i.label.split(' ')[0]} ${s[i.id] ?? '?'}`).join(', ')
+
+// --- Rule trees (variant D): each rule's condition is a tree of groups joined by all, any or not.
+// A tree compiles to one FHIRPath expression (`and`, `or`, `.not()`), so the engine's rows are
+// unchanged: a row's `when` holds that one expression.
+
+export type Join = 'all' | 'any' | 'not'
+export type Node = { kind: 'cond'; c: Condition } | { kind: 'group'; join: Join; children: Node[] }
+export type TreeRow = { tree: Node; outcome: string }
+
+/** Whether a node holds; `not` means none of its children hold. An empty group holds. */
+export function holdsNode(t: Table, n: Node, sample: Record<string, string>): boolean {
+  if (n.kind === 'cond') return holds(t, n.c, sample)
+  const results = n.children.map((child) => holdsNode(t, child, sample))
+  if (n.join === 'all') return results.every(Boolean)
+  if (n.join === 'any') return results.length === 0 || results.some(Boolean)
+  return !results.some(Boolean)
+}
+
+export function nodeText(t: Table, n: Node): string {
+  if (n.kind === 'cond') return conditionText(t, n.c)
+  if (n.children.length === 0) return 'true'
+  const parts = n.children.map((child) => (child.kind === 'group' && child.join !== 'not' && child.children.length > 1 ? `(${nodeText(t, child)})` : nodeText(t, child)))
+  if (n.join === 'all') return parts.join(' and ')
+  if (n.join === 'any') return parts.join(' or ')
+  return `(${parts.join(' or ')}).not()`
+}
+
+const cond = (input: string, op: Op, value: string): Node => ({ kind: 'cond', c: { input, op, value } })
+const group = (join: Join, ...children: Node[]): Node => ({ kind: 'group', join, children })
+
+export const TREE_ROWS: TreeRow[] = [
+  { tree: group('all', cond('category', '=', 'emergency')), outcome: 'bypass' },
+  { tree: group('any', group('all', cond('age', '<', '5'), cond('danger', '=', 'true')), group('all', cond('pregnant', '=', 'true'), cond('category', '=', 'urgent'))), outcome: 'bypass' },
+  { tree: group('all', cond('category', '=', 'urgent'), group('not', cond('pregnant', '=', 'true'))), outcome: 'normal' },
+  { tree: group('all', cond('category', '=', 'routine')), outcome: 'normal' },
+]
+
+export function evaluateTree(t: Table, rows: TreeRow[], sample: Record<string, string>): { outcome: string | null; row: number | null } {
+  for (const [n, r] of rows.entries()) if (holdsNode(t, r.tree, sample)) return { outcome: r.outcome, row: n }
+  return { outcome: t.default, row: null }
+}
+
+export function coverageTree(t: Table, rows: TreeRow[]): { gaps: Record<string, string>[]; neverFires: number[] } {
+  const all = samples(t).map((s) => evaluateTree(t, rows, s))
+  const fired = new Set(all.map((r) => r.row).filter((r): r is number => r !== null))
+  return { gaps: samples(t).filter((_, n) => all[n]?.outcome === null), neverFires: rows.map((_, n) => n).filter((n) => !fired.has(n)) }
+}
