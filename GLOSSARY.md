@@ -78,6 +78,10 @@ _Avoid_: Owner, co-author, assignee
 A published Measure that counts patients or events for a facility and period, such as ANC first visits in March, split by the disaggregations it declares.
 _Avoid_: Report, metric, KPI
 
+**Disaggregation**:
+A shared way of splitting an Indicator's counts, such as MoH's age bands or sex, defined once nationally so every Indicator splits alike and lines up with national reporting categories.
+_Avoid_: Stratifier (in conversation), breakdown, category
+
 **Indicator Report**:
 The counts for one Indicator, one facility or area and one period; a facility's own report is the figure everyone above it sees.
 _Avoid_: Dataset, submission (for the counts themselves)

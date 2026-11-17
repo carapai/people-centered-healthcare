@@ -180,6 +180,21 @@ The decision-table editor opens from the Workflow Studio, from a guard that uses
   A default outcome can be set. *Check now* on the draft page remains the authority.
 - **For the build:** the client's lint forbids a property named `then` (`no-thenable`), which is what the engine calls a row's outcome, so the client maps it at its boundary.
 
+## Indicators
+
+The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530); its layout waits on a prototype ([#534](https://github.com/carapai/people-centered-healthcare/issues/534)). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
+
+- **Two kinds in v1:**
+  - **Count:** one population, e.g. *ANC first visits*.
+  - **Proportion:** initial population, denominator, optional exclusions and numerator, e.g. *% of ANC first visits before 12 weeks*.
+
+  Ratio and continuous-variable measures come later.
+- **Criteria** use the decision tables' condition tree (all / any / not over the program's declared data), saved as one FHIRPath expression shown beneath it. Raw FHIRPath is the fallback for what the tree can't express.
+- **The period date.** Every indicator names the date that places care in a period (e.g. the encounter's start or the observation's date), chosen from a short list for the counted resource. An indicator without one cannot be saved.
+- **Disaggregations** come from shared definitions in the national package, such as MoH's age bands and sex, so every indicator splits the same way and lines up with the HMIS category options. Custom disaggregations over the program's declared data are allowed.
+- **Try** runs the draft over the package's test patients for a chosen period: counts per population and disaggregation; clicking a count lists its patients and which conditions held for each. *Save as test* writes the expected counts to `tests/`, and submission's checks fail when a later edit changes them.
+- **HMIS mapping** is edited in the Reporting package (ADR 0069). The editor only shows, read-only, where the indicator is mapped (e.g. *HMIS 105, ANC 1st visit*).
+
 ## Previews and simulation
 
 - **Forms** are previewed in the client's own `QuestionnaireRenderer`, the one health workers use, so a preview behaves exactly as the form will.
@@ -187,4 +202,4 @@ The decision-table editor opens from the Workflow Studio, from a guard that uses
 
 ## Open
 
-Still in the fog: the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
+Still in the fog: the indicator editor's layout (the prototype above). The Studio has no profile snapshot generator ([profile-snapshots.md](../research/profile-snapshots.md)).
