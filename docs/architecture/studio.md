@@ -1,6 +1,6 @@
 # Studio
 
-This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98: the **Clinical Metadata Studio**, the **Program Designer** and the **Workflow Studio**. What they author is decided elsewhere: packages and their lifecycle in [configuration.md](configuration.md) (ADR 0024, ADR 0025), the artefact types in [metadata.md](metadata.md) (ADR 0049), programs in [program-designer.md](program-designer.md), and workflows in [workflow-engine.md](workflow-engine.md). This page records how people author them. The scope below was decided in [What are the Studio's scope, authors, surface and build order?](https://github.com/carapai/people-centered-healthcare/issues/476). The screens themselves are still being designed on the map.
+This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98: the **Clinical Metadata Studio**, the **Program Designer** and the **Workflow Studio**. What they author is decided elsewhere: packages and their lifecycle in [configuration.md](configuration.md) (ADR 0024, ADR 0025), the artefact types in [metadata.md](metadata.md) (ADR 0049), programs in [program-designer.md](program-designer.md), and workflows in [workflow-engine.md](workflow-engine.md). This page records how people author them. The scope below was decided in [What are the Studio's scope, authors, surface and build order?](https://github.com/carapai/people-centered-healthcare/issues/476). The Program Designer's screen is in [program-designer.md](program-designer.md#the-program-designer); the remaining screens are still being designed on the map.
 
 ## Scope
 
@@ -133,7 +133,6 @@ The Workflow Studio opens from a changed Workflow Definition on the draft page. 
 
 These are tracked on the map:
 
-- [Program Designer](https://github.com/carapai/people-centered-healthcare/issues/482)
 - [Translation](https://github.com/carapai/people-centered-healthcare/issues/483)
 - [Facility overrides](https://github.com/carapai/people-centered-healthcare/issues/484)
 
