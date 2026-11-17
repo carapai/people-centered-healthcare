@@ -149,8 +149,15 @@ The terminology screens open from a changed CodeSystem or ValueSet on the draft 
   Concepts already in the ValueSet are ticked in the tree.
 - **The change against published** lists codes added and removed. Removed ones are flagged: records that already hold them stay valid against the version that issued them, and new forms no longer offer them.
 - **Binding from the form designer.** The form designer's picker searches ValueSets (published, or drafts in the same package), previews the codes and suggests a widget: radio buttons up to 7 codes, a drop-down up to 30, and search-as-you-type beyond that. Binding records `url|version`, and publication pins the expansion in the manifest.
-- **Not designed yet** (not in the prototype):
-  - editing a local CodeSystem's concepts (the semver rules in terminology.md apply);
+- **Editing a local CodeSystem** happens in the same browser, decided in [How does the Studio edit a local CodeSystem's concepts?](https://github.com/carapai/people-centered-healthcare/issues/519), chosen from three prototypes (branch `prototype/codesystem-editor`, variant A). External code systems stay read-only.
+  - The tree gains **Add a code** and **+ under** on each concept. The concept panel becomes a form: code, display, definition and parent.
+  - **A code is fixed once published.** A new code can still be renamed or deleted; a published one can only be **retired**: kept, so records that hold it still resolve, but no longer offered on forms.
+  - Beside the tree, **Version** shows the next version and why, worked out from the change by terminology.md's rules: adding or retiring a code is minor, a display change a patch, and redefining or removing a published code major (removal is not offered).
+  - **What it reaches** lists each ValueSet that draws on the code system, with the codes it gains or loses, and the forms that bind it.
+  - An optional note on the change says why (for example *IMCI 2024 adds this sign*); reviewers read it in the draft's discussion.
+- **Not designed yet** (not in the prototypes):
+  - moving a published code under another parent (it changes what `is-a` ValueSets expand to; its version bump is not set);
+  - entering many codes at once;
   - filters other than `is-a`;
   - ValueSets that span versions of a code system;
   - ConceptMap authoring.

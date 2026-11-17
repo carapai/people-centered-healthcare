@@ -39,6 +39,7 @@ Metadata references terminology. It never copies concept definitions (§41).
 Terminology packages follow the same lifecycle as every package ([configuration.md](configuration.md)).
 - **Semver diff rules for terminology:**
   - adding a code is **minor**;
+  - retiring a code (kept so records still resolve, no longer offered) is **minor** ([#519](https://github.com/carapai/people-centered-healthcare/issues/519));
   - changing a display is **patch**;
   - removing or redefining a code is **major**.
 - **Facility overrides** can never change terminology (ADR 0026).
