@@ -2,13 +2,15 @@
 // Round 2 (layout B chosen): a Report is sections, and each section is either
 // - a table: indicator rows sharing the section's Disaggregations, each Disaggregation laid out as
 //   rows or as columns, with optional column totals, row totals and % change from the previous period; or
-// - a line list: the records an indicator counted, with chosen fields (facility level only).
+// - a line list: one row per enrollment or per visit, with any attribute or any concept as a
+//   column (facility level only).
 // A Report sent to DHIS2 maps each cell of the sections it sends. Places, facilities and
 // population figures are made up.
 import {
   AGE_SETS,
   INITIAL,
   INPUTS,
+  PATIENTS,
   OTHERS,
   PERIOD_TYPES,
   bands,
@@ -139,19 +141,128 @@ export type Mapping = { de: string; coc: string; from: string; to: string }
 
 export type Axis = 'rows' | 'columns'
 export type Row = { id: string; ind: string; label: string }
-export type Field = { id: string; label: string; get: (p: Patient) => string }
-export const FIELDS: Field[] = [
-  { id: 'name', label: 'Name', get: (p) => p.name },
-  { id: 'facility', label: 'Facility', get: (p) => placeOf(facilityOf(p))?.label ?? '' },
-  { id: 'start', label: 'Visit date', get: (p) => p.dates.start ?? '' },
-  { id: 'type', label: 'Visit type', get: (p) => p.encounterType },
-  { id: 'ga', label: 'Gestational age (weeks)', get: (p) => String(p.gestationWeeks) },
-  { id: 'dob', label: 'Date of birth', get: (p) => p.dob },
-  { id: 'hiv', label: 'HIV status', get: (p) => p.hiv },
-  { id: 'district', label: 'District of residence', get: (p) => p.district || 'not recorded' },
-  { id: 'lmp', label: 'LMP', get: (p) => p.dates.lmp ?? '' },
-  { id: 'nextVisit', label: 'Next appointment', get: (p) => p.dates.nextVisit ?? 'none booked' },
+// --- Line lists -----------------------------------------------------------------------------------------
+
+/** One row per enrollment in a program, or one row per visit. */
+export type ListBase = 'enrollments' | 'visits'
+/** For an enrollment row, which of its visits' values a concept column shows. */
+export type Pick = 'latest' | 'first' | 'all' | 'count'
+export type ListColumn = { id: string; src: { kind: 'attr'; id: string } | { kind: 'concept'; id: string; pick: Pick }; label: string }
+export type ListSection = {
+  kind: 'list'
+  id: string
+  title: string
+  base: ListBase
+  program: string
+  visitTypes: string[]
+  when: 'inPeriod' | 'active'
+  ind: string | null
+  columns: ListColumn[]
+}
+export const PROGRAMS = [
+  { id: 'anc', label: 'Antenatal care (ug.moh.anc)', visitTypes: ['anc-first', 'anc-followup'] },
+  { id: 'any', label: 'Any program (all visits)', visitTypes: ['anc-first', 'anc-followup', 'opd'] },
 ]
+const inProgram = (program: string, p: Patient) => (PROGRAMS.find((x) => x.id === program)?.visitTypes ?? []).includes(p.encounterType)
+
+/** A list row: one enrollment (all its visits) or one visit. */
+export type ListRow = { key: string; person: Patient; visits: Patient[] }
+type Attr = { id: string; label: string; group: 'Person' | 'Enrollment' | 'Visit'; get: (r: ListRow) => string; base?: ListBase }
+const first = (r: ListRow) => r.visits[0] ?? r.person
+const last = (r: ListRow) => r.visits.at(-1) ?? r.person
+/** Made-up but stable values for concepts the test patients don't carry. */
+const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7)
+const fake = (p: Patient, salt: string, lo: number, hi: number, dp = 0, key = p.id) => (lo + ((hash(key + salt) % 1000) / 1000) * (hi - lo)).toFixed(dp)
+const ageNow = (dob: string) => String(Math.floor((Date.parse('2026-11-18') - Date.parse(dob)) / (365.25 * 864e5)))
+
+export const ATTRIBUTES: Attr[] = [
+  { id: 'name', label: 'Name', group: 'Person', get: (r) => r.person.name },
+  { id: 'sex', label: 'Sex', group: 'Person', get: (r) => r.person.sex },
+  { id: 'dob', label: 'Date of birth', group: 'Person', get: (r) => r.person.dob },
+  { id: 'age', label: 'Age (years)', group: 'Person', get: (r) => ageNow(r.person.dob) },
+  { id: 'phone', label: 'Phone', group: 'Person', get: (r) => `07${fake(r.person, 'tel', 1e7, 9.9e7, 0, r.person.person)}` },
+  { id: 'district', label: 'District of residence', group: 'Person', get: (r) => r.person.district || 'not recorded' },
+  { id: 'nin', label: 'National ID (NIN)', group: 'Person', get: (r) => (hash(r.person.person) % 3 === 0 ? '' : `CF${fake(r.person, 'nin', 1e11, 9e11, 0, r.person.person)}`) },
+  { id: 'enrolled', label: 'Enrollment date', group: 'Enrollment', get: (r) => first(r).dates.enrolled ?? '' },
+  { id: 'status', label: 'Enrollment status', group: 'Enrollment', get: (r) => (last(r).dates.eocEnd ? 'completed' : 'active') },
+  { id: 'visits', label: 'Visits in the enrollment', group: 'Enrollment', get: (r) => String(r.visits.length), base: 'enrollments' },
+  { id: 'lastVisit', label: 'Last visit date', group: 'Enrollment', get: (r) => last(r).dates.start ?? '', base: 'enrollments' },
+  { id: 'start', label: 'Visit date', group: 'Visit', get: (r) => first(r).dates.start ?? '', base: 'visits' },
+  { id: 'type', label: 'Visit type', group: 'Visit', get: (r) => first(r).encounterType, base: 'visits' },
+  { id: 'facility', label: 'Facility', group: 'Visit', get: (r) => placeOf(facilityOf(first(r)))?.label ?? '' },
+  { id: 'recorded', label: 'Entered on', group: 'Visit', get: (r) => first(r).dates.recorded ?? '', base: 'visits' },
+]
+
+type Concept = { id: string; code: string; label: string; unit?: string; get: (p: Patient) => string }
+/** Concepts from the terminology server (a few of thousands); any can be a column. */
+export const CONCEPTS: Concept[] = [
+  { id: 'ga', code: 'ug-anc#gestational-age', label: 'Gestational age', unit: 'weeks', get: (p) => (p.encounterType.startsWith('anc') ? String(p.gestationWeeks) : '') },
+  { id: 'hiv', code: 'ug-core#hiv-status', label: 'HIV status', get: (p) => p.hiv },
+  { id: 'lmp', code: 'ug-anc#lmp', label: 'Last menstrual period', get: (p) => p.dates.lmp ?? '' },
+  { id: 'edd', code: 'ug-anc#edd', label: 'Expected date of delivery', get: (p) => (p.dates.lmp ? new Date(Date.parse(p.dates.lmp) + 280 * 864e5).toISOString().slice(0, 10) : '') },
+  { id: 'gravida', code: 'ug-anc#gravida', label: 'Gravida', get: (p) => (p.firstPregnancy ? '1' : fake(p, 'g', 2, 5)) },
+  { id: 'hb', code: 'ug-lab#haemoglobin', label: 'Haemoglobin', unit: 'g/dL', get: (p) => fake(p, 'hb', 8.5, 13.5, 1) },
+  { id: 'weight', code: 'ug-core#body-weight', label: 'Weight', unit: 'kg', get: (p) => fake(p, 'w', 48, 85) },
+  { id: 'sbp', code: 'ug-core#systolic-bp', label: 'Systolic blood pressure', unit: 'mmHg', get: (p) => fake(p, 'sbp', 100, 150) },
+  { id: 'dbp', code: 'ug-core#diastolic-bp', label: 'Diastolic blood pressure', unit: 'mmHg', get: (p) => fake(p, 'dbp', 60, 95) },
+  { id: 'muac', code: 'ug-core#muac', label: 'MUAC', unit: 'cm', get: (p) => fake(p, 'muac', 21, 30, 1) },
+  { id: 'syphilis', code: 'ug-lab#syphilis-rdt', label: 'Syphilis test result', get: (p) => (hash(p.id) % 7 === 0 ? 'reactive' : 'non-reactive') },
+  { id: 'ipt', code: 'ug-anc#iptp-dose', label: 'IPTp-SP dose given', get: (p) => (p.encounterType === 'anc-followup' ? fake(p, 'ipt', 1, 3) : '') },
+  { id: 'llin', code: 'ug-anc#llin-given', label: 'Mosquito net given', get: (p) => (p.encounterType === 'anc-first' ? 'yes' : '') },
+  { id: 'next', code: 'ug-core#next-appointment', label: 'Next appointment date', get: (p) => p.dates.nextVisit ?? '' },
+]
+export const PICKS: { id: Pick; label: string }[] = [
+  { id: 'latest', label: 'latest value' },
+  { id: 'first', label: 'first value' },
+  { id: 'all', label: 'all values, with dates' },
+  { id: 'count', label: 'times recorded' },
+]
+export const attribute = (id: string) => ATTRIBUTES.find((a) => a.id === id)
+export const concept = (id: string) => CONCEPTS.find((c) => c.id === id)
+
+const byDate = (list: Patient[]) => {
+  const out: Patient[] = []
+  for (const p of list) {
+    const at = out.findIndex((q) => (q.dates.start ?? '') > (p.dates.start ?? ''))
+    out.splice(at === -1 ? out.length : at, 0, p)
+  }
+  return out
+}
+
+/** The rows of a line list for a period and place, oldest first. */
+export function listRows(s: ListSection, period: Period, placeId: string): ListRow[] {
+  const facilities = facilitiesUnder(placeId)
+  const counted = s.ind ? new Set(evaluate(indicator(s.ind) as Indicator, period).numerator.map((p) => (s.base === 'visits' ? p.id : p.enrollment))) : null
+  const all = PATIENTS.filter((p) => facilities.includes(facilityOf(p)) && inProgram(s.program, p))
+  const inPeriod = (d?: string) => Boolean(d) && (d ?? '') >= period.start && (d ?? '') <= period.end
+  if (s.base === 'visits')
+    return byDate(all.filter((p) => inPeriod(p.dates.start) && (s.visitTypes.length === 0 || s.visitTypes.includes(p.encounterType)) && (!counted || counted.has(p.id)))).map((p) => ({ key: p.id, person: p, visits: [p] }))
+  const enrollments = [...new Set(all.map((p) => p.enrollment))]
+  return enrollments
+    .map((e) => ({ key: e, visits: byDate(all.filter((p) => p.enrollment === e && (p.dates.start ?? '') <= period.end)) }))
+    .filter(({ key, visits }) => {
+      const v = visits[0]
+      if (!v || (counted && !counted.has(key))) return false
+      const enrolled = v.dates.enrolled ?? ''
+      const ended = visits.at(-1)?.dates.eocEnd
+      return s.when === 'inPeriod' ? inPeriod(enrolled) : enrolled <= period.end && (!ended || ended >= period.start)
+    })
+    .map(({ key, visits }) => ({ key, person: visits[0] as Patient, visits }))
+}
+
+export function listValue(c: ListColumn, r: ListRow): string {
+  if (c.src.kind === 'attr') return attribute(c.src.id)?.get(r) ?? ''
+  const con = concept(c.src.id)
+  if (!con) return ''
+  const values = r.visits.map((v) => ({ at: v.dates.start ?? '', v: con.get(v) })).filter((x) => x.v !== '')
+  const unit = con.unit ? ` ${con.unit}` : ''
+  if (c.src.pick === 'count') return String(values.length)
+  if (values.length === 0) return ''
+  if (c.src.pick === 'all') return values.map((x) => `${x.v}${unit} (${x.at})`).join('; ')
+  const x = c.src.pick === 'first' ? values[0] : values.at(-1)
+  return x ? `${x.v}${unit}` : ''
+}
+
 export type TableSection = {
   kind: 'table'
   id: string
@@ -163,7 +274,6 @@ export type TableSection = {
   change: boolean
   send: boolean
 }
-export type ListSection = { kind: 'list'; id: string; title: string; ind: string; fields: string[] }
 export type Section = TableSection | ListSection
 export type Report = {
   title: string
@@ -236,7 +346,26 @@ export const INITIAL_REPORT: Report = {
       change: true,
       send: false,
     },
-    { kind: 'list', id: 's4', title: 'Women who started ANC this period', ind: 'anc-first', fields: ['name', 'start', 'ga', 'hiv', 'district', 'nextVisit'] },
+    {
+      kind: 'list',
+      id: 's4',
+      title: 'Women in ANC this period',
+      base: 'enrollments',
+      program: 'anc',
+      visitTypes: [],
+      when: 'active',
+      ind: null,
+      columns: [
+        { id: 'c1', src: { kind: 'attr', id: 'name' }, label: 'Name' },
+        { id: 'c2', src: { kind: 'attr', id: 'phone' }, label: 'Phone' },
+        { id: 'c3', src: { kind: 'attr', id: 'enrolled' }, label: 'Enrolled' },
+        { id: 'c4', src: { kind: 'attr', id: 'visits' }, label: 'Visits' },
+        { id: 'c5', src: { kind: 'concept', id: 'ga', pick: 'latest' }, label: 'Gestational age (latest)' },
+        { id: 'c6', src: { kind: 'concept', id: 'hb', pick: 'all' }, label: 'Haemoglobin (all)' },
+        { id: 'c7', src: { kind: 'concept', id: 'hiv', pick: 'latest' }, label: 'HIV status' },
+        { id: 'c8', src: { kind: 'concept', id: 'next', pick: 'latest' }, label: 'Next appointment' },
+      ],
+    },
   ],
   mappings: Object.fromEntries([
     ...ageMaps('r1', 'AN01a'),

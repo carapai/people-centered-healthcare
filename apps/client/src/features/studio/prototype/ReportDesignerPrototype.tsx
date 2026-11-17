@@ -5,19 +5,28 @@
 // Each section has its own Disaggregations, so indicators broken down the same way share a section;
 // each Disaggregation is laid out as rows or as columns; a section can show column totals, row
 // totals and % change from the previous period. A section can instead be a line list.
+// Round 4: line lists are one row per enrollment (concept columns pick latest, first, all or a
+// count of their visits' values) or per visit, with any attribute or any concept as a column.
 // Round 3: the outline's sections are an accordion, one open at a time; clicking a section's title
 // or a cell in the preview opens that section.
 import { css, cx } from '@health/design-system/css'
 import { useState } from 'react'
 
-import { PERIOD_TYPES, evaluate, type Indicator, type Period, type PeriodType } from './indicatorData'
+import { PERIOD_TYPES, type Indicator, type Period, type PeriodType } from './indicatorData'
 import {
   CATALOGUE,
   COCS,
   DATA_ELEMENTS,
   DATA_SETS,
   DISAGGS,
-  FIELDS,
+  ATTRIBUTES,
+  CONCEPTS,
+  PICKS,
+  PROGRAMS,
+  attribute,
+  concept,
+  listRows,
+  listValue,
   INITIAL_REPORT,
   LEVELS,
   PLACES,
@@ -30,7 +39,6 @@ import {
   decD,
   disaggLabel,
   encD,
-  facilitiesUnder,
   facilityOf,
   facilityOnly,
   indicator,
@@ -43,7 +51,10 @@ import {
   type Axis,
   type Issue,
   type Level,
+  type ListBase,
+  type ListColumn,
   type ListSection,
+  type Pick,
   type Mapping,
   type Report,
   type Row,
@@ -164,7 +175,7 @@ function Basics({ m }: { m: M }) {
 
 const summary = (s: Section) =>
   s.kind === 'list'
-    ? `Line list · ${indicator(s.ind)?.title ?? s.ind} · ${s.fields.length} fields`
+    ? `Line list · one row per ${s.base === 'enrollments' ? 'enrollment' : 'visit'} · ${s.columns.length} columns`
     : [
         `Table · ${s.rows.length} indicator${s.rows.length === 1 ? '' : 's'}`,
         ...s.disaggs.map((x) => `${disaggLabel(x.d).replace(/ \((age bands|coded)\)$/, '')} as ${x.axis}`),
@@ -319,11 +330,57 @@ function IndicatorPicker({ onPick, label = '+ indicator' }: { onPick: (i: Indica
 
 function ListEditor({ m, s }: { m: M; s: ListSection }) {
   const put = (x: ListSection) => m.set(putSection(m.r, x))
+  const [q, setQ] = useState('')
+  const program = PROGRAMS.find((x) => x.id === s.program)
+  const add = (src: ListColumn['src'], label: string) => put({ ...s, columns: [...s.columns, { id: newId('c'), src, label }] })
+  const used = (kind: string, id: string) => s.columns.some((c) => c.src.kind === kind && c.src.id === id)
+  const matches = q.trim() === '' ? [] : CONCEPTS.filter((c) => `${c.label} ${c.code}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8)
+  const groups = ['Person', 'Enrollment', 'Visit'] as const
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: '2', pl: '3' })}>
+      <div role="radiogroup" aria-label="One row per" className={row}>
+        One row per
+        {(['enrollments', 'visits'] as ListBase[]).map((b) => (
+          <label key={b}>
+            <input type="radio" checked={s.base === b} onChange={() => put({ ...s, base: b, columns: s.columns.filter((c) => c.src.kind === 'concept' || (attribute(c.src.id)?.base ?? b) === b) })} /> {b === 'enrollments' ? 'enrollment' : 'visit'}
+          </label>
+        ))}
+      </div>
       <label className={row}>
-        Lists the records counted by
-        <select className={cx(input, css({ maxWidth: '18rem' }))} value={s.ind} onChange={(e) => put({ ...s, ind: e.target.value })}>
+        Program
+        <select className={cx(input, css({ maxWidth: '18rem' }))} value={s.program} onChange={(e) => put({ ...s, program: e.target.value, visitTypes: [] })}>
+          {PROGRAMS.filter((x) => s.base === 'visits' || x.id !== 'any').map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {s.base === 'visits' ? (
+        <div className={row}>
+          Visits in the period of type
+          {(program?.visitTypes ?? []).map((t) => (
+            <label key={t}>
+              <input type="checkbox" checked={s.visitTypes.includes(t)} onChange={(e) => put({ ...s, visitTypes: e.target.checked ? [...s.visitTypes, t] : s.visitTypes.filter((x) => x !== t) })} /> {t}
+            </label>
+          ))}
+          {s.visitTypes.length === 0 ? <span className={muted}>(none ticked: all)</span> : null}
+        </div>
+      ) : (
+        <div role="radiogroup" aria-label="Which enrollments" className={row}>
+          Enrollments
+          <label>
+            <input type="radio" checked={s.when === 'inPeriod'} onChange={() => put({ ...s, when: 'inPeriod' })} /> started in the period
+          </label>
+          <label>
+            <input type="radio" checked={s.when === 'active'} onChange={() => put({ ...s, when: 'active' })} /> active during the period
+          </label>
+        </div>
+      )}
+      <label className={row}>
+        Only those counted by
+        <select className={cx(input, css({ maxWidth: '16rem' }))} value={s.ind ?? ''} onChange={(e) => put({ ...s, ind: e.target.value || null })}>
+          <option value="">(no indicator: everyone above)</option>
           {CATALOGUE.map((i) => (
             <option key={i.id} value={i.id}>
               {i.title}
@@ -331,12 +388,58 @@ function ListEditor({ m, s }: { m: M; s: ListSection }) {
           ))}
         </select>
       </label>
-      <div className={row}>
-        Fields
-        {FIELDS.map((f) => (
-          <label key={f.id}>
-            <input type="checkbox" checked={s.fields.includes(f.id)} onChange={(e) => put({ ...s, fields: e.target.checked ? FIELDS.filter((x) => x.id === f.id || s.fields.includes(x.id)).map((x) => x.id) : s.fields.filter((x) => x !== f.id) })} /> {f.label}
-          </label>
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+        <span className={muted}>Columns</span>
+        {s.columns.map((c, i) => {
+          const con = c.src.kind === 'concept' ? concept(c.src.id) : undefined
+          const attr = c.src.kind === 'attr' ? attribute(c.src.id) : undefined
+          return (
+            <div key={c.id} className={css({ display: 'flex', flexDirection: 'column' })}>
+              <div className={row}>
+                <input className={cx(input, css({ flex: '1', minWidth: '8rem' }))} value={c.label} aria-label="Column heading" onChange={(e) => put({ ...s, columns: s.columns.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)) })} />
+                {c.src.kind === 'concept' && s.base === 'enrollments' ? (
+                  <select className={cx(input, css({ fontSize: 'xs' }))} aria-label="Which value" value={c.src.pick} onChange={(e) => put({ ...s, columns: s.columns.map((x) => (x.id === c.id && x.src.kind === 'concept' ? { ...x, src: { ...x.src, pick: e.target.value as Pick } } : x)) })}>
+                    {PICKS.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <button type="button" className={small} aria-label="Move up" onClick={() => put({ ...s, columns: move(s.columns, i, -1) })}>
+                  ↑
+                </button>
+                <button type="button" className={small} aria-label="Remove column" onClick={() => put({ ...s, columns: s.columns.filter((x) => x.id !== c.id) })}>
+                  ✕
+                </button>
+              </div>
+              <span className={cx(mono, css({ pl: '2' }))}>{con ? `concept ${con.code}` : `${attr?.group.toLowerCase() ?? ''} attribute`}</span>
+            </div>
+          )
+        })}
+        <select className={cx(input, css({ fontSize: 'xs', alignSelf: 'start' }))} value="" aria-label="Add an attribute column" onChange={(e) => {
+          const at = attribute(e.target.value)
+          if (at) add({ kind: 'attr', id: at.id }, at.label)
+        }}>
+          <option value="">+ attribute</option>
+          {groups.map((g) => (
+            <optgroup key={g} label={g}>
+              {ATTRIBUTES.filter((x) => x.group === g && (x.base ?? s.base) === s.base && !used('attr', x.id)).map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <input className={cx(input, css({ fontSize: 'xs' }))} placeholder="+ concept: search any concept (e.g. haemoglobin, blood pressure)" value={q} onChange={(e) => setQ(e.target.value)} />
+        {matches.map((c) => (
+          <button key={c.id} type="button" className={cx(small, css({ alignSelf: 'start' }))} disabled={used('concept', c.id)} onClick={() => {
+            add({ kind: 'concept', id: c.id, pick: 'latest' }, c.unit ? `${c.label} (${c.unit})` : c.label)
+            setQ('')
+          }}>
+            {c.label} <span className={mono}>{c.code}</span>
+          </button>
         ))}
       </div>
       <span className={muted}>Patient-level, so facility level only; never sent to DHIS2.</span>
@@ -364,7 +467,7 @@ function Outline({ m }: { m: M }) {
         </button>
         <button type="button" className={ghost} onClick={() => {
             const id = newId('s')
-            set({ ...r, sections: [...r.sections, { kind: 'list', id, title: 'New line list', ind: 'anc-first', fields: ['name', 'start', 'ga'] }] })
+            set({ ...r, sections: [...r.sections, { kind: 'list', id, title: 'New line list', base: 'visits', program: 'anc', visitTypes: [], when: 'inPeriod', ind: null, columns: [{ id: newId('c'), src: { kind: 'attr', id: 'name' }, label: 'Name' }, { id: newId('c'), src: { kind: 'attr', id: 'start' }, label: 'Visit date' }] }] })
             m.setOpen(id)
           }}>
           + line list
@@ -521,20 +624,16 @@ function SectionTable({ m, s }: { m: M; s: TableSection }) {
 
 function LineList({ m, s }: { m: M; s: ListSection }) {
   const place = placeOf(m.place)
-  const ind = indicator(s.ind)
-  if (!ind) return null
   if (place && place.level !== 'facility') return <p className={muted}>Line lists show patient-level records and run at facility level only. Pick a facility to see this one.</p>
-  const facilities = facilitiesUnder(m.place)
-  const list = evaluate(ind, m.period).numerator.filter((p) => facilities.includes(facilityOf(p)))
-  const fields = FIELDS.filter((f) => s.fields.includes(f.id))
+  const list = listRows(s, m.period, m.place)
   return (
     <div className={css({ overflowX: 'auto' })}>
       <table className={css({ borderCollapse: 'collapse', width: '100%' })}>
         <thead>
           <tr>
-            {fields.map((f) => (
-              <th key={f.id} className={cx(th, css({ textAlign: 'left' }))}>
-                {f.label}
+            {s.columns.map((c) => (
+              <th key={c.id} className={cx(th, css({ textAlign: 'left' }))}>
+                {c.label}
               </th>
             ))}
           </tr>
@@ -542,16 +641,16 @@ function LineList({ m, s }: { m: M; s: ListSection }) {
         <tbody>
           {list.length === 0 ? (
             <tr>
-              <td className={cx(tdL, muted)} colSpan={fields.length}>
-                No records in {m.period.label}.
+              <td className={cx(tdL, muted)} colSpan={s.columns.length}>
+                No {s.base} in {m.period.label}.
               </td>
             </tr>
           ) : (
-            list.map((p) => (
-              <tr key={p.id}>
-                {fields.map((f) => (
-                  <td key={f.id} className={tdL}>
-                    {f.get(p)}
+            list.map((r) => (
+              <tr key={r.key}>
+                {s.columns.map((c) => (
+                  <td key={c.id} className={tdL}>
+                    {listValue(c, r)}
                   </td>
                 ))}
               </tr>
@@ -560,7 +659,8 @@ function LineList({ m, s }: { m: M; s: ListSection }) {
         </tbody>
       </table>
       <span className={muted}>
-        {list.length} records · {ind.title} {ind.version}
+        {list.length} {s.base} · {PROGRAMS.find((x) => x.id === s.program)?.label}
+        {s.ind ? ` · counted by ${indicator(s.ind)?.title ?? s.ind}` : ''}
       </span>
     </div>
   )
