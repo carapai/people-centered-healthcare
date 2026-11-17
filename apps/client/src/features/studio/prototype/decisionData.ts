@@ -118,7 +118,7 @@ export const describe = (t: Table, s: Record<string, string>) => t.inputs.map((i
 
 export type Join = 'all' | 'any' | 'not'
 export type Node = { kind: 'cond'; c: Condition } | { kind: 'group'; join: Join; children: Node[] }
-export type TreeRow = { tree: Node; outcome: string }
+export type TreeRow = { name: string; tree: Node; outcome: string }
 
 /** Whether a node holds; `not` means none of its children hold. An empty group holds. */
 export function holdsNode(t: Table, n: Node, sample: Record<string, string>): boolean {
@@ -142,10 +142,10 @@ const cond = (input: string, op: Op, value: string): Node => ({ kind: 'cond', c:
 const group = (join: Join, ...children: Node[]): Node => ({ kind: 'group', join, children })
 
 export const TREE_ROWS: TreeRow[] = [
-  { tree: group('all', cond('category', '=', 'emergency')), outcome: 'bypass' },
-  { tree: group('any', group('all', cond('age', '<', '5'), cond('danger', '=', 'true')), group('all', cond('pregnant', '=', 'true'), cond('category', '=', 'urgent'))), outcome: 'bypass' },
-  { tree: group('all', cond('category', '=', 'urgent'), group('not', cond('pregnant', '=', 'true'))), outcome: 'normal' },
-  { tree: group('all', cond('category', '=', 'routine')), outcome: 'normal' },
+  { name: 'Emergency goes straight to consultation', tree: group('all', cond('category', '=', 'emergency')), outcome: 'bypass' },
+  { name: 'Sick child or urgent pregnancy', tree: group('any', group('all', cond('age', '<', '5'), cond('danger', '=', 'true')), group('all', cond('pregnant', '=', 'true'), cond('category', '=', 'urgent'))), outcome: 'bypass' },
+  { name: 'Other urgent patients pay first', tree: group('all', cond('category', '=', 'urgent'), group('not', cond('pregnant', '=', 'true'))), outcome: 'normal' },
+  { name: 'Routine patients pay first', tree: group('all', cond('category', '=', 'routine')), outcome: 'normal' },
 ]
 
 export function evaluateTree(t: Table, rows: TreeRow[], sample: Record<string, string>): { outcome: string | null; row: number | null } {

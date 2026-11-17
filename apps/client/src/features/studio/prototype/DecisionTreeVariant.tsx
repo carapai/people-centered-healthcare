@@ -109,12 +109,15 @@ export function VariantD() {
   const [table, setTable] = useState<Table>(TABLE)
   const [rows, setRows] = useState<TreeRow[]>(TREE_ROWS)
   const [cases, setCases] = useState<Case[]>(CASES)
+  const [open, setOpen] = useState<number | null>(1)
   const [sample, setSample] = useState<Record<string, string> | null>({ category: 'urgent', age: '3', danger: 'true', pregnant: 'false' })
   const [name, setName] = useState('')
   const { gaps, neverFires } = coverageTree(table, rows)
   const failing = cases.filter((c) => evaluateTree(table, rows, c.inputs).outcome !== c.expect).length
   const result = sample ? evaluateTree(table, rows, sample) : null
-  const edit = (n: number) => (path: number[], f: (node: Node) => Node | null) => setRows(rows.map((r, m) => (m === n ? { ...r, tree: update(r.tree, path, f) } : r)))
+  const rule = open === null ? undefined : rows[open]
+  const setRule = (patch: Partial<TreeRow>) => open !== null && setRows(rows.map((r, m) => (m === open ? { ...r, ...patch } : r)))
+  const edit = (path: number[], f: (node: Node) => Node | null) => rule && setRule({ tree: update(rule.tree, path, f) })
   const move = (n: number, by: number) => {
     const next = [...rows]
     const a = next[n]
@@ -123,104 +126,146 @@ export function VariantD() {
     next[n] = b
     next[n + by] = a
     setRows(next)
+    if (open === n) setOpen(n + by)
+    else if (open === n + by) setOpen(n)
+  }
+  const add = () => {
+    setRows([...rows, { name: `New rule ${rows.length + 1}`, tree: { kind: 'group', join: 'all', children: [] }, outcome: table.outcomes[0] ?? '' }])
+    setOpen(rows.length)
   }
   return (
-    <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', lg: '1fr 24rem' }, gap: '3', alignItems: 'start' })}>
-      <div className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
-        <div className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' }))}>
-          <strong>Checks (the same ones publication runs):</strong>
-          <span className={gaps.length ? bad : ok}>{gaps.length ? `${gaps.length} cases match no rule and there is no default, e.g. ${describe(table, gaps[0] ?? {})}` : 'Every case matches a rule or the default'}</span>
-          <span className={neverFires.length ? bad : ok}>{neverFires.length ? `Rule ${neverFires.map((n) => n + 1).join(', ')} never fires` : 'Every rule can fire'}</span>
-          <span className={failing ? bad : ok}>{failing ? `${failing} of ${cases.length} test cases fail` : `All ${cases.length} test cases pass`}</span>
-          <label>
-            When no rule matches:{' '}
-            <select className={input} value={table.default ?? ''} onChange={(e) => setTable({ ...table, default: e.target.value || null })}>
-              <option value="">no outcome (a gap)</option>
-              {table.outcomes.map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <ol className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
-          {rows.map((r, n) => (
-            <li key={n} className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2' }), result?.row === n ? css({ borderColor: 'accent.default', bg: 'bg.selected' }) : neverFires.includes(n) ? css({ bg: 'bg.subtle' }) : undefined)}>
-              <div className={css({ display: 'flex', gap: '2', alignItems: 'center', flexWrap: 'wrap' })}>
-                <strong>Rule {n + 1}</strong>
-                {result?.row === n ? <span className={ok}>fires for this patient</span> : null}
-                {neverFires.includes(n) ? <span className={bad}>never fires</span> : null}
-                <span className={css({ ml: 'auto', display: 'flex', gap: '1', alignItems: 'center', fontSize: 'sm' })}>
-                  then
-                  <select aria-label={`Rule ${n + 1} outcome`} className={input} value={r.outcome} onChange={(e) => setRows(rows.map((x, m) => (m === n ? { ...x, outcome: e.target.value } : x)))}>
-                    {table.outcomes.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                  <button type="button" className={small} disabled={n === 0} onClick={() => move(n, -1)}>
+    <div className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+      <div className={cx(box, css({ p: '3', display: 'flex', gap: '4', flexWrap: 'wrap', fontSize: 'sm', alignItems: 'center' }))}>
+        <strong>Checks:</strong>
+        <span className={gaps.length ? bad : ok}>{gaps.length ? `${gaps.length} cases match no rule, e.g. ${describe(table, gaps[0] ?? {})}` : 'every case is covered'}</span>
+        <span className={neverFires.length ? bad : ok}>{neverFires.length ? `“${neverFires.map((n) => rows[n]?.name).join('”, “')}” never fires` : 'every rule can fire'}</span>
+        <span className={failing ? bad : ok}>{failing ? `${failing} of ${cases.length} test cases fail` : `all ${cases.length} test cases pass`}</span>
+        <label>
+          When no rule matches:{' '}
+          <select className={input} value={table.default ?? ''} onChange={(e) => setTable({ ...table, default: e.target.value || null })}>
+            <option value="">no outcome (a gap)</option>
+            {table.outcomes.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className={css({ display: 'grid', gridTemplateColumns: { base: '1fr', xl: '20rem 1fr 20rem' }, gap: '3', alignItems: 'start' })}>
+        <nav aria-label="Rules" className={cx(box, css({ p: '2', display: 'flex', flexDirection: 'column', gap: '1' }))}>
+          <span className={muted}>Rules, tried from the top; the first that holds wins</span>
+          <ol className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+            {rows.map((r, n) => (
+              <li key={n} className={cx(css({ display: 'flex', gap: '1', alignItems: 'stretch', borderRadius: 'sm' }), open === n ? css({ bg: 'bg.selected' }) : undefined)}>
+                <button type="button" aria-current={open === n ? 'true' : undefined} onClick={() => setOpen(n)} className={css({ flex: '1', textAlign: 'left', p: '2', cursor: 'pointer', fontSize: 'sm' })}>
+                  <div>
+                    <strong>{n + 1}.</strong> {r.name || '(unnamed)'}
+                  </div>
+                  <div className={muted}>
+                    → {r.outcome}
+                    {result?.row === n ? <span className={ok}> · fires for this patient</span> : null}
+                    {neverFires.includes(n) ? <span className={bad}> · never fires</span> : null}
+                  </div>
+                </button>
+                <span className={css({ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.5', pr: '1' })}>
+                  <button type="button" className={small} aria-label={`Move ${r.name} up`} disabled={n === 0} onClick={() => move(n, -1)}>
                     ▲
                   </button>
-                  <button type="button" className={small} disabled={n === rows.length - 1} onClick={() => move(n, 1)}>
+                  <button type="button" className={small} aria-label={`Move ${r.name} down`} disabled={n === rows.length - 1} onClick={() => move(n, 1)}>
                     ▼
                   </button>
-                  <button type="button" className={small} aria-label="Delete rule" onClick={() => setRows(rows.filter((_, m) => m !== n))}>
-                    ✕
-                  </button>
                 </span>
-              </div>
-              <NodeEditor t={table} node={r.tree} path={[]} onChange={edit(n)} sample={sample} />
-              <div className={cx(mono, css({ color: 'fg.muted', bg: 'bg.subtle', p: '2', borderRadius: 'sm', overflowX: 'auto' }))}>{nodeText(table, r.tree)}</div>
-            </li>
-          ))}
-        </ol>
-        <button type="button" className={cx(small, css({ alignSelf: 'flex-start', py: '1' }))} onClick={() => setRows([...rows, { tree: { kind: 'group', join: 'all', children: [] }, outcome: table.outcomes[0] ?? '' }])}>
-          Add rule
-        </button>
-      </div>
-      <aside className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2', position: { lg: 'sticky' }, top: '4' }))}>
-        <h2 className={h2}>Try a patient</h2>
-        <label className={css({ fontSize: 'sm' })}>
-          <input type="checkbox" checked={sample !== null} onChange={(e) => setSample(e.target.checked ? { category: 'urgent', age: '30', danger: 'false', pregnant: 'false' } : null)} /> Mark each node ✓ or ✗ for this patient
-        </label>
-        {sample
-          ? table.inputs.map((i) => (
-              <label key={i.id} className={css({ fontSize: 'sm', display: 'flex', flexDirection: 'column', gap: '1' })}>
-                {i.label}
-                {i.type === 'number' ? (
-                  <input type="number" className={input} value={sample[i.id] ?? ''} onChange={(e) => setSample({ ...sample, [i.id]: e.target.value })} />
-                ) : (
-                  <select className={input} value={sample[i.id] ?? ''} onChange={(e) => setSample({ ...sample, [i.id]: e.target.value })}>
-                    {(i.type === 'boolean' ? ['true', 'false'] : (i.values ?? [])).map((v) => (
-                      <option key={v}>{v}</option>
-                    ))}
-                  </select>
-                )}
-              </label>
-            ))
-          : null}
-        {result ? <p className={result.outcome ? ok : bad}>{result.outcome ? `Outcome: ${result.outcome} (rule ${(result.row ?? 0) + 1})` : 'No rule matches and there is no default'}</p> : null}
-        {sample ? (
-          <div className={css({ display: 'flex', gap: '2' })}>
-            <input className={cx(input, css({ flex: '1' }))} placeholder="Name this case" value={name} onChange={(e) => setName(e.target.value)} />
-            <button type="button" className={small} disabled={!name || !result?.outcome} onClick={() => (setCases([...cases, { name, inputs: sample, expect: result?.outcome ?? '' }]), setName(''))}>
-              Save as test
-            </button>
-          </div>
-        ) : null}
-        <h2 className={h2}>Test cases</h2>
-        <ul className={css({ fontSize: 'sm', display: 'flex', flexDirection: 'column', gap: '1' })}>
-          {cases.map((c, n) => {
-            const r = evaluateTree(table, rows, c.inputs)
-            const pass = r.outcome === c.expect
-            return (
-              <li key={n}>
-                <button type="button" className={css({ cursor: 'pointer', textAlign: 'left' })} onClick={() => setSample(c.inputs)}>
-                  {pass ? <span className={ok}>✓</span> : <span className={bad}>✗</span>} {c.name}: expects {c.expect}, gets {r.outcome ?? 'nothing'}
-                </button>
               </li>
-            )
-          })}
-        </ul>
-      </aside>
+            ))}
+          </ol>
+          <button type="button" className={cx(small, css({ py: '1' }))} onClick={add}>
+            Add rule
+          </button>
+        </nav>
+        <section className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '3' }))}>
+          {rule && open !== null ? (
+            <>
+              <div className={css({ display: 'flex', gap: '2', alignItems: 'center', flexWrap: 'wrap' })}>
+                <strong>Rule {open + 1}</strong>
+                <input aria-label="Rule name" className={cx(input, css({ flex: '1', minWidth: '14rem', fontWeight: 'semibold' }))} value={rule.name} onChange={(e) => setRule({ name: e.target.value })} />
+                <span className={css({ fontSize: 'sm' })}>then</span>
+                <select aria-label="Outcome" className={input} value={rule.outcome} onChange={(e) => setRule({ outcome: e.target.value })}>
+                  {table.outcomes.map((o) => (
+                    <option key={o}>{o}</option>
+                  ))}
+                </select>
+                <button type="button" className={small} onClick={() => (setRows(rows.filter((_, m) => m !== open)), setOpen(null))}>
+                  Delete rule
+                </button>
+              </div>
+              <NodeEditor t={table} node={rule.tree} path={[]} onChange={edit} sample={sample} />
+              <div>
+                <div className={muted}>Saved as FHIRPath</div>
+                <div className={cx(mono, css({ color: 'fg.muted', bg: 'bg.subtle', p: '2', borderRadius: 'sm', overflowX: 'auto' }))}>{nodeText(table, rule.tree)}</div>
+              </div>
+            </>
+          ) : (
+            <p className={muted}>Choose a rule from the list to see and edit it.</p>
+          )}
+        </section>
+        <aside className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2', position: { xl: 'sticky' }, top: '4' }))}>
+          <h2 className={h2}>Try a patient</h2>
+          <label className={css({ fontSize: 'sm' })}>
+            <input type="checkbox" checked={sample !== null} onChange={(e) => setSample(e.target.checked ? { category: 'urgent', age: '30', danger: 'false', pregnant: 'false' } : null)} /> Mark each node ✓ or ✗ for this patient
+          </label>
+          {sample
+            ? table.inputs.map((i) => (
+                <label key={i.id} className={css({ fontSize: 'sm', display: 'flex', flexDirection: 'column', gap: '1' })}>
+                  {i.label}
+                  {i.type === 'number' ? (
+                    <input type="number" className={input} value={sample[i.id] ?? ''} onChange={(e) => setSample({ ...sample, [i.id]: e.target.value })} />
+                  ) : (
+                    <select className={input} value={sample[i.id] ?? ''} onChange={(e) => setSample({ ...sample, [i.id]: e.target.value })}>
+                      {(i.type === 'boolean' ? ['true', 'false'] : (i.values ?? [])).map((v) => (
+                        <option key={v}>{v}</option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              ))
+            : null}
+          {result ? (
+            <p className={result.outcome ? ok : bad}>
+              {result.outcome ? (
+                <>
+                  Outcome: {result.outcome}, from{' '}
+                  <button type="button" className={css({ textDecoration: 'underline', cursor: 'pointer' })} onClick={() => setOpen(result.row)}>
+                    “{rows[result.row ?? 0]?.name}”
+                  </button>
+                </>
+              ) : (
+                'No rule matches and there is no default'
+              )}
+            </p>
+          ) : null}
+          {sample ? (
+            <div className={css({ display: 'flex', gap: '2' })}>
+              <input className={cx(input, css({ flex: '1' }))} placeholder="Name this case" value={name} onChange={(e) => setName(e.target.value)} />
+              <button type="button" className={small} disabled={!name || !result?.outcome} onClick={() => (setCases([...cases, { name, inputs: sample, expect: result?.outcome ?? '' }]), setName(''))}>
+                Save as test
+              </button>
+            </div>
+          ) : null}
+          <h2 className={h2}>Test cases</h2>
+          <ul className={css({ fontSize: 'sm', display: 'flex', flexDirection: 'column', gap: '1' })}>
+            {cases.map((c, n) => {
+              const r = evaluateTree(table, rows, c.inputs)
+              const pass = r.outcome === c.expect
+              return (
+                <li key={n}>
+                  <button type="button" className={css({ cursor: 'pointer', textAlign: 'left' })} onClick={() => setSample(c.inputs)}>
+                    {pass ? <span className={ok}>✓</span> : <span className={bad}>✗</span>} {c.name}: expects {c.expect}, gets {r.outcome ?? 'nothing'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </aside>
+      </div>
     </div>
   )
 }
