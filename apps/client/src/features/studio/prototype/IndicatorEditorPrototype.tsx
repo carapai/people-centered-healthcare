@@ -11,7 +11,9 @@ import { css, cx } from '@health/design-system/css'
 import { useState } from 'react'
 
 import {
+  CALCS,
   CODED,
+  COUNT_UNITS,
   DATE_FIELDS,
   DATE_OPS,
   HMIS_MAPPING,
@@ -25,8 +27,10 @@ import {
   baseLabel,
   baseOf,
   compiled,
+  compute,
+  denOf,
+  valueLabel,
   disaggLabel,
-  display,
   evaluate,
   holds,
   newDate,
@@ -48,6 +52,8 @@ import {
   type Patient,
   type Period,
   type PeriodType,
+  type Calc,
+  type CountUnit,
   type SavedTest,
   type Side,
   type Unit,
@@ -240,35 +246,125 @@ function TreeEditor({ node, onChange, patient, ctx, depth = 0 }: { node: Node; o
 // --- Sides ---------------------------------------------------------------------------------------------
 
 function SideCard({ ind, side, setInd, count }: { ind: Indicator; side: Side; setInd: (i: Indicator) => void; count: number | null }) {
-  const part = side === 'numerator' ? ind.numerator : ind.denominator
-  const set = (p: { tree: Node } | 'one') => (side === 'numerator' ? p !== 'one' && setInd({ ...ind, numerator: p }) : setInd({ ...ind, denominator: p }))
-  if (part === 'one') {
-    return (
-      <div className={css({ display: 'flex', gap: '3', alignItems: 'center' })}>
-        <button type="button" className={ghost} onClick={() => set({ tree: { kind: 'group', join: 'all', children: [] } })}>
-          + Add denominator
-        </button>
-        <span className={muted}>Without one, the indicator is a count of the numerator.</span>
-      </div>
-    )
-  }
-  const within = side === 'numerator' && ind.denominator !== 'one'
+  const den = denOf(ind)
+  if (side === 'denominator' && den === 'one') return null
+  const tree = side === 'numerator' ? ind.numerator.tree : ind.den.tree
+  const setTree = (t: Node) => setInd(side === 'numerator' ? { ...ind, numerator: { tree: t } } : { ...ind, den: { ...ind.den, tree: t } })
+  const population = side === 'denominator' && ind.den.population !== null
+  const within = side === 'numerator' && den !== 'one' && ind.den.population === null
+  const unit = ind.unit
+  const Unit = `${unit.slice(0, 1).toUpperCase()}${unit.slice(1)}`
   return (
     <section className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2' }))}>
       <div className={css({ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '2' })}>
         <h2 className={h2}>{side === 'numerator' ? 'Numerator' : 'Denominator'}</h2>
-        <span className={css({ display: 'flex', gap: '2', alignItems: 'baseline' })}>
-          {count === null ? null : <span className={muted}>{count} in the period tried</span>}
-          {side === 'denominator' ? (
-            <button type="button" className={small} onClick={() => set('one')}>
-              Remove denominator
-            </button>
-          ) : null}
-        </span>
+        {count === null ? null : (
+          <span className={muted}>
+            {count} {population ? '(estimate)' : `${unit} in the period tried`}
+          </span>
+        )}
       </div>
-      <span className={css({ fontSize: 'sm' })}>{within ? 'Patients in the denominator who match' : 'Patients with care in the period who match'}</span>
-      <TreeEditor node={part.tree} onChange={(tree) => set({ tree })} />
+      {side === 'denominator' ? (
+        <div role="radiogroup" aria-label="Denominator source" className={css({ display: 'flex', gap: '3', fontSize: 'sm', flexWrap: 'wrap' })}>
+          <label>
+            <input type="radio" checked={!population} onChange={() => setInd({ ...ind, den: { ...ind.den, population: null } })} /> {unit} who match conditions
+          </label>
+          <label>
+            <input type="radio" checked={population} onChange={() => setInd({ ...ind, den: { ...ind.den, population: 120 } })} /> a population estimate (e.g. expected pregnancies)
+          </label>
+        </div>
+      ) : null}
+      {population ? (
+        <label className={row}>
+          Estimate for the period
+          <input className={cx(input, css({ width: '6rem' }))} type="number" min={1} value={ind.den.population ?? 0} onChange={(e) => setInd({ ...ind, den: { ...ind.den, population: Number(e.target.value) } })} />
+          <span className={muted}>(in the product this comes from population configuration, per place and period)</span>
+        </label>
+      ) : (
+        <>
+          <span className={css({ fontSize: 'sm' })}>{within ? `${Unit} in the denominator who match` : `${Unit} with care in the period who match`}</span>
+          <TreeEditor node={tree} onChange={setTree} />
+        </>
+      )}
       <code className={mono}>{compiled(ind, side)}</code>
+    </section>
+  )
+}
+
+const DAYS_FROM: DateField[] = ['lmp', 'enrolled', 'eocStart', 'start', 'dob']
+
+function Calculation({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => void }) {
+  const calc = CALCS.find((x) => x.id === ind.calc)
+  const v = ind.value
+  return (
+    <section className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '2', fontSize: 'sm' }))}>
+      <h2 className={h2}>What it calculates</h2>
+      <div className={row}>
+        <select className={input} value={ind.calc} aria-label="Calculation" onChange={(e) => setInd({ ...ind, calc: e.target.value as Calc })}>
+          {CALCS.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+            </option>
+          ))}
+        </select>
+        {calc?.value ? (
+          <>
+            :
+            <select className={input} aria-label="Value" value={v.kind === 'input' ? v.input : 'days'} onChange={(e) => setInd({ ...ind, value: e.target.value === 'days' ? { kind: 'days', from: 'lmp', to: 'start' } : { kind: 'input', input: e.target.value as 'ga' | 'age' } })}>
+              <option value="ga">Gestational age (weeks)</option>
+              <option value="age">Age (years)</option>
+              <option value="days">Days between two dates</option>
+            </select>
+            {v.kind === 'days' ? (
+              <>
+                from
+                <select className={input} aria-label="From date" value={v.from} onChange={(e) => setInd({ ...ind, value: { ...v, from: e.target.value as DateField } })}>
+                  {DAYS_FROM.map((id) => (
+                    <option key={id} value={id}>
+                      {DATE_FIELDS.find((d) => d.id === id)?.label}
+                    </option>
+                  ))}
+                </select>
+                to
+                <select className={input} aria-label="To date" value={v.to} onChange={(e) => setInd({ ...ind, value: { ...v, to: e.target.value as DateField } })}>
+                  {DATE_FIELDS.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : null}
+          </>
+        ) : null}
+        {ind.calc === 'rate' ? (
+          <>
+            per
+            <select className={input} aria-label="Per" value={ind.per} onChange={(e) => setInd({ ...ind, per: Number(e.target.value) })}>
+              {[100, 1000, 10_000, 100_000].map((x) => (
+                <option key={x} value={x}>
+                  {x.toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
+      </div>
+      <label className={row}>
+        Counting
+        <select className={input} value={ind.unit} aria-label="What is counted" onChange={(e) => setInd({ ...ind, unit: e.target.value as CountUnit })}>
+          {COUNT_UNITS.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className={muted}>
+        {calc?.hint}
+        {calc?.den ? '. Needs a denominator (below).' : '.'}
+        {calc?.value ? ` One value per counted ${ind.unit === 'people' ? 'person' : ind.unit === 'enrollments' ? 'enrollment' : 'visit'}: ${valueLabel(v)}.` : ''}
+      </span>
     </section>
   )
 }
@@ -339,7 +435,7 @@ const ageSummary = (id: string) => {
 function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: Side; list: Patient[]; setInd: (i: Indicator) => void; period: Period }) {
   const [open, setOpen] = useState<string | null>(null)
   const ctx: Ctx = { ind, period, seen: [`${ind.id}.${side}`] }
-  const part = side === 'numerator' ? ind.numerator : ind.denominator
+  const part = side === 'numerator' ? ind.numerator : denOf(ind)
   return (
     <ul className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' })}>
       {list.length === 0 ? <li className={muted}>Nobody.</li> : null}
@@ -349,9 +445,9 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
             {open === p.id ? '▾' : '▸'} {p.name} · {p.encounterType} · GA {p.gestationWeeks}w · HIV {p.hiv} · visit {p.dates.start}
             {p.dates.recorded !== p.dates.start ? <span className={muted}> (entered {p.dates.recorded})</span> : null}
           </button>
-          {open === p.id && part !== 'one' ? (
+          {open === p.id && part !== 'one' && !('population' in part && part.population !== null) ? (
             <div className={cx(box, css({ p: '2', mt: '1', bg: 'bg.subtle' }))}>
-              <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { tree } } : { ...ind, denominator: { tree } })} patient={p} ctx={ctx} />
+              <TreeEditor node={part.tree} onChange={(tree) => setInd(side === 'numerator' ? { ...ind, numerator: { tree } } : { ...ind, den: { ...ind.den, tree } })} patient={p} ctx={ctx} />
             </div>
           ) : null}
         </li>
@@ -361,13 +457,13 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
 }
 
 function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: Period }) {
-  const part = side === 'numerator' ? ind.numerator : ind.denominator
-  if (part === 'one') return null
+  const part = side === 'numerator' ? ind.numerator : denOf(ind)
+  if (part === 'one' || ('population' in part && part.population !== null)) return null
   const from = baseOf(ind, startOf(ind, side), period)
   const out = from.filter((p) => !holds(part.tree, p, { ind, period, seen: [`${ind.id}.${side}`] }))
   return (
     <p className={muted}>
-      {from.length} {side === 'numerator' && ind.denominator !== 'one' ? 'in the denominator' : 'with care in the period'}; {out.length} don't match
+      {from.length} {side === 'numerator' && denOf(ind) !== 'one' ? 'in the denominator' : 'with care in the period'}; {out.length} don't match
       {out.length ? `: ${out.map((p) => p.name).join(', ')}` : ''}.
     </p>
   )
@@ -381,20 +477,21 @@ export function IndicatorEditorPrototype() {
   const r = evaluate(ind, period)
   const sides: Side[] = r.denominator === null ? ['numerator'] : ['numerator', 'denominator']
   const shown: Side = sides.includes(drill) ? drill : 'numerator'
-  const expectNow = { numerator: r.numerator.length, denominator: r.denominator === null ? ('one' as const) : r.denominator.length }
+  const total = compute(ind, r.numerator, r.denominator, period)
   const pass = (t: SavedTest) => {
     const x = evaluate(ind, t.period)
-    return t.expect.numerator === x.numerator.length && t.expect.denominator === (x.denominator === null ? 'one' : x.denominator.length)
+    return compute(ind, x.numerator, x.denominator, t.period).text === t.expect
   }
+  const hasDen = denOf(ind) !== 'one'
   const line = (key: string, label: string, test: (p: Patient) => boolean, strong = false) => {
-    const n = r.numerator.filter(test).length
-    const d = r.denominator?.filter(test).length
+    const v = compute(ind, r.numerator.filter(test), r.denominator?.filter(test) ?? null, period)
+    const bandOk = strong || !hasDen || ind.den.population === null
     return (
       <tr key={key}>
         <td className={strong ? css({ fontWeight: 'semibold' }) : cx(muted, css({ pl: '3' }))}>{label}</td>
-        <td>{n}</td>
-        {d === undefined ? null : <td>{d}</td>}
-        {d === undefined ? null : <td>{d ? `${Math.round((100 * n) / d)}%` : '–'}</td>}
+        <td>{v.n}</td>
+        {hasDen ? <td>{bandOk ? v.d : '–'}</td> : null}
+        <td>{bandOk ? v.text : '–'}</td>
       </tr>
     )
   }
@@ -411,8 +508,9 @@ export function IndicatorEditorPrototype() {
             <Settings ind={ind} setInd={setInd} />
             <p className={cx(muted, css({ fontSize: 'xs', mt: '2' }))}>Mapped to {HMIS_MAPPING} (read-only)</p>
           </section>
-          <SideCard ind={ind} side="numerator" setInd={setInd} count={r.numerator.length} />
-          <SideCard ind={ind} side="denominator" setInd={setInd} count={r.denominator === null ? null : r.denominator.length} />
+          <Calculation ind={ind} setInd={setInd} />
+          <SideCard ind={ind} side="numerator" setInd={setInd} count={total.n} />
+          <SideCard ind={ind} side="denominator" setInd={setInd} count={total.d} />
         </div>
         <aside className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '3', position: { lg: 'sticky' }, top: '4' }))}>
           <h2 className={h2}>Try over test patients</h2>
@@ -435,20 +533,24 @@ export function IndicatorEditorPrototype() {
             Reporting period {periodStart(period)} to {periodEnd(period)}
           </span>
           <p className={css({ fontSize: '2xl', fontWeight: 'semibold' })}>
-            {display(r)} {r.denominator === null ? <span className={muted}>(a count)</span> : <span className={muted}>({r.numerator.length} of {r.denominator.length})</span>}
+            {total.text}{' '}
+            <span className={muted}>
+              ({CALCS.find((x) => x.id === ind.calc)?.label.toLowerCase()} · {total.n} {ind.unit}
+              {total.d === null ? '' : ` over ${total.d}`})
+            </span>
           </p>
           <table className={css({ fontSize: 'sm', '& td, & th': { px: '1', textAlign: 'right' }, '& th:first-child, & td:first-child': { textAlign: 'left' } })}>
             <thead>
               <tr>
                 <th />
-                {sides.map((s) => (
+                {(hasDen ? sides : (['numerator'] as Side[])).map((s) => (
                   <th key={s}>
                     <button type="button" className={cx(css({ cursor: 'pointer' }), shown === s ? css({ textDecoration: 'underline' }) : undefined)} onClick={() => setDrill(s)}>
                       {s === 'numerator' ? 'Numerator' : 'Denominator'}
                     </button>
                   </th>
                 ))}
-                {r.denominator === null ? null : <th>%</th>}
+                <th>Value</th>
               </tr>
             </thead>
             <tbody>
@@ -466,13 +568,13 @@ export function IndicatorEditorPrototype() {
           <h3 className={css({ fontWeight: 'semibold' })}>{shown === 'numerator' ? 'Numerator' : 'Denominator'}: who and why</h3>
           <Dropped ind={ind} side={shown} period={period} />
           <Patients ind={ind} side={shown} list={shown === 'denominator' ? (r.denominator ?? []) : r.numerator} setInd={setInd} period={period} />
-          <button type="button" className={ghost} onClick={() => setTests([...tests.filter((t) => t.period.label !== period.label), { period, expect: expectNow }])}>
+          <button type="button" className={ghost} onClick={() => setTests([...tests.filter((t) => t.period.label !== period.label), { period, expect: total.text }])}>
             Save as test ({period.label})
           </button>
           {tests.length === 0 ? <span className={muted}>No saved tests. Submission runs them and fails if the counts change.</span> : null}
           {tests.map((t) => (
             <div key={t.period.label} className={cx(css({ fontSize: 'sm' }), pass(t) ? ok : bad)}>
-              {pass(t) ? '✓' : '✗ would fail submission:'} {t.period.label} expects numerator {t.expect.numerator}, denominator {t.expect.denominator === 'one' ? '1' : t.expect.denominator}
+              {pass(t) ? '✓' : '✗ would fail submission:'} {t.period.label} expects {t.expect}
             </div>
           ))}
         </aside>

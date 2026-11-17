@@ -57,8 +57,11 @@ export const AGE_SETS: AgeBandSet[] = [
 ]
 export type Disagg = { kind: 'age'; set: string } | { kind: 'coded'; input: string }
 
+/** One record: a visit, with its person and enrollment (several records can share a person). */
 export type Patient = {
   id: string
+  person: string
+  enrollment: string
   name: string
   dob: string
   sex: 'female' | 'male'
@@ -69,8 +72,35 @@ export type Patient = {
   district: string
   dates: Partial<Record<DateField, string>>
 }
-export type Indicator = { id: string; title: string; version: string; periodDate: DateField; numerator: { tree: Node }; denominator: { tree: Node } | 'one'; disaggregations: Disagg[] }
-export type SavedTest = { period: Period; expect: { numerator: number; denominator: number | 'one' } }
+// --- What an indicator calculates -------------------------------------------------------------------
+
+export type Calc = 'count' | 'percentage' | 'rate' | 'ratio' | 'sum' | 'average' | 'median' | 'min' | 'max'
+export const CALCS: { id: Calc; label: string; den: boolean; value: boolean; hint: string }[] = [
+  { id: 'count', label: 'Count', den: false, value: false, hint: 'How many, e.g. ANC 1st visits' },
+  { id: 'percentage', label: 'Percentage', den: true, value: false, hint: 'Numerator ÷ denominator × 100' },
+  { id: 'rate', label: 'Rate', den: true, value: false, hint: 'Numerator ÷ denominator × a factor, e.g. per 1,000' },
+  { id: 'ratio', label: 'Ratio', den: true, value: false, hint: 'Numerator ÷ denominator, e.g. visits per pregnant woman' },
+  { id: 'sum', label: 'Sum of a value', den: false, value: true, hint: 'e.g. total doses given' },
+  { id: 'average', label: 'Average of a value', den: false, value: true, hint: 'e.g. mean gestational age at 1st visit' },
+  { id: 'median', label: 'Median of a value', den: false, value: true, hint: 'e.g. median days from LMP to 1st visit' },
+  { id: 'min', label: 'Minimum of a value', den: false, value: true, hint: '' },
+  { id: 'max', label: 'Maximum of a value', den: false, value: true, hint: '' },
+]
+/** What one counted thing is: distinct people, distinct enrollments, or each visit. */
+export type CountUnit = 'people' | 'enrollments' | 'visits'
+export const COUNT_UNITS: { id: CountUnit; label: string }[] = [
+  { id: 'people', label: 'People (each person once)' },
+  { id: 'enrollments', label: 'Enrollments (each program enrollment once)' },
+  { id: 'visits', label: 'Visits (every matching visit)' },
+]
+export type ValueSpec = { kind: 'input'; input: 'ga' | 'age' } | { kind: 'days'; from: DateField; to: DateField }
+export type Den = { tree: Node; population: number | null }
+
+export type Indicator = { id: string; title: string; version: string; periodDate: DateField; calc: Calc; unit: CountUnit; value: ValueSpec; per: number; numerator: { tree: Node }; den: Den; disaggregations: Disagg[] }
+/** The denominator, or 'one' when the calculation has none. */
+export const denOf = (ind: Indicator): Den | 'one' => (CALCS.find((x) => x.id === ind.calc)?.den ? ind.den : 'one')
+const emptyDen: Den = { tree: { kind: 'group', join: 'all', children: [] }, population: null }
+export type SavedTest = { period: Period; expect: string }
 
 export const INPUTS: Input[] = [
   { id: 'type', label: 'Visit type', path: '%encounter.type.coding.code', type: 'code', values: ['anc-first', 'anc-followup', 'opd'] },
@@ -90,8 +120,8 @@ export const newDate = (): DateCond => inPeriod('start')
 
 /** Published indicators in this package and its dependencies, which a condition can refer to. */
 export const OTHERS: Indicator[] = [
-  { id: 'anc-visits', title: 'ANC visits (all)', version: '2.3.0', periodDate: 'start', numerator: { tree: { kind: 'group', join: 'any', children: [c('type', '=', 'anc-first'), c('type', '=', 'anc-followup')] } }, denominator: 'one', disaggregations: [] },
-  { id: 'anc-first', title: 'ANC 1st visits', version: '2.3.0', periodDate: 'start', numerator: { tree: all(c('sex', '=', 'female'), c('type', '=', 'anc-first')) }, denominator: 'one', disaggregations: [] },
+  { id: 'anc-visits', title: 'ANC visits (all)', version: '2.3.0', periodDate: 'start', calc: 'count', unit: 'visits', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: { kind: 'group', join: 'any', children: [c('type', '=', 'anc-first'), c('type', '=', 'anc-followup')] } }, den: emptyDen, disaggregations: [] },
+  { id: 'anc-first', title: 'ANC 1st visits', version: '2.3.0', periodDate: 'start', calc: 'count', unit: 'people', value: { kind: 'input', input: 'ga' }, per: 1000, numerator: { tree: all(c('sex', '=', 'female'), c('type', '=', 'anc-first')) }, den: emptyDen, disaggregations: [] },
 ]
 
 export const INITIAL: Indicator = {
@@ -99,7 +129,11 @@ export const INITIAL: Indicator = {
   title: 'ANC 1st visit before 12 weeks',
   version: '2.4.0-draft',
   periodDate: 'start',
-  denominator: { tree: all({ kind: 'member', ref: { kind: 'indicator', id: 'anc-first', side: 'numerator' } }, { kind: 'group', join: 'not', children: [c('age', '<', '10')] }) },
+  calc: 'percentage',
+  unit: 'people',
+  value: { kind: 'days', from: 'lmp', to: 'start' },
+  per: 1000,
+  den: { population: null, tree: all({ kind: 'member', ref: { kind: 'indicator', id: 'anc-first', side: 'numerator' } }, { kind: 'group', join: 'not', children: [c('age', '<', '10')] }) },
   numerator: { tree: all(c('ga', '<', '12')) },
   disaggregations: [{ kind: 'age', set: 'moh-age-anc' }, { kind: 'coded', input: 'hiv' }],
 }
@@ -120,7 +154,9 @@ export const PERIOD_TYPES: { id: PeriodType; label: string; periods: Period[] }[
 ]
 export const DEFAULT_PERIOD: Period = { type: 'monthly', label: '2026-03', start: '2026-03-01', end: '2026-03-31' }
 
-const P = (id: string, name: string, dob: string, sex: Patient['sex'], encounterType: string, ga: number, first: boolean, hiv: Patient['hiv'], district: string, dates: Patient['dates']): Patient => ({ id, name, dob, sex, encounterType, gestationWeeks: ga, firstPregnancy: first, hiv, district, dates: { dob, ...dates } })
+const P = (id: string, name: string, dob: string, sex: Patient['sex'], encounterType: string, ga: number, first: boolean, hiv: Patient['hiv'], district: string, dates: Patient['dates']): Patient => ({ id, person: id, enrollment: `${id}-anc`, name, dob, sex, encounterType, gestationWeeks: ga, firstPregnancy: first, hiv, district, dates: { dob, ...dates } })
+/** A further visit by the same person, in the same enrollment. */
+const again = (p: Patient, id: string, encounterType: string, ga: number, date: string): Patient => ({ ...p, id, encounterType, gestationWeeks: ga, dates: { ...p.dates, start: date, obs: date, recorded: date } })
 export const PATIENTS: Patient[] = [
   P('p1', 'Nakato A.', '2002-11-02', 'female', 'anc-first', 10, true, 'negative', 'Kampala', { start: '2026-03-04', obs: '2026-03-04', recorded: '2026-03-04', lmp: '2025-12-24', enrolled: '2026-03-04', eocStart: '2026-03-04', nextVisit: '2026-04-01' }),
   P('p2', 'Akello B.', '2008-06-15', 'female', 'anc-first', 16, true, 'unknown', 'Wakiso', { start: '2026-03-11', obs: '2026-03-11', recorded: '2026-03-11', lmp: '2025-11-19', enrolled: '2026-03-11', eocStart: '2026-03-11' }),
@@ -133,6 +169,8 @@ export const PATIENTS: Patient[] = [
   P('p9', 'Achen I.', '2016-10-10', 'female', 'anc-first', 10, true, 'unknown', 'Wakiso', { start: '2026-03-20', obs: '2026-03-20', recorded: '2026-03-20', lmp: '2026-01-09', enrolled: '2026-03-20', eocStart: '2026-03-20' }),
   P('p10', 'Kisakye J.', '1996-02-14', 'female', 'anc-first', 11, false, 'negative', 'Kampala', { start: '2026-02-17', obs: '2026-02-17', recorded: '2026-02-17', lmp: '2025-12-02', enrolled: '2026-02-17', eocStart: '2026-02-17', eocEnd: '2026-03-12' }),
 ]
+const firstVisit = (id: string) => PATIENTS.find((p) => p.id === id) as Patient
+PATIENTS.push(again(firstVisit('p1'), 'p1b', 'anc-followup', 14, '2026-03-28'), again(firstVisit('p8'), 'p8b', 'anc-followup', 11, '2026-03-30'), again(firstVisit('p4'), 'p4b', 'anc-followup', 22, '2026-03-31'))
 
 // --- Period arithmetic (monthly periods "YYYY-MM") -----------------------------------------------------
 
@@ -200,28 +238,63 @@ export function holds(n: Node, p: Patient, ctx: Ctx): boolean {
 }
 
 /** Where a side starts: the numerator is always within the denominator when there is one. */
-export const startOf = (ind: Indicator, s: Side): Base => (s === 'numerator' && ind.denominator !== 'one' ? { kind: 'denominator' } : { kind: 'period' })
+export const startOf = (ind: Indicator, s: Side): Base => (s === 'numerator' && denOf(ind) !== 'one' ? { kind: 'denominator' } : { kind: 'period' })
 
 export function side(ind: Indicator, s: Side, period: Period, seen: string[] = []): Patient[] {
   if (seen.includes(`${ind.id}.${s}`)) return [] // a loop; the real check refuses it at Validation
-  const part = s === 'numerator' ? ind.numerator : ind.denominator
-  if (part === 'one') return []
+  const part = s === 'numerator' ? ind.numerator : denOf(ind)
+  if (part === 'one' || ('population' in part && part.population !== null)) return []
   const next = [...seen, `${ind.id}.${s}`]
   return baseOf(ind, startOf(ind, s), period, next).filter((p) => holds(part.tree, p, { ind, period, seen: next }))
 }
 
 export function baseOf(ind: Indicator, b: Base, period: Period, seen: string[] = []): Patient[] {
   if (b.kind === 'period') return PATIENTS.filter((p) => holdsDate(inPeriod(ind.periodDate), p, period))
-  if (b.kind === 'denominator') return ind.denominator === 'one' ? baseOf(ind, { kind: 'period' }, period, seen) : side(ind, 'denominator', period, seen)
+  if (b.kind === 'denominator') return denOf(ind) === 'one' ? baseOf(ind, { kind: 'period' }, period, seen) : side(ind, 'denominator', period, seen)
   const other = OTHERS.find((x) => x.id === b.id)
   return other ? side(other, b.side, period, seen) : []
 }
 
 export function evaluate(ind: Indicator, period: Period) {
-  return { numerator: side(ind, 'numerator', period), denominator: ind.denominator === 'one' ? null : side(ind, 'denominator', period) }
+  return { numerator: side(ind, 'numerator', period), denominator: denOf(ind) === 'one' ? null : side(ind, 'denominator', period) }
 }
 export type Result = ReturnType<typeof evaluate>
-export const display = (r: Result) => (r.denominator === null ? `${r.numerator.length}` : r.denominator.length ? `${Math.round((100 * r.numerator.length) / r.denominator.length)}%` : '–')
+
+const keyOf = (unit: CountUnit, p: Patient) => (unit === 'people' ? p.person : unit === 'enrollments' ? p.enrollment : p.id)
+/** The counted things: records deduplicated by the counting unit, keeping the first. */
+export const counted = (unit: CountUnit, list: Patient[]) => list.filter((p, i) => list.findIndex((q) => keyOf(unit, q) === keyOf(unit, p)) === i)
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
+export const valueOf = (spec: ValueSpec, p: Patient, period: Period): number | null => {
+  if (spec.kind === 'input') return spec.input === 'ga' ? p.gestationWeeks : ageAt(p.dob, periodEnd(period), 'years')
+  const a = p.dates[spec.from]
+  const b = p.dates[spec.to]
+  return a && b ? daysBetween(a, b) : null
+}
+export const valueLabel = (spec: ValueSpec) => (spec.kind === 'input' ? (spec.input === 'ga' ? 'gestational age (weeks)' : 'age (years)') : `days from ${DATE_FIELDS.find((d) => d.id === spec.from)?.label ?? spec.from} to ${DATE_FIELDS.find((d) => d.id === spec.to)?.label ?? spec.to}`)
+
+const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
+
+/** The indicator's value over a numerator and a denominator (records already filtered, e.g. to one band). */
+export function compute(ind: Indicator, num: Patient[], den: Patient[] | null, period: Period): { text: string; n: number; d: number | null } {
+  const n = counted(ind.unit, num)
+  const dd = denOf(ind)
+  const d = dd === 'one' ? null : dd.population !== null ? dd.population : counted(ind.unit, den ?? []).length
+  if (ind.calc === 'count') return { text: String(n.length), n: n.length, d }
+  if (ind.calc === 'percentage') return { text: d ? `${fmt((100 * n.length) / d)}%` : '–', n: n.length, d }
+  if (ind.calc === 'rate') return { text: d ? `${fmt((ind.per * n.length) / d)} per ${ind.per.toLocaleString()}` : '–', n: n.length, d }
+  if (ind.calc === 'ratio') return { text: d ? (n.length / d).toFixed(2) : '–', n: n.length, d }
+  const values: number[] = []
+  for (const p of n) {
+    const x = valueOf(ind.value, p, period)
+    if (x === null) continue
+    const at = values.findIndex((y) => y > x)
+    values.splice(at === -1 ? values.length : at, 0, x)
+  }
+  if (values.length === 0) return { text: '–', n: n.length, d }
+  const sum = values.reduce((a, b) => a + b, 0)
+  const v = ind.calc === 'sum' ? sum : ind.calc === 'average' ? sum / values.length : ind.calc === 'min' ? (values[0] ?? 0) : ind.calc === 'max' ? (values.at(-1) ?? 0) : (values[Math.floor((values.length - 1) / 2)] ?? 0)
+  return { text: fmt(v), n: n.length, d }
+}
 
 // --- Bands for the Try table ---------------------------------------------------------------------------
 
@@ -274,8 +347,9 @@ export function fhirpath(n: Node, ind?: Indicator): string {
 }
 
 export function compiled(ind: Indicator, s: Side): string {
-  const part = s === 'numerator' ? ind.numerator : ind.denominator
+  const part = s === 'numerator' ? ind.numerator : denOf(ind)
   if (part === 'one') return '1'
+  if ('population' in part && part.population !== null) return `${part.population} /* population estimate */`
   const own = fhirpath(part.tree, ind)
   const base = startOf(ind, s).kind === 'denominator' ? compiled(ind, 'denominator') : dateExpr(inPeriod(ind.periodDate))
   return `(${base}) and (${own})`
@@ -283,7 +357,7 @@ export function compiled(ind: Indicator, s: Side): string {
 
 function memberExpr(b: Base, ind?: Indicator): string {
   if (b.kind === 'period') return 'true'
-  if (b.kind === 'denominator') return ind && ind.denominator !== 'one' ? `/* this indicator's denominator */ ${compiled(ind, 'denominator')}` : 'true'
+  if (b.kind === 'denominator') return ind && denOf(ind) !== 'one' ? `/* this indicator's denominator */ ${compiled(ind, 'denominator')}` : 'true'
   const o = OTHERS.find((x) => x.id === b.id)
   return o ? `/* ${o.title}|${o.version} ${b.side} */ ${compiled(o, b.side)}` : 'false'
 }
@@ -300,7 +374,7 @@ export function refOptions(): Base[] {
   const out: Base[] = []
   for (const o of OTHERS) {
     out.push({ kind: 'indicator', id: o.id, side: 'numerator' })
-    if (o.denominator !== 'one') out.push({ kind: 'indicator', id: o.id, side: 'denominator' })
+    if (denOf(o) !== 'one') out.push({ kind: 'indicator', id: o.id, side: 'denominator' })
   }
   return out
 }
