@@ -1,5 +1,7 @@
 # HMIS reports are signed off at the facility and sent to DHIS2 by central
 
+> Amended by [ADR 0070](0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md).
+
 Decided in [How does the platform report to DHIS2: who submits, when, and how are corrections handled?](https://github.com/carapai/people-centered-healthcare/issues/529), from the research in [dhis2-hmis.md](https://github.com/carapai/people-centered-healthcare/blob/research/dhis2-hmis/docs/research/dhis2-hmis.md) (branch `research/dhis2-hmis`). Uganda's eHMIS is DHIS2 and takes aggregate data sets only. Indicators are computed on each Facility Edge Node ([ADR 0068](0068-indicators-are-fhirpath-measures-computed-on-each-edge.md)). Integrations run only at central, and a facility's in-charge answers for the numbers sent in its name.
 
 **The decision:**

@@ -1,5 +1,7 @@
 # Indicators are FHIRPath Measures, computed on each Facility Edge Node and summed at central
 
+> Amended by [ADR 0070](0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md).
+
 Decided in [Where are indicators defined, computed and stored: facility, district or central?](https://github.com/carapai/people-centered-healthcare/issues/528), from the research in [indicators.md](https://github.com/carapai/people-centered-healthcare/blob/research/indicators/docs/research/indicators.md) (branch `research/indicators`). A facility must see its own figures and draft its HMIS report while offline, and a district must see the same numbers the facility in-charge signed off. This amends the Deployables table in [resource-ownership.md](../architecture/resource-ownership.md), which kept Analytics at central only.
 
 **The decision:**
