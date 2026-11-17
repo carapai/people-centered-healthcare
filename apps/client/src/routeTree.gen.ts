@@ -31,6 +31,7 @@ import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
 import { Route as PrototypeIndicatorEditorRouteImport } from './routes/prototype.indicator-editor'
 import { Route as PrototypeReportDesignerRouteImport } from './routes/prototype.report-designer'
+import { Route as PrototypeWorkspaceRouteImport } from './routes/prototype.workspace'
 import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
 import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
@@ -155,6 +156,11 @@ const PrototypeReportDesignerRoute = PrototypeReportDesignerRouteImport.update({
   path: '/prototype/report-designer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeWorkspaceRoute = PrototypeWorkspaceRouteImport.update({
+  id: '/prototype/workspace',
+  path: '/prototype/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceptionIndexRoute = ReceptionIndexRouteImport.update({
   id: '/reception/',
   path: '/reception/',
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/portal/callback': typeof PortalCallbackRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
+  '/prototype/workspace': typeof PrototypeWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/portal/callback': typeof PortalCallbackRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
+  '/prototype/workspace': typeof PrototypeWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/portal/callback': typeof PortalCallbackRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
+  '/prototype/workspace': typeof PrototypeWorkspaceRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -349,6 +358,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
+    | '/prototype/workspace'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
+    | '/prototype/workspace'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/portal/callback'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
+    | '/prototype/workspace'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -458,6 +470,7 @@ export interface RootRouteChildren {
   PortalCallbackRoute: typeof PortalCallbackRoute
   PrototypeIndicatorEditorRoute: typeof PrototypeIndicatorEditorRoute
   PrototypeReportDesignerRoute: typeof PrototypeReportDesignerRoute
+  PrototypeWorkspaceRoute: typeof PrototypeWorkspaceRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
   StockEquipmentRoute: typeof StockEquipmentRoute
@@ -629,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrototypeReportDesignerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/workspace': {
+      id: '/prototype/workspace'
+      path: '/prototype/workspace'
+      fullPath: '/prototype/workspace'
+      preLoaderRoute: typeof PrototypeWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reception/': {
       id: '/reception/'
       path: '/reception'
@@ -738,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortalCallbackRoute: PortalCallbackRoute,
   PrototypeIndicatorEditorRoute: PrototypeIndicatorEditorRoute,
   PrototypeReportDesignerRoute: PrototypeReportDesignerRoute,
+  PrototypeWorkspaceRoute: PrototypeWorkspaceRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
   StockEquipmentRoute: StockEquipmentRoute,
