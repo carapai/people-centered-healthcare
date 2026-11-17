@@ -13,6 +13,7 @@ This page consolidates how a facility is configured to operate (MASTER_PROMPT §
 | Programs active (ART, TB, ANC, …) | Program activations and override points | configuration | configuration.md |
 | Staff and roles | PractitionerRole; locally grantable roles list | workforce-registry, identity | offline-auth.md |
 | Devices | Device registry on the edge | edge admin | lan-security.md |
+| HMIS org unit ID and the forms reported through the platform | Facility settings, set at central only, checked against the NHFR | reporting | ADR 0069 |
 
 ## Operating models (§63)
 

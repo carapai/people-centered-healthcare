@@ -82,6 +82,10 @@ _Avoid_: Report, metric, KPI
 The counts for one Indicator, one facility or area and one period; a facility's own report is the figure everyone above it sees.
 _Avoid_: Dataset, submission (for the counts themselves)
 
+**HMIS Report**:
+One national reporting form, such as HMIS 105, for one facility and period, filled from Indicator Reports and signed off by the facility before it is sent.
+_Avoid_: Submission, return, dataset (for the form)
+
 **Language Pack**:
 A package that holds one language's wording for another package's forms and code lists, published and activated on its own, so translating never changes or re-versions the clinical content it translates.
 _Avoid_: Locale, translation file, localisation bundle
