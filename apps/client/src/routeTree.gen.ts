@@ -29,6 +29,7 @@ import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
+import { Route as PrototypeProgramDesignerRouteImport } from './routes/prototype.program-designer'
 import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
 import { Route as ReceptionQueuesRouteImport } from './routes/reception.queues'
 import { Route as RegistryReviewsRouteImport } from './routes/registry.reviews'
@@ -142,6 +143,12 @@ const PortalCallbackRoute = PortalCallbackRouteImport.update({
   path: '/portal/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeProgramDesignerRoute =
+  PrototypeProgramDesignerRouteImport.update({
+    id: '/prototype/program-designer',
+    path: '/prototype/program-designer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ReceptionIndexRoute = ReceptionIndexRouteImport.update({
   id: '/reception/',
   path: '/reception/',
@@ -223,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/program-designer': typeof PrototypeProgramDesignerRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -257,6 +265,7 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/program-designer': typeof PrototypeProgramDesignerRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -292,6 +301,7 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/program-designer': typeof PrototypeProgramDesignerRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
   '/stock/equipment': typeof StockEquipmentRoute
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/program-designer'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/program-designer'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -396,6 +408,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/program-designer'
     | '/reception/queues'
     | '/registry/reviews'
     | '/stock/equipment'
@@ -431,6 +444,7 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
+  PrototypeProgramDesignerRoute: typeof PrototypeProgramDesignerRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
   StockEquipmentRoute: typeof StockEquipmentRoute
@@ -588,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/program-designer': {
+      id: '/prototype/program-designer'
+      path: '/prototype/program-designer'
+      fullPath: '/prototype/program-designer'
+      preLoaderRoute: typeof PrototypeProgramDesignerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reception/': {
       id: '/reception/'
       path: '/reception'
@@ -695,6 +716,7 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
+  PrototypeProgramDesignerRoute: PrototypeProgramDesignerRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,
   StockEquipmentRoute: StockEquipmentRoute,
