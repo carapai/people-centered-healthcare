@@ -182,18 +182,36 @@ The decision-table editor opens from the Workflow Studio, from a guard that uses
 
 ## Indicators
 
-The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530); its layout and the shape of an indicator in [How does the indicator editor look: populations, period date, disaggregations and Try?](https://github.com/carapai/people-centered-healthcare/issues/534), from prototypes (branch `prototype/indicator-editor`, variant A after four rounds). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
+The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530), its layout in [How does the indicator editor look: populations, period date, disaggregations and Try?](https://github.com/carapai/people-centered-healthcare/issues/534), and its calculations, dates and disaggregations in [How does the indicator editor filter by dates relative to the reporting period, and author age bands and coded disaggregations?](https://github.com/carapai/people-centered-healthcare/issues/539), from prototypes (branch `prototype/indicator-editor`). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
 
-- **Layout:** the definition on the left (period date and disaggregations, then the numerator, then the denominator), and *Try* beside it on the right, always visible.
-- **Numerator over denominator.** An indicator starts as a **count** of its numerator, e.g. *ANC first visits*. *+ Add denominator* makes it a **percentage**, e.g. *% of ANC first visits before 12 weeks*; *Remove denominator* makes it a count again. There is no separate exclusion population: a *none of these* group in the denominator does that. Ratio and continuous-variable measures come later.
-  - The **denominator** is everyone with care in the period who matches its conditions.
-  - The **numerator** is everyone in the denominator who matches its conditions, or everyone with care in the period when there is no denominator.
-  - In the `Measure`, a count is cohort scoring over the initial population; a percentage is proportion scoring with the denominator's criteria as the initial population and denominator.
-- **Criteria** use the decision tables' condition tree (all / any / not over the program's declared data), saved as one FHIRPath expression shown beneath it. Raw FHIRPath is the fallback for what the tree can't express.
-  - **+ in another indicator** adds the condition *is in* another published indicator's numerator or denominator, e.g. *is in ANC 1st visits 2.3.0, its numerator*. It is pinned to that version until the author changes it, and compiles to that side's criteria. Indicators that refer to each other in a circle are refused at Validation.
-- **The period date.** Every indicator names the date that places care in a period (e.g. the encounter's start or the observation's date), chosen from a short list for the counted resource. An indicator without one cannot be saved.
-- **Disaggregations** come from shared definitions in the national package, such as MoH's age bands and sex, so every indicator splits the same way and lines up with the HMIS category options. Custom disaggregations over the program's declared data are allowed.
-- **Try** runs the draft over the package's test patients for a chosen period: counts per population and disaggregation; clicking a count lists its patients and which conditions held for each. *Save as test* writes the expected counts to `tests/`, and submission's checks fail when a later edit changes them.
+- **Layout:** the definition on the left (period date and disaggregations, *What it calculates*, the numerator, then the denominator), and *Try* beside it on the right, always visible.
+- **Indicators have no period of their own.** A **Report** groups indicators and chooses the period type (weekly, monthly, quarterly, semi-annual, annual, financial year from July) and the period; every indicator in it is evaluated over that period. How a Report is defined is still open ([#540](https://github.com/carapai/people-centered-healthcare/issues/540)).
+- **What it calculates:**
+
+  | Calculation | Needs a denominator | FHIR `Measure` scoring |
+  |---|---|---|
+  | Count | No | cohort |
+  | Percentage (× 100) | Yes | proportion |
+  | Rate (× 100, 1,000, 10,000 or 100,000) | Yes | ratio; the factor (e.g. per 1,000) is recorded on the Measure as an extension |
+  | Ratio | Yes | ratio |
+  | Sum, average, median, minimum, maximum of a value | No | continuous-variable, the value as the measure observation |
+  | Count distinct values of a coded field | No | continuous-variable |
+
+  - **What is counted:** people (each once), enrollments (each once), visits, or observations.
+  - **A value** is a numeric field (e.g. gestational age) or the days between two dates (e.g. last menstrual period to the visit). Counting people or enrollments, it is each one's **first** or **last** value in the period.
+  - **Cumulative** counts from the first record up to the end of the reporting period (e.g. *ever enrolled on ART*), instead of within it.
+- **Numerator and denominator.** The denominator appears only for percentage, rate and ratio. It is either the counted things with care in the period that match its conditions, or a **Population Estimate** for the place and period (e.g. expected pregnancies); an estimate can't be disaggregated. The numerator is the counted things in the denominator that match its own conditions, or everything with care in the period when there is no denominator from records. There is no separate exclusion population: a *none of these* group does that.
+- **Criteria** use the decision tables' condition tree (all / any / not), saved as one FHIRPath expression shown beneath it. Raw FHIRPath is the fallback for what the tree can't express. A group can add:
+  - **+ condition** over the program's declared data;
+  - **+ date** on any declared date (visit, observation, enrollment, episode of care start or end, last menstrual period, date of birth, next appointment, …): *is in the reporting period*, *is on*, *before* or *after* the period's start, its end or a fixed date, *is between* two of those, *is within* N days, weeks or months before or after one, *is in the previous* N periods (of the Report's period type), *is empty*, *is not empty*. They compile against `%periodStart` and `%periodEnd`;
+  - **+ group**;
+  - **+ in another indicator**: *is in* another published indicator's numerator or denominator, pinned to that version until the author changes it. Indicators that refer to each other in a circle are refused at Validation.
+- **The period date** is required: the declared date that places care in a Report's period (e.g. when the visit started), from the same list as date conditions.
+- **Disaggregations:**
+  - **Age bands** come from an **Age Band Set**, its own published configuration (national, or in a package), which fixes the unit and the date age is taken at. The indicator only picks one ([#541](https://github.com/carapai/people-centered-healthcare/issues/541)).
+  - **Any coded field** (sex, HIV status, visit type, district, …) disaggregates by its codes.
+  - Every disaggregation has a **not recorded** band, so the bands always add up to the total.
+- **Try** picks a period type and a period as a Report would, and shows the value, the numerator and denominator per disaggregation band, and who is in each side and why. *Save as test* writes the expected value to `tests/`, and submission's checks fail when a later edit changes it.
 - **HMIS mapping** is edited in the Reporting package (ADR 0069). The editor only shows, read-only, where the indicator is mapped (e.g. *HMIS 105, ANC 1st visit*).
 
 ## Previews and simulation
