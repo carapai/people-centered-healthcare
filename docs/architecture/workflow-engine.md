@@ -204,4 +204,4 @@ stateDiagram-v2
   3. every action reference and its parameters to be valid;
   4. every guard to type-check against the declared data requirements;
   5. the declared workflow-principal permissions to be approved.
-- **Studio UX** remains in the map's Studio fog.
+- **Studio UX:** the Workflow Studio's outline, canvas, inspector and sandbox are in [studio.md](studio.md#the-workflow-studio).
