@@ -74,6 +74,10 @@ _Avoid_: Template, config, form (for the definition)
 The one author who may currently edit, check, submit, hand over or withdraw a package's draft; everyone who has held a draft counts as its author, so none of them may review or approve it.
 _Avoid_: Owner, co-author, assignee
 
+**Language Pack**:
+A package that holds one language's wording for another package's forms and code lists, published and activated on its own, so translating never changes or re-versions the clinical content it translates.
+_Avoid_: Locale, translation file, localisation bundle
+
 **Extraction Mapping**:
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform

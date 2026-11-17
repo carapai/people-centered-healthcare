@@ -39,6 +39,7 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 | Program | Forms, mappings, workflow and program definitions for ART, TB, ANC, … | Program clinical leads (two approvers) |
 | Country configuration | Roles and permissions, deployment settings | Platform admin (one approver) |
 | Override | District or facility configuration at declared override points | See [Overrides](#overrides-adr-0026) |
+| Language | One language's wording for another package's forms and code lists, merged in when served ([ADR 0066](../adr/0066-translations-ship-as-language-packs.md)) | One approver who reads the language |
 
 - **Identity.** A package is identified by `name@version` and its sha-256.
 - **Transport.** Packages travel as blobs through the content-addressed store (ADR 0021).

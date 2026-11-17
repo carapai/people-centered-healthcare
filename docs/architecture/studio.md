@@ -13,7 +13,7 @@ This page covers the authoring tools of MASTER_PROMPT §43, §44, §52 and §98:
 | Workflow editing | A visual canvas of states and transitions (§52), with each element's details edited in a side panel of ordinary form fields. The canvas is `@xyflow/react` 13.x with `@dagrejs/dagre` layout, decided in [Which graph-canvas library fits the Workflow Studio?](https://github.com/carapai/people-centered-healthcare/issues/480) |
 | Who may do what | Named permissions granted through roles (see the authoring API below). The API records the signed-in account as the actor |
 | Importing content | Plain FHIR JSON resources and the R4 conversion (metadata.md). FSH/SUSHI sources and an IG Publisher round-trip are not supported |
-| Translation of authored content | In scope. English is required; other languages are optional, through FHIR's translation extension. The details are an open ticket |
+| Translation of authored content | In scope. English is required; other languages ship as Language Packs (ADR 0066), edited in the translation editor below |
 | Working on a draft | One author at a time. Others read and comment, and the author can hand the draft over. There is no live co-editing |
 
 ## The package workspace
@@ -124,6 +124,15 @@ The Workflow Studio opens from a changed Workflow Definition on the draft page. 
   - the migration map from the previous version;
   - the PlanDefinition import's review screen.
 
+## The translation editor
+
+The translation editor opens from a Language Pack draft (ADR 0066). It was decided in [How are forms and code lists translated?](https://github.com/carapai/people-centered-healthcare/issues/483).
+
+- **A table per artefact** of the target package: English on the left, the pack's language on the right, one row per translatable string (item text, prefix, help, answer options, section titles, code-list displays).
+- **Filters** for missing and stale strings, and each artefact's coverage. A stale row shows the old English beside the new.
+- **A live preview** of each form in the pack's language, in the real `QuestionnaireRenderer`, falling back to English string by string as health workers and patients will see it.
+- The pack is submitted, approved and activated like any package, with one approver who reads the language.
+
 ## Previews and simulation
 
 - **Forms** are previewed in the client's own `QuestionnaireRenderer`, the one health workers use, so a preview behaves exactly as the form will.
@@ -133,7 +142,6 @@ The Workflow Studio opens from a changed Workflow Definition on the draft page. 
 
 These are tracked on the map:
 
-- [Translation](https://github.com/carapai/people-centered-healthcare/issues/483)
 - [Facility overrides](https://github.com/carapai/people-centered-healthcare/issues/484)
 
 Still in the fog: terminology browsing and CodeSystem/ValueSet authoring, the decision-table rule builder, the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
