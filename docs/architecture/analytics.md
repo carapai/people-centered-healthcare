@@ -28,6 +28,5 @@ Decided in [ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-an
 ## Open
 
 - Which DHIS2 login MoH grants (one integration account or one per facility), and whether eHMIS uses data approval for these forms.
-- Whether CQL replaces hand-written FHIRPath (the `octofhir-cql` spike).
-- The indicator editor's layout (its behaviour is in [studio.md § Indicators](studio.md#indicators)).
+- CQL: not yet. `octofhir-cql` cannot translate WHO's indicator libraries and misreads R5 data ([#532](https://github.com/carapai/people-centered-healthcare/issues/532)); re-run the spike when it closes those gaps.
 - National and district dashboards, population denominators, surveillance alerting (the map's unexplored areas).

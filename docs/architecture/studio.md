@@ -182,14 +182,15 @@ The decision-table editor opens from the Workflow Studio, from a guard that uses
 
 ## Indicators
 
-The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530); its layout waits on a prototype ([#534](https://github.com/carapai/people-centered-healthcare/issues/534)). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
+The indicator editor opens from a changed `Measure` on the draft page; the Program Designer's package panel also lists the program's indicators beside the journeys they count. Its behaviour was decided in [How does the Studio author an indicator and test it against sample patients?](https://github.com/carapai/people-centered-healthcare/issues/530); its layout and the shape of an indicator in [How does the indicator editor look: populations, period date, disaggregations and Try?](https://github.com/carapai/people-centered-healthcare/issues/534), from prototypes (branch `prototype/indicator-editor`, variant A after four rounds). Indicators are defined and computed as in [analytics.md](analytics.md) (ADR 0068).
 
-- **Two kinds in v1:**
-  - **Count:** one population, e.g. *ANC first visits*.
-  - **Proportion:** initial population, denominator, optional exclusions and numerator, e.g. *% of ANC first visits before 12 weeks*.
-
-  Ratio and continuous-variable measures come later.
+- **Layout:** the definition on the left (period date and disaggregations, then the numerator, then the denominator), and *Try* beside it on the right, always visible.
+- **Numerator over denominator.** An indicator starts as a **count** of its numerator, e.g. *ANC first visits*. *+ Add denominator* makes it a **percentage**, e.g. *% of ANC first visits before 12 weeks*; *Remove denominator* makes it a count again. There is no separate exclusion population: a *none of these* group in the denominator does that. Ratio and continuous-variable measures come later.
+  - The **denominator** is everyone with care in the period who matches its conditions.
+  - The **numerator** is everyone in the denominator who matches its conditions, or everyone with care in the period when there is no denominator.
+  - In the `Measure`, a count is cohort scoring over the initial population; a percentage is proportion scoring with the denominator's criteria as the initial population and denominator.
 - **Criteria** use the decision tables' condition tree (all / any / not over the program's declared data), saved as one FHIRPath expression shown beneath it. Raw FHIRPath is the fallback for what the tree can't express.
+  - **+ in another indicator** adds the condition *is in* another published indicator's numerator or denominator, e.g. *is in ANC 1st visits 2.3.0, its numerator*. It is pinned to that version until the author changes it, and compiles to that side's criteria. Indicators that refer to each other in a circle are refused at Validation.
 - **The period date.** Every indicator names the date that places care in a period (e.g. the encounter's start or the observation's date), chosen from a short list for the counted resource. An indicator without one cannot be saved.
 - **Disaggregations** come from shared definitions in the national package, such as MoH's age bands and sex, so every indicator splits the same way and lines up with the HMIS category options. Custom disaggregations over the program's declared data are allowed.
 - **Try** runs the draft over the package's test patients for a chosen period: counts per population and disaggregation; clicking a count lists its patients and which conditions held for each. *Save as test* writes the expected counts to `tests/`, and submission's checks fail when a later edit changes them.
@@ -202,4 +203,4 @@ The indicator editor opens from a changed `Measure` on the draft page; the Progr
 
 ## Open
 
-Still in the fog: the indicator editor's layout (the prototype above). The Studio has no profile snapshot generator ([profile-snapshots.md](../research/profile-snapshots.md)).
+The Studio has no profile snapshot generator ([profile-snapshots.md](../research/profile-snapshots.md)).
