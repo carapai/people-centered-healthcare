@@ -80,8 +80,8 @@ The form designer opens from a changed Questionnaire on the draft page. Its layo
 - **Not designed yet** (not in the prototype):
   - `enableWhen` operators other than "is Yes", and several conditions;
   - FHIRPath expressions for calculated values and constraints;
-  - nested groups and repeating groups;
-  - choosing a published ValueSet.
+  - nested groups and repeating groups.
+- **Binding a ValueSet** uses the picker described under Terminology below.
 
 ## The Workflow Studio
 
@@ -133,6 +133,28 @@ The translation editor opens from a Language Pack draft (ADR 0066). It was decid
 - **A live preview** of each form in the pack's language, in the real `QuestionnaireRenderer`, falling back to English string by string as health workers and patients will see it.
 - The pack is submitted, approved and activated like any package, with one approver who reads the language.
 
+## Terminology
+
+The terminology screens open from a changed CodeSystem or ValueSet on the draft page. Their layout was decided in [How does the Studio browse terminology and author CodeSystems and ValueSets?](https://github.com/carapai/people-centered-healthcare/issues/512), chosen from three prototypes (branch `prototype/terminology-studio`).
+
+- **Three columns:**
+  - **Left: the code systems** that are active, each marked local or external (read-only, shipped as a terminology package; terminology.md), with its version and concept count.
+  - **Middle: the hierarchy** of the selected code system, expandable, with search by code or words. Search runs in the terminology service, because external systems such as ICD-11 hold tens of thousands of concepts. The selected concept shows its display, its definition and the ValueSets that contain it.
+  - **Right: the open ValueSet**: its expansion, the change against its published expansion, and the forms that bind it.
+- **Adding to a ValueSet.** With a draft ValueSet open, the selected concept can be:
+  - added alone;
+  - added with everything under it, as an `is-a` filter, so later child codes follow;
+  - excluded.
+
+  Concepts already in the ValueSet are ticked in the tree.
+- **The change against published** lists codes added and removed. Removed ones are flagged: records that already hold them stay valid against the version that issued them, and new forms no longer offer them.
+- **Binding from the form designer.** The form designer's picker searches ValueSets (published, or drafts in the same package), previews the codes and suggests a widget: radio buttons up to 7 codes, a drop-down up to 30, and search-as-you-type beyond that. Binding records `url|version`, and publication pins the expansion in the manifest.
+- **Not designed yet** (not in the prototype):
+  - editing a local CodeSystem's concepts (the semver rules in terminology.md apply);
+  - filters other than `is-a`;
+  - ValueSets that span versions of a code system;
+  - ConceptMap authoring.
+
 ## Previews and simulation
 
 - **Forms** are previewed in the client's own `QuestionnaireRenderer`, the one health workers use, so a preview behaves exactly as the form will.
@@ -140,6 +162,6 @@ The translation editor opens from a Language Pack draft (ADR 0066). It was decid
 
 ## Open
 
-On the map: [How does the Studio browse terminology and author CodeSystems and ValueSets?](https://github.com/carapai/people-centered-healthcare/issues/512) and [How does the Studio author and test a decision table?](https://github.com/carapai/people-centered-healthcare/issues/513).
+On the map: [How does the Studio author and test a decision table?](https://github.com/carapai/people-centered-healthcare/issues/513).
 
 Still in the fog: the Studio's own profile snapshot generator (ADR 0053), and indicator authoring.
