@@ -38,7 +38,7 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 | Terminology | Large code systems and expansions (ICD, LOINC, …) | Terminology lead (two approvers) |
 | Program | Forms, mappings, workflow and program definitions for ART, TB, ANC, … | Program clinical leads (two approvers) |
 | Country configuration | Roles and permissions, deployment settings | Platform admin (one approver) |
-| Override | District or facility configuration at declared override points | See [Overrides](#overrides-adr-0026) |
+| Override | District or facility configuration at declared override points | See [Overrides](#overrides-adr-0026-adr-0067) |
 | Language | One language's wording for another package's forms and code lists, merged in when served ([ADR 0066](../adr/0066-translations-ship-as-language-packs.md)) | One approver who reads the language |
 
 - **Identity.** A package is identified by `name@version` and its sha-256.
@@ -135,14 +135,15 @@ sequenceDiagram
 - **Existing data is unaffected.** Records written under the rolled-back version keep their pinned versions and are still interpreted with them.
 - **Always possible,** because packages never contain data migrations.
 
-## Overrides (ADR 0026)
+## Overrides (ADR 0026, ADR 0067)
 
-- **Override points.** Only configuration keys declared as **override points** by the base package can be overridden. Examples are layout, section visibility, which Healthcare Services and programs are active, worklist and queue settings, and local settings.
+- **Override points.** Only configuration keys declared as **override points** by the base package can be overridden. The package declares them in `configuration/override-points.json`, each with a type, a default, the values allowed and a class: **presentation** (section order and collapsing, widgets, hints, worklist columns), **operational** (services and service points that run, queues, clinic days, slot lengths, Financial Gates on or off, printing) or **clinically visible** (programs active, program-declared ranges). An override never hides a question (ADR 0067).
 - **Never overridable:** profiles, terminology, Extraction Mappings, workflow definitions and clinical rules.
 - **Layering.** Overrides are layered national → district → facility and merged key by key; the most specific value wins.
-- **Approval.** Presentation-only overrides need the facility admin alone. Clinically visible overrides, such as hiding a form section or disabling a program form, also need a district or central reviewer.
+- **Approval.** Presentation and operational changes are applied by the facility admin alone: Apply publishes and activates them at once, audited. Clinically visible changes, such as turning a program off, become a pending request until a district or central reviewer approves them (ADR 0067).
+- **Where.** One override package per scope (e.g. `ug.facility.kam013`), edited on the **Facility settings** page at central with `configuration.override`. Edges receive it through configuration sync.
 - **Lifecycle.** Overrides follow the same lifecycle as any package.
-- **Base upgrades.** A base package's major version may remove override points. Validation flags any override that becomes orphaned before the new base can be activated in that scope.
+- **Base upgrades.** A base package's major version may remove override points. Validation flags any override that becomes orphaned, or falls outside newly narrowed values, before the new base can be activated in that scope. The Facility settings page offers Remove or Change, and central (`metadata.manage`) may fix them on a facility's behalf with a reason.
 
 ## Signing
 

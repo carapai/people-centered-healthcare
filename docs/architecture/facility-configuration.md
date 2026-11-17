@@ -37,7 +37,7 @@ Sources: [pricing-and-insurance.md](pricing-and-insurance.md), [billing-and-paym
 |---|---|---|
 | Tenant (country) | Country configuration package: roles, snapshot lifetime, code systems | Base layer |
 | Organization, district | District override packages | Override points, key by key (ADR 0026) |
-| Facility | Facility override package: services, programs, layouts, queues, gates on or off | Most specific configuration wins |
+| Facility | Facility override package: services, programs, layouts, queues, gates on or off, set on the Facility settings page (ADR 0067) | Most specific configuration wins |
 | Department, service, program | Price Books, gates and charge triggers per department, service or program | Pricing: fixed stages and the most specific Price Book (ADR 0031) |
 | Payer contract | Contract Price Books, Benefit Plans | Stage 1 base price and stage 4 split |
 | Patient eligibility | Eligibility categories, e.g. an exemption | Stage 5 |

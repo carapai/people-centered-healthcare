@@ -1,5 +1,7 @@
 # District and facility overrides change configuration only, at override points their base package declares
 
+> Amended by [ADR 0067](0067-facility-settings-three-classes-of-override-point-set-at-central.md): overrides never hide a form section; the classes, approval and screen are decided there.
+
 **What an override package may change:** configuration keys that its base package explicitly declares as **override points**. Examples are layouts, section visibility, which Healthcare Services and programs are active, and worklist and queue settings.
 
 **What it may never change:** profiles, terminology meaning, Extraction Mappings, workflow definitions or clinical rules.

@@ -87,7 +87,7 @@ The dated decision that a published version of a definition or configuration pac
 _Avoid_: Deployment, release (for activation)
 
 **Override Point**:
-A configuration setting that a base package explicitly allows a district or facility to change.
+A configuration setting that a base package explicitly allows a district or facility to change, within values it allows; it never removes a question from a form.
 _Avoid_: Customisation, local copy
 
 **Form Layout**:
