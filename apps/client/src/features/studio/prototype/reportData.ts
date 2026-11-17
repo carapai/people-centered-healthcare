@@ -1,10 +1,14 @@
 // PROTOTYPE (#544), throwaway: a Report (ADR 0070) over the indicator prototype's test patients.
-// A Report has a title, one period type, the levels it runs for, sections of indicator rows, columns
-// from one Disaggregation or two crossed, and (when sent to DHIS2) a mapping on each cell with
-// effective dates. Places, facilities and population figures are made up.
+// Round 2 (layout B chosen): a Report is sections, and each section is either
+// - a table: indicator rows sharing the section's Disaggregations, each Disaggregation laid out as
+//   rows or as columns, with optional column totals, row totals and % change from the previous period; or
+// - a line list: the records an indicator counted, with chosen fields (facility level only).
+// A Report sent to DHIS2 maps each cell of the sections it sends. Places, facilities and
+// population figures are made up.
 import {
   AGE_SETS,
   INITIAL,
+  INPUTS,
   OTHERS,
   PERIOD_TYPES,
   bands,
@@ -22,25 +26,36 @@ import {
 
 // --- Indicators the Report can use (published, by url|version) -------------------------------------------
 
-const cond = (input: string, value: string): Node => ({ kind: 'cond', input, op: '=', value })
-const firstVisitTree: Node = { kind: 'group', join: 'all', children: [cond('sex', 'female'), cond('type', 'anc-first')] }
+const cond = (input: string, value: string, op: '=' | '>=' = '='): Node => ({ kind: 'cond', input, op, value })
+const firstVisit = (...more: Node[]): Node => ({ kind: 'group', join: 'all', children: [cond('sex', 'female'), cond('type', 'anc-first'), ...more] })
 const base = OTHERS[1] as Indicator
+const ageAnc: Disagg = { kind: 'age', set: 'moh-age-anc' }
+const hiv: Disagg = { kind: 'coded', input: 'hiv' }
 
 export const CATALOGUE: Indicator[] = [
-  ...OTHERS,
+  { ...(OTHERS[0] as Indicator), disaggregations: [ageAnc] },
+  { ...base, disaggregations: [ageAnc, hiv] },
   { ...INITIAL, version: '2.4.0' },
-  { ...base, id: 'anc-hiv-pos', title: 'Pregnant women HIV positive at ANC 1st visit', version: '1.1.0', numerator: { tree: { kind: 'group', join: 'all', children: [cond('sex', 'female'), cond('type', 'anc-first'), cond('hiv', 'positive')] } } },
-  { ...base, id: 'anc-median-ga', title: 'Median gestational age at ANC 1st visit', version: '1.0.0', calc: 'median', value: { kind: 'input', input: 'ga' }, pick: 'first', numerator: { tree: firstVisitTree } },
-  { ...base, id: 'anc-districts', title: 'Districts ANC clients come from', version: '1.0.0', calc: 'distinct', distinctOf: 'district', numerator: { tree: firstVisitTree } },
-  { ...base, id: 'anc-coverage', title: 'ANC 1st visit coverage', version: '1.2.0', calc: 'percentage', den: { tree: { kind: 'group', join: 'all', children: [] }, population: 0 }, numerator: { tree: firstVisitTree } },
+  { ...base, id: 'anc-first-late', title: 'ANC 1st visit at 12 weeks or later', version: '1.0.0', numerator: { tree: firstVisit(cond('ga', '12', '>=')) }, disaggregations: [ageAnc] },
+  { ...base, id: 'anc-hiv-pos', title: 'Pregnant women HIV positive at ANC 1st visit', version: '1.1.0', numerator: { tree: firstVisit(cond('hiv', 'positive')) }, disaggregations: [ageAnc] },
+  { ...base, id: 'anc-median-ga', title: 'Median gestational age at ANC 1st visit', version: '1.0.0', calc: 'median', value: { kind: 'input', input: 'ga' }, pick: 'first', numerator: { tree: firstVisit() }, disaggregations: [] },
+  { ...base, id: 'anc-districts', title: 'Districts ANC clients come from', version: '1.0.0', calc: 'distinct', distinctOf: 'district', numerator: { tree: firstVisit() }, disaggregations: [] },
+  { ...base, id: 'anc-coverage', title: 'ANC 1st visit coverage', version: '1.2.0', calc: 'percentage', den: { tree: { kind: 'group', join: 'all', children: [] }, population: 0 }, numerator: { tree: firstVisit() }, disaggregations: [] },
 ]
-export const PACKAGE_OF: Record<string, string> = { 'anc-visits': 'ug.moh.anc', 'anc-first': 'ug.moh.anc', 'anc-first-12w': 'ug.moh.anc', 'anc-hiv-pos': 'ug.moh.emtct', 'anc-median-ga': 'ug.moh.anc', 'anc-districts': 'ug.moh.anc', 'anc-coverage': 'ug.moh.anc' }
+const PACKAGE_OF: Record<string, string> = { 'anc-hiv-pos': 'ug.moh.emtct' }
 export const indicator = (id: string) => CATALOGUE.find((i) => i.id === id)
 export const canonical = (i: Indicator) => `https://health.go.ug/fhir/${PACKAGE_OF[i.id] ?? 'ug.moh.anc'}/Measure/${i.id}|${i.version}`
 /** Medians and distinct counts can't be rebuilt from facility summaries (ADR 0070). */
 export const facilityOnly = (i: Indicator) => i.calc === 'median' || i.calc === 'distinct'
 /** DHIS2 aggregate data elements hold counts. */
 export const isCount = (i: Indicator) => i.calc === 'count' || i.calc === 'sum'
+export const DISAGGS: Disagg[] = [...AGE_SETS.map((a): Disagg => ({ kind: 'age', set: a.id })), ...INPUTS.filter((i) => i.type !== 'number').map((c): Disagg => ({ kind: 'coded', input: c.id }))]
+export const encD = (d: Disagg) => (d.kind === 'age' ? `age:${d.set}` : `coded:${d.input}`)
+export const decD = (s: string): Disagg => {
+  const [k = '', v = ''] = s.split(':')
+  return k === 'age' ? { kind: 'age', set: v } : { kind: 'coded', input: v }
+}
+export { disaggLabel }
 
 // --- Places --------------------------------------------------------------------------------------------
 
@@ -58,8 +73,9 @@ export const PLACES: Place[] = [
 ]
 const FACILITY_OF: Record<string, string> = { p1: 'kisenyi', p3: 'kisenyi', p8: 'kisenyi', p10: 'kisenyi', p5: 'kawaala', p9: 'kawaala', p2: 'wakiso-hc4', p4: 'wakiso-hc4', p6: 'wakiso-hc4', p7: 'wakiso-hc4' }
 export const facilityOf = (p: Patient) => FACILITY_OF[p.person] ?? ''
+export const placeOf = (id: string) => PLACES.find((x) => x.id === id)
 export const facilitiesUnder = (id: string): string[] => {
-  const place = PLACES.find((x) => x.id === id)
+  const place = placeOf(id)
   if (!place) return []
   if (place.level === 'facility') return [place.id]
   return PLACES.filter((x) => x.parent === id).flatMap((x) => facilitiesUnder(x.id))
@@ -76,12 +92,36 @@ export function estimate(placeId: string, period: Period): number | null {
   return parts.some((x) => x === null) ? null : parts.reduce<number>((a, b) => a + (b ?? 0), 0)
 }
 
+// --- Periods --------------------------------------------------------------------------------------------
+
+const MONTHS: Record<PeriodType, number> = { weekly: 0, monthly: 1, quarterly: 3, semiAnnual: 6, annual: 12, financialJuly: 12 }
+const iso = (d: Date) => d.toISOString().slice(0, 10)
+const addDays = (date: string, n: number) => {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return iso(d)
+}
+const addMonths = (date: string, n: number) => {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCMonth(d.getUTCMonth() + n)
+  return iso(d)
+}
+/** The period before this one, of the same type. */
+export function previous(p: Period): Period {
+  const list = PERIOD_TYPES.find((t) => t.id === p.type)?.periods ?? []
+  const i = list.findIndex((x) => x.label === p.label)
+  const known = i > 0 ? list[i - 1] : undefined
+  if (known) return known
+  const start = p.type === 'weekly' ? addDays(p.start, -7) : addMonths(p.start, -MONTHS[p.type])
+  return { type: p.type, label: `before ${p.label}`, start, end: addDays(p.start, -1) }
+}
+
 // --- DHIS2 metadata (made up; the real list comes from the instance at Validation) -------------------------
 
 export const DATA_SETS = [{ id: 'hmis105m', label: 'HMIS 105: Health unit outpatient monthly report (2024)' }]
 export const DATA_ELEMENTS = [
   { id: 'AN01a', label: '105-AN01a. ANC 1st visit for women' },
-  { id: 'AN01b', label: '105-AN01b. ANC 1st visit for women within 12 weeks' },
+  { id: 'AN01c', label: '105-AN01c. ANC 1st visit at 12 weeks or later' },
   { id: 'AN02', label: '105-AN02. ANC visits (all)' },
   { id: 'AN17', label: '105-AN17. Pregnant women newly testing HIV positive' },
   { id: 'AN01-2019', label: '105-AN01. ANC 1st visit (2019 form, retired)' },
@@ -97,29 +137,53 @@ export type Mapping = { de: string; coc: string; from: string; to: string }
 
 // --- The Report -----------------------------------------------------------------------------------------
 
+export type Axis = 'rows' | 'columns'
 export type Row = { id: string; ind: string; label: string }
-export type Section = { id: string; title: string; rows: Row[] }
+export type Field = { id: string; label: string; get: (p: Patient) => string }
+export const FIELDS: Field[] = [
+  { id: 'name', label: 'Name', get: (p) => p.name },
+  { id: 'facility', label: 'Facility', get: (p) => placeOf(facilityOf(p))?.label ?? '' },
+  { id: 'start', label: 'Visit date', get: (p) => p.dates.start ?? '' },
+  { id: 'type', label: 'Visit type', get: (p) => p.encounterType },
+  { id: 'ga', label: 'Gestational age (weeks)', get: (p) => String(p.gestationWeeks) },
+  { id: 'dob', label: 'Date of birth', get: (p) => p.dob },
+  { id: 'hiv', label: 'HIV status', get: (p) => p.hiv },
+  { id: 'district', label: 'District of residence', get: (p) => p.district || 'not recorded' },
+  { id: 'lmp', label: 'LMP', get: (p) => p.dates.lmp ?? '' },
+  { id: 'nextVisit', label: 'Next appointment', get: (p) => p.dates.nextVisit ?? 'none booked' },
+]
+export type TableSection = {
+  kind: 'table'
+  id: string
+  title: string
+  disaggs: { d: Disagg; axis: Axis }[]
+  rows: Row[]
+  colTotals: boolean
+  rowTotals: boolean
+  change: boolean
+  send: boolean
+}
+export type ListSection = { kind: 'list'; id: string; title: string; ind: string; fields: string[] }
+export type Section = TableSection | ListSection
 export type Report = {
   title: string
   pkg: string
   version: string
   periodType: PeriodType
   levels: Level[]
-  columns: Disagg[]
-  total: boolean
   sections: Section[]
   dhis2: string | null
   mappings: Record<string, Mapping[]>
 }
-export const cellKey = (row: string, col: string) => `${row}::${col}`
+export const cellKey = (row: string, rk: string, ck: string) => `${row}::${rk}::${ck}`
 
-const ageMaps = (de: string, from: string, to = ''): [string, Mapping[]][] =>
-  [
-    ['10–14 years', 'y10'],
-    ['15–19 years', 'y15'],
-    ['20–24 years', 'y20'],
-    ['25+ years', 'y25'],
-  ].map(([col = '', coc = '']) => [col, [{ de, coc, from, to }]])
+const AGE_COCS: [string, string][] = [
+  ['10–14 years', 'y10'],
+  ['15–19 years', 'y15'],
+  ['20–24 years', 'y20'],
+  ['25+ years', 'y25'],
+]
+const ageMaps = (row: string, de: string, skip: string[] = []) => AGE_COCS.filter(([col]) => !skip.includes(col)).map(([col, coc]): [string, Mapping[]] => [cellKey(row, '', col), [{ de, coc, from: '2024-07-01', to: '' }]])
 
 export const INITIAL_REPORT: Report = {
   title: 'HMIS 105 · 2 Antenatal care',
@@ -127,107 +191,151 @@ export const INITIAL_REPORT: Report = {
   version: '4.2.0-draft',
   periodType: 'monthly',
   levels: ['facility', 'district', 'national'],
-  columns: [{ kind: 'age', set: 'moh-age-anc' }],
-  total: true,
   dhis2: 'hmis105m',
   sections: [
     {
+      kind: 'table',
       id: 's1',
       title: '2.1 ANC attendance',
+      disaggs: [{ d: ageAnc, axis: 'columns' }],
       rows: [
         { id: 'r1', ind: 'anc-first', label: 'ANC 1st visit for women' },
-        { id: 'r2', ind: 'anc-first-12w', label: 'ANC 1st visit within 12 weeks (%)' },
+        { id: 'r2', ind: 'anc-first-late', label: 'ANC 1st visit at 12 weeks or later' },
         { id: 'r3', ind: 'anc-visits', label: 'ANC visits (all)' },
       ],
+      colTotals: false,
+      rowTotals: true,
+      change: true,
+      send: true,
     },
-    { id: 's2', title: '2.2 eMTCT', rows: [{ id: 'r4', ind: 'anc-hiv-pos', label: 'Pregnant women newly HIV positive' }] },
-    { id: 's3', title: 'Facility monitoring (not in the HMIS form)', rows: [{ id: 'r5', ind: 'anc-median-ga', label: 'Median gestational age at 1st visit (weeks)' }] },
+    {
+      kind: 'table',
+      id: 's2',
+      title: '2.2 ANC 1st visits by HIV status',
+      disaggs: [
+        { d: hiv, axis: 'rows' },
+        { d: ageAnc, axis: 'columns' },
+      ],
+      rows: [{ id: 'r4', ind: 'anc-first', label: 'ANC 1st visit for women' }],
+      colTotals: true,
+      rowTotals: true,
+      change: false,
+      send: false,
+    },
+    {
+      kind: 'table',
+      id: 's3',
+      title: 'Facility monitoring (not in the HMIS form)',
+      disaggs: [],
+      rows: [
+        { id: 'r5', ind: 'anc-first-12w', label: 'ANC 1st visit within 12 weeks (%)' },
+        { id: 'r6', ind: 'anc-median-ga', label: 'Median gestational age at 1st visit (weeks)' },
+      ],
+      colTotals: false,
+      rowTotals: false,
+      change: true,
+      send: false,
+    },
+    { kind: 'list', id: 's4', title: 'Women who started ANC this period', ind: 'anc-first', fields: ['name', 'start', 'ga', 'hiv', 'district', 'nextVisit'] },
   ],
   mappings: Object.fromEntries([
-    ...ageMaps('AN01a', '2024-07-01').map(([col, m]) => [cellKey('r1', col), m] as const),
-    [cellKey('r1', '10–14 years'), [{ de: 'AN01-2019', coc: 'y10', from: '2019-07-01', to: '2024-06-30' }, { de: 'AN01a', coc: 'y10', from: '2024-07-01', to: '' }]],
-    ...ageMaps('AN02', '2024-07-01').map(([col, m]) => [cellKey('r3', col), m] as const),
-    ...ageMaps('AN17', '2024-07-01')
-      .slice(0, 2)
-      .map(([col, m]) => [cellKey('r4', col), m] as const),
+    ...ageMaps('r1', 'AN01a'),
+    [cellKey('r1', '', '10–14 years'), [{ de: 'AN01-2019', coc: 'y10', from: '2019-07-01', to: '2024-06-30' }, { de: 'AN01a', coc: 'y10', from: '2024-07-01', to: '' }]],
+    ...ageMaps('r2', 'AN01c'),
+    ...ageMaps('r3', 'AN02', ['25+ years']),
   ]),
 }
 
-// --- Columns and cells ------------------------------------------------------------------------------------
+// --- Bands and cells --------------------------------------------------------------------------------------
 
-export type Col = { key: string; parts: string[]; tests: ((p: Patient) => boolean)[]; total: boolean }
-/** The columns: bands of one Disaggregation, or every pair of two crossed, then an optional total. */
-export function columns(r: Report, ind: Indicator, period: Period): Col[] {
-  const [a, b] = r.columns
-  const total: Col = { key: 'Total', parts: ['Total'], tests: [], total: true }
-  if (!a) return [total]
-  const first = bands(a, ind, period)
-  const cols: Col[] = b
-    ? first.flatMap((x) => bands(b, ind, period).map((y) => ({ key: `${x.label} × ${y.label}`, parts: [x.label, y.label], tests: [x.test, y.test], total: false })))
-    : first.map((x) => ({ key: x.label, parts: [x.label], tests: [x.test], total: false }))
-  return r.total ? [...cols, total] : cols
+export type Test = (p: Patient) => boolean
+export type Combo = { key: string; parts: string[]; tests: Test[] }
+/** Every combination of the bands of these Disaggregations, first one outermost. */
+export function cross(ds: Disagg[], ind: Indicator, period: Period): Combo[] {
+  let out: Combo[] = [{ key: '', parts: [], tests: [] }]
+  for (const d of ds) {
+    const bs = bands(d, ind, period)
+    out = out.flatMap((c) => bs.map((b) => ({ key: [...c.parts, b.label].join(' × '), parts: [...c.parts, b.label], tests: [...c.tests, b.test] })))
+  }
+  return out
 }
-/** Column headers don't depend on the row's indicator except through the period date; use the first row's. */
-export const headerColumns = (r: Report, period: Period) => columns(r, indicator(r.sections[0]?.rows[0]?.ind ?? 'anc-first') ?? (OTHERS[1] as Indicator), period)
+export const axisOf = (s: TableSection, axis: Axis) => s.disaggs.filter((x) => x.axis === axis).map((x) => x.d)
 
-export type Cell = { text: string; n: number | null; d: number | null; why?: string; patients: Patient[] }
-export function cell(ind: Indicator, col: Col, period: Period, placeId: string): Cell {
-  const place = PLACES.find((x) => x.id === placeId)
-  if (place && place.level !== 'facility' && facilityOnly(ind)) return { text: 'n/a', n: null, d: null, why: `A ${ind.calc === 'median' ? 'median' : 'distinct count'} can't be rebuilt from facility summaries; it is shown at facility level only.`, patients: [] }
+export type Cell = { text: string; value: number | null; n: number | null; d: number | null; why?: string; patients: Patient[] }
+export function cell(ind: Indicator, tests: Test[], period: Period, placeId: string): Cell {
+  const place = placeOf(placeId)
+  if (place && place.level !== 'facility' && facilityOnly(ind)) return { text: 'n/a', value: null, n: null, d: null, why: `A ${ind.calc === 'median' ? 'median' : 'distinct count'} can't be rebuilt from facility summaries; it is shown at facility level only.`, patients: [] }
   const facilities = facilitiesUnder(placeId)
-  const keep = (p: Patient) => facilities.includes(facilityOf(p)) && col.tests.every((t) => t(p))
+  const keep = (p: Patient) => facilities.includes(facilityOf(p)) && tests.every((t) => t(p))
   const r = evaluate(ind, period)
   const num = r.numerator.filter(keep)
   const den = r.denominator?.filter(keep) ?? null
   const dd = denOf(ind)
+  let out: { text: string; n: number; d: number | null }
   if (dd !== 'one' && dd.population !== null) {
-    if (!col.total) return { text: '–', n: null, d: null, why: 'Population Estimates are not split by band.', patients: num }
+    if (tests.length > 0) return { text: '–', value: null, n: null, d: null, why: 'Population Estimates are not split by band.', patients: num }
     const est = estimate(placeId, period)
-    if (est === null) return { text: '–', n: null, d: null, why: `No population estimate for ${place?.label ?? placeId}: figures are given per district and summed upward, never split down to facilities.`, patients: num }
-    const out = compute({ ...ind, den: { ...dd, population: Math.round(est * 10) / 10 } }, num, null, period)
-    return { ...out, patients: num }
-  }
-  return { ...compute(ind, num, den, period), patients: num }
+    if (est === null) return { text: '–', value: null, n: null, d: null, why: `No population estimate for ${place?.label ?? placeId}: figures are given per district and summed upward, never split down to facilities.`, patients: num }
+    out = compute({ ...ind, den: { ...dd, population: Math.round(est * 10) / 10 } }, num, null, period)
+  } else out = compute(ind, num, den, period)
+  const value = Number.parseFloat(out.text)
+  return { ...out, value: Number.isNaN(value) ? null : value, patients: num }
+}
+/** % change from the previous period, as text. */
+export function change(now: Cell, before: Cell): string {
+  if (now.value === null || before.value === null) return ''
+  if (before.value === 0) return now.value === 0 ? '' : 'new'
+  const pct = Math.round((100 * (now.value - before.value)) / before.value)
+  return `${pct > 0 ? '▲' : pct < 0 ? '▼' : ''}${Math.abs(pct)}%`
 }
 
 export const mappingFor = (list: Mapping[] | undefined, date: string) => list?.find((m) => m.from <= date && (m.to === '' || date <= m.to))
 
+/** The cells of a table section that DHIS2 needs mapped: count rows, real bands (no totals, no "not recorded"). */
+export function sentCells(s: TableSection, period: Period) {
+  return s.rows.flatMap((rw) => {
+    const ind = indicator(rw.ind)
+    if (!ind) return []
+    const rows = cross(axisOf(s, 'rows'), ind, period)
+    const cols = cross(axisOf(s, 'columns'), ind, period)
+    return rows.flatMap((rc) => cols.map((cc) => ({ rw, ind, rk: rc.key, ck: cc.key, needed: isCount(ind) && ![...rc.parts, ...cc.parts].includes('not recorded') })))
+  })
+}
+
 // --- Validation -------------------------------------------------------------------------------------------
 
-export type Issue = { level: 'error' | 'warning' | 'info'; where: string; text: string; tab: 'basics' | 'rows' | 'columns' | 'dhis2' }
+export type Issue = { level: 'error' | 'warning' | 'info'; where: string; text: string }
 export function validate(r: Report): Issue[] {
   const issues: Issue[] = []
   const period = PERIOD_TYPES.find((p) => p.id === r.periodType)?.periods[0]
   if (!period) return issues
-  if (r.levels.length === 0) issues.push({ level: 'error', where: 'Levels', text: 'Pick at least one level the Report runs for.', tab: 'basics' })
-  if (r.columns.length > 2) issues.push({ level: 'error', where: 'Columns', text: 'At most two Disaggregations can be crossed.', tab: 'columns' })
-  const above = r.levels.filter((l) => l !== 'facility')
-  for (const s of r.sections)
+  if (r.levels.length === 0) issues.push({ level: 'error', where: 'Levels', text: 'Pick at least one level the Report runs for.' })
+  const above = r.levels.some((l) => l !== 'facility')
+  for (const s of r.sections) {
+    if (s.kind === 'list') {
+      if (above) issues.push({ level: 'error', where: s.title, text: 'A line list shows patient-level records, which never leave the facility. Run this Report at facility level only, or move the line list to a facility Report.' })
+      continue
+    }
     for (const row of s.rows) {
       const ind = indicator(row.ind)
       if (!ind) continue
-      if (facilityOnly(ind) && above.length > 0) issues.push({ level: 'error', where: row.label, text: `Is a ${ind.calc === 'median' ? 'median' : 'distinct count'}, which can't be rebuilt from facility summaries because patient data never leaves the facility. Run this Report at facility level only, or move the row to a facility Report.`, tab: 'rows' })
-      for (const d of r.columns) {
-        const declared = ind.disaggregations.some((x) => JSON.stringify(x) === JSON.stringify(d))
-        if (!declared) issues.push({ level: 'info', where: row.label, text: `The indicator doesn't list ${disaggLabel(d)}; this Report asks the edge to compute it by those bands too.`, tab: 'columns' })
-      }
-      if (!r.dhis2) continue
-      if (!isCount(ind)) {
-        const mapped = Object.keys(r.mappings).some((k) => k.startsWith(`${row.id}::`) && (r.mappings[k]?.length ?? 0) > 0)
-        if (mapped) issues.push({ level: 'warning', where: row.label, text: `Is a ${ind.calc}, but DHIS2 data elements on this form hold counts. Send the counts it is built from instead.`, tab: 'dhis2' })
-        continue
-      }
-      const today = '2026-11-17'
-      const cols = columns(r, ind, period).filter((c) => !c.total && !c.parts.includes('not recorded'))
-      const missing = cols.filter((c) => !mappingFor(r.mappings[cellKey(row.id, c.key)], today))
-      if (missing.length > 0) issues.push({ level: 'error', where: row.label, text: `${missing.length} of ${cols.length} cells have no DHIS2 mapping in effect today (${missing.map((c) => c.key).join(', ')}).`, tab: 'dhis2' })
-      for (const c of cols) {
-        const list = r.mappings[cellKey(row.id, c.key)] ?? []
-        for (const [i, m] of list.entries())
-          for (const o of list.slice(i + 1)) if (m.from <= (o.to || '9999') && o.from <= (m.to || '9999')) issues.push({ level: 'error', where: `${row.label} · ${c.key}`, text: 'Two mappings are in effect over the same dates.', tab: 'dhis2' })
-      }
+      if (facilityOnly(ind) && above) issues.push({ level: 'error', where: row.label, text: `Is a ${ind.calc === 'median' ? 'median' : 'distinct count'}, which can't be rebuilt from facility summaries because patient data never leaves the facility. Run this Report at facility level only, or move the row to a facility Report.` })
+      const missingD = s.disaggs.filter((x) => !ind.disaggregations.some((y) => encD(y) === encD(x.d)))
+      if (missingD.length > 0) issues.push({ level: 'info', where: `${s.title} · ${row.label}`, text: `The indicator doesn't list ${missingD.map((x) => disaggLabel(x.d)).join(' or ')}; this Report asks the edge to compute it by those bands too.` })
     }
+    if (!r.dhis2 || !s.send) continue
+    const cells = sentCells(s, period)
+    for (const rw of s.rows) {
+      const ind = indicator(rw.ind)
+      if (ind && !isCount(ind)) issues.push({ level: 'warning', where: `${s.title} · ${rw.label}`, text: `Is a ${ind.calc}; DHIS2 data elements on this form hold counts, so this row isn't sent. Send the counts it is built from instead.` })
+    }
+    const missing = cells.filter((c) => c.needed && !mappingFor(r.mappings[cellKey(c.rw.id, c.rk, c.ck)], '2026-11-18'))
+    if (missing.length > 0) issues.push({ level: 'error', where: s.title, text: `${missing.length} cells have no DHIS2 mapping in effect today: ${missing.map((c) => `${c.rw.label} · ${[c.rk, c.ck].filter(Boolean).join(' · ') || 'value'}`).join('; ')}.` })
+    for (const c of cells) {
+      const list = r.mappings[cellKey(c.rw.id, c.rk, c.ck)] ?? []
+      for (const [i, m] of list.entries())
+        for (const o of list.slice(i + 1)) if (m.from <= (o.to || '9999') && o.from <= (m.to || '9999')) issues.push({ level: 'error', where: `${c.rw.label} · ${c.ck}`, text: 'Two mappings are in effect over the same dates.' })
+    }
+  }
   return issues
 }
-
-export { AGE_SETS }
