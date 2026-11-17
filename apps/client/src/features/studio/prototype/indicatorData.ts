@@ -43,7 +43,7 @@ export type DateCond = { kind: 'date'; field: DateField; op: DateOp; a: Anchor; 
 
 export type Node = { kind: 'cond'; input: string; op: Op; value: string } | { kind: 'group'; join: Join; children: Node[] } | { kind: 'member'; ref: Base } | DateCond
 /** What evaluation needs: the indicator being edited, the period, and the sides already being evaluated (to stop loops). */
-export type Ctx = { ind: Indicator; period: string; seen: string[] }
+export type Ctx = { ind: Indicator; period: Period; seen: string[] }
 
 // --- Disaggregations ---------------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ export type Patient = {
   dates: Partial<Record<DateField, string>>
 }
 export type Indicator = { id: string; title: string; version: string; periodDate: DateField; numerator: { tree: Node }; denominator: { tree: Node } | 'one'; disaggregations: Disagg[] }
-export type SavedTest = { period: string; expect: { numerator: number; denominator: number | 'one' } }
+export type SavedTest = { period: Period; expect: { numerator: number; denominator: number | 'one' } }
 
 export const INPUTS: Input[] = [
   { id: 'type', label: 'Visit type', path: '%encounter.type.coding.code', type: 'code', values: ['anc-first', 'anc-followup', 'opd'] },
@@ -103,7 +103,20 @@ export const INITIAL: Indicator = {
 }
 
 export const HMIS_MAPPING = 'HMIS 105 (2024) · 2.1 ANC 1st visit for women within 12 weeks · from Reporting package ug.moh.hmis 4.1.0'
-export const PERIODS = ['2026-02', '2026-03', '2026-04']
+/** Indicators have no period of their own: a report picks the period type and the period, and every
+ * indicator in it is evaluated over that period. */
+export type PeriodType = 'weekly' | 'monthly' | 'quarterly' | 'semiAnnual' | 'annual' | 'financialJuly'
+export type Period = { type: PeriodType; label: string; start: string; end: string }
+const monthsPer: Record<PeriodType, number> = { weekly: 0, monthly: 1, quarterly: 3, semiAnnual: 6, annual: 12, financialJuly: 12 }
+export const PERIOD_TYPES: { id: PeriodType; label: string; periods: Period[] }[] = [
+  { id: 'weekly', label: 'Weekly', periods: [['2026W10', '2026-03-02', '2026-03-08'], ['2026W11', '2026-03-09', '2026-03-15'], ['2026W12', '2026-03-16', '2026-03-22'], ['2026W13', '2026-03-23', '2026-03-29']].map(([label = '', start = '', end = '']) => ({ type: 'weekly' as const, label, start, end })) },
+  { id: 'monthly', label: 'Monthly', periods: [['2026-02', '2026-02-01', '2026-02-28'], ['2026-03', '2026-03-01', '2026-03-31'], ['2026-04', '2026-04-01', '2026-04-30']].map(([label = '', start = '', end = '']) => ({ type: 'monthly' as const, label, start, end })) },
+  { id: 'quarterly', label: 'Quarterly', periods: [['2026Q1', '2026-01-01', '2026-03-31'], ['2026Q2', '2026-04-01', '2026-06-30']].map(([label = '', start = '', end = '']) => ({ type: 'quarterly' as const, label, start, end })) },
+  { id: 'semiAnnual', label: 'Semi-annual', periods: [['2025S2', '2025-07-01', '2025-12-31'], ['2026S1', '2026-01-01', '2026-06-30']].map(([label = '', start = '', end = '']) => ({ type: 'semiAnnual' as const, label, start, end })) },
+  { id: 'annual', label: 'Annual', periods: [['2025', '2025-01-01', '2025-12-31'], ['2026', '2026-01-01', '2026-12-31']].map(([label = '', start = '', end = '']) => ({ type: 'annual' as const, label, start, end })) },
+  { id: 'financialJuly', label: 'Financial year (July)', periods: [['2025July', '2025-07-01', '2026-06-30']].map(([label = '', start = '', end = '']) => ({ type: 'financialJuly' as const, label, start, end })) },
+]
+export const DEFAULT_PERIOD: Period = { type: 'monthly', label: '2026-03', start: '2026-03-01', end: '2026-03-31' }
 
 const P = (id: string, name: string, dob: string, sex: Patient['sex'], encounterType: string, ga: number, first: boolean, hiv: Patient['hiv'], district: string, dates: Patient['dates']): Patient => ({ id, name, dob, sex, encounterType, gestationWeeks: ga, firstPregnancy: first, hiv, district, dates: { dob, ...dates } })
 export const PATIENTS: Patient[] = [
@@ -122,11 +135,10 @@ export const PATIENTS: Patient[] = [
 // --- Period arithmetic (monthly periods "YYYY-MM") -----------------------------------------------------
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
-export const periodStart = (p: string) => `${p}-01`
-export const periodEnd = (p: string) => {
-  const [y = 0, m = 1] = p.split('-').map(Number)
-  return iso(new Date(Date.UTC(y, m, 0)))
-}
+export const periodStart = (p: Period) => p.start
+export const periodEnd = (p: Period) => p.end
+/** The start of the period N periods before this one, of the same type. */
+const periodsBack = (p: Period, n: number) => (p.type === 'weekly' ? shift(p.start, -7 * n, 'days') : shift(p.start, -monthsPer[p.type] * n, 'months'))
 const shift = (date: string, n: number, unit: Unit) => {
   const d = new Date(`${date}T00:00:00Z`)
   if (unit === 'days') d.setUTCDate(d.getUTCDate() + n)
@@ -134,7 +146,7 @@ const shift = (date: string, n: number, unit: Unit) => {
   else d.setUTCMonth(d.getUTCMonth() + n)
   return iso(d)
 }
-const anchor = (a: Anchor, period: string) => (a.at === 'periodStart' ? periodStart(period) : a.at === 'periodEnd' ? periodEnd(period) : (a.date ?? ''))
+const anchor = (a: Anchor, period: Period) => (a.at === 'periodStart' ? periodStart(period) : a.at === 'periodEnd' ? periodEnd(period) : (a.date ?? ''))
 export const ageAt = (dob: string, at: string, unit: 'years' | 'months') => {
   const [by = 0, bm = 1, bd = 1] = dob.split('-').map(Number)
   const [ay = 0, am = 1, ad = 1] = at.split('-').map(Number)
@@ -144,10 +156,10 @@ export const ageAt = (dob: string, at: string, unit: 'years' | 'months') => {
 
 // --- Evaluation ----------------------------------------------------------------------------------------
 
-const value = (p: Patient, input: string, period: string): string =>
+const value = (p: Patient, input: string, period: Period): string =>
   input === 'type' ? p.encounterType : input === 'ga' ? String(p.gestationWeeks) : input === 'age' ? String(ageAt(p.dob, periodEnd(period), 'years')) : input === 'sex' ? p.sex : input === 'hiv' ? p.hiv : input === 'district' ? p.district : String(p.firstPregnancy)
 
-function holdsCond(n: Extract<Node, { kind: 'cond' }>, p: Patient, period: string): boolean {
+function holdsCond(n: Extract<Node, { kind: 'cond' }>, p: Patient, period: Period): boolean {
   const input = INPUTS.find((i) => i.id === n.input)
   const raw = value(p, n.input, period)
   if (input?.type === 'number') {
@@ -158,7 +170,7 @@ function holdsCond(n: Extract<Node, { kind: 'cond' }>, p: Patient, period: strin
   return n.op === '!=' ? raw !== n.value : raw === n.value
 }
 
-function holdsDate(n: DateCond, p: Patient, period: string): boolean {
+function holdsDate(n: DateCond, p: Patient, period: Period): boolean {
   const d = p.dates[n.field]
   if (n.op === 'empty') return !d
   if (n.op === 'notEmpty') return Boolean(d)
@@ -170,7 +182,7 @@ function holdsDate(n: DateCond, p: Patient, period: string): boolean {
   if (n.op === 'before') return d < a
   if (n.op === 'after') return d > a
   if (n.op === 'between') return d >= a && d <= b
-  if (n.op === 'previous') return d >= shift(periodStart(period), -n.n, 'months') && d < periodStart(period)
+  if (n.op === 'previous') return d >= periodsBack(period, n.n) && d < periodStart(period)
   const other = shift(a, n.dir === 'before' ? -n.n : n.n, n.unit)
   return n.dir === 'before' ? d >= other && d <= a : d >= a && d <= other
 }
@@ -188,7 +200,7 @@ export function holds(n: Node, p: Patient, ctx: Ctx): boolean {
 /** Where a side starts: the numerator is always within the denominator when there is one. */
 export const startOf = (ind: Indicator, s: Side): Base => (s === 'numerator' && ind.denominator !== 'one' ? { kind: 'denominator' } : { kind: 'period' })
 
-export function side(ind: Indicator, s: Side, period: string, seen: string[] = []): Patient[] {
+export function side(ind: Indicator, s: Side, period: Period, seen: string[] = []): Patient[] {
   if (seen.includes(`${ind.id}.${s}`)) return [] // a loop; the real check refuses it at Validation
   const part = s === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return []
@@ -196,14 +208,14 @@ export function side(ind: Indicator, s: Side, period: string, seen: string[] = [
   return baseOf(ind, startOf(ind, s), period, next).filter((p) => holds(part.tree, p, { ind, period, seen: next }))
 }
 
-export function baseOf(ind: Indicator, b: Base, period: string, seen: string[] = []): Patient[] {
+export function baseOf(ind: Indicator, b: Base, period: Period, seen: string[] = []): Patient[] {
   if (b.kind === 'period') return PATIENTS.filter((p) => holdsDate(inPeriod(ind.periodDate), p, period))
   if (b.kind === 'denominator') return ind.denominator === 'one' ? baseOf(ind, { kind: 'period' }, period, seen) : side(ind, 'denominator', period, seen)
   const other = OTHERS.find((x) => x.id === b.id)
   return other ? side(other, b.side, period, seen) : []
 }
 
-export function evaluate(ind: Indicator, period: string) {
+export function evaluate(ind: Indicator, period: Period) {
   return { numerator: side(ind, 'numerator', period), denominator: ind.denominator === 'one' ? null : side(ind, 'denominator', period) }
 }
 export type Result = ReturnType<typeof evaluate>
@@ -214,7 +226,7 @@ export const display = (r: Result) => (r.denominator === null ? `${r.numerator.l
 export const bandLabel = (b: AgeBand, unit: string) => (b.to === null ? `${b.from}+ ${unit}` : b.from === b.to ? `${b.from} ${unit}` : `${b.from}–${b.to} ${unit}`)
 export const disaggLabel = (d: Disagg) => (d.kind === 'national' ? `${NATIONAL[d.id].label} (national)` : d.kind === 'age' ? `${d.label} (age bands)` : `${INPUTS.find((i) => i.id === d.input)?.label ?? d.input} (coded)`)
 
-export function bands(d: Disagg, ind: Indicator, period: string): { label: string; test: (p: Patient) => boolean }[] {
+export function bands(d: Disagg, ind: Indicator, period: Period): { label: string; test: (p: Patient) => boolean }[] {
   const ageBands = (list: AgeBand[], unit: 'years' | 'months', at: 'periodEnd' | 'periodDate') =>
     list.map((b) => ({
       label: bandLabel(b, unit),
@@ -241,7 +253,7 @@ function dateExpr(n: DateCond): string {
   if (n.op === 'before') return `${f} < ${anchorExpr(n.a)}`
   if (n.op === 'after') return `${f} > ${anchorExpr(n.a)}`
   if (n.op === 'between') return `${f} >= ${anchorExpr(n.a)} and ${f} <= ${anchorExpr(n.b)}`
-  if (n.op === 'previous') return `${f} >= %periodStart - ${n.n} months and ${f} < %periodStart`
+  if (n.op === 'previous') return `${f} >= %periodStart - ${n.n} %periodLength and ${f} < %periodStart`
   if (n.op === 'empty') return `${f}.empty()`
   if (n.op === 'notEmpty') return `${f}.exists()`
   return n.dir === 'before' ? `${f} >= ${anchorExpr(n.a)} - ${n.n} ${n.unit} and ${f} <= ${anchorExpr(n.a)}` : `${f} >= ${anchorExpr(n.a)} and ${f} <= ${anchorExpr(n.a)} + ${n.n} ${n.unit}`

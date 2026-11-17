@@ -18,7 +18,8 @@ import {
   INITIAL,
   INPUTS,
   NATIONAL,
-  PERIODS,
+  DEFAULT_PERIOD,
+  PERIOD_TYPES,
   bandLabel,
   bands,
   baseLabel,
@@ -46,6 +47,8 @@ import {
   type Node,
   type Op,
   type Patient,
+  type Period,
+  type PeriodType,
   type SavedTest,
   type Side,
   type Unit,
@@ -366,7 +369,7 @@ function Settings({ ind, setInd }: { ind: Indicator; setInd: (i: Indicator) => v
 // --- Try -----------------------------------------------------------------------------------------------
 
 /** Patients on one side, each opening to that side's conditions marked for them. */
-function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: Side; list: Patient[]; setInd: (i: Indicator) => void; period: string }) {
+function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: Side; list: Patient[]; setInd: (i: Indicator) => void; period: Period }) {
   const [open, setOpen] = useState<string | null>(null)
   const ctx: Ctx = { ind, period, seen: [`${ind.id}.${side}`] }
   const part = side === 'numerator' ? ind.numerator : ind.denominator
@@ -390,7 +393,7 @@ function Patients({ ind, side, list, setInd, period }: { ind: Indicator; side: S
   )
 }
 
-function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: string }) {
+function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: Period }) {
   const part = side === 'numerator' ? ind.numerator : ind.denominator
   if (part === 'one') return null
   const from = baseOf(ind, startOf(ind, side), period)
@@ -405,7 +408,7 @@ function Dropped({ ind, side, period }: { ind: Indicator; side: Side; period: st
 
 export function IndicatorEditorPrototype() {
   const [ind, setInd] = useState<Indicator>(INITIAL)
-  const [period, setPeriod] = useState(PERIODS[1] ?? '2026-03')
+  const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD)
   const [drill, setDrill] = useState<Side>('numerator')
   const [tests, setTests] = useState<SavedTest[]>([])
   const r = evaluate(ind, period)
@@ -446,12 +449,20 @@ export function IndicatorEditorPrototype() {
         </div>
         <aside className={cx(box, css({ p: '3', display: 'flex', flexDirection: 'column', gap: '3', position: { lg: 'sticky' }, top: '4' }))}>
           <h2 className={h2}>Try over test patients</h2>
-          <div role="radiogroup" aria-label="Reporting period" className={css({ display: 'flex', gap: '1' })}>
-            {PERIODS.map((p) => (
-              <button key={p} type="button" role="radio" aria-checked={period === p} className={cx(small, period === p ? css({ bg: 'bg.selected' }) : undefined)} onClick={() => setPeriod(p)}>
-                {p}
-              </button>
-            ))}
+          <span className={muted}>A report chooses the period; try the indicator as a report would.</span>
+          <div className={row}>
+            <select className={input} value={period.type} aria-label="Period type" onChange={(e) => setPeriod(PERIOD_TYPES.find((t) => t.id === (e.target.value as PeriodType))?.periods.at(-1) ?? DEFAULT_PERIOD)}>
+              {PERIOD_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <select className={input} value={period.label} aria-label="Period" onChange={(e) => setPeriod(PERIOD_TYPES.find((t) => t.id === period.type)?.periods.find((p) => p.label === e.target.value) ?? period)}>
+              {(PERIOD_TYPES.find((t) => t.id === period.type)?.periods ?? []).map((p) => (
+                <option key={p.label}>{p.label}</option>
+              ))}
+            </select>
           </div>
           <span className={muted}>
             Reporting period {periodStart(period)} to {periodEnd(period)}
@@ -488,13 +499,13 @@ export function IndicatorEditorPrototype() {
           <h3 className={css({ fontWeight: 'semibold' })}>{shown === 'numerator' ? 'Numerator' : 'Denominator'}: who and why</h3>
           <Dropped ind={ind} side={shown} period={period} />
           <Patients ind={ind} side={shown} list={shown === 'denominator' ? (r.denominator ?? []) : r.numerator} setInd={setInd} period={period} />
-          <button type="button" className={ghost} onClick={() => setTests([...tests.filter((t) => t.period !== period), { period, expect: expectNow }])}>
-            Save as test ({period})
+          <button type="button" className={ghost} onClick={() => setTests([...tests.filter((t) => t.period.label !== period.label), { period, expect: expectNow }])}>
+            Save as test ({period.label})
           </button>
           {tests.length === 0 ? <span className={muted}>No saved tests. Submission runs them and fails if the counts change.</span> : null}
           {tests.map((t) => (
-            <div key={t.period} className={cx(css({ fontSize: 'sm' }), pass(t) ? ok : bad)}>
-              {pass(t) ? '✓' : '✗ would fail submission:'} {t.period} expects numerator {t.expect.numerator}, denominator {t.expect.denominator === 'one' ? '1' : t.expect.denominator}
+            <div key={t.period.label} className={cx(css({ fontSize: 'sm' }), pass(t) ? ok : bad)}>
+              {pass(t) ? '✓' : '✗ would fail submission:'} {t.period.label} expects numerator {t.expect.numerator}, denominator {t.expect.denominator === 'one' ? '1' : t.expect.denominator}
             </div>
           ))}
         </aside>
