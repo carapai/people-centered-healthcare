@@ -5,6 +5,8 @@
 // Each section has its own Disaggregations, so indicators broken down the same way share a section;
 // each Disaggregation is laid out as rows or as columns; a section can show column totals, row
 // totals and % change from the previous period. A section can instead be a line list.
+// Round 3: the outline's sections are an accordion, one open at a time; clicking a section's title
+// or a cell in the preview opens that section.
 import { css, cx } from '@health/design-system/css'
 import { useState } from 'react'
 
@@ -83,19 +85,27 @@ type M = {
   setPlace: (p: string) => void
   pos: Pos
   setPos: (p: Pos) => void
+  /** The one section open in the outline (an accordion). */
+  open: string | null
+  setOpen: (id: string | null) => void
   issues: Issue[]
 }
 function useModel(): M {
   const [r, setR] = useState(INITIAL_REPORT)
   const [period, setPeriod] = useState<Period>(PERIOD_TYPES[1]?.periods[1] as Period)
   const [place, setPlace] = useState('kisenyi')
-  const [pos, setPos] = useState<Pos>(null)
+  const [pos, setPosOnly] = useState<Pos>(null)
+  const [open, setOpen] = useState<string | null>(INITIAL_REPORT.sections[0]?.id ?? null)
+  const setPos = (p: Pos) => {
+    setPosOnly(p)
+    if (p) setOpen(p.section)
+  }
   const set = (x: Report) => {
     setR(x)
     if (x.periodType !== period.type) setPeriod(PERIOD_TYPES.find((p) => p.id === x.periodType)?.periods[0] as Period)
     if (!x.levels.includes(placeOf(place)?.level ?? 'facility')) setPlace(PLACES.find((p) => x.levels.includes(p.level))?.id ?? place)
   }
-  return { r, set, period, setPeriod, place, setPlace, pos, setPos, issues: validate(r) }
+  return { r, set, period, setPeriod, place, setPlace, pos, setPos, open, setOpen, issues: validate(r) }
 }
 
 const move = <T,>(list: T[], i: number, by: number) => {
@@ -152,12 +162,31 @@ function Basics({ m }: { m: M }) {
   )
 }
 
+const summary = (s: Section) =>
+  s.kind === 'list'
+    ? `Line list · ${indicator(s.ind)?.title ?? s.ind} · ${s.fields.length} fields`
+    : [
+        `Table · ${s.rows.length} indicator${s.rows.length === 1 ? '' : 's'}`,
+        ...s.disaggs.map((x) => `${disaggLabel(x.d).replace(/ \((age bands|coded)\)$/, '')} as ${x.axis}`),
+        ...(s.send ? ['sent to DHIS2'] : []),
+      ].join(' · ')
+
 function SectionHead({ m, s, i }: { m: M; s: Section; i: number }) {
   const { r, set } = m
+  const isOpen = m.open === s.id
   return (
     <div className={row}>
-      <span className={mono}>{s.kind === 'table' ? 'TABLE' : 'LINE LIST'}</span>
-      <input className={cx(input, css({ fontWeight: 'semibold', flex: '1', minWidth: '10rem' }))} value={s.title} aria-label="Section title" onChange={(e) => set(putSection(r, { ...s, title: e.target.value }))} />
+      <button type="button" className={css({ cursor: 'pointer', fontSize: 'md', width: '6', flexShrink: 0 })} aria-expanded={isOpen} aria-label={isOpen ? 'Collapse section' : 'Expand section'} onClick={() => m.setOpen(isOpen ? null : s.id)}>
+        {isOpen ? '▾' : '▸'}
+      </button>
+      {isOpen ? (
+        <input className={cx(input, css({ fontWeight: 'semibold', flex: '1', minWidth: '10rem' }))} value={s.title} aria-label="Section title" onChange={(e) => set(putSection(r, { ...s, title: e.target.value }))} />
+      ) : (
+        <button type="button" className={css({ flex: '1', textAlign: 'left', cursor: 'pointer', display: 'flex', flexDirection: 'column' })} onClick={() => m.setOpen(s.id)}>
+          <span className={css({ fontWeight: 'semibold' })}>{s.title}</span>
+          <span className={cx(muted, css({ fontSize: 'xs' }))}>{summary(s)}</span>
+        </button>
+      )}
       <button type="button" className={small} aria-label="Move up" onClick={() => set({ ...r, sections: move(r.sections, i, -1) })}>
         ↑
       </button>
@@ -322,14 +351,22 @@ function Outline({ m }: { m: M }) {
       {r.sections.map((s, i) => (
         <div key={s.id} className={css({ display: 'flex', flexDirection: 'column', gap: '2', borderTop: i === 0 ? 'none' : '1px solid', borderColor: 'border', pt: i === 0 ? '0' : '3' })}>
           <SectionHead m={m} s={s} i={i} />
-          {s.kind === 'table' ? <TableEditor m={m} s={s} /> : <ListEditor m={m} s={s} />}
+          {m.open !== s.id ? null : s.kind === 'table' ? <TableEditor m={m} s={s} /> : <ListEditor m={m} s={s} />}
         </div>
       ))}
       <div className={row}>
-        <button type="button" className={ghost} onClick={() => set({ ...r, sections: [...r.sections, { kind: 'table', id: newId('s'), title: 'New section', disaggs: [], rows: [], colTotals: false, rowTotals: false, change: false, send: false }] })}>
+        <button type="button" className={ghost} onClick={() => {
+            const id = newId('s')
+            set({ ...r, sections: [...r.sections, { kind: 'table', id, title: 'New section', disaggs: [], rows: [], colTotals: false, rowTotals: false, change: false, send: false }] })
+            m.setOpen(id)
+          }}>
           + table section
         </button>
-        <button type="button" className={ghost} onClick={() => set({ ...r, sections: [...r.sections, { kind: 'list', id: newId('s'), title: 'New line list', ind: 'anc-first', fields: ['name', 'start', 'ga'] }] })}>
+        <button type="button" className={ghost} onClick={() => {
+            const id = newId('s')
+            set({ ...r, sections: [...r.sections, { kind: 'list', id, title: 'New line list', ind: 'anc-first', fields: ['name', 'start', 'ga'] }] })
+            m.setOpen(id)
+          }}>
           + line list
         </button>
       </div>
@@ -715,7 +752,9 @@ export function ReportDesignerPrototype() {
           <h2 className={h2}>{m.r.title}</h2>
           {m.r.sections.map((s) => (
             <div key={s.id} className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
-              <h3 className={h3}>{s.title}</h3>
+              <button type="button" className={cx(h3, css({ textAlign: 'left', cursor: 'pointer', color: m.open === s.id ? 'accent.text' : 'fg.default' }))} title="Open this section in the outline" onClick={() => m.setOpen(s.id)}>
+                {s.title}
+              </button>
               {s.kind === 'table' ? <SectionTable m={m} s={s} /> : <LineList m={m} s={s} />}
             </div>
           ))}
