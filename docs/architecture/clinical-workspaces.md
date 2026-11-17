@@ -1,6 +1,6 @@
 # Clinical and health worker workspaces
 
-This page consolidates the decided foundations for the health worker and clinical workspaces (MASTER_PROMPT §53–56, §98–101). The underlying data, workflow and client decisions are settled. **Workspace UX** (layouts, navigation, density defaults, worklist design) is not, and stays in the map's fog as expected prototype work.
+This page consolidates the decided foundations for the health worker and clinical workspaces (MASTER_PROMPT §53–56, §98–101). The underlying data, workflow and client decisions are settled, and the layout was decided from a prototype in [How does a health worker's workspace look: worklist, clinical inbox, chart and density per role?](https://github.com/carapai/people-centered-healthcare/issues/563) (branch `prototype/workspace`).
 
 ## What the workspaces are built on
 
@@ -33,8 +33,19 @@ Receptionist, nurse, clinician, pharmacist, laboratory professional, community h
 - **Shared PCs.** Idle lock after 15 min and PIN user switch, both of which clear the view (offline-auth.md).
 - **Emergency.** Emergency bypass in OPD; urgent care is never blocked by a Financial Gate (ADR 0033).
 
+## Layout: patient tabs
+
+Every role uses the same layout; what fills it comes from the role.
+
+- **Status bar** on every screen: facility and service point, the mode, whether central is reachable (when it isn't, *working on this facility only*), changes waiting to sync or the last sync time, who is signed in, density, and Lock (PIN user switch).
+- **Module tabs** come from the permission snapshot and the enabled services. For example, a clinician gets *My queue, Inbox, Find a patient, Unsigned notes*; a nurse *Triage queue, Inbox, Find a patient, Care tasks*; a receptionist *Arrivals, Register or find, All queues*.
+- **The queue is a drawer** on the left that can be collapsed. It is ordered emergency, then urgent, then longest waiting. An entry shows priority, name, age and sex, the reason, triage vitals (abnormal values highlighted), flags (allergies highlighted), the payment state (free care, paid, awaiting, or *payment deferred* for an emergency, which never blocks care), and whether it is waiting (*Take*), yours, or with a colleague.
+- **Each opened patient is a tab**, so several stay open (one waiting on a result, the next one called). The chart has a header (priority, name, identifier, allergies, vitals, reason, payment) and tabs for Summary, Note, Orders and Results. Finishing is a workflow event (*send to pharmacy*, *send to lab and come back*, *discharge*) or *Hand over to…*.
+- **The inbox is a slide-over** from the right, critical first. Items act in place (mark reviewed, approve, sign) or open the patient's tab.
+- **Critical results are a banner on every screen** until someone marks them reviewed.
+- **Density defaults:** compact for clinicians, comfortable for nurses and receptionists. Each user can switch.
+
 ## Open (fog)
 
-- Workspace and inbox UX, worklist layouts, and density defaults per role.
 - Notification channels (SMS and push).
 - CQL-based clinical decision support.
