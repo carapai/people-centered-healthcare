@@ -173,12 +173,17 @@ function memberExpr(b: Base, ind?: Indicator): string {
 }
 
 /** The sides a membership condition may name. */
-export function refOptions(ind: Indicator): Base[] {
+export function refOptions(): Base[] {
   const out: Base[] = []
-  if (ind.denominator !== 'one') out.push({ kind: 'denominator' })
   for (const o of OTHERS) {
     out.push({ kind: 'indicator', id: o.id, side: 'numerator' })
     if (o.denominator !== 'one') out.push({ kind: 'indicator', id: o.id, side: 'denominator' })
   }
   return out
+}
+
+/** Removes "is in the denominator" conditions, for when the denominator becomes 1. */
+export function stripDenominator(n: Node): Node {
+  if (n.kind !== 'group') return n
+  return { ...n, children: n.children.filter((ch) => !(ch.kind === 'member' && ch.ref.kind === 'denominator')).map(stripDenominator) }
 }
