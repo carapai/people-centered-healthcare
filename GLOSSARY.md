@@ -74,6 +74,14 @@ _Avoid_: Template, config, form (for the definition)
 The one author who may currently edit, check, submit, hand over or withdraw a package's draft; everyone who has held a draft counts as its author, so none of them may review or approve it.
 _Avoid_: Owner, co-author, assignee
 
+**Indicator**:
+A published Measure that counts patients or events for a facility and period, such as ANC first visits in March, split by the disaggregations it declares.
+_Avoid_: Report, metric, KPI
+
+**Indicator Report**:
+The counts for one Indicator, one facility or area and one period; a facility's own report is the figure everyone above it sees.
+_Avoid_: Dataset, submission (for the counts themselves)
+
 **Language Pack**:
 A package that holds one language's wording for another package's forms and code lists, published and activated on its own, so translating never changes or re-versions the clinical content it translates.
 _Avoid_: Locale, translation file, localisation bundle
