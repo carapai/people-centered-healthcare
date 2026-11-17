@@ -29,5 +29,5 @@ Decided in [ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-an
 
 - Which DHIS2 login MoH grants (one integration account or one per facility), and whether eHMIS uses data approval for these forms.
 - Whether CQL replaces hand-written FHIRPath (the `octofhir-cql` spike).
-- The Studio's indicator authoring screen and its Simulation over sample patients.
+- The indicator editor's layout (its behaviour is in [studio.md § Indicators](studio.md#indicators)).
 - National and district dashboards, population denominators, surveillance alerting (the map's unexplored areas).
