@@ -202,7 +202,7 @@ stateDiagram-v2
 - **Below `level3`,** the account sees only what the patient submitted themselves.
 - **Released clinical records** require `level3` and a link to a Patient.
 - **Signing in.** A patient signs in with a one-time code to their verified phone every time; there is no patient password (decided on #111). The code is six digits, valid 5 minutes, with 5 tries, and a phone gets at most one code a minute and 5 an hour.
-- **Sending codes.** Codes go through an `OtpSender` port. Until the SMS channel is chosen (communications fog), the only adapter is a development outbox, which the e2e tests read.
+- **Sending codes.** Codes go through an `OtpSender` port. It sends through the `MessageSender` port (ADR 0073); the production adapter is a local SMS aggregator, and the development outbox stays for the e2e tests.
 - **In code:**
   - `health-identity`: `PhoneAccount`, `PhoneNumber` (E.164), `OtpPolicy` and `OtpChallenge`.
   - `health-client-registry::person`: `Person`, its links and assurance, and `PortalAccess`.

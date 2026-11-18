@@ -110,6 +110,14 @@ _Avoid_: Submission, return, dataset (for the form)
 A package that holds one language's wording for another package's forms and code lists, published and activated on its own, so translating never changes or re-versions the clinical content it translates.
 _Avoid_: Locale, translation file, localisation bundle
 
+**Message**:
+Content sent to a person outside the platform, such as an SMS, written from a template in the person's language.
+_Avoid_: Notification, alert (for an SMS)
+
+**Notification**:
+A signal to a running client that something changed and it should refresh; it carries no content and never leaves the platform.
+_Avoid_: Message, push message
+
 **Extraction Mapping**:
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform
