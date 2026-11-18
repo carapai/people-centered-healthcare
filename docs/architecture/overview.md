@@ -80,6 +80,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Operating theatre | [operating-theatre.md](operating-theatre.md) |
 | Labour and delivery | [labour-and-delivery.md](labour-and-delivery.md) |
 | Blood transfusion | [blood-transfusion.md](blood-transfusion.md) |
+| ICU, early warning and the mortuary | [icu-early-warning-and-mortuary.md](icu-early-warning-and-mortuary.md) |
 | Messages to patients and staff | [communications.md](communications.md) |
 | Finance | [pricing-and-insurance.md](pricing-and-insurance.md), [billing-and-payments.md](billing-and-payments.md) |
 | Supply chain | [inventory-and-procurement.md](inventory-and-procurement.md) |
@@ -185,6 +186,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0082](../adr/0082-operations-are-booked-onto-theatre-lists-and-recorded-without-moving-the-ward-placement.md) | An Operation Request is scheduled onto a Theatre List; a Procedure Consent is required (emergency override with reason); the WHO Surgical Safety Checklist is recorded, not enforced; Anaesthesia Record and signed Operation Note; theatre time is on the Procedure, so the ward placement and census do not move; operations coded from a local catalogue mapped to HMIS 108 rows; HMIS 057 register view |
 | [0083](../adr/0083-labour-is-an-inpatient-maternity-stay-and-every-live-birth-is-a-patient-from-birth.md) | Labour is a maternity inpatient stay with a Maternity Number; the Labour Chart is a package form (partograph in v1, Labour Care Guide ready); a Delivery records an outcome per baby; every live birth is a Patient from birth with the mother as Caregiver, healthy newborns outside the census; stillbirths are outcomes; maternal and perinatal death notifications and reviews as timed Tasks; weekly NIRA Birth Return; HMIS 072 view |
 | [0084](../adr/0084-blood-units-are-single-unit-stock-issued-only-when-cross-matched.md) | Each Blood Unit is a single-unit Stock Unit and a BiologicallyDerivedProduct; a Transfusion Request leads to grouping and a Compatibility Test per unit; incompatible units cannot be issued (emergency uncross-matched O with reason); Blood Issue with return window; bedside two-person check and administration on the chart; Transfusion Reactions as AdverseEvents; HMIS 091 view and UT01–UT04 |
+| [0085](../adr/0085-icu-and-the-mortuary-build-on-wards-and-deaths-and-early-warning-is-advisory.md) | A ward has a level of care (ICU or HDU) beside its HMIS 108 Ward Type; ICU Chart package and ICU register view; an advisory Early Warning Score package (MEWS default, per ward, off by default) raising escalation Tasks; Mortuary Admission and Body Release with gate pass, never gated by unpaid fees; police cases need clearance; weekly NIRA Death Return for every facility death |
 
 ## Still open
 

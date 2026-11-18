@@ -298,6 +298,30 @@ _Avoid_: Blood dispatch, blood dispense
 A harmful reaction suspected during or after a transfusion.
 _Avoid_: Adverse reaction (alone), transfusion incident
 
+**Level of Care**:
+Whether a ward gives intensive (ICU) or high-dependency (HDU) care, independent of the Ward Type it reports under.
+_Avoid_: ICU flag, ward grade
+
+**ICU Chart**:
+The hourly bedside record of a Patient in intensive or high-dependency care.
+_Avoid_: ICU flowsheet, critical care form
+
+**Early Warning Score**:
+A score calculated from a Patient's vital signs that flags a Patient who may be deteriorating.
+_Avoid_: MEWS (as the general term), alert score
+
+**Mortuary Admission**:
+The receipt of a body into the mortuary, with who brought it, how it is identified and where it is stored.
+_Avoid_: Body admission, mortuary entry
+
+**Body Release**:
+The handing over of a body from the mortuary to the person collecting it, with the gate pass.
+_Avoid_: Body discharge, collection
+
+**Death Return**:
+The weekly list of deaths in a facility, with their particulars, handed to the civil registration officer.
+_Avoid_: Death register, NIRA death list
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter

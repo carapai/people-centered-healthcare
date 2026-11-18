@@ -37,7 +37,7 @@ The maternity form shows HIV status and the ARV regimen from the HIV program to 
 ## NIRA
 
 - **Births:** the weekly **Birth Return** lists every birth in the facility with its Form 3 particulars and signatures, printed for the NIRA registration officer.
-- **Deaths:** the NIRA copy of each cause-of-death certificate goes on a weekly death return; the certificate is due at NIRA within 7 days.
+- **Deaths:** every facility death, maternal or not, goes on the weekly Death Return in [icu-early-warning-and-mortuary.md](icu-early-warning-and-mortuary.md) (ADR 0085).
 
 ## Register and counts
 
