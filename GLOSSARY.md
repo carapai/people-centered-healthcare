@@ -118,6 +118,14 @@ _Avoid_: Notification, alert (for an SMS)
 A signal to a running client that something changed and it should refresh; it carries no content and never leaves the platform.
 _Avoid_: Message, push message
 
+**Decision Support Rule**:
+A published decision table that looks at a patient's record at a set moment, such as opening the chart or signing an order, and produces Advice for the clinician.
+_Avoid_: CDS rule, alert rule, guard (a guard gates a workflow step)
+
+**Advice**:
+A suggestion or warning shown to a clinician by a Decision Support Rule, marked info, warning or critical; it never moves a workflow on its own.
+_Avoid_: Alert, reminder, card
+
 **Extraction Mapping**:
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform

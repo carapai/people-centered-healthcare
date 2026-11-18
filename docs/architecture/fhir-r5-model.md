@@ -85,7 +85,7 @@ The physical storage of resources, history and index entries in SurrealDB is in 
 
   Each is only a sufficient condition; otherwise the engine decides. A unit test evaluates every skipped check over the official corpus (about 41,800), and each holds.
 - **Performance** (`tests/performance.rs`). Over the 731 official clinical examples, in a release build on a development laptop, tiers 1–3 take p50 0.34 ms and **p95 1.12 ms**, against the 2 ms budget (ADR 0053). That is with the vital-signs profiles active: each example is checked against the profiles it claims, and every vital-signs Observation against `vitalsigns`. Before the shape checks, tiers 1–2 alone took p95 2.5–3.1 ms. The test fails over budget in a release build with the corpus; CI runs it once CI exists (#47). The measurement on reference edge hardware waits for that hardware. Very large conformance resources take far longer (up to 5.5 s), so request size limits matter on write paths that accept them.
-- Whether CQL is needed stays in the map's Not yet specified.
+- No CQL runtime in v1 (ADR 0074).
 
 ## Validation (ADR 0016)
 

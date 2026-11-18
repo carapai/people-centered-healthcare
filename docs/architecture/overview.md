@@ -70,7 +70,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Terminology, metadata, configuration | [terminology.md](terminology.md), [metadata.md](metadata.md), [configuration.md](configuration.md), [facility-configuration.md](facility-configuration.md) |
 | Forms and programs | [questionnaire-extraction.md](questionnaire-extraction.md), [program-designer.md](program-designer.md) |
 | Authoring (Studio) | [studio.md](studio.md) |
-| Workflow | [workflow-engine.md](workflow-engine.md) |
+| Workflow and decision support | [workflow-engine.md](workflow-engine.md), [decision-support.md](decision-support.md) |
 | Patients | [patient-identity.md](patient-identity.md), [patient-portal.md](patient-portal.md), [care-journeys.md](care-journeys.md) |
 | Health workers | [clinical-workspaces.md](clinical-workspaces.md) |
 | Messages to patients and staff | [communications.md](communications.md) |
@@ -167,7 +167,8 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0071](../adr/0071-population-estimates-ship-as-yearly-population-packages.md) | Population Estimates ship as a yearly Population package with estimate types given per place or derived by percentage, pro-rated to a Report's period; Age Band Sets live in the national core and program packages, a band change being major |
 | [0072](../adr/0072-report-sections-carry-their-own-disaggregations-and-line-lists-stay-at-the-facility.md) | Each Report section is a table with its own Disaggregations as rows or columns, totals and % change, or a line list of enrollments or visits with any attribute or concept as a column, facility only (amends 0070) |
 | [0073](../adr/0073-messages-are-sent-by-central-over-sms-through-a-local-aggregator.md) | Messages go to patients by SMS from central through a local aggregator behind one `MessageSender` port, with no health detail in the text; templates in Language Packs; opt-in per category for reminders; retried until expiry, no automatic fallback; staff get in-app Notifications |
+| [0074](../adr/0074-decision-support-is-fhirpath-decision-tables-translated-from-who-content-with-no-cql-runtime.md) | Decision support is FHIRPath decision tables (Decision Support Rules) translated from WHO SMART content at import, with no CQL runtime; evaluated on the node holding the record at patient-view, form save and order-sign; Advice as cards, only critical Advice at order-sign needs an override, recorded as DetectedIssue |
 
 ## Still open
 
-The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, CQL for decision support, the Studio's screens ([studio.md](studio.md)) and workspace UX, analytics beyond indicators and HMIS reporting ([analytics.md](analytics.md)), R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
+The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance the Studio's screens ([studio.md](studio.md)) and workspace UX, analytics beyond indicators and HMIS reporting ([analytics.md](analytics.md)), R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
