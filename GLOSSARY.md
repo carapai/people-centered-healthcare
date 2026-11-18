@@ -230,6 +230,30 @@ _Avoid_: Nursing care plan, instruction
 The note of one round's review of an inpatient: assessment and plan.
 _Avoid_: Progress note, daily note
 
+**Operation Request**:
+A surgeon's signed request for an operation on a Patient.
+_Avoid_: Theatre booking, surgery order
+
+**Theatre List**:
+The ordered operations planned for one operating theatre on one day.
+_Avoid_: Theatre schedule, OT list
+
+**Procedure Consent**:
+A Patient's, or their guardian's, witnessed agreement to an operation or procedure.
+_Avoid_: Consent (alone), surgical consent form
+
+**Surgical Safety Checklist**:
+The three checks around an operation (sign in, time out, sign out), each recorded with who did it and when.
+_Avoid_: WHO checklist, time-out form
+
+**Anaesthesia Record**:
+The record of anaesthesia given during an operation: type, drugs and the Patient's vital signs.
+_Avoid_: Anaesthetic chart
+
+**Operation Note**:
+The surgeon's signed account of an operation: team, what was done, findings and post-operative orders.
+_Avoid_: Surgical note, theatre note
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter
