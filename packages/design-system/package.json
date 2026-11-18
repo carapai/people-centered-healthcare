@@ -53,7 +53,7 @@
   "scripts": {
     "codegen": "panda codegen",
     "lib": "panda codegen && panda lib --include './src/**/*.{ts,tsx}'",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -b",
     "lint": "oxlint --deny-warnings src example test",
     "example": "bunx --bun vite example",
     "build:example": "bunx --bun vite build example",

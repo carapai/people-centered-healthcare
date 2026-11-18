@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "codegen": "bun run --cwd ../../packages/design-system lib && panda codegen",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -b",
     "lint": "oxlint --deny-warnings src scripts test e2e && bun scripts/check-boundaries.ts",
     "build": "bunx --bun vite build",
     "build:tauri": "bunx --bun vite build --mode tauri",
