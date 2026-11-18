@@ -1,15 +1,14 @@
 # Deployment branding is a named-palette setting in the Country Configuration package, applied by attributes at runtime
 
-Decided in [How is deployment branding (accent, gray, radius, font, logo) modelled and applied with the light, dark and high-contrast themes?](https://github.com/carapai/people-centered-healthcare/issues/646), on the map [Wayfinder: a professional, themeable design system (Park UI)](https://github.com/carapai/people-centered-healthcare/issues/643). It builds on [ADR 0080](0080-the-design-system-copies-park-ui-recipes-as-source-onto-radix-colors.md) (Radix Colors, Park UI's `colorPalette`) and the visual direction chosen in [What visual direction should the design system take?](https://github.com/carapai/people-centered-healthcare/issues/647).
+Decided in [How is deployment branding (accent, gray, radius, font, logo) modelled and applied with the light, dark and high-contrast themes?](https://github.com/carapai/people-centered-healthcare/issues/646), on the map [Wayfinder: a professional, themeable design system (Park UI)](https://github.com/carapai/people-centered-healthcare/issues/643). It builds on [ADR 0080](0080-the-design-system-copies-park-ui-recipes-as-source-onto-radix-colors.md) (Radix Colors, Park UI's `colorPalette`) and on Park UI's defaults ([Publish the design system backlog](https://github.com/carapai/people-centered-healthcare/issues/648)).
 
 One build serves every country, central and the edges, so a deployment's look cannot be compiled in. It must also never break WCAG 2.2 AA, the high-contrast theme or offline use.
 
 **The decision:**
-- **Branding has six fields:**
+- **Branding has five fields:**
   - an **accent** palette, named from Radix's scales;
   - a **gray** palette, one of Radix's six grays (gray, mauve, slate, sage, olive, sand);
-  - a **radius**: `none`, `small`, `medium` or `large`, scaling the control and card radii together;
-  - a **font**, one of the fonts the release bundles;
+  - a **radius**, one of Park UI's radius options;
   - a **product name**, shown in the header, the page title and on sign-in;
   - **logos**: a required logo (light), an optional dark logo (dark and high contrast) and a required square mark (sidebar, favicon, desktop icon).
 
@@ -23,20 +22,20 @@ One build serves every country, central and the edges, so a deployment's look ca
   - One branding per deployment. There is no override point for districts or facilities.
   - Changing it means publishing and activating a new package version, with one approver.
 - **Applied at runtime without a rebuild:**
-  - The bundle carries every allowed scale as CSS variables, keyed by `[data-accent=…]`, `[data-gray=…]`, `[data-radius=…]` and `[data-font=…]` (about 30 KB).
+  - The bundle carries every allowed scale as CSS variables, keyed by `[data-accent=…]`, `[data-gray=…]` and `[data-radius=…]` (about 30 KB).
   - The node serves the active branding at `/branding.json` and the logos under `/branding/`.
   - The client fetches them alongside `runtime.json`, before its first render, and sets the attributes on `<html>`. Nothing is generated at runtime and there are no inline styles, so the Content-Security-Policy is unchanged and there is no flash of the default look.
 - **Themes and density:**
   - Accent and gray apply in light and dark.
-  - **High contrast ignores accent and gray** and stays black, white and yellow; it keeps radius, font and logo.
+  - **High contrast ignores accent and gray** and stays black, white and yellow; it keeps radius and logo.
   - Density is independent of branding.
 - **Logos are inert SVG.** They are drawn with `<img>`. Publication rejects a logo with `<script>` or `<foreignObject>`, an external reference, or a size over 64 KB. Without a dark logo, dark and high contrast show the product name as text.
-- **Default:** with no branding, a deployment gets slate and teal, medium radius, the default font and "Health Platform".
+- **Default:** with no branding, a deployment gets Park UI's default accent, gray and radius and "Health Platform".
 - **Offline:**
   - Edges receive branding with the package through sync.
   - The service worker caches `/branding.json` and the logos with the app, and desktops get them from their edge.
   - Newly activated branding shows on the next app load, never mid-session.
-- **Preview:** while a package is in review, the Studio shows a branding preview. It renders the App Shell, a worklist, a patient chart and a dialog with the draft branding in light, dark and high contrast, next to the contrast and logo check results.
+- **Fonts and preview are deferred.** Park UI's default font stack is used and branding sets no font; a Studio preview of a draft branding waits until deployments need it. Publication's contrast and logo checks still apply.
 
 ## Considered options
 

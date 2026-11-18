@@ -147,7 +147,7 @@ A configuration setting that a base package explicitly allows a district or faci
 _Avoid_: Customisation, local copy
 
 **Branding**:
-A deployment's look, chosen from allowed values: accent and gray palettes, corner radius, font, product name and logos. It is set once for the whole deployment and never changes the high-contrast theme.
+A deployment's look, chosen from allowed values: accent and gray palettes, corner radius, product name and logos. It is set once for the whole deployment and never changes the high-contrast theme.
 _Avoid_: Theme, skin
 
 **Form Layout**:
