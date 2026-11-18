@@ -73,6 +73,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Workflow and decision support | [workflow-engine.md](workflow-engine.md), [decision-support.md](decision-support.md) |
 | Patients | [patient-identity.md](patient-identity.md), [patient-portal.md](patient-portal.md), [care-journeys.md](care-journeys.md) |
 | Health workers | [clinical-workspaces.md](clinical-workspaces.md) |
+| Immunization | [immunization.md](immunization.md) |
 | Messages to patients and staff | [communications.md](communications.md) |
 | Finance | [pricing-and-insurance.md](pricing-and-insurance.md), [billing-and-payments.md](billing-and-payments.md) |
 | Supply chain | [inventory-and-procurement.md](inventory-and-procurement.md) |
@@ -169,7 +170,8 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0073](../adr/0073-messages-are-sent-by-central-over-sms-through-a-local-aggregator.md) | Messages go to patients by SMS from central through a local aggregator behind one `MessageSender` port, with no health detail in the text; templates in Language Packs; opt-in per category for reminders; retried until expiry, no automatic fallback; staff get in-app Notifications |
 | [0074](../adr/0074-decision-support-is-fhirpath-decision-tables-translated-from-who-content-with-no-cql-runtime.md) | Decision support is FHIRPath decision tables (Decision Support Rules) translated from WHO SMART content at import, with no CQL runtime; evaluated on the node holding the record at patient-view, form save and order-sign; Advice as cards, only critical Advice at order-sign needs an override, recorded as DetectedIssue |
 | [0075](../adr/0075-dashboards-read-indicator-reports-only-over-standard-periods.md) | Dashboards arrange Visualizations over Indicator Reports only, at central for district and above and on the edge for the facility; any range of standard periods, no arbitrary dates; standard Dashboards in the Reporting package, saved ones as user content; scoped to the user's area; missing never shown as zero |
+| [0076](../adr/0076-immunization-is-a-core-record-with-a-hand-authored-schedule-and-computed-due-doses.md) | Immunization is a core lifelong record with no enrollment; the schedule is hand-authored Decision Support Rules in the national Immunization package (not imported from WHO SMART IMMZ); due doses are computed into a Due List, never stored as ImmunizationRecommendation; doses come from Stock with open-vial tracking; Historical Doses count for the schedule, not for reporting; children are Patients from first contact with a Caregiver; Defaulters traced from the Due List |
 
 ## Still open
 
-The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, the Studio's screens ([studio.md](studio.md)) and workspace UX, surveillance alerting ([analytics.md](analytics.md)), R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
+The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, the Studio's screens ([studio.md](studio.md)) and workspace UX, surveillance alerting ([analytics.md](analytics.md)), R4 adapters and the integration catalogue, hot standby edges, immunization campaigns). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).

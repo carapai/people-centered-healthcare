@@ -206,6 +206,22 @@ _Avoid_: User (unqualified), patient account
 The registry's record of a person receiving care, independent of whether they have a Login Account.
 _Avoid_: Client, user
 
+**Vaccination Session**:
+One period of vaccinating, at the facility (static) or in the community (outreach), to which each dose and opened vial belongs.
+_Avoid_: Clinic day, immunization day
+
+**Due List**:
+The Patients at a facility with a dose due or overdue under the immunization schedule.
+_Avoid_: Recommendation list, register
+
+**Defaulter**:
+A Patient with a scheduled dose overdue by more than the programme's threshold.
+_Avoid_: Drop-out (a coverage measure, not a person), missed patient
+
+**Historical Dose**:
+A dose given elsewhere or earlier and recorded from the card, the register or another facility; it counts for the schedule but not for this facility's reports.
+_Avoid_: Back-entry, retrospective dose
+
 **Caregiver**:
 A person authorised, through a recorded relationship and a Consent, to act for a Patient such as a child or dependent adult.
 _Avoid_: Guardian (unless legally meant), proxy
