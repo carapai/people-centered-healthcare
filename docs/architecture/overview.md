@@ -79,6 +79,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Imaging | [imaging.md](imaging.md) |
 | Operating theatre | [operating-theatre.md](operating-theatre.md) |
 | Labour and delivery | [labour-and-delivery.md](labour-and-delivery.md) |
+| Blood transfusion | [blood-transfusion.md](blood-transfusion.md) |
 | Messages to patients and staff | [communications.md](communications.md) |
 | Finance | [pricing-and-insurance.md](pricing-and-insurance.md), [billing-and-payments.md](billing-and-payments.md) |
 | Supply chain | [inventory-and-procurement.md](inventory-and-procurement.md) |
@@ -183,6 +184,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0081](../adr/0081-deployment-branding-is-a-named-palette-setting-applied-by-attributes-at-runtime.md) | Deployment Branding (accent and gray as named Radix scales from a contrast-tested allowed list, radius, product name, inert SVG logos) lives in the Country Configuration package, is served by the node and applied by attributes on `<html>` at runtime with no rebuild; high contrast ignores it |
 | [0082](../adr/0082-operations-are-booked-onto-theatre-lists-and-recorded-without-moving-the-ward-placement.md) | An Operation Request is scheduled onto a Theatre List; a Procedure Consent is required (emergency override with reason); the WHO Surgical Safety Checklist is recorded, not enforced; Anaesthesia Record and signed Operation Note; theatre time is on the Procedure, so the ward placement and census do not move; operations coded from a local catalogue mapped to HMIS 108 rows; HMIS 057 register view |
 | [0083](../adr/0083-labour-is-an-inpatient-maternity-stay-and-every-live-birth-is-a-patient-from-birth.md) | Labour is a maternity inpatient stay with a Maternity Number; the Labour Chart is a package form (partograph in v1, Labour Care Guide ready); a Delivery records an outcome per baby; every live birth is a Patient from birth with the mother as Caregiver, healthy newborns outside the census; stillbirths are outcomes; maternal and perinatal death notifications and reviews as timed Tasks; weekly NIRA Birth Return; HMIS 072 view |
+| [0084](../adr/0084-blood-units-are-single-unit-stock-issued-only-when-cross-matched.md) | Each Blood Unit is a single-unit Stock Unit and a BiologicallyDerivedProduct; a Transfusion Request leads to grouping and a Compatibility Test per unit; incompatible units cannot be issued (emergency uncross-matched O with reason); Blood Issue with return window; bedside two-person check and administration on the chart; Transfusion Reactions as AdverseEvents; HMIS 091 view and UT01–UT04 |
 
 ## Still open
 
