@@ -206,6 +206,34 @@ _Avoid_: User (unqualified), patient account
 The registry's record of a person receiving care, independent of whether they have a Login Account.
 _Avoid_: Client, user
 
+**Admission Order**:
+A clinician's decision that a Patient needs a ward bed, waiting until a ward receives them.
+_Avoid_: Admission (for the order alone), bed request
+
+**Inpatient Number**:
+The facility's number for one inpatient stay, restarting each financial year.
+_Avoid_: IP file number, ward number
+
+**Ward Type**:
+The national category of a ward by function, such as paediatrics or female surgical, used to count beds and stays.
+_Avoid_: Department, unit
+
+**Nursing Order**:
+A recurring instruction to nurses that is not a medication, such as a blood pressure check twice a day.
+_Avoid_: Nursing care plan, instruction
+
+**Ward Round Note**:
+The note of one round's review of an inpatient: assessment and plan.
+_Avoid_: Progress note, daily note
+
+**Discharge Summary**:
+The signed account of an inpatient stay given to the Patient when they leave.
+_Avoid_: Discharge form, discharge letter
+
+**Unknown Patient**:
+A Patient registered before they can be identified, with sex, estimated age and a temporary name.
+_Avoid_: John Doe, anonymous patient
+
 **Referral**:
 A request from one facility that another take over or add to a Patient's care, including a referral back down a level.
 _Avoid_: Transfer (within a facility), consult (within a facility)
