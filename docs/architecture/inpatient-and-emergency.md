@@ -115,7 +115,7 @@ The Patient is marked deceased, which stops reminders, Messages and Due List ent
 
 ## Not in v1
 
-- Operating theatre: bookings, the theatre register, and HMIS 108 items 3 and 4.
+- Operating theatre: decided separately in [operating-theatre.md](operating-theatre.md) (ADR 0082).
 - Blood transfusion (item 5).
 - Labour ward and the partograph.
 - ICU.
