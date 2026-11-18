@@ -33,7 +33,9 @@ jobs:
       - run: tools/docs/check-adr-index.sh
       - name: Render the Mermaid diagrams
         run: |
-          bun add --global @mermaid-js/mermaid-cli@12.0.0
+          # Puppeteer's install script (it downloads headless Chrome) asks for node: run it on Bun.
+          bun add --global --ignore-scripts @mermaid-js/mermaid-cli@12.0.0
+          bun "${BUN_INSTALL:-$HOME/.bun}/install/global/node_modules/puppeteer/install.mjs"
           tools/docs/render-mermaid.sh
 
   links:

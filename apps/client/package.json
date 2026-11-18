@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "bunx --bun vite",
-    "codegen": "bun run --cwd ../../packages/design-system lib && panda codegen",
-    "typecheck": "tsc -b",
-    "lint": "oxlint --deny-warnings src scripts test e2e && bun scripts/check-boundaries.ts",
+    "codegen": "bun run --cwd ../../packages/design-system lib && bunx --bun panda codegen",
+    "typecheck": "bunx --bun tsc -b",
+    "lint": "bunx --bun oxlint --deny-warnings src scripts test e2e && bun scripts/check-boundaries.ts",
     "build": "bunx --bun vite build",
     "build:tauri": "bunx --bun vite build --mode tauri",
     "scan": "bun scripts/scan-bundle.ts dist",

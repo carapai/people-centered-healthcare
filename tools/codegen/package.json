@@ -5,8 +5,8 @@
   "scripts": {
     "generate": "cd ../.. && cargo run --quiet --locked -p central-server -- openapi > packages/api-client/openapi/central.json && bun tools/codegen/src/openapi.ts packages/api-client/openapi/central.json packages/api-client/src/central.ts && bun tools/codegen/src/fhir-types.ts crates/contracts/health-fhir-validation/data/r5-elements.json packages/fhir-types/src/r5.ts",
     "check": "bun run generate && cd ../.. && git diff --exit-code -- packages/api-client/openapi packages/api-client/src/central.ts packages/fhir-types/src/r5.ts",
-    "typecheck": "tsc -p tsconfig.json",
-    "lint": "oxlint --deny-warnings src test",
+    "typecheck": "bunx --bun tsc -p tsconfig.json",
+    "lint": "bunx --bun oxlint --deny-warnings src test",
     "test": "bunx --bun vitest run"
   },
   "devDependencies": {

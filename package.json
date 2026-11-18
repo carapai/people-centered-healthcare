@@ -11,7 +11,7 @@
     "tools/codegen"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "bunx --bun tsc -p tsconfig.json",
     "check": "bun run typecheck && bun run --filter '*' check"
   },
   "patchedDependencies": {
