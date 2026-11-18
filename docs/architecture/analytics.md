@@ -14,7 +14,7 @@ How program indicators are defined, computed, stored and synced. The decision is
 | Send | Central | Posts the signed-off Report to DHIS2 through its cells' mappings ([ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md)) |
 
 - **Periods follow when care happened,** not when it was entered. A late entry marks its period's report changed.
-- **Exact counts** go to MoH. Small-cell suppression is for public dashboards only.
+- **Exact counts** go to MoH. Small-cell suppression is for public dashboards only, which are not in v1.
 - **Patient lists** (for example, who is overdue) are worklists on the node, not indicators.
 
 ## Reports
@@ -44,8 +44,35 @@ Decided in [ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-an
 - **Corrections:** changes after sign-off mark the period changed; the in-charge re-signs and central resends the whole form. Lock or approval rejections become a task for the district HMIS focal person. A corrected zero is sent as a deletion unless the cell's zeros are significant.
 - **Manual entry:** a per-facility, per-form *reported through the platform* switch at central; overwrite counts from DHIS2's import summary are shown to the in-charge and district.
 
+## Dashboards
+
+Decided in [ADR 0075](../adr/0075-dashboards-read-indicator-reports-only-over-standard-periods.md).
+
+- **A Visualization** is one saved view (chart, table, map or single number) over chosen indicators, periods, places and Disaggregations. **A Dashboard** arranges Visualizations.
+- **Summaries only:** at central for district and above, and on the edge for the facility, offline. Medians and distinct counts show at facility level only.
+- **Standard periods:** any range of weeks, months, quarters or financial years. There are no arbitrary date ranges.
+- **The data explorer** pivots indicators by place, period and Disaggregation, and saves Visualizations.
+- **Standard Dashboards** ship in the Reporting package. **Saved Dashboards** are user content (`analytics.author`), shared with a person, role or place level.
+- **Scope, freshness and completeness:**
+  - Users see their assigned area.
+  - Each Visualization shows when its data was computed and how many facilities have reported.
+  - A facility that has not synced shows as missing, never as zero.
+- **Maps:** facility points from the NHFR, and boundaries from the national core package.
+- **Thresholds:** values can be coloured by threshold bands. Notifying anyone is not decided (surveillance alerting).
+- **Not in v1:** public dashboards.
+- **Layout: explorer first** (decided from the prototype in [How do the data explorer and a Dashboard look?](https://github.com/carapai/people-centered-healthcare/issues/597), branch `prototype/dashboards`, variant A):
+  - **Data explorer:**
+    - Pickers on the left: data, periods (standard periods only), places in the user's area (or *each area under my place*, which follows the viewer), disaggregation, and series.
+    - Chart-type buttons sit above a live Visualization.
+    - *Save Visualization* takes a title and optionally a Dashboard.
+  - **Dashboards tab:**
+    - Dashboards are listed on the left, standard or saved.
+    - Sharing is with a person, role or place level, and each viewer still sees only their own area.
+    - Each item has *Open in explorer*.
+  - **Every Visualization card** shows where it was computed, when, how many facilities reported, the missing facilities with their last sync, and why a median is absent above facility level.
+
 ## Open
 
 - Which DHIS2 login MoH grants (one integration account or one per facility), and whether eHMIS uses data approval for these forms.
 - CQL: not yet. `octofhir-cql` cannot translate WHO's indicator libraries and misreads R5 data ([#532](https://github.com/carapai/people-centered-healthcare/issues/532)); re-run the spike when it closes those gaps.
-- National and district dashboards, population denominators, surveillance alerting (the map's unexplored areas).
+- Surveillance alerting, and public dashboards with small-cell suppression.

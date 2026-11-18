@@ -102,6 +102,14 @@ _Avoid_: Target, census (for the figure itself)
 The counts for one Indicator, one facility or area and one period; a facility's own report is the figure everyone above it sees.
 _Avoid_: Dataset, submission (for the counts themselves)
 
+**Visualization**:
+One saved view of indicators (a chart, table, map or single number) over chosen periods, places and disaggregations.
+_Avoid_: Chart, favourite, report (a Report has a fixed layout and one period type)
+
+**Dashboard**:
+A named arrangement of Visualizations, for exploring indicators over any standard periods; never sent to DHIS2.
+_Avoid_: Report, scorecard
+
 **HMIS Report**:
 One national reporting form, such as HMIS 105, for one facility and period, filled from Indicator Reports and signed off by the facility before it is sent.
 _Avoid_: Submission, return, dataset (for the form)
