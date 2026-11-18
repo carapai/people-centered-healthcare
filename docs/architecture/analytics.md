@@ -60,10 +60,19 @@ Decided in [ADR 0075](../adr/0075-dashboards-read-indicator-reports-only-over-st
 - **Maps:** facility points from the NHFR, and boundaries from the national core package.
 - **Thresholds:** values can be coloured by threshold bands. Notifying anyone is not decided (surveillance alerting).
 - **Not in v1:** public dashboards.
+- **Layout: explorer first** (decided from the prototype in [How do the data explorer and a Dashboard look?](https://github.com/carapai/people-centered-healthcare/issues/597), branch `prototype/dashboards`, variant A):
+  - **Data explorer:**
+    - Pickers on the left: data, periods (standard periods only), places in the user's area (or *each area under my place*, which follows the viewer), disaggregation, and series.
+    - Chart-type buttons sit above a live Visualization.
+    - *Save Visualization* takes a title and optionally a Dashboard.
+  - **Dashboards tab:**
+    - Dashboards are listed on the left, standard or saved.
+    - Sharing is with a person, role or place level, and each viewer still sees only their own area.
+    - Each item has *Open in explorer*.
+  - **Every Visualization card** shows where it was computed, when, how many facilities reported, the missing facilities with their last sync, and why a median is absent above facility level.
 
 ## Open
 
 - Which DHIS2 login MoH grants (one integration account or one per facility), and whether eHMIS uses data approval for these forms.
 - CQL: not yet. `octofhir-cql` cannot translate WHO's indicator libraries and misreads R5 data ([#532](https://github.com/carapai/people-centered-healthcare/issues/532)); re-run the spike when it closes those gaps.
 - Surveillance alerting, and public dashboards with small-cell suppression.
-- How the data explorer and Dashboards look (a prototype).
