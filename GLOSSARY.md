@@ -146,6 +146,10 @@ _Avoid_: Deployment, release (for activation)
 A configuration setting that a base package explicitly allows a district or facility to change, within values it allows; it never removes a question from a form.
 _Avoid_: Customisation, local copy
 
+**Branding**:
+A deployment's look, chosen from allowed values: accent and gray palettes, corner radius, font, product name and logos. It is set once for the whole deployment and never changes the high-contrast theme.
+_Avoid_: Theme, skin
+
 **Form Layout**:
 The presentation of a form (ordering, grouping, widgets, visibility) kept separately from the clinical definition of the form it presents.
 _Avoid_: Form (for the layout), template
