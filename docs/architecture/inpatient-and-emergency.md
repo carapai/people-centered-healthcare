@@ -68,7 +68,7 @@ stateDiagram-v2
 | Vital signs | `Observation`s, charted | Temperature chart |
 | Fluid balance | Intake and output `Observation`s, with running totals | Fluid balance chart |
 
-Ward stores that track stock at administration post consumption from each dose (ADR 0035). There is no early-warning score in v1.
+Ward stores that track stock at administration post consumption from each dose (ADR 0035). An Early Warning Score can be switched on per ward: see [icu-early-warning-and-mortuary.md](icu-early-warning-and-mortuary.md) (ADR 0085).
 
 ## Ward rounds
 
@@ -118,7 +118,4 @@ The Patient is marked deceased, which stops reminders, Messages and Due List ent
 - Operating theatre: decided separately in [operating-theatre.md](operating-theatre.md) (ADR 0082).
 - Blood transfusion (item 5): decided separately in [blood-transfusion.md](blood-transfusion.md) (ADR 0084).
 - Labour ward and the partograph: decided separately in [labour-and-delivery.md](labour-and-delivery.md) (ADR 0083).
-- ICU.
-- The mortuary.
-- Early-warning scores.
-- Death notification to NIRA.
+- ICU, early-warning scores, the mortuary and death notification to NIRA: decided separately in [icu-early-warning-and-mortuary.md](icu-early-warning-and-mortuary.md) (ADR 0085).
