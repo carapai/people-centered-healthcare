@@ -10,6 +10,8 @@ The research found:
 
 Our own design system is about 900 lines: 7 recipes and the DataTable. The client calls `css()` with our semantic token names in 39 files.
 
+> **Revised in [Publish the design system backlog](https://github.com/carapai/people-centered-healthcare/issues/648):** Park UI's defaults are taken as delivered (its accent, gray, radius, sizes and font stack) and changed only where a need shows. Density keeps two modes but uses Park UI's own sizes: comfortable is its default size, compact its `sm`, with no hand-set 44/32 px values. We add only what Park UI lacks: the high-contrast theme, contrast fixes where axe fails, the `data-theme` mapping, `ds.*` messages, the DataTable, the App Shell and EmptyState.
+
 **The decision:**
 - **Copied source, no dependency.**
   - Park UI's recipes and component parts are copied into `@health/design-system` and ported to Panda 2.
@@ -21,7 +23,7 @@ Our own design system is about 900 lines: 7 recipes and the DataTable. The clien
 - **Park UI's semantic token vocabulary**, including the virtual `colorPalette`, becomes ours.
   - The old names (`bg.canvas`, `fg.muted`, `accent.default`, …) stay as aliases until the client no longer uses them.
   - A lint rule flags old names.
-- **Density stays system-wide.** Control heights, padding and gaps come from density-aware tokens (44 px comfortable, 32 px compact). Size variants remain only where size carries meaning, such as buttons and avatars.
+- **Density stays system-wide.** Comfortable uses Park UI's default component sizes and compact its `sm` sizes, switched by `data-density`. Size variants remain only where size carries meaning, such as buttons and avatars.
 - **Component set.**
   - Our existing 7 are restyled from Park UI.
   - Added for the shell: Button, IconButton, Input, Textarea, Checkbox, Radio Group, Switch, Tabs, Card, Badge, Avatar, Skeleton, Tooltip, Popover, Drawer, Alert, Spinner, Progress.

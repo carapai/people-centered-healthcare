@@ -37,7 +37,7 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 | National core | Profiles, base terminology, SearchParameters, MoH's Age Band Sets | MoH standards team (two approvers) |
 | Terminology | Large code systems and expansions (ICD, LOINC, …) | Terminology lead (two approvers) |
 | Program | Forms, mappings, workflow and program definitions, indicators and program-specific Age Band Sets for ART, TB, ANC, … | Program clinical leads (two approvers) |
-| Country configuration | Roles and permissions, deployment settings | Platform admin (one approver) |
+| Country configuration | Roles and permissions, deployment settings, Branding (`configuration/branding.json` and its logos, [ADR 0081](../adr/0081-deployment-branding-is-a-named-palette-setting-applied-by-attributes-at-runtime.md)) | Platform admin (one approver) |
 | Override | District or facility configuration at declared override points | See [Overrides](#overrides-adr-0026-adr-0067) |
 | Language | One language's wording for another package's forms and code lists, merged in when served ([ADR 0066](../adr/0066-translations-ship-as-language-packs.md)) | One approver who reads the language |
 | Reporting | Reports: indicators laid out for one period type and the levels they run for, and for an HMIS form each cell's DHIS2 mapping with effective dates ([ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md), [ADR 0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md)) | HMIS lead (one approver) |
