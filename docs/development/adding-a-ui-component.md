@@ -8,8 +8,8 @@ A reusable component in the design system, or a screen in a feature module of th
 
 ## Steps
 
-1. **Reusable?** Put it in `@health/design-system` as a Panda CSS 2 slot recipe over an Ark UI 5 component: the recipe in `src/theme/recipes/`, the parts in `src/components/` (see `slot.tsx`), and an example in `example/gallery.tsx`. Park UI is not used. Tables use the `DataTable` (TanStack Table 9 + Virtual, ARIA grid, keyboard model). Icons come from Lucide.
-2. **Tokens:** use semantic tokens (`bg.*`, `fg.*`, `border.*`, `accent.*`, `danger.*`; sizes `control` and `cell`), which carry the light, dark and high-contrast values and the compact density; no raw colours or sizes.
+1. **Reusable?** Put it in `@health/design-system` as a Panda CSS 2 slot recipe over an Ark UI 5 component: the recipe in `src/theme/recipes/`, the parts in `src/components/` (see `slot.tsx`), and an example in `example/gallery.tsx`. Start from the Park UI recipe when one exists (ADR 0080): copy it as source, port it to Panda 2, replace size variants with the density tokens, move its strings into `ds.*` messages, and record its upstream commit in `THIRD_PARTY.md`. Tables use the `DataTable` (TanStack Table 9 + Virtual, ARIA grid, keyboard model). Icons come from Lucide.
+2. **Tokens:** use the semantic tokens on Radix Colors (Park UI's vocabulary, with `colorPalette` for the accent; the older `bg.canvas`, `fg.muted`, `accent.*` names are aliases being removed; sizes `control` and `cell`), which carry the light, dark and high-contrast values and the compact density; no raw colours or sizes.
 3. **Feature screen?** Put it in the Bounded Context's lazily loaded feature module, on the one route tree.
 4. **Data:** read through `FhirClient` and write through the context's command port, via TanStack Query (`queryFn` / `mutationFn`). Never assemble FHIR writes for a business operation in the UI.
 5. **State ownership:** URL state in TanStack Router (Zod-validated search params), field drafts in TanStack Form, processes in XState v5 actors that hold **ids only**, widget state in Ark UI or `useState`.
@@ -37,4 +37,4 @@ A reusable component in the design system, or a screen in a feature module of th
 
 ## Governing decisions
 
-[ADR 0036](../adr/0036-ports-over-swappable-transport-with-tauri-ipc-into-the-shared-router.md), [ADR 0037](../adr/0037-no-clinical-data-in-browser-or-webview-storage.md), [ADR 0038](../adr/0038-fhirpath-js-for-live-form-behaviour.md), [client-application.md](../architecture/client-application.md), [research/frontend.md](../research/frontend.md).
+[ADR 0036](../adr/0036-ports-over-swappable-transport-with-tauri-ipc-into-the-shared-router.md), [ADR 0037](../adr/0037-no-clinical-data-in-browser-or-webview-storage.md), [ADR 0038](../adr/0038-fhirpath-js-for-live-form-behaviour.md), [ADR 0080](../adr/0080-the-design-system-copies-park-ui-recipes-as-source-onto-radix-colors.md), [client-application.md](../architecture/client-application.md), [research/frontend.md](../research/frontend.md).
