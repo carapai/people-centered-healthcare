@@ -31,10 +31,10 @@ sequenceDiagram
   S->>C: ServiceRequest + Referral Summary (sync)
   C->>R: In R's Sync Scope (pull)
   R->>R: Task received, accepted
-  R->>R: Patient arrives: matched, Task arrived
+  R->>R: Patient arrives and is matched, Task arrived
   R->>C: Referral Feedback (sync)
   C->>S: In S's Sync Scope (pull)
-  S->>S: Notification to referring clinician; referral completed
+  S->>S: Notification to referring clinician, referral completed
 ```
 
 Each step works offline at its own facility and syncs when the link returns.
