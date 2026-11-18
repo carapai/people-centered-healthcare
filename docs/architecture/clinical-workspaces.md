@@ -14,7 +14,7 @@ This page consolidates the decided foundations for the health worker and clinica
 | Signatures and amendments | Signed notes are immutable; changes are amendments that `relatesTo` the original | synchronization.md |
 | Forms | Questionnaires with Form Layouts; live behaviour in fhirpath.js; extraction in Rust | questionnaire-extraction.md, ADR 0038 |
 | Orders | Command ports into orders, laboratory and medications; never assembled in the UI | client-application.md |
-| Decision support | FHIRPath guards and decision tables in workflows; CQL-based CDS is in the fog | ADR 0043 |
+| Decision support | Advice from Decision Support Rules in the chart's Advice panel and beside orders and forms | decision-support.md, ADR 0074 |
 | Activity history, provenance | Workflow history, Provenance, AuditEvent | ADR 0044 |
 | Notifications | Server-sent or Tauri events carrying invalidation hints; FCM/APNs push on mobile clients | client-application.md, communications.md |
 | Handover | Task reassignment plus the worklist read model | workflow-engine.md |
@@ -47,4 +47,4 @@ Every role uses the same layout; what fills it comes from the role.
 
 ## Open (fog)
 
-- CQL-based clinical decision support.
+- Drug-drug interaction checks (decision-support.md).

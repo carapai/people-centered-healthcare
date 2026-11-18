@@ -145,7 +145,7 @@ Each extraction run writes, in the same transaction:
   - **observation-based** population.
 - **Where it runs:** `$populate`, evaluated in `health-fhir-extraction` on the node.
 - **Data access.** Population may query local data. It is not pure, which is why it is kept apart from extraction.
-- **Not in v1:** CQL and StructureMap population. CQL stays in the map's rules-language fog.
+- **Not in v1:** CQL and StructureMap population. There is no CQL runtime (ADR 0074).
 - **In code (#94):**
   - **`health_fhir_extraction::populate`:**
     - binds each `launchContext` by name, then the Questionnaire's and each item's `variable`s in turn (`FhirPathEngine::evaluate_with`);

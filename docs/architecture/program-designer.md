@@ -23,7 +23,7 @@ A program is a **program package** (ADR 0024) authored and published through the
 ## Rules
 
 - **Approved sources.** Program packages reference approved clinical protocols and versioned metadata, and need two approvers for clinical content (ADR 0025).
-- **Imports.** WHO SMART L3 content (R4) is imported and converted to R5. CQL logic is not executed in workflow guards, so it is translated into FHIRPath decision tables where possible; CQL for decision support remains in the fog (ADR 0043).
+- **Imports.** WHO SMART L3 content (R4) is imported and converted to R5. CQL logic is never executed: it is translated into FHIRPath decision tables (guards, and Decision Support Rules), and anything untranslatable is flagged for a person to write (ADR 0043, ADR 0074).
 - **Concurrency.** Multiple programs run as separate concurrent Workflow Instances for one patient (ADR 0042).
 - **Program context** on records uses `workflow-episodeOfCare` (questionnaire-extraction.md).
 - **Transfers.** A program transfer between facilities is a central-coordinated hand-over: the old facility closes its episode and the new one opens its own (write-authority.md).
@@ -69,4 +69,3 @@ The Program Designer opens from a changed program package on the draft page, lik
 ## Open (fog)
 
 - The indicator engine, cohorts, and DHIS2 aggregate and tracker export.
-- CQL for decision support.
