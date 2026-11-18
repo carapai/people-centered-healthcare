@@ -11,9 +11,14 @@
     "tools/codegen"
   ],
   "scripts": {
-    "check": "bun run --filter '*' check"
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "bun run typecheck && bun run --filter '*' check"
   },
   "patchedDependencies": {
     "@ark-ui/react@5.39.3": "patches/@ark-ui%2Freact@5.39.3.patch"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2"
   }
 }

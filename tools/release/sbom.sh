@@ -27,7 +27,7 @@ done
 find apps crates tools -name '*.cdx.json' -not -path '*/node_modules/*' -delete
 
 # The Bun workspace's one lock file, at the root.
-bunx @cyclonedx/cdxgen@12.9.0 --type js --spec-version 1.6 --no-recurse \
+bunx --bun @cyclonedx/cdxgen@12.9.0 --type js --spec-version 1.6 --no-recurse \
   --output "$out/web.cdx.json" .
 
 # Each lists what it must: SurrealDB in the binaries, Tauri in the desktop, React in the web app.

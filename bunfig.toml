@@ -1,0 +1,4 @@
+# Bun is the only JavaScript runtime (AGENTS.md § Tooling). `bun run` runs every script and every
+# tool it calls on Bun, even those whose shebang asks for node.
+[run]
+bun = true
