@@ -29,6 +29,7 @@ import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
+import { Route as PrototypeDashboardsRouteImport } from './routes/prototype.dashboards'
 import { Route as PrototypeIndicatorEditorRouteImport } from './routes/prototype.indicator-editor'
 import { Route as PrototypeReportDesignerRouteImport } from './routes/prototype.report-designer'
 import { Route as PrototypeWorkspaceRouteImport } from './routes/prototype.workspace'
@@ -145,6 +146,11 @@ const PortalCallbackRoute = PortalCallbackRouteImport.update({
   path: '/portal/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrototypeDashboardsRoute = PrototypeDashboardsRouteImport.update({
+  id: '/prototype/dashboards',
+  path: '/prototype/dashboards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrototypeIndicatorEditorRoute =
   PrototypeIndicatorEditorRouteImport.update({
     id: '/prototype/indicator-editor',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/dashboards': typeof PrototypeDashboardsRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
   '/prototype/workspace': typeof PrototypeWorkspaceRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/dashboards': typeof PrototypeDashboardsRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
   '/prototype/workspace': typeof PrototypeWorkspaceRoute
@@ -317,6 +325,7 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/portal/callback': typeof PortalCallbackRoute
+  '/prototype/dashboards': typeof PrototypeDashboardsRoute
   '/prototype/indicator-editor': typeof PrototypeIndicatorEditorRoute
   '/prototype/report-designer': typeof PrototypeReportDesignerRoute
   '/prototype/workspace': typeof PrototypeWorkspaceRoute
@@ -356,6 +365,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/dashboards'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
     | '/prototype/workspace'
@@ -393,6 +403,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/dashboards'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
     | '/prototype/workspace'
@@ -430,6 +441,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/portal/callback'
+    | '/prototype/dashboards'
     | '/prototype/indicator-editor'
     | '/prototype/report-designer'
     | '/prototype/workspace'
@@ -468,6 +480,7 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
+  PrototypeDashboardsRoute: typeof PrototypeDashboardsRoute
   PrototypeIndicatorEditorRoute: typeof PrototypeIndicatorEditorRoute
   PrototypeReportDesignerRoute: typeof PrototypeReportDesignerRoute
   PrototypeWorkspaceRoute: typeof PrototypeWorkspaceRoute
@@ -628,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prototype/dashboards': {
+      id: '/prototype/dashboards'
+      path: '/prototype/dashboards'
+      fullPath: '/prototype/dashboards'
+      preLoaderRoute: typeof PrototypeDashboardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prototype/indicator-editor': {
       id: '/prototype/indicator-editor'
       path: '/prototype/indicator-editor'
@@ -756,6 +776,7 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PortalCallbackRoute: PortalCallbackRoute,
+  PrototypeDashboardsRoute: PrototypeDashboardsRoute,
   PrototypeIndicatorEditorRoute: PrototypeIndicatorEditorRoute,
   PrototypeReportDesignerRoute: PrototypeReportDesignerRoute,
   PrototypeWorkspaceRoute: PrototypeWorkspaceRoute,
