@@ -6,12 +6,13 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     // Third-party Babel 7/8 and Panda declarations clash; checked here only (ADR 0054).
     "skipLibCheck": true,
-    "types": ["node", "bun"]
+    "types": ["bun"]
   },
   "include": ["vite.config.ts", "vitest.config.ts", "vitest.contract.config.ts", "playwright.config.ts", "playwright.edge.config.ts", "panda.config.ts", "scripts", "test/contract/server.ts", "test/contract/context.ts", "e2e"]
 }

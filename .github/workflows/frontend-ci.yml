@@ -35,6 +35,13 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+      # Bun is the only JavaScript runtime (AGENTS.md § Tooling): a `node` that fails comes first on PATH.
+      - name: No Node.js
+        run: |
+          mkdir -p "$RUNNER_TEMP/no-node"
+          printf '#!/bin/sh\necho "::error::node was called: $*" >&2\nexit 97\n' > "$RUNNER_TEMP/no-node/node"
+          chmod +x "$RUNNER_TEMP/no-node/node"
+          echo "$RUNNER_TEMP/no-node" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       # Builds @health/design-system with `panda lib` first; the app loads it as its designSystem.
       - run: bun run codegen
@@ -66,6 +73,13 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+      # Bun is the only JavaScript runtime (AGENTS.md § Tooling): a `node` that fails comes first on PATH.
+      - name: No Node.js
+        run: |
+          mkdir -p "$RUNNER_TEMP/no-node"
+          printf '#!/bin/sh\necho "::error::node was called: $*" >&2\nexit 97\n' > "$RUNNER_TEMP/no-node/node"
+          chmod +x "$RUNNER_TEMP/no-node/node"
+          echo "$RUNNER_TEMP/no-node" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bun run lib
       - run: bun run typecheck
@@ -76,8 +90,8 @@ jobs:
       # runner image already carries Chrome's, so an apt mirror outage does not fail the job; a
       # library truly missing still fails the tests.
       - run: |
-          bunx playwright install chromium
-          bunx playwright install-deps chromium || echo "::warning::apt is unreachable; using the runner image's libraries"
+          bunx --bun playwright install chromium
+          bunx --bun playwright install-deps chromium || echo "::warning::apt is unreachable; using the runner image's libraries"
       - run: bun run test
       - run: bun run build:example
 

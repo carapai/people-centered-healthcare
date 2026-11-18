@@ -65,7 +65,7 @@ bun run build && bunx --bun vite preview --port 4173 --strictPort
 
 | Script | Fails when |
 |---|---|
-| `typecheck` | TS 7 errors in the app (full lib checking), or in tool configs (`tsconfig.node.json`, with `skipLibCheck`) |
+| `typecheck` | `tsc -b` over `tsconfig.json`, a solution file: TS 7 errors in the app (`tsconfig.app.json`, full lib checking), or in tool configs, scripts and e2e (`tsconfig.node.json`, Bun's types, with `skipLibCheck`) |
 | `lint` | oxlint errors, including `@tauri-apps/**` imported outside `src/platform/**`; runtime checks or browser storage outside the allowlist (`scripts/check-boundaries.ts`) |
 | `test` | A platform-layer unit test fails (`test/`) |
 | `test:contract` | The `FhirClient` suite fails against either the central or the edge node (`test/contract/`; client-application.md § Ports) |

@@ -14,6 +14,15 @@ Instructions for coding agents working in this repository.
 4. Implement one unblocked task at a time. Before starting, read `docs/planning/current-state.md`. After finishing, update it.
 5. Never claim a check passed unless it was executed successfully in the session.
 
+## Tooling
+
+Bun is the only JavaScript runtime and package manager; Node.js is not installed or assumed anywhere.
+
+- Every tool in a `package.json` script or a workflow runs as `bunx --bun <tool>` (most npm CLIs' shebangs ask for `node`). Root `bunfig.toml` sets `[run] bun = true` as a backstop, but Bun reads it only from the directory it starts in. Package install scripts that need `node` are skipped (`--ignore-scripts`) and run with `bun` instead.
+- Type definitions come from `@types/bun` (which carries the `node:*` modules), never `@types/node` directly. Every `.ts` file is covered by a `tsconfig.json`; repository-level scripts use the root one.
+- CI puts a `node` that fails on `PATH` in the client, design system and documentation jobs, so any Node dependency fails the build.
+- Exceptions: none. A tool that cannot run on Bun is listed here with the reason before it is used.
+
 ## Repository root
 
 This directory is the `health-platform/` root described in the specification. Do not create a nested `health-platform/` folder.

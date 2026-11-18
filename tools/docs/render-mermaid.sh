@@ -2,7 +2,7 @@
 # Renders every ```mermaid block in the tracked Markdown, so a diagram that does not parse
 # fails documentation.yml:
 #
-#   tools/docs/render-mermaid.sh   # needs mmdc (@mermaid-js/mermaid-cli) on PATH
+#   tools/docs/render-mermaid.sh   # needs mmdc (@mermaid-js/mermaid-cli) on PATH; it runs on Bun
 set -euo pipefail
 
 OUT=$(mktemp -d)
@@ -26,7 +26,7 @@ done < <(git ls-files '*.md' | grep -v '^third_party/')
 for diagram in "$OUT"/*.mmd; do
   [[ -e "$diagram" ]] || continue
   count=$((count + 1))
-  if ! error=$(mmdc --quiet --puppeteerConfigFile "$OUT/puppeteer.json" --input "$diagram" --output "${diagram%.mmd}.svg" 2>&1); then
+  if ! error=$(bun "$(command -v mmdc)" --quiet --puppeteerConfigFile "$OUT/puppeteer.json" --input "$diagram" --output "${diagram%.mmd}.svg" 2>&1); then
     source_name=$(basename "${diagram%.mmd}")
     echo "Mermaid block does not render: ${source_name%_*} (line ${source_name##*_})" >&2
     echo "$error" | grep -v '^\s*at ' | head -5 >&2

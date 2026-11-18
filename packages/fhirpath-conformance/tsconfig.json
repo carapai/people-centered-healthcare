@@ -8,10 +8,11 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
-    "skipLibCheck": false,
+    // bun-types and @types/node clash in their own declarations; our code is still checked in full.
+    "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    "types": ["bun"]
   },
   "include": ["src", "test"]
 }

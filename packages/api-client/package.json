@@ -7,8 +7,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "lint": "oxlint --deny-warnings src test",
+    "typecheck": "bunx --bun tsc -p tsconfig.json",
+    "lint": "bunx --bun oxlint --deny-warnings src test",
     "test": "bunx --bun vitest run",
     "check": "bun run typecheck && bun run lint && bun run test"
   },

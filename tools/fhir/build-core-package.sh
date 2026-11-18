@@ -24,7 +24,7 @@ JAR="$ROOT/$JAR"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cp -R "$SRC/sushi-config.yaml" "$SRC/input" "$WORK/"
-(cd "$WORK" && bunx "fsh-sushi@$SUSHI_VERSION" build . >"$WORK/sushi.log" 2>&1) || {
+(cd "$WORK" && bunx --bun "fsh-sushi@$SUSHI_VERSION" build . >"$WORK/sushi.log" 2>&1) || {
   cat "$WORK/sushi.log" >&2
   exit 1
 }
