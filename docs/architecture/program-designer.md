@@ -1,6 +1,6 @@
 # Program designer
 
-This page consolidates how clinical programs (ART, TB, ANC, diabetes, hypertension, immunization, …; MASTER_PROMPT §44) are defined and delivered. The definition model is decided, and so is the Program Designer's screen (below). The Studio's scope, workspace and authoring API are in [studio.md](studio.md).
+This page consolidates how clinical programs (ART, TB, ANC, diabetes, hypertension, immunization ([immunization.md](immunization.md)), …; MASTER_PROMPT §44) are defined and delivered. The definition model is decided, and so is the Program Designer's screen (below). The Studio's scope, workspace and authoring API are in [studio.md](studio.md).
 
 ## A program is a package
 
