@@ -73,6 +73,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Workflow | [workflow-engine.md](workflow-engine.md) |
 | Patients | [patient-identity.md](patient-identity.md), [patient-portal.md](patient-portal.md), [care-journeys.md](care-journeys.md) |
 | Health workers | [clinical-workspaces.md](clinical-workspaces.md) |
+| Messages to patients and staff | [communications.md](communications.md) |
 | Finance | [pricing-and-insurance.md](pricing-and-insurance.md), [billing-and-payments.md](billing-and-payments.md) |
 | Supply chain | [inventory-and-procurement.md](inventory-and-procurement.md) |
 | Edge, LAN, auth | [facility-edge.md](facility-edge.md), [lan-security.md](lan-security.md), [offline-auth.md](offline-auth.md), [backup-and-recovery.md](backup-and-recovery.md) |
@@ -165,7 +166,8 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0070](../adr/0070-reports-are-configuration-that-lay-out-indicators-and-carry-the-dhis2-mapping.md) | A Report is configuration laying out indicators for one period type and the levels it runs for; summaries carry what roll-up needs, medians and distinct counts stay at facility level; HMIS forms are Reports whose cells carry the DHIS2 mapping (amends 0068, 0069) |
 | [0071](../adr/0071-population-estimates-ship-as-yearly-population-packages.md) | Population Estimates ship as a yearly Population package with estimate types given per place or derived by percentage, pro-rated to a Report's period; Age Band Sets live in the national core and program packages, a band change being major |
 | [0072](../adr/0072-report-sections-carry-their-own-disaggregations-and-line-lists-stay-at-the-facility.md) | Each Report section is a table with its own Disaggregations as rows or columns, totals and % change, or a line list of enrollments or visits with any attribute or concept as a column, facility only (amends 0070) |
+| [0073](../adr/0073-messages-are-sent-by-central-over-sms-through-a-local-aggregator.md) | Messages go to patients by SMS from central through a local aggregator behind one `MessageSender` port, with no health detail in the text; templates in Language Packs; opt-in per category for reminders; retried until expiry, no automatic fallback; staff get in-app Notifications |
 
 ## Still open
 
-The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, CQL for decision support, the Studio's screens ([studio.md](studio.md)) and workspace UX, analytics beyond indicators and HMIS reporting ([analytics.md](analytics.md)), communications, R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).
+The map's "Not yet specified" section lists what is deliberately undecided (legal and regulatory review, national PKI and identity governance, CQL for decision support, the Studio's screens ([studio.md](studio.md)) and workspace UX, analytics beyond indicators and HMIS reporting ([analytics.md](analytics.md)), R4 adapters and the integration catalogue, hot standby edges). Validation spikes that gate implementation are listed in [docs/planning/current-state.md](../planning/current-state.md).

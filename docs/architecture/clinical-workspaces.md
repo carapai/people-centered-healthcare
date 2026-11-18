@@ -16,7 +16,7 @@ This page consolidates the decided foundations for the health worker and clinica
 | Orders | Command ports into orders, laboratory and medications; never assembled in the UI | client-application.md |
 | Decision support | FHIRPath guards and decision tables in workflows; CQL-based CDS is in the fog | ADR 0043 |
 | Activity history, provenance | Workflow history, Provenance, AuditEvent | ADR 0044 |
-| Notifications | Server-sent or Tauri events carrying invalidation hints; message channels are in the communications fog | client-application.md |
+| Notifications | Server-sent or Tauri events carrying invalidation hints; FCM/APNs push on mobile clients | client-application.md, communications.md |
 | Handover | Task reassignment plus the worklist read model | workflow-engine.md |
 
 ## Roles (§53)
@@ -47,5 +47,4 @@ Every role uses the same layout; what fills it comes from the role.
 
 ## Open (fog)
 
-- Notification channels (SMS and push).
 - CQL-based clinical decision support.

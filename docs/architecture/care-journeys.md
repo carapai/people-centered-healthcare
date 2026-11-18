@@ -24,5 +24,5 @@ This page consolidates the decided basis for the Care Journey (MASTER_PROMPT §6
 ## Open (fog)
 
 - Journey and timeline UX.
-- Which communications appear (communications fog).
+- Which Messages appear in the timeline (sent Messages are Communications; see communications.md).
 - The analytics projections used for program indicators.

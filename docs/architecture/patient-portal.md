@@ -1,6 +1,6 @@
 # Patient portal
 
-This page consolidates the decided parts of the patient workspace (MASTER_PROMPT §57–62). Identity, assurance, caregiver and request rules are decided in [patient-identity.md](patient-identity.md) (ADRs 0027–0029). Portal UX, notifications, payments in the portal, and result-release rules are **open**.
+This page consolidates the decided parts of the patient workspace (MASTER_PROMPT §57–62). Identity, assurance, caregiver and request rules are decided in [patient-identity.md](patient-identity.md) (ADRs 0027–0029). Portal UX, payments in the portal, and result-release rules are **open**.
 
 ## Where it runs
 
@@ -23,7 +23,7 @@ This page consolidates the decided parts of the patient workspace (MASTER_PROMPT
 | Health record access, released results | Requires `level3` and a link to a Patient; PDP and sensitivity labels apply | Access decided; **which results are "released", and when, is open** |
 | Consent | Consent records; scoped, expiring caregiver grants | Decided |
 | Authorized caregiver access | RelatedPerson + Consent + verification; adolescent confidentiality | Decided |
-| Patient education, secure messages, notifications | Communications | **Open** (communications fog) |
+| Messages (one-time codes, reminders, results ready, receipts) | SMS from central ([communications.md](communications.md), ADR 0073) | Decided; patient education and secure two-way messaging are **open** |
 | Payments | Mobile money via central provider integration (ADR 0032) | Mechanism decided; **portal payment UX is open** |
 | Feedback | — | **Open** |
 
@@ -43,5 +43,5 @@ This page consolidates the decided parts of the patient workspace (MASTER_PROMPT
 
 - Portal UX.
 - Result-release policy (which results, after what clinician action or delay).
-- Messaging and notification channels, including the SMS provider for one-time codes.
+- Patient education and secure two-way messaging.
 - Portal payments and feedback.
