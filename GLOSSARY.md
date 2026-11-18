@@ -254,6 +254,30 @@ _Avoid_: Anaesthetic chart
 The surgeon's signed account of an operation: team, what was done, findings and post-operative orders.
 _Avoid_: Surgical note, theatre note
 
+**Maternity Number**:
+The serial number given to each admission to a maternity ward, separate from the Inpatient Number.
+_Avoid_: Maternity IP number, delivery number
+
+**Labour Chart**:
+The record of a woman's labour, plotted over time against alert and action lines, in the form the facility has activated (partograph or Labour Care Guide).
+_Avoid_: Partogram (unless that form is meant)
+
+**Delivery**:
+One birth event for a woman, with the outcome for each baby born.
+_Avoid_: Birth (for the event), confinement
+
+**Newborn**:
+A baby registered as a Patient at birth and linked to the mother, until discharged from the birth stay.
+_Avoid_: Neonate (as a record type), baby record
+
+**Maternal Death Notification**:
+The required report of a woman's death in pregnancy, childbirth or soon after, made within 24 hours and followed by a review.
+_Avoid_: Maternal death form, death alert
+
+**Birth Return**:
+The weekly list of births in a facility, with their particulars, handed to the civil registration officer.
+_Avoid_: Birth register, NIRA list
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter

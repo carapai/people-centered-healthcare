@@ -117,7 +117,7 @@ The Patient is marked deceased, which stops reminders, Messages and Due List ent
 
 - Operating theatre: decided separately in [operating-theatre.md](operating-theatre.md) (ADR 0082).
 - Blood transfusion (item 5).
-- Labour ward and the partograph.
+- Labour ward and the partograph: decided separately in [labour-and-delivery.md](labour-and-delivery.md) (ADR 0083).
 - ICU.
 - The mortuary.
 - Early-warning scores.
