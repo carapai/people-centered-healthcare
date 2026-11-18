@@ -206,6 +206,18 @@ _Avoid_: User (unqualified), patient account
 The registry's record of a person receiving care, independent of whether they have a Login Account.
 _Avoid_: Client, user
 
+**Referral**:
+A request from one facility that another take over or add to a Patient's care, including a referral back down a level.
+_Avoid_: Transfer (within a facility), consult (within a facility)
+
+**Referral Summary**:
+The sending clinician's signed snapshot of the Patient sent with a Referral.
+_Avoid_: Referral letter, referral form
+
+**Referral Feedback**:
+The receiving facility's reply to a Referral, saying what was found and done and what should continue.
+_Avoid_: Counter-referral, reply slip
+
 **Vaccination Session**:
 One period of vaccinating, at the facility (static) or in the community (outreach), to which each dose and opened vial belongs.
 _Avoid_: Clinic day, immunization day
