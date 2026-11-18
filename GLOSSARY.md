@@ -234,6 +234,14 @@ _Avoid_: Discharge form, discharge letter
 A Patient registered before they can be identified, with sex, estimated age and a temporary name.
 _Avoid_: John Doe, anonymous patient
 
+**Imaging Examination**:
+One imaging procedure performed for a request, such as a chest X-ray or an obstetric ultrasound, whether or not digital images exist.
+_Avoid_: Scan (for the request), study (for a non-DICOM examination)
+
+**Accession Number**:
+The number that ties an imaging request to the examination and any images made for it.
+_Avoid_: Request number, film number
+
 **Referral**:
 A request from one facility that another take over or add to a Patient's care, including a referral back down a level.
 _Avoid_: Transfer (within a facility), consult (within a facility)
