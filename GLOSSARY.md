@@ -278,6 +278,26 @@ _Avoid_: Maternal death form, death alert
 The weekly list of births in a facility, with their particulars, handed to the civil registration officer.
 _Avoid_: Birth register, NIRA list
 
+**Blood Unit**:
+One numbered bag of blood or a blood component, with its group and expiry, tracked from receipt to the Patient who receives it.
+_Avoid_: Pint, blood bag (as a record)
+
+**Transfusion Request**:
+A clinician's signed request for blood or a blood component for a Patient.
+_Avoid_: Blood order, blood request form
+
+**Compatibility Test**:
+The laboratory's check that a Blood Unit is safe to give to a particular Patient.
+_Avoid_: Crossmatch (as a record name), compatibility check
+
+**Blood Issue**:
+The release of a compatible Blood Unit from the blood bank to a ward for one named Patient.
+_Avoid_: Blood dispatch, blood dispense
+
+**Transfusion Reaction**:
+A harmful reaction suspected during or after a transfusion.
+_Avoid_: Adverse reaction (alone), transfusion incident
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter
