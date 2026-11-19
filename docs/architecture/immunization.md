@@ -95,13 +95,19 @@ Decided in [ADR 0086](../adr/0086-campaigns-are-configured-centrally-and-tallied
 - A daily **Campaign Report** shows coverage against target, doses and wastage by district, facility and day. Nothing is sent to EpiVac or ODK.
 - Individually recorded campaign doses print on the Child Health Card printout or a campaign card. No verifiable digital certificate yet.
 
-## AEFI
+## Surveillance
 
-An adverse event following immunization is an `AdverseEvent` linked to the `Immunization`. Sending it to eIDSR waits for case-based surveillance.
+Decided in [ADR 0087](../adr/0087-surveillance-reports-are-computed-from-records-and-handed-to-existing-national-channels.md); facts on branch `research/immunization-campaigns`.
+
+- **Weekly HMIS 033b.** Computed each Monday for the past epidemiological week (Monday to Sunday) from coded diagnoses, deaths, laboratory results and AEFIs, through a row mapping in a package, with zeros. The in-charge reviews and signs it; it prints in triplicate and shows the figures to key into mTrac. Sending stays on mTrac.
+- **Immediately reportable conditions.** The IDSR list is in a package. A diagnosis or event on it raises a Notification and a 24-hour Task for the facility surveillance focal person: notify the district surveillance focal person and complete the case form.
+- **AEFI.** An `AdverseEvent` linked to the `Immunization`, with the IDSR Annex 11A fields: vaccine, batch, expiry, date and time and dose number come from the dose; seriousness is recorded. It prints as Annex 11A and counts in the 033b AE row.
+- **Case investigation.** AFP, measles and neonatal tetanus forms are package Questionnaires filled from the record, including the child's doses and, for neonatal tetanus, the mother's Td doses and delivery. Specimens are laboratory requests referred to UVRI; results, the EPID number and the final classification are recorded. The form prints to travel with the specimen.
+- **Response prompts.** A confirmed neonatal tetanus case puts the mother on the Due List for Td; a measles case prompts vitamin A. Advisory.
 
 ## Not in v1
 
-- Weekly mTrac (HMIS 033b) reports.
-- AEFI to eIDSR.
+- Electronic submission to mTrac, eIDSR and VigiFlow.
+- Outbreak threshold alerting.
 - Printing the child health card.
 - VHT app access.
