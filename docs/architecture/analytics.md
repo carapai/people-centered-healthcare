@@ -39,7 +39,7 @@ Decided in [ADR 0071](../adr/0071-population-estimates-ship-as-yearly-population
 
 Decided in [ADR 0069](../adr/0069-hmis-reports-are-signed-off-at-the-facility-and-sent-by-central.md).
 
-- **v1 forms:** 105, 108 and 106a, aggregate only. 033b is computed and signed in the platform but sent on mTRAC; case forms print for the district (ADR 0087); electronic case-based surveillance waits for MoH.
+- **v1 forms:** 105, 108 and 106a, aggregate only. 033b is computed and signed in the platform and keyed into mTRAC, or sent to DHIS2 where enabled (ADR 0091); case forms print for the district (ADR 0087); electronic case-based surveillance waits for MoH.
 - **Mapping:** each cell of a Report sent to DHIS2 maps to a data set, data element and category option combo, with effective dates, checked against the instance's metadata at Validation. Each facility's org unit ID is set at central and checked against the NHFR.
 - **Corrections:** changes after sign-off mark the period changed; the in-charge re-signs and central resends the whole form. Lock or approval rejections become a task for the district HMIS focal person. A corrected zero is sent as a deletion unless the cell's zeros are significant.
 - **Manual entry:** a per-facility, per-form *reported through the platform* switch at central; overwrite counts from DHIS2's import summary are shown to the in-charge and district.
@@ -58,7 +58,7 @@ Decided in [ADR 0075](../adr/0075-dashboards-read-indicator-reports-only-over-st
   - Each Visualization shows when its data was computed and how many facilities have reported.
   - A facility that has not synced shows as missing, never as zero.
 - **Maps:** facility points from the NHFR, and boundaries from the national core package.
-- **Thresholds:** values can be coloured by threshold bands. Notifying anyone is not decided (surveillance alerting).
+- **Thresholds:** values can be coloured by threshold bands. Outbreak threshold alerts are in [surveillance.md](surveillance.md) (ADR 0091).
 - **Not in v1:** public dashboards.
 - **Layout: explorer first** (decided from the prototype in [How do the data explorer and a Dashboard look?](https://github.com/carapai/people-centered-healthcare/issues/597), branch `prototype/dashboards`, variant A):
   - **Data explorer:**

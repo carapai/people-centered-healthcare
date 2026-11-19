@@ -390,6 +390,14 @@ _Avoid_: Notifiable disease (alone), alert disease
 The national form completed for one suspected case of a disease under surveillance, sent with its specimen.
 _Avoid_: CIF (alone), case form
 
+**Surveillance package**:
+The national package that lists the Immediately Reportable Conditions and the outbreak thresholds for each disease.
+_Avoid_: IDSR config, threshold settings
+
+**Outbreak Alert**:
+The record that a disease crossed an outbreak threshold in a place and week, followed until it is confirmed as an outbreak or discarded.
+_Avoid_: Epidemic alert, signal, threshold breach
+
 **Due List**:
 The Patients at a facility with a dose due or overdue under the immunization schedule.
 _Avoid_: Recommendation list, register

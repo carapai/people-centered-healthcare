@@ -104,6 +104,7 @@ Decided in [ADR 0087](../adr/0087-surveillance-reports-are-computed-from-records
 - **AEFI.** An `AdverseEvent` linked to the `Immunization`, with the IDSR Annex 11A fields: vaccine, batch, expiry, date and time and dose number come from the dose; seriousness is recorded. It prints as Annex 11A and counts in the 033b AE row.
 - **Case investigation.** AFP, measles and neonatal tetanus forms are package Questionnaires filled from the record, including the child's doses and, for neonatal tetanus, the mother's Td doses and delivery. Specimens are laboratory requests referred to UVRI; results, the EPID number and the final classification are recorded. The form prints to travel with the specimen.
 - **Response prompts.** A confirmed neonatal tetanus case puts the mother on the Due List for Td; a measles case prompts vitamin A. Advisory.
+- **Outbreak thresholds and submission** are in [surveillance.md](surveillance.md) (ADR 0091).
 
 ## Not in v1
 

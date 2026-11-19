@@ -76,6 +76,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Immunization | [immunization.md](immunization.md) |
 | Referrals | [referrals.md](referrals.md) |
 | Emergency transport | [emergency-transport.md](emergency-transport.md) |
+| Surveillance | [surveillance.md](surveillance.md) |
 | Inpatient and emergency | [inpatient-and-emergency.md](inpatient-and-emergency.md) |
 | Imaging | [imaging.md](imaging.md) |
 | Operating theatre | [operating-theatre.md](operating-theatre.md) |
@@ -193,6 +194,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0088](../adr/0088-emergency-transport-is-recorded-at-the-facilities-and-dispatch-stays-outside-the-platform.md) | A Referral by ambulance creates a Transport Request (AS1–AS3) updated by hand; Ambulance Trips record vehicle or service, crew and times for response-time Indicators; Handover at the emergency unit; no dispatch console or in-ambulance app, a FHIR port instead; community and MoH e-referral stay paper with the HMIS 032 QR bridge |
 | [0089](../adr/0089-orthanc-gets-worklists-from-the-edge-keeps-images-and-forwards-studies-to-in-country-reporters.md) | The edge feeds Orthanc's Worklists plugin over REST when a request is ready and removes the entry on study arrival; arrival prefills the examination; Orthanc never recycles, keeps images at least 5 years and is backed up in Uganda; studies go to in-country Remote Reporting Services by Transfers Accelerator, reported in the platform when the service is on it; remote reporters carry a UMDPC number |
 | [0090](../adr/0090-drug-interactions-come-from-a-curated-national-interaction-list-not-a-licensed-knowledge-base.md) | Drug interactions come from a curated national Interaction List package of `ClinicalUseDefinition` pairs (ingredients or drug classes, no ATC), seeded from the ONC high-priority list and the Uganda Clinical Guidelines ART table; one built-in rule checks at order-sign and dispense against current orders, active prescriptions and 30 days of dispenses; contraindicated is critical with an override, major a warning, moderate info; overrides persist for the pair; no licensed knowledge base in v1 |
+| [0091](../adr/0091-outbreak-alerts-are-computed-from-a-national-surveillance-package-and-033b-may-go-to-dhis2.md) | A national Surveillance package holds IDSR threshold rules (single case, count, rate, normal channel; Section 11 wins), run weekly on the edge for facility rules and at central for district rules, with DHIS2 baselines (3+ years for a normal channel); crossing one creates an Outbreak Alert with a line list, a 24-hour Task and an SMS to the district team; 033b may go to DHIS2 when MoH permits, mTrac keying stays the default; eIDSR and VigiFlow deferred |
 
 ## Still open
 
