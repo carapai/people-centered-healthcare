@@ -22,6 +22,7 @@ mod recovery;
 mod release;
 mod seed;
 mod seed_media;
+mod studio;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -215,7 +216,10 @@ struct SessionInfo {
 async fn session() {}
 
 #[derive(utoipa::OpenApi)]
-#[openapi(paths(session), components(schemas(SessionInfo)))]
+#[openapi(
+    paths(session, studio::list, studio::page, studio::act),
+    components(schemas(SessionInfo))
+)]
 struct CentralApi;
 
 /// Central's OpenAPI document: its API routes and the system routes. The FHIR API at `/fhir`

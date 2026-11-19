@@ -142,6 +142,7 @@ export function httpPlatform(
       deviceIntegration: false,
       syncStatus: mode === 'edge',
       edgeStatus: mode === 'edge',
+      studio: mode === 'central',
     },
   }
 }

@@ -37,6 +37,8 @@ import { Route as StockEquipmentRouteImport } from './routes/stock.equipment'
 import { Route as StockProductsRouteImport } from './routes/stock.products'
 import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
+import { Route as StudioIndexRouteImport } from './routes/studio.index'
+import { Route as StudioIdRouteImport } from './routes/studio.$id'
 import { Route as SyncConflictsRouteImport } from './routes/sync.conflicts'
 import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
@@ -182,6 +184,16 @@ const StockRequisitionsRoute = StockRequisitionsRouteImport.update({
   path: '/stock/requisitions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIndexRoute = StudioIndexRouteImport.update({
+  id: '/studio/',
+  path: '/studio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioIdRoute = StudioIdRouteImport.update({
+  id: '/studio/$id',
+  path: '/studio/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SyncConflictsRoute = SyncConflictsRouteImport.update({
   id: '/sync/conflicts',
   path: '/sync/conflicts',
@@ -229,11 +241,13 @@ export interface FileRoutesByFullPath {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/studio/$id': typeof StudioIdRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
+  '/studio/': typeof StudioIndexRoute
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
 }
@@ -263,11 +277,13 @@ export interface FileRoutesByTo {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/studio/$id': typeof StudioIdRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal': typeof PortalIndexRoute
   '/reception': typeof ReceptionIndexRoute
   '/stock': typeof StockIndexRoute
+  '/studio': typeof StudioIndexRoute
   '/till': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
 }
@@ -298,11 +314,13 @@ export interface FileRoutesById {
   '/stock/products': typeof StockProductsRoute
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
+  '/studio/$id': typeof StudioIdRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
   '/reception/': typeof ReceptionIndexRoute
   '/stock/': typeof StockIndexRoute
+  '/studio/': typeof StudioIndexRoute
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
 }
@@ -334,11 +352,13 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/studio/$id'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
     | '/reception/'
     | '/stock/'
+    | '/studio/'
     | '/till/'
     | '/records/$type/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -368,11 +388,13 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/studio/$id'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal'
     | '/reception'
     | '/stock'
+    | '/studio'
     | '/till'
     | '/records/$type/$id'
   id:
@@ -402,11 +424,13 @@ export interface FileRouteTypes {
     | '/stock/products'
     | '/stock/receive'
     | '/stock/requisitions'
+    | '/studio/$id'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
     | '/reception/'
     | '/stock/'
+    | '/studio/'
     | '/till/'
     | '/records/$type/$id'
   fileRoutesById: FileRoutesById
@@ -437,11 +461,13 @@ export interface RootRouteChildren {
   StockProductsRoute: typeof StockProductsRoute
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
+  StudioIdRoute: typeof StudioIdRoute
   SyncConflictsRoute: typeof SyncConflictsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
   PortalIndexRoute: typeof PortalIndexRoute
   ReceptionIndexRoute: typeof ReceptionIndexRoute
   StockIndexRoute: typeof StockIndexRoute
+  StudioIndexRoute: typeof StudioIndexRoute
   TillIndexRoute: typeof TillIndexRoute
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
 }
@@ -644,6 +670,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StockRequisitionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/': {
+      id: '/studio/'
+      path: '/studio'
+      fullPath: '/studio/'
+      preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/$id': {
+      id: '/studio/$id'
+      path: '/studio/$id'
+      fullPath: '/studio/$id'
+      preLoaderRoute: typeof StudioIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sync/conflicts': {
       id: '/sync/conflicts'
       path: '/sync/conflicts'
@@ -701,11 +741,13 @@ const rootRouteChildren: RootRouteChildren = {
   StockProductsRoute: StockProductsRoute,
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
+  StudioIdRoute: StudioIdRoute,
   SyncConflictsRoute: SyncConflictsRoute,
   TillSuperviseRoute: TillSuperviseRoute,
   PortalIndexRoute: PortalIndexRoute,
   ReceptionIndexRoute: ReceptionIndexRoute,
   StockIndexRoute: StockIndexRoute,
+  StudioIndexRoute: StudioIndexRoute,
   TillIndexRoute: TillIndexRoute,
   RecordsTypeIdRoute: RecordsTypeIdRoute,
 }

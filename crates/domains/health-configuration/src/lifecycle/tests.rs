@@ -228,3 +228,43 @@ fn records_serialise_with_their_step() {
     let back: Record = serde_json::from_value(json).expect("read back");
     assert_eq!(back, record);
 }
+
+#[test]
+fn what_a_person_may_do_is_checked_by_the_rules_the_transitions_enforce() {
+    let mut lifecycle = draft(PackageKind::Program);
+    assert_eq!(lifecycle.check(Action::Submit, "ann"), Ok(()));
+    assert_eq!(
+        lifecycle.check(Action::Submit, "eve"),
+        Err(Refused::NotAuthor)
+    );
+    assert_eq!(
+        lifecycle.check(Action::Approve, "bob"),
+        Err(Refused::Stage(Stage::Draft))
+    );
+    to_approval(&mut lifecycle, "rita");
+    // The author is refused review and approval; the stage is right, so that is the reason.
+    assert_eq!(
+        lifecycle.check(Action::Approve, "ann"),
+        Err(Refused::Author)
+    );
+    assert_eq!(
+        lifecycle.check(Action::RequestChanges, "ann"),
+        Err(Refused::Author)
+    );
+    assert_eq!(lifecycle.check(Action::Approve, "bob"), Ok(()));
+    assert_eq!(
+        lifecycle.check(Action::Publish, "ops"),
+        Err(Refused::NotApproved { have: 0, need: 2 })
+    );
+    lifecycle.approve("bob", now()).expect("approved");
+    assert_eq!(
+        lifecycle.check(Action::Approve, "bob"),
+        Err(Refused::AlreadyApproved("bob".into()))
+    );
+    // A check changes nothing.
+    let before = lifecycle.clone();
+    for action in Action::ALL {
+        let _ = lifecycle.check(action, "cara");
+    }
+    assert_eq!(lifecycle, before);
+}

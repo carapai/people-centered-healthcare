@@ -175,6 +175,34 @@ pub enum Refused {
 /// The actor recorded for the automated steps.
 pub const SYSTEM: &str = "system";
 
+/// A step a person takes (studio.md § The authoring API, Allowed actions). The automated steps
+/// (validation and simulation) are not among them: submission runs them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Action {
+    /// An author submits the draft.
+    Submit,
+    /// A reviewer accepts it.
+    Review,
+    /// A reviewer or an approver sends it back to Draft.
+    RequestChanges,
+    /// An approver approves it.
+    Approve,
+    /// It is signed and published.
+    Publish,
+}
+
+impl Action {
+    /// Every action, in the order a package meets them.
+    pub const ALL: [Self; 5] = [
+        Self::Submit,
+        Self::Review,
+        Self::RequestChanges,
+        Self::Approve,
+        Self::Publish,
+    ];
+}
+
 /// One package version on its way to publication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Lifecycle {
@@ -269,6 +297,47 @@ impl Lifecycle {
         }
     }
 
+    /// Whether `by` may take `action` now, by the rules its transition enforces: the transition
+    /// itself calls this, so what is offered and what is enforced cannot drift apart. A reason
+    /// or a fingerprint the transition also needs is not checked here.
+    pub fn check(&self, action: Action, by: &str) -> Result<(), Refused> {
+        match action {
+            Action::Submit => {
+                self.expect(Stage::Draft)?;
+                if self.authors.contains(by) {
+                    Ok(())
+                } else {
+                    Err(Refused::NotAuthor)
+                }
+            }
+            Action::Review => {
+                self.expect(Stage::Review)?;
+                self.independent(by)
+            }
+            Action::RequestChanges => {
+                if !matches!(self.stage, Stage::Review | Stage::Approval) {
+                    return Err(Refused::Stage(self.stage));
+                }
+                self.independent(by)
+            }
+            Action::Approve => {
+                self.expect(Stage::Approval)?;
+                self.independent(by)?;
+                if self.approvers.contains(by) {
+                    return Err(Refused::AlreadyApproved(by.to_owned()));
+                }
+                Ok(())
+            }
+            Action::Publish => {
+                self.ready()?;
+                if blank(by) {
+                    return Err(Refused::Incomplete);
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// `by` replaces the draft's content with `content`, and becomes an author.
     pub fn revise(&mut self, by: &str, content: &str, now: Timestamp) -> Result<Record, Refused> {
         self.expect(Stage::Draft)?;
@@ -282,10 +351,7 @@ impl Lifecycle {
 
     /// An author submits the draft for validation.
     pub fn submit(&mut self, by: &str, now: Timestamp) -> Result<Record, Refused> {
-        self.expect(Stage::Draft)?;
-        if !self.authors.contains(by) {
-            return Err(Refused::NotAuthor);
-        }
+        self.check(Action::Submit, by)?;
         Ok(self.record(Step::Submitted, Stage::Validation, by, now))
     }
 
@@ -322,8 +388,7 @@ impl Lifecycle {
 
     /// A reviewer who is not an author accepts it.
     pub fn review(&mut self, by: &str, now: Timestamp) -> Result<Record, Refused> {
-        self.expect(Stage::Review)?;
-        self.independent(by)?;
+        self.check(Action::Review, by)?;
         self.reviewer = Some(by.to_owned());
         Ok(self.record(Step::Reviewed, Stage::Approval, by, now))
     }
@@ -335,10 +400,7 @@ impl Lifecycle {
         reason: &str,
         now: Timestamp,
     ) -> Result<Record, Refused> {
-        if !matches!(self.stage, Stage::Review | Stage::Approval) {
-            return Err(Refused::Stage(self.stage));
-        }
-        self.independent(by)?;
+        self.check(Action::RequestChanges, by)?;
         if blank(reason) {
             return Err(Refused::Incomplete);
         }
@@ -350,11 +412,7 @@ impl Lifecycle {
 
     /// An approver who is not an author, and has not approved it yet, approves it.
     pub fn approve(&mut self, by: &str, now: Timestamp) -> Result<Record, Refused> {
-        self.expect(Stage::Approval)?;
-        self.independent(by)?;
-        if self.approvers.contains(by) {
-            return Err(Refused::AlreadyApproved(by.to_owned()));
-        }
+        self.check(Action::Approve, by)?;
         self.approvers.insert(by.to_owned());
         Ok(self.record(Step::Approved, Stage::Approval, by, now))
     }
@@ -373,10 +431,7 @@ impl Lifecycle {
     /// `by` published it, signing content fingerprinted `signed`, which must be what was
     /// approved.
     pub fn publish(&mut self, by: &str, signed: &str, now: Timestamp) -> Result<Record, Refused> {
-        self.ready()?;
-        if blank(by) {
-            return Err(Refused::Incomplete);
-        }
+        self.check(Action::Publish, by)?;
         if signed != self.content {
             return Err(Refused::ContentChanged {
                 approved: self.content.clone(),

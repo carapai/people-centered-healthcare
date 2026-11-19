@@ -3,6 +3,43 @@
 
 import { z } from 'zod'
 
+import { integer } from './numbers'
+
+/** Where a package version stands in the lifecycle. */
+export const PackageStage = z.enum(["draft", "validation", "simulation", "review", "approval", "published"])
+export type PackageStage = z.infer<typeof PackageStage>
+
+/** What kind of refusal: the client words it. */
+export const StudioRefusalCode = z.enum(["permission", "stage", "author", "not-author", "already-approved", "approvals-needed", "not-published", "other"])
+export type StudioRefusalCode = z.infer<typeof StudioRefusalCode>
+
+/** Why a step is refused. */
+export const ActionRefusal = z.object({
+  /** What kind of refusal. */
+  "code": StudioRefusalCode,
+  /** In English, e.g. "You wrote this draft, so you cannot review or approve it". */
+  "message": z.string(),
+  /** How many more approvals, for `approvals-needed`. */
+  "missing": integer.nullable().optional(),
+  /** The permission missing, for `permission`. */
+  "permission": z.string().nullable().optional(),
+  "stage": PackageStage.nullable().optional(),
+})
+export type ActionRefusal = z.infer<typeof ActionRefusal>
+
+/** A version active in a scope. */
+export const ActiveScope = z.object({
+  /** The scope, in words (e.g. `national`, `district Kampala`). */
+  "scope": z.string(),
+  /** The version active there. */
+  "version": z.string(),
+})
+export type ActiveScope = z.infer<typeof ActiveScope>
+
+/** How an artefact changed. */
+export const ArtefactChangeType = z.enum(["added", "changed", "removed"])
+export type ArtefactChangeType = z.infer<typeof ArtefactChangeType>
+
 /** One readiness check's result. */
 export const CheckStatus = z.enum(["pass", "fail"])
 export type CheckStatus = z.infer<typeof CheckStatus>
@@ -18,6 +55,20 @@ export const Health = z.object({
 })
 export type Health = z.infer<typeof Health>
 
+/** A step the Studio offers on a package. */
+export const StudioActionName = z.enum(["submit", "review", "approve", "publish", "activate", "request-changes"])
+export type StudioActionName = z.infer<typeof StudioActionName>
+
+/** One step on a package, and why the signed-in person may not take it. */
+export const PackageAction = z.object({
+  /** The step. */
+  "action": StudioActionName,
+  /** Whether they may take it now. */
+  "allowed": z.boolean(),
+  "refusal": ActionRefusal.nullable().optional(),
+})
+export type PackageAction = z.infer<typeof PackageAction>
+
 /** `ready` when every check passes. */
 export const ReadyStatus = z.enum(["ready", "not-ready"])
 export type ReadyStatus = z.infer<typeof ReadyStatus>
@@ -30,6 +81,10 @@ export const ReadinessReport = z.object({
   "status": ReadyStatus,
 })
 export type ReadinessReport = z.infer<typeof ReadinessReport>
+
+/** How far the version moved from the previous published one. */
+export const SemverBump = z.enum(["none", "patch", "minor", "major"])
+export type SemverBump = z.infer<typeof SemverBump>
 
 /** The signed-in session, as `GET /api/session` answers (served by `health-auth`). */
 export const SessionInfo = z.object({
@@ -46,6 +101,137 @@ export const SessionInfo = z.object({
 })
 export type SessionInfo = z.infer<typeof SessionInfo>
 
+/** What a step needs besides who takes it. */
+export const StudioActionInput = z.object({
+  /** Why changes are requested (`request-changes`), or why it is activated (`activate`). */
+  "reason": z.string().nullable().optional(),
+  /** Where to activate it (`activate`): `national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`. */
+  "scope": z.string().nullable().optional(),
+})
+export type StudioActionInput = z.infer<typeof StudioActionInput>
+
+/** One added, changed or removed artefact. */
+export const StudioArtefactChange = z.object({
+  /** Its version now. */
+  "after": z.string().nullable().optional(),
+  /** Its version before. */
+  "before": z.string().nullable().optional(),
+  /** How it changed. */
+  "change": ArtefactChangeType,
+  /** Its path in the package. */
+  "path": z.string(),
+  /** Its `resourceType`. */
+  "resourceType": z.string(),
+  /** Its canonical URL. */
+  "url": z.string().nullable().optional(),
+})
+export type StudioArtefactChange = z.infer<typeof StudioArtefactChange>
+
+/** Which automated check. */
+export const StudioCheck = z.enum(["validation", "simulation"])
+export type StudioCheck = z.infer<typeof StudioCheck>
+
+/** The latest stored result of one check. */
+export const StudioCheckResult = z.object({
+  /** When it ran (RFC 3339). */
+  "at": z.string(),
+  /** Which check. */
+  "check": StudioCheck,
+  /** Whether it ran on the current content. */
+  "current": z.boolean(),
+  /** Whether it passed. */
+  "passed": z.boolean(),
+  /** Every problem found. */
+  "problems": z.array(z.string()),
+})
+export type StudioCheckResult = z.infer<typeof StudioCheckResult>
+
+/** What happened in one history entry. */
+export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published"])
+export type StudioHistoryStep = z.infer<typeof StudioHistoryStep>
+
+/** One entry of the discussion: a lifecycle record. */
+export const StudioHistoryEntry = z.object({
+  /** When (RFC 3339). */
+  "at": z.string(),
+  /** Who did it (`system` for the automated checks). */
+  "by": z.string(),
+  /** The problems a failed check found. */
+  "problems": z.array(z.string()),
+  /** What a reviewer or approver asked to change. */
+  "reason": z.string().nullable().optional(),
+  /** The stage after. */
+  "stage": PackageStage,
+  /** What happened. */
+  "step": StudioHistoryStep,
+})
+export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
+
+/** The kind of package, which decides its approvers. */
+export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override"])
+export type StudioPackageKind = z.infer<typeof StudioPackageKind>
+
+/** One row of the package list. */
+export const StudioPackage = z.object({
+  /** Every step, each with whether the signed-in person may take it and why not. */
+  "actions": z.array(PackageAction),
+  /** The scopes the package is active in now. */
+  "active": z.array(ActiveScope),
+  /** Everyone who wrote it. */
+  "authors": z.array(z.string()),
+  "bump": SemverBump.nullable().optional(),
+  /** `name@version`. */
+  "id": z.string(),
+  /** Its kind. */
+  "kind": StudioPackageKind,
+  /** The package name. */
+  "name": z.string(),
+  "next": StudioActionName.nullable().optional(),
+  /** The latest published version before it. */
+  "previous": z.string().nullable().optional(),
+  /** Where it stands. */
+  "stage": PackageStage,
+  /** Its title, from its manifest. */
+  "title": z.string().nullable().optional(),
+  /** This version. */
+  "version": z.string(),
+})
+export type StudioPackage = z.infer<typeof StudioPackage>
+
+/** The package list. */
+export const StudioPackageList = z.object({
+  /** One row per package, by name. */
+  "packages": z.array(StudioPackage),
+})
+export type StudioPackageList = z.infer<typeof StudioPackageList>
+
+/** One package version read from top to bottom. */
+export const StudioPackagePage = z.object({
+  /** How many approvals its kind needs. */
+  "approvalsRequired": integer,
+  /** Who has approved it. */
+  "approvers": z.array(z.string()),
+  /** What changed against the previous published version. */
+  "changes": z.array(StudioArtefactChange),
+  /** The stored check results. */
+  "checks": z.array(StudioCheckResult),
+  /** The history, oldest first. */
+  "history": z.array(StudioHistoryEntry),
+  /** Its row in the list, with the actions. */
+  "package": StudioPackage,
+  /** Who accepted it at review. */
+  "reviewer": z.string().nullable().optional(),
+})
+export type StudioPackagePage = z.infer<typeof StudioPackagePage>
+
+/** Why a Studio request failed. */
+export const StudioProblem = z.object({
+  /** What went wrong. */
+  "detail": z.string(),
+  "refusal": ActionRefusal.nullable().optional(),
+})
+export type StudioProblem = z.infer<typeof StudioProblem>
+
 /** Each operation: its method, path and response schemas by status (`null`: no body). */
 export const operations = {
   getSession: {
@@ -54,6 +240,41 @@ export const operations = {
     responses: {
       200: SessionInfo,
       401: null,
+    },
+  },
+  listStudioPackages: {
+    method: 'GET',
+    path: '/api/studio/packages',
+    responses: {
+      200: StudioPackageList,
+      401: StudioProblem,
+      403: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  getStudioPackage: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  takeStudioAction: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/{action}',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+      503: StudioProblem,
     },
   },
   getHealth: {

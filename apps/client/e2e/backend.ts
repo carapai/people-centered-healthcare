@@ -10,7 +10,7 @@
 // tools/synthetic-data). Everything is in memory: it is seeded again each start.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -52,6 +52,12 @@ const env = {
   // The patient portal (#111), sending one-time codes to the development outbox.
   HEALTH_PORTAL_REDIRECT_URIS: `${ORIGIN}/portal/callback`,
   HEALTH_DEV_OTP_OUTBOX: otpOutbox,
+  // Central's blob store, which holds the Studio's package tarballs (#492).
+  HEALTH_FILES_DIR: (() => {
+    const files = join(dir, 'files')
+    mkdirSync(files)
+    return files
+  })(),
   // Payments at one till (#254).
   HEALTH_PAYMENT_TILLS: 'till-1',
   // The ANC visit form (#92), and the OPD triage form with its vital-signs mapping (#103) from
@@ -121,7 +127,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], admin: ADMIN_PERMISSIONS },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], admin: ADMIN_PERMISSIONS },
       labels: [],
     }),
   ),
@@ -161,6 +167,10 @@ for (const user of Object.values(USERS)) {
 }
 children.push(spawn(centralBin, [], { env, stdio: 'inherit' }))
 await waitFor(`${CENTRAL}/ready`, 60_000)
+// A draft of the OPD reference package for the Studio (#492), written by someone else than the
+// e2e users, so a reviewer sees it waiting for its author.
+const drafted = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/opd'), '--by', 'e2e-author'], { env, stdio: 'inherit' })
+if (drafted.status !== 0) throw new Error('drafting the Studio package failed')
 if (seedPatients > 0) {
   // Sign-in and the FHIR API answer 503 until they are built, just after /ready.
   for (let tries = 0; (await fetch(`${CENTRAL}/fhir/metadata`).catch(() => undefined))?.status === 503; tries += 1) {

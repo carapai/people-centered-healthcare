@@ -66,6 +66,8 @@ export interface Capabilities {
   syncStatus: boolean
   /** The node serves its own status report (`/admin/status`): a facility edge. */
   edgeStatus: boolean
+  /** The Studio's authoring API (`/api/studio`): central only, never an edge or a desktop. */
+  studio: boolean
 }
 
 /** Which runtime this bundle is serving; read only by the status area, never to branch features. */
