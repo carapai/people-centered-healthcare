@@ -322,6 +322,18 @@ _Avoid_: Body discharge, collection
 The weekly list of deaths in a facility, with their particulars, handed to the civil registration officer.
 _Avoid_: Death register, NIRA death list
 
+**Transport Request**:
+A facility's request for an ambulance to move a referred Patient, with its priority.
+_Avoid_: Ambulance request, dispatch request
+
+**Ambulance Trip**:
+One journey of an ambulance for a Transport Request, with its crew and times.
+_Avoid_: Run, mission, ambulance trip sheet
+
+**Handover**:
+The ambulance crew handing a Patient over to the receiving emergency unit.
+_Avoid_: Handoff, drop-off
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter

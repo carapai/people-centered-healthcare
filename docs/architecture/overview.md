@@ -75,6 +75,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Health workers | [clinical-workspaces.md](clinical-workspaces.md) |
 | Immunization | [immunization.md](immunization.md) |
 | Referrals | [referrals.md](referrals.md) |
+| Emergency transport | [emergency-transport.md](emergency-transport.md) |
 | Inpatient and emergency | [inpatient-and-emergency.md](inpatient-and-emergency.md) |
 | Imaging | [imaging.md](imaging.md) |
 | Operating theatre | [operating-theatre.md](operating-theatre.md) |
@@ -189,6 +190,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0085](../adr/0085-icu-and-the-mortuary-build-on-wards-and-deaths-and-early-warning-is-advisory.md) | A ward has a level of care (ICU or HDU) beside its HMIS 108 Ward Type; ICU Chart package and ICU register view; an advisory Early Warning Score package (MEWS default, per ward, off by default) raising escalation Tasks; Mortuary Admission and Body Release with gate pass, never gated by unpaid fees; police cases need clearance; weekly NIRA Death Return for every facility death |
 | [0086](../adr/0086-campaigns-are-configured-centrally-and-tallied-unless-individual-recording-is-chosen.md) | Campaigns are central configuration with a recording mode: tally per post and day (default for mass campaigns) or individual Immunizations (targeted); campaign doses do not replace routine doses unless set to; Child Health Days are tagged routine sessions; micro-plans are planned sessions; daily Campaign Report; no EpiVac or ODK export |
 | [0087](../adr/0087-surveillance-reports-are-computed-from-records-and-handed-to-existing-national-channels.md) | Weekly HMIS 033b computed from records, signed by the in-charge and sent on mTrac; immediately reportable conditions raise a 24-hour Task; AEFI on IDSR Annex 11A filled from the dose; AFP, measles and NNT case forms filled from the record with specimens referred to UVRI; response prompts as Advice; no electronic eIDSR or VigiFlow submission in v1 |
+| [0088](../adr/0088-emergency-transport-is-recorded-at-the-facilities-and-dispatch-stays-outside-the-platform.md) | A Referral by ambulance creates a Transport Request (AS1–AS3) updated by hand; Ambulance Trips record vehicle or service, crew and times for response-time Indicators; Handover at the emergency unit; no dispatch console or in-ambulance app, a FHIR port instead; community and MoH e-referral stay paper with the HMIS 032 QR bridge |
 
 ## Still open
 

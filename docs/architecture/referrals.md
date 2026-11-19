@@ -71,6 +71,4 @@ Each step works offline at its own facility and syncs when the link returns.
 
 ## Not in v1
 
-- Ambulance dispatch: the 912 number, call and dispatch centres, KDETS.
-- Referrals sent by VHTs from an app.
-- Exchange with outside e-referral systems.
+- Ambulance transport, dispatch, VHT app referrals and outside e-referral systems: decided separately in [emergency-transport.md](emergency-transport.md) (ADR 0088).
