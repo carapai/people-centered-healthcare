@@ -375,6 +375,21 @@ pub(crate) fn routes(
                 subject_layer,
             )),
         );
+        // The Studio's authoring API (#492), at central only, over the package blob store.
+        if let Some(blobs) = &settings.files {
+            api = api.nest(
+                "/studio",
+                crate::studio::router(
+                    publications(fhir_store.clone(), blobs.clone()),
+                    studio_signer(),
+                )
+                .layer(axum::middleware::from_fn(signed_in))
+                .layer(axum::middleware::from_fn_with_state(
+                    subjects.clone(),
+                    subject_layer,
+                )),
+            );
+        }
         let Routes {
             fhir,
             reviews,
@@ -439,6 +454,35 @@ pub(crate) fn routes(
         router = router.merge(sync);
     }
     Ok(router.nest("/api", api))
+}
+
+/// Central's publication lifecycle over `store` and the package blob store, as the `package`
+/// commands run it.
+fn publications(
+    store: SurrealStore,
+    blobs: health_files::FsBlobStore,
+) -> health_publication::Publications {
+    health_publication::Publications::new(
+        store,
+        blobs,
+        Arc::new(SystemClock),
+        health_packages::Schemas::platform(),
+        Arc::new(health_publication::WorkflowSandbox),
+        "central",
+    )
+}
+
+/// The publication-signing key the Studio publishes with, when central is given one
+/// (`HEALTH_PUBLICATION_KEY_FILE`); without it, publishing from the Studio answers 503.
+fn studio_signer() -> Option<Arc<health_publication::LocalSigner>> {
+    std::env::var_os("HEALTH_PUBLICATION_KEY_FILE")?;
+    match crate::package::signer() {
+        Ok(signer) => Some(Arc::new(signer)),
+        Err(_) => {
+            tracing::error!(error.kind = "publication-key", "the Studio cannot publish");
+            None
+        }
+    }
 }
 
 /// Re-derives each completed response a group carries (ADR 0022; questionnaire-extraction.md
@@ -972,6 +1016,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/notes/{*rest}", service.clone())
         .route_service("/api/pharmacy/{*rest}", service.clone())
         .route_service("/api/laboratory/{*rest}", service.clone())
+        .route_service("/api/studio/{*rest}", service.clone())
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
         .route_service("/api/care-plans/{*rest}", service.clone())

@@ -122,6 +122,7 @@ export function tauriPlatform(): Platform {
       deviceIntegration: true,
       syncStatus: true,
       edgeStatus: false,
+      studio: false,
     },
   }
 }

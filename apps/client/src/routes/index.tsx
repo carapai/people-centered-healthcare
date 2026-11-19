@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { accessMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, triageMessages, worklistMessages } from '../i18n/messages'
+import { accessMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, studioMessages, triageMessages, worklistMessages } from '../i18n/messages'
 import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
@@ -96,6 +96,12 @@ function Home() {
               <li>
                 <Link to="/inbox">{intl.formatMessage(inboxMessages.ibTitle)}</Link>
               </li>
+              {/* The Studio is central's only (studio.md § Scope). */}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/studio">{intl.formatMessage(studioMessages.sdTitle)}</Link>
+                </li>
+              ) : null}
               {/* Offline administration lives on the edge (offline-auth.md); it answers non-admins 403. */}
               {platform.device === undefined ? null : (
                 <li>

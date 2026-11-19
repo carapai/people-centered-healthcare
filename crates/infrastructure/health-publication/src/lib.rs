@@ -29,6 +29,9 @@
 //!   It is kept once and logged for every node below, and audited. Rollback is another
 //!   activation, of an earlier version.
 //!
+//! - [`studio`] is what the Studio shows of it (#492): the package list, one package read from
+//!   top to bottom, and the actions the signed-in person may take, each refused one with why.
+//!
 //! Each change is a compare-and-set on the lifecycle's revision, so of two people acting at
 //! once one gets [`Error::Conflict`] rather than overwriting the other.
 
@@ -51,6 +54,7 @@ use uuid::Uuid;
 
 mod extraction;
 mod programs;
+pub mod studio;
 mod workflows;
 
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;

@@ -30,6 +30,253 @@
         }
       }
     },
+    "/api/studio/packages": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the package list.",
+        "description": "The Studio's package list (central only): one row per package, its newest version, with the actions the signed-in person may take and why each other one is refused. Needs a `metadata.*` or `configuration.activate` permission.",
+        "operationId": "listStudioPackages",
+        "responses": {
+          "200": {
+            "description": "The packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackageList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves one package version's page.",
+        "description": "One package version read from top to bottom: what changed against the previous published version, the stored check results, who must act and the history.",
+        "operationId": "getStudioPackage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/{action}": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and takes one lifecycle step.",
+        "description": "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). Answers the page as it is afterwards.",
+        "operationId": "takeStudioAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "description": "The step",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/StudioActionName"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioActionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Done; the page as it is now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The step's permission is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version or step",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The lifecycle refused the step, or it changed meanwhile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A reason or a scope is missing or not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Central has no publication-signing key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -85,6 +332,78 @@
   },
   "components": {
     "schemas": {
+      "ActionRefusal": {
+        "type": "object",
+        "description": "Why a step is refused.",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/StudioRefusalCode",
+            "description": "What kind of refusal."
+          },
+          "message": {
+            "type": "string",
+            "description": "In English, e.g. \"You wrote this draft, so you cannot review or approve it\"."
+          },
+          "missing": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many more approvals, for `approvals-needed`.",
+            "minimum": 0
+          },
+          "permission": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The permission missing, for `permission`."
+          },
+          "stage": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PackageStage",
+                "description": "The package's stage, for `stage`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ActiveScope": {
+        "type": "object",
+        "description": "A version active in a scope.",
+        "required": [
+          "scope",
+          "version"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "The scope, in words (e.g. `national`, `district Kampala`)."
+          },
+          "version": {
+            "type": "string",
+            "description": "The version active there."
+          }
+        }
+      },
+      "ArtefactChangeType": {
+        "type": "string",
+        "description": "How an artefact changed.",
+        "enum": [
+          "added",
+          "changed",
+          "removed"
+        ]
+      },
       "CheckStatus": {
         "type": "string",
         "description": "One readiness check's result.",
@@ -111,6 +430,47 @@
         "description": "Always `pass` when the process answers at all.",
         "enum": [
           "pass"
+        ]
+      },
+      "PackageAction": {
+        "type": "object",
+        "description": "One step on a package, and why the signed-in person may not take it.",
+        "required": [
+          "action",
+          "allowed"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/StudioActionName",
+            "description": "The step."
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether they may take it now."
+          },
+          "refusal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActionRefusal",
+                "description": "Why not, when they may not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PackageStage": {
+        "type": "string",
+        "description": "Where a package version stands in the lifecycle.",
+        "enum": [
+          "draft",
+          "validation",
+          "simulation",
+          "review",
+          "approval",
+          "published"
         ]
       },
       "ReadinessReport": {
@@ -143,6 +503,16 @@
         "enum": [
           "ready",
           "not-ready"
+        ]
+      },
+      "SemverBump": {
+        "type": "string",
+        "description": "How far the version moved from the previous published one.",
+        "enum": [
+          "none",
+          "patch",
+          "minor",
+          "major"
         ]
       },
       "SessionInfo": {
@@ -179,6 +549,403 @@
             "description": "The session id."
           }
         }
+      },
+      "StudioActionInput": {
+        "type": "object",
+        "description": "What a step needs besides who takes it.",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why changes are requested (`request-changes`), or why it is activated (`activate`)."
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to activate it (`activate`): `national`, `district:<code>`, `facility:<code>` or\n`program:<facility>:<program>`."
+          }
+        }
+      },
+      "StudioActionName": {
+        "type": "string",
+        "description": "A step the Studio offers on a package.",
+        "enum": [
+          "submit",
+          "review",
+          "approve",
+          "publish",
+          "activate",
+          "request-changes"
+        ]
+      },
+      "StudioArtefactChange": {
+        "type": "object",
+        "description": "One added, changed or removed artefact.",
+        "required": [
+          "change",
+          "resourceType",
+          "path"
+        ],
+        "properties": {
+          "after": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version now."
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version before."
+          },
+          "change": {
+            "$ref": "#/components/schemas/ArtefactChangeType",
+            "description": "How it changed."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its path in the package."
+          },
+          "resourceType": {
+            "type": "string",
+            "description": "Its `resourceType`."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its canonical URL."
+          }
+        }
+      },
+      "StudioCheck": {
+        "type": "string",
+        "description": "Which automated check.",
+        "enum": [
+          "validation",
+          "simulation"
+        ]
+      },
+      "StudioCheckResult": {
+        "type": "object",
+        "description": "The latest stored result of one check.",
+        "required": [
+          "check",
+          "passed",
+          "problems",
+          "at",
+          "current"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "When it ran (RFC 3339)."
+          },
+          "check": {
+            "$ref": "#/components/schemas/StudioCheck",
+            "description": "Which check."
+          },
+          "current": {
+            "type": "boolean",
+            "description": "Whether it ran on the current content."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether it passed."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every problem found."
+          }
+        }
+      },
+      "StudioHistoryEntry": {
+        "type": "object",
+        "description": "One entry of the discussion: a lifecycle record.",
+        "required": [
+          "step",
+          "by",
+          "at",
+          "stage",
+          "problems"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "When (RFC 3339)."
+          },
+          "by": {
+            "type": "string",
+            "description": "Who did it (`system` for the automated checks)."
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The problems a failed check found."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What a reviewer or approver asked to change."
+          },
+          "stage": {
+            "$ref": "#/components/schemas/PackageStage",
+            "description": "The stage after."
+          },
+          "step": {
+            "$ref": "#/components/schemas/StudioHistoryStep",
+            "description": "What happened."
+          }
+        }
+      },
+      "StudioHistoryStep": {
+        "type": "string",
+        "description": "What happened in one history entry.",
+        "enum": [
+          "created",
+          "revised",
+          "submitted",
+          "validated",
+          "validation-failed",
+          "simulated",
+          "simulation-failed",
+          "reviewed",
+          "changes-requested",
+          "approved",
+          "published"
+        ]
+      },
+      "StudioPackage": {
+        "type": "object",
+        "description": "One row of the package list.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "version",
+          "stage",
+          "authors",
+          "active",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageAction"
+            },
+            "description": "Every step, each with whether the signed-in person may take it and why not."
+          },
+          "active": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveScope"
+            },
+            "description": "The scopes the package is active in now."
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Everyone who wrote it."
+          },
+          "bump": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SemverBump",
+                "description": "How far the version moved from `previous`; absent for a first version."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "`name@version`."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StudioPackageKind",
+            "description": "Its kind."
+          },
+          "name": {
+            "type": "string",
+            "description": "The package name."
+          },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioActionName",
+                "description": "Their next step: the first they may take; absent when there is nothing for them."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The latest published version before it."
+          },
+          "stage": {
+            "$ref": "#/components/schemas/PackageStage",
+            "description": "Where it stands."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title, from its manifest."
+          },
+          "version": {
+            "type": "string",
+            "description": "This version."
+          }
+        }
+      },
+      "StudioPackageKind": {
+        "type": "string",
+        "description": "The kind of package, which decides its approvers.",
+        "enum": [
+          "national-core",
+          "terminology",
+          "program",
+          "country-configuration",
+          "override"
+        ]
+      },
+      "StudioPackageList": {
+        "type": "object",
+        "description": "The package list.",
+        "required": [
+          "packages"
+        ],
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioPackage"
+            },
+            "description": "One row per package, by name."
+          }
+        }
+      },
+      "StudioPackagePage": {
+        "type": "object",
+        "description": "One package version read from top to bottom.",
+        "required": [
+          "package",
+          "changes",
+          "checks",
+          "approvalsRequired",
+          "approvers",
+          "history"
+        ],
+        "properties": {
+          "approvalsRequired": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many approvals its kind needs.",
+            "minimum": 0
+          },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Who has approved it."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioArtefactChange"
+            },
+            "description": "What changed against the previous published version."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCheckResult"
+            },
+            "description": "The stored check results."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioHistoryEntry"
+            },
+            "description": "The history, oldest first."
+          },
+          "package": {
+            "$ref": "#/components/schemas/StudioPackage",
+            "description": "Its row in the list, with the actions."
+          },
+          "reviewer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who accepted it at review."
+          }
+        }
+      },
+      "StudioProblem": {
+        "type": "object",
+        "description": "Why a Studio request failed.",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "What went wrong."
+          },
+          "refusal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActionRefusal",
+                "description": "Why the step was refused, when it was."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "StudioRefusalCode": {
+        "type": "string",
+        "description": "What kind of refusal: the client words it.",
+        "enum": [
+          "permission",
+          "stage",
+          "author",
+          "not-author",
+          "already-approved",
+          "approvals-needed",
+          "not-published",
+          "other"
+        ]
       }
     }
   }

@@ -14,7 +14,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 5 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 4 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 4 | 8 |
-| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 1 | 3 |
+| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 2 | 26 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 8 | 9 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 8 | 8 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
@@ -1551,3 +1551,4 @@ Total: 117 of 137 implementation tasks done (counted from the GitHub milestones)
     - ledger operations on the log;
     - zstd;
     - a multi-node simulation with partitions in nightly CI (testing.md).
+- 2026-11-19: #492 the Studio's package list and read-only draft page: `health-publication::studio` derives each package's allowed actions from `Lifecycle::check` (the rule every transition now calls) and the `metadata.*` permissions; `/api/studio` at central only (`central-server`'s `studio` module, in the OpenAPI document); the client's `/studio` and `/studio/$id`, shown only where `capabilities.studio` (central).

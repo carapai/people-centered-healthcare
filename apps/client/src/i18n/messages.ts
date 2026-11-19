@@ -1524,3 +1524,142 @@ export const conflictMessages = defineMessages<ConflictValues>({
   cfFailed: { id: 'app.conflicts.failed', defaultMessage: 'The decision was not recorded. {reason}', description: 'Conflict review: decision refused' },
   cfBack: { id: 'app.conflicts.back', defaultMessage: 'Back to the queue', description: 'Conflict review action' },
 })
+
+type StudioValues = {
+  sdTitle: {}
+  sdUnavailable: {}
+  sdLoading: {}
+  sdRefused: {}
+  sdFailed: {}
+  sdEmpty: {}
+  sdHint: {}
+  sdColPackage: {}
+  sdColVersion: {}
+  sdColStatus: {}
+  sdColAuthor: {}
+  sdColNext: {}
+  sdColActive: {}
+  sdVersionBump: { version: string; bump: string }
+  sdVersionFirst: { version: string }
+  sdNothing: {}
+  sdNowhere: {}
+  sdActiveIn: { scope: string; version: string }
+  sdBack: {}
+  sdPackageHeading: { title: string; version: string }
+  sdSummary: { name: string; kind: string; stage: string; authors: string }
+  sdChanged: {}
+  sdChangedAgainst: { version: string }
+  sdChangedFirst: {}
+  sdNoChanges: {}
+  sdChangeAdded: { type: string; path: string; version: string }
+  sdChangeChanged: { type: string; path: string; before: string; after: string }
+  sdChangeRemoved: { type: string; path: string; version: string }
+  sdSafe: { failing: number }
+  sdNotChecked: {}
+  sdCheckPassed: { check: string; at: string }
+  sdCheckFailed: { check: string; at: string }
+  sdCheckStale: {}
+  sdWhoActs: {}
+  sdApprovals: { given: number; required: number }
+  sdReviewer: { reviewer: string }
+  sdNoReviewer: {}
+  sdApprovers: { approvers: string }
+  sdDiscussion: {}
+  sdHistoryEntry: { step: string; by: string; at: string }
+  sdReason: {}
+  sdScope: {}
+  sdScopeHint: {}
+  sdDone: {}
+  sdActionFailed: { reason: string }
+  sdRefusalPermission: { permission: string }
+  sdRefusalStage: { stage: string }
+  sdRefusalAuthor: {}
+  sdRefusalNotAuthor: {}
+  sdRefusalAlreadyApproved: {}
+  sdRefusalApprovalsNeeded: { missing: number }
+  sdRefusalNotPublished: {}
+  sdActionSubmit: {}
+  sdActionReview: {}
+  sdActionApprove: {}
+  sdActionPublish: {}
+  sdActionActivate: {}
+  sdActionRequestChanges: {}
+  sdStageDraft: {}
+  sdStageValidation: {}
+  sdStageSimulation: {}
+  sdStageReview: {}
+  sdStageApproval: {}
+  sdStagePublished: {}
+  sdCheckValidation: {}
+  sdCheckSimulation: {}
+}
+
+// The Studio's package list and draft page (features/studio, #492).
+export const studioMessages = defineMessages<StudioValues>({
+  sdTitle: { id: 'app.studio.title', defaultMessage: 'Studio', description: 'Studio package list heading and link' },
+  sdUnavailable: { id: 'app.studio.unavailable', defaultMessage: 'The Studio is only available at central.', description: 'Studio opened on an edge or a desktop' },
+  sdLoading: { id: 'app.studio.loading', defaultMessage: 'Loading the packages…', description: 'Studio: loading' },
+  sdRefused: { id: 'app.studio.refused', defaultMessage: 'You need a metadata permission to use the Studio.', description: 'Studio: no permission' },
+  sdFailed: { id: 'app.studio.failed', defaultMessage: 'The Studio could not be loaded.', description: 'Studio: request failed' },
+  sdEmpty: { id: 'app.studio.empty', defaultMessage: 'There are no packages yet.', description: 'Studio: empty package list' },
+  sdHint: { id: 'app.studio.hint', defaultMessage: 'Move with the arrow keys and press Enter to open a package.', description: 'Studio: how to use the package table' },
+  sdColPackage: { id: 'app.studio.colPackage', defaultMessage: 'Package', description: 'Studio table column' },
+  sdColVersion: { id: 'app.studio.colVersion', defaultMessage: 'Version', description: 'Studio table column' },
+  sdColStatus: { id: 'app.studio.colStatus', defaultMessage: 'Status', description: 'Studio table column' },
+  sdColAuthor: { id: 'app.studio.colAuthor', defaultMessage: 'Author', description: 'Studio table column' },
+  sdColNext: { id: 'app.studio.colNext', defaultMessage: 'Your next step', description: 'Studio table column' },
+  sdColActive: { id: 'app.studio.colActive', defaultMessage: 'Active in', description: 'Studio table column' },
+  sdVersionBump: { id: 'app.studio.versionBump', defaultMessage: '{version} ({bump})', description: 'Studio: a version and its semver bump' },
+  sdVersionFirst: { id: 'app.studio.versionFirst', defaultMessage: '{version} (first version)', description: 'Studio: a first version' },
+  sdNothing: { id: 'app.studio.nothing', defaultMessage: 'Nothing for you', description: 'Studio: no next step for the signed-in person' },
+  sdNowhere: { id: 'app.studio.nowhere', defaultMessage: 'Not active', description: 'Studio: active in no scope' },
+  sdActiveIn: { id: 'app.studio.activeIn', defaultMessage: '{scope} ({version})', description: 'Studio: a scope and the version active there' },
+  sdBack: { id: 'app.studio.back', defaultMessage: 'Back to the packages', description: 'Studio: back to the list' },
+  sdPackageHeading: { id: 'app.studio.packageHeading', defaultMessage: '{title} {version}', description: 'Studio draft page heading' },
+  sdSummary: { id: 'app.studio.summary', defaultMessage: '{name}, {kind} package, {stage}. Written by {authors}.', description: 'Studio draft page summary' },
+  sdChanged: { id: 'app.studio.changed', defaultMessage: 'What changed', description: 'Studio draft page section' },
+  sdChangedAgainst: { id: 'app.studio.changedAgainst', defaultMessage: 'Compared with the published version {version}.', description: 'Studio: what the diff is against' },
+  sdChangedFirst: { id: 'app.studio.changedFirst', defaultMessage: 'This is the first version: every artefact is new.', description: 'Studio: first version diff' },
+  sdNoChanges: { id: 'app.studio.noChanges', defaultMessage: 'No artefact changed.', description: 'Studio: empty diff' },
+  sdChangeAdded: { id: 'app.studio.changeAdded', defaultMessage: 'Added {type} {path}, version {version}', description: 'Studio: an added artefact' },
+  sdChangeChanged: { id: 'app.studio.changeChanged', defaultMessage: 'Changed {type} {path}, version {before} to {after}', description: 'Studio: a changed artefact' },
+  sdChangeRemoved: { id: 'app.studio.changeRemoved', defaultMessage: 'Removed {type} {path}, version {version}', description: 'Studio: a removed artefact' },
+  sdSafe: { id: 'app.studio.safe', defaultMessage: 'Is it safe? {failing, plural, =0 {Nothing failing} one {# check failing} other {# checks failing}}', description: 'Studio draft page section with the failing count' },
+  sdNotChecked: { id: 'app.studio.notChecked', defaultMessage: 'Not checked yet: submitting runs validation and simulation.', description: 'Studio: no check results' },
+  sdCheckPassed: { id: 'app.studio.checkPassed', defaultMessage: '{check} passed, {at}', description: 'Studio: a passing check' },
+  sdCheckFailed: { id: 'app.studio.checkFailed', defaultMessage: '{check} failed, {at}', description: 'Studio: a failing check' },
+  sdCheckStale: { id: 'app.studio.checkStale', defaultMessage: 'The draft changed since this ran.', description: 'Studio: a check result on older content' },
+  sdWhoActs: { id: 'app.studio.whoActs', defaultMessage: 'Who must act', description: 'Studio draft page section' },
+  sdApprovals: { id: 'app.studio.approvals', defaultMessage: '{given} of {required} approvals', description: 'Studio: approvals given and needed' },
+  sdReviewer: { id: 'app.studio.reviewer', defaultMessage: 'Reviewed by {reviewer}', description: 'Studio: who reviewed' },
+  sdNoReviewer: { id: 'app.studio.noReviewer', defaultMessage: 'Not reviewed yet', description: 'Studio: no reviewer yet' },
+  sdApprovers: { id: 'app.studio.approvers', defaultMessage: 'Approved by {approvers}', description: 'Studio: who approved' },
+  sdDiscussion: { id: 'app.studio.discussion', defaultMessage: 'Discussion', description: 'Studio draft page section' },
+  sdHistoryEntry: { id: 'app.studio.historyEntry', defaultMessage: '{step} by {by}, {at}', description: 'Studio: one history entry' },
+  sdReason: { id: 'app.studio.reason', defaultMessage: 'What needs to change', description: 'Studio: request changes reason field' },
+  sdScope: { id: 'app.studio.scope', defaultMessage: 'Activate in', description: 'Studio: activation scope field' },
+  sdScopeHint: { id: 'app.studio.scopeHint', defaultMessage: 'national, district:<code>, facility:<code> or program:<facility>:<program>', description: 'Studio: how to write a scope' },
+  sdDone: { id: 'app.studio.done', defaultMessage: 'Done.', description: 'Studio: a step was taken' },
+  sdActionFailed: { id: 'app.studio.actionFailed', defaultMessage: 'The step was not taken. {reason}', description: 'Studio: a step was refused' },
+  sdRefusalPermission: { id: 'app.studio.refusalPermission', defaultMessage: 'You need the {permission} permission', description: 'Studio: refused, missing permission' },
+  sdRefusalStage: { id: 'app.studio.refusalStage', defaultMessage: 'Not possible while it is at the {stage} stage', description: 'Studio: refused at this stage' },
+  sdRefusalAuthor: { id: 'app.studio.refusalAuthor', defaultMessage: 'You wrote this draft, so you cannot review or approve it', description: 'Studio: refused, separation of duties' },
+  sdRefusalNotAuthor: { id: 'app.studio.refusalNotAuthor', defaultMessage: 'Only an author of this draft may submit it', description: 'Studio: refused, not an author' },
+  sdRefusalAlreadyApproved: { id: 'app.studio.refusalAlreadyApproved', defaultMessage: 'You have already approved this draft', description: 'Studio: refused, approved already' },
+  sdRefusalApprovalsNeeded: { id: 'app.studio.refusalApprovalsNeeded', defaultMessage: '{missing, plural, one {# more approval needed} other {# more approvals needed}}', description: 'Studio: refused, approvals missing' },
+  sdRefusalNotPublished: { id: 'app.studio.refusalNotPublished', defaultMessage: 'Only a published version can be activated', description: 'Studio: refused, not published' },
+  sdActionSubmit: { id: 'app.studio.actionSubmit', defaultMessage: 'Submit', description: 'Studio action' },
+  sdActionReview: { id: 'app.studio.actionReview', defaultMessage: 'Accept the review', description: 'Studio action' },
+  sdActionApprove: { id: 'app.studio.actionApprove', defaultMessage: 'Approve', description: 'Studio action' },
+  sdActionPublish: { id: 'app.studio.actionPublish', defaultMessage: 'Publish', description: 'Studio action' },
+  sdActionActivate: { id: 'app.studio.actionActivate', defaultMessage: 'Activate', description: 'Studio action' },
+  sdActionRequestChanges: { id: 'app.studio.actionRequestChanges', defaultMessage: 'Request changes', description: 'Studio action' },
+  sdStageDraft: { id: 'app.studio.stageDraft', defaultMessage: 'draft', description: 'Studio: lifecycle stage' },
+  sdStageValidation: { id: 'app.studio.stageValidation', defaultMessage: 'validation', description: 'Studio: lifecycle stage' },
+  sdStageSimulation: { id: 'app.studio.stageSimulation', defaultMessage: 'simulation', description: 'Studio: lifecycle stage' },
+  sdStageReview: { id: 'app.studio.stageReview', defaultMessage: 'review', description: 'Studio: lifecycle stage' },
+  sdStageApproval: { id: 'app.studio.stageApproval', defaultMessage: 'approval', description: 'Studio: lifecycle stage' },
+  sdStagePublished: { id: 'app.studio.stagePublished', defaultMessage: 'published', description: 'Studio: lifecycle stage' },
+  sdCheckValidation: { id: 'app.studio.checkValidation', defaultMessage: 'Validation', description: 'Studio: check name' },
+  sdCheckSimulation: { id: 'app.studio.checkSimulation', defaultMessage: 'Simulation', description: 'Studio: check name' },
+})

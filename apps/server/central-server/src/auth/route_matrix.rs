@@ -39,6 +39,7 @@ const FHIR: &str = "crates/infrastructure/health-fhir-server/src/";
 const AUTH: &str = "crates/infrastructure/health-auth/src/";
 const SYNC: &str = "crates/infrastructure/health-sync-server/src/";
 const PROVISIONING: &str = "crates/infrastructure/health-provisioning/src/";
+const STUDIO: &str = "apps/server/central-server/src/studio/";
 
 /// Every router central mounts (`routes`), with each route it declares.
 const INVENTORY: &[Mounted] = &[
@@ -350,6 +351,12 @@ const INVENTORY: &[Mounted] = &[
         paths: &["/session"],
     },
     Mounted {
+        file: "central-server/src/studio/mod.rs",
+        prefix: "/api/studio",
+        gate: Gate::Staff,
+        paths: &["/packages", "/packages/{id}", "/packages/{id}/{action}"],
+    },
+    Mounted {
         file: "health-provisioning/src/routes.rs",
         prefix: "/api",
         gate: Gate::Public,
@@ -376,6 +383,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("health-auth/src/", AUTH),
     ("health-sync-server/src/", SYNC),
     ("health-provisioning/src/", PROVISIONING),
+    ("central-server/src/studio/", STUDIO),
 ];
 
 /// The paths a source file declares with `.route("…"`.
@@ -458,6 +466,7 @@ fn concrete(prefix: &str, path: &str) -> String {
         .replace("{vid}", "1")
         .replace("{version}", "1.0.0")
         .replace("{step}", "submit")
+        .replace("{action}", "approve")
         .replace("{kind}", "ServiceRequest")
         .replace("{state}", "triage")
         .replace("{command}", "claim")

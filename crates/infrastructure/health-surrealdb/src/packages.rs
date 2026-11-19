@@ -99,6 +99,17 @@ impl SurrealTx {
         Ok(all(rows))
     }
 
+    /// The JSON of every lifecycle, published ones too, by id (the Studio's package list).
+    pub async fn package_lifecycles(&mut self) -> Result<Vec<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [data] FROM package_lifecycle ORDER BY id",
+                Vec::new(),
+            )
+            .await?;
+        Ok(all(rows))
+    }
+
     /// Appends record `id` (a UUIDv7) to lifecycle `lifecycle`.
     pub async fn append_package_lifecycle_record(
         &mut self,
