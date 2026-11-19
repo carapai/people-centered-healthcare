@@ -44,7 +44,3 @@ Every role uses the same layout; what fills it comes from the role.
 - **The inbox is a slide-over** from the right, critical first. Items act in place (mark reviewed, approve, sign) or open the patient's tab.
 - **Critical results are a banner on every screen** until someone marks them reviewed.
 - **Density defaults:** compact for clinicians, comfortable for nurses and receptionists. Each user can switch.
-
-## Open (fog)
-
-- Drug-drug interaction checks (decision-support.md).

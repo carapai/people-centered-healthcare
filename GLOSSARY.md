@@ -134,6 +134,10 @@ _Avoid_: CDS rule, alert rule, guard (a guard gates a workflow step)
 A suggestion or warning shown to a clinician by a Decision Support Rule, marked info, warning or critical; it never moves a workflow on its own.
 _Avoid_: Alert, reminder, card
 
+**Interaction List**:
+The curated national list of medicine pairs that interact, each with a severity, effect, management and source, which Decision Support Rules check when medicines are ordered or dispensed.
+_Avoid_: Drug database, DDI knowledge base
+
 **Extraction Mapping**:
 A Published Definition that states which answers on a form become which clinical records, and whether each record stays governed by the form or starts a life of its own.
 _Avoid_: Form mapping, transform
