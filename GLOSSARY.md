@@ -334,6 +334,10 @@ _Avoid_: Run, mission, ambulance trip sheet
 The ambulance crew handing a Patient over to the receiving emergency unit.
 _Avoid_: Handoff, drop-off
 
+**Remote Reporting Service**:
+A radiology service outside the facility that reads its images and writes the report.
+_Avoid_: Teleradiology provider, remote PACS
+
 **Discharge Summary**:
 The signed account of an inpatient stay given to the Patient when they leave.
 _Avoid_: Discharge form, discharge letter
