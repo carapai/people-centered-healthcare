@@ -80,13 +80,27 @@ A dose from the card, the register or another facility is recorded as `Immunizat
 - Its current layout and DHIS2 identifiers are not yet verified. The latest machine-readable template found dates from 2017.
 - Wastage and "fully immunized by 1 year" are Indicators.
 
+## Campaigns
+
+Decided in [ADR 0086](../adr/0086-campaigns-are-configured-centrally-and-tallied-unless-individual-recording-is-chosen.md); facts on branch `research/immunization-campaigns`.
+
+- **Child Health Days** (April and October) are routine static and outreach sessions tagged with the round. Doses count for the schedule; vitamin A and deworming are recorded as medication given at the session. HMIS 075/076 views cover each round.
+- A **Campaign** is configuration published from central: vaccines, eligibility, dates, districts, target population per facility, recording mode, and whether its doses count for the schedule.
+- **Recording mode:**
+  - **tally** (default for mass campaigns): a **Campaign Tally** per post and day, with doses by vaccine and age band and vials issued, used and discarded by reason;
+  - **individual** (targeted campaigns such as mpox): an `Immunization` per dose, marked with its Campaign.
+- Campaign doses do not satisfy routine doses or clear the Due List unless the Campaign is set to count.
+- **Micro-plans** are planned Vaccination Sessions with site, date, team, VHTs and target population.
+- Campaign teams take a sub-store under an Authority Lease and return used and discarded vials by reason each day.
+- A daily **Campaign Report** shows coverage against target, doses and wastage by district, facility and day. Nothing is sent to EpiVac or ODK.
+- Individually recorded campaign doses print on the Child Health Card printout or a campaign card. No verifiable digital certificate yet.
+
 ## AEFI
 
 An adverse event following immunization is an `AdverseEvent` linked to the `Immunization`. Sending it to eIDSR waits for case-based surveillance.
 
 ## Not in v1
 
-- Campaigns: ICHD, mass campaigns, and the mpox and Ebola vaccines.
 - Weekly mTrac (HMIS 033b) reports.
 - AEFI to eIDSR.
 - Printing the child health card.

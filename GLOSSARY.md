@@ -354,6 +354,14 @@ _Avoid_: Counter-referral, reply slip
 One period of vaccinating, at the facility (static) or in the community (outreach), to which each dose and opened vial belongs.
 _Avoid_: Clinic day, immunization day
 
+**Campaign**:
+A time-limited vaccination drive for a defined population, set up nationally, alongside routine immunization.
+_Avoid_: Mass immunization (as a record name), SIA, Child Health Days
+
+**Campaign Tally**:
+The count of doses given and vials used at one campaign post on one day, without a record per person.
+_Avoid_: Tally sheet (as the record), campaign summary
+
 **Due List**:
 The Patients at a facility with a dose due or overdue under the immunization schedule.
 _Avoid_: Recommendation list, register
