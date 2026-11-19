@@ -362,6 +362,14 @@ _Avoid_: Mass immunization (as a record name), SIA, Child Health Days
 The count of doses given and vials used at one campaign post on one day, without a record per person.
 _Avoid_: Tally sheet (as the record), campaign summary
 
+**Immediately Reportable Condition**:
+A disease or event that must be reported to the district within 24 hours of being found.
+_Avoid_: Notifiable disease (alone), alert disease
+
+**Case Investigation Form**:
+The national form completed for one suspected case of a disease under surveillance, sent with its specimen.
+_Avoid_: CIF (alone), case form
+
 **Due List**:
 The Patients at a facility with a dose due or overdue under the immunization schedule.
 _Avoid_: Recommendation list, register
