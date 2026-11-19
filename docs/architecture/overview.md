@@ -79,6 +79,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | Surveillance | [surveillance.md](surveillance.md) |
 | Inpatient and emergency | [inpatient-and-emergency.md](inpatient-and-emergency.md) |
 | Imaging | [imaging.md](imaging.md) |
+| Integrations | [integrations.md](integrations.md) |
 | Operating theatre | [operating-theatre.md](operating-theatre.md) |
 | Labour and delivery | [labour-and-delivery.md](labour-and-delivery.md) |
 | Blood transfusion | [blood-transfusion.md](blood-transfusion.md) |
@@ -195,6 +196,7 @@ Thirteen Bounded Contexts, built as modules of a modular monolith (ADR 0001) and
 | [0089](../adr/0089-orthanc-gets-worklists-from-the-edge-keeps-images-and-forwards-studies-to-in-country-reporters.md) | The edge feeds Orthanc's Worklists plugin over REST when a request is ready and removes the entry on study arrival; arrival prefills the examination; Orthanc never recycles, keeps images at least 5 years and is backed up in Uganda; studies go to in-country Remote Reporting Services by Transfers Accelerator, reported in the platform when the service is on it; remote reporters carry a UMDPC number |
 | [0090](../adr/0090-drug-interactions-come-from-a-curated-national-interaction-list-not-a-licensed-knowledge-base.md) | Drug interactions come from a curated national Interaction List package of `ClinicalUseDefinition` pairs (ingredients or drug classes, no ATC), seeded from the ONC high-priority list and the Uganda Clinical Guidelines ART table; one built-in rule checks at order-sign and dispense against current orders, active prescriptions and 30 days of dispenses; contraindicated is critical with an override, major a warning, moderate info; overrides persist for the pair; no licensed knowledge base in v1 |
 | [0091](../adr/0091-outbreak-alerts-are-computed-from-a-national-surveillance-package-and-033b-may-go-to-dhis2.md) | A national Surveillance package holds IDSR threshold rules (single case, count, rate, normal channel; Section 11 wins), run weekly on the edge for facility rules and at central for district rules, with DHIS2 baselines (3+ years for a normal channel); crossing one creates an Outbreak Alert with a line list, a 24-hour Task and an SMS to the district team; 033b may go to DHIS2 when MoH permits, mTrac keying stays the default; eIDSR and VigiFlow deferred |
+| [0092](../adr/0092-integrations-are-a-catalogue-of-configured-connections-with-one-inbox-for-failed-messages.md) | Each external connection is a configured Integration in one central catalogue; analyser links (ASTM/HL7 over TCP, GeneXpert first, and export files) run on the edge, results preliminary and matched by barcode, Unmatched Results held for the lab; CPHL viral load through UgISL off until credentials; a one-time UgandaEMR R4 migration, no R4 API, HIE adapters deferred; payer claim exports, no insurer API; an Integration Inbox replays or discards failed messages, never edits them |
 
 ## Still open
 

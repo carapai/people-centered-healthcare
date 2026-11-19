@@ -233,5 +233,6 @@ Version-id format and client-supplied ids versus R5's "server SHALL ignore clien
 - **Tier 1 failures** are refused with an OperationOutcome and kept verbatim in the Inbound Dead Letter.
 - **Tier 2–3 failures, and writes the store refuses,** go to quarantine.
 - **Review:** reviewers list entries, replay them (validated again from tier 1, then written) or discard them.
+- **Screens:** the Integration Inbox ([integrations.md](integrations.md), ADR 0092).
 
 Every access is audited. Each integration sets its retention (90 days by default), and `purge` enforces it. The entries live in the `inbound` table (migration `0005_inbound`). The sync-ingest `rejected` status is part of sync ingest ([#81](https://github.com/carapai/people-centered-healthcare/issues/81)). Details: [crates/infrastructure/health-integration/README.md](../../crates/infrastructure/health-integration/README.md).

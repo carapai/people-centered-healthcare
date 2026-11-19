@@ -52,6 +52,18 @@ _Avoid_: Subscription, partition
 The kept raw copy of an external payload that was rejected for failing structural validation. It is held for review and replay so the data is never lost.
 _Avoid_: Quarantine (that is for profile or terminology failures), error queue
 
+**Integration**:
+A configured connection between the platform and one external system, with its own status, credentials and record of successes and failures.
+_Avoid_: Interface, connector, channel
+
+**Integration Inbox**:
+The place where an integration administrator reviews inbound messages that failed validation and replays or discards them.
+_Avoid_: Error queue, dead letter UI
+
+**Unmatched Result**:
+A laboratory result from an analyser that matches no request, held until the laboratory matches it to a request or discards it.
+_Avoid_: Orphan result
+
 **Blocking Key**:
 A coarse value, such as a phonetic name with a birth year, that limits which existing patients are compared with a new record. Only patients who share at least one blocking key are scored.
 _Avoid_: Index key, match key
