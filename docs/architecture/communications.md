@@ -21,6 +21,7 @@ How the platform sends Messages to patients and staff. Decided in [How does the 
 | Results ready | SMS | Opt-in, *results* | 7 days | 08:00–20:00 EAT |
 | Payment receipt | SMS | None (the patient asked for it) | 7 days | No |
 | Staff alert | In-app Notification; FCM/APNs on mobile clients | — | — | — |
+| Outbreak Alert (staff, [surveillance.md](surveillance.md), ADR 0091) | SMS to the district surveillance focal person and district health team | None (duty) | 7 days | No |
 
 ## Flow
 
