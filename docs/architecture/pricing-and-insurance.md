@@ -92,7 +92,7 @@ sequenceDiagram
   C-->>E: claim status and adjustments sync down
 ```
 
-- **Payer adapters.** The payer port is defined in the `coverage` domain crate (dependency-rules.md: driven ports belong to the Module), and there is one adapter per payer in `health-integration`. It uses FHIR Claim where the payer supports it, and an export format or portal file otherwise. No national payer or claim format is assumed; Uganda's NHIS is not in force.
+- **Payer adapters.** The payer port is defined in the `coverage` domain crate (dependency-rules.md: driven ports belong to the Module), and there is one adapter per payer in `health-integration`. It uses FHIR Claim where the payer supports it, and an export format or portal file otherwise. No national payer or claim format is assumed; Uganda's NHIS is not in force. In v1 no payer has an API adapter: each has a claim export from a configurable template, and Smart visit codes and preauthorization numbers are recorded by hand ([integrations.md](integrations.md), ADR 0092).
 - **Preauthorization** is a Claim with `use=preauthorization`. A financial gate can require an approved preauthorization (billing-and-payments.md).
 - **Denials** are a ClaimResponse outcome. **Appeals** are resubmissions referencing the original.
 - **Shortfalls** (decided 2026-11-06): what a payer denies or approves below the claim, **the patient pays**. Each shortfall moves from the coverage's receivable to the patient's. An appeal that succeeds is paid by the payer, and the patient's share is then adjusted.

@@ -142,7 +142,7 @@ stateDiagram-v2
 
 - **Printing** (receipts, labels) goes through the OS.
 - **Barcode scanners** are supported in keyboard-wedge mode, with no driver work.
-- **Serial or HL7 analyser links** are out of v1 and sit in the map's integration-catalogue fog.
+- **Analysers** never connect to the desktop; analyser links run on the Facility Edge Node ([integrations.md](integrations.md), ADR 0092).
 
 ## In code
 
