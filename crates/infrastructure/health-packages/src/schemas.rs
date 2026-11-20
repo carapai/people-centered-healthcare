@@ -28,6 +28,10 @@ pub const LANGUAGE_PACK: &str =
 
 const LANGUAGE_PACK_SCHEMA: &str = include_str!("../schemas/language-pack-1.json");
 
+const OVERRIDE_POINTS_SCHEMA: &str = include_str!("../schemas/override-points-1.json");
+
+const OVERRIDES_SCHEMA: &str = include_str!("../schemas/overrides-1.json");
+
 /// The configuration schemas a software release reads, by `$schema` URI.
 #[derive(Default)]
 pub struct Schemas {
@@ -46,14 +50,21 @@ pub const FORMAT_VERSIONS: &[u32] = &[1];
 
 impl Schemas {
     /// The schemas built into this release, each arriving with the feature that reads its
-    /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]) and Language Pack entries (#502,
-    /// [`LANGUAGE_PACK`]). Configuration naming any other schema
-    /// (override points, settings) is refused until its feature arrives.
+    /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]), Language Pack entries (#502,
+    /// [`LANGUAGE_PACK`]), and override point declarations and settings (#507,
+    /// [`crate::overrides::OVERRIDE_POINTS_SCHEMA`], [`crate::overrides::OVERRIDES_SCHEMA`]).
+    /// Configuration naming any other schema (deployment settings) is refused until its
+    /// feature arrives.
     pub fn platform() -> Self {
         let mut schemas = Self::default();
         for (uri, text) in [
             (FORM_LAYOUT, FORM_LAYOUT_SCHEMA),
             (LANGUAGE_PACK, LANGUAGE_PACK_SCHEMA),
+            (
+                crate::overrides::OVERRIDE_POINTS_SCHEMA,
+                OVERRIDE_POINTS_SCHEMA,
+            ),
+            (crate::overrides::OVERRIDES_SCHEMA, OVERRIDES_SCHEMA),
         ] {
             // Built into the release and checked by its tests, so it always compiles.
             if let Ok(schema) = serde_json::from_str::<Value>(text)

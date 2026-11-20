@@ -34,6 +34,11 @@
 //!   Validation refuses a pack whose target has no published version in the major it targets,
 //!   and the semver check compares its translations (`health_configuration::language`).
 //!
+//! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
+//!   settings against the latest published version of each base package they name, and
+//!   [`Publications::activate`] refuses a base version that would orphan, or put outside its
+//!   values, a setting of an override in effect in an overlapping scope.
+//!
 //! - [`studio`] is what the Studio shows of it (#492): the package list, one package read from
 //!   top to bottom, and the actions the signed-in person may take, each refused one with why.
 //!
@@ -43,10 +48,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use health_configuration::activation::{Activation, ActivationRecord, Scope};
+use health_configuration::activation::{Activation, ActivationRecord, Scope, in_effect};
 use health_configuration::language::{Report, Translates, Translations};
 use health_configuration::lifecycle::semver::{self, BumpProblem, ContentChange, Release};
 use health_configuration::lifecycle::{Lifecycle, Record, Refused, Stage, Step};
+use health_configuration::overrides;
 use health_configuration::package::{PackageKind, Version};
 use health_files::{BlobHash, FsBlobStore};
 use health_packages::{Limits, Packed, PublicationSigner, Schemas};
@@ -422,6 +428,7 @@ impl Publications {
                 translates.package, translates.version
             ));
         }
+        problems.extend(self.override_problems(tx, packed).await?);
         let name = &packed.contents.package.name;
         let latest = self
             .published(tx, name)
@@ -464,6 +471,102 @@ impl Publications {
         }
         if let Err(found) = semver::check(&old, &new, &content) {
             problems.extend(found.iter().map(describe));
+        }
+        Ok(problems)
+    }
+
+    /// An override package's settings checked against the latest published version of each
+    /// base package they name (ADR 0026, ADR 0067): a base that is not published, a key it does
+    /// not declare and a value it does not allow are refused.
+    async fn override_problems(
+        &self,
+        tx: &mut SurrealTx,
+        packed: &Packed,
+    ) -> Result<Vec<String>, Error> {
+        if packed.contents.package.kind != PackageKind::Override {
+            return Ok(Vec::new());
+        }
+        let Ok(settings) = health_packages::overrides::settings(&packed.files) else {
+            // An unreadable file is already a publication problem.
+            return Ok(Vec::new());
+        };
+        let mut problems = Vec::new();
+        for base in overrides::bases(&settings) {
+            let latest = self
+                .published(tx, base)
+                .await?
+                .into_iter()
+                .max_by(|a, b| a.version.cmp(&b.version));
+            let Some(latest) = latest else {
+                problems.push(format!("no version of {base} is published to override"));
+                continue;
+            };
+            let declared = self.packed(&latest.digest).await?;
+            match health_packages::overrides::points(&declared.files) {
+                Ok(points) => problems.extend(
+                    overrides::check(base, &points, &settings)
+                        .iter()
+                        .map(|problem| format!("{problem} (in {})", latest.id)),
+                ),
+                Err(error) => problems.push(error.to_string()),
+            }
+        }
+        Ok(problems)
+    }
+
+    /// What stops published base package `published` being activated in `scope`: each override
+    /// package in effect in a scope overlapping it whose settings for the base the version would
+    /// orphan, or put outside the values it allows (ADR 0026, ADR 0067). The scopes do not say
+    /// which district a facility is in, so a district's base and a facility's override (or the
+    /// reverse) are checked by the node when it switches.
+    async fn override_conflicts(
+        &self,
+        tx: &mut SurrealTx,
+        published: &PublishedPackage,
+        scope: &Scope,
+    ) -> Result<Vec<String>, Error> {
+        if matches!(
+            published.kind,
+            PackageKind::Override | PackageKind::Language
+        ) {
+            return Ok(Vec::new());
+        }
+        let records: Vec<ActivationRecord> = tx
+            .package_activations()
+            .await
+            .map_err(failed)?
+            .iter()
+            .map(|json| serde_json::from_str(json).map_err(failed))
+            .collect::<Result<_, _>>()?;
+        let activations: Vec<Activation> = records.into_iter().map(|r| r.activation).collect();
+        let mut base = None;
+        let mut problems = Vec::new();
+        for active in in_effect(&activations, self.clock.now()) {
+            if active.package == published.package || !active.scope.overlaps(scope) {
+                continue;
+            }
+            let id = format!("{}@{}", active.package, active.version);
+            let Some(json) = tx.published_package(&id).await.map_err(failed)? else {
+                continue;
+            };
+            let found: PublishedPackage = serde_json::from_str(&json).map_err(failed)?;
+            if found.kind != PackageKind::Override {
+                continue;
+            }
+            let settings = self.packed(&found.digest).await?;
+            if base.is_none() {
+                base = Some(self.packed(&published.digest).await?);
+            }
+            let Some(base) = &base else { continue };
+            problems.extend(
+                health_packages::overrides::check(
+                    &published.package,
+                    &base.files,
+                    &settings.files,
+                )?
+                .iter()
+                .map(|problem| format!("{id} in {}: {problem}", active.scope)),
+            );
         }
         Ok(problems)
     }
@@ -626,7 +729,8 @@ impl Publications {
     }
 
     /// `by` activates published `package@version` in `scope` from `effective_at` (now, if
-    /// `None`), saying why. Activating a version that is not published is refused.
+    /// `None`), saying why. Activating a version that is not published is refused, as is a base
+    /// version that conflicts with an override in effect there ([`Error::Conflict`]).
     pub async fn activate(
         &self,
         package: &str,
@@ -644,6 +748,13 @@ impl Publications {
             .map_err(failed)?
             .ok_or_else(|| Error::NotFound(format!("{id} is not published")))?;
         let published: PublishedPackage = serde_json::from_str(&json).map_err(failed)?;
+        let conflicts = self.override_conflicts(&mut tx, &published, &scope).await?;
+        if !conflicts.is_empty() {
+            return Err(Error::Conflict(format!(
+                "{id} cannot be activated in {scope} until its overrides there are removed or changed: {}",
+                conflicts.join("; ")
+            )));
+        }
         let now = self.clock.now();
         let record = ActivationRecord {
             activation: Activation {

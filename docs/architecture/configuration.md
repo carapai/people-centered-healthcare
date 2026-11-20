@@ -153,6 +153,12 @@ sequenceDiagram
 - **Where.** One override package per scope (e.g. `ug.facility.kam013`), edited on the **Facility settings** page at central with `configuration.override`. Edges receive it through configuration sync.
 - **Lifecycle.** Overrides follow the same lifecycle as any package.
 - **Base upgrades.** A base package's major version may remove override points. Validation flags any override that becomes orphaned, or falls outside newly narrowed values, before the new base can be activated in that scope. The Facility settings page offers Remove or Change, and central (`metadata.manage`) may fix them on a facility's behalf with a reason.
+- **In code (#507):**
+  - `health_configuration::overrides` holds the declarations (`Point`: key, `type` boolean, integer, code, codes or order, default, `allowed` list or range, class) and the settings (`Setting`: base package, key, value). An `order` holds every allowed code once, so reordering never drops one, and a key naming hiding (`hidden`, `visible`, `show` and the like) is refused.
+  - The schemas are `override-points/1` and `overrides/1`. An override package has no dependencies and holds only `configuration/overrides.json`, so it keeps working across base versions while its values stay allowed.
+  - Validation checks an override package against the latest published version of each base it names.
+  - `Publications::activate` refuses a base version that orphans, or puts outside its values, a setting of an override in effect in an overlapping scope. Central does not know which district a facility is in, so the node checks the rest when it switches (`health-activation`).
+  - Not yet: the Facility settings page, Apply and pending requests, and the semver rule for a narrowed point.
 
 ## Signing
 

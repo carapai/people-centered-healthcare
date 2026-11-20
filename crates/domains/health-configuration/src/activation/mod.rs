@@ -65,6 +65,41 @@ impl Scope {
     }
 }
 
+impl Scope {
+    /// Whether a node may be in both `self` and `other`, as far as the scopes alone tell: the
+    /// nation holds every scope, and a facility its programs. Which district a facility is in is
+    /// not in the scope, so a district and a facility never overlap here; the node, which knows
+    /// its chain, checks those when it switches.
+    pub fn overlaps(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::National, _) | (_, Self::National) => true,
+            (Self::District { district: a }, Self::District { district: b }) => a == b,
+            (
+                Self::Facility { facility: a } | Self::Program { facility: a, .. },
+                Self::Facility { facility: b },
+            )
+            | (Self::Facility { facility: a }, Self::Program { facility: b, .. }) => a == b,
+            (Self::Program { .. }, Self::Program { .. }) => self == other,
+            _ => false,
+        }
+    }
+}
+
+/// The activation in effect at `now` for each package in each scope: the latest issued of those
+/// already effective.
+pub fn in_effect(activations: &[Activation], now: Timestamp) -> Vec<&Activation> {
+    let mut winners: BTreeMap<(&str, &Scope), &Activation> = BTreeMap::new();
+    for activation in activations.iter().filter(|a| a.effective_at <= now) {
+        let entry = winners
+            .entry((activation.package.as_str(), &activation.scope))
+            .or_insert(activation);
+        if (activation.issued_at, &activation.id) > (entry.issued_at, &entry.id) {
+            *entry = activation;
+        }
+    }
+    winners.into_values().collect()
+}
+
 impl fmt::Display for Scope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

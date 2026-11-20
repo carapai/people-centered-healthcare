@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/overrides/1",
+  "title": "Overrides",
+  "description": "One scope's settings at the override points its base packages declare (ADR 0026, ADR 0067): each names the base package, the point's key and the value chosen.",
+  "type": "object",
+  "required": ["$schema", "settings"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/overrides/1" },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["package", "key", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "package": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "key": { "type": "string", "pattern": "^[a-z0-9]+([.-][a-z0-9]+)*$", "maxLength": 128 },
+          "value": {
+            "oneOf": [
+              { "type": "boolean" },
+              { "type": "integer" },
+              { "type": "string", "minLength": 1 },
+              { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
