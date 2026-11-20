@@ -95,3 +95,55 @@ test('the author edits a file, a stale second tab is refused, and Check now keep
   await expect(page.getByRole('button', { name: 'Submit' })).toBeEnabled()
   await noViolations(page)
 })
+
+// #493: the OPD draft's holder hands it over to a second author. Until they accept, the holder
+// keeps it; once they do, the former holder may no longer edit it. They hand it back after.
+test('a handover takes effect only when accepted, and the former holder can no longer edit', async ({ page, browser }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await expect(page.getByRole('heading', { name: 'Who must act' })).toBeVisible()
+  await type(page, 'Hand over or reassign to', USERS.coauthor.username)
+  await press(page, 'Hand over')
+  await expect(page.getByRole('status').filter({ hasText: 'Done.' })).toBeVisible()
+  await expect(page.getByText(/who is handing it over to/)).toBeVisible()
+  // Not accepted yet: the holder still edits and submits.
+  await expect(page.getByRole('button', { name: 'Submit' })).toBeEnabled()
+  await noViolations(page)
+
+  const other = await (await browser.newContext()).newPage()
+  await signIn(other, USERS.coauthor)
+  await press(other, 'Studio', 'link')
+  await expect(other.getByRole('grid', { name: 'Studio' }).getByText('Accept the handover')).toBeVisible()
+  await other.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await expect(other.getByRole('button', { name: 'Submit' })).toBeDisabled()
+  await press(other, 'Accept the handover')
+  await expect(other.getByRole('status').filter({ hasText: 'Done.' })).toBeVisible()
+  await expect(other.getByRole('button', { name: 'Submit' })).toBeEnabled()
+  await noViolations(other)
+
+  // The former holder may no longer edit or submit it.
+  await page.reload()
+  await page.waitForURL(/\/sign-in\?/)
+  await type(page, 'Username', USERS.author.username)
+  await page.keyboard.press('Tab')
+  await page.keyboard.type(USERS.author.password)
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Who must act' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Submit' })).toHaveAccessibleDescription("Only the draft's holder may do that")
+  await expect(page.getByText("You cannot change this package: Only the draft's holder may do that")).toBeVisible()
+
+  // Handed back, so the draft is its author's again.
+  await type(other, 'Hand over or reassign to', USERS.author.username)
+  await press(other, 'Hand over')
+  await expect(other.getByRole('status').filter({ hasText: 'Done.' })).toBeVisible()
+  await other.context().close()
+  await page.reload()
+  await page.waitForURL(/\/sign-in\?/)
+  await type(page, 'Username', USERS.author.username)
+  await page.keyboard.press('Tab')
+  await page.keyboard.type(USERS.author.password)
+  await page.keyboard.press('Enter')
+  await press(page, 'Accept the handover')
+  await expect(page.getByRole('button', { name: 'Submit' })).toBeEnabled()
+})

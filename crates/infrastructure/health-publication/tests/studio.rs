@@ -162,7 +162,7 @@ async fn an_author_sees_review_and_approval_refused_with_the_reason() {
     assert_eq!(rows[0].next, None);
     assert_eq!(
         refused(&rows[0].actions, StudioAction::Submit).map(|r| r.code),
-        Some(RefusalCode::NotAuthor)
+        Some(RefusalCode::NotHolder)
     );
 
     publications.submit(id, "ann").await.expect("submit");

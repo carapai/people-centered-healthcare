@@ -281,6 +281,7 @@ pub(crate) fn routes(
         });
     }
     let accounts = store.clone();
+    let studio_people = store.clone();
     // Edge provisioning and recovery-key escrow (#268): a one-time code, or the node's own
     // signature, is the only credential, so they are outside the gates.
     let mut provisioning = None;
@@ -382,6 +383,7 @@ pub(crate) fn routes(
                 crate::studio::router(
                     publications(fhir_store.clone(), blobs.clone()),
                     studio_signer(),
+                    studio_accounts(studio_people.clone()),
                 )
                 .layer(axum::middleware::from_fn(signed_in))
                 .layer(axum::middleware::from_fn_with_state(
@@ -470,6 +472,19 @@ fn publications(
         Arc::new(health_publication::WorkflowSandbox),
         "central",
     )
+}
+
+/// The account id of each username, for the Studio's handover and reassignment (#493).
+fn studio_accounts(store: SurrealAuthStore) -> crate::studio::Accounts {
+    Arc::new(move |username: String| {
+        let store = store.clone();
+        Box::pin(async move {
+            health_auth::AuthStore::account_by_username(&store, &username)
+                .await
+                .map(|account| account.map(|account| account.id.to_string()))
+                .map_err(|error| error.to_string())
+        })
+    })
 }
 
 /// The publication-signing key the Studio publishes with, when central is given one

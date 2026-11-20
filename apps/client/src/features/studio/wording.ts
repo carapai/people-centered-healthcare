@@ -14,6 +14,11 @@ const actionLabels = {
   activate: m.sdActionActivate,
   'request-changes': m.sdActionRequestChanges,
   check: m.sdActionCheck,
+  'accept-handover': m.sdActionAcceptHandover,
+  'hand-over': m.sdActionHandOver,
+  'decline-handover': m.sdActionDeclineHandover,
+  withdraw: m.sdActionWithdraw,
+  reassign: m.sdActionReassign,
 } as const satisfies Record<StudioActionName, unknown>
 
 const stageLabels = {
@@ -23,6 +28,7 @@ const stageLabels = {
   review: m.sdStageReview,
   approval: m.sdStageApproval,
   published: m.sdStagePublished,
+  withdrawn: m.sdStageWithdrawn,
 } as const satisfies Record<PackageStage, unknown>
 
 const checkLabels = { validation: m.sdCheckValidation, simulation: m.sdCheckSimulation } as const satisfies Record<StudioCheck, unknown>
@@ -49,8 +55,10 @@ export function refusalText(intl: IntlShape, refusal: ActionRefusal): string {
       return refusal.stage === null || refusal.stage === undefined ? refusal.message : intl.formatMessage(m.sdRefusalStage, { stage: stageLabel(intl, refusal.stage) })
     case 'author':
       return intl.formatMessage(m.sdRefusalAuthor)
-    case 'not-author':
-      return intl.formatMessage(m.sdRefusalNotAuthor)
+    case 'not-holder':
+      return intl.formatMessage(m.sdRefusalNotHolder)
+    case 'not-offered':
+      return intl.formatMessage(m.sdRefusalNotOffered)
     case 'already-approved':
       return intl.formatMessage(m.sdRefusalAlreadyApproved)
     case 'approvals-needed':

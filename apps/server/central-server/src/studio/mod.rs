@@ -10,6 +10,13 @@
 //!   `request-changes` with a `reason`, `approve`, `publish`, `activate` with a `scope`, and
 //!   `check`, *Check now*) and answers the page as it is afterwards.
 //!
+//! The Draft Holder (#493): only the holder edits, checks, submits, hands over or withdraws a
+//! draft. `hand-over` offers it `to` a username, `accept-handover` makes the person offered it
+//! its holder, and `decline-handover` calls the offer off (the holder or the person offered).
+//! `reassign`, with `metadata.manage`, gives it `to` a username at once, for a `reason`.
+//! `withdraw` ends it and answers its page under the id it is kept as; its `name@version` is
+//! free again. The lifecycle records account ids, so a username is looked up here.
+//!
 //! Editing a draft (#494):
 //!
 //! - `POST /drafts` starts one: a copy of a published version (`copyOf`) under the next minor
@@ -24,6 +31,8 @@
 
 mod dto;
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
@@ -38,15 +47,29 @@ use health_publication::{Error, LocalSigner, Publications};
 
 pub(crate) use dto::*;
 
+/// The account id of the person with a username, `None` if there is none, `Err` if the account
+/// store failed.
+pub(crate) type Accounts = Arc<
+    dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<Option<String>, String>> + Send>>
+        + Send
+        + Sync,
+>;
+
 #[derive(Clone)]
 pub(crate) struct Studio {
     publications: Publications,
     signer: Option<Arc<LocalSigner>>,
+    accounts: Accounts,
 }
 
 /// The Studio's routes over `publications`, publishing with `signer` when central has the
-/// publication-signing key. They expect the subject layer's `Subject`.
-pub(crate) fn router(publications: Publications, signer: Option<Arc<LocalSigner>>) -> Router {
+/// publication-signing key, and finding who a draft goes to by username in `accounts`. They
+/// expect the subject layer's `Subject`.
+pub(crate) fn router(
+    publications: Publications,
+    signer: Option<Arc<LocalSigner>>,
+    accounts: Accounts,
+) -> Router {
     Router::new()
         .route("/packages", get(list))
         .route("/packages/{id}", get(page))
@@ -60,6 +83,7 @@ pub(crate) fn router(publications: Publications, signer: Option<Arc<LocalSigner>
         .with_state(Studio {
             publications,
             signer,
+            accounts,
         })
 }
 
@@ -443,7 +467,7 @@ pub(crate) async fn start(
     };
     match started {
         Ok(lifecycle) => {
-            let id = format!("{}@{}", lifecycle.package, lifecycle.version);
+            let id = health_publication::lifecycle_id(&lifecycle);
             answer(&studio, &subject, &id, StatusCode::CREATED).await
         }
         Err(error) => failure(&error),
@@ -476,7 +500,7 @@ impl StudioNewDraft {
 
 /// Documents and takes one lifecycle step.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/{action}", tag = "studio", operation_id = "takeStudioAction",
-    description = "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). `check` (*Check now*) runs validation and simulation on a draft and keeps the results, leaving it in Draft. Answers the page as it is afterwards.",
+    description = "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage, the Draft Holder and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). `check` (*Check now*) runs validation and simulation on a draft and keeps the results, leaving it in Draft. `hand-over` offers the draft `to` a username, who holds it once they `accept-handover`; `decline-handover` calls the offer off. `reassign` (`metadata.manage`) gives it `to` a username at once, for a `reason`. `withdraw` ends an unpublished draft and keeps it under another id, freeing its `name@version`. Answers the page as it is afterwards, under the id it is kept as.",
     params(
         ("id" = String, Path, description = "`name@version`"),
         ("action" = StudioActionName, Path, description = "The step"),
@@ -488,7 +512,7 @@ impl StudioNewDraft {
         (status = 403, description = "The step's permission is missing", body = StudioProblem),
         (status = 404, description = "No such package version or step", body = StudioProblem),
         (status = 409, description = "The lifecycle refused the step, or it changed meanwhile", body = StudioProblem),
-        (status = 422, description = "A reason or a scope is missing or not valid", body = StudioProblem),
+        (status = 422, description = "A reason, a scope or who it goes to is missing or not valid", body = StudioProblem),
         (status = 500, description = "The package store failed", body = StudioProblem),
         (status = 503, description = "Central has no publication-signing key", body = StudioProblem),
     ))]
@@ -517,13 +541,42 @@ pub(crate) async fn act(
     let input = input.map(|Json(input)| input).unwrap_or_default();
     let by = subject.account.as_str();
     let publications = &studio.publications;
+    let mut id = id;
+    let reason = input.reason.as_deref().unwrap_or("").trim().to_owned();
+    let to = match action {
+        StudioAction::HandOver | StudioAction::Reassign => {
+            match recipient(&studio, input.to.as_deref()).await {
+                Ok(to) => to,
+                Err(response) => return *response,
+            }
+        }
+        _ => String::new(),
+    };
     let done = match action {
+        StudioAction::HandOver => publications.hand_over(&id, by, &to).await.map(|_| ()),
+        StudioAction::AcceptHandover => publications.accept_handover(&id, by).await.map(|_| ()),
+        StudioAction::DeclineHandover => publications.decline_handover(&id, by).await.map(|_| ()),
+        StudioAction::Reassign => {
+            if reason.is_empty() {
+                return problem(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "say why the draft is reassigned",
+                    None,
+                );
+            }
+            publications
+                .reassign(&id, by, &to, &reason)
+                .await
+                .map(|_| ())
+        }
+        StudioAction::Withdraw => publications.withdraw(&id, by).await.map(|(kept, _)| {
+            id = kept;
+        }),
         StudioAction::Submit => publications.submit(&id, by).await.map(|_| ()),
         StudioAction::Check => publications.check_now(&id, by).await.map(|_| ()),
         StudioAction::Review => publications.review(&id, by).await.map(|_| ()),
         StudioAction::Approve => publications.approve(&id, by).await.map(|_| ()),
         StudioAction::RequestChanges => {
-            let reason = input.reason.as_deref().unwrap_or("").trim();
             if reason.is_empty() {
                 return problem(
                     StatusCode::UNPROCESSABLE_ENTITY,
@@ -532,7 +585,7 @@ pub(crate) async fn act(
                 );
             }
             publications
-                .request_changes(&id, by, reason)
+                .request_changes(&id, by, &reason)
                 .await
                 .map(|_| ())
         }
@@ -570,11 +623,7 @@ pub(crate) async fn act(
                     );
                 }
             };
-            let reason = input
-                .reason
-                .as_deref()
-                .map(str::trim)
-                .filter(|r| !r.is_empty());
+            let reason = Some(reason.as_str()).filter(|r| !r.is_empty());
             // Only a published version is activated; the lifecycle says whether it is.
             match publications.lifecycle(&id).await {
                 Ok((lifecycle, _))
@@ -600,6 +649,36 @@ pub(crate) async fn act(
         return failure(&error);
     }
     answer(&studio, &subject, &id, StatusCode::OK).await
+}
+
+/// The account id of the person a draft goes to, by the username given.
+async fn recipient(studio: &Studio, to: Option<&str>) -> Result<String, Box<Response>> {
+    let username = to
+        .map(str::trim)
+        .filter(|to| !to.is_empty())
+        .ok_or_else(|| {
+            Box::new(problem(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "say who the draft goes to, by their username",
+                None,
+            ))
+        })?;
+    match (studio.accounts)(username.to_owned()).await {
+        Ok(Some(account)) => Ok(account),
+        Ok(None) => Err(Box::new(problem(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("no account is named {username}"),
+            None,
+        ))),
+        Err(_) => {
+            tracing::error!(error.kind = "store", "the account store failed");
+            Err(Box::new(problem(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "the account store failed",
+                None,
+            )))
+        }
+    }
 }
 
 #[cfg(test)]

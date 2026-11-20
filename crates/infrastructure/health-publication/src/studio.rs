@@ -6,9 +6,13 @@
 //! transition calls, and the permission is the one the Studio's API checks before acting. The
 //! list is advisory: every action is checked again when it is taken (ADR 0025).
 //!
-//! *Check now* (#494) is listed with the others, but is never anyone's next step. Whether the
-//! person may change the draft is [`edit_refusal`], and the page carries the draft's revision
-//! and files for the editors.
+//! *Check now* (#494) is listed with the others, but is never anyone's next step, nor are
+//! handing over, calling a handover off, withdrawing and reassigning (#493): accepting a handover
+//! is. Whether the person may change the draft is [`edit_refusal`], and the page carries the
+//! draft's revision and files for the editors.
+//!
+//! The list shows each package's newest version that is not withdrawn; a withdrawn one shows
+//! only when the package has nothing else, and every withdrawn one is still read by its id.
 
 use std::collections::BTreeMap;
 
@@ -21,7 +25,7 @@ use health_surrealdb::SurrealTx;
 use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, Publications, PublishedPackage, failed, fingerprints};
+use crate::{Error, Publications, PublishedPackage, failed, fingerprints, lifecycle_id};
 
 /// Start, edit, check, submit, hand over and withdraw a draft.
 pub const AUTHOR_PERMISSION: &str = "metadata.author";
@@ -64,12 +68,24 @@ pub enum StudioAction {
     Activate,
     /// *Check now*: run validation and simulation on the draft, keeping the results.
     Check,
+    /// Accept a handover offered to them: they hold the draft from then on.
+    AcceptHandover,
+    /// Offer the draft to someone else, who holds it once they accept.
+    HandOver,
+    /// Call a handover off: the holder keeps the draft.
+    DeclineHandover,
+    /// Withdraw the draft: kept with its history, its `name@version` free again.
+    Withdraw,
+    /// Give a draft whose holder is unavailable to someone else, saying why.
+    Reassign,
 }
 
 impl StudioAction {
-    /// Every action, in the order a package meets them. Requesting changes and *Check now* come
-    /// last: neither is the step a package is waiting for.
-    pub const ALL: [Self; 7] = [
+    /// Every action, in the order a package meets them. Accepting a handover comes first: the
+    /// draft waits for it. Requesting changes, *Check now*, handing over, calling a handover off,
+    /// withdrawing and reassigning come last: none is the step a package is waiting for.
+    pub const ALL: [Self; 12] = [
+        Self::AcceptHandover,
         Self::Submit,
         Self::Review,
         Self::Approve,
@@ -77,17 +93,35 @@ impl StudioAction {
         Self::Activate,
         Self::RequestChanges,
         Self::Check,
+        Self::HandOver,
+        Self::DeclineHandover,
+        Self::Withdraw,
+        Self::Reassign,
     ];
 
     /// The permission it needs (studio.md § The authoring API, Permissions).
     pub fn permission(self) -> &'static str {
         match self {
-            Self::Submit | Self::Check => AUTHOR_PERMISSION,
+            Self::Submit
+            | Self::Check
+            | Self::AcceptHandover
+            | Self::HandOver
+            | Self::DeclineHandover
+            | Self::Withdraw => AUTHOR_PERMISSION,
             Self::Review | Self::RequestChanges => REVIEW_PERMISSION,
             Self::Approve => APPROVE_PERMISSION,
             Self::Publish => PUBLISH_PERMISSION,
             Self::Activate => ACTIVATE_PERMISSION,
+            Self::Reassign => MANAGE_PERMISSION,
         }
+    }
+
+    /// Whether a package waits for it: only such an action is someone's next step.
+    fn awaited(self) -> bool {
+        !matches!(
+            self,
+            Self::Check | Self::HandOver | Self::DeclineHandover | Self::Withdraw | Self::Reassign
+        )
     }
 
     fn lifecycle(self) -> Option<Action> {
@@ -98,6 +132,11 @@ impl StudioAction {
             Self::Approve => Some(Action::Approve),
             Self::Publish => Some(Action::Publish),
             Self::Check => Some(Action::Check),
+            Self::AcceptHandover => Some(Action::AcceptHandover),
+            Self::HandOver => Some(Action::HandOver),
+            Self::DeclineHandover => Some(Action::DeclineHandover),
+            Self::Withdraw => Some(Action::Withdraw),
+            Self::Reassign => Some(Action::Reassign),
             Self::Activate => None,
         }
     }
@@ -113,8 +152,10 @@ pub enum RefusalCode {
     Stage,
     /// They wrote the draft, so they may not review or approve it.
     Author,
-    /// Only an author may submit the draft.
-    NotAuthor,
+    /// Only the Draft Holder may do that.
+    NotHolder,
+    /// No handover is offered to them (or, to the holder, none is pending).
+    NotOffered,
     /// They have approved it already.
     AlreadyApproved,
     /// More approvals are needed before publication.
@@ -185,9 +226,13 @@ impl From<&Refused> for Refusal {
                 RefusalCode::Author,
                 "You wrote this draft, so you cannot review or approve it",
             ),
-            Refused::NotAuthor => Self::new(
-                RefusalCode::NotAuthor,
-                "Only an author of this draft may submit it",
+            Refused::NotHolder => Self::new(
+                RefusalCode::NotHolder,
+                "Only the draft's holder may do that",
+            ),
+            Refused::NotOffered => Self::new(
+                RefusalCode::NotOffered,
+                "No handover of this draft is waiting for you",
             ),
             Refused::AlreadyApproved(_) => Self::new(
                 RefusalCode::AlreadyApproved,
@@ -256,17 +301,19 @@ pub fn allowed(
         .collect()
 }
 
-/// The first action the person may take: their next step, or nothing for them. *Check now* is
-/// never the next step: it changes nothing.
+/// The first action the person may take that the package waits for: their next step, or
+/// nothing for them. *Check now*, handing over, calling a handover off, withdrawing and
+/// reassigning never are.
 pub fn next_step(actions: &[Allowed]) -> Option<StudioAction> {
     actions
         .iter()
-        .find(|allowed| allowed.refused.is_none() && allowed.action != StudioAction::Check)
+        .find(|allowed| allowed.refused.is_none() && allowed.action.awaited())
         .map(|allowed| allowed.action)
 }
 
 /// Why `by` may not change `lifecycle`'s draft (its files or its version); `None` if they may.
-/// The same rule [`Lifecycle::revise`] enforces, behind the author permission.
+/// The same rule [`Lifecycle::revise`] enforces, the Draft Holder's, behind the author
+/// permission.
 pub fn edit_refusal(
     lifecycle: &Lifecycle,
     by: &str,
@@ -340,7 +387,11 @@ pub struct PackageSummary {
     pub bump: Option<Bump>,
     /// Where it stands.
     pub stage: Stage,
-    /// Everyone who wrote it.
+    /// Its Draft Holder.
+    pub holder: String,
+    /// Who it is being handed over to, until they accept or the offer is called off.
+    pub offered_to: Option<String>,
+    /// Everyone who has held it.
     pub authors: Vec<String>,
     /// The scopes the package is active in now, with the version active in each.
     pub active: Vec<ActiveIn>,
@@ -598,7 +649,7 @@ impl Publications {
         let previous = self.previous(tx, lifecycle).await?;
         let actions = allowed(lifecycle, by, has);
         let summary = PackageSummary {
-            id: format!("{}@{}", lifecycle.package, lifecycle.version),
+            id: lifecycle_id(lifecycle),
             name: lifecycle.package.clone(),
             title: title(packed),
             kind: lifecycle.kind,
@@ -608,6 +659,8 @@ impl Publications {
                 .map(|p| Bump::between(&p.version, &lifecycle.version)),
             previous: previous.as_ref().map(|p| p.version.clone()),
             stage: lifecycle.stage,
+            holder: lifecycle.holder.clone(),
+            offered_to: lifecycle.offered_to.clone(),
             authors: lifecycle.authors.iter().cloned().collect(),
             active: active(activations, &lifecycle.package, self.clock.now()),
             next: next_step(&actions),
@@ -617,7 +670,8 @@ impl Publications {
     }
 
     /// The package list for `by`, whose roles carry the permissions `has` answers for: one row
-    /// per package, its newest version, by name.
+    /// per package, its newest version not withdrawn (or its newest withdrawn one, when it has
+    /// nothing else), by name.
     pub async fn studio_packages(
         &self,
         by: &str,
@@ -627,9 +681,11 @@ impl Publications {
         let mut newest: BTreeMap<String, Lifecycle> = BTreeMap::new();
         for json in tx.package_lifecycles().await.map_err(failed)? {
             let lifecycle: Lifecycle = serde_json::from_str(&json).map_err(failed)?;
-            let newer = newest
-                .get(&lifecycle.package)
-                .is_none_or(|held| lifecycle.version > held.version);
+            let withdrawn = |l: &Lifecycle| l.stage == Stage::Withdrawn;
+            let newer = newest.get(&lifecycle.package).is_none_or(|held| {
+                (withdrawn(held), &lifecycle.version, lifecycle.withdrawn_at)
+                    > (withdrawn(&lifecycle), &held.version, held.withdrawn_at)
+            });
             if newer {
                 newest.insert(lifecycle.package.clone(), lifecycle);
             }

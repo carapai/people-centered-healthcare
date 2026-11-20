@@ -753,7 +753,7 @@
           "studio"
         ],
         "summary": "Documents and takes one lifecycle step.",
-        "description": "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). `check` (*Check now*) runs validation and simulation on a draft and keeps the results, leaving it in Draft. Answers the page as it is afterwards.",
+        "description": "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage, the Draft Holder and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). `check` (*Check now*) runs validation and simulation on a draft and keeps the results, leaving it in Draft. `hand-over` offers the draft `to` a username, who holds it once they `accept-handover`; `decline-handover` calls the offer off. `reassign` (`metadata.manage`) gives it `to` a username at once, for a `reason`. `withdraw` ends an unpublished draft and keeps it under another id, freeing its `name@version`. Answers the page as it is afterwards, under the id it is kept as.",
         "operationId": "takeStudioAction",
         "parameters": [
           {
@@ -837,7 +837,7 @@
             }
           },
           "422": {
-            "description": "A reason or a scope is missing or not valid",
+            "description": "A reason, a scope or who it goes to is missing or not valid",
             "content": {
               "application/json": {
                 "schema": {
@@ -1062,7 +1062,8 @@
           "simulation",
           "review",
           "approval",
-          "published"
+          "published",
+          "withdrawn"
         ]
       },
       "ReadinessReport": {
@@ -1151,7 +1152,7 @@
               "string",
               "null"
             ],
-            "description": "Why changes are requested (`request-changes`), or why it is activated (`activate`)."
+            "description": "Why changes are requested (`request-changes`), why the draft is reassigned\n(`reassign`), or why it is activated (`activate`)."
           },
           "scope": {
             "type": [
@@ -1159,6 +1160,13 @@
               "null"
             ],
             "description": "Where to activate it (`activate`): `national`, `district:<code>`, `facility:<code>` or\n`program:<facility>:<program>`."
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The username of who the draft goes to (`hand-over`, `reassign`)."
           }
         }
       },
@@ -1172,7 +1180,12 @@
           "publish",
           "activate",
           "request-changes",
-          "check"
+          "check",
+          "accept-handover",
+          "hand-over",
+          "decline-handover",
+          "withdraw",
+          "reassign"
         ]
       },
       "StudioArtefactChange": {
@@ -1320,6 +1333,13 @@
             "type": "string",
             "description": "Who did it (`system` for the automated checks)."
           },
+          "person": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who the draft was offered or reassigned to; who held it before, when it was handed over."
+          },
           "previous": {
             "type": [
               "string",
@@ -1339,7 +1359,7 @@
               "string",
               "null"
             ],
-            "description": "What a reviewer or approver asked to change."
+            "description": "What a reviewer or approver asked to change, or why a manager reassigned the draft."
           },
           "stage": {
             "$ref": "#/components/schemas/PackageStage",
@@ -1367,7 +1387,12 @@
           "approved",
           "published",
           "checked",
-          "version-changed"
+          "version-changed",
+          "handover-offered",
+          "handover-declined",
+          "handed-over",
+          "reassigned",
+          "withdrawn"
         ]
       },
       "StudioNewDraft": {
@@ -1431,6 +1456,7 @@
           "kind",
           "version",
           "stage",
+          "holder",
           "authors",
           "active",
           "actions"
@@ -1455,7 +1481,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Everyone who wrote it."
+            "description": "Everyone who has held it: none of them may review or approve it."
           },
           "bump": {
             "oneOf": [
@@ -1467,6 +1493,10 @@
                 "type": "null"
               }
             ]
+          },
+          "holder": {
+            "type": "string",
+            "description": "Its Draft Holder (an account id): the one person who may edit, check, submit, hand over\nor withdraw it."
           },
           "id": {
             "type": "string",
@@ -1490,6 +1520,13 @@
                 "type": "null"
               }
             ]
+          },
+          "offeredTo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who it is being handed over to (an account id), until they accept or it is called off."
           },
           "previous": {
             "type": [
@@ -1698,7 +1735,8 @@
           "permission",
           "stage",
           "author",
-          "not-author",
+          "not-holder",
+          "not-offered",
           "already-approved",
           "approvals-needed",
           "not-published",

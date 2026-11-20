@@ -80,7 +80,7 @@ Scoped activation on nodes (configuration.md § Distribution and activation on n
 
 ## Tests
 
-Unit tests cover exact versions and their precedence, each publication rule, and reading `package.json` as written. The lifecycle tests cover two approvers for each clinical kind and one for configuration, authors and co-authors refused as reviewers and approvers, returns to Draft clearing approvals, content pinned from submission to signing, steps out of order, and records as JSON. The activation tests cover:
+Unit tests cover exact versions and their precedence, each publication rule, and reading `package.json` as written. The lifecycle tests cover two approvers for each clinical kind and one for configuration, authors and every past Draft Holder refused as a reviewer and approver, handover only once accepted, reassignment with a reason, withdrawal, returns to Draft clearing approvals, content pinned from submission to signing, steps out of order, and records as JSON. The activation tests cover:
 - the scope chain's merge, including another district's, facility's or program's activation;
 - effective times and rollback;
 - the staging, dependency, software and format checks;

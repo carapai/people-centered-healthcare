@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl'
 import { studioMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, actionInput, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '6', maxWidth: '5xl' })
@@ -21,7 +21,8 @@ const muted = css({ color: 'fg.muted' })
  * changed, is it safe, who must act, and the discussion. The actions are the server's list, in
  * its order; one the person may not take stays on the page, disabled, with the server's reason.
  * Its files open one by one in the file editor (#494); in a draft the person may change the
- * version, and a published version can be copied into the next version's draft.
+ * version, and a published version can be copied into the next version's draft. Its Draft
+ * Holder (#493) is named under the title, with any handover waiting to be accepted.
  */
 export function PackagePage({ id }: { id: string }) {
   const intl = useIntl()
@@ -59,6 +60,15 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
         <p className={muted}>
           {intl.formatMessage(m.sdSummary, { name: summary.name, kind: summary.kind, stage: stageLabel(intl, summary.stage), authors: summary.authors.join(', ') })}
         </p>
+        {summary.stage === 'published' ? null : summary.stage === 'withdrawn' ? (
+          <p>{intl.formatMessage(m.sdWithdrawn)}</p>
+        ) : (
+          <p>
+            {summary.offeredTo === null || summary.offeredTo === undefined
+              ? intl.formatMessage(m.sdHolder, { holder: summary.holder })
+              : intl.formatMessage(m.sdOffered, { holder: summary.holder, to: summary.offeredTo })}
+          </p>
+        )}
       </header>
 
       <section aria-labelledby="studio-changed">
@@ -134,6 +144,7 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
           {draft.history.map((entry, index) => (
             <li key={`${entry.at}:${index}`}>
               {intl.formatMessage(m.sdHistoryEntry, { step: entry.step, by: entry.by, at: time(entry.at) })}
+              {entry.person === null || entry.person === undefined ? null : <p>{intl.formatMessage(m.sdHistoryPerson, { person: entry.person })}</p>}
               {entry.reason === null || entry.reason === undefined ? null : <p>{entry.reason}</p>}
               {entry.problems.length === 0 ? null : (
                 <ul className={list}>
@@ -269,27 +280,44 @@ function Actions({ id, draft }: { id: string; draft: StudioPackagePage }) {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const reasonId = useId()
   const scopeId = useId()
   const scopeHintId = useId()
+  const toId = useId()
+  const toHintId = useId()
   const [reason, setReason] = useState('')
   const [scope, setScope] = useState('national')
+  const [to, setTo] = useState('')
   const step = useMutation({
-    mutationFn: (action: StudioActionName) => takeAction(platform.transport, id, action, needs(action) === 'reason' ? { reason } : needs(action) === 'scope' ? { scope } : {}),
+    mutationFn: (action: StudioActionName) => takeAction(platform.transport, id, action, actionInput(action, { reason, scope, to })),
     onSuccess: async (taken) => {
-      queryClient.setQueryData(packageQuery(platform.transport, id).queryKey, taken)
+      queryClient.setQueryData(packageQuery(platform.transport, taken.package.id).queryKey, taken)
       setReason('')
+      setTo('')
       await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
+      // A withdrawn draft is kept under another id, which the page moves to.
+      if (taken.package.id !== id) await navigate({ to: '/studio/$id', params: { id: taken.package.id } })
     },
   })
   const offered = (action: StudioActionName) => draft.package.actions.some((a) => a.action === action && a.allowed)
+  const asked = (wanted: 'reason' | 'to') => draft.package.actions.some((a) => a.allowed && needs(a.action).includes(wanted))
   const failure = step.error instanceof StudioError ? (step.error.refusal === null || step.error.refusal === undefined ? step.error.detail : refusalText(intl, step.error.refusal)) : ''
   return (
     <>
-      {offered('request-changes') ? (
+      {asked('reason') ? (
         <div className={field}>
           <label htmlFor={reasonId}>{intl.formatMessage(m.sdReason)}</label>
           <textarea id={reasonId} className={control} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+      ) : null}
+      {asked('to') ? (
+        <div className={field}>
+          <label htmlFor={toId}>{intl.formatMessage(m.sdTo)}</label>
+          <input id={toId} className={control} value={to} aria-describedby={toHintId} autoComplete="off" onChange={(e) => setTo(e.target.value)} />
+          <span id={toHintId} className={muted}>
+            {intl.formatMessage(m.sdToHint)}
+          </span>
         </div>
       ) : null}
       {offered('activate') ? (

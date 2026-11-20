@@ -68,24 +68,222 @@ fn configuration_needs_one_approver() {
 }
 
 #[test]
-fn no_author_reviews_and_a_co_author_counts_as_an_author() {
+fn only_the_holder_edits_checks_submits_and_hands_over() {
     let mut lifecycle = draft(PackageKind::Program);
-    lifecycle.revise("dan", "sha-b", now()).expect("revised");
-    assert_eq!(lifecycle.content, "sha-b");
-    lifecycle.submit("dan", now()).expect("a co-author submits");
+    assert_eq!(lifecycle.holder, "ann");
+    for action in [
+        Action::Edit,
+        Action::Check,
+        Action::Submit,
+        Action::HandOver,
+        Action::Withdraw,
+    ] {
+        assert_eq!(lifecycle.check(action, "ann"), Ok(()), "{action:?}");
+        assert_eq!(
+            lifecycle.check(action, "eve"),
+            Err(Refused::NotHolder),
+            "{action:?}"
+        );
+    }
+    assert_eq!(
+        lifecycle.revise("eve", "sha-b", now()),
+        Err(Refused::NotHolder)
+    );
+    assert_eq!(lifecycle.submit("eve", now()), Err(Refused::NotHolder));
+    assert_eq!(
+        lifecycle.hand_over("eve", "dan", now()),
+        Err(Refused::NotHolder)
+    );
+    assert_eq!(lifecycle.withdraw("eve", now()), Err(Refused::NotHolder));
+    lifecycle
+        .revise("ann", "sha-b", now())
+        .expect("the holder revises");
+    assert_eq!(lifecycle.authors, BTreeSet::from(["ann".to_owned()]));
+}
+
+#[test]
+fn an_unaccepted_handover_leaves_the_draft_with_its_holder() {
+    let mut lifecycle = draft(PackageKind::Program);
+    assert_eq!(
+        lifecycle.hand_over("ann", "ann", now()),
+        Err(Refused::AlreadyHolder("ann".into()))
+    );
+    assert_eq!(
+        lifecycle.hand_over("ann", " ", now()),
+        Err(Refused::Incomplete)
+    );
+    let record = lifecycle.hand_over("ann", "dan", now()).expect("offered");
+    assert_eq!(record.step, Step::HandoverOffered { to: "dan".into() });
+    assert_eq!((record.from, record.to), (Stage::Draft, Stage::Draft));
+
+    // Until dan accepts, ann holds it: she edits and submits, and dan does not.
+    assert_eq!(lifecycle.holder, "ann");
+    assert_eq!(lifecycle.offered_to.as_deref(), Some("dan"));
+    assert_eq!(
+        lifecycle.check(Action::Edit, "dan"),
+        Err(Refused::NotHolder)
+    );
+    assert_eq!(lifecycle.check(Action::Edit, "ann"), Ok(()));
+    assert!(!lifecycle.authors.contains("dan"));
+    // Nobody else accepts it.
+    assert_eq!(
+        lifecycle.accept_handover("eve", now()),
+        Err(Refused::NotOffered)
+    );
+    assert_eq!(
+        lifecycle.check(Action::AcceptHandover, "ann"),
+        Err(Refused::NotOffered)
+    );
+
+    // Called off, by dan here, it stays with ann.
+    let record = lifecycle.decline_handover("dan", now()).expect("declined");
+    assert_eq!(record.step, Step::HandoverDeclined { to: "dan".into() });
+    assert_eq!(lifecycle.offered_to, None);
+    assert_eq!(
+        lifecycle.accept_handover("dan", now()),
+        Err(Refused::NotOffered)
+    );
+    assert_eq!(
+        lifecycle.decline_handover("ann", now()),
+        Err(Refused::NotOffered)
+    );
+    assert_eq!(lifecycle.holder, "ann");
+}
+
+#[test]
+fn a_former_holder_counts_as_an_author_and_cannot_review_or_approve() {
+    let mut lifecycle = draft(PackageKind::Program);
+    lifecycle.hand_over("ann", "dan", now()).expect("offered");
+    let record = lifecycle.accept_handover("dan", now()).expect("accepted");
+    assert_eq!(record.step, Step::HandedOver { from: "ann".into() });
+    assert_eq!(record.by, "dan");
+    assert_eq!(lifecycle.holder, "dan");
+    assert_eq!(lifecycle.offered_to, None);
+    assert_eq!(
+        lifecycle.authors,
+        BTreeSet::from(["ann".to_owned(), "dan".to_owned()])
+    );
+
+    // ann no longer holds it, and dan does.
+    assert_eq!(
+        lifecycle.revise("ann", "sha-b", now()),
+        Err(Refused::NotHolder)
+    );
+    assert_eq!(lifecycle.submit("ann", now()), Err(Refused::NotHolder));
+    lifecycle
+        .revise("dan", "sha-b", now())
+        .expect("dan revises");
+    lifecycle.submit("dan", now()).expect("dan submits");
     lifecycle.validated(vec![], now()).expect("validated");
     lifecycle.simulated(vec![], now()).expect("simulated");
     assert_eq!(lifecycle.review("ann", now()), Err(Refused::Author));
     assert_eq!(lifecycle.review("dan", now()), Err(Refused::Author));
     assert_eq!(lifecycle.review(" ", now()), Err(Refused::Incomplete));
     lifecycle.review("rita", now()).expect("reviewed");
+    // The former holder may not approve it.
+    assert_eq!(lifecycle.approve("ann", now()), Err(Refused::Author));
+    assert_eq!(
+        lifecycle.check(Action::Approve, "ann"),
+        Err(Refused::Author)
+    );
     assert_eq!(lifecycle.approve("dan", now()), Err(Refused::Author));
+    lifecycle.approve("bob", now()).expect("approved");
 }
 
 #[test]
-fn only_an_author_submits() {
+fn a_manager_reassigns_a_draft_with_a_reason_and_the_new_holder_is_an_author() {
     let mut lifecycle = draft(PackageKind::Program);
-    assert_eq!(lifecycle.submit("eve", now()), Err(Refused::NotAuthor));
+    lifecycle.hand_over("ann", "dan", now()).expect("offered");
+    assert_eq!(
+        lifecycle.reassign("mo", "fay", " ", now()),
+        Err(Refused::Incomplete)
+    );
+    assert_eq!(
+        lifecycle.reassign("mo", "ann", "away", now()),
+        Err(Refused::AlreadyHolder("ann".into()))
+    );
+    let record = lifecycle
+        .reassign("mo", "fay", "ann is on leave until March", now())
+        .expect("reassigned");
+    assert_eq!(
+        record.step,
+        Step::Reassigned {
+            from: "ann".into(),
+            to: "fay".into(),
+            reason: "ann is on leave until March".into(),
+        }
+    );
+    assert_eq!(record.by, "mo");
+    assert_eq!(lifecycle.holder, "fay");
+    // The pending offer is gone; the manager is not an author.
+    assert_eq!(lifecycle.offered_to, None);
+    assert_eq!(
+        lifecycle.authors,
+        BTreeSet::from(["ann".to_owned(), "fay".to_owned()])
+    );
+    let json = serde_json::to_value(&record).expect("json");
+    assert_eq!(json["step"], "reassigned");
+    assert_eq!(json["reason"], "ann is on leave until March");
+    assert_eq!(
+        (json["previous-holder"].as_str(), json["holder"].as_str()),
+        (Some("ann"), Some("fay"))
+    );
+    assert_eq!(
+        (json["from"].as_str(), json["to"].as_str()),
+        (Some("draft"), Some("draft"))
+    );
+    let back: Record = serde_json::from_value(json).expect("read back");
+    assert_eq!(back, record);
+
+    lifecycle.submit("fay", now()).expect("submitted");
+    assert_eq!(
+        lifecycle.reassign("mo", "dan", "late", now()),
+        Err(Refused::Stage(Stage::Validation))
+    );
+}
+
+#[test]
+fn the_holder_withdraws_an_unpublished_draft_and_it_ends_there() {
+    let mut lifecycle = draft(PackageKind::Program);
+    to_approval(&mut lifecycle, "rita");
+    let record = lifecycle.withdraw("ann", now()).expect("withdrawn");
+    assert_eq!(record.step, Step::Withdrawn);
+    assert_eq!(
+        (record.from, record.to),
+        (Stage::Approval, Stage::Withdrawn)
+    );
+    assert_eq!(lifecycle.withdrawn_at, Some(now()));
+    // Nothing further happens to it.
+    for action in Action::ALL {
+        assert!(lifecycle.check(action, "ann").is_err(), "{action:?}");
+    }
+    assert_eq!(
+        lifecycle.withdraw("ann", now()),
+        Err(Refused::Stage(Stage::Withdrawn))
+    );
+
+    let mut published = draft(PackageKind::CountryConfiguration);
+    to_approval(&mut published, "rita");
+    published.approve("bob", now()).expect("approved");
+    published.publish("ops", "sha-a", now()).expect("published");
+    assert_eq!(
+        published.withdraw("ann", now()),
+        Err(Refused::Stage(Stage::Published))
+    );
+}
+
+#[test]
+fn a_lifecycle_kept_before_the_draft_holder_is_held_by_its_author() {
+    let json = serde_json::json!({
+        "package": "ug.moh.anc", "version": "1.2.0", "kind": "program", "stage": "draft",
+        "authors": ["ann"], "content": "sha-a", "reviewer": null, "approvers": []
+    });
+    let lifecycle: Lifecycle = serde_json::from_value(json).expect("read");
+    assert_eq!(lifecycle.holder, "ann");
+    assert_eq!(lifecycle.offered_to, None);
+    let back: Lifecycle =
+        serde_json::from_value(serde_json::to_value(&lifecycle).expect("json")).expect("read");
+    assert_eq!(back, lifecycle);
 }
 
 #[test]
@@ -235,7 +433,7 @@ fn what_a_person_may_do_is_checked_by_the_rules_the_transitions_enforce() {
     assert_eq!(lifecycle.check(Action::Submit, "ann"), Ok(()));
     assert_eq!(
         lifecycle.check(Action::Submit, "eve"),
-        Err(Refused::NotAuthor)
+        Err(Refused::NotHolder)
     );
     assert_eq!(
         lifecycle.check(Action::Approve, "bob"),

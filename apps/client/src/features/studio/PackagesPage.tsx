@@ -16,7 +16,7 @@ const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
 
 /**
  * The Studio's package list (studio.md § The package workspace; #492): one row per package with
- * its title, name and kind, its version and bump, its status and author, the signed-in person's
+ * its title, name and kind, its version and bump, its status and Draft Holder, the signed-in person's
  * next step, and the scopes it is active in. The server works out the next step.
  */
 export function PackagesPage() {
@@ -42,7 +42,7 @@ export function PackagesPage() {
           : intl.formatMessage(m.sdVersionBump, { version: row.version, bump: row.bump }),
     },
     { id: 'status', header: intl.formatMessage(m.sdColStatus), cell: (row) => stageLabel(intl, row.stage), sortValue: (row) => row.stage },
-    { id: 'author', header: intl.formatMessage(m.sdColAuthor), cell: (row) => row.authors.join(', ') },
+    { id: 'author', header: intl.formatMessage(m.sdColAuthor), cell: (row) => row.holder },
     {
       id: 'next',
       header: intl.formatMessage(m.sdColNext),

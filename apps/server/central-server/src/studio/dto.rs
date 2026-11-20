@@ -21,6 +21,11 @@ pub(crate) enum StudioActionName {
     Activate,
     RequestChanges,
     Check,
+    AcceptHandover,
+    HandOver,
+    DeclineHandover,
+    Withdraw,
+    Reassign,
 }
 
 impl StudioActionName {
@@ -40,6 +45,11 @@ impl From<StudioAction> for StudioActionName {
             StudioAction::Activate => Self::Activate,
             StudioAction::RequestChanges => Self::RequestChanges,
             StudioAction::Check => Self::Check,
+            StudioAction::AcceptHandover => Self::AcceptHandover,
+            StudioAction::HandOver => Self::HandOver,
+            StudioAction::DeclineHandover => Self::DeclineHandover,
+            StudioAction::Withdraw => Self::Withdraw,
+            StudioAction::Reassign => Self::Reassign,
         }
     }
 }
@@ -54,6 +64,11 @@ impl From<StudioActionName> for StudioAction {
             StudioActionName::Activate => Self::Activate,
             StudioActionName::RequestChanges => Self::RequestChanges,
             StudioActionName::Check => Self::Check,
+            StudioActionName::AcceptHandover => Self::AcceptHandover,
+            StudioActionName::HandOver => Self::HandOver,
+            StudioActionName::DeclineHandover => Self::DeclineHandover,
+            StudioActionName::Withdraw => Self::Withdraw,
+            StudioActionName::Reassign => Self::Reassign,
         }
     }
 }
@@ -68,6 +83,7 @@ pub(crate) enum PackageStage {
     Review,
     Approval,
     Published,
+    Withdrawn,
 }
 
 impl From<Stage> for PackageStage {
@@ -79,6 +95,7 @@ impl From<Stage> for PackageStage {
             Stage::Review => Self::Review,
             Stage::Approval => Self::Approval,
             Stage::Published => Self::Published,
+            Stage::Withdrawn => Self::Withdrawn,
         }
     }
 }
@@ -149,7 +166,8 @@ pub(crate) enum StudioRefusalCode {
     Permission,
     Stage,
     Author,
-    NotAuthor,
+    NotHolder,
+    NotOffered,
     AlreadyApproved,
     ApprovalsNeeded,
     NotPublished,
@@ -179,7 +197,8 @@ impl From<&Refusal> for ActionRefusal {
                 RefusalCode::Permission => StudioRefusalCode::Permission,
                 RefusalCode::Stage => StudioRefusalCode::Stage,
                 RefusalCode::Author => StudioRefusalCode::Author,
-                RefusalCode::NotAuthor => StudioRefusalCode::NotAuthor,
+                RefusalCode::NotHolder => StudioRefusalCode::NotHolder,
+                RefusalCode::NotOffered => StudioRefusalCode::NotOffered,
                 RefusalCode::AlreadyApproved => StudioRefusalCode::AlreadyApproved,
                 RefusalCode::ApprovalsNeeded => StudioRefusalCode::ApprovalsNeeded,
                 RefusalCode::NotPublished => StudioRefusalCode::NotPublished,
@@ -256,7 +275,12 @@ pub(crate) struct StudioPackage {
     pub(crate) bump: Option<SemverBump>,
     /// Where it stands.
     pub(crate) stage: PackageStage,
-    /// Everyone who wrote it.
+    /// Its Draft Holder (an account id): the one person who may edit, check, submit, hand over
+    /// or withdraw it.
+    pub(crate) holder: String,
+    /// Who it is being handed over to (an account id), until they accept or it is called off.
+    pub(crate) offered_to: Option<String>,
+    /// Everyone who has held it: none of them may review or approve it.
     pub(crate) authors: Vec<String>,
     /// The scopes the package is active in now.
     pub(crate) active: Vec<ActiveScope>,
@@ -277,6 +301,8 @@ impl From<&PackageSummary> for StudioPackage {
             previous: summary.previous.as_ref().map(ToString::to_string),
             bump: summary.bump.map(SemverBump::from),
             stage: summary.stage.into(),
+            holder: summary.holder.clone(),
+            offered_to: summary.offered_to.clone(),
             authors: summary.authors.clone(),
             active: summary.active.iter().map(ActiveScope::from).collect(),
             actions: summary.actions.iter().map(PackageAction::from).collect(),
@@ -392,6 +418,11 @@ pub(crate) enum StudioHistoryStep {
     Published,
     Checked,
     VersionChanged,
+    HandoverOffered,
+    HandoverDeclined,
+    HandedOver,
+    Reassigned,
+    Withdrawn,
 }
 
 /// One entry of the discussion: a lifecycle record.
@@ -406,8 +437,10 @@ pub(crate) struct StudioHistoryEntry {
     pub(crate) at: String,
     /// The stage after.
     pub(crate) stage: PackageStage,
-    /// What a reviewer or approver asked to change.
+    /// What a reviewer or approver asked to change, or why a manager reassigned the draft.
     pub(crate) reason: Option<String>,
+    /// Who the draft was offered or reassigned to; who held it before, when it was handed over.
+    pub(crate) person: Option<String>,
     /// The problems a failed check found; for *Check now*, validation's then simulation's.
     pub(crate) problems: Vec<String>,
     /// The version the draft had, when it took another.
@@ -445,6 +478,24 @@ impl From<&Record> for StudioHistoryEntry {
                 validation.iter().chain(simulation).cloned().collect(),
             ),
             Step::VersionChanged { .. } => (StudioHistoryStep::VersionChanged, None, Vec::new()),
+            Step::HandoverOffered { .. } => (StudioHistoryStep::HandoverOffered, None, Vec::new()),
+            Step::HandoverDeclined { .. } => {
+                (StudioHistoryStep::HandoverDeclined, None, Vec::new())
+            }
+            Step::HandedOver { .. } => (StudioHistoryStep::HandedOver, None, Vec::new()),
+            Step::Reassigned { reason, .. } => (
+                StudioHistoryStep::Reassigned,
+                Some(reason.clone()),
+                Vec::new(),
+            ),
+            Step::Withdrawn => (StudioHistoryStep::Withdrawn, None, Vec::new()),
+        };
+        let person = match &record.step {
+            Step::HandoverOffered { to }
+            | Step::HandoverDeclined { to }
+            | Step::Reassigned { to, .. } => Some(to.clone()),
+            Step::HandedOver { from } => Some(from.clone()),
+            _ => None,
         };
         let previous = match &record.step {
             Step::VersionChanged { previous } => Some(previous.to_string()),
@@ -456,6 +507,7 @@ impl From<&Record> for StudioHistoryEntry {
             at: record.at.to_string(),
             stage: record.to.into(),
             reason,
+            person,
             problems,
             previous,
         }
@@ -593,9 +645,13 @@ impl From<&PackagePage> for StudioPackagePage {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StudioActionInput {
-    /// Why changes are requested (`request-changes`), or why it is activated (`activate`).
+    /// Why changes are requested (`request-changes`), why the draft is reassigned
+    /// (`reassign`), or why it is activated (`activate`).
     #[serde(default)]
     pub(crate) reason: Option<String>,
+    /// The username of who the draft goes to (`hand-over`, `reassign`).
+    #[serde(default)]
+    pub(crate) to: Option<String>,
     /// Where to activate it (`activate`): `national`, `district:<code>`, `facility:<code>` or
     /// `program:<facility>:<program>`.
     #[serde(default)]

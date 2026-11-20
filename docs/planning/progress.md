@@ -14,7 +14,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 5 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 4 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 4 | 8 |
-| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 5 | 26 |
+| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 6 | 26 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 8 | 9 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 8 | 8 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 1 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 120 of 138 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
+Total: 121 of 138 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
 
 ## Log
 
@@ -1557,3 +1557,4 @@ Total: 120 of 138 implementation tasks done (counted from the GitHub milestones)
 - 2026-11-20: #520 package Validation checks each profile's snapshot against its differential (`health_fhir_validation::check_snapshot`, called by `health-packages`' publication rules and node verification): every differential element must be in the snapshot with the same `min`, `max`, types and target profiles, `fixed[x]`/`pattern[x]`, binding, slicing and invariants, or the package is not publishable, naming the element and the constraint; a differential-only profile is refused. The core package, the official R5 profiles and our fixtures pass unchanged.
 - 2026-11-20: #835 and #829 the Studio usable locally: `signInOnUnauthorized` (`apps/client/src/platform/sign-in.ts`) wraps the API and FHIR transports so a 401 starts a sign-in that returns to the page; the e2e backend provisions `e2e-author` (the seeded draft's author, by account id), `e2e-approver` and `e2e-publisher`, and makes a throwaway publication-signing key with `openssl`; the DataTable opens a row on a click as on Enter.
 - 2026-11-20: #494 editing a draft in the Studio: `health-publication::editing` keeps the draft's tarball as its working copy, saves one file at a time against the draft's revision (`If-Match`; a stale or missing one is 412 and nothing is kept), starts a draft blank or as a copy of a published version at the next minor `-draft` version, changes a draft's version (the lifecycle and its records move to the new `name@version`), and runs _Check now_ (`Step::Checked`, the stage and revision unchanged); `/api/studio/drafts`, `/packages/{id}/files/{*path}` and `/packages/{id}/version`; the client's file editor at `/studio/$id/files/$`, the draft page's Files section, version field and _Start the next version_, and a blank draft form on the package list.
+- 2026-11-20: #493 the Draft Holder: the lifecycle has one `holder`, who alone edits, checks, submits, hands over or withdraws a draft; a handover (`Step::HandoverOffered`) takes effect only when the person offered accepts (`Step::HandedOver`), and either may call it off; `metadata.manage` reassigns with a reason kept in the history and the audit (`Step::Reassigned`); `authors` is everyone who has held the draft, replacing "a revision makes you a co-author"; withdrawal (`Stage::Withdrawn`) keeps the draft and its history under `name@version~withdrawn-<when>`, so `name@version` can be drafted again; the `central-server package` commands are audited as CLI actions by their `--by` name; `/api/studio/packages/{id}/{hand-over,accept-handover,decline-handover,reassign,withdraw}`, the handover target named by username; the draft page names the holder and any pending handover, and the e2e backend provisions `e2e-coauthor` to accept one.

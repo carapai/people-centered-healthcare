@@ -1547,6 +1547,12 @@ type StudioValues = {
   sdBack: {}
   sdPackageHeading: { title: string; version: string }
   sdSummary: { name: string; kind: string; stage: string; authors: string }
+  sdHolder: { holder: string }
+  sdOffered: { holder: string; to: string }
+  sdHistoryPerson: { person: string }
+  sdTo: {}
+  sdToHint: {}
+  sdWithdrawn: {}
   sdChanged: {}
   sdChangedAgainst: { version: string }
   sdChangedFirst: {}
@@ -1574,7 +1580,8 @@ type StudioValues = {
   sdRefusalPermission: { permission: string }
   sdRefusalStage: { stage: string }
   sdRefusalAuthor: {}
-  sdRefusalNotAuthor: {}
+  sdRefusalNotHolder: {}
+  sdRefusalNotOffered: {}
   sdRefusalAlreadyApproved: {}
   sdRefusalApprovalsNeeded: { missing: number }
   sdRefusalNotPublished: {}
@@ -1593,6 +1600,12 @@ type StudioValues = {
   sdCheckValidation: {}
   sdCheckSimulation: {}
   sdActionCheck: {}
+  sdActionAcceptHandover: {}
+  sdActionHandOver: {}
+  sdActionDeclineHandover: {}
+  sdActionWithdraw: {}
+  sdActionReassign: {}
+  sdStageWithdrawn: {}
   sdFiles: {}
   sdFilesHint: {}
   sdOpenFile: { path: string }
@@ -1641,7 +1654,7 @@ export const studioMessages = defineMessages<StudioValues>({
   sdColPackage: { id: 'app.studio.colPackage', defaultMessage: 'Package', description: 'Studio table column' },
   sdColVersion: { id: 'app.studio.colVersion', defaultMessage: 'Version', description: 'Studio table column' },
   sdColStatus: { id: 'app.studio.colStatus', defaultMessage: 'Status', description: 'Studio table column' },
-  sdColAuthor: { id: 'app.studio.colAuthor', defaultMessage: 'Author', description: 'Studio table column' },
+  sdColAuthor: { id: 'app.studio.colAuthor', defaultMessage: 'Held by', description: 'Studio table column: the Draft Holder' },
   sdColNext: { id: 'app.studio.colNext', defaultMessage: 'Your next step', description: 'Studio table column' },
   sdColActive: { id: 'app.studio.colActive', defaultMessage: 'Active in', description: 'Studio table column' },
   sdVersionBump: { id: 'app.studio.versionBump', defaultMessage: '{version} ({bump})', description: 'Studio: a version and its semver bump' },
@@ -1651,7 +1664,13 @@ export const studioMessages = defineMessages<StudioValues>({
   sdActiveIn: { id: 'app.studio.activeIn', defaultMessage: '{scope} ({version})', description: 'Studio: a scope and the version active there' },
   sdBack: { id: 'app.studio.back', defaultMessage: 'Back to the packages', description: 'Studio: back to the list' },
   sdPackageHeading: { id: 'app.studio.packageHeading', defaultMessage: '{title} {version}', description: 'Studio draft page heading' },
-  sdSummary: { id: 'app.studio.summary', defaultMessage: '{name}, {kind} package, {stage}. Written by {authors}.', description: 'Studio draft page summary' },
+  sdSummary: { id: 'app.studio.summary', defaultMessage: '{name}, {kind} package, {stage}. Held so far by {authors}.', description: 'Studio draft page summary; authors are everyone who has held the draft' },
+  sdHolder: { id: 'app.studio.holder', defaultMessage: 'Held by {holder}.', description: 'Studio: the Draft Holder' },
+  sdOffered: { id: 'app.studio.offered', defaultMessage: 'Held by {holder}, who is handing it over to {to}. It stays with {holder} until {to} accepts.', description: 'Studio: a handover waiting to be accepted' },
+  sdHistoryPerson: { id: 'app.studio.historyPerson', defaultMessage: 'Concerning {person}', description: 'Studio: who a handover or reassignment concerns' },
+  sdTo: { id: 'app.studio.to', defaultMessage: 'Hand over or reassign to', description: 'Studio: who a draft goes to, by username' },
+  sdToHint: { id: 'app.studio.toHint', defaultMessage: 'Their username. A handover waits for them to accept; a reassignment needs a reason, above.', description: 'Studio: how to name who a draft goes to' },
+  sdWithdrawn: { id: 'app.studio.withdrawn', defaultMessage: 'This draft was withdrawn. It is kept with its history, and its version can be drafted again.', description: 'Studio: a withdrawn draft' },
   sdChanged: { id: 'app.studio.changed', defaultMessage: 'What changed', description: 'Studio draft page section' },
   sdChangedAgainst: { id: 'app.studio.changedAgainst', defaultMessage: 'Compared with the published version {version}.', description: 'Studio: what the diff is against' },
   sdChangedFirst: { id: 'app.studio.changedFirst', defaultMessage: 'This is the first version: every artefact is new.', description: 'Studio: first version diff' },
@@ -1671,7 +1690,7 @@ export const studioMessages = defineMessages<StudioValues>({
   sdApprovers: { id: 'app.studio.approvers', defaultMessage: 'Approved by {approvers}', description: 'Studio: who approved' },
   sdDiscussion: { id: 'app.studio.discussion', defaultMessage: 'Discussion', description: 'Studio draft page section' },
   sdHistoryEntry: { id: 'app.studio.historyEntry', defaultMessage: '{step} by {by}, {at}', description: 'Studio: one history entry' },
-  sdReason: { id: 'app.studio.reason', defaultMessage: 'What needs to change', description: 'Studio: request changes reason field' },
+  sdReason: { id: 'app.studio.reason', defaultMessage: 'Reason: what needs to change, or why the draft is reassigned', description: 'Studio: request changes or reassign reason field' },
   sdScope: { id: 'app.studio.scope', defaultMessage: 'Activate in', description: 'Studio: activation scope field' },
   sdScopeHint: { id: 'app.studio.scopeHint', defaultMessage: 'national, district:<code>, facility:<code> or program:<facility>:<program>', description: 'Studio: how to write a scope' },
   sdDone: { id: 'app.studio.done', defaultMessage: 'Done.', description: 'Studio: a step was taken' },
@@ -1679,7 +1698,8 @@ export const studioMessages = defineMessages<StudioValues>({
   sdRefusalPermission: { id: 'app.studio.refusalPermission', defaultMessage: 'You need the {permission} permission', description: 'Studio: refused, missing permission' },
   sdRefusalStage: { id: 'app.studio.refusalStage', defaultMessage: 'Not possible while it is at the {stage} stage', description: 'Studio: refused at this stage' },
   sdRefusalAuthor: { id: 'app.studio.refusalAuthor', defaultMessage: 'You wrote this draft, so you cannot review or approve it', description: 'Studio: refused, separation of duties' },
-  sdRefusalNotAuthor: { id: 'app.studio.refusalNotAuthor', defaultMessage: 'Only an author of this draft may submit it', description: 'Studio: refused, not an author' },
+  sdRefusalNotHolder: { id: 'app.studio.refusalNotHolder', defaultMessage: "Only the draft's holder may do that", description: 'Studio: refused, not the Draft Holder' },
+  sdRefusalNotOffered: { id: 'app.studio.refusalNotOffered', defaultMessage: 'No handover of this draft is waiting for you', description: 'Studio: refused, no handover offered' },
   sdRefusalAlreadyApproved: { id: 'app.studio.refusalAlreadyApproved', defaultMessage: 'You have already approved this draft', description: 'Studio: refused, approved already' },
   sdRefusalApprovalsNeeded: { id: 'app.studio.refusalApprovalsNeeded', defaultMessage: '{missing, plural, one {# more approval needed} other {# more approvals needed}}', description: 'Studio: refused, approvals missing' },
   sdRefusalNotPublished: { id: 'app.studio.refusalNotPublished', defaultMessage: 'Only a published version can be activated', description: 'Studio: refused, not published' },
@@ -1698,6 +1718,12 @@ export const studioMessages = defineMessages<StudioValues>({
   sdCheckValidation: { id: 'app.studio.checkValidation', defaultMessage: 'Validation', description: 'Studio: check name' },
   sdCheckSimulation: { id: 'app.studio.checkSimulation', defaultMessage: 'Simulation', description: 'Studio: check name' },
   sdActionCheck: { id: 'app.studio.actionCheck', defaultMessage: 'Check now', description: 'Studio action: run validation and simulation without submitting' },
+  sdActionAcceptHandover: { id: 'app.studio.actionAcceptHandover', defaultMessage: 'Accept the handover', description: 'Studio action: become the Draft Holder' },
+  sdActionHandOver: { id: 'app.studio.actionHandOver', defaultMessage: 'Hand over', description: 'Studio action: offer the draft to someone' },
+  sdActionDeclineHandover: { id: 'app.studio.actionDeclineHandover', defaultMessage: 'Call off the handover', description: 'Studio action: cancel or decline a handover' },
+  sdActionWithdraw: { id: 'app.studio.actionWithdraw', defaultMessage: 'Withdraw', description: 'Studio action: withdraw the draft' },
+  sdActionReassign: { id: 'app.studio.actionReassign', defaultMessage: 'Reassign', description: 'Studio action: give the draft to someone else, as a manager' },
+  sdStageWithdrawn: { id: 'app.studio.stageWithdrawn', defaultMessage: 'withdrawn', description: 'Studio: lifecycle stage' },
   sdFiles: { id: 'app.studio.files', defaultMessage: 'Files', description: 'Studio: the draft files heading' },
   sdFilesHint: { id: 'app.studio.filesHint', defaultMessage: 'Open a file to read it or, in a draft, to edit it. Each save is one file.', description: 'Studio: files section hint' },
   sdOpenFile: { id: 'app.studio.openFile', defaultMessage: 'Open {path}', description: 'Studio: link to a file editor' },

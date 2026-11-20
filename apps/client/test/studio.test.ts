@@ -2,7 +2,7 @@ import { ResponseError, type StudioPackage } from '@health/api-client'
 import { createIntl } from 'react-intl'
 import { describe, expect, test, vi } from 'vitest'
 
-import { StudioError, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
+import { StudioError, actionInput, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
 import { actionLabel, refusalText } from '../src/features/studio/wording'
 import { httpPlatform } from '../src/platform/compose'
 import { fakeTransport } from './fake'
@@ -21,6 +21,8 @@ const row: StudioPackage = {
   previous: '1.0.0',
   bump: 'minor',
   stage: 'approval',
+  holder: 'ann',
+  offeredTo: null,
   authors: ['ann'],
   active: [{ scope: 'national', version: '1.0.0' }],
   actions: [
@@ -38,7 +40,7 @@ const page = {
   approvalsRequired: 2,
   reviewer: 'rita',
   approvers: [],
-  history: [{ step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, problems: [], previous: null }],
+  history: [{ step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, person: null, problems: [], previous: null }],
   revision: 3,
   editable: false,
   editRefusal: { code: 'stage', message: 'Not possible while it is at the approval stage', permission: null, stage: 'approval', missing: null },
@@ -72,7 +74,24 @@ describe('the Studio', () => {
     expect(transport.sent[0]).toMatchObject({ method: 'GET', path: '/studio/packages/ug.moh.anc%401.1.0' })
     await takeAction(transport, row.id, 'request-changes', { reason: 'Reword the pulse question' })
     expect(transport.sent[1]).toMatchObject({ method: 'POST', path: '/studio/packages/ug.moh.anc%401.1.0/request-changes', body: { reason: 'Reword the pulse question' } })
-    expect([needs('request-changes'), needs('activate'), needs('approve')]).toEqual(['reason', 'scope', null])
+    expect([needs('request-changes'), needs('activate'), needs('approve')]).toEqual([['reason'], ['scope'], []])
+  })
+
+  // #493: a handover names who by username; a reassignment also says why; withdrawal needs nothing.
+  test('handing over, reassigning and withdrawing send what each needs', async () => {
+    const fields = { reason: 'ann is on leave', scope: 'national', to: ' e2e-coauthor ' }
+    expect(actionInput('hand-over', fields)).toEqual({ to: 'e2e-coauthor' })
+    expect(actionInput('reassign', fields)).toEqual({ to: 'e2e-coauthor', reason: 'ann is on leave' })
+    expect(actionInput('accept-handover', fields)).toEqual({})
+    expect(actionInput('withdraw', fields)).toEqual({})
+    expect(actionInput('activate', fields)).toEqual({ scope: 'national' })
+    const withdrawn = { ...page, package: { ...row, id: 'ug.moh.anc@1.1.0~withdrawn-20261120090000', stage: 'withdrawn' } }
+    const transport = fakeTransport(() => ({ body: withdrawn }))
+    const taken = await takeAction(transport, row.id, 'withdraw')
+    expect(taken.package.id).toBe('ug.moh.anc@1.1.0~withdrawn-20261120090000')
+    expect(transport.sent[0]).toMatchObject({ method: 'POST', path: '/studio/packages/ug.moh.anc%401.1.0/withdraw' })
+    await takeAction(transport, row.id, 'hand-over', actionInput('hand-over', fields))
+    expect(transport.sent[1]).toMatchObject({ path: '/studio/packages/ug.moh.anc%401.1.0/hand-over', body: { to: 'e2e-coauthor' } })
   })
 
   // #494: each save is one file, sent with the revision it was read at; a stale one is a 412.
@@ -116,6 +135,10 @@ describe('the Studio', () => {
     expect(refusalText(intl, { code: 'other', message: 'who acted must be given' })).toBe('who acted must be given')
     expect(actionLabel(intl, 'approve')).toBe('Approve')
     expect(actionLabel(intl, 'check')).toBe('Check now')
+    expect(refusalText(intl, { code: 'not-holder', message: '' })).toBe("Only the draft's holder may do that")
+    expect(refusalText(intl, { code: 'not-offered', message: '' })).toBe('No handover of this draft is waiting for you')
+    expect(actionLabel(intl, 'accept-handover')).toBe('Accept the handover')
+    expect(actionLabel(intl, 'withdraw')).toBe('Withdraw')
   })
 
   test('only central offers the Studio; an edge never does', () => {

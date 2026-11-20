@@ -6,8 +6,13 @@
 //!
 //! - [`Publications::draft`] packs an author's files (`health_packages::pack`) and stores the
 //!   unsigned tarball as a blob. Its sha-256 is the draft's content: what is validated, reviewed,
-//!   approved and finally signed. A second draft of the same `name@version` revises it, and makes
-//!   its author an author too.
+//!   approved and finally signed. A second draft of the same `name@version` revises it, by its
+//!   Draft Holder only.
+//! - **The Draft Holder** (#493): [`Publications::hand_over`] offers a draft to someone,
+//!   [`Publications::accept_handover`] makes them its holder and [`Publications::decline_handover`]
+//!   calls the offer off; [`Publications::reassign`] is a manager's, with a reason that the
+//!   history and the audit keep. [`Publications::withdraw`] ends a draft and keeps it under
+//!   another id ([`lifecycle_id`]), so its `name@version` is free for a new draft.
 //! - [`Publications::submit`] submits the draft and runs the automated steps in the same
 //!   transaction:
 //!   - **validation:** the publication rules and the release's schemas
@@ -47,6 +52,9 @@
 //!
 //! Each change is a compare-and-set on the lifecycle's revision, so of two people acting at
 //! once one gets [`Error::Conflict`] rather than overwriting the other.
+//!
+//! The `central-server package` commands build theirs [`Publications::from_cli`], so the audit
+//! of each step they take records it as a CLI action by the `--by` name.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -169,6 +177,27 @@ pub struct Publications {
     limits: Limits,
     observer: String,
     actions: Arc<Vec<ActionDescriptor>>,
+    cli: bool,
+}
+
+/// What the CLI's steps are audited as coming through, beside the `--by` name.
+pub const CLI_AGENT: &str = "central-server package (CLI)";
+
+/// The id lifecycle `lifecycle` is kept under: `name@version`, or, once withdrawn,
+/// `name@version~withdrawn-<when>`, which leaves `name@version` free for a new draft.
+pub fn lifecycle_id(lifecycle: &Lifecycle) -> String {
+    let id = format!("{}@{}", lifecycle.package, lifecycle.version);
+    match (lifecycle.stage, lifecycle.withdrawn_at) {
+        (Stage::Withdrawn, Some(at)) => {
+            let when: String = at
+                .to_string()
+                .chars()
+                .filter(char::is_ascii_digit)
+                .collect();
+            format!("{id}~withdrawn-{when}")
+        }
+        _ => id,
+    }
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -252,7 +281,16 @@ impl Publications {
             limits: Limits::default(),
             observer: observer.into(),
             actions: Arc::new(Vec::new()),
+            cli: false,
         }
+    }
+
+    /// These publications, as the `central-server package` commands use them: each step is
+    /// audited as a CLI action, by the `--by` name it was given.
+    #[must_use]
+    pub fn from_cli(mut self) -> Self {
+        self.cli = true;
+        self
     }
 
     /// These publications, checking Workflow Definitions against `actions`: every workflow
@@ -272,6 +310,10 @@ impl Publications {
     }
 
     fn audit(&self, record: &Record, detail: &str) -> Value {
+        let mut agents = vec![json!({ "who": { "display": record.by }, "requestor": true })];
+        if self.cli {
+            agents.push(json!({ "who": { "display": CLI_AGENT }, "requestor": false }));
+        }
         json!({
             "resourceType": "AuditEvent",
             "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/audit-event-type", "code": "rest", "display": "Restful Operation" }] }],
@@ -280,7 +322,7 @@ impl Publications {
             "severity": "notice",
             "recorded": record.at.to_string(),
             "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
-            "agent": [{ "who": { "display": record.by }, "requestor": true }],
+            "agent": agents,
             "source": { "observer": { "display": self.observer } },
             "entity": [{
                 "what": { "display": format!("package {}@{}", record.package, record.version) },
@@ -696,6 +738,86 @@ impl Publications {
         .await
     }
 
+    /// The holder, `by`, offers draft `id` to `to`, who holds it once they accept.
+    pub async fn hand_over(&self, id: &str, by: &str, to: &str) -> Result<Lifecycle, Error> {
+        self.step(id, |lifecycle, now| {
+            let record = lifecycle.hand_over(by, to, now)?;
+            Ok((record, format!("offered to {}", to.trim())))
+        })
+        .await
+    }
+
+    /// `by`, offered draft `id`, accepts it and holds it from now on.
+    pub async fn accept_handover(&self, id: &str, by: &str) -> Result<Lifecycle, Error> {
+        self.step(id, |lifecycle, now| {
+            let from = lifecycle.holder.clone();
+            let record = lifecycle.accept_handover(by, now)?;
+            Ok((record, format!("handed over from {from}")))
+        })
+        .await
+    }
+
+    /// The holder of draft `id`, or the person offered it, calls the handover off.
+    pub async fn decline_handover(&self, id: &str, by: &str) -> Result<Lifecycle, Error> {
+        self.step(id, |lifecycle, now| {
+            let record = lifecycle.decline_handover(by, now)?;
+            Ok((record, "handover called off".to_owned()))
+        })
+        .await
+    }
+
+    /// A manager, `by`, gives draft `id` to `to`, its holder being unavailable, for `reason`.
+    /// Whether `by` may manage drafts is the caller's to check (`metadata.manage`).
+    pub async fn reassign(
+        &self,
+        id: &str,
+        by: &str,
+        to: &str,
+        reason: &str,
+    ) -> Result<Lifecycle, Error> {
+        self.step(id, |lifecycle, now| {
+            let from = lifecycle.holder.clone();
+            let record = lifecycle.reassign(by, to, reason, now)?;
+            let detail = format!("reassigned from {from} to {}: {}", to.trim(), reason.trim());
+            Ok((record, detail))
+        })
+        .await
+    }
+
+    /// The holder, `by`, withdraws `id` before publication. It is kept, with its history, under
+    /// the id [`lifecycle_id`] gives it, which this answers; `id` is free for a new draft.
+    pub async fn withdraw(&self, id: &str, by: &str) -> Result<(String, Lifecycle), Error> {
+        let mut tx = self.begin().await?;
+        let (mut lifecycle, revision) = self.load(&mut tx, id).await?;
+        let record = lifecycle.withdraw(by, self.clock.now())?;
+        let kept = lifecycle_id(&lifecycle);
+        let data = serde_json::to_string(&lifecycle).map_err(failed)?;
+        let moved = tx
+            .rekey_package_lifecycle(
+                id,
+                &kept,
+                &lifecycle.package,
+                &lifecycle.stage.to_string(),
+                &data,
+                revision,
+            )
+            .await
+            .map_err(failed)?;
+        if !moved {
+            return Err(Error::Conflict(format!(
+                "{id} changed meanwhile; read it again"
+            )));
+        }
+        self.append(
+            &mut tx,
+            &kept,
+            &[(record, format!("withdrawn, kept as {kept}"))],
+        )
+        .await?;
+        tx.commit().await.map_err(failed)?;
+        Ok((kept, lifecycle))
+    }
+
     /// `by` publishes `id` once every approval is in, signing it with `signer`.
     pub async fn publish(
         &self,
@@ -750,7 +872,7 @@ impl Publications {
         Ok((lifecycle, records))
     }
 
-    /// Every lifecycle not yet published, by id.
+    /// Every lifecycle not yet published nor withdrawn, by id.
     pub async fn open(&self) -> Result<Vec<Lifecycle>, Error> {
         let mut tx = self.begin().await?;
         tx.open_package_lifecycles()
@@ -804,6 +926,10 @@ impl Publications {
             signature: published.signature,
         };
         let activation = &record.activation;
+        let mut agents = vec![json!({ "who": { "display": by }, "requestor": true })];
+        if self.cli {
+            agents.push(json!({ "who": { "display": CLI_AGENT }, "requestor": false }));
+        }
         tx.put_package_activation(
             &activation.id,
             package,
@@ -820,7 +946,7 @@ impl Publications {
             "severity": "notice",
             "recorded": now.to_string(),
             "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
-            "agent": [{ "who": { "display": by }, "requestor": true }],
+            "agent": agents,
             "source": { "observer": { "display": self.observer } },
             "entity": [{
                 "what": { "display": format!("package {id}") },

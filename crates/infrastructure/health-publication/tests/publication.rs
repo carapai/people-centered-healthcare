@@ -267,23 +267,26 @@ async fn validation_sends_a_broken_draft_back_with_its_problems() {
         "{problems:?}"
     );
 
-    // Only a draft's content may change; revising it by someone else makes them an author.
+    // Only a draft's content may change, and only its Draft Holder changes it (#493).
     json["dependencies"]["ug.moh.core"] = json!("2.1.0");
     files.insert("package.json".into(), json.to_string().into_bytes());
+    assert!(matches!(
+        central.publications.draft(&files, "dan").await,
+        Err(Error::Refused(Refused::NotHolder))
+    ));
     let revised = central
         .publications
-        .draft(&files, "dan")
+        .draft(&files, "ann")
         .await
         .expect("revise");
     assert_ne!(revised.content, lifecycle.content);
-    assert!(revised.authors.contains("dan"));
     to_approval(&central, id).await;
     assert!(matches!(
         central.publications.draft(&files, "ann").await,
         Err(Error::Refused(Refused::Stage(Stage::Approval)))
     ));
     assert!(matches!(
-        central.publications.approve(id, "dan").await,
+        central.publications.approve(id, "ann").await,
         Err(Error::Refused(Refused::Author))
     ));
 
