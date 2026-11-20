@@ -47,6 +47,7 @@ Layer: **infrastructure**. Published Definition packages on disk and in transit 
 - **A ValueSet's `expansion`** is its pinned expansion. Nested `contains` are flattened, and abstract headings without a code are skipped.
 - **A CodeSystem without `caseSensitive`** is taken as case-sensitive, the stricter reading.
 - **ConceptMaps are R5:** a group's `source` and `target` lose any `|version`, and `noMap` is a target with no code, `not-related-to`.
+- **`terminology::catalogue(files)`** (#523) lists a package's CodeSystems and ValueSets (path, url, version, name, title) and every Questionnaire question that binds a ValueSet (`answerValueSet`), nested ones included, for the Studio's terminology browser.
 - **Refused, never skipped:** a resource without its `url`, an unknown `content` or filter operator, a filter without its parts, a concept or listed code without its code, a group without its source and target, and an unknown relationship (`Error::Terminology`). Files that are not top-level JSON resources of those types are left alone.
 
 ## Configuration schemas

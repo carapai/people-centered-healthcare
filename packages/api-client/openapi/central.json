@@ -617,6 +617,535 @@
         }
       }
     },
+    "/api/studio/packages/{id}/terminology/code-systems": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the code systems.",
+        "description": "The code systems package version `id` is authored against: its own, and those of the latest published version of every other package. Each is local or external (shipped in a terminology package, read only), with its version and concept count.",
+        "operationId": "listStudioCodeSystems",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The code systems",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioCodeSystems"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A package's terminology cannot be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/terminology/concept": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves one concept.",
+        "description": "One concept: its display, definition, the codes directly above it, and the ValueSets (this package's and the published ones) whose expansion contains it.",
+        "operationId": "getStudioConcept",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "system",
+            "in": "query",
+            "description": "The code system's canonical URL",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "description": "Its version; the latest held when there is none",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "description": "The code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioConcept"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No system or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version, code system or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/terminology/concepts": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves a page of concepts.",
+        "description": "A page of a code system's concepts, found here so a browser never loads a large code system: with `text`, those whose code, display or a designation holds every word (an exact code first); otherwise those directly under `parent`, or the top-level ones.",
+        "operationId": "listStudioConcepts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "system",
+            "in": "query",
+            "description": "The code system's canonical URL",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "description": "Its version; the latest held when there is none",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parent",
+            "in": "query",
+            "description": "The concept whose children to list",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "description": "Words or a code to search for",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Skip this many concepts",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "At most this many (50 unless asked, 500 at most)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The concepts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioConceptPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No system, or a number that is not one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version, code system or parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/terminology/expand": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves an expansion.",
+        "description": "A ValueSet's expansion over what package version `id` is authored against: one held, by `url` (and `version`), or an unsaved one of this package sent as `valueSet`. For this package's own ValueSets it carries the change against the expansion in the package's previous published version: codes added, and codes removed, which new forms no longer offer. It also lists the form questions that bind it.",
+        "operationId": "expandStudioValueSet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioExpandInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The expansion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioExpansion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither a url nor a ValueSet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version, ValueSet or code system",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The ValueSet cannot be read or expanded here",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/terminology/value-sets": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the ValueSets.",
+        "description": "The ValueSets a form of package version `id` may bind: its own (drafts, in a draft) and those of the latest published version of every other package, with `text` matching a URL, name or title.",
+        "operationId": "listStudioValueSets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "description": "Words to match, ignoring case",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ValueSets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioValueSets"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A package's terminology cannot be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/version": {
       "put": {
         "tags": [
@@ -1232,6 +1761,48 @@
           }
         }
       },
+      "StudioBinding": {
+        "type": "object",
+        "description": "A form question that binds the ValueSet.",
+        "required": [
+          "package",
+          "path",
+          "linkId",
+          "valueSet"
+        ],
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "description": "The question's `linkId`."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package, `name@version`."
+          },
+          "path": {
+            "type": "string",
+            "description": "The Questionnaire's file."
+          },
+          "questionnaire": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Questionnaire's canonical URL."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title."
+          },
+          "valueSet": {
+            "type": "string",
+            "description": "The binding as written, `url` or `url|version`."
+          }
+        }
+      },
       "StudioCheck": {
         "type": "string",
         "description": "Which automated check.",
@@ -1273,6 +1844,384 @@
               "type": "string"
             },
             "description": "Every problem found."
+          }
+        }
+      },
+      "StudioCode": {
+        "type": "object",
+        "description": "One code of an expansion.",
+        "required": [
+          "system",
+          "code",
+          "inactive"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code."
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display."
+          },
+          "inactive": {
+            "type": "boolean",
+            "description": "Whether it is inactive."
+          },
+          "system": {
+            "type": "string",
+            "description": "Its code system."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The code system's version."
+          }
+        }
+      },
+      "StudioCodeSystem": {
+        "type": "object",
+        "description": "A code system the package version is authored against.",
+        "required": [
+          "url",
+          "package",
+          "own",
+          "external",
+          "complete",
+          "concepts"
+        ],
+        "properties": {
+          "complete": {
+            "type": "boolean",
+            "description": "Whether every concept is held (`content` is `complete`); only then can a ValueSet filter it."
+          },
+          "concepts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many concepts it holds.",
+            "minimum": 0
+          },
+          "external": {
+            "type": "boolean",
+            "description": "Whether it is external: shipped in a terminology package, and read only."
+          },
+          "own": {
+            "type": "boolean",
+            "description": "Whether it is this package's own."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package it comes from, `name@version`."
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its file, when it is this package's own."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its `title`, or its `name`."
+          },
+          "url": {
+            "type": "string",
+            "description": "Its canonical URL."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
+      "StudioCodeSystems": {
+        "type": "object",
+        "description": "The code systems, this package's own first.",
+        "required": [
+          "codeSystems"
+        ],
+        "properties": {
+          "codeSystems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCodeSystem"
+            },
+            "description": "The code systems."
+          }
+        }
+      },
+      "StudioConcept": {
+        "type": "object",
+        "description": "One concept read in full.",
+        "required": [
+          "codeSystem",
+          "code",
+          "inactive",
+          "parents",
+          "children",
+          "valueSets"
+        ],
+        "properties": {
+          "children": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many concepts are directly under it.",
+            "minimum": 0
+          },
+          "code": {
+            "type": "string",
+            "description": "Its code."
+          },
+          "codeSystem": {
+            "type": "string",
+            "description": "The code system, `url|version`."
+          },
+          "definition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its definition."
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display."
+          },
+          "inactive": {
+            "type": "boolean",
+            "description": "Whether it is inactive (retired)."
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The codes directly above it."
+          },
+          "valueSets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioValueSet"
+            },
+            "description": "The ValueSets that contain it."
+          }
+        }
+      },
+      "StudioConceptPage": {
+        "type": "object",
+        "description": "A page of concepts.",
+        "required": [
+          "codeSystem",
+          "total",
+          "concepts"
+        ],
+        "properties": {
+          "codeSystem": {
+            "type": "string",
+            "description": "The code system, `url|version`."
+          },
+          "concepts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioConceptRow"
+            },
+            "description": "This page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many concepts there are before paging.",
+            "minimum": 0
+          }
+        }
+      },
+      "StudioConceptRow": {
+        "type": "object",
+        "description": "A concept, as a row of the hierarchy or of a search.",
+        "required": [
+          "code",
+          "inactive",
+          "children"
+        ],
+        "properties": {
+          "children": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many concepts are directly under it.",
+            "minimum": 0
+          },
+          "code": {
+            "type": "string",
+            "description": "Its code."
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display."
+          },
+          "inactive": {
+            "type": "boolean",
+            "description": "Whether it is inactive (retired)."
+          }
+        }
+      },
+      "StudioExpandInput": {
+        "type": "object",
+        "description": "Which ValueSet to expand.",
+        "properties": {
+          "count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "At most this many codes (200 unless asked, 1000 at most).",
+            "minimum": 0
+          },
+          "filter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Only codes whose code or display holds this text."
+          },
+          "offset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Skip this many codes.",
+            "minimum": 0
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A ValueSet held, by canonical URL."
+          },
+          "valueSet": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "An unsaved ValueSet resource of this package, expanded in place of the one it replaces."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version; the latest held when there is none."
+          }
+        }
+      },
+      "StudioExpansion": {
+        "type": "object",
+        "description": "A ValueSet's expansion.",
+        "required": [
+          "valueSet",
+          "total",
+          "contains",
+          "boundBy"
+        ],
+        "properties": {
+          "boundBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioBinding"
+            },
+            "description": "The form questions that bind it, in this package and the published ones."
+          },
+          "change": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioExpansionChange",
+                "description": "Its change against the published expansion, for this package's own ValueSets."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCode"
+            },
+            "description": "The codes on this page."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many codes it has (after `filter`), before paging.",
+            "minimum": 0
+          },
+          "valueSet": {
+            "type": "string",
+            "description": "The ValueSet expanded, `url|version`."
+          }
+        }
+      },
+      "StudioExpansionChange": {
+        "type": "object",
+        "description": "How the expansion changed against the published one.",
+        "required": [
+          "addedTotal",
+          "added",
+          "removedTotal",
+          "removed"
+        ],
+        "properties": {
+          "added": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCode"
+            },
+            "description": "The codes added (the first 1000)."
+          },
+          "addedTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many codes were added.",
+            "minimum": 0
+          },
+          "published": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The published ValueSet compared against, `url|version`; none when it was never published,\nso every code is added."
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCode"
+            },
+            "description": "The codes removed (the first 1000): records that hold them stay valid against the\nversion that issued them, and new forms no longer offer them."
+          },
+          "removedTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many codes were removed.",
+            "minimum": 0
           }
         }
       },
@@ -1742,6 +2691,64 @@
           "not-published",
           "other"
         ]
+      },
+      "StudioValueSet": {
+        "type": "object",
+        "description": "A ValueSet, as a list names it.",
+        "required": [
+          "url",
+          "package",
+          "path",
+          "own"
+        ],
+        "properties": {
+          "own": {
+            "type": "boolean",
+            "description": "Whether it is this package's own (a draft, when this package version is one)."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package it comes from, `name@version`."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its file in that package."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its `title`, or its `name`."
+          },
+          "url": {
+            "type": "string",
+            "description": "Its canonical URL."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
+      "StudioValueSets": {
+        "type": "object",
+        "description": "The ValueSets of the package version and of the published packages.",
+        "required": [
+          "valueSets"
+        ],
+        "properties": {
+          "valueSets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioValueSet"
+            },
+            "description": "The ValueSets, this package's own first."
+          }
+        }
       },
       "StudioVersionInput": {
         "type": "object",

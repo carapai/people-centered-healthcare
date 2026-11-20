@@ -4,7 +4,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { studioMessages as m } from '../../i18n/messages'
+import { studioMessages as m, terminologyMessages as tm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
 import { StudioError, actionInput, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
@@ -95,6 +95,12 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                     <DesignerLink id={id} path={change.path} />
                   </>
                 ) : null}
+                {isTerminology(change.resourceType) && change.change !== 'removed' ? (
+                  <>
+                    {' · '}
+                    <TerminologyLink id={id} path={change.path} />
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -178,6 +184,18 @@ function DesignerLink({ id, path }: { id: string; path: string }) {
   )
 }
 
+const isTerminology = (type: string | null | undefined) => type === 'CodeSystem' || type === 'ValueSet'
+
+/** Opens a CodeSystem or ValueSet in the terminology browser (#523). */
+function TerminologyLink({ id, path }: { id: string; path: string }) {
+  const intl = useIntl()
+  return (
+    <Link to="/studio/$id/terminology/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(tm.tbOpen, { path })}>
+      {intl.formatMessage(tm.tbOpenShort)}
+    </Link>
+  )
+}
+
 function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
   const intl = useIntl()
   const platform = usePlatform()
@@ -232,6 +250,12 @@ function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
               <>
                 {' · '}
                 <DesignerLink id={id} path={file.path} />
+              </>
+            ) : null}
+            {isTerminology(file.resourceType) ? (
+              <>
+                {' · '}
+                <TerminologyLink id={id} path={file.path} />
               </>
             ) : null}
           </li>

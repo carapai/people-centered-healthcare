@@ -680,3 +680,371 @@ fn the_openapi_document_describes_the_studio() {
         assert!(document.contains(operation), "{operation}");
     }
 }
+
+// The terminology browser (#523).
+
+const ICD11: &str = "http://id.who.int/icd/release/11/mms";
+const SIGNS: &str = "http://health.go.ug/fhir/CodeSystem/anc-signs";
+const DANGER: &str = "http://health.go.ug/fhir/ValueSet/danger-signs";
+
+fn signer() -> health_publication::LocalSigner {
+    let at = |text: &str| text.parse().expect("time");
+    let root = health_pki::Authority::root("Uganda Health Root", at("2026-01-01T00:00:00Z"))
+        .expect("root");
+    let key = health_pki::new_key().expect("key");
+    let issued = root
+        .issue_publication(
+            &health_pki::request(&key, "MoH publication signing").expect("request"),
+            "MoH publication signing",
+            at("2026-06-01T00:00:00Z"),
+        )
+        .expect("certificate");
+    health_publication::LocalSigner::from_pem(&key.serialize_pem(), issued.pem()).expect("signer")
+}
+
+/// `name@version` of `kind` holding `resources`, each in `<resourceType>-<id>.json`.
+fn terminology_package(name: &str, version: &str, kind: &str, resources: &[Value]) -> Files {
+    let file = |path: String, json: &Value| (path, json.to_string().into_bytes());
+    let mut files = Files::from([
+        file(
+            "package.json".into(),
+            &json!({
+                "name": name, "version": version, "fhirVersions": ["5.0.0"],
+                "kind": kind, "platform": { "minSoftware": "0.3.0", "formatVersion": 1 }
+            }),
+        ),
+        file(
+            "Library-manifest.json".into(),
+            &json!({
+                "resourceType": "Library", "id": "manifest", "title": name,
+                "url": format!("http://health.go.ug/fhir/Library/{name}-manifest"), "version": version,
+                "status": "active", "type": { "text": "asset-collection" }
+            }),
+        ),
+    ]);
+    for resource in resources {
+        let path = format!(
+            "{}-{}.json",
+            resource["resourceType"].as_str().expect("type"),
+            resource["id"].as_str().expect("id")
+        );
+        files.insert(path, resource.to_string().into_bytes());
+    }
+    files
+}
+
+async fn publish(publications: &Publications, files: &Files) {
+    let lifecycle = publications.draft(files, "ann").await.expect("draft");
+    let id = health_publication::lifecycle_id(&lifecycle);
+    let submitted = publications.submit(&id, "ann").await.expect("submit");
+    assert_eq!(
+        submitted.stage,
+        health_configuration::lifecycle::Stage::Review,
+        "{id} must validate"
+    );
+    publications.review(&id, "rita").await.expect("review");
+    publications.approve(&id, "bob").await.expect("approve");
+    publications.approve(&id, "cara").await.expect("approve");
+    publications
+        .publish(&id, "ops", &signer())
+        .await
+        .expect("publish");
+}
+
+/// A slice of ICD-11: a chapter with 300 intestinal infections under one block.
+fn icd11() -> Value {
+    let infections: Vec<Value> = (0..300)
+        .map(|n| json!({ "code": format!("1A{n:03}"), "display": format!("Intestinal infection type {n}") }))
+        .collect();
+    json!({
+        "resourceType": "CodeSystem", "id": "icd11", "url": ICD11, "version": "2024-01",
+        "name": "ICD11MMS", "title": "ICD-11 MMS", "status": "active", "content": "complete",
+        "caseSensitive": false,
+        "concept": [
+            { "code": "01", "display": "Certain infectious or parasitic diseases",
+              "concept": [{ "code": "1A0", "display": "Bacterial intestinal infections", "concept": infections }] },
+            { "code": "12", "display": "Diseases of the respiratory system",
+              "concept": [{ "code": "CA40", "display": "Pneumonia" }] }
+        ]
+    })
+}
+
+fn signs(version: &str, extra: &[Value]) -> Value {
+    let mut bleeding = vec![json!({ "code": "heavy-bleeding", "display": "Heavy bleeding" })];
+    bleeding.extend(extra.iter().cloned());
+    json!({
+        "resourceType": "CodeSystem", "id": "anc-signs", "url": SIGNS, "version": version,
+        "name": "AncSigns", "status": "active", "content": "complete",
+        "concept": [{ "code": "danger", "display": "Danger signs", "concept": [
+            { "code": "bleeding", "display": "Vaginal bleeding", "concept": bleeding },
+            { "code": "fits", "display": "Convulsions" }
+        ]}]
+    })
+}
+
+fn danger(version: &str, compose: Value) -> Value {
+    json!({
+        "resourceType": "ValueSet", "id": "danger-signs", "url": DANGER, "version": version,
+        "name": "DangerSigns", "title": "Danger signs", "status": "active", "compose": compose
+    })
+}
+
+fn form(version: &str) -> Value {
+    json!({
+        "resourceType": "Questionnaire", "id": "anc-visit", "title": "ANC visit",
+        "url": "http://health.go.ug/fhir/Questionnaire/anc-visit", "version": version, "status": "active",
+        "item": [{ "linkId": "danger", "text": "Danger signs", "type": "coding",
+                   "answerValueSet": format!("{DANGER}|{version}") }]
+    })
+}
+
+#[tokio::test]
+async fn the_terminology_browser_searches_adds_with_is_a_and_flags_removals() {
+    let (publications, _dir) = publications().await;
+    publish(
+        &publications,
+        &terminology_package("who.icd11", "2024.1.0", "terminology", &[icd11()]),
+    )
+    .await;
+    let listed = json!({ "include": [{ "system": SIGNS, "concept": [{ "code": "bleeding" }, { "code": "fits" }] }] });
+    publish(
+        &publications,
+        &terminology_package(
+            "ug.moh.anc",
+            "1.0.0",
+            "program",
+            &[signs("1.0.0", &[]), danger("1.0.0", listed), form("1.0.0")],
+        ),
+    )
+    .await;
+    let ann = || subject("ann", &[AUTHOR]);
+    let (status, page) = call(
+        &publications,
+        ann(),
+        "POST",
+        "/drafts",
+        Some(json!({ "copyOf": "ug.moh.anc@1.0.0" })),
+    )
+    .await;
+    assert_eq!(status, 201, "{page}");
+    let draft = page["package"]["id"].as_str().expect("id").to_owned();
+    let base = format!("/packages/{draft}/terminology");
+
+    // The code systems: the draft's own, local; ICD-11 from its terminology package, external.
+    let (status, systems) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/code-systems"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{systems}");
+    let systems = systems["codeSystems"].as_array().expect("list");
+    let own = systems.iter().find(|s| s["url"] == SIGNS).expect("own");
+    assert_eq!(
+        (own["own"].clone(), own["external"].clone()),
+        (json!(true), json!(false))
+    );
+    assert_eq!(own["concepts"], 4);
+    assert_eq!(own["path"], "CodeSystem-anc-signs.json");
+    let icd = systems.iter().find(|s| s["url"] == ICD11).expect("icd");
+    assert_eq!(
+        (icd["external"].clone(), icd["concepts"].clone()),
+        (json!(true), json!(304))
+    );
+    assert_eq!(icd["package"], "who.icd11@2024.1.0");
+
+    // Searching ICD-11 by words: the server answers one page, never the whole system.
+    let (status, found) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concepts?system={ICD11}&text=intestinal%20TYPE&count=20"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{found}");
+    assert_eq!(found["total"], 300);
+    assert_eq!(found["concepts"].as_array().expect("page").len(), 20);
+    assert_eq!(found["concepts"][0]["code"], "1A000");
+    // The hierarchy, one level at a time.
+    let (_, top) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concepts?system={ICD11}"),
+        None,
+    )
+    .await;
+    assert_eq!(top["concepts"][0]["code"], "01");
+    assert_eq!(top["concepts"][0]["children"], 1);
+    let (_, under) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concepts?system={SIGNS}&parent=danger"),
+        None,
+    )
+    .await;
+    let codes: Vec<&str> = under["concepts"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .map(|c| c["code"].as_str().expect("code"))
+        .collect();
+    assert_eq!(codes, ["bleeding", "fits"]);
+    let (status, _) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concepts?system=urn:none"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 404);
+
+    // A concept shows the ValueSets that contain it.
+    let (status, concept) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concept?system={SIGNS}&code=fits"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{concept}");
+    assert_eq!(concept["parents"], json!(["danger"]));
+    assert_eq!(concept["valueSets"][0]["url"], DANGER);
+
+    // Editing the draft ValueSet, unsaved: bleeding with everything under it, and fits removed.
+    let edited = danger(
+        "1.1.0-draft",
+        json!({ "include": [{ "system": SIGNS,
+        "filter": [{ "property": "concept", "op": "is-a", "value": "bleeding" }] }] }),
+    );
+    let (status, expansion) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{base}/expand"),
+        Some(json!({ "valueSet": edited })),
+    )
+    .await;
+    assert_eq!(status, 200, "{expansion}");
+    let codes = |e: &Value, key: &str| -> Vec<String> {
+        e[key]
+            .as_array()
+            .expect("codes")
+            .iter()
+            .map(|c| c["code"].as_str().expect("code").to_owned())
+            .collect()
+    };
+    assert_eq!(
+        codes(&expansion, "contains"),
+        ["bleeding", "heavy-bleeding"]
+    );
+    let change = &expansion["change"];
+    assert_eq!(change["published"], format!("{DANGER}|1.0.0"));
+    assert_eq!(codes(change, "added"), ["heavy-bleeding"]);
+    assert_eq!(codes(change, "removed"), ["fits"], "the removal is flagged");
+    assert_eq!(change["removedTotal"], 1);
+    assert_eq!(expansion["boundBy"][0]["linkId"], "danger");
+
+    // Saved, the is-a filter is kept, and a child code added later is in the expansion.
+    let save = |path: &str, resource: &Value| {
+        (
+            format!("/packages/{draft}/files/{path}"),
+            json!({ "content": resource.to_string() }),
+        )
+    };
+    let (_, tag, _) = send(
+        &publications,
+        ann(),
+        "GET",
+        &format!("/packages/{draft}"),
+        None,
+        None,
+    )
+    .await;
+    let (path, body) = save("ValueSet-danger-signs.json", &edited);
+    let (status, tag, page) = send(
+        &publications,
+        ann(),
+        "PUT",
+        &path,
+        tag.as_deref(),
+        Some(body),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    let (_, saved) = call(&publications, ann(), "GET", &path, None).await;
+    assert!(
+        saved["content"]
+            .as_str()
+            .expect("text")
+            .contains("\"is-a\"")
+    );
+    let spotting = json!({ "code": "spotting", "display": "Spotting" });
+    let (path, body) = save(
+        "CodeSystem-anc-signs.json",
+        &signs("1.1.0-draft", &[spotting]),
+    );
+    let (status, _, page) = send(
+        &publications,
+        ann(),
+        "PUT",
+        &path,
+        tag.as_deref(),
+        Some(body),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    let (status, expansion) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{base}/expand"),
+        Some(json!({ "url": DANGER })),
+    )
+    .await;
+    assert_eq!(status, 200, "{expansion}");
+    assert_eq!(
+        codes(&expansion, "contains"),
+        ["bleeding", "heavy-bleeding", "spotting"]
+    );
+    assert_eq!(codes(&expansion["change"], "removed"), ["fits"]);
+
+    // The ValueSets a form may bind: the draft's own, searched.
+    let (status, sets) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/value-sets?text=danger"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{sets}");
+    assert_eq!(sets["valueSets"][0]["url"], DANGER);
+    assert_eq!(sets["valueSets"][0]["own"], true);
+    let (_, none) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/value-sets?text=pneumonia"),
+        None,
+    )
+    .await;
+    assert_eq!(none["valueSets"], json!([]));
+
+    // Without a Studio permission there is nothing to browse.
+    let (status, _) = call(
+        &publications,
+        subject("eve", &[]),
+        "GET",
+        &format!("{base}/code-systems"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 403);
+}

@@ -291,5 +291,95 @@ pub fn load(terminology: &mut Terminology, files: &Files) -> Result<(), Error> {
     Ok(())
 }
 
+/// A CodeSystem or ValueSet of a package, as the Studio lists it (#523).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Entry {
+    /// Its file in the package.
+    pub path: String,
+    /// `CodeSystem` or `ValueSet`.
+    pub resource_type: String,
+    /// Its canonical URL.
+    pub url: String,
+    /// Its version.
+    pub version: Option<String>,
+    /// Its `name`.
+    pub name: Option<String>,
+    /// Its `title`.
+    pub title: Option<String>,
+}
+
+/// A Questionnaire question that binds a ValueSet (`answerValueSet`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Binding {
+    /// The Questionnaire's file in the package.
+    pub path: String,
+    /// The Questionnaire's canonical URL.
+    pub questionnaire: Option<String>,
+    /// Its `title`, or its `name`.
+    pub title: Option<String>,
+    /// The question's `linkId`.
+    pub link_id: String,
+    /// The ValueSet bound, `url` or `url|version` as written.
+    pub value_set: String,
+}
+
+/// What a package holds of terminology and binds to it: its CodeSystems and ValueSets, and its
+/// Questionnaires' `answerValueSet` bindings.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Catalogue {
+    /// Its CodeSystems and ValueSets, by path.
+    pub entries: Vec<Entry>,
+    /// Its bindings, by path then question order.
+    pub bindings: Vec<Binding>,
+}
+
+fn bindings(into: &mut Vec<Binding>, path: &str, form: &Value, items: &Value) {
+    for item in array(items, "item") {
+        if let (Some(link_id), Some(value_set)) =
+            (text(item, "linkId"), text(item, "answerValueSet"))
+        {
+            into.push(Binding {
+                path: path.to_owned(),
+                questionnaire: text(form, "url"),
+                title: text(form, "title").or_else(|| text(form, "name")),
+                link_id,
+                value_set,
+            });
+        }
+        bindings(into, path, form, item);
+    }
+}
+
+/// The CodeSystems, ValueSets and bindings among a package's top-level `files`. Files that are
+/// not JSON resources are left alone, as [`load`] does.
+pub fn catalogue(files: &Files) -> Catalogue {
+    let mut found = Catalogue::default();
+    for (path, bytes) in files {
+        if path.contains('/') || !path.ends_with(".json") || path.starts_with('.') {
+            continue;
+        }
+        let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
+            continue;
+        };
+        match value.get("resourceType").and_then(Value::as_str) {
+            Some(kind @ ("CodeSystem" | "ValueSet")) => {
+                if let Some(url) = text(&value, "url") {
+                    found.entries.push(Entry {
+                        path: path.clone(),
+                        resource_type: kind.to_owned(),
+                        url,
+                        version: text(&value, "version"),
+                        name: text(&value, "name"),
+                        title: text(&value, "title"),
+                    });
+                }
+            }
+            Some("Questionnaire") => bindings(&mut found.bindings, path, &value, &value),
+            _ => {}
+        }
+    }
+    found
+}
+
 #[cfg(test)]
 mod tests;

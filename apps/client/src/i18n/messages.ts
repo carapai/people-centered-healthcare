@@ -1969,3 +1969,158 @@ export const studioMessages = defineMessages<StudioValues>({
   fdLayoutFile: { id: 'app.studio.formDesigner.layoutFile', defaultMessage: 'Its layout is {path}.', description: 'Studio: the Form Layout file' },
   fdLayoutNew: { id: 'app.studio.formDesigner.layoutNew', defaultMessage: 'It has no layout yet: a section, widget or hint adds {path}.', description: 'Studio: no Form Layout yet' },
 })
+
+type TerminologyValues = {
+  tbOpen: { path: string }
+  tbOpenShort: {}
+  tbHeading: { title: string }
+  tbBack: {}
+  tbLoading: {}
+  tbFailed: { reason: string }
+  tbNotTerminology: {}
+  tbSystems: {}
+  tbSystemsNone: {}
+  tbSystemRow: { title: string; version: string; count: number }
+  tbLocal: {}
+  tbExternal: {}
+  tbOwn: {}
+  tbConcepts: { title: string }
+  tbPickSystem: {}
+  tbSearch: {}
+  tbSearchHint: {}
+  tbSearchButton: {}
+  tbClearSearch: {}
+  tbFound: { total: number; shown: number }
+  tbNoneFound: {}
+  tbMore: {}
+  tbShowUnder: { code: string; count: number }
+  tbHideUnder: { code: string }
+  tbIncluded: {}
+  tbInactive: {}
+  tbSelected: {}
+  tbConceptCode: { code: string; system: string }
+  tbDefinition: {}
+  tbParents: { parents: string }
+  tbTopLevel: {}
+  tbContainedIn: {}
+  tbContainedInNone: {}
+  tbAdd: { code: string }
+  tbAddUnder: { code: string }
+  tbExclude: { code: string }
+  tbValueSet: {}
+  tbNoValueSet: {}
+  tbOpenValueSet: {}
+  tbNewValueSet: {}
+  tbNewName: {}
+  tbNewNameHint: {}
+  tbNewTitle: {}
+  tbCreate: {}
+  tbReadOnly: {}
+  tbRules: {}
+  tbRulesNone: {}
+  tbRuleCodes: { system: string }
+  tbRuleUnder: { code: string; system: string }
+  tbRuleExcluded: { system: string }
+  tbRuleOther: { system: string }
+  tbRemoveRule: {}
+  tbRemoveCode: { code: string }
+  tbExpansion: { total: number }
+  tbExpansionShown: { shown: number }
+  tbExpansionFailed: { reason: string }
+  tbChange: {}
+  tbChangeFirst: {}
+  tbChangeAgainst: { published: string }
+  tbChangeNone: {}
+  tbAdded: { total: number }
+  tbRemoved: { total: number }
+  tbRemovedFlag: {}
+  tbBoundBy: {}
+  tbBoundByNone: {}
+  tbBinding: { form: string; linkId: string; package: string }
+  tbSave: {}
+  tbSaved: {}
+  tbUnsaved: {}
+  tbStale: {}
+  tbReload: {}
+  tbSaveFailed: { reason: string }
+}
+
+// The Studio's terminology browser (features/studio/terminology, #523).
+export const terminologyMessages = defineMessages<TerminologyValues>({
+  tbOpen: { id: 'app.studio.terminology.open', defaultMessage: '{path} in the terminology browser', description: 'Studio: link from a CodeSystem or ValueSet to the terminology browser' },
+  tbOpenShort: { id: 'app.studio.terminology.openShort', defaultMessage: 'Terminology', description: 'Studio: visible text of the link to the terminology browser' },
+  tbHeading: { id: 'app.studio.terminology.heading', defaultMessage: 'Terminology: {title}', description: 'Studio: terminology browser heading' },
+  tbBack: { id: 'app.studio.terminology.back', defaultMessage: 'Back to the package', description: 'Studio: link back to the package page' },
+  tbLoading: { id: 'app.studio.terminology.loading', defaultMessage: 'Loading the terminology…', description: 'Studio: terminology loading' },
+  tbFailed: { id: 'app.studio.terminology.failed', defaultMessage: 'The terminology could not be loaded: {reason}', description: 'Studio: terminology failed to load' },
+  tbNotTerminology: { id: 'app.studio.terminology.notTerminology', defaultMessage: 'This file is not a CodeSystem or a ValueSet. Open it as JSON instead.', description: 'Studio: terminology browser opened on another file' },
+  tbSystems: { id: 'app.studio.terminology.systems', defaultMessage: 'Code systems', description: 'Studio: the code systems column' },
+  tbSystemsNone: { id: 'app.studio.terminology.systemsNone', defaultMessage: 'No code systems: this package and the published ones hold none.', description: 'Studio: no code systems' },
+  tbSystemRow: { id: 'app.studio.terminology.systemRow', defaultMessage: '{title} {version} · {count, plural, one {# concept} other {# concepts}}', description: 'Studio: one code system' },
+  tbLocal: { id: 'app.studio.terminology.local', defaultMessage: 'Local', description: 'Studio: a code system authored here' },
+  tbExternal: { id: 'app.studio.terminology.external', defaultMessage: 'External, read only', description: 'Studio: a code system shipped in a terminology package' },
+  tbOwn: { id: 'app.studio.terminology.own', defaultMessage: 'In this package', description: 'Studio: a code system of the package being edited' },
+  tbConcepts: { id: 'app.studio.terminology.concepts', defaultMessage: 'Concepts of {title}', description: 'Studio: the concepts column' },
+  tbPickSystem: { id: 'app.studio.terminology.pickSystem', defaultMessage: 'Choose a code system to browse.', description: 'Studio: no code system chosen' },
+  tbSearch: { id: 'app.studio.terminology.search', defaultMessage: 'Search by code or words', description: 'Studio: search field label' },
+  tbSearchHint: { id: 'app.studio.terminology.searchHint', defaultMessage: 'The search runs on the server, a page at a time.', description: 'Studio: search field hint' },
+  tbSearchButton: { id: 'app.studio.terminology.searchButton', defaultMessage: 'Search', description: 'Studio: run the search' },
+  tbClearSearch: { id: 'app.studio.terminology.clearSearch', defaultMessage: 'Back to the hierarchy', description: 'Studio: leave the search' },
+  tbFound: { id: 'app.studio.terminology.found', defaultMessage: '{total, plural, one {# match} other {# matches}}, {shown} shown', description: 'Studio: search results count' },
+  tbNoneFound: { id: 'app.studio.terminology.noneFound', defaultMessage: 'Nothing matches.', description: 'Studio: no search results' },
+  tbMore: { id: 'app.studio.terminology.more', defaultMessage: 'Show more', description: 'Studio: load the next page of concepts' },
+  tbShowUnder: { id: 'app.studio.terminology.showUnder', defaultMessage: 'Show the {count} under {code}', description: 'Studio: expand a concept in the hierarchy' },
+  tbHideUnder: { id: 'app.studio.terminology.hideUnder', defaultMessage: 'Hide what is under {code}', description: 'Studio: collapse a concept in the hierarchy' },
+  tbIncluded: { id: 'app.studio.terminology.included', defaultMessage: 'in the ValueSet', description: 'Studio: the concept is in the open ValueSet' },
+  tbInactive: { id: 'app.studio.terminology.inactive', defaultMessage: 'retired', description: 'Studio: the concept is inactive' },
+  tbSelected: { id: 'app.studio.terminology.selected', defaultMessage: 'Selected concept', description: 'Studio: the selected concept panel' },
+  tbConceptCode: { id: 'app.studio.terminology.conceptCode', defaultMessage: '{code} in {system}', description: 'Studio: the selected concept code' },
+  tbDefinition: { id: 'app.studio.terminology.definition', defaultMessage: 'Definition', description: 'Studio: concept definition label' },
+  tbParents: { id: 'app.studio.terminology.parents', defaultMessage: 'Under {parents}', description: 'Studio: the concepts directly above' },
+  tbTopLevel: { id: 'app.studio.terminology.topLevel', defaultMessage: 'A top-level concept', description: 'Studio: the concept has no parent' },
+  tbContainedIn: { id: 'app.studio.terminology.containedIn', defaultMessage: 'ValueSets that contain it', description: 'Studio: ValueSets holding the concept' },
+  tbContainedInNone: { id: 'app.studio.terminology.containedInNone', defaultMessage: 'No ValueSet contains it.', description: 'Studio: no ValueSet holds the concept' },
+  tbAdd: { id: 'app.studio.terminology.add', defaultMessage: 'Add {code}', description: 'Studio: add one concept to the ValueSet' },
+  tbAddUnder: { id: 'app.studio.terminology.addUnder', defaultMessage: 'Add {code} and everything under it', description: 'Studio: add a concept with an is-a filter' },
+  tbExclude: { id: 'app.studio.terminology.exclude', defaultMessage: 'Exclude {code}', description: 'Studio: take a concept out of the ValueSet' },
+  tbValueSet: { id: 'app.studio.terminology.valueSet', defaultMessage: 'ValueSet', description: 'Studio: the ValueSet column' },
+  tbNoValueSet: { id: 'app.studio.terminology.noValueSet', defaultMessage: 'No ValueSet is open. Open one of this package, or start one.', description: 'Studio: no ValueSet open' },
+  tbOpenValueSet: { id: 'app.studio.terminology.openValueSet', defaultMessage: 'ValueSets of this package', description: 'Studio: the package ValueSets list' },
+  tbNewValueSet: { id: 'app.studio.terminology.newValueSet', defaultMessage: 'New ValueSet', description: 'Studio: start a ValueSet' },
+  tbNewName: { id: 'app.studio.terminology.newName', defaultMessage: 'Id', description: 'Studio: the new ValueSet id' },
+  tbNewNameHint: { id: 'app.studio.terminology.newNameHint', defaultMessage: 'Letters, digits and hyphens, e.g. danger-signs.', description: 'Studio: the new ValueSet id hint' },
+  tbNewTitle: { id: 'app.studio.terminology.newTitle', defaultMessage: 'Title', description: 'Studio: the new ValueSet title' },
+  tbCreate: { id: 'app.studio.terminology.create', defaultMessage: 'Start the ValueSet', description: 'Studio: create the ValueSet' },
+  tbReadOnly: { id: 'app.studio.terminology.readOnly', defaultMessage: 'Read only: you may not change this package version.', description: 'Studio: the ValueSet cannot be edited' },
+  tbRules: { id: 'app.studio.terminology.rules', defaultMessage: 'What it holds', description: 'Studio: the compose rules' },
+  tbRulesNone: { id: 'app.studio.terminology.rulesNone', defaultMessage: 'Nothing yet: add concepts from the code system.', description: 'Studio: no rules' },
+  tbRuleCodes: { id: 'app.studio.terminology.ruleCodes', defaultMessage: 'From {system}:', description: 'Studio: listed codes rule' },
+  tbRuleUnder: { id: 'app.studio.terminology.ruleUnder', defaultMessage: '{code} and everything under it, from {system}', description: 'Studio: an is-a rule' },
+  tbRuleExcluded: { id: 'app.studio.terminology.ruleExcluded', defaultMessage: 'Excluded from {system}:', description: 'Studio: an exclude rule' },
+  tbRuleOther: { id: 'app.studio.terminology.ruleOther', defaultMessage: 'A rule on {system} this browser does not edit (kept as it is)', description: 'Studio: a rule with other filters' },
+  tbRemoveRule: { id: 'app.studio.terminology.removeRule', defaultMessage: 'Remove this rule', description: 'Studio: remove a rule' },
+  tbRemoveCode: { id: 'app.studio.terminology.removeCode', defaultMessage: 'Remove {code}', description: 'Studio: remove a listed code' },
+  tbExpansion: { id: 'app.studio.terminology.expansion', defaultMessage: 'Expansion: {total, plural, one {# code} other {# codes}}', description: 'Studio: the expansion heading' },
+  tbExpansionShown: { id: 'app.studio.terminology.expansionShown', defaultMessage: 'The first {shown} are shown.', description: 'Studio: the expansion is cut' },
+  tbExpansionFailed: { id: 'app.studio.terminology.expansionFailed', defaultMessage: 'It cannot be expanded: {reason}', description: 'Studio: expansion failed' },
+  tbChange: { id: 'app.studio.terminology.change', defaultMessage: 'Change against published', description: 'Studio: the change heading' },
+  tbChangeFirst: { id: 'app.studio.terminology.changeFirst', defaultMessage: 'Never published: every code is new.', description: 'Studio: no published expansion' },
+  tbChangeAgainst: { id: 'app.studio.terminology.changeAgainst', defaultMessage: 'Against {published}.', description: 'Studio: the published ValueSet compared' },
+  tbChangeNone: { id: 'app.studio.terminology.changeNone', defaultMessage: 'The same codes as published.', description: 'Studio: no change' },
+  tbAdded: { id: 'app.studio.terminology.added', defaultMessage: 'Added: {total}', description: 'Studio: codes added' },
+  tbRemoved: { id: 'app.studio.terminology.removed', defaultMessage: 'Removed: {total}', description: 'Studio: codes removed' },
+  tbRemovedFlag: {
+    id: 'app.studio.terminology.removedFlag',
+    defaultMessage: 'Removed codes stay valid in records made with the published version; new forms no longer offer them.',
+    description: 'Studio: what removing a code means',
+  },
+  tbBoundBy: { id: 'app.studio.terminology.boundBy', defaultMessage: 'Forms that bind it', description: 'Studio: the bindings heading' },
+  tbBoundByNone: { id: 'app.studio.terminology.boundByNone', defaultMessage: 'No form binds it.', description: 'Studio: no bindings' },
+  tbBinding: { id: 'app.studio.terminology.binding', defaultMessage: '{form}, question {linkId} ({package})', description: 'Studio: one binding' },
+  tbSave: { id: 'app.studio.terminology.save', defaultMessage: 'Save the ValueSet', description: 'Studio: save the ValueSet' },
+  tbSaved: { id: 'app.studio.terminology.saved', defaultMessage: 'Saved.', description: 'Studio: ValueSet saved' },
+  tbUnsaved: { id: 'app.studio.terminology.unsaved', defaultMessage: 'Unsaved changes', description: 'Studio: the ValueSet has unsaved changes' },
+  tbStale: { id: 'app.studio.terminology.stale', defaultMessage: 'Someone saved this draft since you opened it, so nothing was saved. Reload to see their change.', description: 'Studio: 412 on save' },
+  tbReload: { id: 'app.studio.terminology.reload', defaultMessage: 'Reload', description: 'Studio: reload after a refused save' },
+  tbSaveFailed: { id: 'app.studio.terminology.saveFailed', defaultMessage: 'The ValueSet was not saved: {reason}', description: 'Studio: save failed' },
+})

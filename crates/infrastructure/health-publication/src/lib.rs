@@ -79,6 +79,7 @@ pub mod editing;
 mod extraction;
 mod programs;
 pub mod studio;
+pub mod terminology;
 mod workflows;
 
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
@@ -178,6 +179,7 @@ pub struct Publications {
     observer: String,
     actions: Arc<Vec<ActionDescriptor>>,
     cli: bool,
+    read: terminology::Read,
 }
 
 /// What the CLI's steps are audited as coming through, beside the `--by` name.
@@ -282,6 +284,7 @@ impl Publications {
             observer: observer.into(),
             actions: Arc::new(Vec::new()),
             cli: false,
+            read: terminology::Read::default(),
         }
     }
 
