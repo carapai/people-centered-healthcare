@@ -342,3 +342,58 @@ async fn passing_scenarios_let_the_package_through_and_a_failing_one_sends_it_ba
         ]
     );
 }
+
+/// The OPD definition with a decision table routing after triage on two data requirements, its
+/// sick-child rule `rule`.
+fn routed(rule: &str) -> Value {
+    let mut definition = opd();
+    definition["dataRequirements"] = json!([
+        { "name": "patient", "resourceType": "Patient", "paths": ["Patient.age"] },
+        { "name": "triage", "resourceType": "Observation", "paths": ["Observation.danger"] }
+    ]);
+    definition["decisionTables"] = json!([{
+        "id": "route",
+        "rows": [{ "name": "Sick child", "when": [rule], "then": "bypass" }],
+        "default": "normal"
+    }]);
+    definition
+}
+
+#[tokio::test]
+async fn a_saved_decision_table_test_fails_submission_when_a_later_edit_changes_its_outcome() {
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    // *Save as test* keeps the inputs and today's outcome in the package's tests/.
+    let test = json!({
+        "type": "decision-table-test", "name": "Child of 3 with danger signs",
+        "definition": format!("{URL}|1.0.0"), "table": "route",
+        "inputs": { "%patient.age": 3, "%triage.danger": true },
+        "expect": "bypass"
+    })
+    .to_string()
+    .into_bytes();
+    let rule = "%patient.age < 5 and %triage.danger = true";
+    let mut passing = package(
+        "1.0.0",
+        &routed(rule),
+        "application/vnd.health.workflow+json",
+    );
+    passing.insert("tests/route-sick-child.json".into(), test.clone());
+    let (stage, failures) = simulated(&publications, &passing, "ug.moh.opd@1.0.0").await;
+    assert_eq!((stage, failures), (Stage::Review, Vec::new()));
+
+    // A later edit narrows the rule to infants: the child of 3 now gets the default.
+    let mut edited = package(
+        "1.0.1",
+        &routed("%patient.age < 1 and %triage.danger = true"),
+        "application/vnd.health.workflow+json",
+    );
+    edited.insert("tests/route-sick-child.json".into(), test);
+    let (stage, failures) = simulated(&publications, &edited, "ug.moh.opd@1.0.1").await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        failures,
+        [
+            "tests/route-sick-child.json: Child of 3 with danger signs: table route expected bypass, got normal"
+        ]
+    );
+}

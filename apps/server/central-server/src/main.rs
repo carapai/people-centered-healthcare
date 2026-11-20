@@ -232,7 +232,9 @@ async fn session() {}
         studio::terminology::concept,
         studio::terminology::list_value_sets,
         studio::terminology::expand,
-        studio::actions::list
+        studio::actions::list,
+        studio::decisions::try_table,
+        studio::decisions::check
     ),
     components(schemas(SessionInfo))
 )]

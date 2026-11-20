@@ -1,17 +1,21 @@
 //! Workflow Definitions at validation (#96; workflow-engine.md § Simulation and publication
 //! gates; ADR 0049): every `WorkflowDefinitionLibrary` in a package is read and checked against
 //! the actions the release knows, so an unknown action or an invalid parameter fails
-//! publication, and [`WorkflowSandbox`] runs their simulation scenarios (#101).
+//! publication, and [`WorkflowSandbox`] runs their simulation scenarios (#101) and their
+//! decision-table test cases (#516).
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use health_fhir_validation::OctofhirEngine;
 use health_packages::{Files, Packed};
+use health_workflow::decision::{TEST_TYPE, TableTest};
 use health_workflow::definition::WorkflowDefinition;
 use health_workflow::simulation::{SCENARIO_TYPE, Scenario, simulate};
 use health_workflow_actions::ActionDescriptor;
 use serde_json::Value;
 
-use crate::Sandbox;
+use crate::decisions::{run_test, shown};
+use crate::{Sandbox, Simulation};
 
 /// The content type of a Workflow Definition (ADR 0049).
 pub(crate) const CONTENT_TYPE: &str = "application/vnd.health.workflow+json";
@@ -100,46 +104,96 @@ pub(crate) fn problems(packed: &Packed, catalog: &[ActionDescriptor]) -> Vec<Str
 /// gates): every `tests/` JSON file whose `type` is `workflow-scenario` runs against the
 /// package's definition it names, on the same interpreter, with stubbed actions and guards.
 /// Every scenario must pass; one naming a definition the package does not hold fails.
+///
+/// It runs the package's decision-table test cases too (`decision-table-test`, #516): each
+/// table decides again for the case's inputs on the FHIRPath engine, and an outcome other than
+/// the one the case keeps fails it.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WorkflowSandbox;
 
 impl Sandbox for WorkflowSandbox {
-    fn simulate(&self, package: &Packed) -> Vec<String> {
-        let (definitions, _) = read(package);
-        let mut failed = Vec::new();
-        for (path, bytes) in &package.files {
-            if !path.starts_with("tests/") || !path.ends_with(".json") {
-                continue;
-            }
-            let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
-                continue;
-            };
-            if value["type"] != SCENARIO_TYPE {
-                continue;
-            }
-            let scenario = match serde_json::from_value::<Scenario>(value) {
-                Ok(scenario) => scenario,
-                Err(error) => {
-                    failed.push(format!("{path}: not a workflow scenario: {error}"));
-                    continue;
-                }
-            };
-            let Some((_, definition)) = definitions
-                .iter()
-                .find(|(_, d)| format!("{}|{}", d.url, d.version) == scenario.definition)
-            else {
-                failed.push(format!(
-                    "{path}: the package holds no definition {}",
-                    scenario.definition
-                ));
-                continue;
-            };
+    fn simulate<'a>(&'a self, package: &'a Packed) -> Simulation<'a> {
+        Box::pin(run(package))
+    }
+}
+
+async fn run(package: &Packed) -> Vec<String> {
+    let (definitions, _) = read(package);
+    let find = |named: &str| {
+        definitions
+            .iter()
+            .find(|(_, d)| format!("{}|{}", d.url, d.version) == named)
+            .map(|(_, d)| d)
+    };
+    let engine = OctofhirEngine::new();
+    let mut failed = Vec::new();
+    for (path, bytes) in &package.files {
+        if !path.starts_with("tests/") || !path.ends_with(".json") {
+            continue;
+        }
+        let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
+            continue;
+        };
+        if value["type"] == TEST_TYPE {
             failed.extend(
-                simulate(definition, &scenario)
+                decision_test(&engine, &find, value)
+                    .await
                     .into_iter()
                     .map(|problem| format!("{path}: {problem}")),
             );
+            continue;
         }
-        failed
+        if value["type"] != SCENARIO_TYPE {
+            continue;
+        }
+        let scenario = match serde_json::from_value::<Scenario>(value) {
+            Ok(scenario) => scenario,
+            Err(error) => {
+                failed.push(format!("{path}: not a workflow scenario: {error}"));
+                continue;
+            }
+        };
+        let Some(definition) = find(&scenario.definition) else {
+            failed.push(format!(
+                "{path}: the package holds no definition {}",
+                scenario.definition
+            ));
+            continue;
+        };
+        failed.extend(
+            simulate(definition, &scenario)
+                .into_iter()
+                .map(|problem| format!("{path}: {problem}")),
+        );
+    }
+    failed
+}
+
+/// A decision-table test case's failure, if it fails.
+async fn decision_test<'a>(
+    engine: &OctofhirEngine,
+    find: &impl Fn(&str) -> Option<&'a WorkflowDefinition>,
+    value: Value,
+) -> Option<String> {
+    let test = match serde_json::from_value::<TableTest>(value) {
+        Ok(test) => test,
+        Err(error) => return Some(format!("not a decision-table test: {error}")),
+    };
+    let Some(definition) = find(&test.definition) else {
+        return Some(format!(
+            "the package holds no definition {}",
+            test.definition
+        ));
+    };
+    match run_test(engine, definition, &test).await {
+        Ok(decision) if decision.outcome.as_ref() == Some(&test.expect) => None,
+        Ok(decision) => Some(format!(
+            "{}: table {} expected {}, got {}",
+            test.name,
+            test.table,
+            shown(Some(&test.expect)),
+            shown(decision.outcome.as_ref())
+        )),
+        Err(error) => Some(format!("{}: {error}", test.name)),
     }
 }

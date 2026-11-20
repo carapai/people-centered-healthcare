@@ -1,9 +1,10 @@
 // The Workflow Studio's model (studio.md § The Workflow Studio; workflow-engine.md; #498), as
 // pure functions. It reads a Workflow Definition from its Library's inline
 // `application/vnd.health.workflow+json` content (ADR 0049), edits its statechart in place and
-// writes it back, keeping whatever it does not edit (exit actions, invocations' ids, decision
-// tables, the data model) as read. Typed actions are picked from the release's catalogue
-// (`GET /api/studio/workflow-actions`), the same one publication checks definitions against.
+// writes it back, keeping whatever it does not edit (exit actions, invocations' ids, the data
+// model) as read; decision tables are edited in the decision-table editor (`decisions.ts`).
+// Typed actions are picked from the release's catalogue (`GET /api/studio/workflow-actions`),
+// the same one publication checks definitions against.
 // The shapes are the Rust engine's (`health_workflow::model` and `::definition`), field for
 // field.
 
@@ -81,7 +82,8 @@ export interface DataRequirement {
 
 export interface DecisionTable {
   id: string
-  rows: { when: string[]; then: Value }[]
+  /** Rules: an optional name, FHIRPath conditions (the editor writes one) and the outcome. */
+  rows: { name?: string | null; when: string[]; then: Value }[]
   default?: Value | null
 }
 

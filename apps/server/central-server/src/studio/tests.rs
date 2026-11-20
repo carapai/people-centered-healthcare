@@ -677,6 +677,8 @@ fn the_openapi_document_describes_the_studio() {
         "removeStudioFile",
         "setStudioVersion",
         "listStudioWorkflowActions",
+        "tryStudioDecisionTable",
+        "checkStudioDecisionTable",
     ] {
         assert!(document.contains(operation), "{operation}");
     }
@@ -1146,4 +1148,147 @@ fn the_release_catalogue_lists_each_action_once() {
     references.sort();
     references.dedup();
     assert_eq!(references.len(), catalogue.len());
+}
+
+// The decision-table editor (#516).
+
+/// A draft Workflow Definition routing after triage: a sick child or an urgent pregnancy
+/// bypasses payment, and a routine patient pays first, shadowing the routine infant below it.
+fn routing() -> Value {
+    json!({
+        "url": "http://health.go.ug/fhir/Library/anc-visit", "version": "1.0.0",
+        "statechart": { "states": [{ "id": "done", "kind": "final" }] },
+        "dataRequirements": [
+            { "name": "patient", "resourceType": "Patient", "paths": ["Patient.age", "Patient.pregnant"] },
+            { "name": "triage", "resourceType": "Observation", "paths": ["Observation.category", "Observation.danger"] }
+        ],
+        "decisionTables": [{
+            "id": "route",
+            "rows": [
+                { "name": "Sick child or urgent pregnancy",
+                  "when": ["(%patient.age < 5 and %triage.danger = true) or (%patient.pregnant = true and %triage.category = 'urgent')"],
+                  "then": "bypass" },
+                { "name": "Routine", "when": ["%triage.category = 'routine'"], "then": "normal" },
+                { "name": "Routine infant", "when": ["%triage.category = 'routine' and %patient.age < 1"], "then": "bypass" }
+            ]
+        }]
+    })
+}
+
+#[tokio::test]
+async fn the_decision_table_editor_tries_a_patient_and_checks_the_draft_table() {
+    let (publications, _dir) = publications().await;
+    let mut files = package();
+    let test = |name: &str, age: i64, expect: &str| {
+        json!({
+            "type": "decision-table-test", "name": name,
+            "definition": "http://health.go.ug/fhir/Library/anc-visit|1.0.0", "table": "route",
+            "inputs": { "%patient.age": age, "%triage.danger": true, "%triage.category": "routine", "%patient.pregnant": false },
+            "expect": expect
+        })
+        .to_string()
+        .into_bytes()
+    };
+    files.insert(
+        "tests/sick-child.json".into(),
+        test("Sick child", 3, "bypass"),
+    );
+    files.insert(
+        "tests/well-adult.json".into(),
+        test("Adult with danger signs", 30, "bypass"),
+    );
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+
+    // Try a patient: the outcome, the rule that fired, and each part of its tree.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &format!("/packages/{ID}/decision-tables/try"),
+        Some(json!({
+            "definition": routing(), "table": "route",
+            "inputs": { "%patient.age": 3, "%triage.danger": true, "%triage.category": "urgent", "%patient.pregnant": false },
+            "nodes": ["%patient.age < 5 and %triage.danger = true", "%patient.pregnant = true", "%patient.age <"]
+        })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["outcome"], "bypass");
+    assert_eq!(body["row"], 0);
+    assert_eq!(body["nodes"][0]["holds"], true);
+    assert_eq!(body["nodes"][1]["holds"], false);
+    assert_eq!(body["nodes"][2]["holds"], false);
+    assert!(body["nodes"][2]["error"].is_string(), "{body}");
+
+    // The checks: the shadowed rule never fires, gaps show without a default, and the saved
+    // test cases run against the draft.
+    let samples = json!({
+        "%patient.age": [0, 1, 4, 5, 6],
+        "%patient.pregnant": [true, false],
+        "%triage.category": ["routine", "urgent"],
+        "%triage.danger": [true, false]
+    });
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &format!("/packages/{ID}/decision-tables/check"),
+        Some(json!({ "definition": routing(), "table": "route", "samples": samples })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["covered"], true);
+    assert_eq!(body["combinations"], 40);
+    assert_eq!(body["neverFires"], json!([2]));
+    assert!(body["gapCount"].as_u64().expect("gaps") > 0);
+    assert!(
+        body["gaps"]
+            .as_array()
+            .expect("gaps")
+            .iter()
+            .all(|g| g["%triage.category"] == "urgent")
+    );
+    let tests = body["tests"].as_array().expect("tests");
+    assert_eq!(tests.len(), 2);
+    assert_eq!(tests[0]["name"], "Sick child");
+    assert_eq!(tests[0]["passes"], true);
+    assert_eq!(tests[1]["path"], "tests/well-adult.json");
+    assert_eq!(tests[1]["outcome"], "normal");
+    assert_eq!(tests[1]["passes"], false);
+
+    // A table the definition does not have, or an input of no declared requirement, is refused.
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        &format!("/packages/{ID}/decision-tables/try"),
+        Some(json!({ "definition": routing(), "table": "other", "inputs": {} })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &format!("/packages/{ID}/decision-tables/try"),
+        Some(json!({ "definition": routing(), "table": "route", "inputs": { "%visit.kind": "new" } })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    assert_eq!(
+        body["detail"],
+        "%visit.kind reads visit, which is not a declared data requirement"
+    );
+
+    // Like every Studio read, it needs a Studio permission.
+    let (status, _) = call(
+        &publications,
+        subject("cy", &["queues.work"]),
+        "POST",
+        &format!("/packages/{ID}/decision-tables/check"),
+        Some(json!({ "definition": routing(), "table": "route" })),
+    )
+    .await;
+    assert_eq!(status, 403);
 }

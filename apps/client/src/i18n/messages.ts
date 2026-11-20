@@ -2413,3 +2413,191 @@ export const workflowMessages = defineMessages<WorkflowValues>({
   wsAddAssign: { id: 'app.studio.workflow.addAssign', defaultMessage: 'Add: set a field', description: 'Workflow Studio: button' },
   wsRemoveAction: { id: 'app.studio.workflow.removeAction', defaultMessage: 'Remove action {n}', description: 'Workflow Studio: button' },
 })
+
+type DecisionValues = {
+  dtTables: {}
+  dtTablesHint: {}
+  dtTablesNone: {}
+  dtTableRow: { id: string; count: number }
+  dtAddTable: {}
+  dtHeading: { id: string }
+  dtBack: {}
+  dtId: {}
+  dtDefault: {}
+  dtDefaultHint: {}
+  dtChecks: {}
+  dtChecksHint: {}
+  dtChecking: {}
+  dtCheckFailed: { reason: string }
+  dtNoRules: {}
+  dtGaps: { count: number; example: string }
+  dtTooMany: { count: number; most: number }
+  dtNeverFiresCheck: { count: number; names: string }
+  dtTestsResult: { count: number; failing: number }
+  dtError: { error: string }
+  dtInputs: { count: number }
+  dtInputsHint: {}
+  dtRequirement: { name: string; resourceType: string }
+  dtRequirementName: {}
+  dtResourceType: {}
+  dtAddRequirement: {}
+  dtPath: { name: string }
+  dtAddPath: { name: string }
+  dtRemovePath: { path: string }
+  dtRules: {}
+  dtRulesHint: {}
+  dtRuleRow: { n: number; name: string }
+  dtThen: { outcome: string }
+  dtFires: {}
+  dtNever: {}
+  dtUp: { name: string }
+  dtDown: { name: string }
+  dtAddRule: {}
+  dtNewRule: { n: number }
+  dtRuleNone: {}
+  dtChoose: {}
+  dtRule: { n: number }
+  dtRuleName: {}
+  dtOutcome: {}
+  dtDeleteRule: {}
+  dtCompiled: {}
+  dtHolds: {}
+  dtHoldsNot: {}
+  dtRaw: { at: string }
+  dtRawHint: {}
+  dtInput: { at: string }
+  dtOperator: { at: string }
+  dtKind: { at: string }
+  dtKindName: { kind: string }
+  dtValue: { at: string }
+  dtRemoveCondition: { at: string }
+  dtGroup: { at: string; join: string }
+  dtJoin: { at: string }
+  dtJoinName: { join: string }
+  dtAddCondition: { at: string }
+  dtAddGroup: { at: string }
+  dtRemoveGroup: { at: string }
+  dtEmptyGroup: {}
+  dtTry: {}
+  dtTryHint: {}
+  dtTryNothing: {}
+  dtTrying: {}
+  dtTryFailed: { reason: string }
+  dtNoOutcome: {}
+  dtOutcomeDefault: { outcome: string }
+  dtOutcomeFrom: { outcome: string }
+  dtTestName: {}
+  dtSaveTest: {}
+  dtTestSaved: { path: string }
+  dtTestFailed: { reason: string }
+  dtTestCases: {}
+  dtTestsNone: {}
+  dtTestCase: { name: string; expect: string; outcome: string }
+  dtPasses: {}
+  dtFails: {}
+  dtNothing: {}
+}
+
+export const decisionMessages = defineMessages<DecisionValues>({
+  dtTables: { id: 'app.studio.decision.tables', defaultMessage: 'Decision tables', description: 'Decision tables: heading in the Workflow Studio' },
+  dtTablesHint: { id: 'app.studio.decision.tablesHint', defaultMessage: 'Named rules tried from the top: the first that holds gives the outcome.', description: 'Decision tables: hint' },
+  dtTablesNone: { id: 'app.studio.decision.tablesNone', defaultMessage: 'No decision tables yet.', description: 'Decision tables: none' },
+  dtTableRow: { id: 'app.studio.decision.tableRow', defaultMessage: '{id}: {count, plural, one {# rule} other {# rules}}', description: 'Decision tables: one table, to open it' },
+  dtAddTable: { id: 'app.studio.decision.addTable', defaultMessage: 'New decision table', description: 'Decision tables: button' },
+  dtHeading: { id: 'app.studio.decision.heading', defaultMessage: 'Decision table {id}', description: 'Decision tables: editor heading' },
+  dtBack: { id: 'app.studio.decision.back', defaultMessage: 'Back to the statechart', description: 'Decision tables: close the editor' },
+  dtId: { id: 'app.studio.decision.id', defaultMessage: 'Table id', description: 'Decision tables: field' },
+  dtDefault: { id: 'app.studio.decision.default', defaultMessage: 'When no rule holds', description: 'Decision tables: the default outcome' },
+  dtDefaultHint: { id: 'app.studio.decision.defaultHint', defaultMessage: 'Empty: no outcome, so what no rule covers is a gap.', description: 'Decision tables: hint' },
+  dtChecks: { id: 'app.studio.decision.checks', defaultMessage: 'Checks', description: 'Decision tables: heading' },
+  dtChecksHint: {
+    id: 'app.studio.decision.checksHint',
+    defaultMessage: 'The server reruns them as you edit, over every combination of the values the rules name. Check now on the package page remains the authority.',
+    description: 'Decision tables: hint',
+  },
+  dtChecking: { id: 'app.studio.decision.checking', defaultMessage: 'Checking…', description: 'Decision tables: checks loading' },
+  dtCheckFailed: { id: 'app.studio.decision.checkFailed', defaultMessage: 'The checks could not run: {reason}', description: 'Decision tables: checks failed' },
+  dtNoRules: { id: 'app.studio.decision.noRules', defaultMessage: 'The table has no rules yet: add one.', description: 'Decision tables: no rules' },
+  dtGaps: {
+    id: 'app.studio.decision.gaps',
+    defaultMessage: '{count, plural, =0 {Every combination is covered} one {# combination matches no rule, e.g. {example}} other {# combinations match no rule, e.g. {example}}}',
+    description: 'Decision tables: coverage',
+  },
+  dtTooMany: { id: 'app.studio.decision.tooMany', defaultMessage: 'Too many combinations to check coverage: {count}, at most {most}.', description: 'Decision tables: coverage not checked' },
+  dtNeverFiresCheck: {
+    id: 'app.studio.decision.neverFiresCheck',
+    defaultMessage: '{count, plural, =0 {Every rule can fire} other {Never fires, a rule above always matches first: {names}}}',
+    description: 'Decision tables: rules that never fire',
+  },
+  dtTestsResult: {
+    id: 'app.studio.decision.testsResult',
+    defaultMessage: '{count, plural, =0 {No saved test cases} one {{failing} of # test case fails} other {{failing} of # test cases fail}}',
+    description: 'Decision tables: test cases',
+  },
+  dtError: { id: 'app.studio.decision.error', defaultMessage: 'Cannot be evaluated: {error}', description: 'Decision tables: a condition that cannot be evaluated' },
+  dtInputs: {
+    id: 'app.studio.decision.inputs',
+    defaultMessage: 'Inputs: {count, plural, =0 {none declared} one {# from the data requirements} other {# from the data requirements}}',
+    description: 'Decision tables: inputs heading',
+  },
+  dtInputsHint: { id: 'app.studio.decision.inputsHint', defaultMessage: 'Each path a data requirement declares is one input, read as %<name>.<path>.', description: 'Decision tables: hint' },
+  dtRequirement: { id: 'app.studio.decision.requirement', defaultMessage: '%{name} ({resourceType})', description: 'Decision tables: one data requirement' },
+  dtRequirementName: { id: 'app.studio.decision.requirementName', defaultMessage: 'Name', description: 'Decision tables: field' },
+  dtResourceType: { id: 'app.studio.decision.resourceType', defaultMessage: 'Resource type', description: 'Decision tables: field' },
+  dtAddRequirement: { id: 'app.studio.decision.addRequirement', defaultMessage: 'Add a data requirement', description: 'Decision tables: button' },
+  dtPath: { id: 'app.studio.decision.path', defaultMessage: 'Path to add to {name}', description: 'Decision tables: field' },
+  dtAddPath: { id: 'app.studio.decision.addPath', defaultMessage: 'Add the path to {name}', description: 'Decision tables: button' },
+  dtRemovePath: { id: 'app.studio.decision.removePath', defaultMessage: 'Remove {path}', description: 'Decision tables: button' },
+  dtRules: { id: 'app.studio.decision.rules', defaultMessage: 'Rules', description: 'Decision tables: heading' },
+  dtRulesHint: { id: 'app.studio.decision.rulesHint', defaultMessage: 'Tried from the top; the first that holds wins.', description: 'Decision tables: hint' },
+  dtRuleRow: { id: 'app.studio.decision.ruleRow', defaultMessage: '{n}. {name}', description: 'Decision tables: a rule in the list' },
+  dtThen: { id: 'app.studio.decision.then', defaultMessage: '→ {outcome}', description: 'Decision tables: a rule outcome' },
+  dtFires: { id: 'app.studio.decision.fires', defaultMessage: 'fires for this patient', description: 'Decision tables: marker' },
+  dtNever: { id: 'app.studio.decision.never', defaultMessage: 'never fires', description: 'Decision tables: marker' },
+  dtUp: { id: 'app.studio.decision.up', defaultMessage: 'Move “{name}” up', description: 'Decision tables: button' },
+  dtDown: { id: 'app.studio.decision.down', defaultMessage: 'Move “{name}” down', description: 'Decision tables: button' },
+  dtAddRule: { id: 'app.studio.decision.addRule', defaultMessage: 'Add rule', description: 'Decision tables: button' },
+  dtNewRule: { id: 'app.studio.decision.newRule', defaultMessage: 'New rule {n}', description: 'Decision tables: the name of a new rule' },
+  dtRuleNone: { id: 'app.studio.decision.ruleNone', defaultMessage: 'No rule open', description: 'Decision tables: heading' },
+  dtChoose: { id: 'app.studio.decision.choose', defaultMessage: 'Choose a rule from the list to see and edit it.', description: 'Decision tables: hint' },
+  dtRule: { id: 'app.studio.decision.rule', defaultMessage: 'Rule {n}', description: 'Decision tables: heading' },
+  dtRuleName: { id: 'app.studio.decision.ruleName', defaultMessage: 'Rule name', description: 'Decision tables: field' },
+  dtOutcome: { id: 'app.studio.decision.outcome', defaultMessage: 'Outcome', description: 'Decision tables: field' },
+  dtDeleteRule: { id: 'app.studio.decision.deleteRule', defaultMessage: 'Delete rule', description: 'Decision tables: button' },
+  dtCompiled: { id: 'app.studio.decision.compiled', defaultMessage: 'Saved as FHIRPath', description: 'Decision tables: the compiled expression' },
+  dtHolds: { id: 'app.studio.decision.holds', defaultMessage: 'holds for this patient', description: 'Decision tables: marker' },
+  dtHoldsNot: { id: 'app.studio.decision.holdsNot', defaultMessage: 'does not hold for this patient', description: 'Decision tables: marker' },
+  dtRaw: { id: 'app.studio.decision.raw', defaultMessage: 'FHIRPath {at}', description: 'Decision tables: a kept expression' },
+  dtRawHint: { id: 'app.studio.decision.rawHint', defaultMessage: 'Kept as written.', description: 'Decision tables: hint' },
+  dtInput: { id: 'app.studio.decision.input', defaultMessage: 'Input of condition {at}', description: 'Decision tables: field' },
+  dtOperator: { id: 'app.studio.decision.operator', defaultMessage: 'Operator of condition {at}', description: 'Decision tables: field' },
+  dtKind: { id: 'app.studio.decision.kind', defaultMessage: 'Type of condition {at}', description: 'Decision tables: field' },
+  dtKindName: { id: 'app.studio.decision.kindName', defaultMessage: '{kind, select, boolean {yes or no} number {number} other {code}}', description: 'Decision tables: a value type' },
+  dtValue: { id: 'app.studio.decision.value', defaultMessage: 'Value of condition {at}', description: 'Decision tables: field' },
+  dtRemoveCondition: { id: 'app.studio.decision.removeCondition', defaultMessage: 'Remove condition {at}', description: 'Decision tables: button' },
+  dtGroup: { id: 'app.studio.decision.group', defaultMessage: 'Group {at}: {join, select, all {all of these} any {any of these} other {none of these}}', description: 'Decision tables: a group' },
+  dtJoin: { id: 'app.studio.decision.join', defaultMessage: 'Join of group {at}', description: 'Decision tables: field' },
+  dtJoinName: { id: 'app.studio.decision.joinName', defaultMessage: '{join, select, all {all of these} any {any of these} other {not (none of these)}}', description: 'Decision tables: a join' },
+  dtAddCondition: { id: 'app.studio.decision.addCondition', defaultMessage: 'Add a condition to group {at}', description: 'Decision tables: button' },
+  dtAddGroup: { id: 'app.studio.decision.addGroup', defaultMessage: 'Add a group to group {at}', description: 'Decision tables: button' },
+  dtRemoveGroup: { id: 'app.studio.decision.removeGroup', defaultMessage: 'Remove group {at}', description: 'Decision tables: button' },
+  dtEmptyGroup: { id: 'app.studio.decision.emptyGroup', defaultMessage: 'Empty: it always holds. Add a condition or a group.', description: 'Decision tables: hint' },
+  dtTry: { id: 'app.studio.decision.try', defaultMessage: 'Try a patient', description: 'Decision tables: heading' },
+  dtTryHint: { id: 'app.studio.decision.tryHint', defaultMessage: 'The server decides the draft table for these inputs, and marks each part of the open rule ✓ or ✗.', description: 'Decision tables: hint' },
+  dtTryNothing: { id: 'app.studio.decision.tryNothing', defaultMessage: 'No rule reads a declared input yet.', description: 'Decision tables: nothing to try' },
+  dtTrying: { id: 'app.studio.decision.trying', defaultMessage: 'Deciding…', description: 'Decision tables: try loading' },
+  dtTryFailed: { id: 'app.studio.decision.tryFailed', defaultMessage: 'It could not be decided: {reason}', description: 'Decision tables: try failed' },
+  dtNoOutcome: { id: 'app.studio.decision.noOutcome', defaultMessage: 'No rule holds and there is no default', description: 'Decision tables: no outcome' },
+  dtOutcomeDefault: { id: 'app.studio.decision.outcomeDefault', defaultMessage: 'Outcome: {outcome}, the default', description: 'Decision tables: the default decided' },
+  dtOutcomeFrom: { id: 'app.studio.decision.outcomeFrom', defaultMessage: 'Outcome: {outcome}, from', description: 'Decision tables: a rule decided; the rule follows' },
+  dtTestName: { id: 'app.studio.decision.testName', defaultMessage: 'Name this case', description: 'Decision tables: field' },
+  dtSaveTest: { id: 'app.studio.decision.saveTest', defaultMessage: 'Save as test', description: 'Decision tables: button' },
+  dtTestSaved: { id: 'app.studio.decision.testSaved', defaultMessage: 'Saved as {path}. Submission runs it.', description: 'Decision tables: test saved' },
+  dtTestFailed: { id: 'app.studio.decision.testFailed', defaultMessage: 'The test case was not saved: {reason}', description: 'Decision tables: test not saved' },
+  dtTestCases: { id: 'app.studio.decision.testCases', defaultMessage: 'Test cases', description: 'Decision tables: heading' },
+  dtTestsNone: { id: 'app.studio.decision.testsNone', defaultMessage: 'No saved test cases for this table.', description: 'Decision tables: none' },
+  dtTestCase: { id: 'app.studio.decision.testCase', defaultMessage: '{name}: expects {expect}, gets {outcome}', description: 'Decision tables: one test case' },
+  dtPasses: { id: 'app.studio.decision.passes', defaultMessage: 'Passes:', description: 'Decision tables: test passes' },
+  dtFails: { id: 'app.studio.decision.fails', defaultMessage: 'Fails:', description: 'Decision tables: test fails' },
+  dtNothing: { id: 'app.studio.decision.nothing', defaultMessage: 'nothing', description: 'Decision tables: no outcome' },
+})

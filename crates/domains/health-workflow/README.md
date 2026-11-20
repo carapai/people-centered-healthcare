@@ -27,7 +27,7 @@ A Workflow Definition (#96; ADRs 0042, 0043, 0049): what a `WorkflowDefinitionLi
   - the `statechart`, whose `execute` actions name an action as `<id>@<major>`;
   - the `dataModel`'s typed fields;
   - `dataRequirements` (each a resource type and the paths guards read);
-  - `decisionTables` (rows of FHIRPath conditions, each with an outcome, and a default);
+  - `decisionTables` (rows, each an optional `name`, FHIRPath conditions and an outcome, and a default);
   - the workflow `principal`'s permissions.
 - **`problems(catalog)`** is the publication gate's check against the release's actions (`health-workflow-actions`' `ActionDescriptor`s). It finds:
   - an invalid statechart;
@@ -41,11 +41,20 @@ A Workflow Definition (#96; ADRs 0042, 0043, 0049): what a `WorkflowDefinitionLi
 - **No scripting:** guards and conditions are FHIRPath, evaluated through the `Guards` port.
 - **Not yet:** type-checking guards against the data requirements comes with workflow simulation (#101).
 
+## `decision`
+
+Deciding with a decision table, and the checks the Studio's decision-table editor runs (#516; studio.md § Decision tables).
+
+- **Inputs:** each path a data requirement declares is one input, `%<requirement>.<path>` (`DataRequirement::inputs`).
+- **`DecisionTable::decide`:** the first row whose conditions all hold gives the outcome, else the default. Conditions are FHIRPath evaluated by the caller (central's engine, `health-publication`'s `decisions`), so the module stays pure.
+- **`coverage`:** over every combination of sample values per input (`combinations`, at most `MOST_COMBINATIONS`), the combinations that give no outcome and the rows that never fire.
+- **`TableTest`:** a `tests/` file of type `decision-table-test` keeps sample inputs and the outcome they gave; simulation decides again and fails the package when it changed.
+
 ## Tests
 
 `tests/scxml.rs` is the curated W3C SCXML conformance subset: one test per assertion of §3 that the model has, named by its id in the W3C implementation report manifest (30 assertions: 355, 364, 372, 375, 376, 377, 378, 396, 399, 403, 404, 405, 406, 407, 409, 411, 412, 413, 416, 417, 419, 421, 422, 503, 504, 505, 506, 533, 570, 576). Further tests cover guards in document order, timers, idempotency keys, determinism, instance persistence and invalid definitions.
 
-`definition`'s unit tests cover a valid definition; unknown actions and bad references; each parameter problem; typed assignments; unreachable states and dead ends; an ancestor's transition as a way out inside parallel regions; malformed decision tables; an unneeded principal permission; an invalid statechart; and reading a definition from its JSON.
+`definition`'s unit tests cover a valid definition; unknown actions and bad references; each parameter problem; typed assignments; unreachable states and dead ends; an ancestor's transition as a way out inside parallel regions; malformed decision tables and named rows; an unneeded principal permission; an invalid statechart; and reading a definition from its JSON.
 
 **Left out:** history states, which the model lacks; error events, since our content cannot fail; and the ECMAScript data model.
 
