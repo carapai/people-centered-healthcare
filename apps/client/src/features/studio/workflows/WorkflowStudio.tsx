@@ -9,13 +9,16 @@ import { usePlatform } from '../../../platform'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
+import { workflowActionsQuery } from './api'
 import {
   KINDS,
   PRIORITIES,
   activityOf,
+  addExecute,
   addState,
   addTransition,
   competitors,
+  declarePermission,
   descendants,
   edgeId,
   entryActions,
@@ -23,6 +26,7 @@ import {
   moveSource,
   moveState,
   moveTransition,
+  parameterFields,
   parentOf,
   problemAt,
   problems,
@@ -35,14 +39,18 @@ import {
   stateOf,
   transitionAt,
   triggerOf,
+  undeclarePermission,
   updateState,
   updateTransition,
   withActivity,
   withEntryActions,
   withKind,
+  withParam,
+  withReference,
   withTrigger,
   writeDefinition,
   type Action,
+  type ActionSpec,
   type Activity,
   type Kind,
   type Library,
@@ -183,10 +191,12 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const [saved, setSaved] = useState(() => JSON.stringify(initial))
   const [revision, setRevision] = useState(file.revision)
   const [selected, setSelected] = useState<Selection | null>(() => (initial.statechart.states[0] === undefined ? null : { kind: 'state', id: initial.statechart.states[0].id }))
+  const catalogue = useQuery(workflowActionsQuery(platform.transport))
+  const actions = catalogue.data
   const editable = draft.editable
   const text = JSON.stringify(definition)
   const dirty = text !== saved
-  const found = problems(definition)
+  const found = problems(definition, actions)
   const outlined = flagged(found)
   const fixed = publishedIds(published)
 
@@ -249,7 +259,7 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
         </p>
       )}
 
-      <Problems found={found} onSelect={setSelected} />
+      <Problems found={found} definition={definition} catalogue={catalogue.isError ? 'failed' : actions === undefined ? 'loading' : 'read'} editable={editable} onSelect={setSelected} onChange={change} />
 
       <div className={columns}>
         <Outline definition={definition} selected={selected} outlined={outlined} editable={editable} onSelect={setSelected} onChange={change} />
@@ -272,12 +282,22 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
               definition={definition}
               id={selected.id}
               fixed={fixed.has(selected.id)}
+              catalogue={actions}
               editable={editable}
               onChange={change}
               onSelect={setSelected}
             />
           ) : (
-            <TransitionInspector key={`transition:${selected.source}:${selected.index}`} definition={definition} source={selected.source} index={selected.index} editable={editable} onChange={change} onSelect={setSelected} />
+            <TransitionInspector
+              key={`transition:${selected.source}:${selected.index}`}
+              definition={definition}
+              source={selected.source}
+              index={selected.index}
+              catalogue={actions}
+              editable={editable}
+              onChange={change}
+              onSelect={setSelected}
+            />
           )}
         </section>
       </div>
@@ -311,18 +331,49 @@ function problemText(intl: IntlShape, problem: Problem): string {
       return intl.formatMessage(m.wsPAssignment, { field: problem.field })
     case 'bad-table':
       return intl.formatMessage(m.wsPTable, { id: problem.table })
+    case 'bad-reference':
+      return intl.formatMessage(m.wsPBadReference, { action: problem.action })
+    case 'unknown-action':
+      return intl.formatMessage(m.wsPUnknownAction, { action: problem.action })
+    case 'unknown-parameter':
+      return intl.formatMessage(m.wsPUnknownParam, { action: problem.action, param: problem.param })
+    case 'missing-parameter':
+      return intl.formatMessage(m.wsPMissingParam, { action: problem.action, param: problem.param })
+    case 'invalid-parameter':
+      return intl.formatMessage(m.wsPInvalidParam, { action: problem.action, param: problem.param })
+    case 'principal-lacks':
+      return intl.formatMessage(m.wsPPrincipalLacks, { action: problem.action, permission: problem.permission })
+    case 'unneeded-permission':
+      return intl.formatMessage(m.wsPUnneeded, { permission: problem.permission })
   }
 }
 
-/** The publication checks the browser can run, each selecting the element it is about. */
-function Problems({ found, onSelect }: { found: Problem[]; onSelect: (selection: Selection) => void }) {
+interface ProblemsProps {
+  found: Problem[]
+  definition: WorkflowDefinition
+  catalogue: 'loading' | 'failed' | 'read'
+  editable: boolean
+  onSelect: (selection: Selection) => void
+  onChange: (definition: WorkflowDefinition) => void
+}
+
+/** The publication checks the browser can run, each selecting the element it is about. A
+ * permission the workflow principal lacks is declared from its problem, and one it holds that no
+ * action needs is taken back from its own. */
+function Problems({ found, definition, catalogue, editable, onSelect, onChange }: ProblemsProps) {
   const intl = useIntl()
+  const principal = definition.principal ?? []
   return (
     <section aria-labelledby="ws-problems" className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
       <h2 id="ws-problems" className={subheading}>
         {intl.formatMessage(m.wsProblems, { count: found.length })}
       </h2>
       <p className={muted}>{intl.formatMessage(m.wsProblemsHint)}</p>
+      {catalogue === 'loading' ? <p className={muted}>{intl.formatMessage(m.wsActionsLoading)}</p> : null}
+      {catalogue === 'failed' ? <p className={alert}>{intl.formatMessage(m.wsActionsFailed)}</p> : null}
+      <p className={muted}>
+        {intl.formatMessage(m.wsPrincipal, { count: principal.length, permissions: principal.join(', ') })} {intl.formatMessage(m.wsPrincipalHint)}
+      </p>
       {found.length === 0 ? null : (
         <ul className={css({ listStyle: 'disc', pl: '5', display: 'flex', flexDirection: 'column', gap: '1' })}>
           {found.map((problem, n) => {
@@ -337,6 +388,16 @@ function Problems({ found, onSelect }: { found: Problem[]; onSelect: (selection:
                     {text}
                   </button>
                 )}
+                {editable && problem.code === 'principal-lacks' ? (
+                  <button type="button" className={cx(small, css({ ml: '2' }))} onClick={() => onChange(declarePermission(definition, problem.permission))}>
+                    {intl.formatMessage(m.wsDeclare, { permission: problem.permission })}
+                  </button>
+                ) : null}
+                {editable && problem.code === 'unneeded-permission' ? (
+                  <button type="button" className={cx(small, css({ ml: '2' }))} onClick={() => onChange(undeclarePermission(definition, problem.permission))}>
+                    {intl.formatMessage(m.wsUndeclare, { permission: problem.permission })}
+                  </button>
+                ) : null}
               </li>
             )
           })}
@@ -429,12 +490,13 @@ interface StateInspectorProps {
   definition: WorkflowDefinition
   id: string
   fixed: boolean
+  catalogue: ActionSpec[] | undefined
   editable: boolean
   onChange: (definition: WorkflowDefinition) => void
   onSelect: (selection: Selection | null) => void
 }
 
-function StateInspector({ definition, id, fixed, editable, onChange, onSelect }: StateInspectorProps) {
+function StateInspector({ definition, id, fixed, catalogue, editable, onChange, onSelect }: StateInspectorProps) {
   const intl = useIntl()
   const ids = { id: useId(), kind: useId(), parent: useId(), initial: useId(), activity: useId(), target: useId(), idHint: useId() }
   const [name, setName] = useState(id)
@@ -572,7 +634,14 @@ function StateInspector({ definition, id, fixed, editable, onChange, onSelect }:
           ) : null}
         </>
       ) : null}
-      <ActionsEditor legendText={intl.formatMessage(m.wsEntry)} definition={definition} actions={entryActions(state)} editable={editable} onChange={(actions) => edit((s) => withEntryActions(s, actions))} />
+      <ActionsEditor
+        legendText={intl.formatMessage(m.wsEntry)}
+        definition={definition}
+        catalogue={catalogue}
+        actions={entryActions(state)}
+        editable={editable}
+        onChange={(actions) => edit((s) => withEntryActions(s, actions))}
+      />
       <fieldset className={fieldGroup}>
         <legend className={legend}>{intl.formatMessage(m.wsExits)}</legend>
         {(state.transitions ?? []).length === 0 ? (
@@ -634,12 +703,13 @@ interface TransitionInspectorProps {
   definition: WorkflowDefinition
   source: string
   index: number
+  catalogue: ActionSpec[] | undefined
   editable: boolean
   onChange: (definition: WorkflowDefinition) => void
   onSelect: (selection: Selection | null) => void
 }
 
-function TransitionInspector({ definition, source, index, editable, onChange, onSelect }: TransitionInspectorProps) {
+function TransitionInspector({ definition, source, index, catalogue, editable, onChange, onSelect }: TransitionInspectorProps) {
   const intl = useIntl()
   const ids = { trigger: useId(), guard: useId(), expression: useId() }
   const state = stateOf(definition, source)
@@ -799,7 +869,14 @@ function TransitionInspector({ definition, source, index, editable, onChange, on
           </div>
         ) : null}
       </fieldset>
-      <ActionsEditor legendText={intl.formatMessage(m.wsActions)} definition={definition} actions={transition.actions ?? []} editable={editable} onChange={(actions) => edit((t) => ({ ...t, actions }))} />
+      <ActionsEditor
+        legendText={intl.formatMessage(m.wsActions)}
+        definition={definition}
+        catalogue={catalogue}
+        actions={transition.actions ?? []}
+        editable={editable}
+        onChange={(actions) => edit((t) => ({ ...t, actions }))}
+      />
       {editable ? (
         <button
           type="button"
@@ -823,12 +900,26 @@ function typed(kind: 'bool' | 'int' | 'text' | undefined, text: string): Value {
   return text
 }
 
-/** Raise and assign actions edited in place; typed actions kept as read (picked from the
- * registered list in the next part). */
-function ActionsEditor({ legendText, definition, actions, editable, onChange }: { legendText: string; definition: WorkflowDefinition; actions: Action[]; editable: boolean; onChange: (actions: Action[]) => void }) {
+interface ActionsEditorProps {
+  legendText: string
+  definition: WorkflowDefinition
+  catalogue: ActionSpec[] | undefined
+  actions: Action[]
+  editable: boolean
+  onChange: (actions: Action[]) => void
+}
+
+/** Raise, assign and typed actions edited in place. A typed action is picked from the release's
+ * catalogue, with its permission and compensation shown and its parameters as fields generated
+ * from its schema (ADR 0043). */
+function ActionsEditor({ legendText, definition, catalogue, actions, editable, onChange }: ActionsEditorProps) {
   const intl = useIntl()
+  const pickId = useId()
+  const [picked, setPicked] = useState('')
   const fields = definition.dataModel ?? []
   const set = (n: number, action: Action) => onChange(actions.map((a, i) => (i === n ? action : a)))
+  const offered = catalogue ?? []
+  const toAdd = offered.find((spec) => spec.reference === picked) ?? offered[0]
   return (
     <fieldset className={fieldGroup}>
       <legend className={legend}>{legendText}</legend>
@@ -854,20 +945,7 @@ function ActionsEditor({ legendText, definition, actions, editable, onChange }: 
               />
             </>
           ) : null}
-          {action.kind === 'execute' ? (
-            <>
-              <span>
-                {intl.formatMessage(m.wsActionTyped, {
-                  n: n + 1,
-                  action: action.action,
-                  params: Object.entries(action.params ?? {})
-                    .map(([k, v]) => `${k}=${String(v)}`)
-                    .join(', '),
-                })}
-              </span>
-              <span className={muted}>{intl.formatMessage(m.wsTypedLater)}</span>
-            </>
-          ) : null}
+          {action.kind === 'execute' ? <ExecuteEditor n={n} action={action} catalogue={offered} editable={editable} onChange={(next) => set(n, next)} /> : null}
           {editable ? (
             <button type="button" className={cx(small, css({ alignSelf: 'flex-start' }))} onClick={() => onChange(actions.filter((_, i) => i !== n))}>
               {intl.formatMessage(m.wsRemoveAction, { n: n + 1 })}
@@ -885,16 +963,104 @@ function ActionsEditor({ legendText, definition, actions, editable, onChange }: 
           </button>
         </div>
       ) : null}
+      {editable && catalogue !== undefined ? (
+        offered.length === 0 || toAdd === undefined ? (
+          <p className={muted}>{intl.formatMessage(m.wsNoActions)}</p>
+        ) : (
+          <div className={css({ display: 'flex', gap: '2', alignItems: 'flex-end', flexWrap: 'wrap' })}>
+            <label className={label} htmlFor={pickId}>
+              {intl.formatMessage(m.wsTypedToAdd)}
+              <select id={pickId} className={control} value={toAdd.reference} onChange={(e) => setPicked(e.target.value)}>
+                {offered.map((spec) => (
+                  <option key={spec.reference} value={spec.reference}>
+                    {spec.reference}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className={small} onClick={() => onChange(addExecute(actions, toAdd))}>
+              {intl.formatMessage(m.wsAddTyped)}
+            </button>
+          </div>
+        )
+      ) : null}
     </fieldset>
   )
 }
 
-function TextField({ label: text, value, editable, onChange }: { label: string; value: string; editable: boolean; onChange: (value: string) => void }) {
+type Execute = Extract<Action, { kind: 'execute' }>
+
+/** A typed action: which action, what it needs and how it is undone, and its parameters. */
+function ExecuteEditor({ n, action, catalogue, editable, onChange }: { n: number; action: Execute; catalogue: ActionSpec[]; editable: boolean; onChange: (action: Execute) => void }) {
+  const intl = useIntl()
+  const spec = catalogue.find((s) => s.reference === action.action)
+  const options = [...(spec === undefined ? [{ value: action.action, text: intl.formatMessage(m.wsNotInRelease, { action: action.action }) }] : []), ...catalogue.map((s) => ({ value: s.reference, text: s.reference }))]
+  return (
+    <>
+      <SelectField
+        label={intl.formatMessage(m.wsTypedAction, { n: n + 1 })}
+        value={action.action}
+        options={options}
+        editable={editable}
+        onChange={(reference) => {
+          const next = catalogue.find((s) => s.reference === reference)
+          if (next !== undefined) onChange(withReference(action, next))
+        }}
+      />
+      {spec === undefined ? null : (
+        <>
+          <span className={muted}>{intl.formatMessage(m.wsNeeds, { permission: spec.permission })}</span>
+          <span className={muted}>{intl.formatMessage(m.wsCompensation, { kind: spec.compensation.kind.replace('-', ''), action: spec.compensation.action ?? '' })}</span>
+          {parameterFields(spec).map((field) => {
+            const text = intl.formatMessage(m.wsParam, { name: field.name, n: n + 1, required: field.required ? 'yes' : 'no' })
+            const value = action.params?.[field.name]
+            if (field.type === 'boolean') return <CheckField key={field.name} label={text} checked={value === true} editable={editable} onChange={(checked) => onChange(withParam(action, field.name, checked))} />
+            if (field.codes !== null)
+              return (
+                <SelectField
+                  key={field.name}
+                  label={text}
+                  value={typeof value === 'string' ? value : ''}
+                  options={[...(field.required ? [] : [{ value: '', text: intl.formatMessage(m.wsParamUnset) }]), ...field.codes.map((code) => ({ value: code, text: code }))]}
+                  editable={editable}
+                  onChange={(code) => onChange(withParam(action, field.name, code === '' ? undefined : code))}
+                />
+              )
+            if (field.type === 'integer')
+              return (
+                <TextField
+                  key={field.name}
+                  label={text}
+                  inputMode="numeric"
+                  value={value === undefined ? '' : String(value)}
+                  editable={editable}
+                  onChange={(typedText) => onChange(withParam(action, field.name, typedText.trim() === '' ? undefined : Number.isNaN(Number(typedText)) ? typedText : Number(typedText)))}
+                />
+              )
+            return <TextField key={field.name} label={text} value={value === undefined ? '' : String(value)} editable={editable} onChange={(typedText) => onChange(withParam(action, field.name, typedText === '' ? undefined : typedText))} />
+          })}
+        </>
+      )}
+    </>
+  )
+}
+
+function CheckField({ label: text, checked, editable, onChange }: { label: string; checked: boolean; editable: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId()
+  return (
+    <label className={css({ display: 'flex', gap: '2', alignItems: 'center' })} htmlFor={id}>
+      <input id={id} type="checkbox" checked={checked} disabled={!editable} onChange={(e) => onChange(e.target.checked)} />
+      {text}
+    </label>
+  )
+}
+
+function TextField({ label: text, value, editable, inputMode, onChange }: { label: string; value: string; editable: boolean; inputMode?: 'numeric'; onChange: (value: string) => void }) {
   const id = useId()
   return (
     <label className={label} htmlFor={id}>
       {text}
-      <input id={id} className={input} value={value} disabled={!editable} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} className={input} value={value} disabled={!editable} {...(inputMode === undefined ? {} : { inputMode })} onChange={(e) => onChange(e.target.value)} />
     </label>
   )
 }

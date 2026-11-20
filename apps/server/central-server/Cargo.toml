@@ -45,6 +45,7 @@ health-sync-server = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 health-time = { workspace = true }
 health-workflow = { workspace = true }
+health-workflow-actions = { workspace = true }
 jiff = { workspace = true }
 p256 = { workspace = true }
 serde = { workspace = true }

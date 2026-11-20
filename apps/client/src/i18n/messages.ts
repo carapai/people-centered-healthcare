@@ -2258,8 +2258,28 @@ type WorkflowValues = {
   wsActionEvent: { n: number }
   wsActionField: { n: number }
   wsActionValue: { n: number }
-  wsActionTyped: { n: number; action: string; params: string }
-  wsTypedLater: {}
+  wsTypedAction: { n: number }
+  wsNotInRelease: { action: string }
+  wsNeeds: { permission: string }
+  wsCompensation: { kind: string; action: string }
+  wsParam: { name: string; n: number; required: string }
+  wsParamUnset: {}
+  wsAddTyped: {}
+  wsTypedToAdd: {}
+  wsNoActions: {}
+  wsActionsLoading: {}
+  wsActionsFailed: {}
+  wsPBadReference: { action: string }
+  wsPUnknownAction: { action: string }
+  wsPUnknownParam: { action: string; param: string }
+  wsPMissingParam: { action: string; param: string }
+  wsPInvalidParam: { action: string; param: string }
+  wsPPrincipalLacks: { action: string; permission: string }
+  wsPUnneeded: { permission: string }
+  wsDeclare: { permission: string }
+  wsUndeclare: { permission: string }
+  wsPrincipal: { count: number; permissions: string }
+  wsPrincipalHint: {}
   wsAddRaise: {}
   wsAddAssign: {}
   wsRemoveAction: { n: number }
@@ -2274,7 +2294,7 @@ export const workflowMessages = defineMessages<WorkflowValues>({
   wsRefused: { id: 'app.studio.workflow.refused', defaultMessage: '{refusal, select, not-json {This file is not JSON. Open it as JSON instead.} not-workflow {This file is not a Workflow Definition. Open it as JSON instead.} not-inline {Its definition is not inline application/vnd.health.workflow+json content. Open it as JSON instead.} other {Its definition could not be read. Open it as JSON instead.}}', description: 'Workflow Studio: the file cannot be opened' },
   wsFile: { id: 'app.studio.workflow.file', defaultMessage: '{path} · {url}|{version}', description: 'Workflow Studio: the file and the canonical of the definition' },
   wsProblems: { id: 'app.studio.workflow.problems', defaultMessage: '{count, plural, =0 {No publication problems found while editing} one {# publication problem} other {# publication problems}}', description: 'Workflow Studio: publication checks heading' },
-  wsProblemsHint: { id: 'app.studio.workflow.problemsHint', defaultMessage: 'Rerun on every edit; each problem selects what it is about. Check now on the package page remains the authority: it also checks the typed actions and runs the scenarios.', description: 'Workflow Studio: publication checks hint' },
+  wsProblemsHint: { id: 'app.studio.workflow.problemsHint', defaultMessage: 'Rerun on every edit; each problem selects what it is about. Check now on the package page remains the authority: it also runs the scenarios.', description: 'Workflow Studio: publication checks hint' },
   wsPNoId: { id: 'app.studio.workflow.pNoId', defaultMessage: 'A state has no id', description: 'Workflow Studio: problem' },
   wsPDuplicate: { id: 'app.studio.workflow.pDuplicate', defaultMessage: 'Two states share the id “{id}”', description: 'Workflow Studio: problem' },
   wsPChildren: { id: 'app.studio.workflow.pChildren', defaultMessage: '“{id}” is a compound or parallel state with no state inside, or holds states its kind cannot', description: 'Workflow Studio: problem' },
@@ -2355,8 +2375,40 @@ export const workflowMessages = defineMessages<WorkflowValues>({
   wsActionEvent: { id: 'app.studio.workflow.actionEvent', defaultMessage: 'Event of action {n}', description: 'Workflow Studio: field' },
   wsActionField: { id: 'app.studio.workflow.actionField', defaultMessage: 'Field of action {n}', description: 'Workflow Studio: field' },
   wsActionValue: { id: 'app.studio.workflow.actionValue', defaultMessage: 'Value of action {n}', description: 'Workflow Studio: field' },
-  wsActionTyped: { id: 'app.studio.workflow.actionTyped', defaultMessage: 'Action {n}: {action} {params}', description: 'Workflow Studio: a typed action, read only' },
-  wsTypedLater: { id: 'app.studio.workflow.typedLater', defaultMessage: 'Typed actions are kept as read here; picking them from the registered list comes next.', description: 'Workflow Studio: hint' },
+  wsTypedAction: { id: 'app.studio.workflow.typedAction', defaultMessage: 'Typed action {n}', description: 'Workflow Studio: the action a typed action executes' },
+  wsNotInRelease: { id: 'app.studio.workflow.notInRelease', defaultMessage: '{action} (not in this release)', description: 'Workflow Studio: an action reference the catalogue lacks' },
+  wsNeeds: { id: 'app.studio.workflow.needs', defaultMessage: 'Needs the permission {permission}', description: 'Workflow Studio: a typed action’s permission' },
+  wsCompensation: {
+    id: 'app.studio.workflow.compensation',
+    defaultMessage: '{kind, select, none {Cannot be undone: a cancellation records why} action {Undone by {action}} humantask {Undone by a person, as a human task} other {}}',
+    description: 'Workflow Studio: a typed action’s compensation',
+  },
+  wsParam: { id: 'app.studio.workflow.param', defaultMessage: '{name} of action {n}{required, select, yes { (required)} other {}}', description: 'Workflow Studio: a parameter field' },
+  wsParamUnset: { id: 'app.studio.workflow.paramUnset', defaultMessage: 'Not set', description: 'Workflow Studio: an optional code parameter left out' },
+  wsAddTyped: { id: 'app.studio.workflow.addTyped', defaultMessage: 'Add: typed action', description: 'Workflow Studio: button' },
+  wsTypedToAdd: { id: 'app.studio.workflow.typedToAdd', defaultMessage: 'Typed action to add', description: 'Workflow Studio: field' },
+  wsNoActions: { id: 'app.studio.workflow.noActions', defaultMessage: 'No typed actions are registered in this release.', description: 'Workflow Studio: empty catalogue' },
+  wsActionsLoading: { id: 'app.studio.workflow.actionsLoading', defaultMessage: 'Reading this release’s typed actions…', description: 'Workflow Studio: loading the catalogue' },
+  wsActionsFailed: { id: 'app.studio.workflow.actionsFailed', defaultMessage: 'This release’s typed actions could not be read, so they are not checked here.', description: 'Workflow Studio: the catalogue failed' },
+  wsPBadReference: { id: 'app.studio.workflow.pBadReference', defaultMessage: '“{action}” is not an action reference (id@major)', description: 'Workflow Studio: problem' },
+  wsPUnknownAction: { id: 'app.studio.workflow.pUnknownAction', defaultMessage: 'This release has no typed action “{action}”', description: 'Workflow Studio: problem' },
+  wsPUnknownParam: { id: 'app.studio.workflow.pUnknownParam', defaultMessage: '“{action}” has no parameter “{param}”', description: 'Workflow Studio: problem' },
+  wsPMissingParam: { id: 'app.studio.workflow.pMissingParam', defaultMessage: '“{action}” needs its parameter “{param}”', description: 'Workflow Studio: problem' },
+  wsPInvalidParam: { id: 'app.studio.workflow.pInvalidParam', defaultMessage: 'The parameter “{param}” of “{action}” is not valid', description: 'Workflow Studio: problem' },
+  wsPPrincipalLacks: {
+    id: 'app.studio.workflow.pPrincipalLacks',
+    defaultMessage: 'A timer or eventless step runs “{action}” as the workflow principal, which lacks “{permission}”',
+    description: 'Workflow Studio: problem',
+  },
+  wsPUnneeded: { id: 'app.studio.workflow.pUnneeded', defaultMessage: 'The workflow principal holds “{permission}”, which no action needs', description: 'Workflow Studio: problem' },
+  wsDeclare: { id: 'app.studio.workflow.declare', defaultMessage: 'Declare “{permission}” for the workflow principal', description: 'Workflow Studio: button on a problem' },
+  wsUndeclare: { id: 'app.studio.workflow.undeclare', defaultMessage: 'Remove “{permission}” from the workflow principal', description: 'Workflow Studio: button on a problem' },
+  wsPrincipal: { id: 'app.studio.workflow.principal', defaultMessage: '{count, plural, =0 {The workflow principal holds no permissions.} other {The workflow principal holds {permissions}.}}', description: 'Workflow Studio: the principal’s declared permissions' },
+  wsPrincipalHint: {
+    id: 'app.studio.workflow.principalHint',
+    defaultMessage: 'Timer and eventless steps run as the workflow principal, with only these permissions. Those declared here are approved at publication.',
+    description: 'Workflow Studio: hint',
+  },
   wsAddRaise: { id: 'app.studio.workflow.addRaise', defaultMessage: 'Add: raise an event', description: 'Workflow Studio: button' },
   wsAddAssign: { id: 'app.studio.workflow.addAssign', defaultMessage: 'Add: set a field', description: 'Workflow Studio: button' },
   wsRemoveAction: { id: 'app.studio.workflow.removeAction', defaultMessage: 'Remove action {n}', description: 'Workflow Studio: button' },

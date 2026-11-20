@@ -1398,6 +1398,48 @@
         }
       }
     },
+    "/api/studio/workflow-actions": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the action catalogue.",
+        "description": "The typed actions a Workflow Definition may execute in this release, by `<id>@<major>`: the permission each needs, its compensation and the JSON Schema of its parameters. Publication checks definitions against the same list. Needs a Studio permission.",
+        "operationId": "listStudioWorkflowActions",
+        "responses": {
+          "200": {
+            "description": "The actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioWorkflowActions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -1960,6 +2002,35 @@
             "description": "The code systems."
           }
         }
+      },
+      "StudioCompensation": {
+        "type": "object",
+        "description": "How a completed action is undone when its scope is cancelled or fails.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The action that undoes it, when `kind` is `action`."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StudioCompensationKind",
+            "description": "Undone by nothing, another action or a person."
+          }
+        }
+      },
+      "StudioCompensationKind": {
+        "type": "string",
+        "description": "How a completed action is undone.",
+        "enum": [
+          "none",
+          "action",
+          "human-task"
+        ]
       },
       "StudioConcept": {
         "type": "object",
@@ -2653,6 +2724,94 @@
           }
         }
       },
+      "StudioParameter": {
+        "type": "object",
+        "description": "One parameter's JSON Schema.",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "enum": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "For a code: the codes allowed."
+          },
+          "minLength": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For a text: it may not be empty.",
+            "minimum": 0
+          },
+          "type": {
+            "$ref": "#/components/schemas/StudioParameterType",
+            "description": "What it holds."
+          }
+        }
+      },
+      "StudioParameterSchema": {
+        "type": "object",
+        "description": "The JSON Schema of an action's parameters (`ActionDescriptor::parameter_schema`), typed: an\nobject with each parameter as a property, the required ones required, and nothing else.",
+        "required": [
+          "$schema",
+          "title",
+          "type",
+          "properties",
+          "required",
+          "additionalProperties"
+        ],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "The JSON Schema dialect."
+          },
+          "additionalProperties": {
+            "type": "boolean",
+            "description": "Always false: no other parameter is allowed."
+          },
+          "properties": {
+            "type": "object",
+            "description": "Each parameter, by name.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StudioParameter"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "required": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The parameters a definition must give."
+          },
+          "title": {
+            "type": "string",
+            "description": "The action's reference."
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `object`."
+          }
+        }
+      },
+      "StudioParameterType": {
+        "type": "string",
+        "description": "What a parameter holds, as JSON Schema names it.",
+        "enum": [
+          "boolean",
+          "integer",
+          "string"
+        ]
+      },
       "StudioProblem": {
         "type": "object",
         "description": "Why a Studio request failed.",
@@ -2760,6 +2919,62 @@
           "version": {
             "type": "string",
             "description": "An exact version, e.g. `2.1.0`."
+          }
+        }
+      },
+      "StudioWorkflowAction": {
+        "type": "object",
+        "description": "One typed action a definition may execute.",
+        "required": [
+          "reference",
+          "id",
+          "major",
+          "permission",
+          "compensation",
+          "parameterSchema"
+        ],
+        "properties": {
+          "compensation": {
+            "$ref": "#/components/schemas/StudioCompensation",
+            "description": "How it is undone."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its id, `<context>/<action>`."
+          },
+          "major": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its major version.",
+            "minimum": 0
+          },
+          "parameterSchema": {
+            "$ref": "#/components/schemas/StudioParameterSchema",
+            "description": "The JSON Schema of its parameters, from which the Studio generates their fields."
+          },
+          "permission": {
+            "type": "string",
+            "description": "The permission it needs: the user's on a user-triggered transition, the workflow\nprincipal's on a timer, eventless or system step."
+          },
+          "reference": {
+            "type": "string",
+            "description": "How a definition names it: `<id>@<major>`."
+          }
+        }
+      },
+      "StudioWorkflowActions": {
+        "type": "object",
+        "description": "The release's workflow actions.",
+        "required": [
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioWorkflowAction"
+            },
+            "description": "The actions, by reference."
           }
         }
       }

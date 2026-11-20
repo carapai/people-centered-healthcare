@@ -231,7 +231,8 @@ async fn session() {}
         studio::terminology::concepts,
         studio::terminology::concept,
         studio::terminology::list_value_sets,
-        studio::terminology::expand
+        studio::terminology::expand,
+        studio::actions::list
     ),
     components(schemas(SessionInfo))
 )]

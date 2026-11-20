@@ -472,6 +472,7 @@ fn publications(
         Arc::new(health_publication::WorkflowSandbox),
         "central",
     )
+    .with_actions(crate::studio::actions::catalogue())
 }
 
 /// The account id of each username, for the Studio's handover and reassignment (#493).

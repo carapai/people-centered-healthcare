@@ -2,8 +2,12 @@
 // pure functions. It reads a Workflow Definition from its Library's inline
 // `application/vnd.health.workflow+json` content (ADR 0049), edits its statechart in place and
 // writes it back, keeping whatever it does not edit (exit actions, invocations' ids, decision
-// tables, the data model) as read. The shapes are the Rust engine's (`health_workflow::model`
-// and `::definition`), field for field.
+// tables, the data model) as read. Typed actions are picked from the release's catalogue
+// (`GET /api/studio/workflow-actions`), the same one publication checks definitions against.
+// The shapes are the Rust engine's (`health_workflow::model` and `::definition`), field for
+// field.
+
+import type { StudioWorkflowAction } from '@health/api-client'
 
 /** A data-model value: typed fields only (ADR 0042). */
 export type Value = boolean | number | string
@@ -450,12 +454,98 @@ export function withEntryActions(state: State, actions: Action[]): State {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Typed actions (ADR 0043)
+
+/** A typed action of the release's catalogue, as central serves it. */
+export type ActionSpec = StudioWorkflowAction
+
+/** One parameter field, generated from an action's parameter schema. */
+export interface ParameterField {
+  name: string
+  type: 'boolean' | 'integer' | 'string'
+  /** The codes allowed, for a code. */
+  codes: string[] | null
+  required: boolean
+}
+
+/** The parameter fields of `spec`, by name. */
+export function parameterFields(spec: ActionSpec): ParameterField[] {
+  const { properties, required } = spec.parameterSchema
+  const names = Object.keys(properties)
+  // A fresh array, so sorting it in place mutates nothing shared (`toSorted` is ES2023).
+  // oxlint-disable-next-line unicorn/no-array-sort
+  names.sort()
+  return names.map((name) => {
+      const property = properties[name] as ActionSpec['parameterSchema']['properties'][string]
+      return { name, type: property.type, codes: property.enum ?? null, required: required.includes(name) }
+    })
+}
+
+/** What a required field starts as: a flag off, zero, the first code; a text starts empty, and
+ * is missing until it is typed. */
+function starting(field: ParameterField): Value | undefined {
+  if (!field.required) return undefined
+  if (field.type === 'boolean') return false
+  if (field.type === 'integer') return 0
+  return field.codes?.[0]
+}
+
+function startingParams(spec: ActionSpec): Record<string, Value> {
+  const params: Record<string, Value> = {}
+  for (const field of parameterFields(spec)) {
+    const value = starting(field)
+    if (value !== undefined) params[field.name] = value
+  }
+  return params
+}
+
+/** `actions` with `spec` executed last. */
+export function addExecute(actions: Action[], spec: ActionSpec): Action[] {
+  return [...actions, { kind: 'execute', action: spec.reference, params: startingParams(spec) }]
+}
+
+type Execute = Extract<Action, { kind: 'execute' }>
+
+/** `action` executing `spec` instead, keeping the parameters `spec` also has. */
+export function withReference(action: Execute, spec: ActionSpec): Execute {
+  const params = startingParams(spec)
+  for (const [name, value] of Object.entries(action.params ?? {})) if (name in spec.parameterSchema.properties) params[name] = value
+  return { ...action, action: spec.reference, params }
+}
+
+/** `action` with parameter `name` set, or left out when `value` is undefined. */
+export function withParam(action: Execute, name: string, value: Value | undefined): Execute {
+  const { [name]: _gone, ...rest } = action.params ?? {}
+  return { ...action, params: value === undefined ? rest : { ...rest, [name]: value } }
+}
+
+/** The definition with the workflow principal also holding `permission` (approved at publication). */
+export function declarePermission(definition: WorkflowDefinition, permission: string): WorkflowDefinition {
+  const principal = definition.principal ?? []
+  return principal.includes(permission) ? definition : { ...definition, principal: [...principal, permission] }
+}
+
+/** The definition with the workflow principal no longer holding `permission`. */
+export function undeclarePermission(definition: WorkflowDefinition, permission: string): WorkflowDefinition {
+  return tidy({ ...definition, principal: (definition.principal ?? []).filter((p) => p !== permission) })
+}
+
+// ---------------------------------------------------------------------------------------------
 // Publication checks
 
 /** What the Studio finds while editing (workflow-engine.md § Simulation and publication gates).
  * The server's `WorkflowDefinition::problems` at *Check now* remains the authority; these are
- * the checks the browser can run without the release's action catalogue and the simulator. */
+ * the checks the browser can run without the simulator. The action checks need the release's
+ * catalogue, and the principal's: a timer or eventless step runs as the workflow principal, so it
+ * must hold the permission of each action the step runs (studio.md). */
+export type ActionProblem =
+  | { code: 'bad-reference' | 'unknown-action'; at: Selection; action: string }
+  | { code: 'unknown-parameter' | 'missing-parameter' | 'invalid-parameter'; at: Selection; action: string; param: string }
+  | { code: 'principal-lacks'; at: Selection; permission: string; action: string }
+  | { code: 'unneeded-permission'; permission: string }
+
 export type Problem =
+  | ActionProblem
   | { code: 'duplicate-id' | 'bad-children' | 'bad-initial' | 'unreachable' | 'dead-end' | 'bad-task' | 'bad-gate' | 'no-id'; state: string }
   | { code: 'unknown-target'; source: string; index: number; target: string }
   | { code: 'bad-assignment'; at: Selection; field: string }
@@ -464,9 +554,9 @@ export type Problem =
 
 /** The element a problem is about, if it is one. */
 export function problemAt(problem: Problem): Selection | null {
+  if ('at' in problem) return problem.at
   if ('state' in problem) return { kind: 'state', id: problem.state }
   if (problem.code === 'unknown-target') return { kind: 'transition', source: problem.source, index: problem.index }
-  if (problem.code === 'bad-assignment') return problem.at
   return null
 }
 
@@ -476,7 +566,8 @@ const isVersioned = (canonical: string) => {
   return canonical.split('|').length === 2 && url !== '' && version !== ''
 }
 
-export function problems(definition: WorkflowDefinition): Problem[] {
+/** Every problem found, the action checks only once `catalogue` is known. */
+export function problems(definition: WorkflowDefinition, catalogue?: ActionSpec[]): Problem[] {
   const out: Problem[] = []
   const all = rows(definition)
   const ids = new Set<string>()
@@ -506,6 +597,9 @@ export function problems(definition: WorkflowDefinition): Problem[] {
     ;(state.transitions ?? []).forEach((t, index) => assignments(t.actions ?? [], { kind: 'transition', source: state.id, index }))
   }
 
+  const needed = new Set<string>()
+  if (catalogue !== undefined) out.push(...actionProblems(all, catalogue, needed))
+
   out.push(...reachability(definition, all))
 
   for (const { state } of all) {
@@ -525,6 +619,85 @@ export function problems(definition: WorkflowDefinition): Problem[] {
   for (const table of definition.decisionTables ?? []) {
     if (tables.has(table.id) || table.rows.length === 0 || table.rows.some((r) => r.when.length === 0 || r.when.some((c) => c.trim() === ''))) out.push({ code: 'bad-table', table: table.id })
     tables.add(table.id)
+  }
+
+  if (catalogue !== undefined) {
+    out.push(...principalProblems(definition, catalogue))
+    for (const permission of definition.principal ?? []) if (!needed.has(permission)) out.push({ code: 'unneeded-permission', permission })
+  }
+  return out
+}
+
+/** `reference` (`<id>@<major>`) in `catalogue`, `'bad'` if it is not a reference, `undefined` if
+ * the release has no such action. */
+function lookup(reference: string, catalogue: ActionSpec[]): ActionSpec | 'bad' | undefined {
+  // As the engine splits it: at the first `@`, the major a u16.
+  const at = reference.indexOf('@')
+  const major = reference.slice(at + 1)
+  if (at < 0 || !/^\+?\d+$/.test(major) || Number(major) > 65535) return 'bad'
+  return catalogue.find((spec) => spec.id === reference.slice(0, at) && spec.major === Number(major))
+}
+
+function fits(value: Value, field: ParameterField): boolean {
+  if (field.type === 'boolean') return typeof value === 'boolean'
+  if (field.type === 'integer') return typeof value === 'number' && Number.isInteger(value)
+  if (typeof value !== 'string') return false
+  return field.codes === null ? value !== '' : field.codes.includes(value)
+}
+
+/** Each typed action checked as `WorkflowDefinition::check_action` does, noting the permissions
+ * the actions need in `needed`. */
+function actionProblems(all: Row[], catalogue: ActionSpec[], needed: Set<string>): ActionProblem[] {
+  const out: ActionProblem[] = []
+  const check = (actions: Action[], at: Selection) => {
+    for (const action of actions) {
+      if (action.kind !== 'execute') continue
+      const spec = lookup(action.action, catalogue)
+      if (spec === 'bad') {
+        out.push({ code: 'bad-reference', at, action: action.action })
+        continue
+      }
+      if (spec === undefined) {
+        out.push({ code: 'unknown-action', at, action: action.action })
+        continue
+      }
+      needed.add(spec.permission)
+      const params = action.params ?? {}
+      const fields = parameterFields(spec)
+      // oxlint-disable-next-line unicorn/no-array-sort
+      for (const name of Object.keys(params).sort()) if (!fields.some((f) => f.name === name)) out.push({ code: 'unknown-parameter', at, action: action.action, param: name })
+      for (const field of fields) {
+        const value = params[field.name]
+        if (value === undefined) {
+          if (field.required) out.push({ code: 'missing-parameter', at, action: action.action, param: field.name })
+        } else if (!fits(value, field)) out.push({ code: 'invalid-parameter', at, action: action.action, param: field.name })
+      }
+    }
+  }
+  for (const { state } of all) {
+    check([...(state.on_entry ?? []), ...(state.on_exit ?? [])].flat(), { kind: 'state', id: state.id })
+    ;(state.transitions ?? []).forEach((t, index) => check(t.actions ?? [], { kind: 'transition', source: state.id, index }))
+  }
+  return out
+}
+
+/** The permissions a timer or eventless step needs and the principal lacks: those of the
+ * transition's actions and of the entry actions of the states it targets. */
+function principalProblems(definition: WorkflowDefinition, catalogue: ActionSpec[]): ActionProblem[] {
+  const out: ActionProblem[] = []
+  const principal = new Set(definition.principal ?? [])
+  for (const { source, index, transition } of edges(definition)) {
+    const state = stateOf(definition, source)
+    if (state === undefined || triggerOf(state, transition).kind === 'event') continue
+    const entered = (transition.targets ?? []).flatMap((target) => entryActions(stateOf(definition, target) ?? { id: target, kind: 'atomic' }))
+    const seen = new Set<string>()
+    for (const action of [...(transition.actions ?? []), ...entered]) {
+      if (action.kind !== 'execute') continue
+      const spec = lookup(action.action, catalogue)
+      if (spec === 'bad' || spec === undefined || principal.has(spec.permission) || seen.has(spec.permission)) continue
+      seen.add(spec.permission)
+      out.push({ code: 'principal-lacks', at: { kind: 'transition', source, index }, permission: spec.permission, action: spec.reference })
+    }
   }
   return out
 }

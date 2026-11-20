@@ -305,6 +305,11 @@ impl Publications {
         self
     }
 
+    /// The workflow actions definitions are checked against: what the Studio offers (#498).
+    pub fn actions(&self) -> &[ActionDescriptor] {
+        &self.actions
+    }
+
     /// These publications, running `tests/` cases in `sandbox` instead.
     #[must_use]
     pub fn with_sandbox(mut self, sandbox: Arc<dyn Sandbox>) -> Self {

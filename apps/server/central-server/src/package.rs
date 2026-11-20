@@ -113,6 +113,7 @@ fn publications(store: health_surrealdb::SurrealStore) -> Result<Publications, F
         Arc::new(WorkflowSandbox),
         "central",
     )
+    .with_actions(crate::studio::actions::catalogue())
     .from_cli())
 }
 
