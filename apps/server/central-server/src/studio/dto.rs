@@ -1,11 +1,11 @@
 //! The Studio API's documented bodies (`utoipa`), from what `health_publication::studio` gives.
 
-use health_configuration::lifecycle::semver::Bump;
+use health_configuration::lifecycle::semver::{Bump, Nature};
 use health_configuration::lifecycle::{Record, Stage, Step};
 use health_configuration::package::PackageKind;
 use health_publication::studio::{
-    ActiveIn, Allowed, ArtefactChange, ArtefactChangeKind, CheckKind, CheckResult, PackageFile,
-    PackagePage, PackageSummary, Refusal, RefusalCode, StudioAction,
+    ActiveIn, Allowed, ArtefactChange, ArtefactChangeKind, CheckKind, CheckResult, ElementChange,
+    PackageFile, PackagePage, PackageSummary, Refusal, RefusalCode, StudioAction,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -343,6 +343,58 @@ pub(crate) struct StudioArtefactChange {
     pub(crate) before: Option<String>,
     /// Its version now.
     pub(crate) after: Option<String>,
+    /// For a changed artefact, each element that changed; empty for an added or removed one.
+    pub(crate) elements: Vec<StudioElementChange>,
+}
+
+/// How an element changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ElementChangeType {
+    Added,
+    Removed,
+    Changed,
+    Tightened,
+    Relaxed,
+    Reworded,
+}
+
+impl From<Nature> for ElementChangeType {
+    fn from(nature: Nature) -> Self {
+        match nature {
+            Nature::Added => Self::Added,
+            Nature::Removed => Self::Removed,
+            Nature::Changed => Self::Changed,
+            Nature::Tightened => Self::Tightened,
+            Nature::Relaxed => Self::Relaxed,
+            Nature::Reworded => Self::Reworded,
+        }
+    }
+}
+
+/// One changed element of a changed artefact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioElementChange {
+    /// Its path, e.g. `item[bp].text`.
+    pub(crate) at: String,
+    /// How it changed.
+    pub(crate) change: ElementChangeType,
+    /// The version bump it needs.
+    pub(crate) bump: SemverBump,
+    /// One plain line, e.g. "Item bp: text reworded".
+    pub(crate) summary: String,
+}
+
+impl From<&ElementChange> for StudioElementChange {
+    fn from(change: &ElementChange) -> Self {
+        Self {
+            at: change.at.clone(),
+            change: change.nature.into(),
+            bump: change.bump.into(),
+            summary: change.summary.clone(),
+        }
+    }
 }
 
 impl From<&ArtefactChange> for StudioArtefactChange {
@@ -358,6 +410,11 @@ impl From<&ArtefactChange> for StudioArtefactChange {
             url: change.url.clone(),
             before: change.before.clone(),
             after: change.after.clone(),
+            elements: change
+                .elements
+                .iter()
+                .map(StudioElementChange::from)
+                .collect(),
         }
     }
 }
@@ -540,6 +597,8 @@ pub(crate) struct StudioPackagePage {
     pub(crate) edit_refusal: Option<ActionRefusal>,
     /// Its files, to open in an editor.
     pub(crate) files: Vec<StudioPackageFile>,
+    /// The holder's one change note for the whole draft.
+    pub(crate) note: Option<String>,
 }
 
 /// One file of a package version.
@@ -585,6 +644,15 @@ pub(crate) struct StudioFile {
 pub(crate) struct StudioFileInput {
     /// The whole file.
     pub(crate) content: String,
+}
+
+/// A draft's change note.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioNoteInput {
+    /// The note; empty or absent clears it.
+    #[serde(default)]
+    pub(crate) note: Option<String>,
 }
 
 /// A draft's new version.
@@ -637,6 +705,7 @@ impl From<&PackagePage> for StudioPackagePage {
             editable: page.edit.is_none(),
             edit_refusal: page.edit.as_ref().map(ActionRefusal::from),
             files: page.files.iter().map(StudioPackageFile::from).collect(),
+            note: page.note.clone(),
         }
     }
 }

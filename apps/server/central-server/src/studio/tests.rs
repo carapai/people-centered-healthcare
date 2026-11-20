@@ -383,6 +383,56 @@ async fn two_tabs_saving_the_same_draft_the_second_gets_412_and_nothing_is_overw
     assert_eq!(status, 422);
 }
 
+// #495: the holder keeps one change note on the draft, under the same If-Match as a save, and the
+// page gives it back; each changed artefact carries its changed elements.
+#[tokio::test]
+async fn the_holder_keeps_one_change_note_and_the_page_gives_it_back() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let note = format!("/packages/{ID}/note");
+    let body = Some(json!({ "note": "Reworded the BP question" }));
+    let (status, _, _) = send(
+        &publications,
+        subject("ann", &[AUTHOR]),
+        "PUT",
+        &note,
+        None,
+        body.clone(),
+    )
+    .await;
+    assert_eq!(status, 412, "a note needs If-Match");
+    let (status, tag, page) = send(
+        &publications,
+        subject("ann", &[AUTHOR]),
+        "PUT",
+        &note,
+        Some("\"0\""),
+        body.clone(),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["note"], "Reworded the BP question");
+    assert_eq!(tag.as_deref(), Some("\"1\""));
+    assert!(
+        page["changes"]
+            .as_array()
+            .expect("changes")
+            .iter()
+            .all(|c| c["change"] == "added" && c["elements"] == json!([]))
+    );
+    // Someone else, even with the permission, may not.
+    let (status, _, _) = send(
+        &publications,
+        subject("dan", &[AUTHOR]),
+        "PUT",
+        &note,
+        tag.as_deref(),
+        body,
+    )
+    .await;
+    assert_eq!(status, 409);
+}
+
 #[tokio::test]
 async fn check_now_shows_results_on_the_page_and_the_draft_stays_a_draft() {
     let (publications, _dir) = publications().await;

@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl'
 import { studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, actionInput, fileQuery, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, actionInput, fileQuery, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
 import { isWorkflowLibrary } from './workflows/model'
 
@@ -80,6 +80,7 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
         <p className={muted}>
           {summary.previous === null || summary.previous === undefined ? intl.formatMessage(m.sdChangedFirst) : intl.formatMessage(m.sdChangedAgainst, { version: summary.previous })}
         </p>
+        <ChangeNote id={id} draft={draft} />
         {draft.changes.length === 0 ? (
           <p>{intl.formatMessage(m.sdNoChanges)}</p>
         ) : (
@@ -109,6 +110,21 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                     <WorkflowLink id={id} path={change.path} />
                   </>
                 ) : null}
+                {change.elements.length === 0 ? null : (
+                  <ul className={list}>
+                    {change.elements.map((element) => (
+                      <li key={`${element.at}:${element.change}`}>
+                        {intl.formatMessage(m.sdElementChange, { summary: element.summary, bump: element.bump })}
+                        {element.at === '' ? null : (
+                          <>
+                            {' · '}
+                            <code className={muted}>{element.at}</code>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -230,6 +246,59 @@ function useWorkflowFiles(id: string, draft: StudioPackagePage): Set<string> {
     }
   })
   return out
+}
+
+/** The Draft Holder's one change note for the whole draft (#495): shown to everyone, and
+ * edited by whoever may edit the draft, under the same revision check as a save. */
+function ChangeNote({ id, draft }: { id: string; draft: StudioPackagePage }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const queryClient = useQueryClient()
+  const noteId = useId()
+  const hintId = useId()
+  const saved = draft.note ?? ''
+  const why = (error: unknown) => (error instanceof StudioError ? (error.refusal === null || error.refusal === undefined ? error.detail : refusalText(intl, error.refusal)) : '')
+  const [note, setNoteText] = useState(saved)
+  const save = useMutation({
+    mutationFn: () => setNote(platform.transport, id, note.trim(), draft.revision),
+    onSuccess: (next) => {
+      queryClient.setQueryData(packageQuery(platform.transport, id).queryKey, next)
+    },
+  })
+  if (!draft.editable) {
+    return saved === '' ? null : (
+      <div>
+        <h3 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.sdNoteHeading)}</h3>
+        <p className={css({ whiteSpace: 'pre-wrap' })}>{saved}</p>
+      </div>
+    )
+  }
+  return (
+    <form
+      className={css({ display: 'flex', flexDirection: 'column', gap: '2', alignItems: 'flex-start' })}
+      onSubmit={(e) => {
+        e.preventDefault()
+        save.mutate()
+      }}
+    >
+      <div className={field}>
+        <label htmlFor={noteId}>{intl.formatMessage(m.sdNoteLabel)}</label>
+        <textarea id={noteId} className={control} value={note} aria-describedby={hintId} onChange={(e) => setNoteText(e.target.value)} />
+        <span id={hintId} className={muted}>
+          {intl.formatMessage(m.sdNoteHint)}
+        </span>
+      </div>
+      <button type="submit" className={button} disabled={save.isPending || note.trim() === saved}>
+        {intl.formatMessage(m.sdNoteSave)}
+      </button>
+      {save.isSuccess && note.trim() === saved ? <p role="status">{intl.formatMessage(m.sdNoteSaved)}</p> : null}
+      {save.isError ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(m.sdEditorFailed, { reason: why(save.error) })}
+        </p>
+      ) : null}
+    </form>
+  )
 }
 
 function Files({ id, draft, workflows }: { id: string; draft: StudioPackagePage; workflows: Set<string> }) {

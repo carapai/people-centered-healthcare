@@ -23,7 +23,7 @@ export class StudioError extends Error {
 
 export const studioKey = ['studio', 'packages'] as const
 
-type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'startStudioDraft'
+type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'setStudioNote' | 'startStudioDraft'
 
 /** `body` checked against `operation`'s documented response for `status`; a refusal throws. */
 async function parsed<T>(operation: Operation, status: number, body: unknown): Promise<T> {
@@ -100,6 +100,12 @@ export async function removeFile(transport: Transport, id: string, path: string,
 export async function setVersion(transport: Transport, id: string, version: string, revision: number): Promise<StudioPackagePage> {
   const response = await transport.request({ method: 'PUT', path: `${packagePath(id)}/version`, headers: ifMatch(revision), body: { version } })
   return parsed<StudioPackagePage>('setStudioVersion', response.status, response.body)
+}
+
+/** Keeps the holder's one change note for the whole draft; an empty one clears it. */
+export async function setNote(transport: Transport, id: string, note: string, revision: number): Promise<StudioPackagePage> {
+  const response = await transport.request({ method: 'PUT', path: `${packagePath(id)}/note`, headers: ifMatch(revision), body: { note } })
+  return parsed<StudioPackagePage>('setStudioNote', response.status, response.body)
 }
 
 /** Starts a draft: a copy of a published version (`copyOf`), or a blank new package. */

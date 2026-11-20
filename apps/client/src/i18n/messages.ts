@@ -1560,6 +1560,12 @@ type StudioValues = {
   sdChangeAdded: { type: string; path: string; version: string }
   sdChangeChanged: { type: string; path: string; before: string; after: string }
   sdChangeRemoved: { type: string; path: string; version: string }
+  sdElementChange: { summary: string; bump: string }
+  sdNoteHeading: {}
+  sdNoteLabel: {}
+  sdNoteHint: {}
+  sdNoteSave: {}
+  sdNoteSaved: {}
   sdSafe: { failing: number }
   sdNotChecked: {}
   sdCheckPassed: { check: string; at: string }
@@ -1805,6 +1811,16 @@ export const studioMessages = defineMessages<StudioValues>({
   sdChangeAdded: { id: 'app.studio.changeAdded', defaultMessage: 'Added {type} {path}, version {version}', description: 'Studio: an added artefact' },
   sdChangeChanged: { id: 'app.studio.changeChanged', defaultMessage: 'Changed {type} {path}, version {before} to {after}', description: 'Studio: a changed artefact' },
   sdChangeRemoved: { id: 'app.studio.changeRemoved', defaultMessage: 'Removed {type} {path}, version {version}', description: 'Studio: a removed artefact' },
+  sdElementChange: {
+    id: 'app.studio.elementChange',
+    defaultMessage: '{summary} ({bump, select, patch {needs a patch} minor {needs a minor version} major {needs a major version} other {needs no new version}})',
+    description: 'Studio: one changed element of a changed artefact, with the version bump it needs',
+  },
+  sdNoteHeading: { id: 'app.studio.noteHeading', defaultMessage: 'Change note', description: 'Studio: the Draft Holder\'s note for the whole draft' },
+  sdNoteLabel: { id: 'app.studio.noteLabel', defaultMessage: 'Change note for the whole draft', description: 'Studio: change note field' },
+  sdNoteHint: { id: 'app.studio.noteHint', defaultMessage: 'Shown above the generated summaries. Leave it empty to remove it.', description: 'Studio: change note hint' },
+  sdNoteSave: { id: 'app.studio.noteSave', defaultMessage: 'Save the note', description: 'Studio: action' },
+  sdNoteSaved: { id: 'app.studio.noteSaved', defaultMessage: 'The change note is saved.', description: 'Studio: change note saved' },
   sdSafe: { id: 'app.studio.safe', defaultMessage: 'Is it safe? {failing, plural, =0 {Nothing failing} one {# check failing} other {# checks failing}}', description: 'Studio draft page section with the failing count' },
   sdNotChecked: { id: 'app.studio.notChecked', defaultMessage: 'Not checked yet: submitting runs validation and simulation.', description: 'Studio: no check results' },
   sdCheckPassed: { id: 'app.studio.checkPassed', defaultMessage: '{check} passed, {at}', description: 'Studio: a passing check' },

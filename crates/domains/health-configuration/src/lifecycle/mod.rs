@@ -318,6 +318,10 @@ pub struct Lifecycle {
     pub approvers: BTreeSet<String>,
     /// When its holder withdrew it.
     pub withdrawn_at: Option<Timestamp>,
+    /// Its holder's one change note for the whole draft, shown in *What changed* above the
+    /// generated summaries (studio.md § The authoring API).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// A lifecycle as it is stored, including one kept before there was a Draft Holder (#493),
@@ -338,6 +342,8 @@ struct Stored {
     approvers: BTreeSet<String>,
     #[serde(default)]
     withdrawn_at: Option<Timestamp>,
+    #[serde(default)]
+    note: Option<String>,
 }
 
 impl From<Stored> for Lifecycle {
@@ -358,6 +364,7 @@ impl From<Stored> for Lifecycle {
             reviewer: stored.reviewer,
             approvers: stored.approvers,
             withdrawn_at: stored.withdrawn_at,
+            note: stored.note,
         }
     }
 }
@@ -391,6 +398,7 @@ impl Lifecycle {
             reviewer: None,
             approvers: BTreeSet::new(),
             withdrawn_at: None,
+            note: None,
         };
         let record = lifecycle.record(Step::Created, Stage::Draft, by, now);
         Ok((lifecycle, record))
@@ -546,6 +554,16 @@ impl Lifecycle {
         let previous = std::mem::replace(&mut self.version, version);
         content.clone_into(&mut self.content);
         Ok(self.record(Step::VersionChanged { previous }, Stage::Draft, by, now))
+    }
+
+    /// The holder, `by`, gives the draft its one change note, or clears it with an empty one.
+    /// The note is not content: it changes neither the fingerprint nor the history.
+    pub fn set_note(&mut self, by: &str, note: Option<String>) -> Result<(), Refused> {
+        self.check(Action::Edit, by)?;
+        self.note = note
+            .map(|text| text.trim().to_owned())
+            .filter(|text| !text.is_empty());
+        Ok(())
     }
 
     /// *Check now* by `by`: the draft's validation problems and simulation failures, kept as the
