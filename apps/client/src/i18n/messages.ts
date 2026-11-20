@@ -1681,6 +1681,28 @@ type StudioValues = {
   fdAddOption: {}
   fdNewOption: { n: number }
   fdValueSet: { valueSet: string }
+  fdBindValueSet: {}
+  fdChangeValueSet: {}
+  fdUnbind: {}
+  fdPicker: {}
+  fdPickerSearch: {}
+  fdPickerHint: {}
+  fdPickerResults: {}
+  fdPickerNone: {}
+  fdPickerFailed: { reason: string }
+  fdPickerOwn: {}
+  fdPickerPublished: { package: string }
+  fdPickerCancel: {}
+  fdBind: { title: string }
+  fdBindNone: {}
+  fdBindReplaces: {}
+  fdCodesLoading: {}
+  fdCodesOf: { binding: string }
+  fdCodesMore: { more: number }
+  fdWidgetName: { widget: string }
+  fdSuggested: { widget: string }
+  fdSuggestedSearch: {}
+  fdUseSuggested: { widget: string }
   fdShownWhen: {}
   fdAlways: {}
   fdIsYes: { text: string }
@@ -1904,6 +1926,28 @@ export const studioMessages = defineMessages<StudioValues>({
   fdAddOption: { id: 'app.studio.formDesigner.addOption', defaultMessage: 'Add option', description: 'Studio: add an answer option' },
   fdNewOption: { id: 'app.studio.formDesigner.newOption', defaultMessage: 'Option {n}', description: 'Studio: display of a new option' },
   fdValueSet: { id: 'app.studio.formDesigner.valueSet', defaultMessage: 'Bound to the ValueSet {valueSet}', description: 'Studio: an item bound to a ValueSet' },
+  fdBindValueSet: { id: 'app.studio.formDesigner.bindValueSet', defaultMessage: 'Bind a ValueSet', description: 'Studio: open the ValueSet picker' },
+  fdChangeValueSet: { id: 'app.studio.formDesigner.changeValueSet', defaultMessage: 'Bind another ValueSet', description: 'Studio: open the ValueSet picker for a bound question' },
+  fdUnbind: { id: 'app.studio.formDesigner.unbind', defaultMessage: 'Unbind the ValueSet', description: 'Studio: remove a question’s ValueSet binding' },
+  fdPicker: { id: 'app.studio.formDesigner.picker', defaultMessage: 'ValueSet picker', description: 'Studio: the ValueSet picker group' },
+  fdPickerSearch: { id: 'app.studio.formDesigner.pickerSearch', defaultMessage: 'Search ValueSets', description: 'Studio: search ValueSets to bind' },
+  fdPickerHint: { id: 'app.studio.formDesigner.pickerHint', defaultMessage: 'Published ValueSets, and drafts in this package, by URL, name or title.', description: 'Studio: which ValueSets the picker finds' },
+  fdPickerResults: { id: 'app.studio.formDesigner.pickerResults', defaultMessage: 'ValueSets found', description: 'Studio: the ValueSets the picker found' },
+  fdPickerNone: { id: 'app.studio.formDesigner.pickerNone', defaultMessage: 'No ValueSet matches.', description: 'Studio: the picker found nothing' },
+  fdPickerFailed: { id: 'app.studio.formDesigner.pickerFailed', defaultMessage: 'The ValueSets cannot be read: {reason}', description: 'Studio: the picker could not search' },
+  fdPickerOwn: { id: 'app.studio.formDesigner.pickerOwn', defaultMessage: 'Draft in this package', description: 'Studio: a ValueSet of the package being edited' },
+  fdPickerPublished: { id: 'app.studio.formDesigner.pickerPublished', defaultMessage: 'Published in {package}', description: 'Studio: a published ValueSet and its package' },
+  fdPickerCancel: { id: 'app.studio.formDesigner.pickerCancel', defaultMessage: 'Cancel', description: 'Studio: close the ValueSet picker' },
+  fdBind: { id: 'app.studio.formDesigner.bind', defaultMessage: 'Bind {title}', description: 'Studio: bind the chosen ValueSet' },
+  fdBindNone: { id: 'app.studio.formDesigner.bindNone', defaultMessage: 'Bind', description: 'Studio: bind, before a ValueSet is chosen' },
+  fdBindReplaces: { id: 'app.studio.formDesigner.bindReplaces', defaultMessage: 'Binding replaces the question’s own options with the ValueSet’s codes.', description: 'Studio: binding drops the answer options' },
+  fdCodesLoading: { id: 'app.studio.formDesigner.codesLoading', defaultMessage: 'Reading…', description: 'Studio: the picker is reading' },
+  fdCodesOf: { id: 'app.studio.formDesigner.codesOf', defaultMessage: 'Codes of {binding}', description: 'Studio: the codes previewed for a ValueSet' },
+  fdCodesMore: { id: 'app.studio.formDesigner.codesMore', defaultMessage: 'and {more, plural, one {# more code} other {# more codes}}', description: 'Studio: codes not previewed' },
+  fdWidgetName: { id: 'app.studio.formDesigner.widgetName', defaultMessage: '{widget, select, radio {radio buttons} select {a drop-down} other {search as you type}}', description: 'Studio: a widget, named' },
+  fdSuggested: { id: 'app.studio.formDesigner.suggested', defaultMessage: 'Suggested widget: {widget}', description: 'Studio: the widget a ValueSet’s size suggests' },
+  fdSuggestedSearch: { id: 'app.studio.formDesigner.suggestedSearch', defaultMessage: 'A Form Layout has no search-as-you-type widget yet, so it shows as a drop-down.', description: 'Studio: no search widget yet' },
+  fdUseSuggested: { id: 'app.studio.formDesigner.useSuggested', defaultMessage: 'Show it as {widget}', description: 'Studio: apply the suggested widget in the layout' },
   fdShownWhen: { id: 'app.studio.formDesigner.shownWhen', defaultMessage: 'Shown only when', description: 'Studio: enableWhen field' },
   fdAlways: { id: 'app.studio.formDesigner.always', defaultMessage: 'Always shown', description: 'Studio: no condition' },
   fdIsYes: { id: 'app.studio.formDesigner.isYes', defaultMessage: '“{text}” is Yes', description: 'Studio: condition on a yes/no question' },

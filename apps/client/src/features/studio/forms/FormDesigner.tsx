@@ -47,6 +47,7 @@ import {
   type Path,
   type Problem,
 } from './model'
+import { useBoundCodes, ValueSetBinding } from './ValueSetPicker'
 import { addObservation, blankMapping, isMappingOf, newMappingPath, recordProblems, recordable, renameInMapping, targets, withCode, withoutTarget, type Mapping, type RecordProblem } from './record'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '4' })
@@ -275,6 +276,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, mapping
   const editLayout = (f: (l: FormLayout) => FormLayout) => change({ ...form, layout: f(form.layout ?? blankLayout(form.questionnaire)) })
   const editMapping = (f: (mapping: Mapping) => Mapping) => change({ ...form, mapping: f(form.mapping ?? blankMapping(form.questionnaire)) })
   const selectedItem = selected === null ? undefined : itemAt(form.questionnaire, selected)
+  const answers = useBoundCodes(id, form.questionnaire)
 
   return (
     <>
@@ -342,6 +344,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, mapping
           ) : (
             <Inspector
               key={selected.join('.')}
+              id={id}
               form={form}
               layout={layout}
               path={selected}
@@ -369,7 +372,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, mapping
             {intl.formatMessage(m.fdPreview)}
           </h2>
           {/* Remounted on every change, so it always shows the form as it now stands. */}
-          <QuestionnaireRenderer key={questionnaireText + layoutText} questionnaire={form.questionnaire} {...(layout === undefined ? {} : { layout })} onSubmit={() => undefined} />
+          <QuestionnaireRenderer key={questionnaireText + layoutText} questionnaire={form.questionnaire} {...(layout === undefined ? {} : { layout })} answers={answers} onSubmit={() => undefined} />
         </section>
       </div>
     </>
@@ -587,6 +590,8 @@ function Sections({ layout, editable, onEditLayout }: { layout: FormLayout | und
 }
 
 interface InspectorProps {
+  /** The package version, whose terminology a ValueSet is bound from. */
+  id: string
   form: Form
   layout: FormLayout | undefined
   path: Path
@@ -601,7 +606,7 @@ interface InspectorProps {
 }
 
 /** The selected question in three groups: Question, Layout, and Becomes a record. */
-function Inspector({ form, layout, path, item, published, editable, onEdit, onRename, onEditLayout, onEditMapping, onRemove }: InspectorProps) {
+function Inspector({ id, form, layout, path, item, published, editable, onEdit, onRename, onEditLayout, onEditMapping, onRemove }: InspectorProps) {
   const intl = useIntl()
   const idHint = useId()
   const fixed = published.has(item.linkId)
@@ -651,7 +656,7 @@ function Inspector({ form, layout, path, item, published, editable, onEdit, onRe
               <input type="checkbox" checked={item.repeats === true} onChange={(e) => onEdit((x) => withFlag(x, 'repeats', e.target.checked))} />
               {intl.formatMessage(m.fdRepeats)}
             </label>
-            <Options item={item} onEdit={onEdit} editable={editable} />
+            <Options id={id} item={item} layout={layout} onEdit={onEdit} onEditLayout={onEditLayout} editable={editable} />
           </>
         ) : null}
         {condition === 'other' ? (
@@ -725,13 +730,34 @@ function Inspector({ form, layout, path, item, published, editable, onEdit, onRe
   )
 }
 
-function Options({ item, editable, onEdit }: { item: QuestionnaireItem; editable: boolean; onEdit: (f: (item: QuestionnaireItem) => QuestionnaireItem) => void }) {
+function Options({
+  id,
+  item,
+  layout,
+  editable,
+  onEdit,
+  onEditLayout,
+}: {
+  id: string
+  item: QuestionnaireItem
+  layout: FormLayout | undefined
+  editable: boolean
+  onEdit: (f: (item: QuestionnaireItem) => QuestionnaireItem) => void
+  onEditLayout: (f: (layout: FormLayout) => FormLayout) => void
+}) {
   const intl = useIntl()
   const list = item.answerOption ?? []
+  // A bound question offers the ValueSet's codes, not options of its own.
+  if (item.answerValueSet !== undefined)
+    return (
+      <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+        <h3 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.fdOptions)}</h3>
+        <ValueSetBinding id={id} item={item} layout={layout} editable={editable} onEdit={onEdit} onEditLayout={onEditLayout} />
+      </div>
+    )
   return (
     <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
       <h3 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.fdOptions)}</h3>
-      {item.answerValueSet === undefined ? null : <p className={muted}>{intl.formatMessage(m.fdValueSet, { valueSet: item.answerValueSet })}</p>}
       <ol className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
         {list.map((option, n) =>
           option.valueCoding === undefined ? null : (
@@ -765,6 +791,7 @@ function Options({ item, editable, onEdit }: { item: QuestionnaireItem; editable
           {intl.formatMessage(m.fdAddOption)}
         </button>
       ) : null}
+      <ValueSetBinding id={id} item={item} layout={layout} editable={editable} onEdit={onEdit} onEditLayout={onEditLayout} />
     </div>
   )
 }

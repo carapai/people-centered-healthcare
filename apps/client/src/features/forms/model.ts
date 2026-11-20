@@ -52,6 +52,15 @@ export function initialResponse(questionnaire: Questionnaire): QuestionnaireResp
   } as QuestionnaireResponse
 }
 
+/**
+ * The codes a choice question offers: its own options, or, when it is bound to a ValueSet, the
+ * codes `answers` holds for that binding (none until they are known).
+ */
+export function choices(item: QuestionnaireItem, answers: Readonly<Record<string, Coding[]>> = {}): Coding[] {
+  if (item.answerValueSet !== undefined) return answers[item.answerValueSet] ?? []
+  return (item.answerOption ?? []).flatMap((option) => (option.valueCoding === undefined ? [] : [option.valueCoding]))
+}
+
 /** Every Questionnaire item by linkId. */
 export function itemsByLinkId(questionnaire: Questionnaire): Map<string, QuestionnaireItem> {
   const found = new Map<string, QuestionnaireItem>()

@@ -1,4 +1,4 @@
-import type { Questionnaire, QuestionnaireItem, QuestionnaireResponse, QuestionnaireResponseItem, QuestionnaireResponseItemAnswer } from '@health/fhir-types'
+import type { Coding, Questionnaire, QuestionnaireItem, QuestionnaireResponse, QuestionnaireResponseItem, QuestionnaireResponseItemAnswer } from '@health/fhir-types'
 import { css } from '@health/design-system/css'
 import { useForm } from '@tanstack/react-form'
 import { LosslessNumber } from 'lossless-json'
@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl'
 
 import { formMessages } from '../../i18n/messages'
 import { type FormLayout, sections, widget } from './layout'
-import { addRepeat, calculated, initialResponse, isEnabled, itemsByLinkId, missing, removeRepeat, settled, violations, withAnswers } from './model'
+import { addRepeat, calculated, choices, initialResponse, isEnabled, itemsByLinkId, missing, removeRepeat, settled, violations, withAnswers } from './model'
 
 const control = css({ minHeight: 'control', px: '2', borderRadius: 'md', border: '1px solid', borderColor: 'border' })
 const field = css({ display: 'flex', flexDirection: 'column', gap: '1', maxWidth: 'md' })
@@ -40,6 +40,9 @@ export interface QuestionnaireRendererProps {
   onSubmit: (response: QuestionnaireResponse) => void
   /** Whether a save or submit is under way. */
   busy?: boolean
+  /** The codes of each ValueSet a choice question binds (`answerValueSet`), by its binding. A
+   * bound question offers none until they are given. */
+  answers?: Readonly<Record<string, Coding[]>>
 }
 
 /**
@@ -49,7 +52,7 @@ export interface QuestionnaireRendererProps {
  * constraints. Disabled questions are hidden and keep no answer; repeats keep stable ids. The
  * screen enforces nothing: the server re-validates every submission.
  */
-export function QuestionnaireRenderer({ questionnaire, layout, initial, onSave, onSubmit, busy = false }: QuestionnaireRendererProps) {
+export function QuestionnaireRenderer({ questionnaire, layout, initial, onSave, onSubmit, busy = false, answers = {} }: QuestionnaireRendererProps) {
   const intl = useIntl()
   const [tried, setTried] = useState(false)
   // The response is held opaque: TanStack Form's deep key types cannot traverse FHIR's (TS2589),
@@ -70,7 +73,7 @@ export function QuestionnaireRenderer({ questionnaire, layout, initial, onSave, 
       {(response) => {
         const unanswered = missing(questionnaire, response)
         const failing = violations(questionnaire, response)
-        const shown = { response, update, layout, tried, unanswered, failing }
+        const shown = { response, update, layout, tried, unanswered, failing, answers }
         return (
           <form
             noValidate
@@ -126,6 +129,7 @@ interface Shown {
   tried: boolean
   unanswered: string[]
   failing: ReturnType<typeof violations>
+  answers: Readonly<Record<string, Coding[]>>
 }
 
 /** Every instance of one Questionnaire item: a repeating group has one or more. */
@@ -210,7 +214,7 @@ function Question({ definition, instance, ...shown }: Shown & { definition: Ques
         </div>
       )
   } else if (definition.type === 'coding') {
-    const options = (definition.answerOption ?? []).flatMap((o) => (o.valueCoding === undefined ? [] : [o.valueCoding]))
+    const options = choices(definition, shown.answers)
     const code = (answer as { valueCoding?: { code?: string } } | undefined)?.valueCoding?.code ?? ''
     const pick = (value: string) => {
       const coding = options.find((o) => o.code === value)

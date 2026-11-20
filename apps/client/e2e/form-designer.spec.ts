@@ -136,3 +136,58 @@ test('the author sets what answers become a record, and imports an R4 form throu
   // What the mapping recorded of the old form is listed until it is dealt with.
   await expect(page.getByText('The Extraction Mapping records “temperature”, which is no longer in the form')).toBeVisible()
 })
+
+// #497 part 3: a choice question bound to a ValueSet through the picker. The author starts a
+// ValueSet of the triage categories in the terminology browser, then binds it from the form
+// designer: the picker finds the draft, previews its codes, suggests radio buttons, and the
+// binding records `url|version`. The preview offers the ValueSet's codes. With axe.
+test('the author binds the triage category to a ValueSet through the picker', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'CodeSystem-triage-category.json in the terminology browser' }).click()
+  const valueSet = page.getByRole('region', { name: 'ValueSet', exact: true })
+  const concepts = page.getByRole('region', { name: 'Concepts of TriageCategory' })
+  await valueSet.getByLabel('Id', { exact: true }).fill('triage-every')
+  await valueSet.getByLabel('Title', { exact: true }).fill('Every triage category')
+  await press(page, 'Start the ValueSet')
+  for (const code of ['emergency', 'urgent', 'routine']) {
+    await concepts.getByRole('button', { name: new RegExp(`^${code}`) }).click()
+    await press(page, new RegExp(`^Add ${code}$`))
+  }
+  await expect(valueSet.getByRole('heading', { name: 'Expansion: 3 codes' })).toBeVisible()
+  await press(page, 'Save the ValueSet')
+  await page.waitForURL(/\/terminology\/ValueSet-triage-every\.json$/)
+
+  await press(page, 'Back to the package', 'link')
+  await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'Questionnaire-opd-triage.json in the form designer' }).click()
+  const questions = page.getByRole('navigation', { name: 'Questions' })
+  const inspector = page.getByRole('region', { name: 'Selected question' })
+  const preview = page.getByRole('region', { name: /Live preview/ })
+  await questions.getByRole('button', { name: /^Triage category/ }).click()
+
+  // The picker finds the draft ValueSet, previews its codes and suggests a widget.
+  await press(page, 'Bind a ValueSet')
+  const picker = inspector.getByRole('group', { name: 'ValueSet picker' })
+  await picker.getByLabel('Search ValueSets').fill('every')
+  await picker.getByRole('button', { name: /^Every triage category 1\.0\.0 · Draft in this package/ }).click()
+  await expect(picker.getByText('https://health.go.ug/fhir/ValueSet/triage-every|1.0.0')).toBeVisible()
+  await expect(picker.getByText('Expansion: 3 codes')).toBeVisible()
+  await expect(picker.getByRole('list', { name: /^Codes of/ })).toContainText('Urgent: seen next')
+  await expect(picker.getByText('Suggested widget: radio buttons')).toBeVisible()
+  await expect(picker.getByText('Binding replaces the question’s own options with the ValueSet’s codes.')).toBeVisible()
+  await noViolations(page)
+  await press(page, 'Bind Every triage category')
+
+  // Bound, its own options are gone and the preview offers the ValueSet's codes.
+  await expect(inspector.getByText('Bound to the ValueSet https://health.go.ug/fhir/ValueSet/triage-every|1.0.0')).toBeVisible()
+  await expect(inspector.getByLabel('Option 1', { exact: true })).toHaveCount(0)
+  await expect(preview.getByRole('radio', { name: 'Routine' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^“Triage category.*” is a choice with no options$/ })).toHaveCount(0)
+  await noViolations(page)
+  await press(page, /^Save$/)
+  await expect(page.getByRole('status').filter({ hasText: 'Saved.' })).toBeVisible()
+
+  await press(page, 'Open as JSON', 'link')
+  await expect(page.getByLabel('Content (JSON)')).toHaveValue(/"answerValueSet": "https:\/\/health\.go\.ug\/fhir\/ValueSet\/triage-every\|1\.0\.0"/)
+})
