@@ -1693,7 +1693,41 @@ type StudioValues = {
   fdWidgetDefault: { widget: string }
   fdHint: {}
   fdRecord: {}
-  fdRecordLater: {}
+  fdRecordNone: {}
+  fdRecordTarget: { n: number; type: string }
+  fdRecordSystem: { n: number }
+  fdRecordCode: { n: number }
+  fdRecordDisplay: { n: number }
+  fdRecordRemove: { n: number }
+  fdRecordAdd: {}
+  fdRecordNotRecordable: { type: string }
+  fdMappingFile: { path: string }
+  fdMappingNew: { path: string }
+  fdPRecordNoCode: { text: string }
+  fdPRecordOrphan: { id: string }
+  fdImport: {}
+  fdImportHeading: {}
+  fdImportJson: {}
+  fdImportVersion: {}
+  fdImportR5: {}
+  fdImportR4: {}
+  fdImportRead: {}
+  fdImportCancel: {}
+  fdImportReplace: {}
+  fdImportNotJson: {}
+  fdImportNotQuestionnaire: {}
+  fdImportLooksR4: {}
+  fdImportReport: { count: number }
+  fdImportBlocked: {}
+  fdImportClean: {}
+  fdImportReplaced: {}
+  fdRChoice: { at: string }
+  fdROpenChoice: { at: string }
+  fdRSource: { source: string }
+  fdRUnknown: { at: string; element: string }
+  fdRContained: {}
+  fdRModifier: { at: string }
+  fdRType: { at: string; type: string }
   fdPreview: {}
   fdProblems: { count: number }
   fdProblemsHint: {}
@@ -1882,7 +1916,41 @@ export const studioMessages = defineMessages<StudioValues>({
   fdWidgetDefault: { id: 'app.studio.formDesigner.widgetDefault', defaultMessage: 'Default ({widget})', description: 'Studio: the type’s default widget' },
   fdHint: { id: 'app.studio.formDesigner.hint', defaultMessage: 'Hint', description: 'Studio: hint field' },
   fdRecord: { id: 'app.studio.formDesigner.record', defaultMessage: 'Becomes a record', description: 'Studio: inspector group for extraction' },
-  fdRecordLater: { id: 'app.studio.formDesigner.recordLater', defaultMessage: 'What an answer becomes is edited in the package’s Extraction Mapping as JSON for now.', description: 'Studio: extraction not yet in the designer' },
+  fdRecordNone: { id: 'app.studio.formDesigner.recordNone', defaultMessage: 'No record: the answer stays in the response.', description: 'Studio: question with no extraction target' },
+  fdRecordTarget: { id: 'app.studio.formDesigner.recordTarget', defaultMessage: 'Record {n}: {type}', description: 'Studio: extraction target resource type' },
+  fdRecordSystem: { id: 'app.studio.formDesigner.recordSystem', defaultMessage: 'Code system of record {n}', description: 'Studio: extraction code system field' },
+  fdRecordCode: { id: 'app.studio.formDesigner.recordCode', defaultMessage: 'Code of record {n}', description: 'Studio: extraction code field' },
+  fdRecordDisplay: { id: 'app.studio.formDesigner.recordDisplay', defaultMessage: 'Display of record {n}', description: 'Studio: extraction code display field' },
+  fdRecordRemove: { id: 'app.studio.formDesigner.recordRemove', defaultMessage: 'Remove record {n}', description: 'Studio: remove an extraction target' },
+  fdRecordAdd: { id: 'app.studio.formDesigner.recordAdd', defaultMessage: 'Record it as an Observation', description: 'Studio: add an Observation extraction target' },
+  fdRecordNotRecordable: { id: 'app.studio.formDesigner.recordNotRecordable', defaultMessage: 'A {type} item does not become a record itself.', description: 'Studio: an item type with no Observation value' },
+  fdMappingFile: { id: 'app.studio.formDesigner.mappingFile', defaultMessage: 'What answers become is in {path}.', description: 'Studio: the Extraction Mapping file' },
+  fdMappingNew: { id: 'app.studio.formDesigner.mappingNew', defaultMessage: 'It has no Extraction Mapping yet: recording an answer adds {path}.', description: 'Studio: no Extraction Mapping yet' },
+  fdPRecordNoCode: { id: 'app.studio.formDesigner.pRecordNoCode', defaultMessage: 'What “{text}” becomes has no code', description: 'Studio problem' },
+  fdPRecordOrphan: { id: 'app.studio.formDesigner.pRecordOrphan', defaultMessage: 'The Extraction Mapping records “{id}”, which is no longer in the form', description: 'Studio problem' },
+  fdImport: { id: 'app.studio.formDesigner.import', defaultMessage: 'Import FHIR JSON', description: 'Studio: open the import panel' },
+  fdImportHeading: { id: 'app.studio.formDesigner.importHeading', defaultMessage: 'Import FHIR JSON', description: 'Studio: import panel heading' },
+  fdImportJson: { id: 'app.studio.formDesigner.importJson', defaultMessage: 'Questionnaire (FHIR JSON)', description: 'Studio: import text field' },
+  fdImportVersion: { id: 'app.studio.formDesigner.importVersion', defaultMessage: 'FHIR version', description: 'Studio: import version choice' },
+  fdImportR5: { id: 'app.studio.formDesigner.importR5', defaultMessage: 'R5', description: 'Studio: import as R5' },
+  fdImportR4: { id: 'app.studio.formDesigner.importR4', defaultMessage: 'R4, converted to R5 with a report', description: 'Studio: import as R4' },
+  fdImportRead: { id: 'app.studio.formDesigner.importRead', defaultMessage: 'Read it', description: 'Studio: read the pasted JSON' },
+  fdImportCancel: { id: 'app.studio.formDesigner.importCancel', defaultMessage: 'Cancel', description: 'Studio: close the import panel' },
+  fdImportReplace: { id: 'app.studio.formDesigner.importReplace', defaultMessage: 'Replace the form', description: 'Studio: replace the form with the import' },
+  fdImportNotJson: { id: 'app.studio.formDesigner.importNotJson', defaultMessage: 'This is not JSON.', description: 'Studio: import refusal' },
+  fdImportNotQuestionnaire: { id: 'app.studio.formDesigner.importNotQuestionnaire', defaultMessage: 'This is not a Questionnaire.', description: 'Studio: import refusal' },
+  fdImportLooksR4: { id: 'app.studio.formDesigner.importLooksR4', defaultMessage: 'It uses R4’s choice types: read it as R4.', description: 'Studio: import refusal' },
+  fdImportReport: { id: 'app.studio.formDesigner.importReport', defaultMessage: '{count, plural, =0 {Conversion report: nothing to convert} one {Conversion report: # line} other {Conversion report: # lines}}', description: 'Studio: conversion report heading' },
+  fdImportBlocked: { id: 'app.studio.formDesigner.importBlocked', defaultMessage: 'Some of it could not be converted, so it cannot replace the form.', description: 'Studio: import blocked by the report' },
+  fdImportClean: { id: 'app.studio.formDesigner.importClean', defaultMessage: 'It replaces every question of the form. The draft keeps its url, version and status.', description: 'Studio: import ready' },
+  fdImportReplaced: { id: 'app.studio.formDesigner.importReplaced', defaultMessage: 'The form was replaced by the import. Save to keep it.', description: 'Studio: import done' },
+  fdRChoice: { id: 'app.studio.formDesigner.rChoice', defaultMessage: '“{at}”: R4 choice became coding, options only', description: 'Studio conversion report' },
+  fdROpenChoice: { id: 'app.studio.formDesigner.rOpenChoice', defaultMessage: '“{at}”: R4 open-choice became coding, options or free text', description: 'Studio conversion report' },
+  fdRSource: { id: 'app.studio.formDesigner.rSource', defaultMessage: 'Its source {source} is kept in derivedFrom', description: 'Studio conversion report' },
+  fdRUnknown: { id: 'app.studio.formDesigner.rUnknown', defaultMessage: '“{at}”: {element} is not converted', description: 'Studio conversion report' },
+  fdRContained: { id: 'app.studio.formDesigner.rContained', defaultMessage: 'Contained resources are not converted: split SDC templates into an Extraction Mapping first', description: 'Studio conversion report' },
+  fdRModifier: { id: 'app.studio.formDesigner.rModifier', defaultMessage: '“{at}”: a modifier extension is not converted', description: 'Studio conversion report' },
+  fdRType: { id: 'app.studio.formDesigner.rType', defaultMessage: '“{at}”: the type {type} is not converted', description: 'Studio conversion report' },
   fdPreview: { id: 'app.studio.formDesigner.preview', defaultMessage: 'Live preview: what a health worker sees', description: 'Studio: preview heading' },
   fdProblems: { id: 'app.studio.formDesigner.problems', defaultMessage: '{count, plural, =0 {No problems found while editing} one {# problem} other {# problems}}', description: 'Studio: problems heading' },
   fdProblemsHint: { id: 'app.studio.formDesigner.problemsHint', defaultMessage: 'Check now on the package page remains the authority.', description: 'Studio: problems are a preview of the checks' },

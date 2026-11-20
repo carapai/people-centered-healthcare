@@ -1,5 +1,5 @@
 import { css, cx } from '@health/design-system/css'
-import type { Questionnaire, QuestionnaireItem } from '@health/fhir-types'
+import type { Coding, Questionnaire, QuestionnaireItem } from '@health/fhir-types'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useId, useMemo, useRef, useState } from 'react'
@@ -12,6 +12,7 @@ import { QuestionnaireRenderer } from '../../forms/QuestionnaireRenderer'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
+import { blocks, pruneLayout, readQuestionnaire, replaceWith, type FhirVersion, type ImportRefusal, type ReportEntry } from './importing'
 import {
   ANSWER_TYPES,
   addOption,
@@ -46,6 +47,7 @@ import {
   type Path,
   type Problem,
 } from './model'
+import { addObservation, blankMapping, isMappingOf, newMappingPath, recordProblems, recordable, renameInMapping, targets, withCode, withoutTarget, type Mapping, type RecordProblem } from './record'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '4' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -86,6 +88,20 @@ function findLayout(files: { path: string; file: StudioFile | undefined }[], que
   return undefined
 }
 
+/** The Extraction Mapping of `questionnaire` among the draft's top-level Library files, if any. */
+function findMapping(files: { path: string; file: StudioFile | undefined }[], questionnaire: Questionnaire): { path: string; mapping: Mapping } | undefined {
+  for (const { path, file } of files) {
+    if (file === undefined) continue
+    try {
+      const value: unknown = JSON.parse(file.content)
+      if (isMappingOf(value, questionnaire.url)) return { path, mapping: value }
+    } catch {
+      // Not JSON: not a mapping.
+    }
+  }
+  return undefined
+}
+
 /** Where a new Form Layout for the Questionnaire at `path` goes. */
 const newLayoutPath = (path: string) => `configuration/FormLayout-${(path.split('/').pop() ?? path).replace(/^Questionnaire-/, '').replace(/\.json$/, '')}.json`
 
@@ -115,13 +131,16 @@ export function FormDesigner({ id, path }: { id: string; path: string }) {
   const previous = useQuery({ ...fileQuery(platform.transport, previousId ?? '', path), enabled: previousId !== null, retry: false })
   const configuration = (draft.data?.files ?? []).filter((f) => f.path.startsWith('configuration/') && f.path.endsWith('.json')).map((f) => f.path)
   const layouts = useQueries({ queries: configuration.map((p) => ({ ...fileQuery(platform.transport, id, p), retry: false })) })
+  // The Extraction Mappings are Libraries at the package's top level.
+  const libraries = (draft.data?.files ?? []).filter((f) => !f.path.includes('/') && f.path.startsWith('Library-') && f.path.endsWith('.json')).map((f) => f.path)
+  const mappings = useQueries({ queries: libraries.map((p) => ({ ...fileQuery(platform.transport, id, p), retry: false })) })
   // A previous version without this file published none of its ids.
   const previousSettled = previousId === null || previous.data !== undefined || (previous.error instanceof StudioError && previous.error.status === 404)
   // Once the designer has opened it stays open: a save that adds the layout file adds a query,
   // and only *Reload* after a refused save opens it again, from what the server holds.
   const opened = useRef(false)
   const [reloads, setReloads] = useState(0)
-  const loading = !opened.current && (draft.data === undefined || file.data === undefined || !previousSettled || layouts.some((q) => q.isPending))
+  const loading = !opened.current && (draft.data === undefined || file.data === undefined || !previousSettled || layouts.some((q) => q.isPending) || mappings.some((q) => q.isPending))
   const failed = draft.isError || file.isError || (previous.isError && !previousSettled)
   if (!loading && draft.data !== undefined && file.data !== undefined) opened.current = true
   return (
@@ -151,8 +170,9 @@ export function FormDesigner({ id, path }: { id: string; path: string }) {
           file={file.data}
           published={previous.data === undefined ? null : parseQuestionnaire(previous.data.content)}
           layouts={configuration.map((p, n) => ({ path: p, file: layouts[n]?.data }))}
+          mappings={libraries.map((p, n) => ({ path: p, file: mappings[n]?.data }))}
           onReload={async () => {
-            await Promise.all([draft.refetch(), file.refetch(), ...layouts.map((q) => q.refetch())])
+            await Promise.all([draft.refetch(), file.refetch(), ...layouts.map((q) => q.refetch()), ...mappings.map((q) => q.refetch())])
             setReloads((n) => n + 1)
           }}
         />
@@ -168,6 +188,7 @@ interface LoadedProps {
   file: StudioFile
   published: Questionnaire | null
   layouts: { path: string; file: StudioFile | undefined }[]
+  mappings: { path: string; file: StudioFile | undefined }[]
   onReload: () => Promise<void>
 }
 
@@ -186,17 +207,24 @@ function Loaded(props: LoadedProps) {
 interface Form {
   questionnaire: Questionnaire
   layout: FormLayout | undefined
+  /** The Extraction Mapping: what the answers become. */
+  mapping: Mapping | undefined
 }
 
-function Designer({ id, path, draft, file, published: previous, layouts, onReload, initial }: LoadedProps & { initial: Questionnaire }) {
+function Designer({ id, path, draft, file, published: previous, layouts, mappings, onReload, initial }: LoadedProps & { initial: Questionnaire }) {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
   const found = useMemo(() => findLayout(layouts, initial), [layouts, initial])
   const layoutPath = found?.path ?? newLayoutPath(path)
-  const [form, setForm] = useState<Form>({ questionnaire: initial, layout: found?.layout })
-  const [saved, setSaved] = useState(() => ({ questionnaire: JSON.stringify(initial), layout: JSON.stringify(found?.layout ?? null) }))
+  const foundMapping = useMemo(() => findMapping(mappings, initial), [mappings, initial])
+  const mappingPath = foundMapping?.path ?? newMappingPath(path)
+  const [form, setForm] = useState<Form>({ questionnaire: initial, layout: found?.layout, mapping: foundMapping?.mapping })
+  const [saved, setSaved] = useState(() => ({ questionnaire: JSON.stringify(initial), layout: JSON.stringify(found?.layout ?? null), mapping: JSON.stringify(foundMapping?.mapping ?? null) }))
   const [layoutExists, setLayoutExists] = useState(found !== undefined)
+  const [mappingExists, setMappingExists] = useState(foundMapping !== undefined)
+  const [importing, setImporting] = useState(false)
+  const [imported, setImported] = useState(false)
   const [revision, setRevision] = useState(file.revision)
   const [selected, setSelected] = useState<Path | null>(() => ((initial.item ?? []).length > 0 ? [0] : null))
   const published = useMemo(() => linkIds(previous ?? undefined), [previous])
@@ -206,23 +234,31 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
   const questionnaireText = JSON.stringify(form.questionnaire)
   const layoutText = JSON.stringify(form.layout ?? null)
   const layoutDirty = layoutText !== saved.layout && (layoutExists || (layout !== undefined && laysOut(layout)))
-  const dirty = questionnaireText !== saved.questionnaire || layoutDirty
+  const mappingText = JSON.stringify(form.mapping ?? null)
+  const mappingDirty = mappingText !== saved.mapping && form.mapping !== undefined
+  const dirty = questionnaireText !== saved.questionnaire || layoutDirty || mappingDirty
   const listed = problems(form.questionnaire, layout, published)
+  const recordsListed = recordProblems(form.mapping, form.questionnaire)
 
   const save = useMutation({
     mutationFn: async () => {
       let next = await saveFile(platform.transport, id, path, JSON.stringify(form.questionnaire, null, 2), revision)
       // The layout follows in a second save, at the revision the first one answered.
       if (layoutDirty && layout !== undefined) next = await saveFile(platform.transport, id, layoutPath, JSON.stringify(layout, null, 2), next.revision)
+      // Then what the answers become, at the revision the save before answered.
+      if (mappingDirty && form.mapping !== undefined) next = await saveFile(platform.transport, id, mappingPath, JSON.stringify(form.mapping, null, 2), next.revision)
       return next
     },
     onSuccess: async (next) => {
       setRevision(next.revision)
-      setSaved({ questionnaire: questionnaireText, layout: layoutText })
+      setSaved({ questionnaire: questionnaireText, layout: layoutText, mapping: mappingText })
       if (layoutDirty) setLayoutExists(true)
+      if (mappingDirty) setMappingExists(true)
+      setImported(false)
       // What was saved is what the server now holds, for the JSON editor and the next opening.
       queryClient.setQueryData(fileQuery(platform.transport, id, path).queryKey, { path, content: JSON.stringify(form.questionnaire, null, 2), revision: next.revision })
       if (layoutDirty && layout !== undefined) queryClient.setQueryData(fileQuery(platform.transport, id, layoutPath).queryKey, { path: layoutPath, content: JSON.stringify(layout, null, 2), revision: next.revision })
+      if (mappingDirty && form.mapping !== undefined) queryClient.setQueryData(fileQuery(platform.transport, id, mappingPath).queryKey, { path: mappingPath, content: JSON.stringify(form.mapping, null, 2), revision: next.revision })
       queryClient.setQueryData(packageQuery(platform.transport, id).queryKey, next)
       await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
     },
@@ -237,6 +273,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
   }
   const edit = (at: Path, f: (item: QuestionnaireItem) => QuestionnaireItem) => change({ ...form, questionnaire: updateItem(form.questionnaire, at, f) })
   const editLayout = (f: (l: FormLayout) => FormLayout) => change({ ...form, layout: f(form.layout ?? blankLayout(form.questionnaire)) })
+  const editMapping = (f: (mapping: Mapping) => Mapping) => change({ ...form, mapping: f(form.mapping ?? blankMapping(form.questionnaire)) })
   const selectedItem = selected === null ? undefined : itemAt(form.questionnaire, selected)
 
   return (
@@ -245,12 +282,15 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
         <div>
           <h1 className={heading}>{intl.formatMessage(m.fdHeading, { title: form.questionnaire.title ?? form.questionnaire.name ?? path })}</h1>
           <p className={muted}>
-            {path} · {intl.formatMessage(layoutExists ? m.fdLayoutFile : m.fdLayoutNew, { path: layoutPath })}
+            {path} · {intl.formatMessage(layoutExists ? m.fdLayoutFile : m.fdLayoutNew, { path: layoutPath })} {intl.formatMessage(mappingExists ? m.fdMappingFile : m.fdMappingNew, { path: mappingPath })}
           </p>
         </div>
         {editable ? (
           <div className={row}>
             {dirty ? <span className={muted}>{intl.formatMessage(m.fdUnsaved)}</span> : null}
+            <button type="button" className={small} aria-expanded={importing} onClick={() => setImporting((open) => !open)}>
+              {intl.formatMessage(m.fdImport)}
+            </button>
             <button type="button" className={button} disabled={!dirty || save.isPending || stale} onClick={() => save.mutate()}>
               {intl.formatMessage(m.fdSave)}
             </button>
@@ -263,6 +303,19 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
         </p>
       )}
       {save.isSuccess && !dirty ? <p role="status">{intl.formatMessage(m.fdSaved)}</p> : null}
+      {imported && dirty ? <p role="status">{intl.formatMessage(m.fdImportReplaced)}</p> : null}
+      {importing && editable ? (
+        <Import
+          draft={form.questionnaire}
+          onCancel={() => setImporting(false)}
+          onReplace={(questionnaire) => {
+            change({ questionnaire, layout: pruneLayout(form.layout, questionnaire), mapping: form.mapping })
+            setSelected((questionnaire.item ?? []).length > 0 ? [0] : null)
+            setImporting(false)
+            setImported(true)
+          }}
+        />
+      ) : null}
       {stale ? (
         <div role="alert" className={css({ display: 'flex', flexDirection: 'column', gap: '2', alignItems: 'flex-start' })}>
           <p className={alert}>{intl.formatMessage(m.sdEditorStale)}</p>
@@ -276,7 +329,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
         </p>
       )}
 
-      <Problems questionnaire={form.questionnaire} found={listed} onSelect={setSelected} />
+      <Problems questionnaire={form.questionnaire} found={listed} records={recordsListed} onSelect={setSelected} />
 
       <div className={columns}>
         <Outline form={form} layout={layout} selected={selected} editable={editable} onSelect={setSelected} onChange={change} onEditLayout={editLayout} />
@@ -296,10 +349,16 @@ function Designer({ id, path, draft, file, published: previous, layouts, onReloa
               published={published}
               editable={editable}
               onEdit={(f) => edit(selected, f)}
-              onRename={(linkId) => change(renameItem(form, selected, linkId, published))}
+              onRename={(linkId) => {
+                const renamed = renameItem(form, selected, linkId, published)
+                // A new id renamed carries what its answer becomes along.
+                const moved = renamed.questionnaire === form.questionnaire ? form.mapping : renameInMapping(form.mapping, selectedItem.linkId, linkId)
+                change({ ...renamed, mapping: moved })
+              }}
               onEditLayout={editLayout}
+              onEditMapping={editMapping}
               onRemove={() => {
-                change({ questionnaire: removeItem(form.questionnaire, selected), layout: form.layout === undefined ? undefined : withSection(form.layout, selectedItem.linkId, null) })
+                change({ questionnaire: removeItem(form.questionnaire, selected), layout: form.layout === undefined ? undefined : withSection(form.layout, selectedItem.linkId, null), mapping: form.mapping })
                 setSelected(null)
               }}
             />
@@ -348,15 +407,16 @@ function problemText(intl: IntlShape, questionnaire: Questionnaire, problem: Pro
 }
 
 /** The problems found while editing, each selecting the question it is about. */
-function Problems({ questionnaire, found, onSelect }: { questionnaire: Questionnaire; found: Problem[]; onSelect: (path: Path) => void }) {
+function Problems({ questionnaire, found, records, onSelect }: { questionnaire: Questionnaire; found: Problem[]; records: RecordProblem[]; onSelect: (path: Path) => void }) {
   const intl = useIntl()
+  const count = found.length + records.length
   return (
     <section aria-labelledby="fd-problems" className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
       <h2 id="fd-problems" className={subheading}>
-        {intl.formatMessage(m.fdProblems, { count: found.length })}
+        {intl.formatMessage(m.fdProblems, { count })}
       </h2>
       <p className={muted}>{intl.formatMessage(m.fdProblemsHint)}</p>
-      {found.length === 0 ? null : (
+      {count === 0 ? null : (
         <ul className={css({ listStyle: 'disc', pl: '5', display: 'flex', flexDirection: 'column', gap: '1' })}>
           {found.map((problem, n) => {
             const text = problemText(intl, questionnaire, problem)
@@ -368,6 +428,21 @@ function Problems({ questionnaire, found, onSelect }: { questionnaire: Questionn
                   </button>
                 ) : (
                   text
+                )}
+              </li>
+            )
+          })}
+          {records.map((problem) => {
+            const at = rows(questionnaire).find((r) => r.item.linkId === problem.linkId)
+            const text = problem.code === 'record-orphan' ? intl.formatMessage(m.fdPRecordOrphan, { id: problem.linkId }) : intl.formatMessage(m.fdPRecordNoCode, { text: known(intl, at?.item, problem.linkId) })
+            return (
+              <li key={`${problem.code}:${problem.template}`}>
+                {at === undefined ? (
+                  text
+                ) : (
+                  <button type="button" className={css({ textDecoration: 'underline', cursor: 'pointer', textAlign: 'left' })} onClick={() => onSelect(at.path)}>
+                    {text}
+                  </button>
                 )}
               </li>
             )
@@ -399,7 +474,7 @@ function Outline({ form, layout, selected, editable, onSelect, onChange, onEditL
     // It joins the section of the selected question, if that is in one.
     const top = selected === null ? undefined : itemAt(form.questionnaire, selected.slice(0, 1))
     const section = top === undefined || layout === undefined ? null : sectionOf(layout, top.linkId)
-    onChange({ questionnaire: added.questionnaire, layout: section === null || form.layout === undefined ? form.layout : withSection(form.layout, linkId, section) })
+    onChange({ ...form, questionnaire: added.questionnaire, layout: section === null || form.layout === undefined ? form.layout : withSection(form.layout, linkId, section) })
     onSelect(added.path)
   }
   return (
@@ -435,7 +510,7 @@ function Outline({ form, layout, selected, editable, onSelect, onChange, onEditL
                           aria-label={intl.formatMessage(m.fdUp, { text })}
                           onClick={() => {
                             const moved = moveShown(form, path, -1)
-                            onChange({ questionnaire: moved.questionnaire, layout: moved.layout })
+                            onChange({ ...form, questionnaire: moved.questionnaire, layout: moved.layout })
                             onSelect(moved.path)
                           }}
                         >
@@ -447,7 +522,7 @@ function Outline({ form, layout, selected, editable, onSelect, onChange, onEditL
                           aria-label={intl.formatMessage(m.fdDown, { text })}
                           onClick={() => {
                             const moved = moveShown(form, path, 1)
-                            onChange({ questionnaire: moved.questionnaire, layout: moved.layout })
+                            onChange({ ...form, questionnaire: moved.questionnaire, layout: moved.layout })
                             onSelect(moved.path)
                           }}
                         >
@@ -521,11 +596,12 @@ interface InspectorProps {
   onEdit: (f: (item: QuestionnaireItem) => QuestionnaireItem) => void
   onRename: (linkId: string) => void
   onEditLayout: (f: (layout: FormLayout) => FormLayout) => void
+  onEditMapping: (f: (mapping: Mapping) => Mapping) => void
   onRemove: () => void
 }
 
 /** The selected question in three groups: Question, Layout, and Becomes a record. */
-function Inspector({ form, layout, path, item, published, editable, onEdit, onRename, onEditLayout, onRemove }: InspectorProps) {
+function Inspector({ form, layout, path, item, published, editable, onEdit, onRename, onEditLayout, onEditMapping, onRemove }: InspectorProps) {
   const intl = useIntl()
   const idHint = useId()
   const fixed = published.has(item.linkId)
@@ -639,10 +715,7 @@ function Inspector({ form, layout, path, item, published, editable, onEdit, onRe
         </label>
       </fieldset>
 
-      <div className={fieldGroup}>
-        <h3 className={legend}>{intl.formatMessage(m.fdRecord)}</h3>
-        <p className={muted}>{intl.formatMessage(m.fdRecordLater)}</p>
-      </div>
+      <Records form={form} path={path} item={item} editable={editable} onEditMapping={onEditMapping} />
       {editable ? (
         <button type="button" className={small} onClick={onRemove}>
           {intl.formatMessage(m.fdRemove, { text })}
@@ -693,5 +766,160 @@ function Options({ item, editable, onEdit }: { item: QuestionnaireItem; editable
         </button>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * *Becomes a record*: what the answer becomes under the package's Extraction Mapping, each
+ * record's resource type and code, with an Observation added for a question that has none.
+ */
+function Records({ form, path, item, editable, onEditMapping }: { form: Form; path: Path; item: QuestionnaireItem; editable: boolean; onEditMapping: (f: (mapping: Mapping) => Mapping) => void }) {
+  const intl = useIntl()
+  const list = targets(form.mapping, item.linkId)
+  const code = (n: number, coding: Coding | undefined, change: Partial<Coding>) => {
+    const template = list[n]?.template
+    if (template !== undefined) onEditMapping((mapping) => withCode(mapping, template, { ...coding, ...change }))
+  }
+  return (
+    <fieldset className={fieldGroup} disabled={!editable}>
+      <legend className={legend}>{intl.formatMessage(m.fdRecord)}</legend>
+      {list.length === 0 ? <p className={muted}>{intl.formatMessage(m.fdRecordNone)}</p> : null}
+      <ol className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+        {list.map((target, n) => (
+          <li key={target.template} className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+            <span className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.fdRecordTarget, { n: n + 1, type: target.resourceType })}</span>
+            <label className={label}>
+              {intl.formatMessage(m.fdRecordSystem, { n: n + 1 })}
+              <input className={input} value={target.code?.system ?? ''} onChange={(e) => code(n, target.code, { system: e.target.value })} />
+            </label>
+            <label className={label}>
+              {intl.formatMessage(m.fdRecordCode, { n: n + 1 })}
+              <input className={input} value={target.code?.code ?? ''} onChange={(e) => code(n, target.code, { code: e.target.value })} />
+            </label>
+            <label className={label}>
+              {intl.formatMessage(m.fdRecordDisplay, { n: n + 1 })}
+              <input className={input} value={target.code?.display ?? ''} onChange={(e) => code(n, target.code, { display: e.target.value })} />
+            </label>
+            {editable ? (
+              <button type="button" className={small} onClick={() => onEditMapping((mapping) => withoutTarget(mapping, target.template))}>
+                {intl.formatMessage(m.fdRecordRemove, { n: n + 1 })}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {!editable ? null : recordable(item) ? (
+        <button type="button" className={small} onClick={() => onEditMapping((mapping) => addObservation(mapping, form.questionnaire, path, { system: 'http://loinc.org' })?.mapping ?? mapping)}>
+          {intl.formatMessage(m.fdRecordAdd)}
+        </button>
+      ) : (
+        <p className={muted}>{intl.formatMessage(m.fdRecordNotRecordable, { type: item.type })}</p>
+      )}
+    </fieldset>
+  )
+}
+
+function reportText(intl: IntlShape, entry: ReportEntry): string {
+  switch (entry.code) {
+    case 'choice':
+      return intl.formatMessage(m.fdRChoice, { at: entry.at })
+    case 'open-choice':
+      return intl.formatMessage(m.fdROpenChoice, { at: entry.at })
+    case 'source':
+      return intl.formatMessage(m.fdRSource, { source: entry.source })
+    case 'unknown-element':
+      return intl.formatMessage(m.fdRUnknown, { at: entry.at, element: entry.element })
+    case 'contained':
+      return intl.formatMessage(m.fdRContained)
+    case 'modifier-extension':
+      return intl.formatMessage(m.fdRModifier, { at: entry.at })
+    case 'unknown-type':
+      return intl.formatMessage(m.fdRType, { at: entry.at, type: entry.type })
+  }
+}
+
+const refusalMessage = { 'not-json': m.fdImportNotJson, 'not-questionnaire': m.fdImportNotQuestionnaire, 'looks-r4': m.fdImportLooksR4 } as const satisfies Record<ImportRefusal, unknown>
+
+/**
+ * Import FHIR JSON: a pasted Questionnaire, read as R5 or as R4 converted to R5, with its
+ * conversion report; anything unconverted blocks it. It replaces the form until saved.
+ */
+function Import({ draft, onCancel, onReplace }: { draft: Questionnaire; onCancel: () => void; onReplace: (questionnaire: Questionnaire) => void }) {
+  const intl = useIntl()
+  const versionName = useId()
+  const [text, setText] = useState('')
+  const [version, setVersion] = useState<FhirVersion>('R5')
+  const [read, setRead] = useState<ReturnType<typeof readQuestionnaire> | null>(null)
+  const result = read !== null && read.ok ? replaceWith(draft, read.questionnaire, read.report) : null
+  const blocked = result !== null && blocks(result.report)
+  return (
+    <section aria-labelledby="fd-import" className={panel}>
+      <h2 id="fd-import" className={subheading}>
+        {intl.formatMessage(m.fdImportHeading)}
+      </h2>
+      <label className={label}>
+        {intl.formatMessage(m.fdImportJson)}
+        <textarea
+          className={cx(input, css({ minHeight: '10rem', fontFamily: 'mono', fontSize: 'sm' }))}
+          value={text}
+          spellCheck={false}
+          onChange={(e) => {
+            setText(e.target.value)
+            setRead(null)
+          }}
+        />
+      </label>
+      <fieldset className={cx(fieldGroup, css({ flexDirection: 'row', gap: '4', flexWrap: 'wrap' }))}>
+        <legend className={legend}>{intl.formatMessage(m.fdImportVersion)}</legend>
+        {(['R5', 'R4'] as const).map((v) => (
+          <label key={v} className={row}>
+            <input
+              type="radio"
+              name={versionName}
+              value={v}
+              checked={version === v}
+              onChange={() => {
+                setVersion(v)
+                setRead(null)
+              }}
+            />
+            {intl.formatMessage(v === 'R5' ? m.fdImportR5 : m.fdImportR4)}
+          </label>
+        ))}
+      </fieldset>
+      <div className={row}>
+        <button type="button" className={button} disabled={text.trim() === ''} onClick={() => setRead(readQuestionnaire(text, version))}>
+          {intl.formatMessage(m.fdImportRead)}
+        </button>
+        <button type="button" className={small} onClick={onCancel}>
+          {intl.formatMessage(m.fdImportCancel)}
+        </button>
+      </div>
+      {read !== null && !read.ok ? (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(refusalMessage[read.refusal])}
+        </p>
+      ) : null}
+      {result === null ? null : (
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+          <h3 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.fdImportReport, { count: result.report.length })}</h3>
+          {result.report.length === 0 ? null : (
+            <ul aria-label={intl.formatMessage(m.fdImportReport, { count: result.report.length })} className={css({ listStyle: 'disc', pl: '5', display: 'flex', flexDirection: 'column', gap: '1' })}>
+              {result.report.map((entry, n) => (
+                <li key={n} className={entry.outcome === 'unconverted' ? alert : undefined}>
+                  {reportText(intl, entry)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p role={blocked ? 'alert' : 'status'} className={blocked ? alert : muted}>
+            {intl.formatMessage(blocked ? m.fdImportBlocked : m.fdImportClean)}
+          </p>
+          <button type="button" className={cx(button, css({ alignSelf: 'flex-start' }))} disabled={blocked} onClick={() => onReplace(result.questionnaire)}>
+            {intl.formatMessage(m.fdImportReplace)}
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
