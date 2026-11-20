@@ -15,7 +15,8 @@
     "check": "bun run typecheck && bun run --filter '*' check"
   },
   "patchedDependencies": {
-    "@ark-ui/react@5.39.3": "patches/@ark-ui%2Freact@5.39.3.patch"
+    "@ark-ui/react@5.39.3": "patches/@ark-ui%2Freact@5.39.3.patch",
+    "@xyflow/system@1.0.0": "patches/@xyflow%2Fsystem@1.0.0.patch"
   },
   "devDependencies": {
     "@types/bun": "1.4.2",

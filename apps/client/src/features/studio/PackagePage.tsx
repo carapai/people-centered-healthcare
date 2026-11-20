@@ -1,14 +1,15 @@
 import { css } from '@health/design-system/css'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { studioMessages as m, terminologyMessages as tm } from '../../i18n/messages'
+import { studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, actionInput, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, actionInput, fileQuery, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
+import { isWorkflowLibrary } from './workflows/model'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '6', maxWidth: '5xl' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -50,6 +51,7 @@ export function PackagePage({ id }: { id: string }) {
 
 function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
   const intl = useIntl()
+  const workflows = useWorkflowFiles(id, draft)
   const time = (iso: string) => intl.formatDate(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' })
   const summary = draft.package
   const failing = draft.checks.filter((c) => !c.passed).length
@@ -101,13 +103,19 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                     <TerminologyLink id={id} path={change.path} />
                   </>
                 ) : null}
+                {workflows.has(change.path) && change.change !== 'removed' ? (
+                  <>
+                    {' · '}
+                    <WorkflowLink id={id} path={change.path} />
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <Files id={id} draft={draft} />
+      <Files id={id} draft={draft} workflows={workflows} />
 
       <section aria-labelledby="studio-safe">
         <h2 id="studio-safe" className={subheading}>
@@ -196,7 +204,35 @@ function TerminologyLink({ id, path }: { id: string; path: string }) {
   )
 }
 
-function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
+/** Opens a Workflow Definition in the Workflow Studio (#498). */
+function WorkflowLink({ id, path }: { id: string; path: string }) {
+  const intl = useIntl()
+  return (
+    <Link to="/studio/$id/workflows/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(wm.wsOpen, { path })}>
+      {intl.formatMessage(wm.wsOpenShort)}
+    </Link>
+  )
+}
+
+/** The package's top-level Libraries that are Workflow Definitions: only their content says so. */
+function useWorkflowFiles(id: string, draft: StudioPackagePage): Set<string> {
+  const platform = usePlatform()
+  const libraries = draft.files.filter((f) => f.resourceType === 'Library' && !f.path.includes('/')).map((f) => f.path)
+  const read = useQueries({ queries: libraries.map((path) => ({ ...fileQuery(platform.transport, id, path), retry: false })) })
+  const out = new Set<string>()
+  libraries.forEach((path, n) => {
+    const content = read[n]?.data?.content
+    if (content === undefined) return
+    try {
+      if (isWorkflowLibrary(JSON.parse(content))) out.add(path)
+    } catch {
+      // Not JSON: not a workflow.
+    }
+  })
+  return out
+}
+
+function Files({ id, draft, workflows }: { id: string; draft: StudioPackagePage; workflows: Set<string> }) {
   const intl = useIntl()
   const platform = usePlatform()
   const navigate = useNavigate()
@@ -256,6 +292,12 @@ function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
               <>
                 {' · '}
                 <TerminologyLink id={id} path={file.path} />
+              </>
+            ) : null}
+            {workflows.has(file.path) ? (
+              <>
+                {' · '}
+                <WorkflowLink id={id} path={file.path} />
               </>
             ) : null}
           </li>

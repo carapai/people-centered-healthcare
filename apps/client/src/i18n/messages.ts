@@ -2168,3 +2168,196 @@ export const terminologyMessages = defineMessages<TerminologyValues>({
   tbReload: { id: 'app.studio.terminology.reload', defaultMessage: 'Reload', description: 'Studio: reload after a refused save' },
   tbSaveFailed: { id: 'app.studio.terminology.saveFailed', defaultMessage: 'The ValueSet was not saved: {reason}', description: 'Studio: save failed' },
 })
+
+type WorkflowValues = {
+  wsOpen: { path: string }
+  wsOpenShort: {}
+  wsHeading: { title: string }
+  wsLoading: {}
+  wsRefused: { refusal: string }
+  wsFile: { path: string; url: string; version: string }
+  wsProblems: { count: number }
+  wsProblemsHint: {}
+  wsPNoId: {}
+  wsPDuplicate: { id: string }
+  wsPChildren: { id: string }
+  wsPInitial: { id: string }
+  wsPTarget: { source: string; target: string }
+  wsPStart: { target: string }
+  wsPUnreachable: { id: string }
+  wsPDeadEnd: { id: string }
+  wsPTask: { id: string }
+  wsPGate: { id: string }
+  wsPAssignment: { field: string }
+  wsPTable: { id: string }
+  wsStates: {}
+  wsAddState: {}
+  wsAddInside: { id: string }
+  wsExit: { target: string; on: string }
+  wsEventless: {}
+  wsAfter: { after: string }
+  wsCanvasHeading: {}
+  wsCanvas: {}
+  wsCanvasHint: {}
+  wsNodeTask: { role: string; worklist: string }
+  wsNodeGate: {}
+  wsNodeInvoke: {}
+  wsNodeParallel: {}
+  wsNodeCompound: {}
+  wsNodeFinal: {}
+  wsNodeLabel: { id: string; kind: string }
+  wsEdgeLabel: { source: string; target: string; on: string }
+  wsInspect: {}
+  wsChoose: {}
+  wsStateHeading: { id: string }
+  wsId: {}
+  wsIdFixed: {}
+  wsIdUsed: {}
+  wsIdEmpty: {}
+  wsKind: {}
+  wsKindName: { kind: string }
+  wsParent: {}
+  wsTopLevel: {}
+  wsInitial: {}
+  wsActivity: {}
+  wsActivityName: { activity: string }
+  wsRole: {}
+  wsWorklist: {}
+  wsForm: {}
+  wsPriority: {}
+  wsClaimTimeout: {}
+  wsGate: {}
+  wsGateHint: {}
+  wsInvoke: {}
+  wsEntry: {}
+  wsExits: {}
+  wsNone: {}
+  wsAddTransition: {}
+  wsTarget: {}
+  wsRemoveState: { id: string }
+  wsTransitionHeading: { source: string; target: string }
+  wsSource: {}
+  wsTrigger: {}
+  wsTriggerName: { trigger: string }
+  wsEvents: {}
+  wsDuration: {}
+  wsTimerHint: {}
+  wsGuard: {}
+  wsGuardName: { guard: string }
+  wsExpression: {}
+  wsMayRead: {}
+  wsMayReadNone: {}
+  wsCompetitors: {}
+  wsCompetitor: { n: number; target: string; guard: string }
+  wsThis: { n: number }
+  wsEarlier: {}
+  wsLater: {}
+  wsActions: {}
+  wsRemoveTransition: {}
+  wsActionKind: { kind: string }
+  wsActionEvent: { n: number }
+  wsActionField: { n: number }
+  wsActionValue: { n: number }
+  wsActionTyped: { n: number; action: string; params: string }
+  wsTypedLater: {}
+  wsAddRaise: {}
+  wsAddAssign: {}
+  wsRemoveAction: { n: number }
+}
+
+// The Workflow Studio (features/studio/workflows, #498).
+export const workflowMessages = defineMessages<WorkflowValues>({
+  wsOpen: { id: 'app.studio.workflow.open', defaultMessage: '{path} in the Workflow Studio', description: 'Workflow Studio: link from a Workflow Definition to the Workflow Studio' },
+  wsOpenShort: { id: 'app.studio.workflow.openShort', defaultMessage: 'Workflow Studio', description: 'Workflow Studio: visible text of the link to the Workflow Studio' },
+  wsHeading: { id: 'app.studio.workflow.heading', defaultMessage: 'Workflow Studio: {title}', description: 'Workflow Studio: heading' },
+  wsLoading: { id: 'app.studio.workflow.loading', defaultMessage: 'Loading the workflow…', description: 'Workflow Studio: loading' },
+  wsRefused: { id: 'app.studio.workflow.refused', defaultMessage: '{refusal, select, not-json {This file is not JSON. Open it as JSON instead.} not-workflow {This file is not a Workflow Definition. Open it as JSON instead.} not-inline {Its definition is not inline application/vnd.health.workflow+json content. Open it as JSON instead.} other {Its definition could not be read. Open it as JSON instead.}}', description: 'Workflow Studio: the file cannot be opened' },
+  wsFile: { id: 'app.studio.workflow.file', defaultMessage: '{path} · {url}|{version}', description: 'Workflow Studio: the file and the canonical of the definition' },
+  wsProblems: { id: 'app.studio.workflow.problems', defaultMessage: '{count, plural, =0 {No publication problems found while editing} one {# publication problem} other {# publication problems}}', description: 'Workflow Studio: publication checks heading' },
+  wsProblemsHint: { id: 'app.studio.workflow.problemsHint', defaultMessage: 'Rerun on every edit; each problem selects what it is about. Check now on the package page remains the authority: it also checks the typed actions and runs the scenarios.', description: 'Workflow Studio: publication checks hint' },
+  wsPNoId: { id: 'app.studio.workflow.pNoId', defaultMessage: 'A state has no id', description: 'Workflow Studio: problem' },
+  wsPDuplicate: { id: 'app.studio.workflow.pDuplicate', defaultMessage: 'Two states share the id “{id}”', description: 'Workflow Studio: problem' },
+  wsPChildren: { id: 'app.studio.workflow.pChildren', defaultMessage: '“{id}” is a compound or parallel state with no state inside, or holds states its kind cannot', description: 'Workflow Studio: problem' },
+  wsPInitial: { id: 'app.studio.workflow.pInitial', defaultMessage: 'The state “{id}” starts in is not inside it', description: 'Workflow Studio: problem' },
+  wsPTarget: { id: 'app.studio.workflow.pTarget', defaultMessage: 'A transition from “{source}” goes to “{target}”, which is not a state', description: 'Workflow Studio: problem' },
+  wsPStart: { id: 'app.studio.workflow.pStart', defaultMessage: 'The workflow starts in “{target}”, which is not a state', description: 'Workflow Studio: problem' },
+  wsPUnreachable: { id: 'app.studio.workflow.pUnreachable', defaultMessage: '“{id}” cannot be reached', description: 'Workflow Studio: problem' },
+  wsPDeadEnd: { id: 'app.studio.workflow.pDeadEnd', defaultMessage: '“{id}” has no way out', description: 'Workflow Studio: problem' },
+  wsPTask: { id: 'app.studio.workflow.pTask', defaultMessage: 'The human task of “{id}” needs an atomic state, a role, a worklist and a form as url|version', description: 'Workflow Studio: problem' },
+  wsPGate: { id: 'app.studio.workflow.pGate', defaultMessage: 'The gate “{id}” must be atomic, name its gate, have the cashier’s task and move on at gate.pass and gate.defer', description: 'Workflow Studio: problem' },
+  wsPAssignment: { id: 'app.studio.workflow.pAssignment', defaultMessage: 'An action sets “{field}”, which the data model does not declare with that kind', description: 'Workflow Studio: problem' },
+  wsPTable: { id: 'app.studio.workflow.pTable', defaultMessage: 'The decision table “{id}” is not well formed', description: 'Workflow Studio: problem' },
+  wsStates: { id: 'app.studio.workflow.states', defaultMessage: 'States', description: 'Workflow Studio: outline heading' },
+  wsAddState: { id: 'app.studio.workflow.addState', defaultMessage: 'Add a state', description: 'Workflow Studio: add a top-level state' },
+  wsAddInside: { id: 'app.studio.workflow.addInside', defaultMessage: 'Add a state inside {id}', description: 'Workflow Studio: add a state inside a group' },
+  wsExit: { id: 'app.studio.workflow.exit', defaultMessage: '→ {target} on {on}', description: 'Workflow Studio: an exit in the outline' },
+  wsEventless: { id: 'app.studio.workflow.eventless', defaultMessage: 'no event', description: 'Workflow Studio: an eventless transition' },
+  wsAfter: { id: 'app.studio.workflow.after', defaultMessage: 'timer after {after}', description: 'Workflow Studio: a timer transition' },
+  wsCanvasHeading: { id: 'app.studio.workflow.canvasHeading', defaultMessage: 'Canvas', description: 'Workflow Studio: canvas heading' },
+  wsCanvas: { id: 'app.studio.workflow.canvas', defaultMessage: 'Statechart', description: 'Workflow Studio: canvas accessible name' },
+  wsCanvasHint: { id: 'app.studio.workflow.canvasHint', defaultMessage: 'Drag from a state’s right edge to another state to add a transition, or add one from the inspector.', description: 'Workflow Studio: canvas hint' },
+  wsNodeTask: { id: 'app.studio.workflow.nodeTask', defaultMessage: 'Task · {role} · {worklist}', description: 'Workflow Studio: canvas node detail' },
+  wsNodeGate: { id: 'app.studio.workflow.nodeGate', defaultMessage: 'Payment gate', description: 'Workflow Studio: canvas node detail' },
+  wsNodeInvoke: { id: 'app.studio.workflow.nodeInvoke', defaultMessage: 'Sub-workflow', description: 'Workflow Studio: canvas node detail' },
+  wsNodeParallel: { id: 'app.studio.workflow.nodeParallel', defaultMessage: 'parallel: every region at once', description: 'Workflow Studio: canvas node detail' },
+  wsNodeCompound: { id: 'app.studio.workflow.nodeCompound', defaultMessage: 'compound', description: 'Workflow Studio: canvas node detail' },
+  wsNodeFinal: { id: 'app.studio.workflow.nodeFinal', defaultMessage: 'final', description: 'Workflow Studio: canvas node detail' },
+  wsNodeLabel: { id: 'app.studio.workflow.nodeLabel', defaultMessage: '{kind} state {id}', description: 'Workflow Studio: canvas node accessible name' },
+  wsEdgeLabel: { id: 'app.studio.workflow.edgeLabel', defaultMessage: 'Transition from {source} to {target} on {on}', description: 'Workflow Studio: canvas edge accessible name' },
+  wsInspect: { id: 'app.studio.workflow.inspect', defaultMessage: 'Inspect', description: 'Workflow Studio: inspector heading' },
+  wsChoose: { id: 'app.studio.workflow.choose', defaultMessage: 'Select a state or a transition in the outline or on the canvas.', description: 'Workflow Studio: nothing selected' },
+  wsStateHeading: { id: 'app.studio.workflow.stateHeading', defaultMessage: 'State {id}', description: 'Workflow Studio: inspector: a state' },
+  wsId: { id: 'app.studio.workflow.id', defaultMessage: 'Id', description: 'Workflow Studio: field' },
+  wsIdFixed: { id: 'app.studio.workflow.idFixed', defaultMessage: 'Fixed: the published version has this state, and running instances and migration maps refer to it.', description: 'Workflow Studio: hint' },
+  wsIdUsed: { id: 'app.studio.workflow.idUsed', defaultMessage: 'Another state has this id.', description: 'Workflow Studio: error' },
+  wsIdEmpty: { id: 'app.studio.workflow.idEmpty', defaultMessage: 'A state needs an id.', description: 'Workflow Studio: error' },
+  wsKind: { id: 'app.studio.workflow.kind', defaultMessage: 'Kind', description: 'Workflow Studio: field' },
+  wsKindName: { id: 'app.studio.workflow.kindName', defaultMessage: '{kind, select, atomic {Atomic} compound {Compound: one state inside at a time} parallel {Parallel: every state inside at once} final {Final} other {{kind}}}', description: 'Workflow Studio: a state kind' },
+  wsParent: { id: 'app.studio.workflow.parent', defaultMessage: 'Inside', description: 'Workflow Studio: field' },
+  wsTopLevel: { id: 'app.studio.workflow.topLevel', defaultMessage: 'The workflow itself (top level)', description: 'Workflow Studio: option' },
+  wsInitial: { id: 'app.studio.workflow.initial', defaultMessage: 'Starts in', description: 'Workflow Studio: field' },
+  wsActivity: { id: 'app.studio.workflow.activity', defaultMessage: 'What happens there', description: 'Workflow Studio: field' },
+  wsActivityName: { id: 'app.studio.workflow.activityName', defaultMessage: '{activity, select, wait {Wait for an event} task {A human task} gate {A payment gate} invoke {A sub-workflow} other {{activity}}}', description: 'Workflow Studio: an activity' },
+  wsRole: { id: 'app.studio.workflow.role', defaultMessage: 'Role', description: 'Workflow Studio: field' },
+  wsWorklist: { id: 'app.studio.workflow.worklist', defaultMessage: 'Worklist', description: 'Workflow Studio: field' },
+  wsForm: { id: 'app.studio.workflow.form', defaultMessage: 'Form (Questionnaire url|version)', description: 'Workflow Studio: field' },
+  wsPriority: { id: 'app.studio.workflow.priority', defaultMessage: 'Priority', description: 'Workflow Studio: field' },
+  wsClaimTimeout: { id: 'app.studio.workflow.claimTimeout', defaultMessage: 'Claim timeout (ISO 8601 duration, e.g. PT15M)', description: 'Workflow Studio: field' },
+  wsGate: { id: 'app.studio.workflow.gate', defaultMessage: 'Financial Gate configuration (canonical URL)', description: 'Workflow Studio: field' },
+  wsGateHint: { id: 'app.studio.workflow.gateHint', defaultMessage: 'Finance answers gate.pass, gate.defer or gate.block; while it blocks, the task is the cashier’s.', description: 'Workflow Studio: hint' },
+  wsInvoke: { id: 'app.studio.workflow.invoke', defaultMessage: 'Sub-workflow (url|version)', description: 'Workflow Studio: field' },
+  wsEntry: { id: 'app.studio.workflow.entry', defaultMessage: 'Entry actions', description: 'Workflow Studio: legend' },
+  wsExits: { id: 'app.studio.workflow.exits', defaultMessage: 'Transitions out, in document order', description: 'Workflow Studio: legend' },
+  wsNone: { id: 'app.studio.workflow.none', defaultMessage: 'None.', description: 'Workflow Studio: empty list' },
+  wsAddTransition: { id: 'app.studio.workflow.addTransition', defaultMessage: 'Add a transition', description: 'Workflow Studio: button' },
+  wsTarget: { id: 'app.studio.workflow.target', defaultMessage: 'To', description: 'Workflow Studio: field' },
+  wsRemoveState: { id: 'app.studio.workflow.removeState', defaultMessage: 'Remove state {id}', description: 'Workflow Studio: button' },
+  wsTransitionHeading: { id: 'app.studio.workflow.transitionHeading', defaultMessage: 'Transition from {source} to {target}', description: 'Workflow Studio: inspector: a transition' },
+  wsSource: { id: 'app.studio.workflow.source', defaultMessage: 'From', description: 'Workflow Studio: field' },
+  wsTrigger: { id: 'app.studio.workflow.trigger', defaultMessage: 'Triggered by', description: 'Workflow Studio: field' },
+  wsTriggerName: { id: 'app.studio.workflow.triggerName', defaultMessage: '{trigger, select, event {An event} timer {A timer} eventless {Nothing (eventless)} other {{trigger}}}', description: 'Workflow Studio: a trigger' },
+  wsEvents: { id: 'app.studio.workflow.events', defaultMessage: 'Events (comma separated)', description: 'Workflow Studio: field' },
+  wsDuration: { id: 'app.studio.workflow.duration', defaultMessage: 'After (ISO 8601 duration, e.g. PT1H)', description: 'Workflow Studio: field' },
+  wsTimerHint: { id: 'app.studio.workflow.timerHint', defaultMessage: 'A timer runs as the workflow principal.', description: 'Workflow Studio: hint' },
+  wsGuard: { id: 'app.studio.workflow.guard', defaultMessage: 'Guard', description: 'Workflow Studio: field' },
+  wsGuardName: { id: 'app.studio.workflow.guardName', defaultMessage: '{guard, select, always {Always} fhirpath {A FHIRPath expression} other {{guard}}}', description: 'Workflow Studio: a guard kind' },
+  wsExpression: { id: 'app.studio.workflow.expression', defaultMessage: 'FHIRPath expression', description: 'Workflow Studio: field' },
+  wsMayRead: { id: 'app.studio.workflow.mayRead', defaultMessage: 'It may read', description: 'Workflow Studio: the declared data a guard may read' },
+  wsMayReadNone: { id: 'app.studio.workflow.mayReadNone', defaultMessage: 'Nothing is declared yet.', description: 'Workflow Studio: no declared data' },
+  wsCompetitors: { id: 'app.studio.workflow.competitors', defaultMessage: 'Other transitions on the same event, in document order: the first whose guard holds is taken', description: 'Workflow Studio: legend' },
+  wsCompetitor: { id: 'app.studio.workflow.competitor', defaultMessage: '{n}. → {target} {guard}', description: 'Workflow Studio: a competing transition' },
+  wsThis: { id: 'app.studio.workflow.this', defaultMessage: '{n}. this transition', description: 'Workflow Studio: this transition among its competitors' },
+  wsEarlier: { id: 'app.studio.workflow.earlier', defaultMessage: 'Move earlier', description: 'Workflow Studio: button' },
+  wsLater: { id: 'app.studio.workflow.later', defaultMessage: 'Move later', description: 'Workflow Studio: button' },
+  wsActions: { id: 'app.studio.workflow.actions', defaultMessage: 'Actions', description: 'Workflow Studio: legend' },
+  wsRemoveTransition: { id: 'app.studio.workflow.removeTransition', defaultMessage: 'Remove this transition', description: 'Workflow Studio: button' },
+  wsActionKind: { id: 'app.studio.workflow.actionKind', defaultMessage: '{kind, select, raise {Raise an event} assign {Set a field} execute {Typed action} other {{kind}}}', description: 'Workflow Studio: an action kind' },
+  wsActionEvent: { id: 'app.studio.workflow.actionEvent', defaultMessage: 'Event of action {n}', description: 'Workflow Studio: field' },
+  wsActionField: { id: 'app.studio.workflow.actionField', defaultMessage: 'Field of action {n}', description: 'Workflow Studio: field' },
+  wsActionValue: { id: 'app.studio.workflow.actionValue', defaultMessage: 'Value of action {n}', description: 'Workflow Studio: field' },
+  wsActionTyped: { id: 'app.studio.workflow.actionTyped', defaultMessage: 'Action {n}: {action} {params}', description: 'Workflow Studio: a typed action, read only' },
+  wsTypedLater: { id: 'app.studio.workflow.typedLater', defaultMessage: 'Typed actions are kept as read here; picking them from the registered list comes next.', description: 'Workflow Studio: hint' },
+  wsAddRaise: { id: 'app.studio.workflow.addRaise', defaultMessage: 'Add: raise an event', description: 'Workflow Studio: button' },
+  wsAddAssign: { id: 'app.studio.workflow.addAssign', defaultMessage: 'Add: set a field', description: 'Workflow Studio: button' },
+  wsRemoveAction: { id: 'app.studio.workflow.removeAction', defaultMessage: 'Remove action {n}', description: 'Workflow Studio: button' },
+})
