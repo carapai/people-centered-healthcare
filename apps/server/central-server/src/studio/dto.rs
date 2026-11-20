@@ -89,6 +89,7 @@ pub(crate) enum StudioPackageKind {
     Program,
     CountryConfiguration,
     Override,
+    Language,
 }
 
 impl From<PackageKind> for StudioPackageKind {
@@ -99,6 +100,7 @@ impl From<PackageKind> for StudioPackageKind {
             PackageKind::Program => Self::Program,
             PackageKind::CountryConfiguration => Self::CountryConfiguration,
             PackageKind::Override => Self::Override,
+            PackageKind::Language => Self::Language,
         }
     }
 }

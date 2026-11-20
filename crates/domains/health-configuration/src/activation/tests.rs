@@ -69,6 +69,7 @@ fn package(name: &str, version: &str, dependencies: &[(&str, &str)]) -> PackageJ
             min_software: "0.3.0".into(),
             format_version: 1,
         },
+        translates: None,
     }
 }
 

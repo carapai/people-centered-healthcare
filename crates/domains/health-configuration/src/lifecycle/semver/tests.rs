@@ -27,6 +27,7 @@ fn release(at: &str) -> Release {
             ("configuration/layout.json".into(), "c1".into()),
             ("tests/visit.json".into(), "t1".into()),
         ]),
+        translations: None,
     }
 }
 
@@ -229,6 +230,7 @@ fn a_release_is_read_from_package_contents() {
                 min_software: "1.0.0".into(),
                 format_version: 1,
             },
+            translates: None,
         },
         manifest: Some(vec![]),
         artefacts: vec![
@@ -319,5 +321,80 @@ fn an_artefacts_own_bump_is_checked_against_its_content() {
     assert_eq!(
         check(&latest, &next, &content).expect("minor").required,
         Bump::Minor
+    );
+}
+
+fn pack(at: &str, major: u64, entries: &[(&str, &str)]) -> Release {
+    use crate::language::{Key, TRANSLATIONS, Translations};
+    let release = Release {
+        version: version(at),
+        kind: PackageKind::Language,
+        dependencies: BTreeMap::new(),
+        artefacts: BTreeMap::new(),
+        files: BTreeMap::from([(TRANSLATIONS.into(), format!("{entries:?}"))]),
+        translations: None,
+    };
+    let entries = entries
+        .iter()
+        .map(|(code, text)| {
+            let key = Key::Concept {
+                system: "http://health.go.ug/fhir/CodeSystem/anc".into(),
+                code: (*code).into(),
+            };
+            (key, (*text).to_owned())
+        })
+        .collect();
+    release.with_translations(Translations { major, entries })
+}
+
+#[test]
+fn a_language_pack_takes_semver_of_its_own() {
+    let before = pack("1.0.0", 2, &[("visit", "Okukyala"), ("danger", "Akabi")]);
+    // A changed wording is at least a patch, not the minor a changed configuration file needs.
+    let reworded = pack("1.0.1", 2, &[("visit", "Okukyalako"), ("danger", "Akabi")]);
+    let diff = check(&before, &reworded, &BTreeMap::new()).expect("a patch");
+    assert_eq!(diff.required, Bump::Patch);
+    // A new translation is a minor.
+    let added = [
+        ("visit", "Okukyala"),
+        ("danger", "Akabi"),
+        ("fever", "Omusujja"),
+    ];
+    assert!(matches!(
+        check(&before, &pack("1.0.1", 2, &added), &BTreeMap::new())
+            .err()
+            .as_deref(),
+        Some([BumpProblem::Understated {
+            required: Bump::Minor,
+            ..
+        }])
+    ));
+    check(&before, &pack("1.1.0", 2, &added), &BTreeMap::new()).expect("a minor");
+    // A dropped translation is a minor too.
+    let dropped = check(
+        &before,
+        &pack("1.1.0", 2, &[("visit", "Okukyala")]),
+        &BTreeMap::new(),
+    )
+    .expect("a minor");
+    assert_eq!(dropped.required, Bump::Minor);
+    // Targeting the next major version of the package is a major.
+    let moved = pack("1.1.0", 3, &[("visit", "Okukyala"), ("danger", "Akabi")]);
+    assert!(matches!(
+        check(&before, &moved, &BTreeMap::new()).err().as_deref(),
+        Some([BumpProblem::Understated {
+            required: Bump::Major,
+            ..
+        }])
+    ));
+    let diff = check(
+        &before,
+        &pack("2.0.0", 3, &[("visit", "Okukyala"), ("danger", "Akabi")]),
+        &BTreeMap::new(),
+    )
+    .expect("a major");
+    assert_eq!(
+        diff.changes,
+        [(Change::TargetMajor { from: 2, to: 3 }, Bump::Major)]
     );
 }

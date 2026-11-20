@@ -18,8 +18,8 @@ export interface FormLayout {
   version: string
   /** The Questionnaire it lays out, `url|version`. */
   questionnaire: string
-  /** Titled sections of top-level linkIds, in order. */
-  sections: { title: string; items: string[] }[]
+  /** Titled sections of top-level linkIds, in order; an `id` lets a Language Pack translate the title. */
+  sections: { id?: string; title: string; items: string[] }[]
   /** Per question, by linkId. */
   items?: Record<string, { widget?: Widget; hint?: string }>
 }

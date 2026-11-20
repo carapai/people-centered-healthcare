@@ -29,6 +29,11 @@
 //!   It is kept once and logged for every node below, and audited. Rollback is another
 //!   activation, of an earlier version.
 //!
+//! - [`Publications::translation_report`] checks a Language Pack against the latest published
+//!   version of its target (ADR 0066; #502): which entries are current, stale or gone.
+//!   Validation refuses a pack whose target has no published version in the major it targets,
+//!   and the semver check compares its translations (`health_configuration::language`).
+//!
 //! - [`studio`] is what the Studio shows of it (#492): the package list, one package read from
 //!   top to bottom, and the actions the signed-in person may take, each refused one with why.
 //!
@@ -39,6 +44,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use health_configuration::activation::{Activation, ActivationRecord, Scope};
+use health_configuration::language::{Report, Translates, Translations};
 use health_configuration::lifecycle::semver::{self, BumpProblem, ContentChange, Release};
 use health_configuration::lifecycle::{Lifecycle, Record, Refused, Stage, Step};
 use health_configuration::package::{PackageKind, Version};
@@ -154,6 +160,34 @@ fn fingerprints(files: &Files) -> BTreeMap<String, String> {
         .iter()
         .map(|(path, bytes)| (path.clone(), hex(&sha2::Sha256::digest(bytes))))
         .collect()
+}
+
+/// What the semver check compares of `packed`: a Language Pack's translations in place of its
+/// entries file. `None` for an inexact version, already a publication problem.
+fn release(packed: &Packed) -> Option<Release> {
+    let release = Release::of(&packed.contents, &fingerprints(&packed.files)).ok()?;
+    let package = &packed.contents.package;
+    let major = package.translates.as_ref().and_then(Translates::major);
+    Some(match (package.kind, major) {
+        (PackageKind::Language, Some(major)) => {
+            let entries = health_packages::language::translations(&packed.files)
+                .ok()
+                .flatten()
+                .map(|read| read.entries)
+                .unwrap_or_default();
+            release.with_translations(Translations::of(major, &entries))
+        }
+        _ => release,
+    })
+}
+
+/// A Language Pack checked against its target (ADR 0066).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TranslationReport {
+    /// The target version checked against, `name@version`.
+    pub target: String,
+    /// Which entries are current, stale or gone.
+    pub report: Report,
 }
 
 /// One problem per line, with an understated artefact's changes under it.
@@ -378,6 +412,16 @@ impl Publications {
         problems.extend(workflows::problems(packed, &self.actions));
         problems.extend(extraction::problems(packed).await);
         problems.extend(programs::problems(packed));
+        if packed.contents.package.kind == PackageKind::Language
+            && let Some(translates) = &packed.contents.package.translates
+            && translates.major().is_some()
+            && self.target(tx, translates).await?.is_none()
+        {
+            problems.push(format!(
+                "no version of {}@{} is published for the pack to translate",
+                translates.package, translates.version
+            ));
+        }
         let name = &packed.contents.package.name;
         let latest = self
             .published(tx, name)
@@ -388,10 +432,7 @@ impl Publications {
             return Ok(problems);
         };
         let before = self.packed(&latest.digest).await?;
-        let (Ok(old), Ok(new)) = (
-            Release::of(&before.contents, &fingerprints(&before.files)),
-            Release::of(&packed.contents, &fingerprints(&packed.files)),
-        ) else {
+        let (Some(old), Some(new)) = (release(&before), release(packed)) else {
             // An inexact version is already a publication problem.
             return Ok(problems);
         };
@@ -662,6 +703,65 @@ impl Publications {
             .iter()
             .map(|json| serde_json::from_str(json).map_err(failed))
             .collect()
+    }
+
+    /// The latest published version of the package `translates` names, in the major version it
+    /// targets.
+    async fn target(
+        &self,
+        tx: &mut SurrealTx,
+        translates: &Translates,
+    ) -> Result<Option<PublishedPackage>, Error> {
+        let Some(major) = translates.major() else {
+            return Ok(None);
+        };
+        Ok(self
+            .published(tx, &translates.package)
+            .await?
+            .into_iter()
+            .filter(|published| published.version.major == major)
+            .max_by(|a, b| a.version.cmp(&b.version)))
+    }
+
+    /// Language Pack `id`, a draft or a published version, checked against the latest published
+    /// version of its target in the major version it targets, and the published packages that
+    /// version depends on (ADR 0066): which entries are current, which stale (their English
+    /// changed, so English is served and the Studio lists them for re-translation), and which
+    /// gone (their target no longer exists).
+    pub async fn translation_report(&self, id: &str) -> Result<TranslationReport, Error> {
+        let mut tx = self.begin().await?;
+        let (lifecycle, _) = self.load(&mut tx, id).await?;
+        let pack = self.packed(&lifecycle.content).await?;
+        let translates = match (
+            &pack.contents.package.kind,
+            &pack.contents.package.translates,
+        ) {
+            (PackageKind::Language, Some(translates)) => translates.clone(),
+            _ => return Err(Error::Conflict(format!("{id} is not a language pack"))),
+        };
+        let target = self.target(&mut tx, &translates).await?.ok_or_else(|| {
+            Error::NotFound(format!(
+                "no version of {}@{} is published",
+                translates.package, translates.version
+            ))
+        })?;
+        let mut packages = vec![self.packed(&target.digest).await?];
+        let dependencies = packages[0].contents.package.dependencies.clone();
+        for (name, version) in dependencies {
+            if let Some(json) = tx
+                .published_package(&format!("{name}@{version}"))
+                .await
+                .map_err(failed)?
+            {
+                let published: PublishedPackage = serde_json::from_str(&json).map_err(failed)?;
+                packages.push(self.packed(&published.digest).await?);
+            }
+        }
+        let files: Vec<&Files> = packages.iter().map(|packed| &packed.files).collect();
+        Ok(TranslationReport {
+            target: target.id,
+            report: health_packages::language::report(&pack, &files)?,
+        })
     }
 
     /// Published package `id`, with its tarball.

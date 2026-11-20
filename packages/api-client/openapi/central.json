@@ -831,7 +831,8 @@
           "terminology",
           "program",
           "country-configuration",
-          "override"
+          "override",
+          "language"
         ]
       },
       "StudioPackageList": {

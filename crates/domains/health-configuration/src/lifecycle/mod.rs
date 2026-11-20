@@ -16,7 +16,9 @@
 //! - **Separation of duties:**
 //!   - no author reviews or approves;
 //!   - clinical content (national core, terminology, program packages) needs two distinct
-//!     approvers, and configuration (country configuration, overrides) needs one.
+//!     approvers, and configuration (country configuration, overrides) needs one;
+//!   - a Language Pack needs one, by someone who never held its draft, who states in the
+//!     discussion that they read the language (ADR 0066).
 //! - **Publication** needs every approval, and the fingerprint of what was signed must be the one
 //!   approved. A published version is immutable: nothing further happens to it here. Activation
 //!   is a separate, scoped record (#89).
@@ -68,7 +70,7 @@ impl fmt::Display for Stage {
 pub fn approvals_required(kind: PackageKind) -> usize {
     match kind {
         PackageKind::NationalCore | PackageKind::Terminology | PackageKind::Program => 2,
-        PackageKind::CountryConfiguration | PackageKind::Override => 1,
+        PackageKind::CountryConfiguration | PackageKind::Override | PackageKind::Language => 1,
     }
 }
 

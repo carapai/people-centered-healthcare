@@ -12,6 +12,14 @@
 //! | A `configuration/` file is removed | major |
 //! | A `tests/` file is added, changed or removed | patch |
 //!
+//! A Language Pack (ADR 0066) compares its translations instead of its entries file:
+//!
+//! | Change | Bump at least |
+//! |---|---|
+//! | A translation changes | patch |
+//! | A translation is added or dropped | minor |
+//! | The pack targets another major version | major |
+//!
 //! Each artefact's own bump is checked too, against the [`ContentChange`]s found in its content
 //! (`health-packages`' `bump` module reads the JSON): a removed item is major, a new optional
 //! one minor, a display text a patch.
@@ -32,6 +40,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::language::{Key, TRANSLATIONS, Translations};
 use crate::package::{
     INDEX, MANIFEST, NotExact, PACKAGE_JSON, PackageContents, PackageKind, Version,
 };
@@ -129,6 +138,8 @@ pub struct Release {
     /// Every other file's fingerprint, by path, without `package.json`, `.index.json` or the
     /// manifest, which are generated.
     pub files: BTreeMap<String, String>,
+    /// A Language Pack's translations, compared in place of its entries file.
+    pub translations: Option<Translations>,
 }
 
 impl Release {
@@ -171,7 +182,16 @@ impl Release {
             dependencies: contents.package.dependencies.clone(),
             artefacts,
             files,
+            translations: None,
         })
+    }
+
+    /// With a Language Pack's `translations`, compared in place of its entries file.
+    #[must_use]
+    pub fn with_translations(mut self, translations: Translations) -> Self {
+        self.files.remove(TRANSLATIONS);
+        self.translations = Some(translations);
+        self
     }
 }
 
@@ -238,6 +258,28 @@ pub enum Change {
     FileChanged {
         /// Its path.
         path: String,
+    },
+    /// A Language Pack targets another major version.
+    TargetMajor {
+        /// The major version before.
+        from: u64,
+        /// The major version after.
+        to: u64,
+    },
+    /// A translation was added.
+    TranslationAdded {
+        /// What it translates.
+        key: Key,
+    },
+    /// A translation was dropped.
+    TranslationRemoved {
+        /// What it translated.
+        key: Key,
+    },
+    /// A translation changed.
+    TranslationChanged {
+        /// What it translates.
+        key: Key,
     },
 }
 
@@ -402,6 +444,34 @@ fn own_bump(
     }
 }
 
+/// A Language Pack's changes: a new target major is major, an added or dropped translation
+/// minor, a changed one a patch (a new wording may be released as a minor; a typo fix is a patch).
+fn translation_changes(
+    before: &Translations,
+    after: &Translations,
+    changes: &mut Vec<(Change, Bump)>,
+) {
+    if before.major != after.major {
+        let change = Change::TargetMajor {
+            from: before.major,
+            to: after.major,
+        };
+        changes.push((change, Bump::Major));
+    }
+    for (key, text) in &before.entries {
+        match after.entries.get(key) {
+            None => changes.push((Change::TranslationRemoved { key: key.clone() }, Bump::Minor)),
+            Some(now) if now == text => {}
+            Some(_) => changes.push((Change::TranslationChanged { key: key.clone() }, Bump::Patch)),
+        }
+    }
+    for key in after.entries.keys() {
+        if !before.entries.contains_key(key) {
+            changes.push((Change::TranslationAdded { key: key.clone() }, Bump::Minor));
+        }
+    }
+}
+
 /// Compares `next` with `latest`, the latest version published under the same name. `content`
 /// holds what changed in each artefact's content, by canonical URL, for the artefacts that took a
 /// new version.
@@ -507,6 +577,10 @@ pub fn check(
                 file_bump(path, false),
             ));
         }
+    }
+
+    if let (Some(before), Some(after)) = (&latest.translations, &next.translations) {
+        translation_changes(before, after, &mut changes);
     }
 
     let required = needed(
