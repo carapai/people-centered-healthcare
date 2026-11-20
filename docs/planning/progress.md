@@ -9,7 +9,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 3 — Identity, security and Client Registry](https://github.com/carapai/people-centered-healthcare/milestone/3) | 24 | 26 |
 | [Phase 4 — Facility Edge Node foundation](https://github.com/carapai/people-centered-healthcare/milestone/4) | 8 | 8 |
 | [Phase 5 — Synchronization foundation](https://github.com/carapai/people-centered-healthcare/milestone/5) | 8 | 8 |
-| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 12 | 12 |
+| [Phase 6 — Terminology and metadata](https://github.com/carapai/people-centered-healthcare/milestone/6) | 13 | 13 |
 | [Phase 7 — Universal workflow engine](https://github.com/carapai/people-centered-healthcare/milestone/7) | 6 | 7 |
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 5 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 4 | 4 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 1 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 119 of 137 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
+Total: 120 of 138 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
 
 ## Log
 
@@ -1554,3 +1554,4 @@ Total: 119 of 137 implementation tasks done (counted from the GitHub milestones)
 - 2026-11-19: #492 the Studio's package list and read-only draft page: `health-publication::studio` derives each package's allowed actions from `Lifecycle::check` (the rule every transition now calls) and the `metadata.*` permissions; `/api/studio` at central only (`central-server`'s `studio` module, in the OpenAPI document); the client's `/studio` and `/studio/$id`, shown only where `capabilities.studio` (central).
 - 2026-11-20: #502 Language Packs: package kind `language` with one approval, `translates` naming the target package's major version and the language, entries keyed by stable address in `configuration/translations.json` (schema `language-pack/1`), and `Publications::translation_report` listing each entry as current, stale or gone against the latest published target; the pack's own semver compares its translations.
 - 2026-11-20: #507 override points: a base package declares them in `configuration/override-points.json` (schema `override-points/1`), each with a type, default, allowed values (list or range) and class; an override package (no dependencies, nothing but `configuration/overrides.json`, schema `overrides/1`) is validated against the latest published version of each base it names; `Publications::activate` refuses a base version that orphans or out-ranges an override in effect in an overlapping scope, and a node refuses to switch to one (`health-activation`).
+- 2026-11-20: #520 package Validation checks each profile's snapshot against its differential (`health_fhir_validation::check_snapshot`, called by `health-packages`' publication rules and node verification): every differential element must be in the snapshot with the same `min`, `max`, types and target profiles, `fixed[x]`/`pattern[x]`, binding, slicing and invariants, or the package is not publishable, naming the element and the constraint; a differential-only profile is refused. The core package, the official R5 profiles and our fixtures pass unchanged.

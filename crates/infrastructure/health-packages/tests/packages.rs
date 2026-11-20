@@ -461,3 +461,54 @@ fn the_release_reads_form_layouts() {
         Err(Error::Configuration { .. })
     ));
 }
+
+/// `files()` with the `ug-address` profile, its snapshot edited by `edit`.
+fn with_profile(edit: impl FnOnce(&mut serde_json::Value)) -> Files {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../contracts/health-fhir-validation/tests/fixtures/custom-profiles/ug-address.json",
+    );
+    let mut profile: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path).expect("read")).expect("profile");
+    profile["version"] = "1.4.0".into();
+    edit(&mut profile);
+    let mut files = files();
+    files.insert(
+        "StructureDefinition-ug-address.json".into(),
+        profile.to_string().into_bytes(),
+    );
+    files
+}
+
+#[test]
+fn a_snapshot_that_drops_a_differential_constraint_is_not_published() {
+    let pki = pki();
+    publish(&with_profile(|_| {}), &schemas(), &pki.signer, at(SIGNED))
+        .expect("a generated snapshot publishes");
+
+    let stale = with_profile(|profile| {
+        for element in profile["snapshot"]["element"]
+            .as_array_mut()
+            .expect("snapshot")
+        {
+            if element["id"] == "Address.district" {
+                element["min"] = 0.into();
+            }
+        }
+    });
+    assert_eq!(
+        publish(&stale, &schemas(), &pki.signer, at(SIGNED)),
+        Err(Error::NotPublishable(vec![Problem::Snapshot {
+            profile: "StructureDefinition-ug-address.json".into(),
+            detail: "Address.district: the snapshot's min is not the differential's".into(),
+        }]))
+    );
+
+    let differential_only = with_profile(|profile| {
+        profile.as_object_mut().expect("profile").remove("snapshot");
+    });
+    assert!(matches!(
+        publish(&differential_only, &schemas(), &pki.signer, at(SIGNED)),
+        Err(Error::NotPublishable(problems))
+            if matches!(problems.as_slice(), [Problem::Snapshot { .. }])
+    ));
+}

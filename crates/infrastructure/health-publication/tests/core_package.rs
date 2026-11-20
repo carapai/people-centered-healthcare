@@ -1,12 +1,13 @@
 //! The platform core package (#87; ADR 0049) publishes through the lifecycle (#88): the
 //! committed `packages/fhir-core-package/package/` is drafted, passes validation, is reviewed and
 //! approved by two people as national core content, and is signed into a package that verifies
-//! under the root as a node checks it.
+//! under the root as a node checks it. Its snapshots pass the snapshot check unchanged, and one
+//! edited to drop a differential's `min = 1` fails validation naming the element (#520).
 
 use std::path::Path;
 use std::sync::Arc;
 
-use health_configuration::lifecycle::Stage;
+use health_configuration::lifecycle::{Stage, Step};
 use health_files::FsBlobStore;
 use health_packages::{Digest, Limits, Schemas, verify};
 use health_pki::{Authority, Trust, new_key, request};
@@ -116,4 +117,60 @@ async fn the_core_package_publishes_through_the_lifecycle() {
         .filter(|artefact| artefact.resource_type == "StructureDefinition")
         .count();
     assert_eq!(profiles, 33);
+}
+
+#[tokio::test]
+async fn a_core_profile_whose_snapshot_drops_a_min_fails_validation() {
+    let connection = Connection::open(&Settings {
+        target: Target::Memory,
+        namespace: "central".into(),
+        database: "main".into(),
+    })
+    .await
+    .expect("open");
+    migrate(&connection, MIGRATIONS).await.expect("migrate");
+    let clock = Arc::new(FixedClock::new(at("2026-11-04T09:00:00Z")));
+    let dir = tempfile::tempdir().expect("tempdir");
+    let publications = Publications::new(
+        SurrealStore::new(connection, clock.clone()),
+        FsBlobStore::open(dir.path()).expect("blobs"),
+        clock,
+        Schemas::platform(),
+        Arc::new(NoSandbox),
+        "central",
+    );
+
+    let mut files = core_package();
+    let path = "StructureDefinition-episode-program.json";
+    let mut profile: serde_json::Value = serde_json::from_slice(&files[path]).expect("profile");
+    for element in profile["snapshot"]["element"]
+        .as_array_mut()
+        .expect("snapshot")
+    {
+        if element["id"] == "Extension.value[x]" {
+            element["min"] = 0.into();
+        }
+    }
+    files.insert(path.into(), profile.to_string().into_bytes());
+
+    let draft = publications
+        .draft(&files, "platform-author")
+        .await
+        .expect("draft");
+    let id = format!("{}@{}", draft.package, draft.version);
+    let submitted = publications
+        .submit(&id, "platform-author")
+        .await
+        .expect("submit");
+    assert_eq!(submitted.stage, Stage::Draft);
+    let (_, records) = publications.lifecycle(&id).await.expect("records");
+    let Some(Step::ValidationFailed { problems }) = records.last().map(|r| &r.step) else {
+        panic!("validation failed: {records:?}");
+    };
+    assert!(
+        problems.iter().any(|p| p.contains(&format!(
+            "{path}: Extension.value[x]: the snapshot's min is not the differential's"
+        ))),
+        "{problems:?}"
+    );
 }

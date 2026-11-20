@@ -18,6 +18,9 @@
 //! - [`overrides`] reads a base package's override points and an override package's settings,
 //!   and checks the settings against a base's declarations (ADR 0026, ADR 0067; #507).
 //!
+//! - Publication and [`verify`] check each profile's snapshot against its differential
+//!   (`health_fhir_validation::check_snapshot`; ADR 0053; #520).
+//!
 //! - [`release`] reads a platform release's signed artifacts at central, and checks one before a
 //!   node stages it (#136).
 //!
@@ -219,8 +222,8 @@ pub fn check(packed: &Packed, schemas: &Schemas) -> Result<(), Error> {
     schemas.check(&packed.files)
 }
 
-/// Refuses a package that breaks a publication rule, a Language Pack's entries and override
-/// points or settings among them.
+/// Refuses a package that breaks a publication rule, a Language Pack's entries, override
+/// points or settings, and profile snapshots among them.
 fn rules(contents: &PackageContents, files: &Files) -> Result<(), Error> {
     let mut problems = contents.problems_for_publication();
     problems.extend(
@@ -229,11 +232,41 @@ fn rules(contents: &PackageContents, files: &Files) -> Result<(), Error> {
             .map(Problem::Pack),
     );
     problems.extend(overrides::problems(contents, files)?);
+    problems.extend(snapshot_problems(contents, files)?);
     if problems.is_empty() {
         Ok(())
     } else {
         Err(Error::NotPublishable(problems))
     }
+}
+
+/// Each StructureDefinition whose snapshot does not carry its differential, or that has a
+/// differential and no snapshot (ADR 0053; #520): a stale or hand-edited snapshot is not
+/// published, and nothing generates one.
+fn snapshot_problems(contents: &PackageContents, files: &Files) -> Result<Vec<Problem>, Error> {
+    let mut problems = Vec::new();
+    for artefact in &contents.artefacts {
+        if artefact.resource_type != "StructureDefinition" {
+            continue;
+        }
+        let Some(bytes) = files.get(&artefact.path) else {
+            continue;
+        };
+        let definition: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|e| Error::Json {
+                path: artefact.path.clone(),
+                detail: e.to_string(),
+            })?;
+        problems.extend(
+            health_fhir_validation::check_snapshot(&definition)
+                .into_iter()
+                .map(|problem| Problem::Snapshot {
+                    profile: artefact.path.clone(),
+                    detail: problem.to_string(),
+                }),
+        );
+    }
+    Ok(problems)
 }
 
 /// Signs `packed` with `signer` at `at`, after checking it again.

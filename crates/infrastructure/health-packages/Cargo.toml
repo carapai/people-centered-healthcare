@@ -16,6 +16,7 @@ workspace = true
 base64 = { workspace = true }
 flate2 = { workspace = true }
 health-configuration = { workspace = true }
+health-fhir-validation = { workspace = true }
 health-pki = { workspace = true }
 health-terminology = { workspace = true }
 health-time = { workspace = true }
