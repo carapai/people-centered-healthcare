@@ -9,6 +9,8 @@
 //! - [`activation`]: scoped activation on nodes: the activation record, the active set merged
 //!   along a node's scope chain, the checks before a switch, the switch itself (whole or not at
 //!   all) and the versions a node retains.
+//! - [`language`]: Language Packs (ADR 0066): what a pack translates, its entries keyed by a
+//!   stable address with the English each translates, and which are stale or gone.
 //! - [`rollout`]: staged software roll-out: which platform release each node may install, set
 //!   by scope like activations, with the release's artifacts and their digests and signatures.
 //!
@@ -16,6 +18,7 @@
 //! sees a package's parsed contents only.
 
 pub mod activation;
+pub mod language;
 pub mod lifecycle;
 pub mod package;
 pub mod rollout;

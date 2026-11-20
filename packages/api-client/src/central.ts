@@ -168,7 +168,7 @@ export const StudioHistoryEntry = z.object({
 export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 
 /** The kind of package, which decides its approvers. */
-export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override"])
+export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
 export type StudioPackageKind = z.infer<typeof StudioPackageKind>
 
 /** One row of the package list. */

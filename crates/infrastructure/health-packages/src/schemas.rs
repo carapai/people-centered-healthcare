@@ -22,6 +22,12 @@ pub const FORM_LAYOUT: &str =
 
 const FORM_LAYOUT_SCHEMA: &str = include_str!("../schemas/form-layout-1.json");
 
+/// The `$schema` of a Language Pack's entries (ADR 0066; `health_configuration::language`).
+pub const LANGUAGE_PACK: &str =
+    "https://carapai.github.io/people-centered-healthcare/fhir/schema/language-pack/1";
+
+const LANGUAGE_PACK_SCHEMA: &str = include_str!("../schemas/language-pack-1.json");
+
 /// The configuration schemas a software release reads, by `$schema` URI.
 #[derive(Default)]
 pub struct Schemas {
@@ -40,11 +46,15 @@ pub const FORMAT_VERSIONS: &[u32] = &[1];
 
 impl Schemas {
     /// The schemas built into this release, each arriving with the feature that reads its
-    /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]). Configuration naming any other schema
+    /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]) and Language Pack entries (#502,
+    /// [`LANGUAGE_PACK`]). Configuration naming any other schema
     /// (override points, settings) is refused until its feature arrives.
     pub fn platform() -> Self {
         let mut schemas = Self::default();
-        for (uri, text) in [(FORM_LAYOUT, FORM_LAYOUT_SCHEMA)] {
+        for (uri, text) in [
+            (FORM_LAYOUT, FORM_LAYOUT_SCHEMA),
+            (LANGUAGE_PACK, LANGUAGE_PACK_SCHEMA),
+        ] {
             // Built into the release and checked by its tests, so it always compiles.
             if let Ok(schema) = serde_json::from_str::<Value>(text)
                 && let Ok(validator) = jsonschema::validator_for(&schema)

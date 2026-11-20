@@ -46,6 +46,13 @@ ug.moh.anc-1.4.0.tgz.sig        detached signature (publication-signing certific
 - **Identity.** A package is identified by `name@version` and its sha-256.
 - **Transport.** Packages travel as blobs through the content-addressed store (ADR 0021).
 - **Pinned dependencies.** Authors write semver ranges. Publication resolves them and pins exact versions in `package.json` and the manifest.
+- **Language Packs in code (#502):**
+  - `package.json` names the target as `translates: { package, version: "2.x", language }`. The pack is named `<package>.<language>` and has no dependencies (`health_configuration::language`).
+  - Its entries are in `configuration/translations.json` (schema `language-pack/1`), each with a `key`, the `english` it translates and its `text`. A Form Layout section is translatable once it has an `id`.
+  - Validation refuses a pack whose target has no published version in that major.
+  - `Publications::translation_report` checks a pack against the latest published target in its major, and lists each entry as current, stale or gone.
+  - The semver check compares translations: a changed one is a patch, an added or dropped one a minor, and a new target major a major.
+  - Not yet: the merge when served, and the Studio's translation editor.
 - **Configuration schemas** (decided in #86):
   - Every `configuration/` file is JSON, and names its schema with a top-level `$schema` URI.
   - The schemas belong to the software release, as format versions do, never to the package.

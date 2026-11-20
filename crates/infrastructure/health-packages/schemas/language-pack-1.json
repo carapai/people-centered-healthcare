@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/language-pack/1",
+  "title": "Language Pack entries",
+  "description": "One language's wording for another package's forms and code lists (ADR 0066): each entry is keyed by a stable address and records the English it translates.",
+  "type": "object",
+  "required": ["$schema", "language", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/language-pack/1" },
+    "language": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "english", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["kind", "questionnaire", "linkId", "part"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "item" },
+                  "questionnaire": { "type": "string", "minLength": 1 },
+                  "linkId": { "type": "string", "minLength": 1 },
+                  "part": { "enum": ["text", "prefix", "help"] }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["kind", "questionnaire", "linkId", "code"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "answer" },
+                  "questionnaire": { "type": "string", "minLength": 1 },
+                  "linkId": { "type": "string", "minLength": 1 },
+                  "code": { "type": "string", "minLength": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["kind", "layout", "section"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "section" },
+                  "layout": { "type": "string", "minLength": 1 },
+                  "section": { "type": "string", "minLength": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["kind", "system", "code"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "concept" },
+                  "system": { "type": "string", "minLength": 1 },
+                  "code": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          },
+          "english": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

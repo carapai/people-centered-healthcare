@@ -22,6 +22,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::language::{self, PackProblem, Translates};
+
 pub use version::{NotExact, Version};
 
 /// The FHIR version every package is for.
@@ -39,7 +41,7 @@ pub const MANIFEST: &str = "Library-manifest.json";
 /// The FHIR NPM index's path, under [`ROOT`].
 pub const INDEX: &str = ".index.json";
 
-/// The five kinds of package (configuration.md), each with its own approvers.
+/// The kinds of package (configuration.md), each with its own approvers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PackageKind {
@@ -53,6 +55,8 @@ pub enum PackageKind {
     CountryConfiguration,
     /// District or facility configuration at declared override points.
     Override,
+    /// One language's wording for another package's forms and code lists (ADR 0066).
+    Language,
 }
 
 /// What software a package needs (configuration.md § Distribution and activation on nodes).
@@ -82,6 +86,9 @@ pub struct PackageJson {
     pub kind: PackageKind,
     /// What software it needs.
     pub platform: Platform,
+    /// What a Language Pack translates; nothing for any other kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub translates: Option<Translates>,
 }
 
 /// A canonical reference, `url|version`.
@@ -187,6 +194,9 @@ pub enum Problem {
     /// A file outside the package layout.
     #[error("{0} is outside the package layout")]
     Misplaced(String),
+    /// A Language Pack's target, or `translates` on another kind (ADR 0066).
+    #[error("{0}")]
+    Pack(PackProblem),
 }
 
 /// Lower-case letters, digits, `.`, `-` and `_`, starting with a letter or digit.
@@ -243,6 +253,16 @@ impl PackageContents {
                 });
             }
         }
+        problems.extend(
+            language::target_problems(
+                &package.name,
+                package.kind,
+                !package.dependencies.is_empty(),
+                package.translates.as_ref(),
+            )
+            .into_iter()
+            .map(Problem::Pack),
+        );
         match &self.manifest {
             None => problems.push(Problem::NoManifest),
             Some(canonicals) => {
@@ -289,6 +309,7 @@ mod tests {
                     min_software: "0.3.0".into(),
                     format_version: 1,
                 },
+                translates: None,
             },
             manifest: Some(vec![Canonical::parse(
                 "http://health.go.ug/fhir/ValueSet/anc-visit|2.1.0",
@@ -411,6 +432,50 @@ mod tests {
         assert_eq!(
             serde_json::to_value(PackageKind::CountryConfiguration).ok(),
             Some(serde_json::json!("country-configuration"))
+        );
+    }
+
+    #[test]
+    fn a_language_pack_names_what_it_translates() {
+        use crate::language::{PackProblem, Translates};
+        let mut pack = contents();
+        pack.package.name = "ug.moh.anc.lg".into();
+        pack.package.kind = PackageKind::Language;
+        pack.package.dependencies.clear();
+        pack.package.translates = Some(Translates {
+            package: "ug.moh.anc".into(),
+            version: "2.x".into(),
+            language: "lg".into(),
+        });
+        pack.artefacts.clear();
+        pack.paths = vec![
+            PACKAGE_JSON.into(),
+            MANIFEST.into(),
+            INDEX.into(),
+            crate::language::TRANSLATIONS.into(),
+        ];
+        assert_eq!(pack.problems_for_publication(), []);
+        let json = serde_json::to_value(&pack.package).expect("json");
+        assert_eq!(json["kind"], "language");
+        assert_eq!(
+            json["translates"],
+            serde_json::json!({ "package": "ug.moh.anc", "version": "2.x", "language": "lg" })
+        );
+        pack.package.translates = None;
+        assert_eq!(
+            pack.problems_for_publication(),
+            [Problem::Pack(PackProblem::NoTarget)]
+        );
+        // Another kind never says it translates.
+        let mut program = contents();
+        program.package.translates = Some(Translates {
+            package: "ug.moh.core".into(),
+            version: "2.x".into(),
+            language: "lg".into(),
+        });
+        assert_eq!(
+            program.problems_for_publication(),
+            [Problem::Pack(PackProblem::NotAPack)]
         );
     }
 }

@@ -1,12 +1,12 @@
 # Current state
 
-Last updated: 2026-11-19.
+Last updated: 2026-11-20.
 
 ## Phase
 
-Phase 0 (research and Wayfinder) is complete. Implementation is well past half way: 117 of 137 tasks are done, including every task of Phases 2, 4, 5, 6, 8, 9 and 13 is done, and the counts per phase are in [progress](progress.md). Each task gets its own PR against `main`.
+Phase 0 (research and Wayfinder) is complete. Implementation is well past half way: 118 of 137 tasks are done, including every task of Phases 2, 4, 5, 6, 8, 9 and 13 is done, and the counts per phase are in [progress](progress.md). Each task gets its own PR against `main`.
 
-The Studio (Phase 11) has started: the package list and the read-only draft page (#492) are built at central, with each package's allowed actions derived on the server from the lifecycle's rules. Editing, starting drafts, the Draft Holder, *Check now* and comments come with the following Studio tasks.
+The Studio (Phase 11) has started: the package list and the read-only draft page (#492) are built at central, with each package's allowed actions derived on the server from the lifecycle's rules. Editing, starting drafts, the Draft Holder, *Check now* and comments come with the following Studio tasks. Language Packs (#502) are a package kind with one approval: their entries record the English they translate, and central reports which are stale or gone against the target; the merge when served and the translation editor come later.
 
 What is left needs a person, hardware, a decision, or a feature not yet built:
 

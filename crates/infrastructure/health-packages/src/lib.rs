@@ -12,6 +12,9 @@
 //!   a USB stick: it checks the sha-256 the activation names, the signature against the national
 //!   root, the archive's safety, the index, and the publication rules and schemas again.
 //!
+//! - [`language`] reads a Language Pack's entries and reports which are stale or gone against
+//!   its target's English (ADR 0066; #502).
+//!
 //! - [`release`] reads a platform release's signed artifacts at central, and checks one before a
 //!   node stages it (#136).
 //!
@@ -20,6 +23,7 @@
 mod archive;
 pub mod bump;
 mod contents;
+pub mod language;
 pub mod release;
 mod schemas;
 mod signature;
@@ -33,7 +37,7 @@ use health_time::Timestamp;
 use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
-pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, Schemas};
+pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, LANGUAGE_PACK, Schemas};
 pub use signature::{
     LocalSigner, PublicationSigner, SEED_TYP, TYP, sign_detached, verify_detached,
 };
@@ -207,11 +211,23 @@ pub fn unpack(tgz: &[u8], limits: Limits) -> Result<Packed, Error> {
 /// Refuses `packed` if any publication rule fails, or any `configuration/` file does not
 /// validate against `schemas`.
 pub fn check(packed: &Packed, schemas: &Schemas) -> Result<(), Error> {
-    let problems = packed.contents.problems_for_publication();
-    if !problems.is_empty() {
-        return Err(Error::NotPublishable(problems));
-    }
+    rules(&packed.contents, &packed.files)?;
     schemas.check(&packed.files)
+}
+
+/// Refuses a package that breaks a publication rule, a Language Pack's entries among them.
+fn rules(contents: &PackageContents, files: &Files) -> Result<(), Error> {
+    let mut problems = contents.problems_for_publication();
+    problems.extend(
+        language::problems(contents, files)?
+            .into_iter()
+            .map(Problem::Pack),
+    );
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::NotPublishable(problems))
+    }
 }
 
 /// Signs `packed` with `signer` at `at`, after checking it again.
@@ -287,10 +303,7 @@ pub fn verify(
         return Err(Error::Index);
     }
     let contents = contents::read(&files)?;
-    let problems = contents.problems_for_publication();
-    if !problems.is_empty() {
-        return Err(Error::NotPublishable(problems));
-    }
+    rules(&contents, &files)?;
     schemas.check(&files)?;
     Ok(Verified {
         contents,
