@@ -488,7 +488,7 @@ pub struct PackagePage {
     pub reviewer: Option<String>,
     /// Who has approved it.
     pub approvers: Vec<String>,
-    /// Its history, oldest first.
+    /// Its one discussion, oldest first: the history, with the comments among it (#496).
     pub history: Vec<Record>,
     /// Its revision: a save names it, and is refused once another came first.
     pub revision: u64,
@@ -498,6 +498,8 @@ pub struct PackagePage {
     pub files: Vec<PackageFile>,
     /// Its holder's change note for the whole draft.
     pub note: Option<String>,
+    /// Why no one may comment on it any more; `None` while its discussion is open (#496).
+    pub comment: Option<Refusal>,
 }
 
 /// The latest stored result of each check in `history`.
@@ -785,6 +787,7 @@ impl Publications {
             edit: edit_refusal(&lifecycle, by, has),
             files: files(&packed),
             note: lifecycle.note.clone(),
+            comment: crate::discussion::comment_refusal(&lifecycle),
         })
     }
 }

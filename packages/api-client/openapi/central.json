@@ -263,6 +263,117 @@
         }
       }
     },
+    "/api/studio/packages/{id}/comments": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and adds a comment to a draft's discussion.",
+        "description": "Adds a comment to the draft's one discussion, where it joins the history the lifecycle writes. It may name one of the draft's artefacts by its path. Only the text and the artefact come from the request: the entry, who wrote it and when are the server's, and the audit keeps it. It moves nothing and changes no revision. Anyone with a Studio permission may comment until the draft is published or withdrawn; no comment is ever removed.",
+        "operationId": "commentStudioPackage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioCommentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Added; the page",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's revision, unchanged"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Blank, or the draft is published or withdrawn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`about` is not one of the draft's artefacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/decision-tables/check": {
       "post": {
         "tags": [
@@ -2329,6 +2440,26 @@
           }
         }
       },
+      "StudioCommentInput": {
+        "type": "object",
+        "description": "A comment for a draft's discussion. Only these come from the client: the entry, who wrote\nit, when, and the stage are the server's.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "about": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The path of the draft's artefact it is about, e.g. `Questionnaire-anc-visit.json`."
+          },
+          "text": {
+            "type": "string",
+            "description": "What it says."
+          }
+        }
+      },
       "StudioCompensation": {
         "type": "object",
         "description": "How a completed action is undone when its scope is cancelled or fails.",
@@ -2923,7 +3054,7 @@
       },
       "StudioHistoryEntry": {
         "type": "object",
-        "description": "One entry of the discussion: a lifecycle record.",
+        "description": "One entry of the discussion: a lifecycle record, or a comment (#496).",
         "required": [
           "step",
           "by",
@@ -2932,6 +3063,13 @@
           "problems"
         ],
         "properties": {
+          "about": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The path of the artefact a comment is about, if it names one."
+          },
           "at": {
             "type": "string",
             "description": "When (RFC 3339)."
@@ -2975,6 +3113,13 @@
           "step": {
             "$ref": "#/components/schemas/StudioHistoryStep",
             "description": "What happened."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What a comment says."
           }
         }
       },
@@ -2999,7 +3144,8 @@
           "handover-declined",
           "handed-over",
           "reassigned",
-          "withdrawn"
+          "withdrawn",
+          "commented"
         ]
       },
       "StudioNewDraft": {
@@ -3271,7 +3417,8 @@
           "history",
           "revision",
           "editable",
-          "files"
+          "files",
+          "commentable"
         ],
         "properties": {
           "approvalsRequired": {
@@ -3300,6 +3447,21 @@
               "$ref": "#/components/schemas/StudioCheckResult"
             },
             "description": "The stored check results."
+          },
+          "commentRefusal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActionRefusal",
+                "description": "Why not, when they may not: the draft was published or withdrawn."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "commentable": {
+            "type": "boolean",
+            "description": "Whether the signed-in person may comment in the discussion."
           },
           "editRefusal": {
             "oneOf": [

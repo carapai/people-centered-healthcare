@@ -1578,6 +1578,15 @@ type StudioValues = {
   sdApprovers: { approvers: string }
   sdDiscussion: {}
   sdHistoryEntry: { step: string; by: string; at: string }
+  sdCommented: { by: string; at: string }
+  sdCommentAbout: {}
+  sdCommentLabel: {}
+  sdCommentAboutLabel: {}
+  sdCommentAboutNone: {}
+  sdCommentPost: {}
+  sdCommentPosted: {}
+  sdCommentFailed: { reason: string }
+  sdCommentClosed: { reason: string }
   sdReason: {}
   sdScope: {}
   sdScopeHint: {}
@@ -1833,6 +1842,15 @@ export const studioMessages = defineMessages<StudioValues>({
   sdApprovers: { id: 'app.studio.approvers', defaultMessage: 'Approved by {approvers}', description: 'Studio: who approved' },
   sdDiscussion: { id: 'app.studio.discussion', defaultMessage: 'Discussion', description: 'Studio draft page section' },
   sdHistoryEntry: { id: 'app.studio.historyEntry', defaultMessage: '{step} by {by}, {at}', description: 'Studio: one history entry' },
+  sdCommented: { id: 'app.studio.commented', defaultMessage: '{by} commented, {at}', description: 'Studio: a comment in the discussion' },
+  sdCommentAbout: { id: 'app.studio.commentAbout', defaultMessage: 'About', description: 'Studio: before the artefact a comment names' },
+  sdCommentLabel: { id: 'app.studio.commentLabel', defaultMessage: 'Comment', description: 'Studio: the new comment field' },
+  sdCommentAboutLabel: { id: 'app.studio.commentAboutLabel', defaultMessage: 'About which artefact', description: 'Studio: which artefact a new comment is about' },
+  sdCommentAboutNone: { id: 'app.studio.commentAboutNone', defaultMessage: 'The whole draft', description: 'Studio: a comment about no one artefact' },
+  sdCommentPost: { id: 'app.studio.commentPost', defaultMessage: 'Add the comment', description: 'Studio: action' },
+  sdCommentPosted: { id: 'app.studio.commentPosted', defaultMessage: 'Your comment is in the discussion.', description: 'Studio: a comment was added' },
+  sdCommentFailed: { id: 'app.studio.commentFailed', defaultMessage: 'The comment was not added. {reason}', description: 'Studio: a comment was refused' },
+  sdCommentClosed: { id: 'app.studio.commentClosed', defaultMessage: 'The discussion is closed. {reason}', description: 'Studio: no more comments on a published or withdrawn draft' },
   sdReason: { id: 'app.studio.reason', defaultMessage: 'Reason: what needs to change, or why the draft is reassigned', description: 'Studio: request changes or reassign reason field' },
   sdScope: { id: 'app.studio.scope', defaultMessage: 'Activate in', description: 'Studio: activation scope field' },
   sdScopeHint: { id: 'app.studio.scopeHint', defaultMessage: 'national, district:<code>, facility:<code> or program:<facility>:<program>', description: 'Studio: how to write a scope' },

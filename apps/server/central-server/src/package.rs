@@ -187,6 +187,12 @@ fn record_line(record: &Record) -> String {
             );
         }
         Step::Withdrawn => ("withdrawn", &[]),
+        Step::Commented { text, about } => {
+            return match about {
+                Some(path) => format!("  {} {} on {path}: {text}", record.at, record.by),
+                None => format!("  {} {}: {text}", record.at, record.by),
+            };
+        }
         Step::VersionChanged { previous } => {
             return format!(
                 "  {} {} version {previous} → {}",

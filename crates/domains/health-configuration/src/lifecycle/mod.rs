@@ -19,6 +19,9 @@
 //!   - Withdrawal keeps the draft and its history, and ends it: its `name@version` may be
 //!     drafted again.
 //!
+//!   - The draft has one discussion: its records, and the comments anyone in the Studio adds
+//!     ([`Lifecycle::comment`]), which move nothing. Records are only ever appended.
+//!
 //!   Until submission a draft may change version, and *Check now* records the checks' latest
 //!   results without moving it.
 //! - **Content is pinned.** Submitting fixes the content's fingerprint (the sha-256 of its files).
@@ -173,6 +176,15 @@ pub enum Step {
     },
     /// The holder withdrew it before publication.
     Withdrawn,
+    /// Someone commented in the draft's discussion (studio.md § The authoring API, Discussion;
+    /// #496). It moves nothing: the record keeps the stage it was at.
+    Commented {
+        /// What they wrote.
+        text: String,
+        /// The path of the artefact it is about, if it names one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        about: Option<String>,
+    },
 }
 
 /// One transition, as the configuration context keeps and audits it.
@@ -583,6 +595,43 @@ impl Lifecycle {
             step: Step::Checked {
                 validation,
                 simulation,
+            },
+            from: self.stage,
+            to: self.stage,
+            by: by.to_owned(),
+            at: now,
+            content: self.content.clone(),
+        })
+    }
+
+    /// `by` comments `text` in the draft's one discussion, naming the artefact at path `about`
+    /// if they like. Anyone may, the authors too, until the draft is published or withdrawn.
+    /// The draft stays where it is, with its review and approvals: the record is the history's,
+    /// written here, never by a client. Whether `about` is one of the draft's files is the
+    /// caller's to check.
+    pub fn comment(
+        &self,
+        by: &str,
+        text: &str,
+        about: Option<&str>,
+        now: Timestamp,
+    ) -> Result<Record, Refused> {
+        if matches!(self.stage, Stage::Published | Stage::Withdrawn) {
+            return Err(Refused::Stage(self.stage));
+        }
+        if blank(by) || blank(text) {
+            return Err(Refused::Incomplete);
+        }
+        let about = about
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .map(str::to_owned);
+        Ok(Record {
+            package: self.package.clone(),
+            version: self.version.clone(),
+            step: Step::Commented {
+                text: text.trim().to_owned(),
+                about,
             },
             from: self.stage,
             to: self.stage,

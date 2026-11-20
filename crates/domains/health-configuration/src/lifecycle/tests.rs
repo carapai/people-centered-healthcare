@@ -555,3 +555,73 @@ fn the_holder_keeps_one_change_note_on_a_draft() {
         Err(Refused::Stage(Stage::Validation))
     );
 }
+
+// One discussion per draft (#496): anyone in the Studio comments, naming the artefact if they
+// like; the comment is a record like the history's, and moves nothing.
+#[test]
+fn a_comment_joins_the_history_without_moving_the_draft() {
+    let mut lifecycle = draft(PackageKind::Program);
+    let record = lifecycle
+        .comment(
+            "rita",
+            "  Should BP be required?  ",
+            Some("Questionnaire-anc-visit.json"),
+            now(),
+        )
+        .expect("commented");
+    assert_eq!(
+        record.step,
+        Step::Commented {
+            text: "Should BP be required?".into(),
+            about: Some("Questionnaire-anc-visit.json".into()),
+        }
+    );
+    assert_eq!((record.from, record.to), (Stage::Draft, Stage::Draft));
+    assert_eq!(
+        (record.by.as_str(), record.content.as_str()),
+        ("rita", "sha-a")
+    );
+    let json = serde_json::to_value(&record).expect("json");
+    assert_eq!(json["step"], "commented");
+    assert_eq!(json["about"], "Questionnaire-anc-visit.json");
+    let back: Record = serde_json::from_value(json).expect("read back");
+    assert_eq!(back, record);
+
+    // A comment on no artefact; a blank one, or by no one, is refused.
+    let general = lifecycle
+        .comment("ann", "Ready soon", Some("  "), now())
+        .expect("commented");
+    assert_eq!(
+        general.step,
+        Step::Commented {
+            text: "Ready soon".into(),
+            about: None
+        }
+    );
+    assert_eq!(
+        lifecycle.comment("ann", "   ", None, now()),
+        Err(Refused::Incomplete)
+    );
+    assert_eq!(
+        lifecycle.comment(" ", "hello", None, now()),
+        Err(Refused::Incomplete)
+    );
+
+    // In approval a comment keeps the review and the approvals.
+    to_approval(&mut lifecycle, "rita");
+    lifecycle.approve("bob", now()).expect("approved");
+    let record = lifecycle
+        .comment("bob", "I read the Luganda", None, now())
+        .expect("commented");
+    assert_eq!((record.from, record.to), (Stage::Approval, Stage::Approval));
+    assert_eq!(lifecycle.stage, Stage::Approval);
+    assert_eq!(lifecycle.reviewer.as_deref(), Some("rita"));
+    assert_eq!(lifecycle.approvers.len(), 1);
+
+    // Once the draft has ended, its discussion is closed.
+    lifecycle.withdraw("ann", now()).expect("withdrawn");
+    assert_eq!(
+        lifecycle.comment("bob", "too late", None, now()),
+        Err(Refused::Stage(Stage::Withdrawn))
+    );
+}

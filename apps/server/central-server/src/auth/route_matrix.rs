@@ -361,6 +361,7 @@ const INVENTORY: &[Mounted] = &[
             "/packages/{id}/files/{*path}",
             "/packages/{id}/version",
             "/packages/{id}/note",
+            "/packages/{id}/comments",
             "/packages/{id}/terminology/code-systems",
             "/packages/{id}/terminology/concepts",
             "/packages/{id}/terminology/concept",

@@ -23,7 +23,7 @@ export class StudioError extends Error {
 
 export const studioKey = ['studio', 'packages'] as const
 
-type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'setStudioNote' | 'startStudioDraft'
+type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'setStudioNote' | 'startStudioDraft' | 'commentStudioPackage'
 
 /** `body` checked against `operation`'s documented response for `status`; a refusal throws. */
 async function parsed<T>(operation: Operation, status: number, body: unknown): Promise<T> {
@@ -106,6 +106,13 @@ export async function setVersion(transport: Transport, id: string, version: stri
 export async function setNote(transport: Transport, id: string, note: string, revision: number): Promise<StudioPackagePage> {
   const response = await transport.request({ method: 'PUT', path: `${packagePath(id)}/note`, headers: ifMatch(revision), body: { note } })
   return parsed<StudioPackagePage>('setStudioNote', response.status, response.body)
+}
+
+/** Adds a comment to the draft's one discussion, naming the artefact at path `about` if it is
+ * about one (#496). The server writes the entry; it answers the page with it. */
+export async function addComment(transport: Transport, id: string, text: string, about?: string): Promise<StudioPackagePage> {
+  const response = await transport.request({ method: 'POST', path: `${packagePath(id)}/comments`, body: { text, ...(about === undefined || about === '' ? {} : { about }) } })
+  return parsed<StudioPackagePage>('commentStudioPackage', response.status, response.body)
 }
 
 /** Starts a draft: a copy of a published version (`copyOf`), or a blank new package. */

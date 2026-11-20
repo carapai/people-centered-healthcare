@@ -26,6 +26,12 @@
 //!   gives the draft another version. Each change must send `If-Match` with the revision it
 //!   read: one that is missing or stale is refused with 412, and nothing is kept.
 //!
+//! The discussion (#496): `POST /packages/{id}/comments` adds a comment, which may name one of
+//! the draft's artefacts by its path, to the draft's one thread. Anyone the Studio lets in may
+//! comment until the draft is published or withdrawn. The client sends only the text and the
+//! artefact: the lifecycle writes the record, as it writes every history entry, and the audit
+//! keeps it. Nothing removes one.
+//!
 //! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]).
 //!
 //! The Workflow Studio (#498) reads the release's typed actions from `GET /workflow-actions`
@@ -92,6 +98,7 @@ pub(crate) fn router(
         )
         .route("/packages/{id}/version", put(set_version))
         .route("/packages/{id}/note", put(set_note))
+        .route("/packages/{id}/comments", post(comment))
         .route(
             "/packages/{id}/terminology/code-systems",
             get(terminology::code_systems),
@@ -509,6 +516,40 @@ pub(crate) async fn set_note(
     match studio
         .publications
         .set_note(&id, input.note, &subject.account, expected)
+        .await
+    {
+        Ok(_) => answer(&studio, &subject, &id, StatusCode::OK).await,
+        Err(error) => failure(&error),
+    }
+}
+
+/// Documents and adds a comment to a draft's discussion.
+#[utoipa::path(post, path = "/api/studio/packages/{id}/comments", tag = "studio", operation_id = "commentStudioPackage",
+    description = "Adds a comment to the draft's one discussion, where it joins the history the lifecycle writes. It may name one of the draft's artefacts by its path. Only the text and the artefact come from the request: the entry, who wrote it and when are the server's, and the audit keeps it. It moves nothing and changes no revision. Anyone with a Studio permission may comment until the draft is published or withdrawn; no comment is ever removed.",
+    params(("id" = String, Path, description = "`name@version`")),
+    request_body = StudioCommentInput,
+    responses(
+        (status = 200, description = "Added; the page", body = StudioPackagePage, headers(("ETag" = String, description = "The draft's revision, unchanged"))),
+        (status = 401, description = "Not signed in", body = StudioProblem),
+        (status = 403, description = "No Studio permission", body = StudioProblem),
+        (status = 404, description = "No such package version", body = StudioProblem),
+        (status = 409, description = "Blank, or the draft is published or withdrawn", body = StudioProblem),
+        (status = 422, description = "`about` is not one of the draft's artefacts", body = StudioProblem),
+        (status = 500, description = "The package store failed", body = StudioProblem),
+    ))]
+pub(crate) async fn comment(
+    State(studio): State<Studio>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    Json(input): Json<StudioCommentInput>,
+) -> Response {
+    let subject = match author(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    match studio
+        .publications
+        .comment(&id, &subject.account, &input.text, input.about.as_deref())
         .await
     {
         Ok(_) => answer(&studio, &subject, &id, StatusCode::OK).await,
