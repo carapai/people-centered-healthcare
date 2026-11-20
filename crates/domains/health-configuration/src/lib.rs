@@ -11,6 +11,9 @@
 //!   all) and the versions a node retains.
 //! - [`language`]: Language Packs (ADR 0066): what a pack translates, its entries keyed by a
 //!   stable address with the English each translates, and which are stale or gone.
+//! - [`overrides`]: override points (ADR 0026, ADR 0067): what a base package lets a district or
+//!   facility change, in which class, within which values, and the override packages that set
+//!   them.
 //! - [`rollout`]: staged software roll-out: which platform release each node may install, set
 //!   by scope like activations, with the release's artifacts and their digests and signatures.
 //!
@@ -20,5 +23,6 @@
 pub mod activation;
 pub mod language;
 pub mod lifecycle;
+pub mod overrides;
 pub mod package;
 pub mod rollout;

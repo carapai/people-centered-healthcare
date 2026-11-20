@@ -15,6 +15,9 @@
 //! - [`language`] reads a Language Pack's entries and reports which are stale or gone against
 //!   its target's English (ADR 0066; #502).
 //!
+//! - [`overrides`] reads a base package's override points and an override package's settings,
+//!   and checks the settings against a base's declarations (ADR 0026, ADR 0067; #507).
+//!
 //! - [`release`] reads a platform release's signed artifacts at central, and checks one before a
 //!   node stages it (#136).
 //!
@@ -24,6 +27,7 @@ mod archive;
 pub mod bump;
 mod contents;
 pub mod language;
+pub mod overrides;
 pub mod release;
 mod schemas;
 mod signature;
@@ -215,7 +219,8 @@ pub fn check(packed: &Packed, schemas: &Schemas) -> Result<(), Error> {
     schemas.check(&packed.files)
 }
 
-/// Refuses a package that breaks a publication rule, a Language Pack's entries among them.
+/// Refuses a package that breaks a publication rule, a Language Pack's entries and override
+/// points or settings among them.
 fn rules(contents: &PackageContents, files: &Files) -> Result<(), Error> {
     let mut problems = contents.problems_for_publication();
     problems.extend(
@@ -223,6 +228,7 @@ fn rules(contents: &PackageContents, files: &Files) -> Result<(), Error> {
             .into_iter()
             .map(Problem::Pack),
     );
+    problems.extend(overrides::problems(contents, files)?);
     if problems.is_empty() {
         Ok(())
     } else {

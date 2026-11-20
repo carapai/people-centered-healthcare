@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/override-points/1",
+  "title": "Override points",
+  "description": "The settings a base package lets a district or facility change (ADR 0026, ADR 0067): each point's key, type, default, the values allowed (a list or a range) and its class. A point never hides a question.",
+  "type": "object",
+  "required": ["$schema", "points"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/override-points/1" },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "type", "default", "class"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z0-9]+([.-][a-z0-9]+)*$", "maxLength": 128 },
+          "type": { "enum": ["boolean", "integer", "code", "codes", "order"], "description": "codes: some codes from the list, each once; order: every code of the list once, in the order chosen" },
+          "default": { "$ref": "#/$defs/value" },
+          "allowed": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["minimum", "maximum"],
+                "additionalProperties": false,
+                "properties": {
+                  "minimum": { "type": "integer" },
+                  "maximum": { "type": "integer" }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["values"],
+                "additionalProperties": false,
+                "properties": {
+                  "values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": { "oneOf": [{ "type": "integer" }, { "type": "string", "minLength": 1 }] }
+                  }
+                }
+              }
+            ]
+          },
+          "class": { "enum": ["presentation", "operational", "clinically-visible"] },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "value": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "type": "string", "minLength": 1 },
+        { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      ]
+    }
+  }
+}

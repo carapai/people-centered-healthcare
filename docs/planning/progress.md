@@ -14,7 +14,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 8 — OPD clinical vertical slice](https://github.com/carapai/people-centered-healthcare/milestone/8) | 5 | 5 |
 | [Phase 9 — Clinical services](https://github.com/carapai/people-centered-healthcare/milestone/9) | 4 | 4 |
 | [Phase 10 — Patient engagement](https://github.com/carapai/people-centered-healthcare/milestone/10) | 4 | 8 |
-| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 3 | 26 |
+| [Phase 11 — Clinical Program Studio](https://github.com/carapai/people-centered-healthcare/milestone/11) | 4 | 26 |
 | [Phase 12 — Finance and insurance](https://github.com/carapai/people-centered-healthcare/milestone/12) | 8 | 9 |
 | [Phase 13 — Inventory and procurement](https://github.com/carapai/people-centered-healthcare/milestone/13) | 8 | 8 |
 | [Phase 14 — Additional clinical operations](https://github.com/carapai/people-centered-healthcare/milestone/14) | 0 | 0 |
@@ -22,7 +22,7 @@ _Update after each task (AGENTS.md process step 4)._
 | [Phase 16 — Advanced desktop offline mode](https://github.com/carapai/people-centered-healthcare/milestone/16) | 1 | 5 |
 | [Phase 17 — Production hardening](https://github.com/carapai/people-centered-healthcare/milestone/17) | 0 | 5 |
 
-Total: 118 of 137 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
+Total: 119 of 137 implementation tasks done (counted from the GitHub milestones). Validation spikes open: 3.
 
 ## Log
 
@@ -1553,3 +1553,4 @@ Total: 118 of 137 implementation tasks done (counted from the GitHub milestones)
     - a multi-node simulation with partitions in nightly CI (testing.md).
 - 2026-11-19: #492 the Studio's package list and read-only draft page: `health-publication::studio` derives each package's allowed actions from `Lifecycle::check` (the rule every transition now calls) and the `metadata.*` permissions; `/api/studio` at central only (`central-server`'s `studio` module, in the OpenAPI document); the client's `/studio` and `/studio/$id`, shown only where `capabilities.studio` (central).
 - 2026-11-20: #502 Language Packs: package kind `language` with one approval, `translates` naming the target package's major version and the language, entries keyed by stable address in `configuration/translations.json` (schema `language-pack/1`), and `Publications::translation_report` listing each entry as current, stale or gone against the latest published target; the pack's own semver compares its translations.
+- 2026-11-20: #507 override points: a base package declares them in `configuration/override-points.json` (schema `override-points/1`), each with a type, default, allowed values (list or range) and class; an override package (no dependencies, nothing but `configuration/overrides.json`, schema `overrides/1`) is validated against the latest published version of each base it names; `Publications::activate` refuses a base version that orphans or out-ranges an override in effect in an overlapping scope, and a node refuses to switch to one (`health-activation`).

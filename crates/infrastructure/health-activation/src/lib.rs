@@ -14,6 +14,10 @@
 //!   pinned versions, `minSoftware`, `formatVersion`) and the node switches to it in one
 //!   transaction, or keeps the previous set. Either way a [`Report`] is kept, and a failure
 //!   raises `package-activation-failed`.
+//! - **Overrides.** Before switching, each override package in the set is checked against the
+//!   base packages active beside it (ADR 0026, ADR 0067): a base version that removes a point a
+//!   scope sets, or narrows its values below the one chosen, fails the switch until the override
+//!   is removed or changed.
 //! - **Retention.** Tarballs stay in the blob store: every version ever activated here is kept.
 //! - **Definitions** ([`definitions`]): central writes the active packages' definitional
 //!   resources into its store, where clients read them and from where they sync down.
@@ -27,9 +31,9 @@ use std::sync::Arc;
 use health_configuration::activation::{
     ActivationRecord, ActiveSet, Chain, Release, Switch, active_set, switch,
 };
-use health_configuration::package::{PackageJson, Version};
+use health_configuration::package::{PackageJson, PackageKind, Version};
 use health_files::FsBlobStore;
-use health_packages::{Digest, FORMAT_VERSIONS, Limits, Schemas, verify};
+use health_packages::{Digest, FORMAT_VERSIONS, Files, Limits, Schemas, unpack, verify};
 use health_persistence::Store as _;
 use health_pki::Trust;
 use health_surrealdb::SurrealStore;
@@ -176,6 +180,23 @@ where
         &staged,
         &activator.release,
     );
+    // A base that orphans an override in the set, or narrows its values below one, is not
+    // activated: the node, which knows its whole chain, checks every pair (ADR 0026, ADR 0067).
+    let outcome = match outcome {
+        Switch::Activated { active, changes } => {
+            let conflicts = override_conflicts(blobs, &records, &staged, &active).await?;
+            if conflicts.is_empty() {
+                Switch::Activated { active, changes }
+            } else {
+                problems.extend(conflicts);
+                Switch::Failed {
+                    wanted: active,
+                    problems: Vec::new(),
+                }
+            }
+        }
+        other => other,
+    };
     let report = match outcome {
         Switch::Unchanged if problems.is_empty() => return Ok(None),
         Switch::Unchanged => Report {
@@ -253,6 +274,73 @@ where
         ),
     }
     Ok(Some(report))
+}
+
+/// The files of `name@version`, from the blob store, by the digest its activation names. It was
+/// verified when it was staged.
+async fn staged_files(
+    blobs: &FsBlobStore,
+    records: &[ActivationRecord],
+    name: &str,
+    version: &Version,
+) -> Result<Files, String> {
+    let record = records
+        .iter()
+        .rev()
+        .find(|r| r.activation.package == name && &r.activation.version == version)
+        .ok_or_else(|| format!("no activation names {name}@{version}"))?;
+    let hash: health_files::BlobHash = record
+        .digest
+        .parse()
+        .map_err(|_| format!("{} is not a sha-256", record.digest))?;
+    let local = blobs.clone();
+    let tgz = tokio::task::spawn_blocking(move || local.read(&hash))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{name}@{version}: {e}"))?;
+    unpack(&tgz, Limits::default())
+        .map(|packed| packed.files)
+        .map_err(|e| format!("{name}@{version}: {e}"))
+}
+
+/// Each setting of an override package in `active` that the base package active beside it
+/// does not declare, or whose value it does not allow.
+async fn override_conflicts(
+    blobs: Option<&FsBlobStore>,
+    records: &[ActivationRecord],
+    staged: &[PackageJson],
+    active: &ActiveSet,
+) -> Result<Vec<String>, String> {
+    let kind = |name: &str, version: &Version| {
+        staged
+            .iter()
+            .find(|p| p.name == name && p.version.parse::<Version>().ok().as_ref() == Some(version))
+            .map(|p| p.kind)
+    };
+    let overriding: Vec<(&String, &Version)> = active
+        .iter()
+        .filter(|(name, version)| kind(name, version) == Some(PackageKind::Override))
+        .collect();
+    let Some(blobs) = blobs.filter(|_| !overriding.is_empty()) else {
+        return Ok(Vec::new());
+    };
+    let mut problems = Vec::new();
+    for (name, version) in overriding {
+        let settings = staged_files(blobs, records, name, version).await?;
+        let read = health_packages::overrides::settings(&settings).map_err(|e| e.to_string())?;
+        for base in health_configuration::overrides::bases(&read) {
+            let Some(base_version) = active.get(base) else {
+                continue;
+            };
+            let declared = staged_files(blobs, records, base, base_version).await?;
+            let found = health_packages::overrides::check(base, &declared, &settings)
+                .map_err(|e| e.to_string())?;
+            problems.extend(found.iter().map(|problem| {
+                format!("{name}@{version} overrides {base}@{base_version}: {problem}")
+            }));
+        }
+    }
+    Ok(problems)
 }
 
 /// Fetches, verifies and keeps the package `record` activates; its `package.json`.

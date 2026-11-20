@@ -23,6 +23,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 use crate::language::{self, PackProblem, Translates};
+use crate::overrides::{self, OverrideProblem, PointProblem, SettingProblem};
 
 pub use version::{NotExact, Version};
 
@@ -197,6 +198,16 @@ pub enum Problem {
     /// A Language Pack's target, or `translates` on another kind (ADR 0066).
     #[error("{0}")]
     Pack(PackProblem),
+    /// An override package carrying more than its settings, or settings or declarations where
+    /// they do not belong (ADR 0026, ADR 0067).
+    #[error("{0}")]
+    Override(OverrideProblem),
+    /// An override point a base package declares (ADR 0067).
+    #[error("{0}")]
+    Point(PointProblem),
+    /// A setting an override package makes.
+    #[error("{0}")]
+    Setting(SettingProblem),
 }
 
 /// Lower-case letters, digits, `.`, `-` and `_`, starting with a letter or digit.
@@ -262,6 +273,15 @@ impl PackageContents {
             )
             .into_iter()
             .map(Problem::Pack),
+        );
+        problems.extend(
+            overrides::package_problems(
+                package.kind,
+                !package.dependencies.is_empty(),
+                &self.paths,
+            )
+            .into_iter()
+            .map(Problem::Override),
         );
         match &self.manifest {
             None => problems.push(Problem::NoManifest),

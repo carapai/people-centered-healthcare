@@ -316,3 +316,33 @@ fn activations_and_scopes_read_as_written() {
         }]
     );
 }
+
+#[test]
+fn scopes_overlap_where_one_node_may_be_in_both() {
+    let national = Scope::National;
+    assert!(national.overlaps(&facility("KLA01")));
+    assert!(district("kampala").overlaps(&national));
+    assert!(district("kampala").overlaps(&district("kampala")));
+    assert!(!district("kampala").overlaps(&district("gulu")));
+    assert!(facility("KLA01").overlaps(&program("KLA01", "art")));
+    assert!(program("KLA01", "art").overlaps(&facility("KLA01")));
+    assert!(!program("KLA01", "art").overlaps(&program("KLA01", "tb")));
+    assert!(!facility("KLA01").overlaps(&facility("GUL01")));
+    // The scope does not say which district a facility is in: the node checks those.
+    assert!(!district("kampala").overlaps(&facility("KLA01")));
+}
+
+#[test]
+fn in_effect_is_the_latest_effective_activation_per_package_and_scope() {
+    let activations = [
+        activation("a", "ug.facility.kla01", "1.0.0", facility("KLA01"), 1),
+        activation("b", "ug.facility.kla01", "1.1.0", facility("KLA01"), 2),
+        activation("c", "ug.facility.kla01", "1.2.0", facility("KLA01"), 9),
+        activation("d", "ug.facility.gul01", "1.0.0", facility("GUL01"), 1),
+    ];
+    let found: BTreeSet<_> = in_effect(&activations, at(3))
+        .into_iter()
+        .map(|a| a.id.as_str())
+        .collect();
+    assert_eq!(found, BTreeSet::from(["b", "d"]));
+}
