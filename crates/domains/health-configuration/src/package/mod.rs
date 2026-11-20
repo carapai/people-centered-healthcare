@@ -208,6 +208,15 @@ pub enum Problem {
     /// A setting an override package makes.
     #[error("{0}")]
     Setting(SettingProblem),
+    /// A profile whose snapshot does not carry its differential, or that has no snapshot
+    /// (ADR 0053): the element and the constraint are in `detail`.
+    #[error("{profile}: {detail}")]
+    Snapshot {
+        /// The StructureDefinition's path under [`ROOT`].
+        profile: String,
+        /// What differs.
+        detail: String,
+    },
 }
 
 /// Lower-case letters, digits, `.`, `-` and `_`, starting with a letter or digit.

@@ -3517,6 +3517,7 @@ dependencies = [
  "base64 0.22.1",
  "flate2",
  "health-configuration",
+ "health-fhir-validation",
  "health-pki",
  "health-terminology",
  "health-time",

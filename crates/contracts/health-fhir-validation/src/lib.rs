@@ -8,6 +8,7 @@
 //!   `octofhir-fhirpath` (ADR 0052) over a model provider built from the same element table.
 //! - **Tier 3, profiles** ([`SnapshotValidator`], behind [`ProfileValidator`]) checks a
 //!   resource against compiled StructureDefinition snapshots ([`ProfileSet`], ADR 0053).
+//!   At package Validation, [`check_snapshot`] checks each snapshot carries its differential.
 //! - **Tier 4, terminology:** the same walk checks each coded value against its element's
 //!   binding through the [`Bindings`] port, which the node's terminology answers. A required
 //!   binding not met is an error, an extensible or preferred one a warning
@@ -18,6 +19,7 @@ mod fhirpath;
 mod invariants;
 mod profile;
 mod questionnaire;
+mod snapshot;
 mod structure;
 
 pub use bindings::{Bindings, Membership, Strength};
@@ -27,6 +29,7 @@ pub use fhirpath::{
 pub use invariants::{KNOWN_ENGINE_GAPS, validate_invariants};
 pub use profile::{CompileError, ProfileSet, ProfileValidator, SnapshotValidator};
 pub use questionnaire::check_response;
+pub use snapshot::{SnapshotProblem, check_snapshot};
 pub use structure::{
     Issue, IssueCode, Severity, resource_types, skeleton, validate_structure, validate_value,
 };
