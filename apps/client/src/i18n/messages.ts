@@ -1640,6 +1640,77 @@ type StudioValues = {
   sdEditorNotJson: {}
   sdEditorReadOnly: {}
   sdEditorFailed: { reason: string }
+  fdOpen: { path: string }
+  fdOpenShort: {}
+  fdHeading: { title: string }
+  fdLoading: {}
+  fdNotQuestionnaire: {}
+  fdAsJson: {}
+  fdQuestions: {}
+  fdNoSection: {}
+  fdAddQuestion: {}
+  fdNewQuestion: {}
+  fdUp: { text: string }
+  fdDown: { text: string }
+  fdRemove: { text: string }
+  fdUntitled: { id: string }
+  fdSections: {}
+  fdSectionTitle: { n: number }
+  fdAddSection: {}
+  fdNewSection: { n: number }
+  fdSectionUp: { title: string }
+  fdSectionDown: { title: string }
+  fdSectionRemove: { title: string }
+  fdInspector: {}
+  fdChoose: {}
+  fdQuestion: {}
+  fdText: {}
+  fdId: {}
+  fdIdFixed: {}
+  fdIdNew: {}
+  fdType: {}
+  fdTypeOther: { type: string }
+  fdRequired: {}
+  fdRepeats: {}
+  fdOptions: {}
+  fdOptionCode: { n: number }
+  fdOptionDisplay: { n: number }
+  fdOptionUp: { n: number }
+  fdOptionDown: { n: number }
+  fdOptionRemove: { n: number }
+  fdAddOption: {}
+  fdNewOption: { n: number }
+  fdValueSet: { valueSet: string }
+  fdShownWhen: {}
+  fdAlways: {}
+  fdIsYes: { text: string }
+  fdConditionOther: {}
+  fdLayout: {}
+  fdSection: {}
+  fdSectionNone: {}
+  fdSectionNested: {}
+  fdWidget: {}
+  fdWidgetDefault: { widget: string }
+  fdHint: {}
+  fdRecord: {}
+  fdRecordLater: {}
+  fdPreview: {}
+  fdProblems: { count: number }
+  fdProblemsHint: {}
+  fdPNoId: {}
+  fdPDuplicate: { id: string }
+  fdPNoText: { id: string }
+  fdPNoOptions: { text: string }
+  fdPCondition: { text: string }
+  fdPWidget: { text: string; widget: string }
+  fdPNoSection: { text: string }
+  fdPRemoved: { id: string }
+  fdPSectionTitle: { n: number }
+  fdSave: {}
+  fdSaved: {}
+  fdUnsaved: {}
+  fdLayoutFile: { path: string }
+  fdLayoutNew: { path: string }
 }
 
 // The Studio's package list and draft page (features/studio, #492).
@@ -1758,4 +1829,75 @@ export const studioMessages = defineMessages<StudioValues>({
   sdEditorNotJson: { id: 'app.studio.editorNotJson', defaultMessage: 'This is not valid JSON.', description: 'Studio: file editor parse error' },
   sdEditorReadOnly: { id: 'app.studio.editorReadOnly', defaultMessage: 'Read only.', description: 'Studio: the file cannot be edited by this person or at this stage' },
   sdEditorFailed: { id: 'app.studio.editorFailed', defaultMessage: 'Not saved. {reason}', description: 'Studio: a save was refused' },
+  fdOpen: { id: 'app.studio.formDesigner.open', defaultMessage: '{path} in the form designer', description: 'Studio: link from a Questionnaire to the form designer' },
+  fdOpenShort: { id: 'app.studio.formDesigner.openShort', defaultMessage: 'Form designer', description: 'Studio: visible text of the link to the form designer' },
+  fdHeading: { id: 'app.studio.formDesigner.heading', defaultMessage: 'Form designer: {title}', description: 'Studio: form designer heading' },
+  fdLoading: { id: 'app.studio.formDesigner.loading', defaultMessage: 'Loading the form…', description: 'Studio: form designer loading' },
+  fdNotQuestionnaire: { id: 'app.studio.formDesigner.notQuestionnaire', defaultMessage: 'This file is not a Questionnaire. Open it as JSON instead.', description: 'Studio: form designer opened on another file' },
+  fdAsJson: { id: 'app.studio.formDesigner.asJson', defaultMessage: 'Open as JSON', description: 'Studio: form designer link to the JSON editor' },
+  fdQuestions: { id: 'app.studio.formDesigner.questions', defaultMessage: 'Questions', description: 'Studio: form designer outline heading' },
+  fdNoSection: { id: 'app.studio.formDesigner.noSection', defaultMessage: 'In no section: shown at the end of the form', description: 'Studio: outline group of questions no section places' },
+  fdAddQuestion: { id: 'app.studio.formDesigner.addQuestion', defaultMessage: 'Add question', description: 'Studio: form designer button' },
+  fdNewQuestion: { id: 'app.studio.formDesigner.newQuestion', defaultMessage: 'New question', description: 'Studio: text of a newly added question' },
+  fdUp: { id: 'app.studio.formDesigner.up', defaultMessage: 'Move {text} up', description: 'Studio: move a question up' },
+  fdDown: { id: 'app.studio.formDesigner.down', defaultMessage: 'Move {text} down', description: 'Studio: move a question down' },
+  fdRemove: { id: 'app.studio.formDesigner.remove', defaultMessage: 'Remove {text}', description: 'Studio: remove a question' },
+  fdUntitled: { id: 'app.studio.formDesigner.untitled', defaultMessage: '(no text) {id}', description: 'Studio: a question without text in the outline' },
+  fdSections: { id: 'app.studio.formDesigner.sections', defaultMessage: 'Sections', description: 'Studio: form designer sections heading' },
+  fdSectionTitle: { id: 'app.studio.formDesigner.sectionTitle', defaultMessage: 'Title of section {n}', description: 'Studio: section title field' },
+  fdAddSection: { id: 'app.studio.formDesigner.addSection', defaultMessage: 'Add section', description: 'Studio: form designer button' },
+  fdNewSection: { id: 'app.studio.formDesigner.newSection', defaultMessage: 'Section {n}', description: 'Studio: title of a new section' },
+  fdSectionUp: { id: 'app.studio.formDesigner.sectionUp', defaultMessage: 'Move section {title} up', description: 'Studio: move a section' },
+  fdSectionDown: { id: 'app.studio.formDesigner.sectionDown', defaultMessage: 'Move section {title} down', description: 'Studio: move a section' },
+  fdSectionRemove: { id: 'app.studio.formDesigner.sectionRemove', defaultMessage: 'Remove section {title}', description: 'Studio: remove a section; its questions are in none' },
+  fdInspector: { id: 'app.studio.formDesigner.inspector', defaultMessage: 'Selected question', description: 'Studio: inspector heading' },
+  fdChoose: { id: 'app.studio.formDesigner.choose', defaultMessage: 'Choose a question in the list.', description: 'Studio: inspector with nothing selected' },
+  fdQuestion: { id: 'app.studio.formDesigner.question', defaultMessage: 'Question (clinical: approved with the package)', description: 'Studio: inspector group for the Questionnaire' },
+  fdText: { id: 'app.studio.formDesigner.text', defaultMessage: 'Text', description: 'Studio: question text field' },
+  fdId: { id: 'app.studio.formDesigner.id', defaultMessage: 'Id', description: 'Studio: question id field' },
+  fdIdFixed: { id: 'app.studio.formDesigner.idFixed', defaultMessage: 'Published: the id is fixed, because recorded answers and mappings refer to it.', description: 'Studio: why a published question’s id cannot change' },
+  fdIdNew: { id: 'app.studio.formDesigner.idNew', defaultMessage: 'Fixed once published.', description: 'Studio: hint on a new question’s id' },
+  fdType: { id: 'app.studio.formDesigner.type', defaultMessage: 'Answer type', description: 'Studio: answer type field' },
+  fdTypeOther: { id: 'app.studio.formDesigner.typeOther', defaultMessage: '{type}: edited as JSON for now', description: 'Studio: an item type the designer does not edit' },
+  fdRequired: { id: 'app.studio.formDesigner.required', defaultMessage: 'Required', description: 'Studio: required checkbox' },
+  fdRepeats: { id: 'app.studio.formDesigner.repeats', defaultMessage: 'More than one answer', description: 'Studio: repeats checkbox' },
+  fdOptions: { id: 'app.studio.formDesigner.options', defaultMessage: 'Options', description: 'Studio: answer options heading' },
+  fdOptionCode: { id: 'app.studio.formDesigner.optionCode', defaultMessage: 'Code of option {n}', description: 'Studio: option code field' },
+  fdOptionDisplay: { id: 'app.studio.formDesigner.optionDisplay', defaultMessage: 'Option {n}', description: 'Studio: option display field' },
+  fdOptionUp: { id: 'app.studio.formDesigner.optionUp', defaultMessage: 'Move option {n} up', description: 'Studio: move an option' },
+  fdOptionDown: { id: 'app.studio.formDesigner.optionDown', defaultMessage: 'Move option {n} down', description: 'Studio: move an option' },
+  fdOptionRemove: { id: 'app.studio.formDesigner.optionRemove', defaultMessage: 'Remove option {n}', description: 'Studio: remove an option' },
+  fdAddOption: { id: 'app.studio.formDesigner.addOption', defaultMessage: 'Add option', description: 'Studio: add an answer option' },
+  fdNewOption: { id: 'app.studio.formDesigner.newOption', defaultMessage: 'Option {n}', description: 'Studio: display of a new option' },
+  fdValueSet: { id: 'app.studio.formDesigner.valueSet', defaultMessage: 'Bound to the ValueSet {valueSet}', description: 'Studio: an item bound to a ValueSet' },
+  fdShownWhen: { id: 'app.studio.formDesigner.shownWhen', defaultMessage: 'Shown only when', description: 'Studio: enableWhen field' },
+  fdAlways: { id: 'app.studio.formDesigner.always', defaultMessage: 'Always shown', description: 'Studio: no condition' },
+  fdIsYes: { id: 'app.studio.formDesigner.isYes', defaultMessage: '“{text}” is Yes', description: 'Studio: condition on a yes/no question' },
+  fdConditionOther: { id: 'app.studio.formDesigner.conditionOther', defaultMessage: 'Its conditions are edited as JSON for now, and kept as they are.', description: 'Studio: conditions the designer does not edit' },
+  fdLayout: { id: 'app.studio.formDesigner.layout', defaultMessage: 'Layout (presentation)', description: 'Studio: inspector group for the Form Layout' },
+  fdSection: { id: 'app.studio.formDesigner.section', defaultMessage: 'Section', description: 'Studio: section field' },
+  fdSectionNone: { id: 'app.studio.formDesigner.sectionNone', defaultMessage: 'No section (shown at the end)', description: 'Studio: no section' },
+  fdSectionNested: { id: 'app.studio.formDesigner.sectionNested', defaultMessage: 'In the section of the group it belongs to.', description: 'Studio: a nested question’s section' },
+  fdWidget: { id: 'app.studio.formDesigner.widget', defaultMessage: 'Shown as', description: 'Studio: widget field' },
+  fdWidgetDefault: { id: 'app.studio.formDesigner.widgetDefault', defaultMessage: 'Default ({widget})', description: 'Studio: the type’s default widget' },
+  fdHint: { id: 'app.studio.formDesigner.hint', defaultMessage: 'Hint', description: 'Studio: hint field' },
+  fdRecord: { id: 'app.studio.formDesigner.record', defaultMessage: 'Becomes a record', description: 'Studio: inspector group for extraction' },
+  fdRecordLater: { id: 'app.studio.formDesigner.recordLater', defaultMessage: 'What an answer becomes is edited in the package’s Extraction Mapping as JSON for now.', description: 'Studio: extraction not yet in the designer' },
+  fdPreview: { id: 'app.studio.formDesigner.preview', defaultMessage: 'Live preview: what a health worker sees', description: 'Studio: preview heading' },
+  fdProblems: { id: 'app.studio.formDesigner.problems', defaultMessage: '{count, plural, =0 {No problems found while editing} one {# problem} other {# problems}}', description: 'Studio: problems heading' },
+  fdProblemsHint: { id: 'app.studio.formDesigner.problemsHint', defaultMessage: 'Check now on the package page remains the authority.', description: 'Studio: problems are a preview of the checks' },
+  fdPNoId: { id: 'app.studio.formDesigner.pNoId', defaultMessage: 'A question has no id', description: 'Studio problem' },
+  fdPDuplicate: { id: 'app.studio.formDesigner.pDuplicate', defaultMessage: 'Two questions share the id “{id}”', description: 'Studio problem' },
+  fdPNoText: { id: 'app.studio.formDesigner.pNoText', defaultMessage: '“{id}” has no text', description: 'Studio problem' },
+  fdPNoOptions: { id: 'app.studio.formDesigner.pNoOptions', defaultMessage: '“{text}” is a choice with no options', description: 'Studio problem' },
+  fdPCondition: { id: 'app.studio.formDesigner.pCondition', defaultMessage: '“{text}” is shown only when a question that is not yes/no is Yes', description: 'Studio problem' },
+  fdPWidget: { id: 'app.studio.formDesigner.pWidget', defaultMessage: '“{text}” cannot be shown as {widget}', description: 'Studio problem' },
+  fdPNoSection: { id: 'app.studio.formDesigner.pNoSection', defaultMessage: '“{text}” is in no section: it shows at the end of the form', description: 'Studio problem' },
+  fdPRemoved: { id: 'app.studio.formDesigner.pRemoved', defaultMessage: 'The published question “{id}” was removed: answers already recorded refer to it', description: 'Studio problem' },
+  fdPSectionTitle: { id: 'app.studio.formDesigner.pSectionTitle', defaultMessage: 'Section {n} has no title', description: 'Studio problem' },
+  fdSave: { id: 'app.studio.formDesigner.save', defaultMessage: 'Save', description: 'Studio: save the form' },
+  fdSaved: { id: 'app.studio.formDesigner.saved', defaultMessage: 'Saved.', description: 'Studio: form saved' },
+  fdUnsaved: { id: 'app.studio.formDesigner.unsaved', defaultMessage: 'Unsaved changes', description: 'Studio: the form has unsaved changes' },
+  fdLayoutFile: { id: 'app.studio.formDesigner.layoutFile', defaultMessage: 'Its layout is {path}.', description: 'Studio: the Form Layout file' },
+  fdLayoutNew: { id: 'app.studio.formDesigner.layoutNew', defaultMessage: 'It has no layout yet: a section, widget or hint adds {path}.', description: 'Studio: no Form Layout yet' },
 })

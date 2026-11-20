@@ -89,6 +89,12 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                   : change.change === 'removed'
                     ? intl.formatMessage(m.sdChangeRemoved, { type: change.resourceType, path: change.path, version: change.before ?? '' })
                     : intl.formatMessage(m.sdChangeChanged, { type: change.resourceType, path: change.path, before: change.before ?? '', after: change.after ?? '' })}
+                {change.resourceType === 'Questionnaire' && change.change !== 'removed' ? (
+                  <>
+                    {' · '}
+                    <DesignerLink id={id} path={change.path} />
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -162,6 +168,16 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
 }
 
 /** The package's files, each opening in the editor; in a draft, a new file and the version. */
+/** Opens a Questionnaire in the form designer (#497). */
+function DesignerLink({ id, path }: { id: string; path: string }) {
+  const intl = useIntl()
+  return (
+    <Link to="/studio/$id/forms/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(m.fdOpen, { path })}>
+      {intl.formatMessage(m.fdOpenShort)}
+    </Link>
+  )
+}
+
 function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
   const intl = useIntl()
   const platform = usePlatform()
@@ -212,6 +228,12 @@ function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
                 {file.version === null || file.version === undefined ? '' : ` ${file.version}`}
               </span>
             )}
+            {file.resourceType === 'Questionnaire' ? (
+              <>
+                {' · '}
+                <DesignerLink id={id} path={file.path} />
+              </>
+            ) : null}
           </li>
         ))}
       </ul>
