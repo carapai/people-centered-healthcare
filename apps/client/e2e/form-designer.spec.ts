@@ -68,3 +68,71 @@ test('the author designs the triage form, watching the preview, and saves it', a
   await expect(questions.getByRole('heading', { name: 'Arrival' })).toBeVisible()
   await expect(questions.getByRole('button', { name: /^Arrived by ambulance/ })).toBeVisible()
 })
+
+// #497 part 2: what an answer becomes, edited in the package's Extraction Mapping, and a form
+// imported from FHIR JSON, R4 through the conversion report. With axe.
+test('the author sets what answers become a record, and imports an R4 form through the conversion report', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'Questionnaire-opd-triage.json in the form designer' }).click()
+  await expect(page.getByText('What answers become is in Library-opd-triage-mapping.json.')).toBeVisible()
+  const questions = page.getByRole('navigation', { name: 'Questions' })
+  const inspector = page.getByRole('region', { name: 'Selected question' })
+  const preview = page.getByRole('region', { name: /Live preview/ })
+
+  // A temperature already becomes an Observation coded by LOINC; its display is edited.
+  await questions.getByRole('button', { name: /^Temperature/ }).click()
+  await expect(inspector.getByText('Record 1: Observation')).toBeVisible()
+  await expect(inspector.getByLabel('Code of record 1')).toHaveValue('8310-5')
+  await inspector.getByLabel('Display of record 1').fill('Body temperature (oral)')
+
+  // The triage category becomes no record until one is added, and needs a code.
+  await questions.getByRole('button', { name: /^Triage category/ }).click()
+  await expect(inspector.getByText('No record: the answer stays in the response.')).toBeVisible()
+  await press(page, 'Record it as an Observation')
+  await expect(page.getByRole('button', { name: /^What “Triage category.*” becomes has no code$/ })).toBeVisible()
+  await inspector.getByLabel('Code of record 1').fill('11283-9')
+  await inspector.getByLabel('Display of record 1').fill('Acuity assessment')
+  await expect(page.getByRole('button', { name: /becomes has no code$/ })).toHaveCount(0)
+  await noViolations(page)
+  await press(page, /^Save$/)
+  await expect(page.getByRole('status').filter({ hasText: 'Saved.' })).toBeVisible()
+
+  // The mapping holds both.
+  await press(page, 'Back to the package', 'link')
+  await press(page, 'Open Library-opd-triage-mapping.json', 'link')
+  const content = page.getByLabel('Content (JSON)')
+  await expect(content).toHaveValue(/"display": "Body temperature \(oral\)"/)
+  await expect(content).toHaveValue(/"code": "11283-9"/)
+
+  // Import: an R4 form read as R5 is refused; read as R4 it is converted, with its report.
+  await press(page, 'Back to the package', 'link')
+  await page.getByRole('region', { name: 'Files' }).getByRole('link', { name: 'Questionnaire-opd-triage.json in the form designer' }).click()
+  await press(page, 'Import FHIR JSON')
+  const panel = page.getByRole('region', { name: 'Import FHIR JSON' })
+  const r4 = {
+    resourceType: 'Questionnaire',
+    url: 'http://smart.who.int/anc/Questionnaire/ANCDT01',
+    version: '1.0.0',
+    status: 'active',
+    title: 'ANC danger signs',
+    item: [{ linkId: 'danger', type: 'choice', text: 'Danger signs', answerOption: [{ valueCoding: { code: 'bleeding', display: 'Vaginal bleeding' } }] }],
+  }
+  await panel.getByLabel('Questionnaire (FHIR JSON)').fill(JSON.stringify(r4, null, 2))
+  await press(page, 'Read it')
+  await expect(panel.getByRole('alert')).toHaveText('It uses R4’s choice types: read it as R4.')
+  await panel.getByLabel('R4, converted to R5 with a report').check()
+  await press(page, 'Read it')
+  const report = panel.getByRole('list', { name: /^Conversion report/ })
+  await expect(report).toContainText('“danger”: R4 choice became coding, options only')
+  await expect(report).toContainText('Its source http://smart.who.int/anc/Questionnaire/ANCDT01|1.0.0 is kept in derivedFrom')
+  await noViolations(page)
+  await press(page, 'Replace the form')
+  await expect(page.getByRole('status').filter({ hasText: 'The form was replaced by the import. Save to keep it.' })).toBeVisible()
+  await expect(preview.getByText('Danger signs')).toBeVisible()
+  await expect(preview.getByText('Vaginal bleeding')).toBeVisible()
+  await expect(questions.getByRole('button', { name: /^Danger signs/ })).toBeVisible()
+  // What the mapping recorded of the old form is listed until it is dealt with.
+  await expect(page.getByText('The Extraction Mapping records “temperature”, which is no longer in the form')).toBeVisible()
+})
