@@ -18,8 +18,9 @@ import { activity } from './activity'
 import { seed, signIn } from './seed'
 import { ADMIN_PERMISSIONS, OTP_OUTBOX, USERS } from './users'
 
-const ORIGIN = 'http://localhost:4173'
-// Ports may be moved, e.g. to run a second backend beside one already running.
+// Ports may be moved, e.g. to run a second backend beside one already running, with the app's
+// origin for its sign-in redirects.
+const ORIGIN = process.env['HEALTH_E2E_ORIGIN'] ?? 'http://localhost:4173'
 const CENTRAL_PORT = process.env['HEALTH_E2E_CENTRAL_PORT'] ?? '18080'
 const DB_PORT = process.env['HEALTH_E2E_DB_PORT'] ?? '18000'
 const CENTRAL = `http://127.0.0.1:${CENTRAL_PORT}`
@@ -37,8 +38,21 @@ const file = (name: string, content: string) => {
 const otpOutbox = process.env['HEALTH_DEV_OTP_OUTBOX'] ?? OTP_OUTBOX
 writeFileSync(otpOutbox, '', { mode: 0o600 })
 const dbPassword = randomBytes(16).toString('hex')
+// A throwaway publication-signing key and self-signed certificate, so the Studio can publish
+// locally (#835). With no national root configured, nothing verifies the chain against one.
+const publication = (() => {
+  const key = join(dir, 'publication-key.pem')
+  const chain = join(dir, 'publication-chain.pem')
+  const made =
+    spawnSync('openssl', ['genpkey', '-algorithm', 'EC', '-pkeyopt', 'ec_paramgen_curve:P-256', '-out', key]).status === 0 &&
+    spawnSync('openssl', ['req', '-new', '-x509', '-key', key, '-subj', '/CN=e2e publication signing', '-days', '30', '-out', chain]).status === 0
+  if (made) return { HEALTH_PUBLICATION_KEY_FILE: key, HEALTH_PUBLICATION_CHAIN_FILE: chain }
+  process.stdout.write('openssl did not make a publication-signing key: the Studio cannot publish\n')
+  return {}
+})()
 const env = {
   ...process.env,
+  ...publication,
   HEALTH_BIND: `127.0.0.1:${CENTRAL_PORT}`,
   HEALTH_SURREALDB_ENDPOINT: `ws://127.0.0.1:${DB_PORT}`,
   HEALTH_SURREALDB_PASSWORD_FILE: file('db-password', dbPassword),
@@ -127,7 +141,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], admin: ADMIN_PERMISSIONS },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], author: ['metadata.author'], approver: ['metadata.approve'], publisher: ['metadata.publish', 'configuration.activate'], admin: ADMIN_PERMISSIONS },
       labels: [],
     }),
   ),
@@ -167,16 +181,19 @@ for (const user of Object.values(USERS)) {
 }
 children.push(spawn(centralBin, [], { env, stdio: 'inherit' }))
 await waitFor(`${CENTRAL}/ready`, 60_000)
-// A draft of the OPD reference package for the Studio (#492), written by someone else than the
-// e2e users, so a reviewer sees it waiting for its author.
-const drafted = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/opd'), '--by', 'e2e-author'], { env, stdio: 'inherit' })
+// Sign-in and the FHIR API answer 503 until they are built, just after /ready.
+for (let tries = 0; (await fetch(`${CENTRAL}/fhir/metadata`).catch(() => undefined))?.status === 503; tries += 1) {
+  if (tries > 120) throw new Error('the FHIR API did not come up')
+  await new Promise((r) => setTimeout(r, 250))
+}
+// A draft of the OPD reference package for the Studio (#492), by e2e-author, so a reviewer sees
+// it waiting for its author, and its author can sign in and submit it (#835). The lifecycle
+// records people by account id: the access token's subject.
+const authorToken = await signIn(CENTRAL, ORIGIN, USERS.author, 'KAM013')
+const author = (JSON.parse(Buffer.from(authorToken.split('.')[1] ?? '', 'base64url').toString()) as { sub: string }).sub
+const drafted = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/opd'), '--by', author], { env, stdio: 'inherit' })
 if (drafted.status !== 0) throw new Error('drafting the Studio package failed')
 if (seedPatients > 0) {
-  // Sign-in and the FHIR API answer 503 until they are built, just after /ready.
-  for (let tries = 0; (await fetch(`${CENTRAL}/fhir/metadata`).catch(() => undefined))?.status === 503; tries += 1) {
-    if (tries > 120) throw new Error('the FHIR API did not come up')
-    await new Promise((r) => setTimeout(r, 250))
-  }
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)
   process.stdout.write(`${await activity(CENTRAL, token, generated)}\n`)

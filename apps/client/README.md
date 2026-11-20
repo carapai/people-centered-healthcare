@@ -30,7 +30,18 @@ bun run build && bunx --bun vite preview --port 4173 --strictPort
   - **Visits:** 18 patients checked in. 6 wait at triage, 6 are triaged and wait for consultation with their vital signs recorded, and 6 visits are completed.
   - **Appointments:** 11 booked over the next two weeks, and 5 patients' requests waiting in the clinician's inbox.
 - **Admin:** sign in at KAM013 as `admin` / `harbour lantern meadow quartz` (`e2e/users.ts`), who holds every right: `*.cruds`, break-glass and every named permission (`ADMIN_PERMISSIONS`). A permission added to the code belongs in that list too. The e2e users are provisioned as well.
-- **Beside another backend:** `HEALTH_E2E_CENTRAL_PORT`, `HEALTH_E2E_DB_PORT` and `HEALTH_DEV_OTP_OUTBOX` move its ports and one-time-code outbox.
+- **The Studio** (`/studio`) holds a draft of the OPD reference package (`ug.moh.opd`), written by `e2e-author`. It is a program package, so it needs two approvals. Sign in at KAM013 as, for each step (passwords in `e2e/users.ts`):
+
+  | Step | Who |
+  |---|---|
+  | Submit | `e2e-author` |
+  | Review | `e2e-studio` |
+  | Approve (two) | `e2e-studio` and `e2e-approver` |
+  | Publish, activate | `e2e-publisher` |
+
+  The backend makes a throwaway publication-signing key with `openssl` for publishing. Without `openssl`, publishing answers that the key is missing.
+- **A reload signs you out:** tokens live in memory only (ADR 0037). The next request's 401 sends you to sign in, and back to the page you were on after.
+- **Beside another backend:** `HEALTH_E2E_CENTRAL_PORT`, `HEALTH_E2E_DB_PORT` and `HEALTH_DEV_OTP_OUTBOX` move its ports and one-time-code outbox, and `HEALTH_E2E_ORIGIN` the app's origin its sign-in redirects to (default `http://localhost:4173`).
 - The e2e suite never sets `HEALTH_SEED`, so its runs start empty as before.
 
 ## Layout
@@ -45,7 +56,7 @@ bun run build && bunx --bun vite preview --port 4173 --strictPort
     - the OAuth transaction (`sign-in.ts`), which holds the PKCE verifier and state across the redirect and nothing clinical;
     - the device's key pair on an edge (`device.ts`, #74; ADR 0009). It is an ECDSA P-256 pair whose private key is non-extractable, kept in IndexedDB as a `CryptoKey`.
   - `device.ts` holds that key. `compose.ts` loads it for edge mode, and `dpopAuth` signs every request with it: a proof alone before sign-in, which the edge's device gate requires, and bound to the token (`ath`) after.
-  - `sign-in.ts` is the authorization code flow with PKCE, configured by `runtime.json`'s `auth`, at central and on an edge (#75). The `/sign-in` and `/callback` routes use it. On an edge, its `/token` and `/revoke` requests carry a DPoP proof by the device's key (`dpopProof`), so tokens are bound to the device and issued only to an enrolled one.
+  - `sign-in.ts` is the authorization code flow with PKCE, configured by `runtime.json`'s `auth`, at central and on an edge (#75). The `/sign-in` and `/callback` routes use it. `signInOnUnauthorized` wraps the API and FHIR transports: a 401 starts a sign-in that returns to the current page (#835). Pages that work signed out (`/sign-in`, `/callback`, `/enroll`, `/edge/…`, `/portal…`) and a locked session are left alone. On an edge, its `/token` and `/revoke` requests carry a DPoP proof by the device's key (`dpopProof`), so tokens are bound to the device and issued only to an enrolled one.
   - `shell.ts` registers the edge's app-shell service worker and runs the version check against `runtime.json`'s `build` (#76).
   - The build's ID is `HEALTH_BUILD_ID`, or the commit. `vite.config.ts` puts it in the bundle and in `dist/build.json`, which the edge embeds beside the bundle.
 - `src/features/` holds one folder per Bounded Context. Feature code uses `usePlatform()` and the ports.

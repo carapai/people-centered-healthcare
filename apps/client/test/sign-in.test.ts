@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
 
 import { memorySession } from '../src/platform/session'
-import { SignInError, signIn } from '../src/platform/sign-in'
+import { SignInError, signIn, signInOnUnauthorized } from '../src/platform/sign-in'
+import type { Transport } from '../src/platform/types'
 
 const ORIGIN = 'https://central.example'
 const ISSUER = `${ORIGIN}/auth`
@@ -171,5 +172,59 @@ describe('signIn', () => {
     const h = harness([new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 401 })], async () => 'device-proof')
     await expect(h.client.unlock?.('nakato', '999999')).rejects.toEqual(new SignInError('refused'))
     expect(harness([]).client.unlock).toBeUndefined()
+  })
+})
+
+function unauthorizedHarness(path: string, statuses: number[], token?: string) {
+  const session = memorySession()
+  if (token !== undefined) session.setAccessToken(token)
+  const started: string[] = []
+  const inner: Transport = { request: async () => ({ status: statuses.shift() ?? 200, headers: {}, body: undefined }) }
+  const [pathname, search = ''] = path.split('?')
+  const transport = signInOnUnauthorized(inner, { start: async (returnTo) => void started.push(returnTo) }, session, {
+    pathname: pathname ?? '/',
+    search: search === '' ? '' : `?${search}`,
+    hash: '',
+  })
+  return { transport, started, session }
+}
+
+describe('signInOnUnauthorized', () => {
+  const get = { method: 'GET', path: '/studio/packages' } as const
+
+  test('a 401 sends the person to sign in, coming back to the page they were on, once', async () => {
+    const h = unauthorizedHarness('/studio/p1?tab=changes', [401, 401])
+    expect((await h.transport.request(get)).status).toBe(401)
+    await h.transport.request(get)
+    expect(h.started).toEqual(['/studio/p1?tab=changes'])
+  })
+
+  test('a 401 with a token held (expired or revoked) sends them to sign in too', async () => {
+    const h = unauthorizedHarness('/registry/reviews', [401], 'stale')
+    await h.transport.request(get)
+    expect(h.started).toEqual(['/registry/reviews'])
+  })
+
+  test('other answers pass through untouched', async () => {
+    const h = unauthorizedHarness('/studio', [200, 403, 500])
+    for (const status of [200, 403, 500]) expect((await h.transport.request(get)).status).toBe(status)
+    expect(h.started).toEqual([])
+  })
+
+  test.each(['/sign-in', '/callback', '/enroll', '/edge/status', '/portal', '/portal/callback'])('pages that work signed out keep their own 401s (%s)', async (path) => {
+    const h = unauthorizedHarness(path, [401])
+    await h.transport.request(get)
+    expect(h.started).toEqual([])
+  })
+
+  test('a locked session stays on the lock screen: its PIN resumes it', async () => {
+    const h = unauthorizedHarness('/worklists', [401, 401], 'a1')
+    h.session.end('lock')
+    await h.transport.request(get)
+    expect(h.started).toEqual([])
+    // Unlocked, a later 401 signs in again.
+    h.session.setAccessToken('a2')
+    await h.transport.request(get)
+    expect(h.started).toEqual(['/worklists'])
   })
 })

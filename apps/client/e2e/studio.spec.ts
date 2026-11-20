@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { noViolations, press, signIn } from './helpers'
+import { noViolations, press, signIn, type } from './helpers'
 import { USERS } from './users'
 
 // #492: a reviewer opens the Studio at central, finds the OPD draft waiting for its author, and
@@ -28,4 +28,24 @@ test('the package list and a draft read from top to bottom, with refused actions
   await expect(page.getByRole('button', { name: 'Approve' })).toBeDisabled()
   await expect(page.getByText('Not possible while it is at the draft stage').first()).toBeVisible()
   await noViolations(page)
+})
+
+// #835, #829: a click opens a package. Tokens live in memory only, so a reload signs the person
+// out; the page's 401 sends them to sign in, and back to the same package after.
+test('a click opens a package, and after a reload sign-in comes back to it', async ({ page }) => {
+  await signIn(page, USERS.studio)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await expect(page.getByRole('heading', { name: 'What changed' })).toBeVisible()
+  const opened = page.url()
+  expect(opened).toMatch(/\/studio\/.+/)
+
+  await page.reload()
+  await page.waitForURL(/\/sign-in\?/)
+  await type(page, 'Username', USERS.studio.username)
+  await page.keyboard.press('Tab')
+  await page.keyboard.type(USERS.studio.password)
+  await page.keyboard.press('Enter')
+  await page.waitForURL(opened)
+  await expect(page.getByRole('heading', { name: 'What changed' })).toBeVisible()
 })

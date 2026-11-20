@@ -65,6 +65,7 @@ export const dataTable = defineSlotRecipe({
       borderColor: 'border.default',
       _hover: { bg: 'bg.hover' },
       '&[data-active]': { bg: 'bg.selected' },
+      '&[data-activatable]': { cursor: 'pointer' },
     },
     cell: {
       display: 'flex',

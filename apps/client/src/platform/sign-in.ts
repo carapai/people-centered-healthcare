@@ -1,5 +1,6 @@
 import { base64url } from './auth'
 import type { MemorySession } from './session'
+import type { SessionPort, Transport } from './types'
 
 /** Where the authorization server is, from runtime.json. */
 export interface SignInConfig {
@@ -236,6 +237,39 @@ export function signIn(config: SignInConfig, session: MemorySession, options: Si
       if (token !== undefined) {
         await post('/revoke', { token, client_id: config.clientId }).catch(() => undefined)
       }
+    },
+  }
+}
+
+/** Pages that work signed out, where a 401 is the page's own to show. */
+const SIGNED_OUT = /^\/(sign-in|callback|enroll|edge|portal)(\/|$)/
+
+/**
+ * `transport`, sending the person to sign in on a 401 and back to the page they were on after
+ * (#835). Tokens live in memory only (ADR 0037), so a full page load signs the person out; this
+ * makes that a sign-in rather than a failed page. A locked session stays on its lock screen,
+ * where the PIN resumes it, and pages that work signed out keep their own 401s. Only the first
+ * 401 starts a sign-in: the page is left behind.
+ */
+export function signInOnUnauthorized(
+  transport: Transport,
+  staff: Pick<SignIn, 'start'>,
+  session: SessionPort,
+  location: Pick<Location, 'pathname' | 'search' | 'hash'> | undefined = globalThis.location,
+): Transport {
+  let locked = false
+  let leaving = false
+  session.onEnd((reason) => {
+    locked = reason === 'lock'
+  })
+  return {
+    async request(request) {
+      const response = await transport.request(request)
+      if (response.status !== 401 || leaving || location === undefined || SIGNED_OUT.test(location.pathname)) return response
+      if (locked && session.accessToken() === undefined) return response
+      leaving = true
+      void staff.start(`${location.pathname}${location.search}${location.hash}`)
+      return response
     },
   }
 }

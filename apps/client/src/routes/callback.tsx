@@ -23,7 +23,8 @@ function Callback() {
     }
     signIn
       .complete(window.location.href)
-      .then((returnTo) => navigate({ to: returnTo, replace: true }))
+      // Back to the page the person was on, query string included; never off this origin.
+      .then((returnTo) => navigate({ href: /^\/(?![/\\])/.test(returnTo) ? returnTo : '/', replace: true }))
       .catch(() => setFailed(true))
   }, [platform, navigate])
   return <p role="status">{intl.formatMessage(failed ? messages.signInFailed : messages.signInCompleting)}</p>

@@ -52,7 +52,7 @@ export interface DataTableProps<T extends RowData> {
   /** Sort and hidden columns; the caller owns it, usually in the URL (see `view.ts`). */
   view: DataTableView
   onViewChange: (view: DataTableView) => void
-  /** Enter on a body cell. */
+  /** Enter on a body cell, or a click on its row. */
   onRowActivate?: ((row: T) => void) | undefined
   /** The scrolling grid's height; default `28rem`. */
   height?: string | undefined
@@ -358,8 +358,11 @@ export function DataTable<T extends RowData>({ caption, columns, data, getRowId,
                   aria-rowindex={index + 1}
                   data-body-row=""
                   data-active={index === current.row ? '' : undefined}
+                  data-activatable={onRowActivate === undefined ? undefined : ''}
                   className={classes.row}
                   style={{ transform: `translateY(${item.start}px)` }}
+                  // A pointer opens the row as Enter does; the click has already focused its cell.
+                  onClick={onRowActivate === undefined ? undefined : () => onRowActivate(row.original)}
                 >
                   {row.getVisibleCells().map((cell, col) => {
                     const definition = byId.get(cell.column.id)

@@ -179,13 +179,31 @@ test('view and search parameters round-trip, and unknown or unsortable ids are d
   expect(viewFromSearch({ hide: 'name,age,phone' }, ids, sortable).hidden).toEqual([])
 })
 
-test('Enter on a body cell activates its row', async () => {
+test('a click on a body row, or Enter on one of its cells, activates it', async () => {
   const activated: string[] = []
   const rows = patients(10)
   const screen = await render(<Harness data={rows} onActivate={(p) => activated.push(p.id)} />)
   await screen.getByRole('gridcell', { name: rows[2]?.phone ?? '', exact: true }).click()
+  expect(activated).toEqual([rows[2]?.id])
+  // The click also moved the grid's focus there, so the keyboard carries on from that row.
   await userEvent.keyboard('{ArrowUp}{Enter}')
-  expect(activated).toEqual([rows[1]?.id])
+  expect(activated).toEqual([rows[2]?.id, rows[1]?.id])
+})
+
+test('a click on a header sorts and activates nothing', async () => {
+  const activated: string[] = []
+  const rows = patients(3)
+  const screen = await render(<Harness data={rows} onActivate={(p) => activated.push(p.id)} />)
+  await screen.getByRole('columnheader', { name: 'Name' }).click()
+  await expect.element(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'ascending')
+  expect(activated).toEqual([])
+})
+
+test('rows are not clickable without onRowActivate', async () => {
+  const rows = patients(3)
+  const screen = await render(<Harness data={rows} />)
+  await expect.element(screen.getByRole('gridcell', { name: rows[0]?.phone ?? '', exact: true })).toBeVisible()
+  expect(document.querySelector('[data-activatable]')).toBeNull()
 })
 
 test('an empty table says so in a grid cell', async () => {

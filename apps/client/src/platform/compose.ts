@@ -8,8 +8,8 @@ import { httpTransport } from './http'
 import { operationClient } from './operations'
 import { memorySession } from './session'
 import { checkVersion, registerShellWorker } from './shell'
-import { type SignInConfig, signIn } from './sign-in'
-import type { Platform, RuntimeMode } from './types'
+import { type SignInConfig, signIn, signInOnUnauthorized } from './sign-in'
+import type { Platform, RuntimeMode, Transport } from './types'
 
 interface RuntimeConfig {
   mode: Exclude<RuntimeMode, 'tauri'>
@@ -91,9 +91,26 @@ export function httpPlatform(
 ): Platform {
   const session = memorySession()
   const auth = mode === 'central' ? bearerAuth(session) : dpopAuth(session, () => device?.current())
-  const transport = httpTransport(apiBase, auth, fetchImpl)
+  // An edge's tokens are bound to the device's key (DPoP) and issued only to an enrolled device.
+  const staffSignIn =
+    signInConfig === undefined
+      ? undefined
+      : signIn(signInConfig, session, {
+          fetch: fetchImpl,
+          ...(device === undefined
+            ? {}
+            : {
+                proof: async (method: string, url: URL, token?: string) => {
+                  const keys = device.current()
+                  return keys === undefined ? undefined : dpopProof(keys, method, url, token)
+                },
+              }),
+        })
+  // A 401 sends the person to sign in and back (#835): a page load forgets the in-memory tokens.
+  const signedIn = (inner: Transport) => (staffSignIn === undefined ? inner : signInOnUnauthorized(inner, staffSignIn, session))
+  const transport = signedIn(httpTransport(apiBase, auth, fetchImpl))
   // FHIR is served beside the API (central: `/fhir`), or under it when runtime.json names no base.
-  const fhirTransport = fhirBase === undefined ? transport : httpTransport('', auth, fetchImpl)
+  const fhirTransport = fhirBase === undefined ? transport : signedIn(httpTransport('', auth, fetchImpl))
   const fhirPath = fhirBase?.replace(/\/$/, '') ?? '/fhir'
   // The portal is central's only; its patients have a session apart from staff sessions.
   const portal = (() => {
@@ -115,22 +132,7 @@ export function httpPlatform(
     registries: registriesCommands(fhirTransport, fhirPath, ninSystem),
     forms: formsCommands(fhirTransport, fhirPath),
     session,
-    // An edge's tokens are bound to the device's key (DPoP) and issued only to an enrolled device.
-    ...(signInConfig === undefined
-      ? {}
-      : {
-          signIn: signIn(signInConfig, session, {
-            fetch: fetchImpl,
-            ...(device === undefined
-              ? {}
-              : {
-                  proof: async (method: string, url: URL, token?: string) => {
-                    const keys = device.current()
-                    return keys === undefined ? undefined : dpopProof(keys, method, url, token)
-                  },
-                }),
-          }),
-        }),
+    ...(staffSignIn === undefined ? {} : { signIn: staffSignIn }),
     ...(portal === undefined ? {} : { portal }),
     ...(device === undefined ? {} : { device }),
     events: sseEventSource(`${apiBase.replace(/\/$/, '')}/events`, auth, { fetch: fetchImpl }),
