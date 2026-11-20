@@ -354,7 +354,14 @@ const INVENTORY: &[Mounted] = &[
         file: "central-server/src/studio/mod.rs",
         prefix: "/api/studio",
         gate: Gate::Staff,
-        paths: &["/packages", "/packages/{id}", "/packages/{id}/{action}"],
+        paths: &[
+            "/packages",
+            "/packages/{id}",
+            "/packages/{id}/{action}",
+            "/packages/{id}/files/{*path}",
+            "/packages/{id}/version",
+            "/drafts",
+        ],
     },
     Mounted {
         file: "health-provisioning/src/routes.rs",
@@ -473,6 +480,7 @@ fn concrete(prefix: &str, path: &str) -> String {
         .replace("{service_point}", "triage")
         .replace("{entry}", "018f0000-0000-7000-8000-000000000001")
         .replace("{key}", "triage")
+        .replace("{*path}", "Questionnaire-anc-visit.json")
         .replace("{id}", "018f0000-0000-7000-8000-000000000000");
     match path.as_str() {
         "/" => prefix.to_owned(),

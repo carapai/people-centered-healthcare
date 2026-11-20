@@ -13,6 +13,7 @@ const actionLabels = {
   publish: m.sdActionPublish,
   activate: m.sdActionActivate,
   'request-changes': m.sdActionRequestChanges,
+  check: m.sdActionCheck,
 } as const satisfies Record<StudioActionName, unknown>
 
 const stageLabels = {

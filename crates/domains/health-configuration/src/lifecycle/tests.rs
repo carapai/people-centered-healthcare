@@ -268,3 +268,63 @@ fn what_a_person_may_do_is_checked_by_the_rules_the_transitions_enforce() {
     }
     assert_eq!(lifecycle, before);
 }
+
+#[test]
+fn check_now_records_both_results_and_leaves_the_draft_where_it_is() {
+    let mut lifecycle = draft(PackageKind::Program);
+    let before = lifecycle.clone();
+    let record = lifecycle
+        .checked("ann", vec!["a problem".into()], vec![], now())
+        .expect("checked");
+    assert_eq!(
+        record.step,
+        Step::Checked {
+            validation: vec!["a problem".into()],
+            simulation: vec![],
+        }
+    );
+    assert_eq!((record.from, record.to), (Stage::Draft, Stage::Draft));
+    assert_eq!(record.by, "ann");
+    assert_eq!(record.content, "sha-a");
+    assert_eq!(lifecycle, before, "a check changes nothing");
+
+    // Only a draft is checked; once submitted, submission's own run decides.
+    lifecycle.submit("ann", now()).expect("submitted");
+    assert_eq!(
+        lifecycle.checked("ann", vec![], vec![], now()),
+        Err(Refused::Stage(Stage::Validation))
+    );
+    assert_eq!(
+        lifecycle.check(Action::Check, "ann"),
+        Err(Refused::Stage(Stage::Validation))
+    );
+    assert_eq!(
+        lifecycle.check(Action::Edit, "ann"),
+        Err(Refused::Stage(Stage::Validation))
+    );
+}
+
+#[test]
+fn a_draft_changes_version_until_it_is_submitted() {
+    let mut lifecycle = draft(PackageKind::Program);
+    let next: Version = "1.3.0".parse().expect("version");
+    let record = lifecycle
+        .change_version("ann", next.clone(), "sha-b", now())
+        .expect("renumbered");
+    assert_eq!(
+        record.step,
+        Step::VersionChanged {
+            previous: "1.2.0".parse().expect("version"),
+        }
+    );
+    assert_eq!(record.version, next);
+    assert_eq!(lifecycle.version, next);
+    assert_eq!(lifecycle.content, "sha-b");
+    assert_eq!(lifecycle.stage, Stage::Draft);
+
+    lifecycle.submit("ann", now()).expect("submitted");
+    assert_eq!(
+        lifecycle.change_version("ann", "1.4.0".parse().expect("version"), "sha-c", now()),
+        Err(Refused::Stage(Stage::Validation))
+    );
+}

@@ -41,6 +41,9 @@
 //!
 //! - [`studio`] is what the Studio shows of it (#492): the package list, one package read from
 //!   top to bottom, and the actions the signed-in person may take, each refused one with why.
+//! - [`editing`] is how the Studio changes a draft (#494): one file at a time against the
+//!   draft's revision, a new draft blank or copied from a published version, a change of
+//!   version, and *Check now*.
 //!
 //! Each change is a compare-and-set on the lifecycle's revision, so of two people acting at
 //! once one gets [`Error::Conflict`] rather than overwriting the other.
@@ -64,6 +67,7 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
+pub mod editing;
 mod extraction;
 mod programs;
 pub mod studio;
@@ -91,6 +95,17 @@ pub enum Error {
     /// That `name@version` is already published, or the files are another package's.
     #[error("{0}")]
     Conflict(String),
+    /// A save named a revision of the draft that is no longer its revision: someone else saved
+    /// first (studio.md § The authoring API, Editing).
+    #[error("the draft changed meanwhile (it is at revision {current}); read it again")]
+    Stale {
+        /// The draft's revision now.
+        current: u64,
+    },
+    /// What was sent cannot be saved in the draft: a path outside the package, or a change only
+    /// another request makes.
+    #[error("{0}")]
+    Invalid(String),
     /// The store or the blob store failed.
     #[error("store: {0}")]
     Store(String),
@@ -249,6 +264,13 @@ impl Publications {
         self
     }
 
+    /// These publications, running `tests/` cases in `sandbox` instead.
+    #[must_use]
+    pub fn with_sandbox(mut self, sandbox: Arc<dyn Sandbox>) -> Self {
+        self.sandbox = sandbox;
+        self
+    }
+
     fn audit(&self, record: &Record, detail: &str) -> Value {
         json!({
             "resourceType": "AuditEvent",
@@ -336,19 +358,30 @@ impl Publications {
                 }
             }
         }
+        self.append(&mut tx, &id, records).await?;
+        tx.commit().await.map_err(failed)
+    }
+
+    /// Appends each record to lifecycle `id`, with its audit.
+    async fn append(
+        &self,
+        tx: &mut SurrealTx,
+        id: &str,
+        records: &[(Record, String)],
+    ) -> Result<(), Error> {
         for (record, detail) in records {
             tx.append_package_lifecycle_record(
                 &Uuid::now_v7().to_string(),
-                &id,
+                id,
                 &serde_json::to_string(record).map_err(failed)?,
             )
             .await
             .map_err(failed)?;
-            health_audit::append(&mut tx, &self.audit(record, detail))
+            health_audit::append(tx, &self.audit(record, detail))
                 .await
                 .map_err(failed)?;
         }
-        tx.commit().await.map_err(failed)
+        Ok(())
     }
 
     /// Starts or revises the draft of the package in `files`, by `by`.

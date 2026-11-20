@@ -5,13 +5,17 @@
 //! The actions are derived from the rules that enforce them: [`Lifecycle::check`] is what each
 //! transition calls, and the permission is the one the Studio's API checks before acting. The
 //! list is advisory: every action is checked again when it is taken (ADR 0025).
+//!
+//! *Check now* (#494) is listed with the others, but is never anyone's next step. Whether the
+//! person may change the draft is [`edit_refusal`], and the page carries the draft's revision
+//! and files for the editors.
 
 use std::collections::BTreeMap;
 
 use health_configuration::activation::{ActivationRecord, Scope};
 use health_configuration::lifecycle::semver::Bump;
 use health_configuration::lifecycle::{Action, Lifecycle, Record, Refused, Stage, Step};
-use health_configuration::package::{MANIFEST, PackageKind, Version};
+use health_configuration::package::{INDEX, MANIFEST, PackageKind, Version};
 use health_packages::Packed;
 use health_surrealdb::SurrealTx;
 use health_time::Timestamp;
@@ -58,24 +62,27 @@ pub enum StudioAction {
     Publish,
     /// Activate the published version in a scope.
     Activate,
+    /// *Check now*: run validation and simulation on the draft, keeping the results.
+    Check,
 }
 
 impl StudioAction {
-    /// Every action, in the order a package meets them. Requesting changes comes last: it is
-    /// never the step a package is waiting for.
-    pub const ALL: [Self; 6] = [
+    /// Every action, in the order a package meets them. Requesting changes and *Check now* come
+    /// last: neither is the step a package is waiting for.
+    pub const ALL: [Self; 7] = [
         Self::Submit,
         Self::Review,
         Self::Approve,
         Self::Publish,
         Self::Activate,
         Self::RequestChanges,
+        Self::Check,
     ];
 
     /// The permission it needs (studio.md § The authoring API, Permissions).
     pub fn permission(self) -> &'static str {
         match self {
-            Self::Submit => AUTHOR_PERMISSION,
+            Self::Submit | Self::Check => AUTHOR_PERMISSION,
             Self::Review | Self::RequestChanges => REVIEW_PERMISSION,
             Self::Approve => APPROVE_PERMISSION,
             Self::Publish => PUBLISH_PERMISSION,
@@ -90,6 +97,7 @@ impl StudioAction {
             Self::RequestChanges => Some(Action::RequestChanges),
             Self::Approve => Some(Action::Approve),
             Self::Publish => Some(Action::Publish),
+            Self::Check => Some(Action::Check),
             Self::Activate => None,
         }
     }
@@ -248,12 +256,60 @@ pub fn allowed(
         .collect()
 }
 
-/// The first action the person may take: their next step, or nothing for them.
+/// The first action the person may take: their next step, or nothing for them. *Check now* is
+/// never the next step: it changes nothing.
 pub fn next_step(actions: &[Allowed]) -> Option<StudioAction> {
     actions
         .iter()
-        .find(|allowed| allowed.refused.is_none())
+        .find(|allowed| allowed.refused.is_none() && allowed.action != StudioAction::Check)
         .map(|allowed| allowed.action)
+}
+
+/// Why `by` may not change `lifecycle`'s draft (its files or its version); `None` if they may.
+/// The same rule [`Lifecycle::revise`] enforces, behind the author permission.
+pub fn edit_refusal(
+    lifecycle: &Lifecycle,
+    by: &str,
+    has: &(dyn Fn(&str) -> bool + Sync),
+) -> Option<Refusal> {
+    if !has(AUTHOR_PERMISSION) {
+        return Some(Refusal::permission(AUTHOR_PERMISSION));
+    }
+    lifecycle
+        .check(Action::Edit, by)
+        .err()
+        .map(|refused| Refusal::from(&refused))
+}
+
+/// One file of a package version, as the Studio lists it to open in an editor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PackageFile {
+    /// Its path in the package.
+    pub path: String,
+    /// Its `resourceType`, for a FHIR artefact.
+    pub resource_type: Option<String>,
+    /// Its canonical URL, if it has one.
+    pub url: Option<String>,
+    /// Its version, if it has one.
+    pub version: Option<String>,
+}
+
+/// Every file of `packed` but the generated index, by path.
+fn files(packed: &Packed) -> Vec<PackageFile> {
+    packed
+        .files
+        .keys()
+        .filter(|path| path.as_str() != INDEX)
+        .map(|path| {
+            let artefact = packed.contents.artefacts.iter().find(|a| &a.path == path);
+            PackageFile {
+                path: path.clone(),
+                resource_type: artefact.map(|a| a.resource_type.clone()),
+                url: artefact.and_then(|a| a.url.clone()),
+                version: artefact.and_then(|a| a.version.clone()),
+            }
+        })
+        .collect()
 }
 
 /// A version active in a scope.
@@ -366,6 +422,12 @@ pub struct PackagePage {
     pub approvers: Vec<String>,
     /// Its history, oldest first.
     pub history: Vec<Record>,
+    /// Its revision: a save names it, and is refused once another came first.
+    pub revision: u64,
+    /// Why the signed-in person may not change it; `None` if they may.
+    pub edit: Option<Refusal>,
+    /// Its files, to open in an editor.
+    pub files: Vec<PackageFile>,
 }
 
 /// The latest stored result of each check in `history`.
@@ -377,6 +439,21 @@ fn checks(lifecycle: &Lifecycle, history: &[Record]) -> Vec<CheckResult> {
             Step::ValidationFailed { problems } => (0, CheckKind::Validation, problems.clone()),
             Step::Simulated => (1, CheckKind::Simulation, Vec::new()),
             Step::SimulationFailed { problems } => (1, CheckKind::Simulation, problems.clone()),
+            Step::Checked {
+                validation,
+                simulation,
+            } => {
+                let result = |check, problems: &Vec<String>| CheckResult {
+                    check,
+                    passed: problems.is_empty(),
+                    problems: problems.clone(),
+                    at: record.at,
+                    current: record.content == lifecycle.content,
+                };
+                found.insert(0, result(CheckKind::Validation, validation));
+                found.insert(1, result(CheckKind::Simulation, simulation));
+                continue;
+            }
             _ => continue,
         };
         found.insert(
@@ -578,6 +655,7 @@ impl Publications {
     ) -> Result<PackagePage, Error> {
         let (lifecycle, history) = self.lifecycle(id).await?;
         let mut tx = self.begin().await?;
+        let (_, revision) = self.load(&mut tx, id).await?;
         let activations = self.activation_records(&mut tx).await?;
         let packed = self.packed(&lifecycle.content).await?;
         let (summary, previous) = self
@@ -595,6 +673,9 @@ impl Publications {
             reviewer: lifecycle.reviewer.clone(),
             approvers: lifecycle.approvers.iter().cloned().collect(),
             history,
+            revision,
+            edit: edit_refusal(&lifecycle, by, has),
+            files: files(&packed),
         })
     }
 }

@@ -24,7 +24,7 @@ test('the package list and a draft read from top to bottom, with refused actions
   await expect(page.getByRole('heading', { name: 'Discussion' })).toBeVisible()
   // In Draft, only its author may submit; approval waits for review.
   await expect(page.getByRole('button', { name: 'Submit' })).toBeDisabled()
-  await expect(page.getByText('You need the metadata.author permission')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Submit' })).toHaveAccessibleDescription('You need the metadata.author permission')
   await expect(page.getByRole('button', { name: 'Approve' })).toBeDisabled()
   await expect(page.getByText('Not possible while it is at the draft stage').first()).toBeVisible()
   await noViolations(page)
@@ -48,4 +48,50 @@ test('a click opens a package, and after a reload sign-in comes back to it', asy
   await page.keyboard.press('Enter')
   await page.waitForURL(opened)
   await expect(page.getByRole('heading', { name: 'What changed' })).toBeVisible()
+})
+
+// #494: the OPD draft's author edits one of its files in the browser. A second tab that opened
+// the same file before the first one saved is refused, keeps nothing, and is told to reload.
+// *Check now* then shows the checks on the draft page, and the draft stays a draft.
+test('the author edits a file, a stale second tab is refused, and Check now keeps the draft a draft', async ({ page, browser }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible()
+  await page.getByRole('link', { name: 'Open Questionnaire-opd-triage.json' }).click()
+  const content = page.getByLabel('Content (JSON)')
+  await expect(content).toHaveValue(/"resourceType": "Questionnaire"/)
+  await noViolations(page)
+
+  // A second tab, signed in as the same author, opens the same file before the first saves.
+  const other = await (await browser.newContext()).newPage()
+  await signIn(other, USERS.author)
+  await press(other, 'Studio', 'link')
+  await other.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await other.getByRole('link', { name: 'Open Questionnaire-opd-triage.json' }).click()
+  const otherContent = other.getByLabel('Content (JSON)')
+  await expect(otherContent).toHaveValue(/"resourceType": "Questionnaire"/)
+
+  const text = await content.inputValue()
+  await content.fill(text.replace('"status": "active"', '"status": "active", "description": "Edited in the first tab"'))
+  await press(page, 'Save')
+  await expect(page.getByRole('status').filter({ hasText: 'Saved.' })).toBeVisible()
+
+  const otherText = await otherContent.inputValue()
+  await otherContent.fill(otherText.replace('"status": "active"', '"status": "active", "description": "Edited in the second tab"'))
+  await press(other, 'Save')
+  await expect(other.getByRole('alert').filter({ hasText: 'Someone saved this draft after you opened it' })).toBeVisible()
+  await press(other, 'Reload')
+  await expect(otherContent).toHaveValue(/Edited in the first tab/)
+  await other.context().close()
+
+  // Check now runs the checks; the results show on the draft page, and it is still a draft.
+  await press(page, 'Back to the package', 'link')
+  await expect(page.getByRole('heading', { name: 'Who must act' })).toBeVisible()
+  await press(page, 'Check now')
+  await expect(page.getByRole('status').filter({ hasText: 'Done.' })).toBeVisible()
+  await expect(page.getByText(/^Validation (passed|failed)/)).toBeVisible()
+  await expect(page.getByText(/^Simulation (passed|failed)/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Submit' })).toBeEnabled()
+  await noViolations(page)
 })

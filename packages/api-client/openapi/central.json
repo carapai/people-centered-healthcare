@@ -30,6 +30,106 @@
         }
       }
     },
+    "/api/studio/drafts": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and starts a draft.",
+        "description": "Starts a draft as the signed-in account: with `copyOf`, a copy of that published version under the next minor version marked `-draft` (`2.0.0` gives `2.1.0-draft`), its artefacts as they were; otherwise a blank new package from `name`, `kind`, `title`, `version` and `canonical`. Needs `metadata.author`.",
+        "operationId": "startStudioDraft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioNewDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Started; its page",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`copyOf` is not published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That version is drafted or published already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages": {
       "get": {
         "tags": [
@@ -104,6 +204,14 @@
         "responses": {
           "200": {
             "description": "The package version",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's revision, for `If-Match`"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -155,13 +263,497 @@
         }
       }
     },
+    "/api/studio/packages/{id}/files/{path}": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves one file of a package version.",
+        "description": "One file of a package version, for an editor, with the draft's revision as the `ETag` to send back as `If-Match` when saving.",
+        "operationId": "getStudioFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The file's path in the package, e.g. `Questionnaire-anc-visit.json`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version or file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and saves one file of a draft.",
+        "description": "Writes one file of a draft (a new one is added) and repacks the draft. `If-Match` must carry the revision read (the `ETag`): a save without it, or after someone else's, is refused with 412 and nothing is kept. `package.json` keeps its name and version; the version changes through `PUT …/version`. Needs `metadata.author`. Answers the page as it is now.",
+        "operationId": "saveStudioFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The file's path in the package",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The draft's revision, as its ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioFileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the page as it is now",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's new revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The draft is no longer in Draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is missing or stale: reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The file or its path cannot be saved in the package",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and removes one file of a draft.",
+        "description": "Removes one file of a draft and repacks it, with `If-Match` as for a save. `package.json` and the manifest stay. Needs `metadata.author`.",
+        "operationId": "removeStudioFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The file's path in the package",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The draft's revision, as its ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed; the page as it is now",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's new revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version or file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The draft is no longer in Draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is missing or stale: reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That file cannot be removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/version": {
+      "put": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and changes a draft's version.",
+        "description": "Gives a draft another version until it is submitted, where the semver check confirms it: `package.json` and the manifest take it, and the draft becomes `name@version` with its history. `If-Match` as for a save. Needs `metadata.author`. Answers the page under its new id.",
+        "operationId": "setStudioVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The draft's revision, as its ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioVersionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Renumbered; the page under its new id",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's new revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not in Draft, or that version is drafted or published already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is missing or stale: reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not an exact version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/{action}": {
       "post": {
         "tags": [
           "studio"
         ],
         "summary": "Documents and takes one lifecycle step.",
-        "description": "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). Answers the page as it is afterwards.",
+        "description": "Takes one lifecycle step as the signed-in account, checked again here whatever the list said: the permission, the stage and the separation of duties. `request-changes` needs a `reason`, `activate` a `scope` (`national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`). `check` (*Check now*) runs validation and simulation on a draft and keeps the results, leaving it in Draft. Answers the page as it is afterwards.",
         "operationId": "takeStudioAction",
         "parameters": [
           {
@@ -579,7 +1171,8 @@
           "approve",
           "publish",
           "activate",
-          "request-changes"
+          "request-changes",
+          "check"
         ]
       },
       "StudioArtefactChange": {
@@ -670,6 +1263,44 @@
           }
         }
       },
+      "StudioFile": {
+        "type": "object",
+        "description": "One file of a package version, for an editor.",
+        "required": [
+          "path",
+          "content",
+          "revision"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Its text."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its path in the package."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The draft's revision when it was read, also the `ETag`.",
+            "minimum": 0
+          }
+        }
+      },
+      "StudioFileInput": {
+        "type": "object",
+        "description": "A file's new text.",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The whole file."
+          }
+        }
+      },
       "StudioHistoryEntry": {
         "type": "object",
         "description": "One entry of the discussion: a lifecycle record.",
@@ -689,12 +1320,19 @@
             "type": "string",
             "description": "Who did it (`system` for the automated checks)."
           },
+          "previous": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version the draft had, when it took another."
+          },
           "problems": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The problems a failed check found."
+            "description": "The problems a failed check found; for *Check now*, validation's then simulation's."
           },
           "reason": {
             "type": [
@@ -727,8 +1365,62 @@
           "reviewed",
           "changes-requested",
           "approved",
-          "published"
+          "published",
+          "checked",
+          "version-changed"
         ]
+      },
+      "StudioNewDraft": {
+        "type": "object",
+        "description": "How to start a draft: a copy of a published version, or a blank new package.",
+        "properties": {
+          "canonical": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The canonical base of a blank package's artefacts, e.g. `http://health.go.ug/fhir`."
+          },
+          "copyOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The published `name@version` to copy; the draft takes the next minor version."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioPackageKind",
+                "description": "A blank package's kind."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A blank package's name, e.g. `ug.moh.tb`."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A blank package's title."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A blank package's first version, e.g. `0.1.0`."
+          }
+        }
       },
       "StudioPackage": {
         "type": "object",
@@ -823,6 +1515,40 @@
           }
         }
       },
+      "StudioPackageFile": {
+        "type": "object",
+        "description": "One file of a package version.",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Its path in the package."
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its `resourceType`, for a FHIR artefact."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its canonical URL."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
       "StudioPackageKind": {
         "type": "string",
         "description": "The kind of package, which decides its approvers.",
@@ -860,7 +1586,10 @@
           "checks",
           "approvalsRequired",
           "approvers",
-          "history"
+          "history",
+          "revision",
+          "editable",
+          "files"
         ],
         "properties": {
           "approvalsRequired": {
@@ -890,6 +1619,28 @@
             },
             "description": "The stored check results."
           },
+          "editRefusal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ActionRefusal",
+                "description": "Why not, when they may not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "Whether the signed-in person may change the draft's files and version."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioPackageFile"
+            },
+            "description": "Its files, to open in an editor."
+          },
           "history": {
             "type": "array",
             "items": {
@@ -907,6 +1658,12 @@
               "null"
             ],
             "description": "Who accepted it at review."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The draft's revision, also its `ETag`: a save sends it back as `If-Match`.",
+            "minimum": 0
           }
         }
       },
@@ -947,6 +1704,19 @@
           "not-published",
           "other"
         ]
+      },
+      "StudioVersionInput": {
+        "type": "object",
+        "description": "A draft's new version.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "An exact version, e.g. `2.1.0`."
+          }
+        }
       }
     }
   }

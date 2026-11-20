@@ -4,8 +4,8 @@ use health_configuration::lifecycle::semver::Bump;
 use health_configuration::lifecycle::{Record, Stage, Step};
 use health_configuration::package::PackageKind;
 use health_publication::studio::{
-    ActiveIn, Allowed, ArtefactChange, ArtefactChangeKind, CheckKind, CheckResult, PackagePage,
-    PackageSummary, Refusal, RefusalCode, StudioAction,
+    ActiveIn, Allowed, ArtefactChange, ArtefactChangeKind, CheckKind, CheckResult, PackageFile,
+    PackagePage, PackageSummary, Refusal, RefusalCode, StudioAction,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -20,6 +20,7 @@ pub(crate) enum StudioActionName {
     Publish,
     Activate,
     RequestChanges,
+    Check,
 }
 
 impl StudioActionName {
@@ -38,6 +39,7 @@ impl From<StudioAction> for StudioActionName {
             StudioAction::Publish => Self::Publish,
             StudioAction::Activate => Self::Activate,
             StudioAction::RequestChanges => Self::RequestChanges,
+            StudioAction::Check => Self::Check,
         }
     }
 }
@@ -51,6 +53,7 @@ impl From<StudioActionName> for StudioAction {
             StudioActionName::Publish => Self::Publish,
             StudioActionName::Activate => Self::Activate,
             StudioActionName::RequestChanges => Self::RequestChanges,
+            StudioActionName::Check => Self::Check,
         }
     }
 }
@@ -81,7 +84,7 @@ impl From<Stage> for PackageStage {
 }
 
 /// The kind of package, which decides its approvers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum StudioPackageKind {
     NationalCore,
@@ -90,6 +93,19 @@ pub(crate) enum StudioPackageKind {
     CountryConfiguration,
     Override,
     Language,
+}
+
+impl From<StudioPackageKind> for PackageKind {
+    fn from(kind: StudioPackageKind) -> Self {
+        match kind {
+            StudioPackageKind::NationalCore => Self::NationalCore,
+            StudioPackageKind::Terminology => Self::Terminology,
+            StudioPackageKind::Program => Self::Program,
+            StudioPackageKind::CountryConfiguration => Self::CountryConfiguration,
+            StudioPackageKind::Override => Self::Override,
+            StudioPackageKind::Language => Self::Language,
+        }
+    }
 }
 
 impl From<PackageKind> for StudioPackageKind {
@@ -374,6 +390,8 @@ pub(crate) enum StudioHistoryStep {
     ChangesRequested,
     Approved,
     Published,
+    Checked,
+    VersionChanged,
 }
 
 /// One entry of the discussion: a lifecycle record.
@@ -390,8 +408,10 @@ pub(crate) struct StudioHistoryEntry {
     pub(crate) stage: PackageStage,
     /// What a reviewer or approver asked to change.
     pub(crate) reason: Option<String>,
-    /// The problems a failed check found.
+    /// The problems a failed check found; for *Check now*, validation's then simulation's.
     pub(crate) problems: Vec<String>,
+    /// The version the draft had, when it took another.
+    pub(crate) previous: Option<String>,
 }
 
 impl From<&Record> for StudioHistoryEntry {
@@ -416,6 +436,19 @@ impl From<&Record> for StudioHistoryEntry {
             ),
             Step::Approved => (StudioHistoryStep::Approved, None, Vec::new()),
             Step::Published => (StudioHistoryStep::Published, None, Vec::new()),
+            Step::Checked {
+                validation,
+                simulation,
+            } => (
+                StudioHistoryStep::Checked,
+                None,
+                validation.iter().chain(simulation).cloned().collect(),
+            ),
+            Step::VersionChanged { .. } => (StudioHistoryStep::VersionChanged, None, Vec::new()),
+        };
+        let previous = match &record.step {
+            Step::VersionChanged { previous } => Some(previous.to_string()),
+            _ => None,
         };
         Self {
             step,
@@ -424,6 +457,7 @@ impl From<&Record> for StudioHistoryEntry {
             stage: record.to.into(),
             reason,
             problems,
+            previous,
         }
     }
 }
@@ -446,6 +480,91 @@ pub(crate) struct StudioPackagePage {
     pub(crate) approvers: Vec<String>,
     /// The history, oldest first.
     pub(crate) history: Vec<StudioHistoryEntry>,
+    /// The draft's revision, also its `ETag`: a save sends it back as `If-Match`.
+    pub(crate) revision: u64,
+    /// Whether the signed-in person may change the draft's files and version.
+    pub(crate) editable: bool,
+    /// Why not, when they may not.
+    pub(crate) edit_refusal: Option<ActionRefusal>,
+    /// Its files, to open in an editor.
+    pub(crate) files: Vec<StudioPackageFile>,
+}
+
+/// One file of a package version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioPackageFile {
+    /// Its path in the package.
+    pub(crate) path: String,
+    /// Its `resourceType`, for a FHIR artefact.
+    pub(crate) resource_type: Option<String>,
+    /// Its canonical URL.
+    pub(crate) url: Option<String>,
+    /// Its version.
+    pub(crate) version: Option<String>,
+}
+
+impl From<&PackageFile> for StudioPackageFile {
+    fn from(file: &PackageFile) -> Self {
+        Self {
+            path: file.path.clone(),
+            resource_type: file.resource_type.clone(),
+            url: file.url.clone(),
+            version: file.version.clone(),
+        }
+    }
+}
+
+/// One file of a package version, for an editor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioFile {
+    /// Its path in the package.
+    pub(crate) path: String,
+    /// Its text.
+    pub(crate) content: String,
+    /// The draft's revision when it was read, also the `ETag`.
+    pub(crate) revision: u64,
+}
+
+/// A file's new text.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioFileInput {
+    /// The whole file.
+    pub(crate) content: String,
+}
+
+/// A draft's new version.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioVersionInput {
+    /// An exact version, e.g. `2.1.0`.
+    pub(crate) version: String,
+}
+
+/// How to start a draft: a copy of a published version, or a blank new package.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioNewDraft {
+    /// The published `name@version` to copy; the draft takes the next minor version.
+    #[serde(default)]
+    pub(crate) copy_of: Option<String>,
+    /// A blank package's name, e.g. `ug.moh.tb`.
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+    /// A blank package's kind.
+    #[serde(default)]
+    pub(crate) kind: Option<StudioPackageKind>,
+    /// A blank package's title.
+    #[serde(default)]
+    pub(crate) title: Option<String>,
+    /// A blank package's first version, e.g. `0.1.0`.
+    #[serde(default)]
+    pub(crate) version: Option<String>,
+    /// The canonical base of a blank package's artefacts, e.g. `http://health.go.ug/fhir`.
+    #[serde(default)]
+    pub(crate) canonical: Option<String>,
 }
 
 impl From<&PackagePage> for StudioPackagePage {
@@ -462,6 +581,10 @@ impl From<&PackagePage> for StudioPackagePage {
             reviewer: page.reviewer.clone(),
             approvers: page.approvers.clone(),
             history: page.history.iter().map(StudioHistoryEntry::from).collect(),
+            revision: page.revision,
+            editable: page.edit.is_none(),
+            edit_refusal: page.edit.as_ref().map(ActionRefusal::from),
+            files: page.files.iter().map(StudioPackageFile::from).collect(),
         }
     }
 }

@@ -1,14 +1,15 @@
 import { DataTable, emptyView, type DataTableColumn, type DataTableView } from '@health/design-system'
 import { css } from '@health/design-system/css'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
 import { studioMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
-import { StudioError, packagesQuery, type StudioPackage } from './api'
-import { actionLabel, stageLabel } from './wording'
+import { button, control, field } from '../reception/styles'
+import { StudioError, packageQuery, packagesQuery, startDraft, studioKey, type StudioPackage, type StudioPackageKind } from './api'
+import { actionLabel, refusalText, stageLabel } from './wording'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '4', maxWidth: '6xl' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -72,6 +73,72 @@ export function PackagesPage() {
           <DataTable caption={intl.formatMessage(m.sdTitle)} columns={columns} data={packages.data} getRowId={(row) => row.id} view={view} onViewChange={setView} onRowActivate={open} />
         </>
       )}
+      {packages.data === undefined ? null : <NewPackage />}
     </section>
+  )
+}
+
+const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language']
+
+/** A blank draft of a new package (#494). The next version of a published package starts from
+ * its page instead. */
+function NewPackage() {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const ids = { name: useId(), title: useId(), kind: useId(), version: useId(), canonical: useId() }
+  const [form, setForm] = useState({ name: '', title: '', kind: 'program' as StudioPackageKind, version: '0.1.0', canonical: '' })
+  const start = useMutation({
+    mutationFn: () => startDraft(platform.transport, form),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(packageQuery(platform.transport, next.package.id).queryKey, next)
+      await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
+      await navigate({ to: '/studio/$id', params: { id: next.package.id } })
+    },
+  })
+  const failure = start.error instanceof StudioError ? (start.error.refusal === null || start.error.refusal === undefined ? start.error.detail : refusalText(intl, start.error.refusal)) : ''
+  const text = (key: 'name' | 'title' | 'version' | 'canonical', label: string) => (
+    <div className={field}>
+      <label htmlFor={ids[key]}>{label}</label>
+      <input id={ids[key]} className={control} value={form[key]} required onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+    </div>
+  )
+  return (
+    <details>
+      <summary className={css({ cursor: 'pointer', fontWeight: 'semibold' })}>{intl.formatMessage(m.sdNewDraft)}</summary>
+      <form
+        className={css({ display: 'flex', flexDirection: 'column', gap: '3', pt: '3' })}
+        onSubmit={(e) => {
+          e.preventDefault()
+          start.mutate()
+        }}
+      >
+        {text('name', intl.formatMessage(m.sdNewDraftName))}
+        {text('title', intl.formatMessage(m.sdNewDraftTitle))}
+        <div className={field}>
+          <label htmlFor={ids.kind}>{intl.formatMessage(m.sdNewDraftKind)}</label>
+          <select id={ids.kind} className={control} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as StudioPackageKind })}>
+            {kinds.map((kind) => (
+              <option key={kind} value={kind}>
+                {kind}
+              </option>
+            ))}
+          </select>
+        </div>
+        {text('version', intl.formatMessage(m.sdNewDraftVersion))}
+        {text('canonical', intl.formatMessage(m.sdNewDraftCanonical))}
+        <div>
+          <button type="submit" className={button} disabled={start.isPending}>
+            {intl.formatMessage(m.sdNewDraftStart)}
+          </button>
+        </div>
+        {start.isError ? (
+          <p role="alert" className={css({ color: 'danger.text' })}>
+            {intl.formatMessage(m.sdStartFailed, { reason: failure })}
+          </p>
+        ) : null}
+      </form>
+    </details>
   )
 }
