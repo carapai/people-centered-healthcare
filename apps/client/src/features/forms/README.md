@@ -3,7 +3,7 @@
 The shared Questionnaire renderer (client-application.md § Forms; ADRs 0038, 0052, 0054; #92).
 
 - **`QuestionnaireRenderer`** renders a Questionnaire with its Form Layout, on TanStack Form.
-  - **Answers:** boolean (radio or checkbox), coding from `answerOption` (select or radio), integer and decimal, date and dateTime, and string and text.
+  - **Answers:** boolean (radio or checkbox), coding from `answerOption`, or from the codes the caller gives for its `answerValueSet` (`answers`, by binding; the form designer's preview does), as select or radio, integer and decimal, date and dateTime, and string and text.
   - **Exact numbers:** decimals keep the text as typed (`1.50`) as `LosslessNumber`s (ADR 0052).
   - **Groups and repeats:** groups render as fieldsets, and repeating groups can be added and removed. Every repeat keeps a stable `item.id`.
   - **Live behaviour, with fhirpath.js in lossless precise mode** (the configuration shared with `@health/fhirpath-conformance`):
@@ -24,7 +24,7 @@ The shared Questionnaire renderer (client-application.md § Forms; ADRs 0038, 00
 - **Not yet:**
   - opening a form from an encounter or task, with its subject;
   - Form Layouts from the active configuration (the screen renders without one until activation, #89);
-  - `answerValueSet`, attachments, quantities and population.
+  - expanding `answerValueSet` itself (a bound question offers nothing unless its codes are given), attachments, quantities and population.
 
 ## Tests
 

@@ -1,6 +1,7 @@
 import type { Questionnaire, QuestionnaireItem } from '@health/fhir-types'
 
 import { FORM_LAYOUT_SCHEMA, fitting, type FormLayout, type Widget } from '../../forms/layout'
+import { suggestWidget } from '../terminology/model'
 
 // The form designer's model (studio.md § The form designer; #497), as pure functions. It edits
 // the draft's own Questionnaire and its Form Layout in place, keeping the two apart: the
@@ -205,6 +206,36 @@ export function moveOption(item: QuestionnaireItem, index: number, by: number): 
   const [option] = list.splice(index, 1)
   if (option !== undefined) list.splice(to, 0, option)
   return { ...item, answerOption: list }
+}
+
+/**
+ * The item bound to the ValueSet `binding` (`url|version`, studio.md § Terminology, Binding from
+ * the form designer), or unbound (`null`). A question offers either its own options or a
+ * ValueSet's codes, never both, so binding replaces its own options.
+ */
+export function withValueSet(item: QuestionnaireItem, binding: string | null): QuestionnaireItem {
+  const { answerOption: _options, answerValueSet: _valueSet, ...rest } = item
+  return binding === null ? rest : { ...rest, answerValueSet: binding }
+}
+
+/** A binding's canonical URL and version (none when it names no version). */
+export function splitBinding(binding: string): { url: string; version: string | null } {
+  const bar = binding.indexOf('|')
+  return bar === -1 ? { url: binding, version: null } : { url: binding.slice(0, bar), version: binding.slice(bar + 1) }
+}
+
+/** The ValueSets the form binds, each once, in the order they are first asked. */
+export function boundValueSets(questionnaire: Questionnaire): string[] {
+  return [...new Set(rows(questionnaire).flatMap((row) => (row.item.answerValueSet === undefined ? [] : [row.item.answerValueSet])))]
+}
+
+/**
+ * The suggested widget for a ValueSet of `codes` codes, as a Form Layout can name it. A Form
+ * Layout has no search-as-you-type widget yet, so beyond 30 codes it is a drop-down.
+ */
+export function layoutWidget(codes: number): Widget {
+  const suggested = suggestWidget(codes)
+  return suggested === 'search' ? 'select' : suggested
 }
 
 /**
