@@ -28,9 +28,13 @@
 //!
 //! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]).
 //!
+//! The Workflow Studio (#498) reads the release's typed actions from `GET /workflow-actions`
+//! ([`actions`]).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
+pub(crate) mod actions;
 mod dto;
 pub(crate) mod terminology;
 
@@ -103,6 +107,7 @@ pub(crate) fn router(
             post(terminology::expand),
         )
         .route("/drafts", post(start))
+        .route("/workflow-actions", get(actions::list))
         .with_state(Studio {
             publications,
             signer,

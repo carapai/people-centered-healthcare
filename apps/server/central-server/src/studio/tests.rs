@@ -676,6 +676,7 @@ fn the_openapi_document_describes_the_studio() {
         "saveStudioFile",
         "removeStudioFile",
         "setStudioVersion",
+        "listStudioWorkflowActions",
     ] {
         assert!(document.contains(operation), "{operation}");
     }
@@ -1047,4 +1048,102 @@ async fn the_terminology_browser_searches_adds_with_is_a_and_flags_removals() {
     )
     .await;
     assert_eq!(status, 403);
+}
+
+// The Workflow Studio's action catalogue (#498).
+
+#[tokio::test]
+async fn the_studio_lists_the_actions_publication_checks_against_with_their_schemas() {
+    use health_publication::ActionDescriptor;
+    use health_workflow_actions::{Compensation, ParamKind, ParamSpec};
+
+    let (publications, _dir) = publications().await;
+    let publications = publications.with_actions(vec![
+        ActionDescriptor {
+            id: "patient-flow/open-queue-entry",
+            major: 1,
+            permission: "queues.work",
+            compensation: Compensation::Action("patient-flow/close-queue-entry"),
+            params: vec![
+                ParamSpec {
+                    name: "service_point",
+                    kind: ParamKind::Text,
+                    required: true,
+                },
+                ParamSpec {
+                    name: "priority",
+                    kind: ParamKind::Code(&["routine", "urgent"]),
+                    required: false,
+                },
+            ],
+        },
+        ActionDescriptor {
+            id: "laboratory/collect-specimen",
+            major: 2,
+            permission: "laboratory.work",
+            compensation: Compensation::None,
+            params: vec![],
+        },
+    ]);
+    let (status, body) = call(
+        &publications,
+        subject("ann", &["metadata.author"]),
+        "GET",
+        "/workflow-actions",
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let actions = body["actions"].as_array().expect("actions");
+    assert_eq!(actions.len(), 2);
+    assert_eq!(actions[0]["reference"], "laboratory/collect-specimen@2");
+    assert_eq!(
+        actions[0]["compensation"],
+        json!({ "kind": "none", "action": null })
+    );
+    let queue = &actions[1];
+    assert_eq!(queue["reference"], "patient-flow/open-queue-entry@1");
+    assert_eq!(queue["permission"], "queues.work");
+    assert_eq!(
+        queue["compensation"],
+        json!({ "kind": "action", "action": "patient-flow/close-queue-entry" })
+    );
+    // The schema served is the contract's own, field for field.
+    let descriptors = publications.actions();
+    let queue_descriptor = descriptors
+        .iter()
+        .find(|d| d.id == "patient-flow/open-queue-entry")
+        .expect("descriptor");
+    assert_eq!(
+        queue["parameterSchema"],
+        queue_descriptor.parameter_schema()
+    );
+    assert_eq!(
+        queue["parameterSchema"]["required"],
+        json!(["service_point"])
+    );
+
+    // Like every Studio read, it needs a Studio permission.
+    let (status, _) = call(
+        &publications,
+        subject("cy", &["queues.work"]),
+        "GET",
+        "/workflow-actions",
+        None,
+    )
+    .await;
+    assert_eq!(status, 403);
+}
+
+#[test]
+fn the_release_catalogue_lists_each_action_once() {
+    // No Bounded Context declares an action yet; when one does, it is listed once.
+    let catalogue = super::actions::catalogue();
+    let mut references: Vec<String> = catalogue
+        .iter()
+        .map(health_publication::ActionDescriptor::reference)
+        .collect();
+    references.sort();
+    references.dedup();
+    assert_eq!(references.len(), catalogue.len());
 }

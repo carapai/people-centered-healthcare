@@ -756,6 +756,7 @@ dependencies = [
  "health-terminology",
  "health-time",
  "health-workflow",
+ "health-workflow-actions",
  "http-body-util",
  "jiff",
  "p256",

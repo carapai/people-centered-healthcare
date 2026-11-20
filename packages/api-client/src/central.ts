@@ -210,6 +210,19 @@ export const StudioCodeSystems = z.object({
 })
 export type StudioCodeSystems = z.infer<typeof StudioCodeSystems>
 
+/** How a completed action is undone. */
+export const StudioCompensationKind = z.enum(["none", "action", "human-task"])
+export type StudioCompensationKind = z.infer<typeof StudioCompensationKind>
+
+/** How a completed action is undone when its scope is cancelled or fails. */
+export const StudioCompensation = z.object({
+  /** The action that undoes it, when `kind` is `action`. */
+  "action": z.string().nullable().optional(),
+  /** Undone by nothing, another action or a person. */
+  "kind": StudioCompensationKind,
+})
+export type StudioCompensation = z.infer<typeof StudioCompensation>
+
 /** A ValueSet, as a list names it. */
 export const StudioValueSet = z.object({
   /** Whether it is this package's own (a draft, when this package version is one). */
@@ -458,6 +471,38 @@ export const StudioPackagePage = z.object({
 })
 export type StudioPackagePage = z.infer<typeof StudioPackagePage>
 
+/** What a parameter holds, as JSON Schema names it. */
+export const StudioParameterType = z.enum(["boolean", "integer", "string"])
+export type StudioParameterType = z.infer<typeof StudioParameterType>
+
+/** One parameter's JSON Schema. */
+export const StudioParameter = z.object({
+  /** For a code: the codes allowed. */
+  "enum": z.array(z.string()).nullable().optional(),
+  /** For a text: it may not be empty. */
+  "minLength": integer.nullable().optional(),
+  /** What it holds. */
+  "type": StudioParameterType,
+})
+export type StudioParameter = z.infer<typeof StudioParameter>
+
+/** The JSON Schema of an action's parameters (`ActionDescriptor::parameter_schema`), typed: an object with each parameter as a property, the required ones required, and nothing else. */
+export const StudioParameterSchema = z.object({
+  /** The JSON Schema dialect. */
+  "$schema": z.string(),
+  /** Always false: no other parameter is allowed. */
+  "additionalProperties": z.boolean(),
+  /** Each parameter, by name. */
+  "properties": z.record(z.string(), StudioParameter),
+  /** The parameters a definition must give. */
+  "required": z.array(z.string()),
+  /** The action's reference. */
+  "title": z.string(),
+  /** Always `object`. */
+  "type": z.string(),
+})
+export type StudioParameterSchema = z.infer<typeof StudioParameterSchema>
+
 /** Why a Studio request failed. */
 export const StudioProblem = z.object({
   /** What went wrong. */
@@ -479,6 +524,30 @@ export const StudioVersionInput = z.object({
   "version": z.string(),
 })
 export type StudioVersionInput = z.infer<typeof StudioVersionInput>
+
+/** One typed action a definition may execute. */
+export const StudioWorkflowAction = z.object({
+  /** How it is undone. */
+  "compensation": StudioCompensation,
+  /** Its id, `<context>/<action>`. */
+  "id": z.string(),
+  /** Its major version. */
+  "major": integer,
+  /** The JSON Schema of its parameters, from which the Studio generates their fields. */
+  "parameterSchema": StudioParameterSchema,
+  /** The permission it needs: the user's on a user-triggered transition, the workflow principal's on a timer, eventless or system step. */
+  "permission": z.string(),
+  /** How a definition names it: `<id>@<major>`. */
+  "reference": z.string(),
+})
+export type StudioWorkflowAction = z.infer<typeof StudioWorkflowAction>
+
+/** The release's workflow actions. */
+export const StudioWorkflowActions = z.object({
+  /** The actions, by reference. */
+  "actions": z.array(StudioWorkflowAction),
+})
+export type StudioWorkflowActions = z.infer<typeof StudioWorkflowActions>
 
 /** Each operation: its method, path and response schemas by status (`null`: no body). */
 export const operations = {
@@ -650,6 +719,15 @@ export const operations = {
       412: StudioProblem,
       422: StudioProblem,
       500: StudioProblem,
+    },
+  },
+  listStudioWorkflowActions: {
+    method: 'GET',
+    path: '/api/studio/workflow-actions',
+    responses: {
+      200: StudioWorkflowActions,
+      401: StudioProblem,
+      403: StudioProblem,
     },
   },
   getHealth: {

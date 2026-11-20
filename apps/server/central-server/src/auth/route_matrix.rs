@@ -366,6 +366,7 @@ const INVENTORY: &[Mounted] = &[
             "/packages/{id}/terminology/value-sets",
             "/packages/{id}/terminology/expand",
             "/drafts",
+            "/workflow-actions",
         ],
     },
     Mounted {
