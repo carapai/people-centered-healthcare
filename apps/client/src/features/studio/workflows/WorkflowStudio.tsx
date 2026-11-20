@@ -4,12 +4,14 @@ import { Link } from '@tanstack/react-router'
 import { useId, useRef, useState } from 'react'
 import { useIntl, type IntlShape } from 'react-intl'
 
-import { studioMessages as sm, workflowMessages as m } from '../../../i18n/messages'
+import { decisionMessages as dm, studioMessages as sm, workflowMessages as m } from '../../../i18n/messages'
 import { usePlatform } from '../../../platform'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
 import { workflowActionsQuery } from './api'
+import { DecisionTableEditor } from './DecisionTableEditor'
+import { addTable } from './decisions'
 import {
   KINDS,
   PRIORITIES,
@@ -191,6 +193,7 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const [saved, setSaved] = useState(() => JSON.stringify(initial))
   const [revision, setRevision] = useState(file.revision)
   const [selected, setSelected] = useState<Selection | null>(() => (initial.statechart.states[0] === undefined ? null : { kind: 'state', id: initial.statechart.states[0].id }))
+  const [table, setTable] = useState<number | null>(null)
   const catalogue = useQuery(workflowActionsQuery(platform.transport))
   const actions = catalogue.data
   const editable = draft.editable
@@ -217,6 +220,16 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const change = (next: WorkflowDefinition) => {
     setDefinition(next)
     save.reset()
+  }
+  /** A file other than the definition was saved (a decision-table test case): the draft's new
+   * revision is the one the definition's save sends. */
+  const savedOther = (next: StudioPackagePage) => {
+    setRevision(next.revision)
+    queryClient.setQueryData(packageQuery(platform.transport, id).queryKey, next)
+  }
+  const openTable = (tableId: string) => {
+    const index = (definition.decisionTables ?? []).findIndex((t) => t.id === tableId)
+    if (index >= 0) setTable(index)
   }
   const connect = (source: string, target: string) => {
     const added = addTransition(definition, source, target)
@@ -259,49 +272,113 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
         </p>
       )}
 
-      <Problems found={found} definition={definition} catalogue={catalogue.isError ? 'failed' : actions === undefined ? 'loading' : 'read'} editable={editable} onSelect={setSelected} onChange={change} />
+      <Problems
+        found={found}
+        definition={definition}
+        catalogue={catalogue.isError ? 'failed' : actions === undefined ? 'loading' : 'read'}
+        editable={editable}
+        onSelect={(at) => {
+          setTable(null)
+          setSelected(at)
+        }}
+        onOpenTable={openTable}
+        onChange={change}
+      />
 
-      <div className={columns}>
-        <Outline definition={definition} selected={selected} outlined={outlined} editable={editable} onSelect={setSelected} onChange={change} />
-        <section aria-labelledby="ws-canvas" className={panel}>
-          <h2 id="ws-canvas" className={subheading}>
-            {intl.formatMessage(m.wsCanvasHeading)}
-          </h2>
-          {editable ? <p className={muted}>{intl.formatMessage(m.wsCanvasHint)}</p> : null}
-          <WorkflowCanvas definition={definition} selected={selected} flagged={outlined} onSelect={setSelected} onConnect={editable ? connect : undefined} />
-        </section>
-        <section aria-labelledby="ws-inspect" className={panel}>
-          <h2 id="ws-inspect" className={subheading}>
-            {intl.formatMessage(m.wsInspect)}
-          </h2>
-          {selected === null ? (
-            <p className={muted}>{intl.formatMessage(m.wsChoose)}</p>
-          ) : selected.kind === 'state' ? (
-            <StateInspector
-              key={`state:${selected.id}`}
-              definition={definition}
-              id={selected.id}
-              fixed={fixed.has(selected.id)}
-              catalogue={actions}
-              editable={editable}
-              onChange={change}
-              onSelect={setSelected}
-            />
-          ) : (
-            <TransitionInspector
-              key={`transition:${selected.source}:${selected.index}`}
-              definition={definition}
-              source={selected.source}
-              index={selected.index}
-              catalogue={actions}
-              editable={editable}
-              onChange={change}
-              onSelect={setSelected}
-            />
-          )}
-        </section>
-      </div>
+      {table !== null && (definition.decisionTables ?? [])[table] !== undefined ? (
+        <DecisionTableEditor
+          key={table}
+          id={id}
+          definition={definition}
+          index={table}
+          editable={editable}
+          revision={revision}
+          files={draft.files.map((f) => f.path)}
+          onChange={change}
+          onSaved={savedOther}
+          onClose={() => setTable(null)}
+        />
+      ) : (
+        <>
+          <DecisionTables
+            definition={definition}
+            editable={editable}
+            onOpen={setTable}
+            onAdd={() => {
+              const added = addTable(definition)
+              change(added.definition)
+              setTable(added.index)
+            }}
+          />
+          <div className={columns}>
+            <Outline definition={definition} selected={selected} outlined={outlined} editable={editable} onSelect={setSelected} onChange={change} />
+            <section aria-labelledby="ws-canvas" className={panel}>
+              <h2 id="ws-canvas" className={subheading}>
+                {intl.formatMessage(m.wsCanvasHeading)}
+              </h2>
+              {editable ? <p className={muted}>{intl.formatMessage(m.wsCanvasHint)}</p> : null}
+              <WorkflowCanvas definition={definition} selected={selected} flagged={outlined} onSelect={setSelected} onConnect={editable ? connect : undefined} />
+            </section>
+            <section aria-labelledby="ws-inspect" className={panel}>
+              <h2 id="ws-inspect" className={subheading}>
+                {intl.formatMessage(m.wsInspect)}
+              </h2>
+              {selected === null ? (
+                <p className={muted}>{intl.formatMessage(m.wsChoose)}</p>
+              ) : selected.kind === 'state' ? (
+                <StateInspector
+                  key={`state:${selected.id}`}
+                  definition={definition}
+                  id={selected.id}
+                  fixed={fixed.has(selected.id)}
+                  catalogue={actions}
+                  editable={editable}
+                  onChange={change}
+                  onSelect={setSelected}
+                />
+              ) : (
+                <TransitionInspector
+                  key={`transition:${selected.source}:${selected.index}`}
+                  definition={definition}
+                  source={selected.source}
+                  index={selected.index}
+                  catalogue={actions}
+                  editable={editable}
+                  onChange={change}
+                  onSelect={setSelected}
+                />
+              )}
+            </section>
+          </div>
+        </>
+      )}
     </>
+  )
+}
+
+/** The definition's decision tables, each opening the decision-table editor (#516). */
+function DecisionTables({ definition, editable, onOpen, onAdd }: { definition: WorkflowDefinition; editable: boolean; onOpen: (index: number) => void; onAdd: () => void }) {
+  const intl = useIntl()
+  const tables = definition.decisionTables ?? []
+  return (
+    <section aria-labelledby="ws-tables" className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+      <h2 id="ws-tables" className={subheading}>
+        {intl.formatMessage(dm.dtTables)}
+      </h2>
+      <p className={muted}>{intl.formatMessage(tables.length === 0 ? dm.dtTablesNone : dm.dtTablesHint)}</p>
+      <div className={row}>
+        {tables.map((t, n) => (
+          <button key={n} type="button" className={small} onClick={() => onOpen(n)}>
+            {intl.formatMessage(dm.dtTableRow, { id: t.id, count: t.rows.length })}
+          </button>
+        ))}
+        {editable ? (
+          <button type="button" className={small} onClick={onAdd}>
+            {intl.formatMessage(dm.dtAddTable)}
+          </button>
+        ) : null}
+      </div>
+    </section>
   )
 }
 
@@ -354,13 +431,14 @@ interface ProblemsProps {
   catalogue: 'loading' | 'failed' | 'read'
   editable: boolean
   onSelect: (selection: Selection) => void
+  onOpenTable: (id: string) => void
   onChange: (definition: WorkflowDefinition) => void
 }
 
 /** The publication checks the browser can run, each selecting the element it is about. A
  * permission the workflow principal lacks is declared from its problem, and one it holds that no
  * action needs is taken back from its own. */
-function Problems({ found, definition, catalogue, editable, onSelect, onChange }: ProblemsProps) {
+function Problems({ found, definition, catalogue, editable, onSelect, onOpenTable, onChange }: ProblemsProps) {
   const intl = useIntl()
   const principal = definition.principal ?? []
   return (
@@ -382,7 +460,13 @@ function Problems({ found, definition, catalogue, editable, onSelect, onChange }
             return (
               <li key={`${problem.code}:${n}`}>
                 {at === null ? (
-                  text
+                  problem.code === 'bad-table' ? (
+                    <button type="button" className={linkButton} onClick={() => onOpenTable(problem.table)}>
+                      {text}
+                    </button>
+                  ) : (
+                    text
+                  )
                 ) : (
                   <button type="button" className={linkButton} onClick={() => onSelect(at)}>
                     {text}

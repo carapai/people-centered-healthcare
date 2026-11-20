@@ -323,7 +323,7 @@ impl Publications {
         lifecycle.check(Action::Check, by)?;
         let packed = self.packed(&lifecycle.content).await?;
         let problems = self.validation(&mut tx, &packed).await?;
-        let failures = self.sandbox.simulate(&packed);
+        let failures = self.sandbox.simulate(&packed).await;
         let detail = format!(
             "checked: {} validation problem(s), {} failing case(s)",
             problems.len(),

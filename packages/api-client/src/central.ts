@@ -285,6 +285,94 @@ export const StudioConceptPage = z.object({
 })
 export type StudioConceptPage = z.infer<typeof StudioConceptPage>
 
+/** A sample value: a flag, a whole number or a code. */
+export const StudioSample = z.union([z.boolean(), integer, z.string()])
+export type StudioSample = z.infer<typeof StudioSample>
+
+/** One saved test case of the table, run against the draft. */
+export const StudioDecisionTest = z.object({
+  /** Why it could not run, if it could not. */
+  "error": z.string().nullable().optional(),
+  /** The outcome it keeps. */
+  "expect": StudioSample,
+  /** Its sample inputs. */
+  "inputs": z.record(z.string(), StudioSample),
+  /** What it shows. */
+  "name": z.string(),
+  "outcome": StudioSample.nullable().optional(),
+  /** Whether they are the same. */
+  "passes": z.boolean(),
+  /** Its file in the package. */
+  "path": z.string(),
+})
+export type StudioDecisionTest = z.infer<typeof StudioDecisionTest>
+
+/** What the checks found. */
+export const StudioDecisionCheck = z.object({
+  /** How many combinations were tried. */
+  "combinations": integer,
+  /** Whether coverage was checked: not when the combinations of sample values exceed `mostCombinations`. */
+  "covered": z.boolean(),
+  /** Conditions that could not be evaluated. */
+  "errors": z.array(z.string()),
+  /** How many combinations no rule covers (there is no default). */
+  "gapCount": integer,
+  /** The first of them. */
+  "gaps": z.array(z.record(z.string(), StudioSample)),
+  /** The most combinations coverage tries. */
+  "mostCombinations": integer,
+  /** The rules (indexes) that fire for no combination. */
+  "neverFires": z.array(integer),
+  /** The package's saved test cases of this table, run against the draft. */
+  "tests": z.array(StudioDecisionTest),
+})
+export type StudioDecisionCheck = z.infer<typeof StudioDecisionCheck>
+
+/** The editor's checks on a draft table. */
+export const StudioDecisionCheckInput = z.object({
+  /** The draft Workflow Definition, as the Studio holds it. */
+  "definition": z.object({}),
+  /** Each input's sample values: coverage tries every combination. */
+  "samples": z.record(z.string(), z.array(StudioSample)).optional(),
+  /** The table's id. */
+  "table": z.string(),
+})
+export type StudioDecisionCheckInput = z.infer<typeof StudioDecisionCheckInput>
+
+/** How one part of a condition tree came out. */
+export const StudioNodeResult = z.object({
+  /** Why it could not be evaluated, if it could not. */
+  "error": z.string().nullable().optional(),
+  /** The part, as FHIRPath. */
+  "expression": z.string(),
+  /** Whether it holds for the sample inputs. */
+  "holds": z.boolean(),
+})
+export type StudioNodeResult = z.infer<typeof StudioNodeResult>
+
+/** What a draft table decided for sample inputs. */
+export const StudioDecisionTry = z.object({
+  /** Each part asked about, in order. */
+  "nodes": z.array(StudioNodeResult),
+  "outcome": StudioSample.nullable().optional(),
+  /** The index of the rule that fired; none when the default (or nothing) decided. */
+  "row": integer.nullable().optional(),
+})
+export type StudioDecisionTry = z.infer<typeof StudioDecisionTry>
+
+/** *Try a patient* on a draft table. */
+export const StudioDecisionTryInput = z.object({
+  /** The draft Workflow Definition, as the Studio holds it. */
+  "definition": z.object({}),
+  /** The sample inputs, by input (`%<requirement>.<path>`). */
+  "inputs": z.record(z.string(), StudioSample).optional(),
+  /** The parts of a rule's condition tree to mark, each as FHIRPath. */
+  "nodes": z.array(z.string()).optional(),
+  /** The table's id. */
+  "table": z.string(),
+})
+export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
+
 /** Which ValueSet to expand. */
 export const StudioExpandInput = z.object({
   /** At most this many codes (200 unless asked, 1000 at most). */
@@ -605,6 +693,30 @@ export const operations = {
       422: StudioProblem,
       500: StudioProblem,
       503: StudioProblem,
+    },
+  },
+  checkStudioDecisionTable: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/decision-tables/check',
+    responses: {
+      200: StudioDecisionCheck,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  tryStudioDecisionTable: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/decision-tables/try',
+    responses: {
+      200: StudioDecisionTry,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
     },
   },
   getStudioFile: {

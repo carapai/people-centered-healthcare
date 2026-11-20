@@ -1,7 +1,8 @@
-import type { StudioProblem, StudioWorkflowAction } from '@health/api-client'
+import type { StudioDecisionCheck, StudioDecisionTry, StudioProblem, StudioSample, StudioWorkflowAction } from '@health/api-client'
 
 import type { Transport } from '../../../platform/types'
 import { StudioError } from '../api'
+import type { WorkflowDefinition } from './model'
 
 // The release's typed-action catalogue (ADR 0043; #498), read from `/api/studio/workflow-actions`
 // at central: each action's reference, permission, compensation and parameter schema. It is the
@@ -13,7 +14,11 @@ export function workflowActionsQuery(transport: Transport) {
     queryKey: ['studio', 'workflow-actions'] as const,
     staleTime: Number.POSITIVE_INFINITY,
     queryFn: async ({ signal }: { signal?: AbortSignal } = {}): Promise<StudioWorkflowAction[]> => {
-      const response = await transport.request({ method: 'GET', path: '/studio/workflow-actions', ...(signal === undefined ? {} : { signal }) })
+      const response = await transport.request({
+        method: 'GET',
+        path: '/studio/workflow-actions',
+        ...(signal === undefined ? {} : { signal }),
+      })
       const { parseResponse } = await import('@health/api-client')
       const value = parseResponse('listStudioWorkflowActions', response.status, response.body)
       if (response.status === 200) return (value as { actions: StudioWorkflowAction[] }).actions
@@ -21,4 +26,53 @@ export function workflowActionsQuery(transport: Transport) {
       throw new StudioError(response.status, problem?.detail ?? '', problem?.refusal ?? null)
     },
   }
+}
+
+// The decision-table editor (#516): central evaluates the draft table, unsaved edits included,
+// on the FHIRPath engine submission's simulation uses.
+
+export type { StudioDecisionCheck, StudioDecisionTry, StudioSample } from '@health/api-client'
+
+async function post<T>(transport: Transport, operation: 'tryStudioDecisionTable' | 'checkStudioDecisionTable', id: string, kind: 'try' | 'check', body: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await transport.request({
+    method: 'POST',
+    path: `/studio/packages/${encodeURIComponent(id)}/decision-tables/${kind}`,
+    body,
+    ...(signal === undefined ? {} : { signal }),
+  })
+  const { parseResponse } = await import('@health/api-client')
+  const value = parseResponse(operation, response.status, response.body)
+  if (response.status === 200) return value as T
+  const problem = value as StudioProblem | null
+  throw new StudioError(response.status, problem?.detail ?? '', problem?.refusal ?? null)
+}
+
+/** *Try a patient*: the outcome of draft `table` for `inputs`, the rule that fired and how each
+ * of `nodes` (parts of a rule's tree, as FHIRPath) came out. */
+export function tryTable(
+  transport: Transport,
+  id: string,
+  body: {
+    definition: WorkflowDefinition
+    table: string
+    inputs: Record<string, StudioSample>
+    nodes: string[]
+  },
+  signal?: AbortSignal,
+) {
+  return post<StudioDecisionTry>(transport, 'tryStudioDecisionTable', id, 'try', body, signal)
+}
+
+/** The editor's checks on draft `table`: gaps, rules that never fire, and the saved test cases. */
+export function checkTable(
+  transport: Transport,
+  id: string,
+  body: {
+    definition: WorkflowDefinition
+    table: string
+    samples: Record<string, StudioSample[]>
+  },
+  signal?: AbortSignal,
+) {
+  return post<StudioDecisionCheck>(transport, 'checkStudioDecisionTable', id, 'check', body, signal)
 }

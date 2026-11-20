@@ -57,6 +57,8 @@
 //! of each step they take records it as a CLI action by the `--by` name.
 
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use health_configuration::activation::{Activation, ActivationRecord, Scope, in_effect};
@@ -75,6 +77,7 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
+pub mod decisions;
 pub mod editing;
 mod extraction;
 mod programs;
@@ -124,10 +127,13 @@ fn failed(error: impl std::fmt::Display) -> Error {
     Error::Store(error.to_string())
 }
 
+/// What a sandbox's run answers: every failing case, as a problem.
+pub type Simulation<'a> = Pin<Box<dyn Future<Output = Vec<String>> + Send + 'a>>;
+
 /// What runs a package's `tests/` cases in a sandbox (configuration.md § Lifecycle, Simulation).
 pub trait Sandbox: Send + Sync {
     /// Every failing case, as a problem; none if all pass.
-    fn simulate(&self, package: &Packed) -> Vec<String>;
+    fn simulate<'a>(&'a self, package: &'a Packed) -> Simulation<'a>;
 }
 
 /// Runs no case, so simulation passes every package: for tests of the other steps.
@@ -135,8 +141,8 @@ pub trait Sandbox: Send + Sync {
 pub struct NoSandbox;
 
 impl Sandbox for NoSandbox {
-    fn simulate(&self, _: &Packed) -> Vec<String> {
-        Vec::new()
+    fn simulate<'a>(&'a self, _: &'a Packed) -> Simulation<'a> {
+        Box::pin(async { Vec::new() })
     }
 }
 
@@ -685,7 +691,7 @@ impl Publications {
         let record = lifecycle.validated(problems, self.clock.now())?;
         records.push((record, detail));
         if lifecycle.stage == Stage::Simulation {
-            let failures = self.sandbox.simulate(&packed);
+            let failures = self.sandbox.simulate(&packed).await;
             let detail = if failures.is_empty() {
                 "simulated".to_owned()
             } else {

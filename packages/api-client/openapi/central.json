@@ -263,6 +263,192 @@
         }
       }
     },
+    "/api/studio/packages/{id}/decision-tables/check": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the editor's checks.",
+        "description": "The decision-table editor's checks on a draft table of the posted (unsaved) Workflow Definition: over every combination of the sample values per input (at most `mostCombinations`), the combinations no rule covers when the table has no default and the rules that never fire because a rule above always matches first; and the package version's saved test cases of the table (`tests/` files of type `decision-table-test`), run against the draft. *Check now* remains the authority.",
+        "operationId": "checkStudioDecisionTable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioDecisionCheckInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What the checks found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioDecisionCheck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No such table, or an input of no declared data requirement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/decision-tables/try": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves *Try a patient*.",
+        "description": "*Try a patient* on a draft decision table: the server evaluates the table of the posted (unsaved) Workflow Definition for sample inputs, each data requirement bound as `%<requirement>`, and answers the outcome, the rule that fired and how each part of a rule's condition tree came out.",
+        "operationId": "tryStudioDecisionTable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioDecisionTryInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioDecisionTry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No such table, or an input of no declared data requirement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/files/{path}": {
       "get": {
         "tags": [
@@ -2152,6 +2338,239 @@
           }
         }
       },
+      "StudioDecisionCheck": {
+        "type": "object",
+        "description": "What the checks found.",
+        "required": [
+          "covered",
+          "combinations",
+          "mostCombinations",
+          "gapCount",
+          "gaps",
+          "neverFires",
+          "errors",
+          "tests"
+        ],
+        "properties": {
+          "combinations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many combinations were tried.",
+            "minimum": 0
+          },
+          "covered": {
+            "type": "boolean",
+            "description": "Whether coverage was checked: not when the combinations of sample values exceed\n`mostCombinations`."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditions that could not be evaluated."
+          },
+          "gapCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many combinations no rule covers (there is no default).",
+            "minimum": 0
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/components/schemas/StudioSample"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "description": "The first of them."
+          },
+          "mostCombinations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most combinations coverage tries.",
+            "minimum": 0
+          },
+          "neverFires": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "The rules (indexes) that fire for no combination."
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDecisionTest"
+            },
+            "description": "The package's saved test cases of this table, run against the draft."
+          }
+        }
+      },
+      "StudioDecisionCheckInput": {
+        "type": "object",
+        "description": "The editor's checks on a draft table.",
+        "required": [
+          "definition",
+          "table"
+        ],
+        "properties": {
+          "definition": {
+            "type": "object",
+            "description": "The draft Workflow Definition, as the Studio holds it."
+          },
+          "samples": {
+            "type": "object",
+            "description": "Each input's sample values: coverage tries every combination.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/StudioSample"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "table": {
+            "type": "string",
+            "description": "The table's id."
+          }
+        }
+      },
+      "StudioDecisionTest": {
+        "type": "object",
+        "description": "One saved test case of the table, run against the draft.",
+        "required": [
+          "path",
+          "name",
+          "inputs",
+          "expect",
+          "passes"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not run, if it could not."
+          },
+          "expect": {
+            "$ref": "#/components/schemas/StudioSample",
+            "description": "The outcome it keeps."
+          },
+          "inputs": {
+            "type": "object",
+            "description": "Its sample inputs.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StudioSample"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string",
+            "description": "What it shows."
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioSample",
+                "description": "The outcome the draft gives."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passes": {
+            "type": "boolean",
+            "description": "Whether they are the same."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its file in the package."
+          }
+        }
+      },
+      "StudioDecisionTry": {
+        "type": "object",
+        "description": "What a draft table decided for sample inputs.",
+        "required": [
+          "nodes"
+        ],
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioNodeResult"
+            },
+            "description": "Each part asked about, in order."
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioSample",
+                "description": "The outcome; none when no rule holds and there is no default."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The index of the rule that fired; none when the default (or nothing) decided.",
+            "minimum": 0
+          }
+        }
+      },
+      "StudioDecisionTryInput": {
+        "type": "object",
+        "description": "*Try a patient* on a draft table.",
+        "required": [
+          "definition",
+          "table"
+        ],
+        "properties": {
+          "definition": {
+            "type": "object",
+            "description": "The draft Workflow Definition, as the Studio holds it."
+          },
+          "inputs": {
+            "type": "object",
+            "description": "The sample inputs, by input (`%<requirement>.<path>`).",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StudioSample"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The parts of a rule's condition tree to mark, each as FHIRPath."
+          },
+          "table": {
+            "type": "string",
+            "description": "The table's id."
+          }
+        }
+      },
       "StudioExpandInput": {
         "type": "object",
         "description": "Which ValueSet to expand.",
@@ -2464,6 +2883,31 @@
               "null"
             ],
             "description": "A blank package's first version, e.g. `0.1.0`."
+          }
+        }
+      },
+      "StudioNodeResult": {
+        "type": "object",
+        "description": "How one part of a condition tree came out.",
+        "required": [
+          "expression",
+          "holds"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not be evaluated, if it could not."
+          },
+          "expression": {
+            "type": "string",
+            "description": "The part, as FHIRPath."
+          },
+          "holds": {
+            "type": "boolean",
+            "description": "Whether it holds for the sample inputs."
           }
         }
       },
@@ -2850,6 +3294,24 @@
           "not-published",
           "other"
         ]
+      },
+      "StudioSample": {
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "A flag."
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "A whole number."
+          },
+          {
+            "type": "string",
+            "description": "A code or a text."
+          }
+        ],
+        "description": "A sample value: a flag, a whole number or a code."
       },
       "StudioValueSet": {
         "type": "object",

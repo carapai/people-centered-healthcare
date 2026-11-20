@@ -220,6 +220,7 @@ fn an_ancestor_s_transition_is_a_way_out_and_parallel_regions_are_entered() {
 #[test]
 fn decision_tables_must_be_well_formed() {
     let row = |when: &[&str]| Row {
+        name: None,
         when: when.iter().map(|w| (*w).to_owned()).collect(),
         then: text("refer"),
     };

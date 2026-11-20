@@ -29,12 +29,14 @@
 //! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]).
 //!
 //! The Workflow Studio (#498) reads the release's typed actions from `GET /workflow-actions`
-//! ([`actions`]).
+//! ([`actions`]). Its decision-table editor (#516) tries a patient and runs its checks under
+//! `/packages/{id}/decision-tables/` ([`decisions`]).
 //!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
 pub(crate) mod actions;
+pub(crate) mod decisions;
 mod dto;
 pub(crate) mod terminology;
 
@@ -48,6 +50,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
+use health_fhir_validation::OctofhirEngine;
 use health_publication::editing::Blank;
 use health_publication::studio::{AUTHOR_PERMISSION, PERMISSIONS, Refusal, StudioAction};
 use health_publication::{Error, LocalSigner, Publications};
@@ -67,6 +70,8 @@ pub(crate) struct Studio {
     publications: Publications,
     signer: Option<Arc<LocalSigner>>,
     accounts: Accounts,
+    /// The FHIRPath engine decision tables are tried on, built on first use.
+    engine: Arc<OctofhirEngine>,
 }
 
 /// The Studio's routes over `publications`, publishing with `signer` when central has the
@@ -106,12 +111,21 @@ pub(crate) fn router(
             "/packages/{id}/terminology/expand",
             post(terminology::expand),
         )
+        .route(
+            "/packages/{id}/decision-tables/try",
+            post(decisions::try_table),
+        )
+        .route(
+            "/packages/{id}/decision-tables/check",
+            post(decisions::check),
+        )
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))
         .with_state(Studio {
             publications,
             signer,
             accounts,
+            engine: Arc::new(OctofhirEngine::new()),
         })
 }
 

@@ -13,7 +13,7 @@ use health_packages::{Packed, Schemas};
 use health_pki::{Authority, new_key, request};
 use health_publication::editing::Blank;
 use health_publication::studio::{CheckKind, StudioAction};
-use health_publication::{Error, Files, LocalSigner, Publications, Sandbox};
+use health_publication::{Error, Files, LocalSigner, Publications, Sandbox, Simulation};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{FixedClock, Timestamp};
 use serde_json::{Value, json};
@@ -22,8 +22,8 @@ use serde_json::{Value, json};
 struct Failing;
 
 impl Sandbox for Failing {
-    fn simulate(&self, _: &Packed) -> Vec<String> {
-        vec!["tests/visit.json: expected the visit to end".into()]
+    fn simulate<'a>(&'a self, _: &'a Packed) -> Simulation<'a> {
+        Box::pin(async { vec!["tests/visit.json: expected the visit to end".into()] })
     }
 }
 

@@ -7,8 +7,9 @@
 //!   a value of its kind.
 //! - **Data requirements:** the resources and paths the guards need, so the engine loads only
 //!   those.
-//! - **Decision tables:** rows of FHIRPath conditions, each with an outcome, for WHO SMART
-//!   decision logic. The first row whose conditions all hold gives the outcome.
+//! - **Decision tables:** rows of FHIRPath conditions, each with an optional name and an
+//!   outcome, for WHO SMART decision logic. The first row whose conditions all hold gives the
+//!   outcome ([`crate::decision`]).
 //! - **The workflow principal:** the permissions timer and system transitions may use, approved
 //!   at publication.
 //!
@@ -62,10 +63,14 @@ pub struct DataRequirement {
     pub paths: Vec<String>,
 }
 
-/// One row of a decision table.
+/// One row of a decision table: a rule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Row {
-    /// FHIRPath conditions, all of which must hold.
+    /// What the rule is, in words, as the Studio's rules list shows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// FHIRPath conditions, all of which must hold. The Studio writes a rule's all / any / not
+    /// tree as one expression (studio.md § Decision tables).
     pub when: Vec<String>,
     /// The outcome.
     pub then: Value,
