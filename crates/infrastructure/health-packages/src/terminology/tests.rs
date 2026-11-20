@@ -192,3 +192,38 @@ fn the_core_package_s_template_modes_expand_from_its_code_system() {
         Ok(Validation::Invalid)
     );
 }
+
+#[test]
+fn the_catalogue_lists_code_systems_value_sets_and_the_questions_that_bind_them() {
+    let mut files = files(&[
+        signs(),
+        json!({
+            "resourceType": "ValueSet", "url": "urn:danger", "version": "1.0.0",
+            "name": "Danger", "title": "Danger signs", "status": "active"
+        }),
+        json!({
+            "resourceType": "Questionnaire", "url": "urn:form", "title": "ANC visit",
+            "item": [{
+                "linkId": "signs", "type": "group",
+                "item": [{ "linkId": "danger", "type": "coding", "answerValueSet": "urn:danger|1.0.0" }]
+            }, { "linkId": "note", "type": "string" }]
+        }),
+    ]);
+    files.insert("tests/case.json".into(), b"{}".to_vec());
+    let found = catalogue(&files);
+    let kinds: Vec<(&str, &str)> = found
+        .entries
+        .iter()
+        .map(|e| (e.resource_type.as_str(), e.url.as_str()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [("CodeSystem", "urn:signs"), ("ValueSet", "urn:danger")]
+    );
+    assert_eq!(found.entries[1].title.as_deref(), Some("Danger signs"));
+    assert_eq!(found.bindings.len(), 1, "nested questions are read too");
+    assert_eq!(found.bindings[0].link_id, "danger");
+    assert_eq!(found.bindings[0].value_set, "urn:danger|1.0.0");
+    assert_eq!(found.bindings[0].title.as_deref(), Some("ANC visit"));
+    assert_eq!(found.bindings[0].path, "resource-2.json");
+}

@@ -26,10 +26,13 @@
 //!   gives the draft another version. Each change must send `If-Match` with the revision it
 //!   read: one that is missing or stale is refused with 412, and nothing is kept.
 //!
+//! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
 mod dto;
+pub(crate) mod terminology;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -79,6 +82,26 @@ pub(crate) fn router(
             get(read_file).put(write_file).delete(remove_file),
         )
         .route("/packages/{id}/version", put(set_version))
+        .route(
+            "/packages/{id}/terminology/code-systems",
+            get(terminology::code_systems),
+        )
+        .route(
+            "/packages/{id}/terminology/concepts",
+            get(terminology::concepts),
+        )
+        .route(
+            "/packages/{id}/terminology/concept",
+            get(terminology::concept),
+        )
+        .route(
+            "/packages/{id}/terminology/value-sets",
+            get(terminology::list_value_sets),
+        )
+        .route(
+            "/packages/{id}/terminology/expand",
+            post(terminology::expand),
+        )
         .route("/drafts", post(start))
         .with_state(Studio {
             publications,

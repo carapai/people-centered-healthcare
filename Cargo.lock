@@ -3333,6 +3333,7 @@ dependencies = [
  "health-programs",
  "health-programs-app",
  "health-surrealdb",
+ "health-terminology",
  "health-time",
  "health-workflow",
  "health-workflow-actions",

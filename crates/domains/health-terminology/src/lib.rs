@@ -14,15 +14,20 @@
 //! - [`Terminology::validate_code`] (`$validate-code`): whether a code is in a ValueSet or a
 //!   CodeSystem, and whether its display is right.
 //! - [`Terminology::translate`] (`$translate`): a code's targets in a ConceptMap.
+//! - For the Studio's terminology browser (#523): [`Terminology::code_systems`],
+//!   [`Terminology::children`] (the hierarchy one level at a time), [`Terminology::search`] (by
+//!   code or words) and [`compare`] (an expansion against its published one).
 //!
 //! **Offline, so fail closed.** What would need another terminology server is an error, never
 //! an empty answer: a code system that is not held ([`Error::UnknownCodeSystem`]), a value set
 //! that is not held, a filter on a code system held only in part, or a `regex` filter.
 
+mod browse;
 mod model;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use browse::{CodeSystemSummary, ConceptPage, ConceptRow, ExpansionChange, compare};
 pub use model::{
     Canonical, CodeSystem, Concept, ConceptMap, Contains, Content, Designation, Filter, FilterOp,
     Group, Listed, Mapping, Property, PropertyValue, Relationship, Rule, Target, ValueSet,

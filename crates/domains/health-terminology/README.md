@@ -24,6 +24,13 @@ Layer: **domain** (Terminology & Metadata). The terminology operations every nod
   - `Invalid`.
 - **`translate(concept_map, system, code, target_system)`** (`$translate`) returns each target with its relationship, from one ConceptMap or from every one held.
 
+- **For the Studio's terminology browser** (#523; studio.md § Terminology), over the same data:
+  - `code_systems()` lists each code system held with its content and concept count;
+  - `children(system, version, parent, offset, count)` reads the hierarchy one level at a time (the top level with no parent), each row with how many concepts are under it;
+  - `search(system, version, text, offset, count)` finds concepts whose code, display or a designation holds every word, ignoring case, an exact code first, then codes starting with the text, a page at a time;
+  - `compare(published, draft)` lists the codes an expansion added and removed;
+  - `extend` merges another terminology in.
+
 ## Offline, so fail closed
 
 What would need another terminology server is an error, never an empty answer:
@@ -57,3 +64,4 @@ The unit tests run over an ANC danger-signs code system with a nested hierarchy,
 - **Versions:** the latest by semver, or a pinned one.
 - **Cycles** are refused.
 - **Translation** through one map or all of them, by target system, including an unmapped code.
+- **The browser:** search by words, synonym and code over an ICD-11 slice, a page at a time; the hierarchy one level at a time; an `is-a` rule taking in a child code added in a later version; and the change against published listing added and removed codes.

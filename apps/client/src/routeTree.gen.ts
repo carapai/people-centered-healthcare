@@ -45,6 +45,7 @@ import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
 import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
+import { Route as StudioIdTerminologySplatRouteImport } from './routes/studio.$id_.terminology.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -226,6 +227,12 @@ const StudioIdFormsSplatRoute = StudioIdFormsSplatRouteImport.update({
   path: '/studio/$id/forms/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIdTerminologySplatRoute =
+  StudioIdTerminologySplatRouteImport.update({
+    id: '/studio/$id_/terminology/$',
+    path: '/studio/$id/terminology/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -302,6 +310,7 @@ export interface FileRoutesByTo {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -341,6 +350,7 @@ export interface FileRoutesById {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id_/terminology/$': typeof StudioIdTerminologySplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
+    | '/studio/$id/terminology/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
+    | '/studio/$id/terminology/$'
   id:
     | '__root__'
     | '/'
@@ -457,6 +469,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id_/files/$'
     | '/studio/$id_/forms/$'
+    | '/studio/$id_/terminology/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -496,6 +509,7 @@ export interface RootRouteChildren {
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
   StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
+  StudioIdTerminologySplatRoute: typeof StudioIdTerminologySplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -752,6 +766,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdFormsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id_/terminology/$': {
+      id: '/studio/$id_/terminology/$'
+      path: '/studio/$id/terminology/$'
+      fullPath: '/studio/$id/terminology/$'
+      preLoaderRoute: typeof StudioIdTerminologySplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -792,6 +813,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecordsTypeIdRoute: RecordsTypeIdRoute,
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
   StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
+  StudioIdTerminologySplatRoute: StudioIdTerminologySplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

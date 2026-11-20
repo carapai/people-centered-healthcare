@@ -624,7 +624,7 @@ impl Publications {
     }
 
     /// The latest published version of `lifecycle`'s package before its own.
-    async fn previous(
+    pub(crate) async fn previous(
         &self,
         tx: &mut SurrealTx,
         lifecycle: &Lifecycle,

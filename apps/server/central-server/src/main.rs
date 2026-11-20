@@ -226,7 +226,12 @@ async fn session() {}
         studio::read_file,
         studio::write_file,
         studio::remove_file,
-        studio::set_version
+        studio::set_version,
+        studio::terminology::code_systems,
+        studio::terminology::concepts,
+        studio::terminology::concept,
+        studio::terminology::list_value_sets,
+        studio::terminology::expand
     ),
     components(schemas(SessionInfo))
 )]

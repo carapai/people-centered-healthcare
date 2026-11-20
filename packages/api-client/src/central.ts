@@ -129,6 +129,23 @@ export const StudioArtefactChange = z.object({
 })
 export type StudioArtefactChange = z.infer<typeof StudioArtefactChange>
 
+/** A form question that binds the ValueSet. */
+export const StudioBinding = z.object({
+  /** The question's `linkId`. */
+  "linkId": z.string(),
+  /** The package, `name@version`. */
+  "package": z.string(),
+  /** The Questionnaire's file. */
+  "path": z.string(),
+  /** The Questionnaire's canonical URL. */
+  "questionnaire": z.string().nullable().optional(),
+  /** Its title. */
+  "title": z.string().nullable().optional(),
+  /** The binding as written, `url` or `url|version`. */
+  "valueSet": z.string(),
+})
+export type StudioBinding = z.infer<typeof StudioBinding>
+
 /** Which automated check. */
 export const StudioCheck = z.enum(["validation", "simulation"])
 export type StudioCheck = z.infer<typeof StudioCheck>
@@ -147,6 +164,159 @@ export const StudioCheckResult = z.object({
   "problems": z.array(z.string()),
 })
 export type StudioCheckResult = z.infer<typeof StudioCheckResult>
+
+/** One code of an expansion. */
+export const StudioCode = z.object({
+  /** The code. */
+  "code": z.string(),
+  /** Its display. */
+  "display": z.string().nullable().optional(),
+  /** Whether it is inactive. */
+  "inactive": z.boolean(),
+  /** Its code system. */
+  "system": z.string(),
+  /** The code system's version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioCode = z.infer<typeof StudioCode>
+
+/** A code system the package version is authored against. */
+export const StudioCodeSystem = z.object({
+  /** Whether every concept is held (`content` is `complete`); only then can a ValueSet filter it. */
+  "complete": z.boolean(),
+  /** How many concepts it holds. */
+  "concepts": integer,
+  /** Whether it is external: shipped in a terminology package, and read only. */
+  "external": z.boolean(),
+  /** Whether it is this package's own. */
+  "own": z.boolean(),
+  /** The package it comes from, `name@version`. */
+  "package": z.string(),
+  /** Its file, when it is this package's own. */
+  "path": z.string().nullable().optional(),
+  /** Its `title`, or its `name`. */
+  "title": z.string().nullable().optional(),
+  /** Its canonical URL. */
+  "url": z.string(),
+  /** Its version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioCodeSystem = z.infer<typeof StudioCodeSystem>
+
+/** The code systems, this package's own first. */
+export const StudioCodeSystems = z.object({
+  /** The code systems. */
+  "codeSystems": z.array(StudioCodeSystem),
+})
+export type StudioCodeSystems = z.infer<typeof StudioCodeSystems>
+
+/** A ValueSet, as a list names it. */
+export const StudioValueSet = z.object({
+  /** Whether it is this package's own (a draft, when this package version is one). */
+  "own": z.boolean(),
+  /** The package it comes from, `name@version`. */
+  "package": z.string(),
+  /** Its file in that package. */
+  "path": z.string(),
+  /** Its `title`, or its `name`. */
+  "title": z.string().nullable().optional(),
+  /** Its canonical URL. */
+  "url": z.string(),
+  /** Its version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioValueSet = z.infer<typeof StudioValueSet>
+
+/** One concept read in full. */
+export const StudioConcept = z.object({
+  /** How many concepts are directly under it. */
+  "children": integer,
+  /** Its code. */
+  "code": z.string(),
+  /** The code system, `url|version`. */
+  "codeSystem": z.string(),
+  /** Its definition. */
+  "definition": z.string().nullable().optional(),
+  /** Its display. */
+  "display": z.string().nullable().optional(),
+  /** Whether it is inactive (retired). */
+  "inactive": z.boolean(),
+  /** The codes directly above it. */
+  "parents": z.array(z.string()),
+  /** The ValueSets that contain it. */
+  "valueSets": z.array(StudioValueSet),
+})
+export type StudioConcept = z.infer<typeof StudioConcept>
+
+/** A concept, as a row of the hierarchy or of a search. */
+export const StudioConceptRow = z.object({
+  /** How many concepts are directly under it. */
+  "children": integer,
+  /** Its code. */
+  "code": z.string(),
+  /** Its display. */
+  "display": z.string().nullable().optional(),
+  /** Whether it is inactive (retired). */
+  "inactive": z.boolean(),
+})
+export type StudioConceptRow = z.infer<typeof StudioConceptRow>
+
+/** A page of concepts. */
+export const StudioConceptPage = z.object({
+  /** The code system, `url|version`. */
+  "codeSystem": z.string(),
+  /** This page. */
+  "concepts": z.array(StudioConceptRow),
+  /** How many concepts there are before paging. */
+  "total": integer,
+})
+export type StudioConceptPage = z.infer<typeof StudioConceptPage>
+
+/** Which ValueSet to expand. */
+export const StudioExpandInput = z.object({
+  /** At most this many codes (200 unless asked, 1000 at most). */
+  "count": integer.nullable().optional(),
+  /** Only codes whose code or display holds this text. */
+  "filter": z.string().nullable().optional(),
+  /** Skip this many codes. */
+  "offset": integer.nullable().optional(),
+  /** A ValueSet held, by canonical URL. */
+  "url": z.string().nullable().optional(),
+  /** An unsaved ValueSet resource of this package, expanded in place of the one it replaces. */
+  "valueSet": z.object({}).nullable().optional(),
+  /** Its version; the latest held when there is none. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioExpandInput = z.infer<typeof StudioExpandInput>
+
+/** How the expansion changed against the published one. */
+export const StudioExpansionChange = z.object({
+  /** The codes added (the first 1000). */
+  "added": z.array(StudioCode),
+  /** How many codes were added. */
+  "addedTotal": integer,
+  /** The published ValueSet compared against, `url|version`; none when it was never published, so every code is added. */
+  "published": z.string().nullable().optional(),
+  /** The codes removed (the first 1000): records that hold them stay valid against the version that issued them, and new forms no longer offer them. */
+  "removed": z.array(StudioCode),
+  /** How many codes were removed. */
+  "removedTotal": integer,
+})
+export type StudioExpansionChange = z.infer<typeof StudioExpansionChange>
+
+/** A ValueSet's expansion. */
+export const StudioExpansion = z.object({
+  /** The form questions that bind it, in this package and the published ones. */
+  "boundBy": z.array(StudioBinding),
+  "change": StudioExpansionChange.nullable().optional(),
+  /** The codes on this page. */
+  "contains": z.array(StudioCode),
+  /** How many codes it has (after `filter`), before paging. */
+  "total": integer,
+  /** The ValueSet expanded, `url|version`. */
+  "valueSet": z.string(),
+})
+export type StudioExpansion = z.infer<typeof StudioExpansion>
 
 /** One file of a package version, for an editor. */
 export const StudioFile = z.object({
@@ -296,6 +466,13 @@ export const StudioProblem = z.object({
 })
 export type StudioProblem = z.infer<typeof StudioProblem>
 
+/** The ValueSets of the package version and of the published packages. */
+export const StudioValueSets = z.object({
+  /** The ValueSets, this package's own first. */
+  "valueSets": z.array(StudioValueSet),
+})
+export type StudioValueSets = z.infer<typeof StudioValueSets>
+
 /** A draft's new version. */
 export const StudioVersionInput = z.object({
   /** An exact version, e.g. `2.1.0`. */
@@ -396,6 +573,67 @@ export const operations = {
       404: StudioProblem,
       409: StudioProblem,
       412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  listStudioCodeSystems: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/terminology/code-systems',
+    responses: {
+      200: StudioCodeSystems,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  getStudioConcept: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/terminology/concept',
+    responses: {
+      200: StudioConcept,
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  listStudioConcepts: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/terminology/concepts',
+    responses: {
+      200: StudioConceptPage,
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  expandStudioValueSet: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/terminology/expand',
+    responses: {
+      200: StudioExpansion,
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  listStudioValueSets: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/terminology/value-sets',
+    responses: {
+      200: StudioValueSets,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
       422: StudioProblem,
       500: StudioProblem,
     },

@@ -579,3 +579,199 @@ fn canonicals_read_and_print() {
     assert_eq!(Canonical::parse("urn:vs|").version, None);
     assert_eq!(Canonical::parse("urn:vs").to_string(), "urn:vs");
 }
+
+// The Studio's terminology browser (#523).
+
+const ICD11: &str = "http://id.who.int/icd/release/11/mms";
+
+/// A slice of ICD-11 big enough to page: chapter 01 with blocks of numbered codes, and chapter 12.
+fn icd11() -> CodeSystem {
+    let mut cholera = concept("1A00", "Cholera", vec![]);
+    cholera.designations.push(Designation {
+        language: Some("en".into()),
+        use_code: Some("synonym".into()),
+        value: "Asiatic cholera".into(),
+    });
+    let mut intestinal: Vec<Concept> = vec![cholera];
+    for n in 1..=40 {
+        intestinal.push(concept(
+            &format!("1A{n:02}"),
+            &format!("Intestinal infection type {n}"),
+            vec![],
+        ));
+    }
+    CodeSystem {
+        url: ICD11.into(),
+        version: Some("2024-01".into()),
+        case_sensitive: false,
+        content: Content::Complete,
+        concepts: vec![
+            concept(
+                "01",
+                "Certain infectious or parasitic diseases",
+                vec![concept(
+                    "1A0",
+                    "Bacterial intestinal infections",
+                    intestinal,
+                )],
+            ),
+            concept(
+                "12",
+                "Diseases of the respiratory system",
+                vec![concept("CA40", "Pneumonia", vec![])],
+            ),
+        ],
+    }
+}
+
+#[test]
+fn search_by_words_matches_code_display_and_designations_a_page_at_a_time() {
+    let mut terminology = Terminology::new();
+    terminology.add_code_system(icd11());
+
+    let found = terminology
+        .search(ICD11, None, "intestinal TYPE", 0, Some(10))
+        .expect("search");
+    assert_eq!(found.code_system, format!("{ICD11}|2024-01"));
+    assert_eq!(found.total, 40, "every word must match, ignoring case");
+    assert_eq!(found.concepts.len(), 10, "only one page is returned");
+    assert_eq!(found.concepts[0].code, "1A01");
+
+    let next = terminology
+        .search(ICD11, None, "intestinal type", 10, Some(10))
+        .expect("search");
+    assert_eq!(next.concepts[0].code, "1A11");
+
+    let synonym = terminology
+        .search(ICD11, None, "asiatic", 0, None)
+        .expect("search");
+    assert_eq!(synonym.concepts[0].code, "1A00");
+
+    // An exact code comes first, then codes starting with it.
+    let by_code = terminology
+        .search(ICD11, None, "1a0", 0, Some(3))
+        .expect("search");
+    let codes: Vec<&str> = by_code.concepts.iter().map(|c| c.code.as_str()).collect();
+    assert_eq!(codes, ["1A0", "1A00", "1A01"]);
+    assert_eq!(by_code.concepts[0].children, 41);
+
+    assert_eq!(
+        terminology.search("http://example.org/none", None, "x", 0, None),
+        Err(Error::UnknownCodeSystem("http://example.org/none".into()))
+    );
+}
+
+#[test]
+fn the_hierarchy_is_read_one_level_at_a_time() {
+    let mut terminology = Terminology::new();
+    terminology.add_code_system(icd11());
+    let summaries = terminology.code_systems();
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].concepts, 45);
+
+    let roots = terminology
+        .children(ICD11, None, None, 0, None)
+        .expect("roots");
+    let codes: Vec<&str> = roots.concepts.iter().map(|c| c.code.as_str()).collect();
+    assert_eq!(codes, ["01", "12"]);
+    assert_eq!(roots.concepts[0].children, 1);
+
+    let block = terminology
+        .children(ICD11, None, Some("1a0"), 5, Some(5))
+        .expect("children");
+    assert_eq!(block.total, 41);
+    assert_eq!(block.concepts.len(), 5);
+    assert_eq!(block.concepts[0].code, "1A05");
+
+    assert!(matches!(
+        terminology.children(ICD11, None, Some("ZZ"), 0, None),
+        Err(Error::UnknownCode { .. })
+    ));
+}
+
+#[test]
+fn an_is_a_rule_takes_in_a_child_code_added_later() {
+    let rule = Rule {
+        filters: vec![filter("concept", FilterOp::IsA, "bleeding")],
+        ..rule(SIGNS)
+    };
+    let mut terminology = Terminology::new();
+    terminology.add_code_system(signs("1.0.0"));
+    terminology.add_value_set(value_set(DANGER, vec![rule], vec![]));
+    let before = terminology
+        .expand(DANGER, &ExpandRequest::default())
+        .expect("expand");
+    assert_eq!(codes(&before), ["bleeding", "heavy-bleeding"]);
+
+    // The code system's next version adds a code under bleeding.
+    let mut next = signs("1.1.0");
+    next.concepts[0].children[0]
+        .children
+        .push(concept("spotting", "Spotting", vec![]));
+    terminology.add_code_system(next);
+    let after = terminology
+        .expand(DANGER, &ExpandRequest::default())
+        .expect("expand");
+    assert_eq!(codes(&after), ["bleeding", "heavy-bleeding", "spotting"]);
+}
+
+#[test]
+fn the_change_against_published_lists_added_and_removed_codes() {
+    let mut terminology = terminology();
+    let published = terminology
+        .expand(DANGER, &ExpandRequest::default())
+        .expect("expand")
+        .contains;
+    terminology.add_value_set(ValueSet {
+        version: Some("1.1.0".into()),
+        ..value_set(
+            DANGER,
+            vec![Rule {
+                filters: vec![filter("concept", FilterOp::DescendentOf, "danger")],
+                ..rule(SIGNS)
+            }],
+            vec![Rule {
+                concepts: vec![Listed {
+                    code: "fits".into(),
+                    display: None,
+                }],
+                ..rule(SIGNS)
+            }],
+        )
+    });
+    terminology.add_value_set(value_set(
+        "https://health.go.ug/fhir/ValueSet/other",
+        vec![Rule {
+            concepts: vec![Listed {
+                code: "routine".into(),
+                display: None,
+            }],
+            ..rule(SIGNS)
+        }],
+        vec![],
+    ));
+    let draft = terminology
+        .expand(&format!("{DANGER}|1.1.0"), &ExpandRequest::default())
+        .expect("expand")
+        .contains;
+    let change = compare(&published, &draft);
+    assert!(change.added.is_empty());
+    let removed: Vec<&str> = change.removed.iter().map(|c| c.code.as_str()).collect();
+    assert_eq!(removed, ["fits"]);
+
+    let routine = vec![Contains {
+        system: SIGNS.into(),
+        version: None,
+        code: "routine".into(),
+        display: None,
+        inactive: false,
+    }];
+    let change = compare(&published, &[draft.clone(), routine].concat());
+    assert_eq!(change.added[0].code, "routine");
+    assert_eq!(terminology.value_set_references().len(), 3);
+
+    let mut merged = Terminology::new();
+    merged.extend(&terminology);
+    assert_eq!(merged.value_set_references().len(), 3);
+    assert_eq!(merged.code_systems().len(), 1);
+}
