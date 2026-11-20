@@ -18,6 +18,11 @@ export const USERS = {
   labtech: { username: 'e2e-labtech', password: 'quartz heron lantern eighty', roles: 'labtech' },
   verifier: { username: 'e2e-verifier', password: 'cobalt tapir meadow ninety', roles: 'labtech' },
   studio: { username: 'e2e-studio', password: 'marble pelican ferry seventy', roles: 'studio' },
+  // The Studio's other steps (#835): the seeded OPD draft's author, a second approver (a program
+  // package needs two), and who publishes and activates it.
+  author: { username: 'e2e-author', password: 'thistle beacon rafter forty', roles: 'author' },
+  approver: { username: 'e2e-approver', password: 'juniper walrus anchor fifty', roles: 'approver' },
+  publisher: { username: 'e2e-publisher', password: 'cinder otter gazebo sixty', roles: 'publisher' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
 } as const
