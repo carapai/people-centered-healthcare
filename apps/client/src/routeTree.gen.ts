@@ -44,6 +44,7 @@ import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
+import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -220,6 +221,11 @@ const StudioIdFilesSplatRoute = StudioIdFilesSplatRouteImport.update({
   path: '/studio/$id/files/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIdFormsSplatRoute = StudioIdFormsSplatRouteImport.update({
+  id: '/studio/$id_/forms/$',
+  path: '/studio/$id/forms/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -257,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
+  '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -294,6 +301,7 @@ export interface FileRoutesByTo {
   '/till': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
+  '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -332,6 +340,7 @@ export interface FileRoutesById {
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
+  '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
     | '/till/'
     | '/records/$type/$id'
     | '/studio/$id/files/$'
+    | '/studio/$id/forms/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/till'
     | '/records/$type/$id'
     | '/studio/$id/files/$'
+    | '/studio/$id/forms/$'
   id:
     | '__root__'
     | '/'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/till/'
     | '/records/$type/$id'
     | '/studio/$id_/files/$'
+    | '/studio/$id_/forms/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -483,6 +495,7 @@ export interface RootRouteChildren {
   TillIndexRoute: typeof TillIndexRoute
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
+  StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -732,6 +745,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdFilesSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id_/forms/$': {
+      id: '/studio/$id_/forms/$'
+      path: '/studio/$id/forms/$'
+      fullPath: '/studio/$id/forms/$'
+      preLoaderRoute: typeof StudioIdFormsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -771,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   TillIndexRoute: TillIndexRoute,
   RecordsTypeIdRoute: RecordsTypeIdRoute,
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
+  StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

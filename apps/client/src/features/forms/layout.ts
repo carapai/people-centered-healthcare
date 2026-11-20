@@ -51,16 +51,21 @@ export function sections(questionnaire: Questionnaire, layout: FormLayout | unde
   return result.filter((section) => section.items.length > 0)
 }
 
-/** The widget for `item`: the layout's choice where it fits the item's type, else the default. */
-export function widget(item: QuestionnaireItem, layout: FormLayout | undefined): Widget {
-  const chosen = layout?.items?.[item.linkId]?.widget
+/** The widgets that fit `item`'s type, the default first. */
+export function fitting(item: QuestionnaireItem): Widget[] {
   const fits: Record<string, Widget[]> = {
     boolean: ['radio', 'checkbox'],
     coding: ['radio', 'select'],
     string: ['input', 'textarea'],
     text: ['textarea', 'input'],
   }
-  const allowed = fits[item.type] ?? ['input']
+  return fits[item.type] ?? ['input']
+}
+
+/** The widget for `item`: the layout's choice where it fits the item's type, else the default. */
+export function widget(item: QuestionnaireItem, layout: FormLayout | undefined): Widget {
+  const chosen = layout?.items?.[item.linkId]?.widget
+  const allowed = fitting(item)
   if (chosen !== undefined && allowed.includes(chosen)) return chosen
   return allowed[0] ?? 'input'
 }
