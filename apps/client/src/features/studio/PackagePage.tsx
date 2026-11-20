@@ -1,13 +1,13 @@
 import { css } from '@health/design-system/css'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
 import { studioMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, needs, packageQuery, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, needs, packageQuery, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '6', maxWidth: '5xl' })
@@ -20,7 +20,8 @@ const muted = css({ color: 'fg.muted' })
  * One package version read from top to bottom (studio.md § The package workspace; #492): what
  * changed, is it safe, who must act, and the discussion. The actions are the server's list, in
  * its order; one the person may not take stays on the page, disabled, with the server's reason.
- * No editing yet: the editors open from a changed artefact in later work.
+ * Its files open one by one in the file editor (#494); in a draft the person may change the
+ * version, and a published version can be copied into the next version's draft.
  */
 export function PackagePage({ id }: { id: string }) {
   const intl = useIntl()
@@ -84,6 +85,8 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
         )}
       </section>
 
+      <Files id={id} draft={draft} />
+
       <section aria-labelledby="studio-safe">
         <h2 id="studio-safe" className={subheading}>
           {intl.formatMessage(m.sdSafe, { failing })}
@@ -144,6 +147,120 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
         </ol>
       </section>
     </>
+  )
+}
+
+/** The package's files, each opening in the editor; in a draft, a new file and the version. */
+function Files({ id, draft }: { id: string; draft: StudioPackagePage }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const pathId = useId()
+  const pathHintId = useId()
+  const versionId = useId()
+  const [path, setPath] = useState('')
+  const [version, setVersionText] = useState(draft.package.version)
+  const renumber = useMutation({
+    mutationFn: () => setVersion(platform.transport, id, version.trim(), draft.revision),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(packageQuery(platform.transport, next.package.id).queryKey, next)
+      await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
+      if (next.package.id !== id) await navigate({ to: '/studio/$id', params: { id: next.package.id } })
+    },
+  })
+  const copy = useMutation({
+    mutationFn: () => startDraft(platform.transport, { copyOf: id }),
+    onSuccess: async (next) => {
+      queryClient.setQueryData(packageQuery(platform.transport, next.package.id).queryKey, next)
+      await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
+      await navigate({ to: '/studio/$id', params: { id: next.package.id } })
+    },
+  })
+  const why = (error: unknown) => (error instanceof StudioError ? (error.refusal === null || error.refusal === undefined ? error.detail : refusalText(intl, error.refusal)) : '')
+  const published = draft.package.stage === 'published'
+  return (
+    <section aria-labelledby="studio-files" className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+      <h2 id="studio-files" className={subheading}>
+        {intl.formatMessage(m.sdFiles)}
+      </h2>
+      <p className={muted}>{intl.formatMessage(m.sdFilesHint)}</p>
+      {draft.editable || published || draft.editRefusal === null || draft.editRefusal === undefined ? null : (
+        <p className={muted}>{intl.formatMessage(m.sdEditRefused, { reason: refusalText(intl, draft.editRefusal) })}</p>
+      )}
+      <ul className={list}>
+        {draft.files.map((file) => (
+          <li key={file.path}>
+            <Link to="/studio/$id/files/$" params={{ id, _splat: file.path }} aria-label={intl.formatMessage(m.sdOpenFile, { path: file.path })}>
+              {file.path}
+            </Link>
+            {file.resourceType === null || file.resourceType === undefined ? null : (
+              <span className={muted}>
+                {' '}
+                · {file.resourceType}
+                {file.version === null || file.version === undefined ? '' : ` ${file.version}`}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {draft.editable ? (
+        <>
+          <form
+            className={css({ display: 'flex', flexWrap: 'wrap', gap: '3', alignItems: 'flex-end' })}
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (path.trim() !== '') void navigate({ to: '/studio/$id/files/$', params: { id, _splat: path.trim() } })
+            }}
+          >
+            <div className={field}>
+              <label htmlFor={pathId}>{intl.formatMessage(m.sdNewFilePath)}</label>
+              <input id={pathId} className={control} value={path} aria-describedby={pathHintId} onChange={(e) => setPath(e.target.value)} />
+              <span id={pathHintId} className={muted}>
+                {intl.formatMessage(m.sdNewFilePathHint)}
+              </span>
+            </div>
+            <button type="submit" className={button} disabled={path.trim() === ''}>
+              {intl.formatMessage(m.sdAddFile)}
+            </button>
+          </form>
+          <form
+            className={css({ display: 'flex', flexWrap: 'wrap', gap: '3', alignItems: 'flex-end' })}
+            onSubmit={(e) => {
+              e.preventDefault()
+              renumber.mutate()
+            }}
+          >
+            <div className={field}>
+              <label htmlFor={versionId}>{intl.formatMessage(m.sdVersion)}</label>
+              <input id={versionId} className={control} value={version} onChange={(e) => setVersionText(e.target.value)} />
+            </div>
+            <button type="submit" className={button} disabled={renumber.isPending || version.trim() === '' || version.trim() === draft.package.version}>
+              {intl.formatMessage(m.sdChangeVersion)}
+            </button>
+          </form>
+          {renumber.isSuccess ? <p role="status">{intl.formatMessage(m.sdVersionChanged)}</p> : null}
+          {renumber.isError ? (
+            <p role="alert" className={css({ color: 'danger.text' })}>
+              {intl.formatMessage(m.sdEditorFailed, { reason: why(renumber.error) })}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      {published ? (
+        <div className={css({ display: 'flex', flexDirection: 'column', gap: '2', alignItems: 'flex-start' })}>
+          <button type="button" className={button} disabled={copy.isPending} onClick={() => copy.mutate()}>
+            {intl.formatMessage(m.sdStartNext)}
+          </button>
+          <span className={muted}>{intl.formatMessage(m.sdStartNextHint)}</span>
+          {copy.isError ? (
+            <p role="alert" className={css({ color: 'danger.text' })}>
+              {intl.formatMessage(m.sdStartFailed, { reason: why(copy.error) })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   )
 }
 

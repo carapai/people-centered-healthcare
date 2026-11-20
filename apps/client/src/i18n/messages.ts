@@ -1592,6 +1592,41 @@ type StudioValues = {
   sdStagePublished: {}
   sdCheckValidation: {}
   sdCheckSimulation: {}
+  sdActionCheck: {}
+  sdFiles: {}
+  sdFilesHint: {}
+  sdOpenFile: { path: string }
+  sdNewFilePath: {}
+  sdNewFilePathHint: {}
+  sdAddFile: {}
+  sdVersion: {}
+  sdChangeVersion: {}
+  sdVersionChanged: {}
+  sdEditRefused: { reason: string }
+  sdStartNext: {}
+  sdStartNextHint: {}
+  sdStartFailed: { reason: string }
+  sdNewDraft: {}
+  sdNewDraftName: {}
+  sdNewDraftTitle: {}
+  sdNewDraftKind: {}
+  sdNewDraftVersion: {}
+  sdNewDraftCanonical: {}
+  sdNewDraftStart: {}
+  sdEditorHeading: { path: string; id: string }
+  sdEditorBack: {}
+  sdEditorLoading: {}
+  sdEditorNew: {}
+  sdEditorContent: {}
+  sdEditorSave: {}
+  sdEditorSaved: {}
+  sdEditorRemove: {}
+  sdEditorRemoved: {}
+  sdEditorStale: {}
+  sdEditorReload: {}
+  sdEditorNotJson: {}
+  sdEditorReadOnly: {}
+  sdEditorFailed: { reason: string }
 }
 
 // The Studio's package list and draft page (features/studio, #492).
@@ -1662,4 +1697,39 @@ export const studioMessages = defineMessages<StudioValues>({
   sdStagePublished: { id: 'app.studio.stagePublished', defaultMessage: 'published', description: 'Studio: lifecycle stage' },
   sdCheckValidation: { id: 'app.studio.checkValidation', defaultMessage: 'Validation', description: 'Studio: check name' },
   sdCheckSimulation: { id: 'app.studio.checkSimulation', defaultMessage: 'Simulation', description: 'Studio: check name' },
+  sdActionCheck: { id: 'app.studio.actionCheck', defaultMessage: 'Check now', description: 'Studio action: run validation and simulation without submitting' },
+  sdFiles: { id: 'app.studio.files', defaultMessage: 'Files', description: 'Studio: the draft files heading' },
+  sdFilesHint: { id: 'app.studio.filesHint', defaultMessage: 'Open a file to read it or, in a draft, to edit it. Each save is one file.', description: 'Studio: files section hint' },
+  sdOpenFile: { id: 'app.studio.openFile', defaultMessage: 'Open {path}', description: 'Studio: link to a file editor' },
+  sdNewFilePath: { id: 'app.studio.newFilePath', defaultMessage: 'New file', description: 'Studio: path of a file to add' },
+  sdNewFilePathHint: { id: 'app.studio.newFilePathHint', defaultMessage: 'For example ValueSet-anc-risk.json, or tests/visit.json', description: 'Studio: how to name a new file' },
+  sdAddFile: { id: 'app.studio.addFile', defaultMessage: 'Add the file', description: 'Studio: open the editor for a new file' },
+  sdVersion: { id: 'app.studio.version', defaultMessage: 'Version', description: 'Studio: the draft version field' },
+  sdChangeVersion: { id: 'app.studio.changeVersion', defaultMessage: 'Change the version', description: 'Studio: action' },
+  sdVersionChanged: { id: 'app.studio.versionChanged', defaultMessage: 'The draft has its new version.', description: 'Studio: version changed' },
+  sdEditRefused: { id: 'app.studio.editRefused', defaultMessage: 'You cannot change this package: {reason}', description: 'Studio: why editing is off' },
+  sdStartNext: { id: 'app.studio.startNext', defaultMessage: 'Start the next version', description: 'Studio: copy a published version into a new draft' },
+  sdStartNextHint: { id: 'app.studio.startNextHint', defaultMessage: 'A draft of the next minor version, with the same artefacts. You can change its version until you submit it.', description: 'Studio: what starting the next version does' },
+  sdStartFailed: { id: 'app.studio.startFailed', defaultMessage: 'The draft was not started. {reason}', description: 'Studio: starting a draft failed' },
+  sdNewDraft: { id: 'app.studio.newDraft', defaultMessage: 'Start a new package', description: 'Studio: blank draft heading' },
+  sdNewDraftName: { id: 'app.studio.newDraftName', defaultMessage: 'Name', description: 'Studio: new package name, e.g. ug.moh.tb' },
+  sdNewDraftTitle: { id: 'app.studio.newDraftTitle', defaultMessage: 'Title', description: 'Studio: new package title' },
+  sdNewDraftKind: { id: 'app.studio.newDraftKind', defaultMessage: 'Kind', description: 'Studio: new package kind' },
+  sdNewDraftVersion: { id: 'app.studio.newDraftVersion', defaultMessage: 'First version', description: 'Studio: new package version' },
+  sdNewDraftCanonical: { id: 'app.studio.newDraftCanonical', defaultMessage: 'Canonical base URL', description: 'Studio: new package canonical base' },
+  sdNewDraftStart: { id: 'app.studio.newDraftStart', defaultMessage: 'Start the draft', description: 'Studio: start a blank draft' },
+  sdEditorHeading: { id: 'app.studio.editorHeading', defaultMessage: '{path} in {id}', description: 'Studio: file editor heading' },
+  sdEditorBack: { id: 'app.studio.editorBack', defaultMessage: 'Back to the package', description: 'Studio: file editor back link' },
+  sdEditorLoading: { id: 'app.studio.editorLoading', defaultMessage: 'Loading the file…', description: 'Studio: file editor loading' },
+  sdEditorNew: { id: 'app.studio.editorNew', defaultMessage: 'This file is new: it is added to the draft when you save it.', description: 'Studio: editing a file that does not exist yet' },
+  sdEditorContent: { id: 'app.studio.editorContent', defaultMessage: 'Content (JSON)', description: 'Studio: file editor text area' },
+  sdEditorSave: { id: 'app.studio.editorSave', defaultMessage: 'Save', description: 'Studio: save the file' },
+  sdEditorSaved: { id: 'app.studio.editorSaved', defaultMessage: 'Saved.', description: 'Studio: file saved' },
+  sdEditorRemove: { id: 'app.studio.editorRemove', defaultMessage: 'Remove the file', description: 'Studio: remove the file from the draft' },
+  sdEditorRemoved: { id: 'app.studio.editorRemoved', defaultMessage: 'Removed.', description: 'Studio: file removed' },
+  sdEditorStale: { id: 'app.studio.editorStale', defaultMessage: 'Someone saved this draft after you opened it, so your change was not saved. Reload to see the draft as it is now; copy your text first if you need it.', description: 'Studio: a save was refused with 412' },
+  sdEditorReload: { id: 'app.studio.editorReload', defaultMessage: 'Reload', description: 'Studio: reload the file after a refused save' },
+  sdEditorNotJson: { id: 'app.studio.editorNotJson', defaultMessage: 'This is not valid JSON.', description: 'Studio: file editor parse error' },
+  sdEditorReadOnly: { id: 'app.studio.editorReadOnly', defaultMessage: 'Read only.', description: 'Studio: the file cannot be edited by this person or at this stage' },
+  sdEditorFailed: { id: 'app.studio.editorFailed', defaultMessage: 'Not saved. {reason}', description: 'Studio: a save was refused' },
 })

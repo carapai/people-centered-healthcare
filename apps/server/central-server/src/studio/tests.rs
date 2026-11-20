@@ -96,8 +96,24 @@ async fn call(
     path: &str,
     body: Option<Value>,
 ) -> (u16, Value) {
+    let (status, _, json) = send(publications, who, method, path, None, body).await;
+    (status, json)
+}
+
+/// Sends a request with `if_match`, answering its status, `ETag` and body.
+async fn send(
+    publications: &Publications,
+    who: Subject,
+    method: &str,
+    path: &str,
+    if_match: Option<&str>,
+    body: Option<Value>,
+) -> (u16, Option<String>, Value) {
     let app = router(publications.clone(), None).layer(Extension(who));
-    let request = Request::builder().method(method).uri(path);
+    let mut request = Request::builder().method(method).uri(path);
+    if let Some(tag) = if_match {
+        request = request.header("if-match", tag);
+    }
     let request = match body {
         Some(body) => request
             .header("content-type", "application/json")
@@ -107,6 +123,11 @@ async fn call(
     .expect("request");
     let response = app.oneshot(request).await.expect("response");
     let status = response.status().as_u16();
+    let etag = response
+        .headers()
+        .get("etag")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
     let bytes = response
         .into_body()
         .collect()
@@ -118,7 +139,7 @@ async fn call(
     } else {
         serde_json::from_slice(&bytes).expect("json")
     };
-    (status, json)
+    (status, etag, json)
 }
 
 fn action<'a>(package: &'a Value, name: &str) -> &'a Value {
@@ -271,15 +292,204 @@ async fn an_author_who_reviews_sees_approve_refused_and_is_refused_it_when_they_
     assert_eq!(status, 404);
 }
 
+const AUTHOR: &str = health_publication::studio::AUTHOR_PERMISSION;
 const REVIEW: &str = health_publication::studio::REVIEW_PERMISSION;
 const APPROVE: &str = health_publication::studio::APPROVE_PERMISSION;
 const PUBLISH: &str = health_publication::studio::PUBLISH_PERMISSION;
 const ACTIVATE: &str = health_publication::studio::ACTIVATE_PERMISSION;
 
+#[tokio::test]
+async fn two_tabs_saving_the_same_draft_the_second_gets_412_and_nothing_is_overwritten() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let ann = || subject("ann", &[AUTHOR]);
+    let file = format!("/packages/{ID}/files/Questionnaire-anc-visit.json");
+
+    // Both tabs open the same artefact, at the same revision.
+    let (status, tag, opened) = send(&publications, ann(), "GET", &file, None, None).await;
+    assert_eq!(status, 200, "{opened}");
+    let tag = tag.expect("an ETag");
+    assert_eq!(tag, format!("\"{}\"", opened["revision"]));
+    let edited = |text: &str| {
+        json!({ "content": json!({
+            "resourceType": "Questionnaire", "id": "anc-visit",
+            "url": "http://health.go.ug/fhir/Questionnaire/anc-visit", "version": "1.0.0",
+            "status": "active", "item": [{ "linkId": "bp", "text": text, "type": "string" }]
+        }).to_string() })
+    };
+
+    // The first tab saves; the page comes back with the next revision.
+    let (status, next, page) = send(
+        &publications,
+        ann(),
+        "PUT",
+        &file,
+        Some(&tag),
+        Some(edited("Systolic")),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_ne!(next.as_deref(), Some(tag.as_str()));
+    assert_eq!(page["package"]["stage"], "draft");
+
+    // The second tab, on the old revision, is refused, as is a save that names none.
+    let (status, _, refused) = send(
+        &publications,
+        ann(),
+        "PUT",
+        &file,
+        Some(&tag),
+        Some(edited("Diastolic")),
+    )
+    .await;
+    assert_eq!(status, 412, "{refused}");
+    let (status, _, _) = send(&publications, ann(), "PUT", &file, None, Some(edited("x"))).await;
+    assert_eq!(status, 412);
+    let (_, _, now) = send(&publications, ann(), "GET", &file, None, None).await;
+    assert!(
+        now["content"].as_str().expect("text").contains("Systolic"),
+        "{now}"
+    );
+
+    // Saving needs the author permission.
+    let (status, _, _) = send(
+        &publications,
+        subject("rita", &[REVIEW]),
+        "PUT",
+        &file,
+        next.as_deref(),
+        Some(edited("x")),
+    )
+    .await;
+    assert_eq!(status, 403);
+    // A file that is not JSON is refused, and kept nowhere.
+    let (status, _, _) = send(
+        &publications,
+        ann(),
+        "PUT",
+        &file,
+        next.as_deref(),
+        Some(json!({ "content": "{ nope" })),
+    )
+    .await;
+    assert_eq!(status, 422);
+}
+
+#[tokio::test]
+async fn check_now_shows_results_on_the_page_and_the_draft_stays_a_draft() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let (status, tag, page) = send(
+        &publications,
+        subject("ann", &[AUTHOR]),
+        "POST",
+        &format!("/packages/{ID}/check"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["stage"], "draft");
+    assert_eq!(page["checks"][0]["check"], "validation");
+    assert_eq!(page["checks"][1]["check"], "simulation");
+    assert_eq!(page["checks"][0]["current"], true);
+    assert_eq!(
+        page["history"]
+            .as_array()
+            .expect("history")
+            .last()
+            .expect("entry")["step"],
+        "checked"
+    );
+    // Check now is never anyone's next step: the author's is still to submit.
+    assert_eq!(page["package"]["next"], "submit");
+    assert_eq!(page["editable"], true);
+    // A check changes no revision.
+    assert_eq!(tag, Some("\"0\"".to_owned()));
+    let (status, _) = call(
+        &publications,
+        subject("rita", &[REVIEW]),
+        "POST",
+        &format!("/packages/{ID}/check"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 403);
+}
+
+#[tokio::test]
+async fn a_draft_starts_blank_and_takes_another_version() {
+    let (publications, _dir) = publications().await;
+    let dan = || subject("dan", &[AUTHOR]);
+    let (status, tag, page) = send(
+        &publications,
+        dan(),
+        "POST",
+        "/drafts",
+        None,
+        Some(json!({
+            "name": "ug.moh.tb", "kind": "program", "title": "Tuberculosis",
+            "version": "0.1.0-draft", "canonical": "http://health.go.ug/fhir"
+        })),
+    )
+    .await;
+    assert_eq!(status, 201, "{page}");
+    assert_eq!(page["package"]["id"], "ug.moh.tb@0.1.0-draft");
+    assert!(
+        page["files"]
+            .as_array()
+            .expect("files")
+            .iter()
+            .any(|f| f["path"] == "Library-manifest.json")
+    );
+    let (status, _, page) = send(
+        &publications,
+        dan(),
+        "PUT",
+        "/packages/ug.moh.tb@0.1.0-draft/version",
+        tag.as_deref(),
+        Some(json!({ "version": "0.1.0" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["id"], "ug.moh.tb@0.1.0");
+    let history = page["history"].as_array().expect("history");
+    assert_eq!(history.last().expect("entry")["previous"], "0.1.0-draft");
+
+    // Copying needs a published version; a blank draft needs its fields.
+    let (status, _) = call(
+        &publications,
+        dan(),
+        "POST",
+        "/drafts",
+        Some(json!({ "copyOf": "ug.moh.tb@0.1.0" })),
+    )
+    .await;
+    assert_eq!(status, 404);
+    let (status, _) = call(
+        &publications,
+        dan(),
+        "POST",
+        "/drafts",
+        Some(json!({ "name": "ug.moh.hiv" })),
+    )
+    .await;
+    assert_eq!(status, 422);
+}
+
 #[test]
 fn the_openapi_document_describes_the_studio() {
     let document = crate::openapi().to_json().expect("json");
-    for operation in ["listStudioPackages", "getStudioPackage", "takeStudioAction"] {
+    for operation in [
+        "listStudioPackages",
+        "getStudioPackage",
+        "takeStudioAction",
+        "startStudioDraft",
+        "getStudioFile",
+        "saveStudioFile",
+        "removeStudioFile",
+        "setStudioVersion",
+    ] {
         assert!(document.contains(operation), "{operation}");
     }
 }

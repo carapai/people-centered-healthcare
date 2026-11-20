@@ -10,6 +10,8 @@
 //! [`Record`]: the configuration context keeps them, and audits each one.
 //!
 //! - **Drafts stay at central.** Authors revise the draft; whoever revises it becomes an author.
+//!   Until submission a draft may change version, and *Check now* records the checks' latest
+//!   results without moving it.
 //! - **Content is pinned.** Submitting fixes the content's fingerprint (the sha-256 of its files).
 //!   Validation, simulation, review and approval all apply to that content. A revision is only
 //!   possible in Draft, and a return to Draft clears the review and every approval.
@@ -114,6 +116,20 @@ pub enum Step {
     Approved,
     /// It was signed and published.
     Published,
+    /// *Check now* ran validation and simulation on the draft, without changing its stage
+    /// (studio.md § The authoring API, Checks): the latest results, not a decision.
+    Checked {
+        /// Each problem validation found.
+        validation: Vec<String>,
+        /// Each failing `tests/` case.
+        simulation: Vec<String>,
+    },
+    /// The draft took another version, before submission (studio.md § The authoring API,
+    /// Starting). The record carries the new one.
+    VersionChanged {
+        /// The version it had.
+        previous: Version,
+    },
 }
 
 /// One transition, as the configuration context keeps and audits it.
@@ -192,11 +208,17 @@ pub enum Action {
     Approve,
     /// It is signed and published.
     Publish,
+    /// Someone changes the draft's content or version.
+    Edit,
+    /// Someone runs *Check now* on the draft.
+    Check,
 }
 
 impl Action {
     /// Every action, in the order a package meets them.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
+        Self::Edit,
+        Self::Check,
         Self::Submit,
         Self::Review,
         Self::RequestChanges,
@@ -304,6 +326,13 @@ impl Lifecycle {
     /// or a fingerprint the transition also needs is not checked here.
     pub fn check(&self, action: Action, by: &str) -> Result<(), Refused> {
         match action {
+            Action::Edit | Action::Check => {
+                self.expect(Stage::Draft)?;
+                if blank(by) {
+                    return Err(Refused::Incomplete);
+                }
+                Ok(())
+            }
             Action::Submit => {
                 self.expect(Stage::Draft)?;
                 if self.authors.contains(by) {
@@ -342,13 +371,58 @@ impl Lifecycle {
 
     /// `by` replaces the draft's content with `content`, and becomes an author.
     pub fn revise(&mut self, by: &str, content: &str, now: Timestamp) -> Result<Record, Refused> {
-        self.expect(Stage::Draft)?;
-        if blank(by) || blank(content) {
+        self.check(Action::Edit, by)?;
+        if blank(content) {
             return Err(Refused::Incomplete);
         }
         self.authors.insert(by.to_owned());
         content.clone_into(&mut self.content);
         Ok(self.record(Step::Revised, Stage::Draft, by, now))
+    }
+
+    /// `by` gives the draft `version`, its content now fingerprinted `content`, and becomes an
+    /// author. Only a draft changes version; submission's semver check confirms it.
+    pub fn change_version(
+        &mut self,
+        by: &str,
+        version: Version,
+        content: &str,
+        now: Timestamp,
+    ) -> Result<Record, Refused> {
+        self.check(Action::Edit, by)?;
+        if blank(content) {
+            return Err(Refused::Incomplete);
+        }
+        let previous = std::mem::replace(&mut self.version, version);
+        self.authors.insert(by.to_owned());
+        content.clone_into(&mut self.content);
+        Ok(self.record(Step::VersionChanged { previous }, Stage::Draft, by, now))
+    }
+
+    /// *Check now* by `by`: the draft's validation problems and simulation failures, kept as the
+    /// latest results. The draft stays where it is; submission runs the checks again, and that
+    /// run decides.
+    pub fn checked(
+        &self,
+        by: &str,
+        validation: Vec<String>,
+        simulation: Vec<String>,
+        now: Timestamp,
+    ) -> Result<Record, Refused> {
+        self.check(Action::Check, by)?;
+        Ok(Record {
+            package: self.package.clone(),
+            version: self.version.clone(),
+            step: Step::Checked {
+                validation,
+                simulation,
+            },
+            from: self.stage,
+            to: self.stage,
+            by: by.to_owned(),
+            at: now,
+            content: self.content.clone(),
+        })
     }
 
     /// An author submits the draft for validation.

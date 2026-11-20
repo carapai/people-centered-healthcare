@@ -217,7 +217,17 @@ async fn session() {}
 
 #[derive(utoipa::OpenApi)]
 #[openapi(
-    paths(session, studio::list, studio::page, studio::act),
+    paths(
+        session,
+        studio::list,
+        studio::page,
+        studio::act,
+        studio::start,
+        studio::read_file,
+        studio::write_file,
+        studio::remove_file,
+        studio::set_version
+    ),
     components(schemas(SessionInfo))
 )]
 struct CentralApi;

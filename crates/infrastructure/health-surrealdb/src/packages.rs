@@ -68,6 +68,51 @@ impl SurrealTx {
         Ok(!updated.is_empty())
     }
 
+    /// Moves lifecycle `old` to `new` (a draft that took another version), if `old` is still at
+    /// revision `before`: `new` is created at the next revision with `data`, `old`'s records
+    /// follow it, and `old` is gone. False if another change came first.
+    pub async fn rekey_package_lifecycle(
+        &mut self,
+        old: &str,
+        new: &str,
+        package: &str,
+        stage: &str,
+        data: &str,
+        before: u64,
+    ) -> Result<bool, WriteError> {
+        if !self
+            .update_package_lifecycle(old, stage, data, before)
+            .await?
+        {
+            return Ok(false);
+        }
+        self.run(
+            "CREATE type::record('package_lifecycle', $id) CONTENT { data: $data, \
+             package: $package, stage: $stage, revision: <int>$before + 1 } \
+             RETURN VALUE record::id(id)",
+            vec![
+                ("id", new.to_owned()),
+                ("data", data.to_owned()),
+                ("package", package.to_owned()),
+                ("stage", stage.to_owned()),
+                ("before", before.to_string()),
+            ],
+        )
+        .await?;
+        self.run(
+            "UPDATE package_lifecycle_record SET lifecycle = $new WHERE lifecycle = $old \
+             RETURN VALUE record::id(id)",
+            vec![("old", old.to_owned()), ("new", new.to_owned())],
+        )
+        .await?;
+        self.run(
+            "DELETE type::record('package_lifecycle', $id) RETURN NONE",
+            vec![("id", old.to_owned())],
+        )
+        .await?;
+        Ok(true)
+    }
+
     /// The JSON of lifecycle `id` and its revision, if any.
     pub async fn package_lifecycle(
         &mut self,

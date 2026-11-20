@@ -56,7 +56,7 @@ export const Health = z.object({
 export type Health = z.infer<typeof Health>
 
 /** A step the Studio offers on a package. */
-export const StudioActionName = z.enum(["submit", "review", "approve", "publish", "activate", "request-changes"])
+export const StudioActionName = z.enum(["submit", "review", "approve", "publish", "activate", "request-changes", "check"])
 export type StudioActionName = z.infer<typeof StudioActionName>
 
 /** One step on a package, and why the signed-in person may not take it. */
@@ -146,8 +146,26 @@ export const StudioCheckResult = z.object({
 })
 export type StudioCheckResult = z.infer<typeof StudioCheckResult>
 
+/** One file of a package version, for an editor. */
+export const StudioFile = z.object({
+  /** Its text. */
+  "content": z.string(),
+  /** Its path in the package. */
+  "path": z.string(),
+  /** The draft's revision when it was read, also the `ETag`. */
+  "revision": integer,
+})
+export type StudioFile = z.infer<typeof StudioFile>
+
+/** A file's new text. */
+export const StudioFileInput = z.object({
+  /** The whole file. */
+  "content": z.string(),
+})
+export type StudioFileInput = z.infer<typeof StudioFileInput>
+
 /** What happened in one history entry. */
-export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published"])
+export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed"])
 export type StudioHistoryStep = z.infer<typeof StudioHistoryStep>
 
 /** One entry of the discussion: a lifecycle record. */
@@ -156,7 +174,9 @@ export const StudioHistoryEntry = z.object({
   "at": z.string(),
   /** Who did it (`system` for the automated checks). */
   "by": z.string(),
-  /** The problems a failed check found. */
+  /** The version the draft had, when it took another. */
+  "previous": z.string().nullable().optional(),
+  /** The problems a failed check found; for *Check now*, validation's then simulation's. */
   "problems": z.array(z.string()),
   /** What a reviewer or approver asked to change. */
   "reason": z.string().nullable().optional(),
@@ -170,6 +190,22 @@ export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 /** The kind of package, which decides its approvers. */
 export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
 export type StudioPackageKind = z.infer<typeof StudioPackageKind>
+
+/** How to start a draft: a copy of a published version, or a blank new package. */
+export const StudioNewDraft = z.object({
+  /** The canonical base of a blank package's artefacts, e.g. `http://health.go.ug/fhir`. */
+  "canonical": z.string().nullable().optional(),
+  /** The published `name@version` to copy; the draft takes the next minor version. */
+  "copyOf": z.string().nullable().optional(),
+  "kind": StudioPackageKind.nullable().optional(),
+  /** A blank package's name, e.g. `ug.moh.tb`. */
+  "name": z.string().nullable().optional(),
+  /** A blank package's title. */
+  "title": z.string().nullable().optional(),
+  /** A blank package's first version, e.g. `0.1.0`. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioNewDraft = z.infer<typeof StudioNewDraft>
 
 /** One row of the package list. */
 export const StudioPackage = z.object({
@@ -198,6 +234,19 @@ export const StudioPackage = z.object({
 })
 export type StudioPackage = z.infer<typeof StudioPackage>
 
+/** One file of a package version. */
+export const StudioPackageFile = z.object({
+  /** Its path in the package. */
+  "path": z.string(),
+  /** Its `resourceType`, for a FHIR artefact. */
+  "resourceType": z.string().nullable().optional(),
+  /** Its canonical URL. */
+  "url": z.string().nullable().optional(),
+  /** Its version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioPackageFile = z.infer<typeof StudioPackageFile>
+
 /** The package list. */
 export const StudioPackageList = z.object({
   /** One row per package, by name. */
@@ -215,12 +264,19 @@ export const StudioPackagePage = z.object({
   "changes": z.array(StudioArtefactChange),
   /** The stored check results. */
   "checks": z.array(StudioCheckResult),
+  "editRefusal": ActionRefusal.nullable().optional(),
+  /** Whether the signed-in person may change the draft's files and version. */
+  "editable": z.boolean(),
+  /** Its files, to open in an editor. */
+  "files": z.array(StudioPackageFile),
   /** The history, oldest first. */
   "history": z.array(StudioHistoryEntry),
   /** Its row in the list, with the actions. */
   "package": StudioPackage,
   /** Who accepted it at review. */
   "reviewer": z.string().nullable().optional(),
+  /** The draft's revision, also its `ETag`: a save sends it back as `If-Match`. */
+  "revision": integer,
 })
 export type StudioPackagePage = z.infer<typeof StudioPackagePage>
 
@@ -232,6 +288,13 @@ export const StudioProblem = z.object({
 })
 export type StudioProblem = z.infer<typeof StudioProblem>
 
+/** A draft's new version. */
+export const StudioVersionInput = z.object({
+  /** An exact version, e.g. `2.1.0`. */
+  "version": z.string(),
+})
+export type StudioVersionInput = z.infer<typeof StudioVersionInput>
+
 /** Each operation: its method, path and response schemas by status (`null`: no body). */
 export const operations = {
   getSession: {
@@ -240,6 +303,19 @@ export const operations = {
     responses: {
       200: SessionInfo,
       401: null,
+    },
+  },
+  startStudioDraft: {
+    method: 'POST',
+    path: '/api/studio/drafts',
+    responses: {
+      201: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
     },
   },
   listStudioPackages: {
@@ -275,6 +351,59 @@ export const operations = {
       422: StudioProblem,
       500: StudioProblem,
       503: StudioProblem,
+    },
+  },
+  getStudioFile: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/files/{path}',
+    responses: {
+      200: StudioFile,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  saveStudioFile: {
+    method: 'PUT',
+    path: '/api/studio/packages/{id}/files/{path}',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  removeStudioFile: {
+    method: 'DELETE',
+    path: '/api/studio/packages/{id}/files/{path}',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  setStudioVersion: {
+    method: 'PUT',
+    path: '/api/studio/packages/{id}/version',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
     },
   },
   getHealth: {

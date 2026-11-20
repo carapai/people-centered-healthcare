@@ -2,7 +2,7 @@ import { ResponseError, type StudioPackage } from '@health/api-client'
 import { createIntl } from 'react-intl'
 import { describe, expect, test, vi } from 'vitest'
 
-import { StudioError, needs, packageQuery, packagesQuery, studioKey, takeAction } from '../src/features/studio/api'
+import { StudioError, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
 import { actionLabel, refusalText } from '../src/features/studio/wording'
 import { httpPlatform } from '../src/platform/compose'
 import { fakeTransport } from './fake'
@@ -38,7 +38,11 @@ const page = {
   approvalsRequired: 2,
   reviewer: 'rita',
   approvers: [],
-  history: [{ step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, problems: [] }],
+  history: [{ step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, problems: [], previous: null }],
+  revision: 3,
+  editable: false,
+  editRefusal: { code: 'stage', message: 'Not possible while it is at the approval stage', permission: null, stage: 'approval', missing: null },
+  files: [{ path: 'Questionnaire-anc-visit.json', resourceType: 'Questionnaire', url: 'http://health.go.ug/fhir/Questionnaire/anc-visit', version: '1.1.0' }],
 }
 
 describe('the Studio', () => {
@@ -71,6 +75,37 @@ describe('the Studio', () => {
     expect([needs('request-changes'), needs('activate'), needs('approve')]).toEqual(['reason', 'scope', null])
   })
 
+  // #494: each save is one file, sent with the revision it was read at; a stale one is a 412.
+  test('a file is saved with If-Match, and a stale save is refused with 412', async () => {
+    const transport = fakeTransport((request) =>
+      request.method === 'GET'
+        ? { body: { path: 'tests/visit.json', content: '{}', revision: 3 } }
+        : request.headers?.['if-match'] === '"3"'
+          ? { body: { ...page, revision: 4 } }
+          : { status: 412, body: { detail: 'the draft changed since you read it: reload it before saving', refusal: null } },
+    )
+    const file = await fileQuery(transport, row.id, 'tests/visit.json').queryFn()
+    expect(transport.sent[0]).toMatchObject({ method: 'GET', path: '/studio/packages/ug.moh.anc%401.1.0/files/tests/visit.json' })
+    const saved = await saveFile(transport, row.id, 'tests/visit.json', '{"a":1}', file.revision)
+    expect(saved.revision).toBe(4)
+    expect(transport.sent[1]).toMatchObject({ method: 'PUT', headers: { 'if-match': '"3"' }, body: { content: '{"a":1}' } })
+    // The other tab, still at revision 2, is refused and told to reload.
+    const stale = await saveFile(transport, row.id, 'tests/visit.json', '{"a":2}', 2).catch((e: unknown) => e)
+    expect(stale).toBeInstanceOf(StudioError)
+    expect((stale as StudioError).status).toBe(412)
+    await expect(removeFile(transport, row.id, 'tests/visit.json', 3)).resolves.toMatchObject({ revision: 4 })
+    expect(transport.sent.at(-1)).toMatchObject({ method: 'DELETE', headers: { 'if-match': '"3"' } })
+    await setVersion(transport, row.id, '1.2.0', 3)
+    expect(transport.sent.at(-1)).toMatchObject({ method: 'PUT', path: '/studio/packages/ug.moh.anc%401.1.0/version', body: { version: '1.2.0' } })
+  })
+
+  test('a draft starts as a copy of a published version, answered with 201', async () => {
+    const transport = fakeTransport(() => ({ status: 201, body: { ...page, package: { ...row, id: 'ug.moh.anc@1.2.0-draft', version: '1.2.0-draft', stage: 'draft' } } }))
+    const started = await startDraft(transport, { copyOf: row.id })
+    expect(started.package.version).toBe('1.2.0-draft')
+    expect(transport.sent[0]).toMatchObject({ method: 'POST', path: '/studio/drafts', body: { copyOf: row.id } })
+  })
+
   test('the server’s reasons are worded, and one it has no words for is shown as sent', () => {
     const intl = createIntl({ locale: 'en', defaultLocale: 'en' })
     expect(refusalText(intl, authorRefusal)).toBe('You wrote this draft, so you cannot review or approve it')
@@ -80,6 +115,7 @@ describe('the Studio', () => {
     expect(refusalText(intl, { code: 'stage', message: '', stage: 'review' })).toBe('Not possible while it is at the review stage')
     expect(refusalText(intl, { code: 'other', message: 'who acted must be given' })).toBe('who acted must be given')
     expect(actionLabel(intl, 'approve')).toBe('Approve')
+    expect(actionLabel(intl, 'check')).toBe('Check now')
   })
 
   test('only central offers the Studio; an edge never does', () => {

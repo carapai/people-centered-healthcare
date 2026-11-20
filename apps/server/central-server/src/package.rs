@@ -165,6 +165,22 @@ fn record_line(record: &Record) -> String {
         }
         Step::Approved => ("approved", &[]),
         Step::Published => ("published", &[]),
+        Step::VersionChanged { previous } => {
+            return format!(
+                "  {} {} version {previous} → {}",
+                record.at, record.by, record.version
+            );
+        }
+        Step::Checked {
+            validation,
+            simulation,
+        } => {
+            let mut line = format!("  {} {} checked", record.at, record.by);
+            for problem in validation.iter().chain(simulation) {
+                line.push_str(&format!("\n    - {problem}"));
+            }
+            return line;
+        }
     };
     let mut line = format!("  {} {} {step}", record.at, record.by);
     for problem in problems {
