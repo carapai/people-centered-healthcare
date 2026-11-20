@@ -78,6 +78,7 @@ use sha2::Digest as _;
 use uuid::Uuid;
 
 pub mod decisions;
+pub mod discussion;
 pub mod editing;
 mod extraction;
 mod programs;

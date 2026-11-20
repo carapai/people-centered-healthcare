@@ -480,9 +480,10 @@ pub(crate) enum StudioHistoryStep {
     HandedOver,
     Reassigned,
     Withdrawn,
+    Commented,
 }
 
-/// One entry of the discussion: a lifecycle record.
+/// One entry of the discussion: a lifecycle record, or a comment (#496).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StudioHistoryEntry {
@@ -502,6 +503,10 @@ pub(crate) struct StudioHistoryEntry {
     pub(crate) problems: Vec<String>,
     /// The version the draft had, when it took another.
     pub(crate) previous: Option<String>,
+    /// What a comment says.
+    pub(crate) text: Option<String>,
+    /// The path of the artefact a comment is about, if it names one.
+    pub(crate) about: Option<String>,
 }
 
 impl From<&Record> for StudioHistoryEntry {
@@ -546,6 +551,7 @@ impl From<&Record> for StudioHistoryEntry {
                 Vec::new(),
             ),
             Step::Withdrawn => (StudioHistoryStep::Withdrawn, None, Vec::new()),
+            Step::Commented { .. } => (StudioHistoryStep::Commented, None, Vec::new()),
         };
         let person = match &record.step {
             Step::HandoverOffered { to }
@@ -558,6 +564,10 @@ impl From<&Record> for StudioHistoryEntry {
             Step::VersionChanged { previous } => Some(previous.to_string()),
             _ => None,
         };
+        let (text, about) = match &record.step {
+            Step::Commented { text, about } => (Some(text.clone()), about.clone()),
+            _ => (None, None),
+        };
         Self {
             step,
             by: record.by.clone(),
@@ -567,6 +577,8 @@ impl From<&Record> for StudioHistoryEntry {
             person,
             problems,
             previous,
+            text,
+            about,
         }
     }
 }
@@ -599,6 +611,10 @@ pub(crate) struct StudioPackagePage {
     pub(crate) files: Vec<StudioPackageFile>,
     /// The holder's one change note for the whole draft.
     pub(crate) note: Option<String>,
+    /// Whether the signed-in person may comment in the discussion.
+    pub(crate) commentable: bool,
+    /// Why not, when they may not: the draft was published or withdrawn.
+    pub(crate) comment_refusal: Option<ActionRefusal>,
 }
 
 /// One file of a package version.
@@ -655,6 +671,18 @@ pub(crate) struct StudioNoteInput {
     pub(crate) note: Option<String>,
 }
 
+/// A comment for a draft's discussion. Only these come from the client: the entry, who wrote
+/// it, when, and the stage are the server's.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioCommentInput {
+    /// What it says.
+    pub(crate) text: String,
+    /// The path of the draft's artefact it is about, e.g. `Questionnaire-anc-visit.json`.
+    #[serde(default)]
+    pub(crate) about: Option<String>,
+}
+
 /// A draft's new version.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -706,6 +734,8 @@ impl From<&PackagePage> for StudioPackagePage {
             edit_refusal: page.edit.as_ref().map(ActionRefusal::from),
             files: page.files.iter().map(StudioPackageFile::from).collect(),
             note: page.note.clone(),
+            commentable: page.comment.is_none(),
+            comment_refusal: page.comment.as_ref().map(ActionRefusal::from),
         }
     }
 }

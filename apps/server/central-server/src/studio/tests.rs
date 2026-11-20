@@ -475,6 +475,91 @@ async fn check_now_shows_results_on_the_page_and_the_draft_stays_a_draft() {
     assert_eq!(status, 403);
 }
 
+// One discussion per draft (#496): a reviewer comments on the Questionnaire, the comment lands
+// in the history with the lifecycle's records, and a client cannot write a history entry.
+#[tokio::test]
+async fn a_comment_names_its_artefact_and_only_the_lifecycle_writes_the_history() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let comments = format!("/packages/{ID}/comments");
+    let (status, tag, page) = send(
+        &publications,
+        subject("rita", &[REVIEW]),
+        "POST",
+        &comments,
+        None,
+        Some(json!({
+            "text": "Should BP be required?",
+            "about": "Questionnaire-anc-visit.json",
+            // A client may not choose what the entry is, who wrote it or the stage.
+            "step": "approved", "by": "mo", "stage": "published"
+        })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    // A comment changes no revision.
+    assert_eq!(tag, Some("\"0\"".to_owned()));
+    let history = page["history"].as_array().expect("history");
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0]["step"], "created");
+    let comment = &history[1];
+    assert_eq!(comment["step"], "commented");
+    assert_eq!(comment["by"], "rita");
+    assert_eq!(comment["stage"], "draft");
+    assert_eq!(comment["text"], "Should BP be required?");
+    assert_eq!(comment["about"], "Questionnaire-anc-visit.json");
+    assert_eq!(page["package"]["stage"], "draft");
+    assert_eq!(page["commentable"], true);
+
+    // It names only an artefact of the draft, and says something.
+    for (body, expected) in [
+        (
+            json!({ "text": "?", "about": "Questionnaire-gone.json" }),
+            422,
+        ),
+        (json!({ "text": "   " }), 409),
+    ] {
+        let (status, _) = call(
+            &publications,
+            subject("rita", &[REVIEW]),
+            "POST",
+            &comments,
+            Some(body),
+        )
+        .await;
+        assert_eq!(status, expected);
+    }
+    // Only someone the Studio lets in.
+    let (status, _) = call(
+        &publications,
+        subject("zed", &[]),
+        "POST",
+        &comments,
+        Some(json!({ "text": "hello" })),
+    )
+    .await;
+    assert_eq!(status, 403);
+    // No step is a comment, and no route removes one.
+    let (status, _) = call(
+        &publications,
+        subject("ann", &[AUTHOR]),
+        "POST",
+        &format!("/packages/{ID}/commented"),
+        Some(json!({ "reason": "fake" })),
+    )
+    .await;
+    assert!(status >= 400, "{status}");
+    let (status, _) = call(
+        &publications,
+        subject("ann", &[AUTHOR]),
+        "DELETE",
+        &comments,
+        None,
+    )
+    .await;
+    assert_eq!(status, 405);
+}
+
 #[tokio::test]
 async fn a_draft_starts_blank_and_takes_another_version() {
     let (publications, _dir) = publications().await;
@@ -726,6 +811,7 @@ fn the_openapi_document_describes_the_studio() {
         "saveStudioFile",
         "removeStudioFile",
         "setStudioVersion",
+        "commentStudioPackage",
         "listStudioWorkflowActions",
         "tryStudioDecisionTable",
         "checkStudioDecisionTable",

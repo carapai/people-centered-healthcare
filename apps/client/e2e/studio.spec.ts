@@ -147,3 +147,23 @@ test('a handover takes effect only when accepted, and the former holder can no l
   await press(page, 'Accept the handover')
   await expect(page.getByRole('button', { name: 'Submit' })).toBeEnabled()
 })
+
+// #496: one discussion per draft. A reviewer comments on the OPD draft's triage Questionnaire;
+// the comment joins the history, and the artefact it names links to the form designer. With axe.
+test('a comment naming a Questionnaire joins the discussion and links to it', async ({ page }) => {
+  await signIn(page, USERS.studio)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await expect(page.getByRole('heading', { name: 'Discussion' })).toBeVisible()
+  await type(page, 'Comment', 'Should the temperature be required?')
+  await page.getByLabel('About which artefact').selectOption('Questionnaire-opd-triage.json')
+  await press(page, 'Add the comment')
+  await expect(page.getByRole('status').filter({ hasText: 'Your comment is in the discussion.' })).toBeVisible()
+  const discussion = page.getByRole('region', { name: 'Discussion' })
+  await expect(discussion.getByText('Should the temperature be required?')).toBeVisible()
+  await expect(discussion.getByText(/commented,/).last()).toBeVisible()
+  await noViolations(page)
+  await discussion.getByRole('link', { name: 'Questionnaire-opd-triage.json' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/forms\/Questionnaire-opd-triage\.json$/)
+})

@@ -229,6 +229,15 @@ export const StudioCodeSystems = z.object({
 })
 export type StudioCodeSystems = z.infer<typeof StudioCodeSystems>
 
+/** A comment for a draft's discussion. Only these come from the client: the entry, who wrote it, when, and the stage are the server's. */
+export const StudioCommentInput = z.object({
+  /** The path of the draft's artefact it is about, e.g. `Questionnaire-anc-visit.json`. */
+  "about": z.string().nullable().optional(),
+  /** What it says. */
+  "text": z.string(),
+})
+export type StudioCommentInput = z.infer<typeof StudioCommentInput>
+
 /** How a completed action is undone. */
 export const StudioCompensationKind = z.enum(["none", "action", "human-task"])
 export type StudioCompensationKind = z.infer<typeof StudioCompensationKind>
@@ -457,11 +466,13 @@ export const StudioFileInput = z.object({
 export type StudioFileInput = z.infer<typeof StudioFileInput>
 
 /** What happened in one history entry. */
-export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed", "handover-offered", "handover-declined", "handed-over", "reassigned", "withdrawn"])
+export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed", "handover-offered", "handover-declined", "handed-over", "reassigned", "withdrawn", "commented"])
 export type StudioHistoryStep = z.infer<typeof StudioHistoryStep>
 
-/** One entry of the discussion: a lifecycle record. */
+/** One entry of the discussion: a lifecycle record, or a comment (#496). */
 export const StudioHistoryEntry = z.object({
+  /** The path of the artefact a comment is about, if it names one. */
+  "about": z.string().nullable().optional(),
   /** When (RFC 3339). */
   "at": z.string(),
   /** Who did it (`system` for the automated checks). */
@@ -478,6 +489,8 @@ export const StudioHistoryEntry = z.object({
   "stage": PackageStage,
   /** What happened. */
   "step": StudioHistoryStep,
+  /** What a comment says. */
+  "text": z.string().nullable().optional(),
 })
 export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 
@@ -569,6 +582,9 @@ export const StudioPackagePage = z.object({
   "changes": z.array(StudioArtefactChange),
   /** The stored check results. */
   "checks": z.array(StudioCheckResult),
+  "commentRefusal": ActionRefusal.nullable().optional(),
+  /** Whether the signed-in person may comment in the discussion. */
+  "commentable": z.boolean(),
   "editRefusal": ActionRefusal.nullable().optional(),
   /** Whether the signed-in person may change the draft's files and version. */
   "editable": z.boolean(),
@@ -721,6 +737,19 @@ export const operations = {
       422: StudioProblem,
       500: StudioProblem,
       503: StudioProblem,
+    },
+  },
+  commentStudioPackage: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/comments',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
     },
   },
   checkStudioDecisionTable: {

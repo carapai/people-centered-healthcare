@@ -2,7 +2,7 @@ import { ResponseError, type StudioPackage } from '@health/api-client'
 import { createIntl } from 'react-intl'
 import { describe, expect, test, vi } from 'vitest'
 
-import { StudioError, actionInput, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setNote, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
+import { StudioError, actionInput, addComment, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setNote, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
 import { actionLabel, refusalText } from '../src/features/studio/wording'
 import { httpPlatform } from '../src/platform/compose'
 import { fakeTransport } from './fake'
@@ -41,15 +41,33 @@ const page = {
   approvalsRequired: 2,
   reviewer: 'rita',
   approvers: [],
-  history: [{ step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, person: null, problems: [], previous: null }],
+  history: [
+    { step: 'created', by: 'ann', at: '2026-11-19T08:00:00Z', stage: 'draft', reason: null, person: null, problems: [], previous: null, text: null, about: null },
+    { step: 'commented', by: 'rita', at: '2026-11-19T08:30:00Z', stage: 'draft', reason: null, person: null, problems: [], previous: null, text: 'Should BP be required?', about: 'Questionnaire-anc-visit.json' },
+  ],
   revision: 3,
   editable: false,
   editRefusal: { code: 'stage', message: 'Not possible while it is at the approval stage', permission: null, stage: 'approval', missing: null },
   files: [{ path: 'Questionnaire-anc-visit.json', resourceType: 'Questionnaire', url: 'http://health.go.ug/fhir/Questionnaire/anc-visit', version: '1.1.0' }],
   note: 'Units on the BP question',
+  commentable: true,
+  commentRefusal: null,
 }
 
 describe('the Studio', () => {
+  // #496: one discussion per draft. The client sends a comment's text and the artefact it
+  // names; the entry, who wrote it and when are the server's.
+  test('a comment is posted with its text and artefact, and the page comes back with it', async () => {
+    const transport = fakeTransport(() => ({ body: page }))
+    await expect(addComment(transport, row.id, 'Should BP be required?', 'Questionnaire-anc-visit.json')).resolves.toEqual(page)
+    expect(transport.sent[0]).toMatchObject({ method: 'POST', path: '/studio/packages/ug.moh.anc%401.1.0/comments', body: { text: 'Should BP be required?', about: 'Questionnaire-anc-visit.json' } })
+    await addComment(transport, row.id, 'Looks good', '')
+    expect(transport.sent[1]?.body).toEqual({ text: 'Looks good' })
+    const closed = fakeTransport(() => ({ status: 409, body: { detail: 'not possible at the withdrawn stage', refusal: { code: 'stage', message: 'Not possible while it is at the withdrawn stage', permission: null, stage: 'withdrawn', missing: null } } }))
+    const error = await addComment(closed, row.id, 'too late').catch((e: unknown) => e)
+    expect((error as StudioError).status).toBe(409)
+  })
+
   test('the package list is read and checked against central’s schema', async () => {
     const transport = fakeTransport(() => ({ body: { packages: [row] } }))
     const query = packagesQuery(transport)

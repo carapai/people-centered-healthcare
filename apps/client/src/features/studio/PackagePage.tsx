@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl'
 import { studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, actionInput, fileQuery, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, actionInput, addComment, fileQuery, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
 import { isWorkflowLibrary } from './workflows/model'
 
@@ -172,12 +172,36 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
         <Actions id={id} draft={draft} />
       </section>
 
-      <section aria-labelledby="studio-discussion">
-        <h2 id="studio-discussion" className={subheading}>
-          {intl.formatMessage(m.sdDiscussion)}
-        </h2>
-        <ol className={list}>
-          {draft.history.map((entry, index) => (
+      <Discussion id={id} draft={draft} workflows={workflows} time={time} />
+    </>
+  )
+}
+
+/**
+ * The draft's one discussion (#496): the history the lifecycle wrote and the comments among it,
+ * oldest first, then a box for a new comment. A comment naming an artefact links to it; the
+ * server writes the entry, so the client sends only the text and the artefact.
+ */
+function Discussion({ id, draft, workflows, time }: { id: string; draft: StudioPackagePage; workflows: Set<string>; time: (iso: string) => string }) {
+  const intl = useIntl()
+  return (
+    <section aria-labelledby="studio-discussion" className={css({ display: 'flex', flexDirection: 'column', gap: '3' })}>
+      <h2 id="studio-discussion" className={subheading}>
+        {intl.formatMessage(m.sdDiscussion)}
+      </h2>
+      <ol className={list}>
+        {draft.history.map((entry, index) =>
+          entry.step === 'commented' ? (
+            <li key={`${entry.at}:${index}`}>
+              {intl.formatMessage(m.sdCommented, { by: entry.by, at: time(entry.at) })}
+              <p className={css({ whiteSpace: 'pre-wrap' })}>{entry.text}</p>
+              {entry.about === null || entry.about === undefined ? null : (
+                <p>
+                  {intl.formatMessage(m.sdCommentAbout)} <ArtefactLink id={id} draft={draft} workflows={workflows} path={entry.about} />
+                </p>
+              )}
+            </li>
+          ) : (
             <li key={`${entry.at}:${index}`}>
               {intl.formatMessage(m.sdHistoryEntry, { step: entry.step, by: entry.by, at: time(entry.at) })}
               {entry.person === null || entry.person === undefined ? null : <p>{intl.formatMessage(m.sdHistoryPerson, { person: entry.person })}</p>}
@@ -190,10 +214,97 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                 </ul>
               )}
             </li>
-          ))}
-        </ol>
-      </section>
+          ),
+        )}
+      </ol>
+      <CommentBox id={id} draft={draft} />
+    </section>
+  )
+}
+
+/** An artefact a comment names, opening in its editor: the form designer, the terminology
+ * browser, the Workflow Studio, or else the file editor. Its link reads as its path; one the
+ * draft no longer has is its path alone. */
+function ArtefactLink({ id, draft, workflows, path }: { id: string; draft: StudioPackagePage; workflows: Set<string>; path: string }) {
+  const file = draft.files.find((f) => f.path === path)
+  if (file === undefined) return <code>{path}</code>
+  const type = file.resourceType === null || file.resourceType === undefined ? null : <span className={muted}> · {file.resourceType}</span>
+  const to =
+    file.resourceType === 'Questionnaire'
+      ? ('/studio/$id/forms/$' as const)
+      : isTerminology(file.resourceType)
+        ? ('/studio/$id/terminology/$' as const)
+        : workflows.has(path)
+          ? ('/studio/$id/workflows/$' as const)
+          : ('/studio/$id/files/$' as const)
+  return (
+    <>
+      <Link to={to} params={{ id, _splat: path }}>
+        {path}
+      </Link>
+      {type}
     </>
+  )
+}
+
+/** The box for a new comment, naming one of the draft's artefacts if it is about one. Closed,
+ * with the server's reason, once the draft is published or withdrawn. */
+function CommentBox({ id, draft }: { id: string; draft: StudioPackagePage }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const queryClient = useQueryClient()
+  const textId = useId()
+  const aboutId = useId()
+  const [text, setText] = useState('')
+  const [about, setAbout] = useState('')
+  const post = useMutation({
+    mutationFn: () => addComment(platform.transport, id, text.trim(), about),
+    onSuccess: (next) => {
+      queryClient.setQueryData(packageQuery(platform.transport, id).queryKey, next)
+      setText('')
+      setAbout('')
+    },
+  })
+  if (!draft.commentable) {
+    return draft.commentRefusal === null || draft.commentRefusal === undefined ? null : (
+      <p className={muted}>{intl.formatMessage(m.sdCommentClosed, { reason: refusalText(intl, draft.commentRefusal) })}</p>
+    )
+  }
+  const artefacts = draft.files.filter((f) => f.resourceType !== null && f.resourceType !== undefined)
+  const why = post.error instanceof StudioError ? (post.error.refusal === null || post.error.refusal === undefined ? post.error.detail : refusalText(intl, post.error.refusal)) : ''
+  return (
+    <form
+      className={css({ display: 'flex', flexDirection: 'column', gap: '2', alignItems: 'flex-start' })}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (text.trim() !== '') post.mutate()
+      }}
+    >
+      <div className={field}>
+        <label htmlFor={textId}>{intl.formatMessage(m.sdCommentLabel)}</label>
+        <textarea id={textId} className={control} value={text} onChange={(e) => setText(e.target.value)} />
+      </div>
+      <div className={field}>
+        <label htmlFor={aboutId}>{intl.formatMessage(m.sdCommentAboutLabel)}</label>
+        <select id={aboutId} className={control} value={about} onChange={(e) => setAbout(e.target.value)}>
+          <option value="">{intl.formatMessage(m.sdCommentAboutNone)}</option>
+          {artefacts.map((file) => (
+            <option key={file.path} value={file.path}>
+              {`${file.resourceType ?? ''} ${file.path}`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button type="submit" className={button} disabled={post.isPending || text.trim() === ''}>
+        {intl.formatMessage(m.sdCommentPost)}
+      </button>
+      {post.isSuccess ? <p role="status">{intl.formatMessage(m.sdCommentPosted)}</p> : null}
+      {post.isError ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(m.sdCommentFailed, { reason: why })}
+        </p>
+      ) : null}
+    </form>
   )
 }
 
