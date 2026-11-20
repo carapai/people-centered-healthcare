@@ -91,6 +91,7 @@ pub(crate) fn router(
             get(read_file).put(write_file).delete(remove_file),
         )
         .route("/packages/{id}/version", put(set_version))
+        .route("/packages/{id}/note", put(set_note))
         .route(
             "/packages/{id}/terminology/code-systems",
             get(terminology::code_systems),
@@ -470,6 +471,47 @@ pub(crate) async fn set_version(
         .await
     {
         Ok((renamed, _)) => answer(&studio, &subject, &renamed, StatusCode::OK).await,
+        Err(error) => failure(&error),
+    }
+}
+
+/// Documents and keeps a draft's change note.
+#[utoipa::path(put, path = "/api/studio/packages/{id}/note", tag = "studio", operation_id = "setStudioNote",
+    description = "Keeps the holder's one change note for the whole draft, shown in *What changed* above the generated summaries; an empty note clears it. It is not content: the fingerprint and the history stay as they were. `If-Match` as for a save. Needs `metadata.author`, and only the Draft Holder may.",
+    params(
+        ("id" = String, Path, description = "`name@version`"),
+        ("If-Match" = String, Header, description = "The draft's revision, as its ETag"),
+    ),
+    request_body = StudioNoteInput,
+    responses(
+        (status = 200, description = "Kept; the page", body = StudioPackagePage, headers(("ETag" = String, description = "The draft's new revision"))),
+        (status = 401, description = "Not signed in", body = StudioProblem),
+        (status = 403, description = "No metadata.author permission", body = StudioProblem),
+        (status = 404, description = "No such package version", body = StudioProblem),
+        (status = 409, description = "Not in Draft, or not the Draft Holder", body = StudioProblem),
+        (status = 412, description = "If-Match is missing or stale: reload", body = StudioProblem),
+        (status = 500, description = "The package store failed", body = StudioProblem),
+    ))]
+pub(crate) async fn set_note(
+    State(studio): State<Studio>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(input): Json<StudioNoteInput>,
+) -> Response {
+    let subject = match editor(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let Some(expected) = if_match(&headers) else {
+        return precondition_failed();
+    };
+    match studio
+        .publications
+        .set_note(&id, input.note, &subject.account, expected)
+        .await
+    {
+        Ok(_) => answer(&studio, &subject, &id, StatusCode::OK).await,
         Err(error) => failure(&error),
     }
 }

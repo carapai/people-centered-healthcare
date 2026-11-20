@@ -803,6 +803,126 @@
         }
       }
     },
+    "/api/studio/packages/{id}/note": {
+      "put": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and keeps a draft's change note.",
+        "description": "Keeps the holder's one change note for the whole draft, shown in *What changed* above the generated summaries; an empty note clears it. It is not content: the fingerprint and the history stay as they were. `If-Match` as for a save. Needs `metadata.author`, and only the Draft Holder may.",
+        "operationId": "setStudioNote",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The draft's revision, as its ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioNoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Kept; the page",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's new revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not in Draft, or not the Draft Holder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is missing or stale: reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/terminology/code-systems": {
       "get": {
         "tags": [
@@ -1761,6 +1881,18 @@
           "fail"
         ]
       },
+      "ElementChangeType": {
+        "type": "string",
+        "description": "How an element changed.",
+        "enum": [
+          "added",
+          "removed",
+          "changed",
+          "tightened",
+          "relaxed",
+          "reworded"
+        ]
+      },
       "Health": {
         "type": "object",
         "description": "Liveness: the process answers.",
@@ -1951,7 +2083,8 @@
         "required": [
           "change",
           "resourceType",
-          "path"
+          "path",
+          "elements"
         ],
         "properties": {
           "after": {
@@ -1971,6 +2104,13 @@
           "change": {
             "$ref": "#/components/schemas/ArtefactChangeType",
             "description": "How it changed."
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioElementChange"
+            },
+            "description": "For a changed artefact, each element that changed; empty for an added or removed one."
           },
           "path": {
             "type": "string",
@@ -2571,6 +2711,34 @@
           }
         }
       },
+      "StudioElementChange": {
+        "type": "object",
+        "description": "One changed element of a changed artefact.",
+        "required": [
+          "at",
+          "change",
+          "bump",
+          "summary"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "Its path, e.g. `item[bp].text`."
+          },
+          "bump": {
+            "$ref": "#/components/schemas/SemverBump",
+            "description": "The version bump it needs."
+          },
+          "change": {
+            "$ref": "#/components/schemas/ElementChangeType",
+            "description": "How it changed."
+          },
+          "summary": {
+            "type": "string",
+            "description": "One plain line, e.g. \"Item bp: text reworded\"."
+          }
+        }
+      },
       "StudioExpandInput": {
         "type": "object",
         "description": "Which ValueSet to expand.",
@@ -2911,6 +3079,19 @@
           }
         }
       },
+      "StudioNoteInput": {
+        "type": "object",
+        "description": "A draft's change note.",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The note; empty or absent clears it."
+          }
+        }
+      },
       "StudioPackage": {
         "type": "object",
         "description": "One row of the package list.",
@@ -3148,6 +3329,13 @@
               "$ref": "#/components/schemas/StudioHistoryEntry"
             },
             "description": "The history, oldest first."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The holder's one change note for the whole draft."
           },
           "package": {
             "$ref": "#/components/schemas/StudioPackage",

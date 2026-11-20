@@ -569,3 +569,51 @@ fn changes_serialise() {
         json!([{"at": "item[bp]", "nature": "removed", "bump": "major"}])
     );
 }
+
+#[test]
+fn each_change_is_summed_up_in_one_plain_line() {
+    let line = |at: &str, nature| {
+        describe(&ContentChange {
+            at: at.into(),
+            nature,
+            bump: Bump::Patch,
+        })
+    };
+    assert_eq!(
+        line("item[bp].item[bp-sys].text", Nature::Reworded),
+        "Item bp-sys: text reworded"
+    );
+    assert_eq!(line("item[vitals.1]", Nature::Added), "Item vitals.1 added");
+    assert_eq!(
+        line("element[Patient.name].min", Nature::Tightened),
+        "Element Patient.name: min tightened"
+    );
+    assert_eq!(
+        line(
+            "compose.include[http://loinc.org].concept[1234-5]",
+            Nature::Removed
+        ),
+        "Code 1234-5 removed"
+    );
+    assert_eq!(
+        line("item[q].answerOption[yes]", Nature::Removed),
+        "Answer option yes removed"
+    );
+    assert_eq!(line("title", Nature::Reworded), "Title reworded");
+    assert_eq!(
+        line("compose.inactive", Nature::Relaxed),
+        "Compose.inactive relaxed"
+    );
+    assert_eq!(line("", Nature::Changed), "The whole resource changed");
+}
+
+#[test]
+fn a_changed_question_text_is_described_with_its_path() {
+    let before = form(json!([bp()]));
+    let mut after = before.clone();
+    after["item"][0]["item"][0]["text"] = json!("Systolic (mmHg)");
+    let found = changes(&before, &after);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].at, "item[bp].item[bp-sys].text");
+    assert_eq!(describe(&found[0]), "Item bp-sys: text reworded");
+}

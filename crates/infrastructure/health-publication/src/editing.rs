@@ -14,6 +14,8 @@
 //!   a draft another version until it is submitted, where the semver check confirms it.
 //! - **Check now:** [`Publications::check_now`] runs submission's validation and simulation and
 //!   keeps the results as a record, without changing the stage or the revision.
+//! - **The change note:** [`Publications::set_note`] keeps the holder's one note for the whole
+//!   draft, shown in *What changed*, under the same revision check.
 //!
 //! Who may edit is the lifecycle's rule ([`Action::Edit`]); the permission is checked by the
 //! API. Only the Draft Holder saves (#493).
@@ -153,6 +155,28 @@ impl Publications {
         let record = lifecycle.revise(by, &content, self.clock.now())?;
         let records = [(record, format!("saved {path}, {content}"))];
         self.save(tx, &lifecycle, Some(revision), &records)
+            .await
+            .map_err(|error| stale(error, revision))?;
+        Ok(revision + 1)
+    }
+
+    /// `by`, the holder, gives draft `id` its one change note, having read revision
+    /// `expected`; an empty note clears it. Answers the new revision. The note is not content:
+    /// the fingerprint and the history stay as they were.
+    pub async fn set_note(
+        &self,
+        id: &str,
+        note: Option<String>,
+        by: &str,
+        expected: u64,
+    ) -> Result<u64, Error> {
+        let mut tx = self.begin().await?;
+        let (mut lifecycle, revision) = self.load(&mut tx, id).await?;
+        if revision != expected {
+            return Err(Error::Stale { current: revision });
+        }
+        lifecycle.set_note(by, note)?;
+        self.save(tx, &lifecycle, Some(revision), &[])
             .await
             .map_err(|error| stale(error, revision))?;
         Ok(revision + 1)

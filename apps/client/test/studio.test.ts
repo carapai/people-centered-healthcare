@@ -2,10 +2,11 @@ import { ResponseError, type StudioPackage } from '@health/api-client'
 import { createIntl } from 'react-intl'
 import { describe, expect, test, vi } from 'vitest'
 
-import { StudioError, actionInput, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
+import { StudioError, actionInput, fileQuery, needs, packageQuery, packagesQuery, removeFile, saveFile, setNote, setVersion, startDraft, studioKey, takeAction } from '../src/features/studio/api'
 import { actionLabel, refusalText } from '../src/features/studio/wording'
 import { httpPlatform } from '../src/platform/compose'
 import { fakeTransport } from './fake'
+import { studioMessages } from '../src/i18n/messages'
 
 // The Studio (#492): the client renders the server's actions and reasons, and holds no
 // lifecycle rule of its own.
@@ -35,7 +36,7 @@ const row: StudioPackage = {
 
 const page = {
   package: row,
-  changes: [{ change: 'changed', resourceType: 'Questionnaire', path: 'Questionnaire-anc-visit.json', url: 'http://health.go.ug/fhir/Questionnaire/anc-visit', before: '1.0.0', after: '1.1.0' }],
+  changes: [{ change: 'changed', resourceType: 'Questionnaire', path: 'Questionnaire-anc-visit.json', url: 'http://health.go.ug/fhir/Questionnaire/anc-visit', before: '1.0.0', after: '1.1.0', elements: [{ at: 'item[bp].text', change: 'reworded', bump: 'patch', summary: 'Item bp: text reworded' }] }],
   checks: [{ check: 'validation', passed: true, problems: [], at: '2026-11-19T09:00:00Z', current: true }],
   approvalsRequired: 2,
   reviewer: 'rita',
@@ -45,6 +46,7 @@ const page = {
   editable: false,
   editRefusal: { code: 'stage', message: 'Not possible while it is at the approval stage', permission: null, stage: 'approval', missing: null },
   files: [{ path: 'Questionnaire-anc-visit.json', resourceType: 'Questionnaire', url: 'http://health.go.ug/fhir/Questionnaire/anc-visit', version: '1.1.0' }],
+  note: 'Units on the BP question',
 }
 
 describe('the Studio', () => {
@@ -146,5 +148,20 @@ describe('the Studio', () => {
     expect(httpPlatform('central', '/api', fetch).capabilities.studio).toBe(true)
     expect(httpPlatform('edge', '/api', fetch).capabilities.studio).toBe(false)
     vi.unstubAllGlobals()
+  })
+
+  // #495: each changed artefact carries its changed elements, and the holder's note is kept
+  // under the same If-Match as a save.
+  test('what changed carries each changed element, and the change note is saved with If-Match', async () => {
+    const transport = fakeTransport(() => ({ body: page }))
+    const read = await packageQuery(transport, row.id).queryFn()
+    expect(read.changes[0]?.elements).toEqual([{ at: 'item[bp].text', change: 'reworded', bump: 'patch', summary: 'Item bp: text reworded' }])
+    expect(read.note).toBe('Units on the BP question')
+    await setNote(transport, row.id, 'Units on the BP question', 3)
+    expect(transport.sent[1]).toMatchObject({ method: 'PUT', path: '/studio/packages/ug.moh.anc%401.1.0/note', headers: { 'if-match': '"3"' }, body: { note: 'Units on the BP question' } })
+    const intl = createIntl({ locale: 'en', messages: {} })
+    expect(intl.formatMessage(studioMessages.sdElementChange, { summary: 'Item bp: text reworded', bump: 'patch' })).toBe('Item bp: text reworded (needs a patch)')
+    const wrong = fakeTransport(() => ({ body: { ...page, changes: [{ ...page.changes[0], elements: [{ at: 'x', change: 'moved', bump: 'patch', summary: 'x' }] }] } }))
+    await expect(packageQuery(wrong, row.id).queryFn()).rejects.toBeInstanceOf(ResponseError)
   })
 })

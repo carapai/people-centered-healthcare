@@ -4,7 +4,7 @@ The Studio's package workspace (studio.md § The package workspace; #492), at `/
 
 - **`PackagesPage`** (`/studio`): a DataTable with one row per package, its newest version not withdrawn: title, name and kind; version and semver bump; status; its Draft Holder; **your next step**, or "Nothing for you"; and the scopes it is active in. A click on a row, or Enter, opens the package.
 - **`PackagePage`** (`/studio/$id`, `id` is `name@version`), read from top to bottom:
-  1. **What changed:** each added, changed or removed artefact against the previous published version.
+  1. **What changed:** each added, changed or removed artefact against the latest published version before this one; under a changed one, each element path that changed with the server's one-line summary and the bump it needs (#495). The Draft Holder's one change note for the whole draft sits above them, edited in place with `If-Match` (`PUT …/note`) while the draft is editable.
   2. **Is it safe?** The stored validation and simulation results, the heading counting the failing ones, each marked when the draft changed since it ran.
   3. **Who must act:** the reviewer, the approvals given and needed, then every action. One the person may not take stays on the page, disabled, with the server's reason, e.g. "You wrote this draft, so you cannot review or approve it". *Request changes* asks why and *Activate* asks for a scope.
   4. **Discussion:** the history. Comments come later.

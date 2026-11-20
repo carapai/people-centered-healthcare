@@ -6,13 +6,14 @@
 
 use std::sync::Arc;
 
+use health_configuration::lifecycle::semver::{Bump, Nature};
 use health_configuration::lifecycle::{Stage, Step};
 use health_configuration::package::PackageKind;
 use health_files::FsBlobStore;
 use health_packages::{Packed, Schemas};
 use health_pki::{Authority, new_key, request};
 use health_publication::editing::Blank;
-use health_publication::studio::{CheckKind, StudioAction};
+use health_publication::studio::{ArtefactChangeKind, CheckKind, StudioAction};
 use health_publication::{Error, Files, LocalSigner, Publications, Sandbox, Simulation};
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_time::{FixedClock, Timestamp};
@@ -478,4 +479,113 @@ async fn a_draft_changes_version_until_submission_and_a_blank_one_starts_a_new_p
             .await,
         Err(Error::Conflict(_))
     ));
+}
+
+#[tokio::test]
+async fn what_changed_names_each_changed_element_and_the_holder_adds_one_note() {
+    let central = central().await;
+    published(&central).await;
+    let publications = &central.publications;
+    publications
+        .start_copy("ug.moh.anc@2.0.0", "dan")
+        .await
+        .expect("copy");
+    let id = "ug.moh.anc@2.1.0-draft";
+    let (_, revision) = publications.draft_files(id).await.expect("files");
+
+    // A copy changes nothing yet.
+    let page = publications
+        .studio_package(id, "dan", &every)
+        .await
+        .expect("page");
+    assert!(page.changes.is_empty(), "{:?}", page.changes);
+
+    // One question's text changes: that artefact is changed, at that item's path.
+    let reworded = form("Blood pressure (mmHg)").to_string().into_bytes();
+    let revision = publications
+        .save_file(
+            id,
+            "Questionnaire-anc-visit.json",
+            Some(reworded),
+            "dan",
+            revision,
+        )
+        .await
+        .expect("save");
+    let page = publications
+        .studio_package(id, "dan", &every)
+        .await
+        .expect("page");
+    assert_eq!(page.changes.len(), 1, "{:?}", page.changes);
+    let change = &page.changes[0];
+    assert_eq!(change.change, ArtefactChangeKind::Changed);
+    assert_eq!(change.path, "Questionnaire-anc-visit.json");
+    let elements: Vec<_> = change
+        .elements
+        .iter()
+        .map(|e| (e.at.as_str(), e.nature, e.bump, e.summary.as_str()))
+        .collect();
+    assert_eq!(
+        elements,
+        [(
+            "item[bp].text",
+            Nature::Reworded,
+            Bump::Patch,
+            "Item bp: text reworded"
+        )]
+    );
+
+    // The holder adds one change note; nobody else may, and a stale one is refused.
+    assert!(matches!(
+        publications
+            .set_note(id, Some("Units on BP".into()), "dan", revision + 3)
+            .await,
+        Err(Error::Stale { .. })
+    ));
+    assert!(
+        publications
+            .set_note(id, Some("Mine".into()), "rita", revision)
+            .await
+            .is_err()
+    );
+    let next = publications
+        .set_note(id, Some("Units on BP".into()), "dan", revision)
+        .await
+        .expect("noted");
+    assert_eq!(next, revision + 1);
+    let page = publications
+        .studio_package(id, "dan", &every)
+        .await
+        .expect("page");
+    assert_eq!(page.note.as_deref(), Some("Units on BP"));
+    let (_, history) = publications.lifecycle(id).await.expect("lifecycle");
+    assert_eq!(
+        history.last().map(|r| r.step.clone()),
+        Some(Step::Revised),
+        "a note leaves the history alone"
+    );
+}
+
+#[tokio::test]
+async fn a_draft_with_no_published_predecessor_shows_every_artefact_as_added() {
+    let central = central().await;
+    let publications = &central.publications;
+    publications
+        .draft(&anc("2.0.0"), "ann")
+        .await
+        .expect("draft");
+    let page = publications
+        .studio_package("ug.moh.anc@2.0.0", "ann", &every)
+        .await
+        .expect("page");
+    assert_eq!(page.summary.previous, None);
+    let changes: Vec<_> = page
+        .changes
+        .iter()
+        .map(|c| (c.change, c.path.as_str(), c.elements.len()))
+        .collect();
+    assert_eq!(
+        changes,
+        [(ArtefactChangeKind::Added, "Questionnaire-anc-visit.json", 0)]
+    );
 }

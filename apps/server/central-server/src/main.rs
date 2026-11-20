@@ -227,6 +227,7 @@ async fn session() {}
         studio::write_file,
         studio::remove_file,
         studio::set_version,
+        studio::set_note,
         studio::terminology::code_systems,
         studio::terminology::concepts,
         studio::terminology::concept,

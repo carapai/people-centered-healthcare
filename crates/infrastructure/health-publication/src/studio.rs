@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 
 use health_configuration::activation::{ActivationRecord, Scope};
-use health_configuration::lifecycle::semver::Bump;
+use health_configuration::lifecycle::semver::{Bump, Nature};
 use health_configuration::lifecycle::{Action, Lifecycle, Record, Refused, Stage, Step};
 use health_configuration::package::{INDEX, MANIFEST, PackageKind, Version};
 use health_packages::Packed;
@@ -428,6 +428,23 @@ pub struct ArtefactChange {
     pub before: Option<String>,
     /// Its version in this one.
     pub after: Option<String>,
+    /// For a changed artefact, each element that changed, in the order found; empty for an
+    /// added or removed one.
+    pub elements: Vec<ElementChange>,
+}
+
+/// One changed element of a changed artefact: the semver diff of metadata.md § Versioning,
+/// summed up in a plain line.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ElementChange {
+    /// Its path, e.g. `item[bp].text` or `element[Patient.name].min`.
+    pub at: String,
+    /// How it changed.
+    pub nature: Nature,
+    /// The bump it needs.
+    pub bump: Bump,
+    /// One plain line, e.g. "Item bp: text reworded".
+    pub summary: String,
 }
 
 /// Which automated check.
@@ -479,6 +496,8 @@ pub struct PackagePage {
     pub edit: Option<Refusal>,
     /// Its files, to open in an editor.
     pub files: Vec<PackageFile>,
+    /// Its holder's change note for the whole draft.
+    pub note: Option<String>,
 }
 
 /// The latest stored result of each check in `history`.
@@ -542,6 +561,7 @@ fn artefacts(packed: &Packed) -> BTreeMap<String, (ArtefactChange, String)> {
                 url: artefact.url.clone(),
                 before: None,
                 after: artefact.version.clone(),
+                elements: Vec::new(),
             };
             (
                 key,
@@ -554,7 +574,36 @@ fn artefacts(packed: &Packed) -> BTreeMap<String, (ArtefactChange, String)> {
         .collect()
 }
 
-/// Each artefact added, changed or removed from `before` to `after`.
+/// Each element that changed from the file at `old` in `before` to the one at `new` in `after`.
+/// A file that is not JSON changed as a whole.
+fn elements(before: &Packed, old: &str, after: &Packed, new: &str) -> Vec<ElementChange> {
+    let json = |packed: &Packed, path: &str| {
+        packed
+            .files
+            .get(path)
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(bytes).ok())
+    };
+    let found = match (json(before, old), json(after, new)) {
+        (Some(old), Some(new)) => health_packages::bump::changes(&old, &new),
+        _ => vec![health_configuration::lifecycle::semver::ContentChange {
+            at: String::new(),
+            nature: Nature::Changed,
+            bump: Bump::Major,
+        }],
+    };
+    found
+        .into_iter()
+        .map(|change| ElementChange {
+            summary: health_packages::bump::describe(&change),
+            at: change.at,
+            nature: change.nature,
+            bump: change.bump,
+        })
+        .collect()
+}
+
+/// Each artefact added, changed or removed from `before` to `after`, a changed one with the
+/// elements that changed in it.
 pub fn changes(before: Option<&Packed>, after: &Packed) -> Vec<ArtefactChange> {
     let old = before.map(artefacts).unwrap_or_default();
     let new = artefacts(after);
@@ -567,6 +616,9 @@ pub fn changes(before: Option<&Packed>, after: &Packed) -> Vec<ArtefactChange> {
             }
             Some((was, old_print)) if *old_print != print => {
                 change.before.clone_from(&was.after);
+                if let Some(before) = before {
+                    change.elements = elements(before, &was.path, after, &change.path);
+                }
                 found.push(change);
             }
             Some(_) => {}
@@ -732,6 +784,7 @@ impl Publications {
             revision,
             edit: edit_refusal(&lifecycle, by, has),
             files: files(&packed),
+            note: lifecycle.note.clone(),
         })
     }
 }

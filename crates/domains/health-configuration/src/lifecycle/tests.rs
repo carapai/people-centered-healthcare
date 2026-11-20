@@ -526,3 +526,32 @@ fn a_draft_changes_version_until_it_is_submitted() {
         Err(Refused::Stage(Stage::Validation))
     );
 }
+
+#[test]
+fn the_holder_keeps_one_change_note_on_a_draft() {
+    let mut lifecycle = draft(PackageKind::Program);
+    assert_eq!(lifecycle.note, None);
+    lifecycle
+        .set_note("ann", Some("  Reworded the BP question.  ".into()))
+        .expect("noted");
+    assert_eq!(lifecycle.note.as_deref(), Some("Reworded the BP question."));
+    assert_eq!(lifecycle.stage, Stage::Draft);
+    assert_eq!(
+        lifecycle.set_note("bob", Some("mine".into())),
+        Err(Refused::NotHolder)
+    );
+    let back: Lifecycle =
+        serde_json::from_value(serde_json::to_value(&lifecycle).expect("json")).expect("read");
+    assert_eq!(back.note, lifecycle.note);
+
+    lifecycle
+        .set_note("ann", Some("   ".into()))
+        .expect("cleared");
+    assert_eq!(lifecycle.note, None);
+
+    lifecycle.submit("ann", now()).expect("submitted");
+    assert_eq!(
+        lifecycle.set_note("ann", Some("late".into())),
+        Err(Refused::Stage(Stage::Validation))
+    );
+}

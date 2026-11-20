@@ -360,6 +360,7 @@ const INVENTORY: &[Mounted] = &[
             "/packages/{id}/{action}",
             "/packages/{id}/files/{*path}",
             "/packages/{id}/version",
+            "/packages/{id}/note",
             "/packages/{id}/terminology/code-systems",
             "/packages/{id}/terminology/concepts",
             "/packages/{id}/terminology/concept",

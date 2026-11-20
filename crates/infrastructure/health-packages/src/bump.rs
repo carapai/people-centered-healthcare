@@ -10,7 +10,8 @@
 //! [`changes`] compares two versions of an artefact and finds every change with the bump it
 //! needs. Questionnaires, CodeSystems, ValueSets and StructureDefinitions are compared element by
 //! element. For every other resource type, and every element without a rule here, any change is
-//! major: a rule that cannot tell must not let a breaking change through as a patch.
+//! major: a rule that cannot tell must not let a breaking change through as a patch. [`describe`]
+//! sums each one up in a plain line for the Studio's *What changed*.
 //!
 //! **On every resource:**
 //! - `version`, `date`, `meta` and the narrative `text` follow the release, and need nothing;
@@ -944,6 +945,87 @@ fn invariants(old: Option<&Value>, new: Option<&Value>, at: &str, found: &mut Fo
             found.add(format!("{place}[{key}]"), Nature::Added, Bump::Major);
         }
     }
+}
+
+/// One plain line for `change`, for the Studio's *What changed* (studio.md § The authoring API):
+/// the innermost keyed element it is in, e.g. `item[bp].item[bp-sys].text` reworded is
+/// "Item bp-sys: text reworded".
+pub fn describe(change: &ContentChange) -> String {
+    let verb = match change.nature {
+        Nature::Added => "added",
+        Nature::Removed => "removed",
+        Nature::Changed => "changed",
+        Nature::Tightened => "tightened",
+        Nature::Relaxed => "relaxed",
+        Nature::Reworded => "reworded",
+    };
+    let segments = segments(&change.at);
+    let keyed = segments.iter().rposition(|(_, key)| key.is_some());
+    let field = |from: usize| {
+        segments[from..]
+            .iter()
+            .map(|(name, _)| *name)
+            .collect::<Vec<_>>()
+            .join(".")
+    };
+    match keyed {
+        None if change.at.is_empty() => format!("The whole resource {verb}"),
+        None => capitalised(&format!("{} {verb}", field(0))),
+        Some(index) => {
+            let (name, key) = segments[index];
+            let label = match name {
+                "item" => "Item",
+                "concept" => "Code",
+                "element" => "Element",
+                "answerOption" => "Answer option",
+                "include" => "Include rule",
+                "exclude" => "Exclude rule",
+                "extension" | "modifierExtension" => "Extension",
+                other => other,
+            };
+            let subject = format!("{label} {}", key.unwrap_or_default());
+            if index + 1 == segments.len() {
+                format!("{subject} {verb}")
+            } else {
+                format!("{subject}: {} {verb}", field(index + 1))
+            }
+        }
+    }
+}
+
+/// `at` split at the dots outside brackets, each part as its name and its key, if any.
+fn segments(at: &str) -> Vec<(&str, Option<&str>)> {
+    let mut parts = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (index, c) in at.char_indices() {
+        match c {
+            '[' => depth += 1,
+            ']' => depth = depth.saturating_sub(1),
+            '.' if depth == 0 => {
+                parts.push(&at[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    if !at.is_empty() {
+        parts.push(&at[start..]);
+    }
+    parts
+        .into_iter()
+        .map(|part| match part.split_once('[') {
+            Some((name, rest)) => (name, Some(rest.strip_suffix(']').unwrap_or(rest))),
+            None => (part, None),
+        })
+        .collect()
+}
+
+fn capitalised(text: &str) -> String {
+    let mut chars = text.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
 }
 
 #[cfg(test)]

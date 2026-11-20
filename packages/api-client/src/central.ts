@@ -44,6 +44,10 @@ export type ArtefactChangeType = z.infer<typeof ArtefactChangeType>
 export const CheckStatus = z.enum(["pass", "fail"])
 export type CheckStatus = z.infer<typeof CheckStatus>
 
+/** How an element changed. */
+export const ElementChangeType = z.enum(["added", "removed", "changed", "tightened", "relaxed", "reworded"])
+export type ElementChangeType = z.infer<typeof ElementChangeType>
+
 /** Always `pass` when the process answers at all. */
 export const HealthStatus = z.enum(["pass"])
 export type HealthStatus = z.infer<typeof HealthStatus>
@@ -112,6 +116,19 @@ export const StudioActionInput = z.object({
 })
 export type StudioActionInput = z.infer<typeof StudioActionInput>
 
+/** One changed element of a changed artefact. */
+export const StudioElementChange = z.object({
+  /** Its path, e.g. `item[bp].text`. */
+  "at": z.string(),
+  /** The version bump it needs. */
+  "bump": SemverBump,
+  /** How it changed. */
+  "change": ElementChangeType,
+  /** One plain line, e.g. "Item bp: text reworded". */
+  "summary": z.string(),
+})
+export type StudioElementChange = z.infer<typeof StudioElementChange>
+
 /** One added, changed or removed artefact. */
 export const StudioArtefactChange = z.object({
   /** Its version now. */
@@ -120,6 +137,8 @@ export const StudioArtefactChange = z.object({
   "before": z.string().nullable().optional(),
   /** How it changed. */
   "change": ArtefactChangeType,
+  /** For a changed artefact, each element that changed; empty for an added or removed one. */
+  "elements": z.array(StudioElementChange),
   /** Its path in the package. */
   "path": z.string(),
   /** Its `resourceType`. */
@@ -482,6 +501,13 @@ export const StudioNewDraft = z.object({
 })
 export type StudioNewDraft = z.infer<typeof StudioNewDraft>
 
+/** A draft's change note. */
+export const StudioNoteInput = z.object({
+  /** The note; empty or absent clears it. */
+  "note": z.string().nullable().optional(),
+})
+export type StudioNoteInput = z.infer<typeof StudioNoteInput>
+
 /** One row of the package list. */
 export const StudioPackage = z.object({
   /** Every step, each with whether the signed-in person may take it and why not. */
@@ -550,6 +576,8 @@ export const StudioPackagePage = z.object({
   "files": z.array(StudioPackageFile),
   /** The history, oldest first. */
   "history": z.array(StudioHistoryEntry),
+  /** The holder's one change note for the whole draft. */
+  "note": z.string().nullable().optional(),
   /** Its row in the list, with the actions. */
   "package": StudioPackage,
   /** Who accepted it at review. */
@@ -755,6 +783,19 @@ export const operations = {
       409: StudioProblem,
       412: StudioProblem,
       422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  setStudioNote: {
+    method: 'PUT',
+    path: '/api/studio/packages/{id}/note',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      412: StudioProblem,
       500: StudioProblem,
     },
   },
