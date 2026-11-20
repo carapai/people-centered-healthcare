@@ -93,6 +93,9 @@ export function withoutTarget(mapping: Mapping, id: string): Mapping {
   return { ...rest, ...(contained.length === 0 ? {} : { contained }), ...(related.length === 0 ? {} : { relatedArtifact: related }) } as Mapping
 }
 
+/** A linkId as a FHIRPath string literal, its backslashes and quotes escaped. */
+const quoted = (id: string) => `'${id.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+
 /** The FHIRPath that selects the answered item at `path`, from the response down. */
 export function contextPath(questionnaire: Questionnaire, path: Path): string | undefined {
   const steps: string[] = []
@@ -104,7 +107,7 @@ export function contextPath(questionnaire: Questionnaire, path: Path): string | 
     items = item.item
   }
   if (steps.length === 0) return undefined
-  return steps.map((linkId, n) => `item.where(linkId = '${linkId.replace(/'/g, "\\'")}'${n === steps.length - 1 ? ' and answer.exists()' : ''})`).join('.')
+  return steps.map((linkId, n) => `item.where(linkId = ${quoted(linkId)}${n === steps.length - 1 ? ' and answer.exists()' : ''})`).join('.')
 }
 
 const extractValue = (expression: string): Extension => ({ url: EXTRACT_VALUE, valueString: expression })
@@ -237,9 +240,6 @@ export function recordProblems(mapping: Mapping | undefined, questionnaire: Ques
     return code?.code === undefined || code.code === '' ? [{ code: 'record-no-code', linkId, template: template.id }] : []
   })
 }
-
-/** A linkId as a FHIRPath string literal. */
-const quoted = (id: string) => `'${id.replace(/'/g, "\\'")}'`
 
 /** The mapping with every template context naming `from` naming `to` instead (a new id renamed). */
 export function renameInMapping(mapping: Mapping | undefined, from: string, to: string): Mapping | undefined {
