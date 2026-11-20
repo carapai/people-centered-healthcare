@@ -112,7 +112,8 @@ fn publications(store: health_surrealdb::SurrealStore) -> Result<Publications, F
         Schemas::platform(),
         Arc::new(WorkflowSandbox),
         "central",
-    ))
+    )
+    .from_cli())
 }
 
 pub(crate) fn signer() -> Result<LocalSigner, Failure> {
@@ -131,12 +132,13 @@ fn summary(lifecycle: &Lifecycle) -> String {
         people.iter().cloned().collect::<Vec<_>>().join(", ")
     };
     format!(
-        "{}@{} ({:?}): {}\n  content {}\n  authors: {}\n  reviewer: {}\n  approvals: {} of {}{}",
+        "{}@{} ({:?}): {}\n  content {}\n  holder: {}\n  authors: {}\n  reviewer: {}\n  approvals: {} of {}{}",
         lifecycle.package,
         lifecycle.version,
         lifecycle.kind,
         lifecycle.stage,
         lifecycle.content,
+        lifecycle.holder,
         join(&lifecycle.authors),
         lifecycle.reviewer.as_deref().unwrap_or("-"),
         lifecycle.approvers.len(),
@@ -165,6 +167,25 @@ fn record_line(record: &Record) -> String {
         }
         Step::Approved => ("approved", &[]),
         Step::Published => ("published", &[]),
+        Step::HandoverOffered { to } => {
+            return format!("  {} {} offered it to {to}", record.at, record.by);
+        }
+        Step::HandoverDeclined { to } => {
+            return format!(
+                "  {} {} called off the handover to {to}",
+                record.at, record.by
+            );
+        }
+        Step::HandedOver { from } => {
+            return format!("  {} {} took it over from {from}", record.at, record.by);
+        }
+        Step::Reassigned { from, to, reason } => {
+            return format!(
+                "  {} {} reassigned it from {from} to {to}: {reason}",
+                record.at, record.by
+            );
+        }
+        Step::Withdrawn => ("withdrawn", &[]),
         Step::VersionChanged { previous } => {
             return format!(
                 "  {} {} version {previous} → {}",

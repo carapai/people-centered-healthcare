@@ -108,7 +108,29 @@ export async function startDraft(transport: Transport, input: StudioNewDraft): P
   return parsed<StudioPackagePage>('startStudioDraft', response.status, response.body)
 }
 
-/** What a step needs besides who takes it: request changes asks why, activate asks where. */
-export function needs(action: StudioActionName): 'reason' | 'scope' | null {
-  return action === 'request-changes' ? 'reason' : action === 'activate' ? 'scope' : null
+/** What a step needs besides who takes it: requesting changes asks why, activating where,
+ * handing over to whom, and reassigning to whom and why. */
+export function needs(action: StudioActionName): readonly ('reason' | 'scope' | 'to')[] {
+  switch (action) {
+    case 'request-changes':
+      return ['reason']
+    case 'activate':
+      return ['scope']
+    case 'hand-over':
+      return ['to']
+    case 'reassign':
+      return ['to', 'reason']
+    default:
+      return []
+  }
+}
+
+/** The body of `action`, from the fields the person filled in. */
+export function actionInput(action: StudioActionName, fields: { reason: string; scope: string; to: string }): StudioActionInput {
+  const wanted = needs(action)
+  return {
+    ...(wanted.includes('reason') ? { reason: fields.reason } : {}),
+    ...(wanted.includes('scope') ? { scope: fields.scope } : {}),
+    ...(wanted.includes('to') ? { to: fields.to.trim() } : {}),
+  }
 }

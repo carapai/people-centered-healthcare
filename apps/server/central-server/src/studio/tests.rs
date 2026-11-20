@@ -78,6 +78,13 @@ fn package() -> Files {
     ])
 }
 
+/// Accounts named by username: each person's account id is their name, and `nobody` has none.
+fn usernames() -> Accounts {
+    Arc::new(|username: String| {
+        Box::pin(async move { Ok((username != "nobody").then_some(username)) })
+    })
+}
+
 fn subject(account: &str, permissions: &[&str]) -> Subject {
     Subject {
         account: account.into(),
@@ -109,7 +116,7 @@ async fn send(
     if_match: Option<&str>,
     body: Option<Value>,
 ) -> (u16, Option<String>, Value) {
-    let app = router(publications.clone(), None).layer(Extension(who));
+    let app = router(publications.clone(), None, usernames()).layer(Extension(who));
     let mut request = Request::builder().method(method).uri(path);
     if let Some(tag) = if_match {
         request = request.header("if-match", tag);
@@ -276,7 +283,7 @@ async fn an_author_who_reviews_sees_approve_refused_and_is_refused_it_when_they_
         &publications,
         ann(),
         "POST",
-        &format!("{path}/withdraw"),
+        &format!("{path}/delete"),
         None,
     )
     .await;
@@ -297,6 +304,7 @@ const REVIEW: &str = health_publication::studio::REVIEW_PERMISSION;
 const APPROVE: &str = health_publication::studio::APPROVE_PERMISSION;
 const PUBLISH: &str = health_publication::studio::PUBLISH_PERMISSION;
 const ACTIVATE: &str = health_publication::studio::ACTIVATE_PERMISSION;
+const MANAGE: &str = health_publication::studio::MANAGE_PERMISSION;
 
 #[tokio::test]
 async fn two_tabs_saving_the_same_draft_the_second_gets_412_and_nothing_is_overwritten() {
@@ -475,6 +483,185 @@ async fn a_draft_starts_blank_and_takes_another_version() {
     )
     .await;
     assert_eq!(status, 422);
+}
+
+// #493: the holder hands the draft over by username; until it is accepted they keep it, and once
+// it is, the former holder may not approve it. A manager reassigns with a reason, and the holder
+// withdraws, freeing its name@version, the withdrawn one still readable.
+#[tokio::test]
+async fn a_draft_is_handed_over_reassigned_and_withdrawn_by_its_holder() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let path = format!("/packages/{ID}");
+    let ann = || subject("ann", &[AUTHOR, APPROVE]);
+    let dan = || subject("dan", &[AUTHOR]);
+
+    let (status, refused) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{path}/hand-over"),
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(status, 422, "{refused}");
+    let (status, refused) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{path}/hand-over"),
+        Some(json!({ "to": "nobody" })),
+    )
+    .await;
+    assert_eq!(status, 422, "{refused}");
+    let (status, refused) = call(
+        &publications,
+        dan(),
+        "POST",
+        &format!("{path}/hand-over"),
+        Some(json!({ "to": "eve" })),
+    )
+    .await;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"]["code"], "not-holder");
+    let (status, page) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{path}/hand-over"),
+        Some(json!({ "to": "dan" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["holder"], "ann");
+    assert_eq!(page["package"]["offeredTo"], "dan");
+    let history = page["history"].as_array().expect("history");
+    assert_eq!(history.last().expect("entry")["step"], "handover-offered");
+    assert_eq!(history.last().expect("entry")["person"], "dan");
+
+    // Not accepted yet: dan may not edit, and his next step is to accept.
+    let (_, page) = call(&publications, dan(), "GET", &path, None).await;
+    assert_eq!(page["editable"], false);
+    assert_eq!(page["editRefusal"]["code"], "not-holder");
+    assert_eq!(page["package"]["next"], "accept-handover");
+    let (status, page) = call(
+        &publications,
+        dan(),
+        "POST",
+        &format!("{path}/accept-handover"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["holder"], "dan");
+    assert_eq!(page["editable"], true);
+
+    // dan submits; ann, a former holder, may not approve.
+    let (status, page) = call(
+        &publications,
+        dan(),
+        "POST",
+        &format!("{path}/submit"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    let (status, _) = call(
+        &publications,
+        subject("rita", &[REVIEW]),
+        "POST",
+        &format!("{path}/review"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (status, refused) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{path}/approve"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 409, "{refused}");
+    assert_eq!(refused["refusal"]["code"], "author");
+
+    // dan withdraws it; it is kept under another id, and the version is free.
+    let (status, page) = call(
+        &publications,
+        dan(),
+        "POST",
+        &format!("{path}/withdraw"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["stage"], "withdrawn");
+    let kept = page["package"]["id"].as_str().expect("id").to_owned();
+    assert_ne!(kept, ID);
+    let (status, page) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("/packages/{kept}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(
+        page["history"]
+            .as_array()
+            .expect("history")
+            .last()
+            .expect("entry")["step"],
+        "withdrawn"
+    );
+    let (status, _) = call(&publications, ann(), "GET", &path, None).await;
+    assert_eq!(status, 404);
+    publications
+        .draft(&package(), "ann")
+        .await
+        .expect("drafted again");
+
+    // Reassigning needs metadata.manage and a reason.
+    let (status, _) = call(
+        &publications,
+        ann(),
+        "POST",
+        &format!("{path}/reassign"),
+        Some(json!({ "to": "dan", "reason": "leave" })),
+    )
+    .await;
+    assert_eq!(status, 403);
+    let mo = || subject("mo", &[MANAGE]);
+    let (status, _) = call(
+        &publications,
+        mo(),
+        "POST",
+        &format!("{path}/reassign"),
+        Some(json!({ "to": "dan" })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    let (status, page) = call(
+        &publications,
+        mo(),
+        "POST",
+        &format!("{path}/reassign"),
+        Some(json!({ "to": "dan", "reason": "ann is on leave" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["package"]["holder"], "dan");
+    let last = page["history"]
+        .as_array()
+        .expect("history")
+        .last()
+        .cloned()
+        .expect("entry");
+    assert_eq!(last["step"], "reassigned");
+    assert_eq!(last["reason"], "ann is on leave");
+    assert_eq!(last["by"], "mo");
 }
 
 #[test]

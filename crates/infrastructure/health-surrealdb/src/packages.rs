@@ -68,7 +68,7 @@ impl SurrealTx {
         Ok(!updated.is_empty())
     }
 
-    /// Moves lifecycle `old` to `new` (a draft that took another version), if `old` is still at
+    /// Moves lifecycle `old` to `new` (a draft that took another version, or one withdrawn), if `old` is still at
     /// revision `before`: `new` is created at the next revision with `data`, `old`'s records
     /// follow it, and `old` is gone. False if another change came first.
     pub async fn rekey_package_lifecycle(
@@ -133,11 +133,12 @@ impl SurrealTx {
             }))
     }
 
-    /// The JSON of every lifecycle not yet published, by id.
+    /// The JSON of every lifecycle not yet published nor withdrawn, by id.
     pub async fn open_package_lifecycles(&mut self) -> Result<Vec<String>, StoreError> {
         let rows = self
             .rows(
-                "SELECT VALUE [data] FROM package_lifecycle WHERE stage != 'published' ORDER BY id",
+                "SELECT VALUE [data] FROM package_lifecycle \
+                 WHERE stage NOT IN ['published', 'withdrawn'] ORDER BY id",
                 Vec::new(),
             )
             .await?;

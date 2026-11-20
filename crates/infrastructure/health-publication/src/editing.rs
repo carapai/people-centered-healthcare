@@ -16,7 +16,7 @@
 //!   keeps the results as a record, without changing the stage or the revision.
 //!
 //! Who may edit is the lifecycle's rule ([`Action::Edit`]); the permission is checked by the
-//! API. Only the Draft Holder will be allowed to save once there is one (#493).
+//! API. Only the Draft Holder saves (#493).
 
 use health_configuration::lifecycle::{Action, Lifecycle, Stage};
 use health_configuration::package::{

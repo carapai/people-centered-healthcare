@@ -30,11 +30,13 @@ bun run build && bunx --bun vite preview --port 4173 --strictPort
   - **Visits:** 18 patients checked in. 6 wait at triage, 6 are triaged and wait for consultation with their vital signs recorded, and 6 visits are completed.
   - **Appointments:** 11 booked over the next two weeks, and 5 patients' requests waiting in the clinician's inbox.
 - **Admin:** sign in at KAM013 as `admin` / `harbour lantern meadow quartz` (`e2e/users.ts`), who holds every right: `*.cruds`, break-glass and every named permission (`ADMIN_PERMISSIONS`). A permission added to the code belongs in that list too. The e2e users are provisioned as well.
-- **The Studio** (`/studio`) holds a draft of the OPD reference package (`ug.moh.opd`), written by `e2e-author`. It is a program package, so it needs two approvals. Sign in at KAM013 as, for each step (passwords in `e2e/users.ts`):
+- **The Studio** (`/studio`) holds a draft of the OPD reference package (`ug.moh.opd`), held by `e2e-author`. It is a program package, so it needs two approvals. Sign in at KAM013 as, for each step (passwords in `e2e/users.ts`):
 
   | Step | Who |
   |---|---|
-  | Submit | `e2e-author` |
+  | Edit, check now, submit, hand over, withdraw | the Draft Holder: `e2e-author`, or whoever it was handed over to |
+  | Accept a handover | the username it was handed over to, e.g. `e2e-coauthor` |
+  | Reassign | `admin` (`metadata.manage`) |
   | Review | `e2e-studio` |
   | Approve (two) | `e2e-studio` and `e2e-approver` |
   | Publish, activate | `e2e-publisher` |

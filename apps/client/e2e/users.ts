@@ -21,6 +21,8 @@ export const USERS = {
   // The Studio's other steps (#835): the seeded OPD draft's author, a second approver (a program
   // package needs two), and who publishes and activates it.
   author: { username: 'e2e-author', password: 'thistle beacon rafter forty', roles: 'author' },
+  // A second author, to take a draft handed over to them (#493).
+  coauthor: { username: 'e2e-coauthor', password: 'meadow falcon ribbon twenty', roles: 'author' },
   approver: { username: 'e2e-approver', password: 'juniper walrus anchor fifty', roles: 'approver' },
   publisher: { username: 'e2e-publisher', password: 'cinder otter gazebo sixty', roles: 'publisher' },
   // Every right, for exploring a local backend by hand; no test signs in as it.

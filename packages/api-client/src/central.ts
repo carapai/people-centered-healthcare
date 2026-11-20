@@ -6,11 +6,11 @@ import { z } from 'zod'
 import { integer } from './numbers'
 
 /** Where a package version stands in the lifecycle. */
-export const PackageStage = z.enum(["draft", "validation", "simulation", "review", "approval", "published"])
+export const PackageStage = z.enum(["draft", "validation", "simulation", "review", "approval", "published", "withdrawn"])
 export type PackageStage = z.infer<typeof PackageStage>
 
 /** What kind of refusal: the client words it. */
-export const StudioRefusalCode = z.enum(["permission", "stage", "author", "not-author", "already-approved", "approvals-needed", "not-published", "other"])
+export const StudioRefusalCode = z.enum(["permission", "stage", "author", "not-holder", "not-offered", "already-approved", "approvals-needed", "not-published", "other"])
 export type StudioRefusalCode = z.infer<typeof StudioRefusalCode>
 
 /** Why a step is refused. */
@@ -56,7 +56,7 @@ export const Health = z.object({
 export type Health = z.infer<typeof Health>
 
 /** A step the Studio offers on a package. */
-export const StudioActionName = z.enum(["submit", "review", "approve", "publish", "activate", "request-changes", "check"])
+export const StudioActionName = z.enum(["submit", "review", "approve", "publish", "activate", "request-changes", "check", "accept-handover", "hand-over", "decline-handover", "withdraw", "reassign"])
 export type StudioActionName = z.infer<typeof StudioActionName>
 
 /** One step on a package, and why the signed-in person may not take it. */
@@ -103,10 +103,12 @@ export type SessionInfo = z.infer<typeof SessionInfo>
 
 /** What a step needs besides who takes it. */
 export const StudioActionInput = z.object({
-  /** Why changes are requested (`request-changes`), or why it is activated (`activate`). */
+  /** Why changes are requested (`request-changes`), why the draft is reassigned (`reassign`), or why it is activated (`activate`). */
   "reason": z.string().nullable().optional(),
   /** Where to activate it (`activate`): `national`, `district:<code>`, `facility:<code>` or `program:<facility>:<program>`. */
   "scope": z.string().nullable().optional(),
+  /** The username of who the draft goes to (`hand-over`, `reassign`). */
+  "to": z.string().nullable().optional(),
 })
 export type StudioActionInput = z.infer<typeof StudioActionInput>
 
@@ -165,7 +167,7 @@ export const StudioFileInput = z.object({
 export type StudioFileInput = z.infer<typeof StudioFileInput>
 
 /** What happened in one history entry. */
-export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed"])
+export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed", "handover-offered", "handover-declined", "handed-over", "reassigned", "withdrawn"])
 export type StudioHistoryStep = z.infer<typeof StudioHistoryStep>
 
 /** One entry of the discussion: a lifecycle record. */
@@ -174,11 +176,13 @@ export const StudioHistoryEntry = z.object({
   "at": z.string(),
   /** Who did it (`system` for the automated checks). */
   "by": z.string(),
+  /** Who the draft was offered or reassigned to; who held it before, when it was handed over. */
+  "person": z.string().nullable().optional(),
   /** The version the draft had, when it took another. */
   "previous": z.string().nullable().optional(),
   /** The problems a failed check found; for *Check now*, validation's then simulation's. */
   "problems": z.array(z.string()),
-  /** What a reviewer or approver asked to change. */
+  /** What a reviewer or approver asked to change, or why a manager reassigned the draft. */
   "reason": z.string().nullable().optional(),
   /** The stage after. */
   "stage": PackageStage,
@@ -213,9 +217,11 @@ export const StudioPackage = z.object({
   "actions": z.array(PackageAction),
   /** The scopes the package is active in now. */
   "active": z.array(ActiveScope),
-  /** Everyone who wrote it. */
+  /** Everyone who has held it: none of them may review or approve it. */
   "authors": z.array(z.string()),
   "bump": SemverBump.nullable().optional(),
+  /** Its Draft Holder (an account id): the one person who may edit, check, submit, hand over or withdraw it. */
+  "holder": z.string(),
   /** `name@version`. */
   "id": z.string(),
   /** Its kind. */
@@ -223,6 +229,8 @@ export const StudioPackage = z.object({
   /** The package name. */
   "name": z.string(),
   "next": StudioActionName.nullable().optional(),
+  /** Who it is being handed over to (an account id), until they accept or it is called off. */
+  "offeredTo": z.string().nullable().optional(),
   /** The latest published version before it. */
   "previous": z.string().nullable().optional(),
   /** Where it stands. */
