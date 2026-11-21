@@ -1,6 +1,6 @@
 [package]
 name = "health-analytics-app"
-description = "Indicators evaluated (analytics.md; ADR 0068; #548): a FHIR R5 Measure read as an indicator, and its FHIRPath criteria evaluated over each patient's records for one reporting period."
+description = "Indicators evaluated (analytics.md; ADR 0068; #548): a FHIR R5 Measure read as an indicator, and its FHIRPath criteria evaluated over each patient's records for one reporting period: counts, percentages, rates, ratios and summarised values."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,8 +17,8 @@ workspace = true
 health-analytics = { workspace = true }
 health-fhir-validation = { workspace = true }
 jiff = { workspace = true }
+rust_decimal = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
