@@ -39,6 +39,7 @@ import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioIdRouteImport } from './routes/studio.$id'
+import { Route as StudioAgeBandsRouteImport } from './routes/studio.age-bands'
 import { Route as StudioConceptsRouteImport } from './routes/studio.concepts'
 import { Route as StudioDecisionTablesRouteImport } from './routes/studio.decision-tables'
 import { Route as StudioFormsRouteImport } from './routes/studio.forms'
@@ -49,6 +50,7 @@ import { Route as SyncConflictsRouteImport } from './routes/sync.conflicts'
 import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
+import { Route as StudioIdAgeBandsSplatRouteImport } from './routes/studio.$id_.age-bands.$'
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
 import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
 import { Route as StudioIdProgramsSplatRouteImport } from './routes/studio.$id_.programs.$'
@@ -205,6 +207,11 @@ const StudioIdRoute = StudioIdRouteImport.update({
   path: '/studio/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioAgeBandsRoute = StudioAgeBandsRouteImport.update({
+  id: '/studio/age-bands',
+  path: '/studio/age-bands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioConceptsRoute = StudioConceptsRouteImport.update({
   id: '/studio/concepts',
   path: '/studio/concepts',
@@ -253,6 +260,11 @@ const TillSuperviseRoute = TillSuperviseRouteImport.update({
 const RecordsTypeIdRoute = RecordsTypeIdRouteImport.update({
   id: '/records/$type/$id',
   path: '/records/$type/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioIdAgeBandsSplatRoute = StudioIdAgeBandsSplatRouteImport.update({
+  id: '/studio/$id_/age-bands/$',
+  path: '/studio/$id/age-bands/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioIdFilesSplatRoute = StudioIdFilesSplatRouteImport.update({
@@ -309,6 +321,7 @@ export interface FileRoutesByFullPath {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
@@ -323,6 +336,7 @@ export interface FileRoutesByFullPath {
   '/studio/': typeof StudioIndexRoute
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
+  '/studio/$id/age-bands/$': typeof StudioIdAgeBandsSplatRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
@@ -356,6 +370,7 @@ export interface FileRoutesByTo {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
@@ -370,6 +385,7 @@ export interface FileRoutesByTo {
   '/studio': typeof StudioIndexRoute
   '/till': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
+  '/studio/$id/age-bands/$': typeof StudioIdAgeBandsSplatRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
@@ -404,6 +420,7 @@ export interface FileRoutesById {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
@@ -418,6 +435,7 @@ export interface FileRoutesById {
   '/studio/': typeof StudioIndexRoute
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
+  '/studio/$id_/age-bands/$': typeof StudioIdAgeBandsSplatRoute
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id_/programs/$': typeof StudioIdProgramsSplatRoute
@@ -453,6 +471,7 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/age-bands'
     | '/studio/concepts'
     | '/studio/decision-tables'
     | '/studio/forms'
@@ -467,6 +486,7 @@ export interface FileRouteTypes {
     | '/studio/'
     | '/till/'
     | '/records/$type/$id'
+    | '/studio/$id/age-bands/$'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/programs/$'
@@ -500,6 +520,7 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/age-bands'
     | '/studio/concepts'
     | '/studio/decision-tables'
     | '/studio/forms'
@@ -514,6 +535,7 @@ export interface FileRouteTypes {
     | '/studio'
     | '/till'
     | '/records/$type/$id'
+    | '/studio/$id/age-bands/$'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/programs/$'
@@ -547,6 +569,7 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/age-bands'
     | '/studio/concepts'
     | '/studio/decision-tables'
     | '/studio/forms'
@@ -561,6 +584,7 @@ export interface FileRouteTypes {
     | '/studio/'
     | '/till/'
     | '/records/$type/$id'
+    | '/studio/$id_/age-bands/$'
     | '/studio/$id_/files/$'
     | '/studio/$id_/forms/$'
     | '/studio/$id_/programs/$'
@@ -595,6 +619,7 @@ export interface RootRouteChildren {
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
   StudioIdRoute: typeof StudioIdRoute
+  StudioAgeBandsRoute: typeof StudioAgeBandsRoute
   StudioConceptsRoute: typeof StudioConceptsRoute
   StudioDecisionTablesRoute: typeof StudioDecisionTablesRoute
   StudioFormsRoute: typeof StudioFormsRoute
@@ -609,6 +634,7 @@ export interface RootRouteChildren {
   StudioIndexRoute: typeof StudioIndexRoute
   TillIndexRoute: typeof TillIndexRoute
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
+  StudioIdAgeBandsSplatRoute: typeof StudioIdAgeBandsSplatRoute
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
   StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
   StudioIdProgramsSplatRoute: typeof StudioIdProgramsSplatRoute
@@ -828,6 +854,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/age-bands': {
+      id: '/studio/age-bands'
+      path: '/studio/age-bands'
+      fullPath: '/studio/age-bands'
+      preLoaderRoute: typeof StudioAgeBandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/concepts': {
       id: '/studio/concepts'
       path: '/studio/concepts'
@@ -898,6 +931,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecordsTypeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id_/age-bands/$': {
+      id: '/studio/$id_/age-bands/$'
+      path: '/studio/$id/age-bands/$'
+      fullPath: '/studio/$id/age-bands/$'
+      preLoaderRoute: typeof StudioIdAgeBandsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/$id_/files/$': {
       id: '/studio/$id_/files/$'
       path: '/studio/$id/files/$'
@@ -963,6 +1003,7 @@ const rootRouteChildren: RootRouteChildren = {
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
   StudioIdRoute: StudioIdRoute,
+  StudioAgeBandsRoute: StudioAgeBandsRoute,
   StudioConceptsRoute: StudioConceptsRoute,
   StudioDecisionTablesRoute: StudioDecisionTablesRoute,
   StudioFormsRoute: StudioFormsRoute,
@@ -977,6 +1018,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioIndexRoute: StudioIndexRoute,
   TillIndexRoute: TillIndexRoute,
   RecordsTypeIdRoute: RecordsTypeIdRoute,
+  StudioIdAgeBandsSplatRoute: StudioIdAgeBandsSplatRoute,
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
   StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
   StudioIdProgramsSplatRoute: StudioIdProgramsSplatRoute,

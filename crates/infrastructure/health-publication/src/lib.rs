@@ -42,6 +42,10 @@
 //! - **Indicators** (ADR 0068; #548): validation refuses a `Measure` that is not a usable
 //!   indicator, one without a period date among them, and a malformed test patient.
 //!
+//! - **Age Band Sets** (ADR 0071; #551): validation refuses an Age Band Set (a `Library` of type
+//!   `age-band-set`) with a gap or an overlap between its bands, and
+//!   [`Publications::age_band_sets`] lists every published version, which pinned indicators keep.
+//!
 //! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
 //!   settings against the latest published version of each base package they name, and
 //!   [`Publications::activate`] refuses a base version that would orphan, or put outside its
@@ -80,6 +84,7 @@ use serde_json::{Value, json};
 use sha2::Digest as _;
 use uuid::Uuid;
 
+mod age_bands;
 pub mod decisions;
 pub mod designs;
 pub mod discussion;
@@ -91,6 +96,7 @@ pub mod studio;
 pub mod terminology;
 mod workflows;
 
+pub use age_bands::{PublishedAgeBandSet, age_band_sets_in};
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
 pub use workflows::{WorkflowSandbox, workflow_definitions};
 
@@ -514,6 +520,7 @@ impl Publications {
         problems.extend(extraction::problems(packed).await);
         problems.extend(programs::problems(packed));
         problems.extend(indicators::problems(packed));
+        problems.extend(age_bands::problems(packed));
         if packed.contents.package.kind == PackageKind::Language
             && let Some(translates) = &packed.contents.package.translates
             && translates.major().is_some()

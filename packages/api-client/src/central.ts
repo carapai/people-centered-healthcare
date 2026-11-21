@@ -484,7 +484,7 @@ export const StudioDecisionTryInput = z.object({
 export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
 
 /** What kind of design an artefact is: the Studio's sections. */
-export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program"])
+export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set"])
 export type StudioDesignKind = z.infer<typeof StudioDesignKind>
 
 /** One designed artefact, in the package version it opens in. */

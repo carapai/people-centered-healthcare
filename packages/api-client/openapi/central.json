@@ -3695,7 +3695,8 @@
           "decision-table",
           "code-system",
           "value-set",
-          "program"
+          "program",
+          "age-band-set"
         ]
       },
       "StudioDesignPackage": {

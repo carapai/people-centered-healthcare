@@ -34,6 +34,8 @@ function SectionLink({ section, isNew, children }: { section: SectionId; isNew?:
       return <Link to="/studio/decision-tables" search={search}>{children}</Link>
     case 'programs':
       return <Link to="/studio/programs" search={search}>{children}</Link>
+    case 'age-bands':
+      return <Link to="/studio/age-bands" search={search}>{children}</Link>
   }
 }
 

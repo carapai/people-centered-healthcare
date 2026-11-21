@@ -198,22 +198,26 @@ if (drafted.status !== 0) throw new Error('drafting the Studio package failed')
 // but does not hold yet (e2e/fixtures/art). Not clinical guidance: the reference package is #117.
 const program = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, 'fixtures/art'), '--by', author], { env, stdio: 'inherit' })
 if (program.status !== 0) throw new Error('drafting the ART program package failed')
-// A published package with a workflow (#855), so the Studio's sections show a published design
-// that Edit starts the next version of (e2e/fixtures/clinic). Drafted by the author, reviewed and
+// Published packages (#855): one with a workflow, so the Studio's sections show a published design
+// that Edit starts the next version of (e2e/fixtures/clinic), and the national core with MoH's Age
+// Band Sets (#551; packages/reference-packages/core). Each is drafted by the author, reviewed and
 // approved by two others, and published; it needs the publication-signing key made above.
 if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
-  const clinic = resolve(import.meta.dirname, 'fixtures/clinic')
-  const id = 'ug.moh.clinic@1.0.0'
-  for (const step of [
-    ['draft', clinic, '--by', author],
-    ['submit', id, '--by', author],
-    ['review', id, '--by', 'e2e-reviewer-cli'],
-    ['approve', id, '--by', 'e2e-approver-cli'],
-    ['approve', id, '--by', 'e2e-second-approver-cli'],
-    ['publish', id, '--by', 'e2e-publisher-cli'],
-  ]) {
-    const done = spawnSync(centralBin, ['package', ...step], { env, stdio: 'inherit' })
-    if (done.status !== 0) throw new Error(`${step[0]} of the clinic package failed`)
+  for (const [source, id] of [
+    [resolve(import.meta.dirname, 'fixtures/clinic'), 'ug.moh.clinic@1.0.0'],
+    [resolve(import.meta.dirname, '../../../packages/reference-packages/core'), 'ug.moh.core@1.0.0'],
+  ] as const) {
+    for (const step of [
+      ['draft', source, '--by', author],
+      ['submit', id, '--by', author],
+      ['review', id, '--by', 'e2e-reviewer-cli'],
+      ['approve', id, '--by', 'e2e-approver-cli'],
+      ['approve', id, '--by', 'e2e-second-approver-cli'],
+      ['publish', id, '--by', 'e2e-publisher-cli'],
+    ]) {
+      const done = spawnSync(centralBin, ['package', ...step], { env, stdio: 'inherit' })
+      if (done.status !== 0) throw new Error(`${step[0]} of ${id} failed`)
+    }
   }
 }
 if (seedPatients > 0) {

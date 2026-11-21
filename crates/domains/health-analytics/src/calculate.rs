@@ -513,6 +513,7 @@ mod tests {
             period_date: "Encounter.actualPeriod.start".into(),
             populations: BTreeMap::new(),
             references: BTreeSet::new(),
+            age_band_sets: Vec::new(),
             value: matches!(calculation, Calculation::Value(_)).then(|| IndicatorValue {
                 source: ValueSource::Expression("v".into()),
                 pick: Pick::First,

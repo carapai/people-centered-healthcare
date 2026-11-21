@@ -45,6 +45,11 @@
 //! - `inactive` is major unless it goes from `false` to `true`; `lockedDate` is major;
 //! - a stored `expansion` needs nothing, since the compose governs and nodes pin expansions.
 //!
+//! **An Age Band Set** (a `Library` of type `age-band-set`, ADR 0071; #551) is compared by its
+//! decoded content, so re-encoding it changes nothing: its `bands`, `unit` or `ageAt` changed is
+//! major, since it changes Report columns and DHIS2 category options, while a rename (`name`,
+//! `title`) is a patch, as on every resource.
+//!
 //! **StructureDefinition** elements are matched by `id`, in the differential if both versions
 //! have one, otherwise in the snapshot:
 //! - documentation (`short`, `definition`, `comment`, `requirements`, `alias`, `label`,
@@ -174,6 +179,10 @@ pub fn changes(before: &Value, after: &Value) -> Vec<ContentChange> {
         Some("StructureDefinition") => {
             structure_definition(old, new, &mut found);
             &["differential", "snapshot"]
+        }
+        Some("Library") if is_age_band_set(old) && is_age_band_set(new) => {
+            age_band_set(old, new, &mut found);
+            &["content"]
         }
         _ => &[],
     };
@@ -311,6 +320,56 @@ fn keyed<'a>(
 
 fn text_key(name: &'static str) -> impl Fn(&Value) -> Option<String> {
     move |entry| entry.get(name).and_then(Value::as_str).map(str::to_owned)
+}
+
+// Age Band Set
+
+/// The platform `Library.type` code of an Age Band Set.
+const AGE_BAND_SET_TYPE: &str = "age-band-set";
+
+fn is_age_band_set(library: &Map<String, Value>) -> bool {
+    library
+        .get("type")
+        .and_then(|t| t.get("coding"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .any(|c| c.get("code").and_then(Value::as_str) == Some(AGE_BAND_SET_TYPE))
+}
+
+/// An Age Band Set's decoded inline content, if it has any.
+fn decoded(library: &Map<String, Value>) -> Option<Map<String, Value>> {
+    use base64::Engine as _;
+    let data = library.get("content")?.get(0)?.get("data")?.as_str()?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .ok()?;
+    match serde_json::from_slice(&bytes).ok()? {
+        Value::Object(map) => Some(map),
+        _ => None,
+    }
+}
+
+/// Any change to the bands, the unit or the date age is taken at is major.
+fn age_band_set(old: &Map<String, Value>, new: &Map<String, Value>, found: &mut Found) {
+    let (Some(before), Some(after)) = (decoded(old), decoded(new)) else {
+        if old.get("content") != new.get("content") {
+            found.add("content", Nature::Changed, Bump::Major);
+        }
+        return;
+    };
+    let mut names: Vec<&String> = before.keys().chain(after.keys()).collect();
+    names.sort();
+    names.dedup();
+    for name in names {
+        let nature = match (before.get(name), after.get(name)) {
+            (a, b) if a == b => continue,
+            (None, _) => Nature::Added,
+            (_, None) => Nature::Removed,
+            _ => Nature::Changed,
+        };
+        found.add(name.clone(), nature, Bump::Major);
+    }
 }
 
 // Questionnaire

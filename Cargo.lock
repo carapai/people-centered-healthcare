@@ -2333,6 +2333,7 @@ dependencies = [
 name = "health-analytics-app"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "health-analytics",
  "health-fhir-validation",
  "jiff",
