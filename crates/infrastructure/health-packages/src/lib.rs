@@ -28,6 +28,7 @@
 
 mod archive;
 pub mod bump;
+pub mod concepts;
 mod contents;
 pub mod language;
 pub mod overrides;

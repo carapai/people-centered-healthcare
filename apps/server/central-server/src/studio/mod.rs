@@ -32,7 +32,8 @@
 //! artefact: the lifecycle writes the record, as it writes every history entry, and the audit
 //! keeps it. Nothing removes one.
 //!
-//! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]).
+//! The terminology browser (#523) reads under `/packages/{id}/terminology/` ([`terminology`]),
+//! where a local CodeSystem's concepts are edited too (#524).
 //!
 //! The Workflow Studio (#498) reads the release's typed actions from `GET /workflow-actions`
 //! ([`actions`]). Its decision-table editor (#516) tries a patient and runs its checks under
@@ -119,6 +120,11 @@ pub(crate) fn router(
             "/packages/{id}/terminology/expand",
             post(terminology::expand),
         )
+        .route(
+            "/packages/{id}/terminology/code-system-change",
+            get(terminology::code_system_change),
+        )
+        .route("/packages/{id}/terminology/edit", post(terminology::edit))
         .route(
             "/packages/{id}/decision-tables/try",
             post(decisions::try_table),

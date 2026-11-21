@@ -8,14 +8,22 @@
 //!   the package's previous published version, both over the other packages as published.
 //! - **Published content never changes**, so what is read from a published tarball is kept by
 //!   its digest and not read again.
+//! - **Editing a local CodeSystem's concepts** (#524): [`Publications::draft_code_system`] reads
+//!   a draft's CodeSystem with its previous published version, which fixes the codes it holds,
+//!   and [`Publications::edit_concept`] applies one edit (`health_packages::concepts`), gives the
+//!   CodeSystem the version the change calls for, and saves it under the draft's revision check.
+//!   A note on the edit goes to the draft's discussion, naming the CodeSystem. A `terminology`
+//!   package's code systems are external, and stay read only.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use health_configuration::lifecycle::{Lifecycle, Stage};
 use health_configuration::package::PackageKind;
+use health_packages::concepts::{self, ConceptEdit};
 use health_packages::terminology::{Catalogue, catalogue, load};
 use health_terminology::Terminology;
+use serde_json::Value;
 
 use crate::{Error, Publications, PublishedPackage, failed, lifecycle_id};
 
@@ -173,5 +181,127 @@ impl Publications {
             previous,
             others,
         })
+    }
+}
+
+/// A draft's own CodeSystem, as the Studio edits it (#524).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DraftCodeSystem {
+    /// Its file in the draft.
+    pub path: String,
+    /// The resource as it is now.
+    pub current: Value,
+    /// The same CodeSystem (by URL) in the package's previous published version, if any: the
+    /// codes it holds are fixed.
+    pub previous: Option<Value>,
+    /// The draft's revision it was read at.
+    pub revision: u64,
+}
+
+impl DraftCodeSystem {
+    /// The codes that are published, and so fixed.
+    pub fn published(&self) -> BTreeSet<String> {
+        self.previous
+            .as_ref()
+            .map(concepts::codes)
+            .unwrap_or_default()
+    }
+}
+
+/// What an edit did, in a few words, to head its note in the discussion.
+fn summary(edit: &ConceptEdit) -> String {
+    match edit {
+        ConceptEdit::Add { code, parent, .. } => match parent {
+            Some(parent) => format!("Added code {code} under {parent}"),
+            None => format!("Added code {code}"),
+        },
+        ConceptEdit::Change { code, new_code, .. } if code != new_code => {
+            format!("Changed code {code} to {new_code}")
+        }
+        ConceptEdit::Change { code, .. } => format!("Changed code {code}"),
+        ConceptEdit::Delete { code } => format!("Deleted code {code}"),
+        ConceptEdit::Retire { code } => format!("Retired code {code}"),
+    }
+}
+
+impl Publications {
+    /// Draft `id`'s CodeSystem at `path`, with its previous published version. A `terminology`
+    /// package's code systems are external: they are not edited here.
+    pub async fn draft_code_system(&self, id: &str, path: &str) -> Result<DraftCodeSystem, Error> {
+        let mut tx = self.begin().await?;
+        let (lifecycle, revision) = self.load(&mut tx, id).await?;
+        if lifecycle.kind == PackageKind::Terminology {
+            return Err(Error::Invalid(format!(
+                "{id} is a terminology package: its code systems are external and read only"
+            )));
+        }
+        let previous = self.previous(&mut tx, &lifecycle).await?;
+        drop(tx);
+        let files = self.packed(&lifecycle.content).await?.files;
+        let bytes = files
+            .get(path)
+            .ok_or_else(|| Error::NotFound(format!("{id} has no file {path}")))?;
+        let current: Value = serde_json::from_slice(bytes)
+            .map_err(|e| Error::Invalid(format!("{path} does not read: {e}")))?;
+        if current.get("resourceType").and_then(Value::as_str) != Some("CodeSystem") {
+            return Err(Error::Invalid(format!("{path} is not a CodeSystem")));
+        }
+        let url = current.get("url").and_then(Value::as_str);
+        let previous = match previous {
+            Some(published) => self
+                .packed(&published.digest)
+                .await?
+                .files
+                .iter()
+                .filter(|(path, _)| !path.contains('/') && path.ends_with(".json"))
+                .filter_map(|(_, bytes)| serde_json::from_slice::<Value>(bytes).ok())
+                .find(|value| {
+                    value.get("resourceType").and_then(Value::as_str) == Some("CodeSystem")
+                        && value.get("url").and_then(Value::as_str) == url
+                }),
+            None => None,
+        };
+        Ok(DraftCodeSystem {
+            path: path.to_owned(),
+            current,
+            previous,
+            revision,
+        })
+    }
+
+    /// `by` applies `edit` to draft `id`'s CodeSystem at `path`, having read revision
+    /// `expected`: a published code is only ever retired, and the CodeSystem takes the version
+    /// the change calls for against its published one. A `note`, if any, joins the draft's
+    /// discussion naming the CodeSystem, for reviewers. Answers the draft's revision now.
+    pub async fn edit_concept(
+        &self,
+        id: &str,
+        path: &str,
+        edit: &ConceptEdit,
+        note: Option<&str>,
+        by: &str,
+        expected: u64,
+    ) -> Result<u64, Error> {
+        let draft = self.draft_code_system(id, path).await?;
+        if draft.revision != expected {
+            return Err(Error::Stale {
+                current: draft.revision,
+            });
+        }
+        let edited = concepts::apply(
+            &draft.current,
+            edit,
+            &draft.published(),
+            draft.previous.as_ref(),
+        )
+        .map_err(|refused| Error::Invalid(refused.to_string()))?;
+        let mut bytes = serde_json::to_vec_pretty(&edited).map_err(failed)?;
+        bytes.push(b'\n');
+        let revision = self.save_file(id, path, Some(bytes), by, expected).await?;
+        if let Some(note) = note.map(str::trim).filter(|n| !n.is_empty()) {
+            self.comment(id, by, &format!("{}: {note}", summary(edit)), Some(path))
+                .await?;
+        }
+        Ok(revision)
     }
 }

@@ -71,7 +71,7 @@ const filePath = (id: string, path: string) => `${packagePath(id)}/files/${path.
 
 /** The revision a change was read at, as the `If-Match` the server checks: a stale one is
  * refused with 412 (studio.md § The authoring API, Editing). */
-const ifMatch = (revision: number) => ({ 'if-match': `"${revision}"` })
+export const ifMatch = (revision: number) => ({ 'if-match': `"${revision}"` })
 
 /** One file of a package version, with the draft's revision when it was read. */
 export function fileQuery(transport: Transport, id: string, path: string) {

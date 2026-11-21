@@ -18,7 +18,7 @@ test('the author builds a ValueSet from the triage code system in the terminolog
   await expect(systems.getByRole('button', { name: /TriageCategory 1\.0\.0 · 3 concepts/ })).toHaveAttribute('aria-pressed', 'true')
   await expect(systems.getByText('Local · In this package')).toBeVisible()
   const concepts = page.getByRole('region', { name: 'Concepts of TriageCategory' })
-  await expect(concepts.getByRole('button', { name: /emergency/ })).toBeVisible()
+  await expect(concepts.getByRole('button', { name: /^emergency/ })).toBeVisible()
   await noViolations(page)
 
   // Search runs on the server.
@@ -57,4 +57,42 @@ test('the author builds a ValueSet from the triage code system in the terminolog
   await press(page, 'Save the ValueSet')
   await expect(page.getByRole('status').filter({ hasText: 'Saved.' })).toBeVisible()
   await expect(valueSet.getByText('Unsaved changes')).toBeHidden()
+})
+
+// #524: the OPD draft's author edits its triage CodeSystem in the terminology browser: a code
+// added under another, with a note for reviewers, shows in the tree, the Version panel and What
+// it reaches; being new, it is renamed and then deleted, and the note is in the draft's
+// discussion. A published code being fixed, retired, and the minor and major bumps need a
+// published version, which the seeded backend has none of: central-server's studio tests cover
+// them.
+test('the author adds a code under another to the triage code system, renames it and deletes it', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'CodeSystem-triage-category.json in the terminology browser' }).click()
+  const concepts = page.getByRole('region', { name: 'Concepts of TriageCategory' })
+  await concepts.getByRole('button', { name: '+ under urgent' }).click()
+  const adding = concepts.getByRole('form', { name: 'New code under urgent' })
+  await adding.getByLabel('Code', { exact: true }).fill('urgent-pain')
+  await adding.getByLabel('Display', { exact: true }).fill('Urgent: severe pain')
+  await adding.getByLabel('Note for reviewers').fill('Pain protocol 2026')
+  await adding.getByRole('button', { name: 'Add the code' }).click()
+  const edit = concepts.getByRole('form', { name: 'Code urgent-pain' })
+  await expect(edit).toBeVisible()
+  await expect(concepts.getByRole('button', { name: /^urgent-pain/ })).toBeVisible()
+  await expect(concepts.getByRole('region', { name: 'Version' }).getByText('Never published: it keeps its version 1.0.0.')).toBeVisible()
+  await expect(concepts.getByRole('region', { name: 'What it reaches' }).getByText(/Gains .*urgent-pain/)).toBeVisible()
+  await noViolations(page)
+
+  // Being new, it is renamed, then deleted.
+  await edit.getByLabel('Code', { exact: true }).fill('urgent-severe-pain')
+  await edit.getByRole('button', { name: 'Save the code' }).click()
+  const renamed = concepts.getByRole('form', { name: 'Code urgent-severe-pain' })
+  await expect(renamed).toBeVisible()
+  await renamed.getByRole('button', { name: 'Delete urgent-severe-pain' }).click()
+  await expect(concepts.getByRole('button', { name: /^urgent-severe-pain/ })).toBeHidden()
+
+  // Reviewers read the note in the draft's discussion.
+  await press(page, 'Back to the package', 'link')
+  await expect(page.getByRole('region', { name: 'Discussion' }).getByText('Added code urgent-pain under urgent: Pain protocol 2026')).toBeVisible()
 })

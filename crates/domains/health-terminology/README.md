@@ -29,7 +29,8 @@ Layer: **domain** (Terminology & Metadata). The terminology operations every nod
   - `children(system, version, parent, offset, count)` reads the hierarchy one level at a time (the top level with no parent), each row with how many concepts are under it;
   - `search(system, version, text, offset, count)` finds concepts whose code, display or a designation holds every word, ignoring case, an exact code first, then codes starting with the text, a page at a time;
   - `compare(published, draft)` lists the codes an expansion added and removed;
-  - `extend` merges another terminology in.
+  - `extend` merges another terminology in;
+  - `remove_code_system` drops one version, so a draft's code system can be swapped for its published one, and `value_sets_on(system)` lists the ValueSets whose compose draws on a code system: the Studio's *What it reaches* (#524).
 
 ## Offline, so fail closed
 

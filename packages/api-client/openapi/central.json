@@ -1034,6 +1034,108 @@
         }
       }
     },
+    "/api/studio/packages/{id}/terminology/code-system-change": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves a draft CodeSystem's version and reach.",
+        "description": "A draft's own CodeSystem, as saved: **Version**, the version its change calls for against the package's previous published version and each change that calls for it (adding or retiring a code is minor, a display a patch, redefining or removing a code major); and **What it reaches**, each ValueSet drawing on it with the codes it gains or loses for new forms, and the form questions that bind it.",
+        "operationId": "getStudioCodeSystemChange",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "description": "The CodeSystem's file in the draft",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Its version and reach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioCodeSystemChange"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version or file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a local CodeSystem, or a package's terminology cannot be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/terminology/code-systems": {
       "get": {
         "tags": [
@@ -1347,6 +1449,136 @@
           },
           "404": {
             "description": "No such package version, code system or parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/packages/{id}/terminology/edit": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and makes one edit to a draft CodeSystem's concepts.",
+        "description": "One edit to a draft's own CodeSystem: add a code (at the top or under another), change one (its display and definition; a new code's code and parent too), delete a new code, or retire one (kept, so records that hold it still resolve, and no longer offered on forms). A published code cannot be deleted, renamed or moved. The CodeSystem takes the version its change calls for. A `note` joins the draft's discussion, naming the CodeSystem, for reviewers. `If-Match` as for a save. Needs `metadata.author`. Answers the page as it is now.",
+        "operationId": "editStudioConcept",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The draft's revision, as its ETag",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioConceptEditInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the page as it is now",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The draft's new revision"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPackagePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No metadata.author permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version or file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The draft is no longer in Draft, or not the Draft Holder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match is missing or stale: reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused: a published code deleted, renamed or moved, a code taken, an unknown parent, or not a local CodeSystem",
             "content": {
               "application/json": {
                 "schema": {
@@ -2424,6 +2656,66 @@
           }
         }
       },
+      "StudioCodeSystemChange": {
+        "type": "object",
+        "description": "A draft CodeSystem's next version and why, and what its change reaches.",
+        "required": [
+          "url",
+          "path",
+          "bump",
+          "changes",
+          "reaches"
+        ],
+        "properties": {
+          "bump": {
+            "$ref": "#/components/schemas/SemverBump",
+            "description": "The bump its changes need together."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioElementChange"
+            },
+            "description": "Each change, with the bump it needs and a plain line for why."
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version its change calls for; none when it was never published."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its file in the draft."
+          },
+          "published": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version in the package's previous published version; none when never published."
+          },
+          "reaches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReach"
+            },
+            "description": "Each ValueSet drawing on it, with the codes it gains or loses."
+          },
+          "url": {
+            "type": "string",
+            "description": "Its canonical URL."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version as saved."
+          }
+        }
+      },
       "StudioCodeSystems": {
         "type": "object",
         "description": "The code systems, this package's own first.",
@@ -2498,6 +2790,7 @@
           "inactive",
           "parents",
           "children",
+          "fixed",
           "valueSets"
         ],
         "properties": {
@@ -2529,6 +2822,10 @@
             ],
             "description": "Its display."
           },
+          "fixed": {
+            "type": "boolean",
+            "description": "Whether it is published: the package's previous published version holds it, so it cannot\nbe deleted, have its code changed or move, only be retired (#524)."
+          },
           "inactive": {
             "type": "boolean",
             "description": "Whether it is inactive (retired)."
@@ -2548,6 +2845,74 @@
             "description": "The ValueSets that contain it."
           }
         }
+      },
+      "StudioConceptEditInput": {
+        "type": "object",
+        "description": "One edit to a draft CodeSystem's concepts.",
+        "required": [
+          "path",
+          "edit",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code: the new one to add, or the one to change, delete or retire."
+          },
+          "definition": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its definition, for an add or a change."
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display, for an add or a change."
+          },
+          "edit": {
+            "$ref": "#/components/schemas/StudioConceptEditKind",
+            "description": "What the edit does."
+          },
+          "newCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a change, the code from now on (only a new code's may change); the same code if none."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why, for reviewers: it joins the draft's discussion, naming the CodeSystem."
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The code it goes under, for an add or a change; the top level if none."
+          },
+          "path": {
+            "type": "string",
+            "description": "The CodeSystem's file in the draft."
+          }
+        }
+      },
+      "StudioConceptEditKind": {
+        "type": "string",
+        "description": "What an edit does.",
+        "enum": [
+          "add",
+          "change",
+          "delete",
+          "retire"
+        ]
       },
       "StudioConceptPage": {
         "type": "object",
@@ -3627,6 +3992,43 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "StudioReach": {
+        "type": "object",
+        "description": "A ValueSet drawing on the CodeSystem, and what the CodeSystem's change does to it.",
+        "required": [
+          "valueSet",
+          "gained",
+          "lost",
+          "boundBy"
+        ],
+        "properties": {
+          "boundBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioBinding"
+            },
+            "description": "The form questions that bind it."
+          },
+          "gained": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCode"
+            },
+            "description": "The codes it gains for new forms."
+          },
+          "lost": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCode"
+            },
+            "description": "The codes it loses for new forms (retired or removed): records that hold them still\nresolve."
+          },
+          "valueSet": {
+            "$ref": "#/components/schemas/StudioValueSet",
+            "description": "The ValueSet."
           }
         }
       },

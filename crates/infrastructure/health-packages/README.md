@@ -47,6 +47,7 @@ Layer: **infrastructure**. Published Definition packages on disk and in transit 
 - **A ValueSet's `expansion`** is its pinned expansion. Nested `contains` are flattened, and abstract headings without a code are skipped.
 - **A CodeSystem without `caseSensitive`** is taken as case-sensitive, the stricter reading.
 - **ConceptMaps are R5:** a group's `source` and `target` lose any `|version`, and `noMap` is a target with no code, `not-related-to`.
+- **`concepts::apply(code_system, edit, published, previous)`** (#524) makes one Studio edit to a local CodeSystem's concepts (add, change, delete, retire), refusing a published code deleted, renamed or moved; retiring sets the concept's `status` to `retired` and declares the property. It gives the CodeSystem the version `concepts::versioning(previous, current)` works out from `bump::changes` against its previous published version.
 - **`terminology::catalogue(files)`** (#523) lists a package's CodeSystems and ValueSets (path, url, version, name, title) and every Questionnaire question that binds a ValueSet (`answerValueSet`), nested ones included, for the Studio's terminology browser.
 - **Refused, never skipped:** a resource without its `url`, an unknown `content` or filter operator, a filter without its parts, a concept or listed code without its code, a group without its source and target, and an unknown relationship (`Error::Terminology`). Files that are not top-level JSON resources of those types are left alone.
 
@@ -93,7 +94,7 @@ A compact JWS with a detached payload (RFC 7515 Appendix F): `<header>..<signatu
   - `type`, `answerValueSet`, `definition` (the extraction target), `code` and `enableWhen` are major.
 - **CodeSystem** concepts, by `code` at any depth:
   - removed is major, added minor, and under another parent major;
-  - `display`, `definition` and designations need a patch, and a concept's properties a minor;
+  - `display` and designations need a patch, and so does a definition given where there was none; a changed or removed definition is major (it redefines the code; terminology.md, #524); a concept's properties need a minor;
   - property and filter definitions: removed is major, added minor.
 - **ValueSet** `compose`:
   - `include` rules are matched by everything but their codes: removed or shrinking is major, added or growing minor;

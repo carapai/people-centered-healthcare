@@ -775,3 +775,55 @@ fn the_change_against_published_lists_added_and_removed_codes() {
     assert_eq!(merged.value_set_references().len(), 3);
     assert_eq!(merged.code_systems().len(), 1);
 }
+
+// Editing a local CodeSystem (#524).
+
+#[test]
+fn a_retired_code_leaves_new_form_expansions_and_still_resolves() {
+    let mut terminology = terminology();
+    let mut next = signs("1.1.0");
+    next.concepts[0].children[1].properties.push(Property {
+        code: "status".into(),
+        value: PropertyValue::Code("retired".into()),
+    });
+    terminology.add_code_system(next);
+    let forms = ExpandRequest {
+        active_only: true,
+        ..ExpandRequest::default()
+    };
+    let offered = terminology.expand(DANGER, &forms).expect("expand");
+    assert!(!codes(&offered).contains(&"fits"), "{:?}", codes(&offered));
+    // Records that hold it still resolve against the code system.
+    let found = terminology.lookup(SIGNS, None, "fits").expect("lookup");
+    assert!(found.concept.is_inactive());
+    assert_eq!(
+        terminology
+            .validate_in_code_system(SIGNS, None, "fits", None)
+            .expect("validate"),
+        Validation::Valid {
+            display: Some("Convulsions".into())
+        }
+    );
+}
+
+#[test]
+fn a_draft_code_system_is_swapped_for_its_published_one_and_value_sets_on_it_are_found() {
+    let mut terminology = terminology();
+    terminology.add_value_set(value_set(
+        "https://health.go.ug/fhir/ValueSet/icd",
+        vec![rule(ICD)],
+        vec![],
+    ));
+    assert_eq!(
+        terminology.value_sets_on(SIGNS),
+        [format!("{DANGER}|1.0.0")]
+    );
+    let mut draft = signs("1.1.0");
+    draft.concepts[1].code = "review".into();
+    terminology.add_code_system(draft);
+    assert!(terminology.lookup(SIGNS, None, "review").is_ok());
+    terminology.remove_code_system(SIGNS, Some("1.1.0"));
+    assert!(terminology.lookup(SIGNS, None, "routine").is_ok());
+    terminology.remove_code_system(SIGNS, Some("1.0.0"));
+    assert!(terminology.code_systems().is_empty());
+}

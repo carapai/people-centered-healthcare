@@ -1428,3 +1428,228 @@ async fn the_decision_table_editor_tries_a_patient_and_checks_the_draft_table() 
     .await;
     assert_eq!(status, 403);
 }
+
+// Editing a local CodeSystem's concepts (#524).
+
+#[tokio::test]
+async fn a_local_code_system_is_edited_code_by_code_and_its_version_follows() {
+    let (publications, _dir) = publications().await;
+    let mut published_signs = signs("1.0.0", &[]);
+    published_signs["concept"][0]["concept"][1]["definition"] = json!("Fits of any kind");
+    let under_bleeding = json!({ "include": [{ "system": SIGNS,
+        "filter": [{ "property": "concept", "op": "is-a", "value": "bleeding" }] }] });
+    publish(
+        &publications,
+        &terminology_package(
+            "ug.moh.anc",
+            "1.0.0",
+            "program",
+            &[
+                published_signs,
+                danger("1.0.0", under_bleeding),
+                form("1.0.0"),
+            ],
+        ),
+    )
+    .await;
+    let ann = || subject("ann", &[AUTHOR]);
+    let (status, page) = call(
+        &publications,
+        ann(),
+        "POST",
+        "/drafts",
+        Some(json!({ "copyOf": "ug.moh.anc@1.0.0" })),
+    )
+    .await;
+    assert_eq!(status, 201, "{page}");
+    let draft = page["package"]["id"].as_str().expect("id").to_owned();
+    let base = format!("/packages/{draft}/terminology");
+    let path = "CodeSystem-anc-signs.json";
+    let change_of = || format!("{base}/code-system-change?path={path}");
+    let (_, mut tag, _) = send(
+        &publications,
+        ann(),
+        "GET",
+        &format!("/packages/{draft}"),
+        None,
+        None,
+    )
+    .await;
+    let codes = |list: &Value| -> Vec<String> {
+        list.as_array()
+            .expect("codes")
+            .iter()
+            .map(|c| c["code"].as_str().expect("code").to_owned())
+            .collect()
+    };
+
+    // As copied, nothing changed.
+    let (status, change) = call(&publications, ann(), "GET", &change_of(), None).await;
+    assert_eq!(status, 200, "{change}");
+    assert_eq!(
+        (&change["published"], &change["next"], &change["bump"]),
+        (&json!("1.0.0"), &json!("1.0.0"), &json!("none"))
+    );
+    assert_eq!(change["reaches"][0]["valueSet"]["url"], DANGER);
+    assert_eq!(change["reaches"][0]["gained"], json!([]));
+
+    // An edit needs If-Match, like any save.
+    let edit = format!("{base}/edit");
+    let spotting = json!({ "path": path, "edit": "add", "code": "spotting", "display": "Spotting",
+        "parent": "bleeding", "note": "IMCI 2024 adds this sign" });
+    let (status, _, _) = send(
+        &publications,
+        ann(),
+        "POST",
+        &edit,
+        None,
+        Some(spotting.clone()),
+    )
+    .await;
+    assert_eq!(status, 412);
+
+    // Adding a code under bleeding: minor, and the is-a ValueSet on bleeding gains it.
+    let (status, next, page) = send(
+        &publications,
+        ann(),
+        "POST",
+        &edit,
+        tag.as_deref(),
+        Some(spotting),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    assert_ne!(next, tag, "the revision moves on");
+    tag = next;
+    let note = page["history"]
+        .as_array()
+        .expect("history")
+        .iter()
+        .find(|r| r["step"] == "commented")
+        .expect("the note is in the discussion");
+    assert_eq!(
+        note["text"],
+        "Added code spotting under bleeding: IMCI 2024 adds this sign"
+    );
+    assert_eq!(note["about"], path);
+    let (_, change) = call(&publications, ann(), "GET", &change_of(), None).await;
+    assert_eq!(
+        (&change["version"], &change["next"], &change["bump"]),
+        (&json!("1.1.0"), &json!("1.1.0"), &json!("minor"))
+    );
+    assert_eq!(change["changes"][0]["summary"], "Code spotting added");
+    let reach = &change["reaches"][0];
+    assert_eq!(reach["valueSet"]["url"], DANGER);
+    assert_eq!(codes(&reach["gained"]), ["spotting"]);
+    assert_eq!(reach["boundBy"][0]["linkId"], "danger");
+
+    // A published code is fixed: not deleted, nor its code changed.
+    let (_, fits) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concept?system={SIGNS}&code=fits"),
+        None,
+    )
+    .await;
+    assert_eq!(fits["fixed"], true);
+    let (_, new) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concept?system={SIGNS}&code=spotting"),
+        None,
+    )
+    .await;
+    assert_eq!(new["fixed"], false);
+    for refused in [
+        json!({ "path": path, "edit": "delete", "code": "fits" }),
+        json!({ "path": path, "edit": "change", "code": "fits", "newCode": "seizures",
+                "display": "Convulsions", "definition": "Fits of any kind", "parent": "danger" }),
+    ] {
+        let (status, _, problem) = send(
+            &publications,
+            ann(),
+            "POST",
+            &edit,
+            tag.as_deref(),
+            Some(refused),
+        )
+        .await;
+        assert_eq!(status, 422, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .expect("detail")
+                .contains("published")
+        );
+    }
+
+    // Retiring one: kept, so records still resolve, but new forms no longer get it.
+    let (status, next, page) = send(
+        &publications,
+        ann(),
+        "POST",
+        &edit,
+        tag.as_deref(),
+        Some(json!({ "path": path, "edit": "retire", "code": "heavy-bleeding" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    tag = next;
+    let (status, retired) = call(
+        &publications,
+        ann(),
+        "GET",
+        &format!("{base}/concept?system={SIGNS}&code=heavy-bleeding"),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{retired}");
+    assert_eq!(retired["inactive"], true);
+    let (_, change) = call(&publications, ann(), "GET", &change_of(), None).await;
+    assert_eq!(change["bump"], "minor");
+    assert_eq!(codes(&change["reaches"][0]["lost"]), ["heavy-bleeding"]);
+    assert_eq!(codes(&change["reaches"][0]["gained"]), ["spotting"]);
+
+    // A new code is deleted freely.
+    let (status, next, page) = send(
+        &publications,
+        ann(),
+        "POST",
+        &edit,
+        tag.as_deref(),
+        Some(json!({ "path": path, "edit": "delete", "code": "spotting" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    tag = next;
+
+    // Redefining a published code: major, with the reason.
+    let (status, _, page) = send(
+        &publications,
+        ann(),
+        "POST",
+        &edit,
+        tag.as_deref(),
+        Some(
+            json!({ "path": path, "edit": "change", "code": "fits", "display": "Convulsions",
+                     "definition": "Generalised fits only", "parent": "danger" }),
+        ),
+    )
+    .await;
+    assert_eq!(status, 200, "{page}");
+    let (_, change) = call(&publications, ann(), "GET", &change_of(), None).await;
+    assert_eq!(
+        (&change["version"], &change["next"], &change["bump"]),
+        (&json!("2.0.0"), &json!("2.0.0"), &json!("major"))
+    );
+    let reason = change["changes"]
+        .as_array()
+        .expect("changes")
+        .iter()
+        .find(|c| c["bump"] == "major")
+        .expect("a major change");
+    assert_eq!(reason["summary"], "Code fits: definition changed");
+    assert_eq!(reason["at"], "concept[fits].definition");
+}

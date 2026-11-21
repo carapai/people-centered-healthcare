@@ -2121,6 +2121,41 @@ type TerminologyValues = {
   tbStale: {}
   tbReload: {}
   tbSaveFailed: { reason: string }
+  ceAddCode: {}
+  ceAddUnder: {}
+  ceAddHeading: {}
+  ceAddUnderHeading: { code: string }
+  ceEditHeading: { code: string }
+  ceCode: {}
+  ceCodeFixed: {}
+  ceDisplay: {}
+  ceDefinition: {}
+  ceParent: {}
+  ceParentHint: {}
+  ceNote: {}
+  ceNoteHint: {}
+  ceAdd: {}
+  ceSave: {}
+  ceCancel: {}
+  ceDelete: { code: string }
+  ceRetire: { code: string }
+  ceRetired: {}
+  ceRetiredHint: {}
+  ceFailed: { reason: string }
+  ceSaved: {}
+  ceVersion: {}
+  ceVersionFirst: { version: string }
+  ceVersionSame: { published: string }
+  ceVersionNext: { next: string; published: string; bump: string }
+  ceReaches: {}
+  ceReachesNone: {}
+  ceReachValueSet: { title: string; package: string }
+  ceGains: { codes: string }
+  ceLoses: { codes: string }
+  ceLosesHint: {}
+  ceReachSame: {}
+  ceReachBinding: { form: string; linkId: string }
+  ceReachUnbound: {}
 }
 
 // The Studio's terminology browser (features/studio/terminology, #523).
@@ -2201,6 +2236,46 @@ export const terminologyMessages = defineMessages<TerminologyValues>({
   tbStale: { id: 'app.studio.terminology.stale', defaultMessage: 'Someone saved this draft since you opened it, so nothing was saved. Reload to see their change.', description: 'Studio: 412 on save' },
   tbReload: { id: 'app.studio.terminology.reload', defaultMessage: 'Reload', description: 'Studio: reload after a refused save' },
   tbSaveFailed: { id: 'app.studio.terminology.saveFailed', defaultMessage: 'The ValueSet was not saved: {reason}', description: 'Studio: save failed' },
+  // Editing a local CodeSystem's concepts (#524).
+  ceAddCode: { id: 'app.studio.terminology.addCode', defaultMessage: 'Add a code', description: 'Studio: add a top-level code to a local CodeSystem' },
+  ceAddUnder: { id: 'app.studio.terminology.addUnder', defaultMessage: '+ under', description: 'Studio: add a code under this concept (its code follows, for screen readers)' },
+  ceAddHeading: { id: 'app.studio.terminology.addHeading', defaultMessage: 'New code', description: 'Studio: heading of the form adding a top-level code' },
+  ceAddUnderHeading: { id: 'app.studio.terminology.addUnderHeading', defaultMessage: 'New code under {code}', description: 'Studio: heading of the form adding a code under another' },
+  ceEditHeading: { id: 'app.studio.terminology.editHeading', defaultMessage: 'Code {code}', description: 'Studio: heading of the concept form' },
+  ceCode: { id: 'app.studio.terminology.code', defaultMessage: 'Code', description: 'Studio: concept form field' },
+  ceCodeFixed: { id: 'app.studio.terminology.codeFixed', defaultMessage: 'Published: its code and parent are fixed. It can be retired, not deleted.', description: 'Studio: why a published code cannot be renamed, moved or deleted' },
+  ceDisplay: { id: 'app.studio.terminology.display', defaultMessage: 'Display', description: 'Studio: concept form field' },
+  ceDefinition: { id: 'app.studio.terminology.definition', defaultMessage: 'Definition', description: 'Studio: concept form field' },
+  ceParent: { id: 'app.studio.terminology.parent', defaultMessage: 'Parent code', description: 'Studio: concept form field' },
+  ceParentHint: { id: 'app.studio.terminology.parentHint', defaultMessage: 'Empty for a top-level code.', description: 'Studio: concept form hint' },
+  ceNote: { id: 'app.studio.terminology.note', defaultMessage: 'Note for reviewers', description: 'Studio: optional note on a concept change' },
+  ceNoteHint: { id: 'app.studio.terminology.noteHint', defaultMessage: 'Optional: why, for example “IMCI 2024 adds this sign”. It goes to the draft\'s discussion.', description: 'Studio: concept change note hint' },
+  ceAdd: { id: 'app.studio.terminology.add', defaultMessage: 'Add the code', description: 'Studio: submit a new code' },
+  ceSave: { id: 'app.studio.terminology.saveCode', defaultMessage: 'Save the code', description: 'Studio: save a changed code' },
+  ceCancel: { id: 'app.studio.terminology.cancel', defaultMessage: 'Cancel', description: 'Studio: close the new code form' },
+  ceDelete: { id: 'app.studio.terminology.delete', defaultMessage: 'Delete {code}', description: 'Studio: delete a new code' },
+  ceRetire: { id: 'app.studio.terminology.retire', defaultMessage: 'Retire {code}', description: 'Studio: retire a published code' },
+  ceRetired: { id: 'app.studio.terminology.retired', defaultMessage: 'Retired', description: 'Studio: a retired code' },
+  ceRetiredHint: { id: 'app.studio.terminology.retiredHint', defaultMessage: 'Retired: records that hold it still resolve, and new forms no longer offer it.', description: 'Studio: what retiring a code means' },
+  ceFailed: { id: 'app.studio.terminology.codeFailed', defaultMessage: 'The code was not saved: {reason}', description: 'Studio: a concept edit failed' },
+  ceSaved: { id: 'app.studio.terminology.codeSaved', defaultMessage: 'Saved.', description: 'Studio: a concept edit was saved' },
+  ceVersion: { id: 'app.studio.terminology.version', defaultMessage: 'Version', description: 'Studio: heading of the code system\'s next version' },
+  ceVersionFirst: { id: 'app.studio.terminology.versionFirst', defaultMessage: 'Never published: it keeps its version {version}.', description: 'Studio: a code system never published' },
+  ceVersionSame: { id: 'app.studio.terminology.versionSame', defaultMessage: 'No change from the published {published}.', description: 'Studio: no change against published' },
+  ceVersionNext: {
+    id: 'app.studio.terminology.versionNext',
+    defaultMessage: 'Next version {next}, {bump, select, patch {a patch} minor {a minor version} major {a major version} other {no new version}} from the published {published}, because:',
+    description: 'Studio: the next version of a code system and its bump',
+  },
+  ceReaches: { id: 'app.studio.terminology.reaches', defaultMessage: 'What it reaches', description: 'Studio: heading of the ValueSets a code system change reaches' },
+  ceReachesNone: { id: 'app.studio.terminology.reachesNone', defaultMessage: 'No ValueSet draws on this code system.', description: 'Studio: nothing reached' },
+  ceReachValueSet: { id: 'app.studio.terminology.reachValueSet', defaultMessage: '{title} ({package})', description: 'Studio: a ValueSet reached' },
+  ceGains: { id: 'app.studio.terminology.gains', defaultMessage: 'Gains {codes}', description: 'Studio: codes a ValueSet gains' },
+  ceLoses: { id: 'app.studio.terminology.loses', defaultMessage: 'Loses {codes}', description: 'Studio: codes a ValueSet loses' },
+  ceLosesHint: { id: 'app.studio.terminology.losesHint', defaultMessage: 'Records that hold them still resolve; new forms no longer offer them.', description: 'Studio: what losing a code means' },
+  ceReachSame: { id: 'app.studio.terminology.reachSame', defaultMessage: 'No change for new forms.', description: 'Studio: a ValueSet that neither gains nor loses' },
+  ceReachBinding: { id: 'app.studio.terminology.reachBinding', defaultMessage: 'Bound by {form}, question {linkId}', description: 'Studio: a form binding a reached ValueSet' },
+  ceReachUnbound: { id: 'app.studio.terminology.reachUnbound', defaultMessage: 'No form binds it.', description: 'Studio: a reached ValueSet no form binds' },
 })
 
 type WorkflowValues = {
