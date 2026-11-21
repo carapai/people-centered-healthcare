@@ -142,6 +142,41 @@ async fn an_indicator_without_a_period_date_fails_validation() {
     );
 }
 
+/// Two indicators that refer to each other fail validation (#550): each would need the other's
+/// membership first.
+#[tokio::test]
+async fn indicators_that_refer_to_each_other_fail_validation() {
+    let mut files = files(&root().join("anc"));
+    let refer = |files: &mut Files, path: &str, to: &str| {
+        let mut measure: Value = serde_json::from_slice(&files[path]).expect("measure");
+        let criteria = &mut measure["group"][0]["population"][0]["criteria"]["expression"];
+        *criteria = Value::String(format!(
+            "{} and '{to}' in %indicators.numerator",
+            criteria.as_str().expect("criteria")
+        ));
+        files.insert(path.into(), measure.to_string().into_bytes());
+    };
+    refer(
+        &mut files,
+        "Measure-anc-first-visits.json",
+        "https://health.go.ug/fhir/Measure/anc-visits|1.0.0",
+    );
+    refer(
+        &mut files,
+        "Measure-anc-visits.json",
+        "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0",
+    );
+    assert_eq!(
+        submitted_files(&files, "ug.moh.anc@1.0.0").await,
+        (
+            Stage::Draft,
+            vec![
+                "Measure-anc-first-visits.json, Measure-anc-visits.json: the indicators https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0, https://health.go.ug/fhir/Measure/anc-visits|1.0.0 refer to each other in a circle".to_owned(),
+            ]
+        )
+    );
+}
+
 /// The Workflow Definition Library at `library` holds exactly the readable source `source`.
 fn holds_its_source(library: &str, source: &str) {
     let library: Value =

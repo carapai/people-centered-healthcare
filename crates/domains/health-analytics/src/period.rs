@@ -149,7 +149,36 @@ impl Period {
     pub fn contains(&self, date: Date) -> bool {
         self.start <= date && date <= self.end
     }
+
+    /// The first days of the `n` periods of its type before this one, the nearest first: a
+    /// date is in the previous `n` periods when it is on or after the `n`th and before this
+    /// period's start (#550).
+    pub fn previous_starts(&self, n: usize) -> Vec<Date> {
+        let step = match self.kind {
+            PeriodType::Weekly => jiff::Span::new().weeks(1),
+            PeriodType::Monthly => jiff::Span::new().months(1),
+            PeriodType::Quarterly => jiff::Span::new().months(3),
+            PeriodType::SemiAnnual => jiff::Span::new().months(6),
+            PeriodType::Annual | PeriodType::FinancialJuly => jiff::Span::new().years(1),
+        };
+        let mut starts = Vec::with_capacity(n);
+        let mut start = self.start;
+        while starts.len() < n {
+            match start.checked_sub(step) {
+                Ok(earlier) => {
+                    starts.push(earlier);
+                    start = earlier;
+                }
+                Err(_) => break,
+            }
+        }
+        starts
+    }
 }
+
+/// How many periods back *in the previous N periods* can reach: `%previousPeriods.start` holds
+/// this many starts.
+pub const PREVIOUS_PERIODS: usize = 60;
 
 /// The local date a FHIR `date` or `dateTime` was written for: its first ten characters, so care
 /// at 23:30 on 31 March in the facility's time zone counts toward March. A partial date (a year,
@@ -215,6 +244,36 @@ mod tests {
             assert_eq!(error.example, kind.example());
             assert!(error.to_string().contains(id));
         }
+    }
+
+    #[test]
+    fn the_previous_periods_start_one_period_of_its_type_apart() {
+        let starts = |kind, id, n| -> Vec<String> {
+            Period::parse(kind, id)
+                .expect("period")
+                .previous_starts(n)
+                .iter()
+                .map(ToString::to_string)
+                .collect()
+        };
+        assert_eq!(
+            starts(PeriodType::Monthly, "2026-03", 3),
+            ["2026-02-01", "2026-01-01", "2025-12-01"]
+        );
+        assert_eq!(
+            starts(PeriodType::Weekly, "2026W10", 2),
+            ["2026-02-23", "2026-02-16"]
+        );
+        assert_eq!(
+            starts(PeriodType::Quarterly, "2026Q1", 2),
+            ["2025-10-01", "2025-07-01"]
+        );
+        assert_eq!(starts(PeriodType::SemiAnnual, "2026S1", 1), ["2025-07-01"]);
+        assert_eq!(starts(PeriodType::Annual, "2026", 1), ["2025-01-01"]);
+        assert_eq!(
+            starts(PeriodType::FinancialJuly, "2025July", 2),
+            ["2024-07-01", "2023-07-01"]
+        );
     }
 
     #[test]

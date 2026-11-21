@@ -6,7 +6,9 @@
 //! `test-patient`). The answer is the value with what roll-up needs (the count or numerator,
 //! the denominator, the values' count, sum, minimum and maximum) and every test patient, counted
 //! or not, with each record's part: why they are counted or not, its value, and whether that
-//! value was the one taken (#549).
+//! value was the one taken (#549). Criteria may read `%periodStart`, `%periodEnd` and
+//! `%previousPeriods`, and refer to another indicator of the package by `url|version`
+//! (`%indicators`), which is evaluated over the same period and test patients first (#550).
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -14,7 +16,9 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use health_access_policy::Subject;
 use health_analytics::{Calculation, Observed, Period, PeriodType, Reason};
-use health_analytics_app::{PatientRecords, evaluate, is_test_patient, measure, test_patient};
+use health_analytics_app::{
+    Library, PatientRecords, evaluate, is_test_patient, measure, test_patient,
+};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -222,7 +226,7 @@ fn shown(reason: &Reason) -> (StudioRecordReason, Option<String>) {
 
 /// Documents and serves *Try*.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/indicators/try", tag = "studio", operation_id = "tryStudioIndicator",
-    description = "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
+    description = "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
     params(("id" = String, Path, description = "`name@version`")),
     request_body = StudioIndicatorTryInput,
     responses(
@@ -230,7 +234,7 @@ fn shown(reason: &Reason) -> (StudioRecordReason, Option<String>) {
         (status = 401, description = "Not signed in", body = StudioProblem),
         (status = 403, description = "No Studio permission", body = StudioProblem),
         (status = 404, description = "No such package version", body = StudioProblem),
-        (status = 422, description = "The Measure is not a usable indicator, or the period is not one of its type", body = StudioProblem),
+        (status = 422, description = "The Measure is not a usable indicator, the period is not one of its type, or it refers to an indicator the package does not hold or in a circle", body = StudioProblem),
         (status = 500, description = "The package store failed", body = StudioProblem),
     ))]
 pub(crate) async fn try_indicator(
@@ -261,13 +265,18 @@ pub(crate) async fn try_indicator(
     };
     let mut errors = Vec::new();
     let mut tested = Vec::new();
+    let mut indicators = Vec::new();
     for (path, bytes) in &files {
-        if !path.starts_with("tests/") || !path.ends_with(".json") {
-            continue;
-        }
         let Ok(file) = serde_json::from_slice::<Value>(bytes) else {
             continue;
         };
+        if file["resourceType"] == "Measure" {
+            indicators.extend(measure(&file).indicator().ok());
+            continue;
+        }
+        if !path.starts_with("tests/") || !path.ends_with(".json") {
+            continue;
+        }
         if !is_test_patient(&file) {
             continue;
         }
@@ -277,7 +286,21 @@ pub(crate) async fn try_indicator(
         }
     }
     let records: Vec<PatientRecords> = tested.iter().map(|(_, t)| t.records.clone()).collect();
-    let count = evaluate(studio.engine.as_ref(), &indicator, &period, &records).await;
+    // The posted Measure stands in for its saved file.
+    indicators.push(indicator.clone());
+    let library = Library::new(indicators);
+    let count = match evaluate(
+        studio.engine.as_ref(),
+        &library,
+        &indicator,
+        &period,
+        &records,
+    )
+    .await
+    {
+        Ok(count) => count,
+        Err(why) => return unprocessable(why),
+    };
     errors.extend(
         count
             .errors()

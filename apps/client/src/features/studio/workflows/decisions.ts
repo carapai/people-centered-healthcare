@@ -26,17 +26,31 @@ export interface Condition {
   op: Operator
   value: Literal
 }
-export interface Group {
+/** A group of conditions joined by all, any or not. `A` is the other conditions a tree may hold
+ * (an indicator's dates and memberships, `indicators/conditions.ts`); a decision table's hold none. */
+export interface Group<A = never> {
   kind: 'group'
   join: Join
-  children: Node[]
+  children: Node<A>[]
 }
 /** An expression the editor did not write, kept as FHIRPath text. */
 export interface Raw {
   kind: 'fhirpath'
   expression: string
 }
-export type Node = Condition | Group | Raw
+export type Node<A = never> = Condition | Group<A> | Raw | A
+
+/** How a tree's other conditions are written and read back: `compile` writes one, and `read`
+ * recognises one at the start of `rest`, with the length of its text. */
+export interface Atoms<A> {
+  compile: (atom: A) => string
+  read: (rest: string) => { atom: A; length: number } | null
+}
+
+const OWN_KINDS = new Set(['condition', 'group', 'fhirpath'])
+
+/** Whether `node` is one of the tree's other conditions. */
+export const isAtom = <A>(node: Node<A>): node is A => !OWN_KINDS.has((node as { kind: string }).kind)
 
 export interface Rule {
   name: string
@@ -81,35 +95,53 @@ export const inputsOf = (definition: WorkflowDefinition): string[] => [...new Se
 
 const literalText = (value: Literal): string => (typeof value === 'string' ? `'${value.replaceAll('\\', '\\\\').replaceAll("'", String.raw`\'`)}'` : String(value))
 
-/** A node as FHIRPath. An empty group holds. */
-export function compile(node: Node): string {
-  if (node.kind === 'condition') return `${node.input} ${node.op} ${literalText(node.value)}`
-  if (node.kind === 'fhirpath') return node.expression
-  if (node.children.length === 0) return 'true'
-  const many = node.children.length > 1 || node.join === 'not'
-  const parts = node.children.map((child) => {
-    const text = compile(child)
-    const nested = (child.kind === 'group' && child.join !== 'not' && child.children.length > 1) || child.kind === 'fhirpath'
+/** A node as FHIRPath. An empty group holds. Other conditions are written by `atoms`. */
+export function compile<A = never>(node: Node<A>, atoms?: Atoms<A>): string {
+  if (isAtom(node)) {
+    if (atoms === undefined) throw new Error('a condition the tree cannot write')
+    return atoms.compile(node)
+  }
+  const own = node as Condition | Group<A> | Raw
+  if (own.kind === 'condition') return `${own.input} ${own.op} ${literalText(own.value)}`
+  if (own.kind === 'fhirpath') return own.expression
+  if (own.children.length === 0) return 'true'
+  const many = own.children.length > 1 || own.join === 'not'
+  const parts = own.children.map((child) => {
+    const text = compile(child, atoms)
+    const kind = (child as { kind: string }).kind
+    const nested = (kind === 'group' && (child as Group<A>).join !== 'not' && (child as Group<A>).children.length > 1) || kind === 'fhirpath'
     return many && nested ? `(${text})` : text
   })
-  if (node.join === 'all') return parts.join(' and ')
-  if (node.join === 'any') return parts.join(' or ')
+  if (own.join === 'all') return parts.join(' and ')
+  if (own.join === 'any') return parts.join(' or ')
   return `(${parts.join(' or ')}).not()`
 }
 
 // ---------------------------------------------------------------------------------------------
 // Parsing FHIRPath back into a tree: only what `compile` writes.
 
-type Token = { t: 'open' | 'close' | 'not' | 'and' | 'or' | 'true' | 'false' } | { t: 'op'; v: Operator } | { t: 'input'; v: string } | { t: 'number'; v: number } | { t: 'string'; v: string }
+type Token<A> =
+  | { t: 'open' | 'close' | 'not' | 'and' | 'or' | 'true' | 'false' }
+  | { t: 'op'; v: Operator }
+  | { t: 'input'; v: string }
+  | { t: 'number'; v: number }
+  | { t: 'string'; v: string }
+  | { t: 'atom'; v: A }
 
-function tokenize(text: string): Token[] | null {
-  const out: Token[] = []
+function tokenize<A>(text: string, atoms?: Atoms<A>): Token<A>[] | null {
+  const out: Token<A>[] = []
   let at = 0
   while (at < text.length) {
     const rest = text.slice(at)
     const space = /^\s+/.exec(rest)
     if (space !== null) {
       at += space[0].length
+      continue
+    }
+    const atom = atoms?.read(rest) ?? null
+    if (atom !== null) {
+      out.push({ t: 'atom', v: atom.atom })
+      at += atom.length
       continue
     }
     if (rest.startsWith('.not()')) {
@@ -169,13 +201,13 @@ function tokenize(text: string): Token[] | null {
   return out
 }
 
-class Parser {
+class Parser<A> {
   at = 0
-  constructor(readonly tokens: Token[]) {}
+  constructor(readonly tokens: Token<A>[]) {}
   peek = () => this.tokens[this.at]
   next = () => this.tokens[this.at++]
 
-  expr(): Node | null {
+  expr(): Node<A> | null {
     const first = this.and()
     if (first === null) return null
     const children = [first]
@@ -188,7 +220,7 @@ class Parser {
     return children.length === 1 ? first : { kind: 'group', join: 'any', children }
   }
 
-  and(): Node | null {
+  and(): Node<A> | null {
     const first = this.unary()
     if (first === null) return null
     const children = [first]
@@ -201,18 +233,23 @@ class Parser {
     return children.length === 1 ? first : { kind: 'group', join: 'all', children }
   }
 
-  unary(): Node | null {
+  unary(): Node<A> | null {
     const token = this.peek()
+    if (token?.t === 'atom') {
+      this.next()
+      return token.v
+    }
     if (token?.t === 'open') {
       this.next()
       const inner = this.expr()
       if (inner === null || this.next()?.t !== 'close') return null
       if (this.peek()?.t === 'not') {
         this.next()
+        const any = !isAtom(inner) && inner.kind === 'group' && inner.join === 'any'
         return {
           kind: 'group',
           join: 'not',
-          children: inner.kind === 'group' && inner.join === 'any' ? inner.children : [inner],
+          children: any ? (inner as Group<A>).children : [inner],
         }
       }
       // A parenthesised group stays a group of its own.
@@ -234,10 +271,11 @@ class Parser {
   }
 }
 
-/** The tree `expression` holds: what `compile` wrote, or the text kept as FHIRPath. */
-export function parse(expression: string): Group {
-  const tokens = tokenize(expression)
-  const parser = tokens === null ? null : new Parser(tokens)
+/** The tree `expression` holds: what `compile` wrote, or the text kept as FHIRPath. Other
+ * conditions are read by `atoms`. */
+export function parse<A = never>(expression: string, atoms?: Atoms<A>): Group<A> {
+  const tokens = tokenize(expression, atoms)
+  const parser = tokens === null ? null : new Parser<A>(tokens)
   const node = parser?.expr() ?? null
   if (node === null || parser === null || parser.at !== parser.tokens.length)
     return {
@@ -245,7 +283,7 @@ export function parse(expression: string): Group {
       join: 'all',
       children: [{ kind: 'fhirpath', expression }],
     }
-  return node.kind === 'group' ? node : { kind: 'group', join: 'all', children: [node] }
+  return !isAtom(node) && node.kind === 'group' ? (node as Group<A>) : { kind: 'group', join: 'all', children: [node] }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -257,7 +295,7 @@ type EngineRow = DecisionTable['rows'][number]
  * one tree. */
 export function readRules(table: DecisionTable): Rule[] {
   return table.rows.map((row, n) => {
-    const trees = row.when.map(parse)
+    const trees = row.when.map((when) => parse(when))
     const tree: Group =
       trees.length === 1 && trees[0] !== undefined
         ? trees[0]

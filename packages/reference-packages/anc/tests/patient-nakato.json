@@ -163,6 +163,30 @@
         "system": "http://unitsofmeasure.org",
         "code": "wk"
       }
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "nakato-next-1",
+      "status": "booked",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/nakato"
+      },
+      "start": "2026-04-28T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/nakato"
+          },
+          "status": "accepted"
+        }
+      ]
     }
   ]
 }

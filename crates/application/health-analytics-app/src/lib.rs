@@ -21,15 +21,24 @@
 //!   the many), and `%periodStart` and `%periodEnd` as the period's
 //!   first and last days (`YYYY-MM-DD`). A record's enrollment is its `episodeOfCare` or its
 //!   `workflow-episodeOfCare` extension.
+//!   `%previousPeriods.start` holds the first days of the [`PREVIOUS_PERIODS`] periods of the
+//!   same type before it, the nearest first (`YYYY-MM-DD`), so *in the previous 3 periods* is
+//!   `d >= %previousPeriods.start[2].toDate() and d < %periodStart.toDate()` (#550).
+//!   `%indicators` holds the other indicators the patient is in, by side
+//!   (`numerator`, `denominator`), each `url|version`: a criterion reads it as
+//!   `'<url>|<version>' in %indicators.numerator`. Those indicators come from a [`Library`] and
+//!   are evaluated over the same period and patients first; a circle is refused (#550).
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 
 use health_analytics::{
     Aggregate, BetweenDefinition, Calculation, Evaluation, Expression, Indicator,
-    MeasureDefinition, Observed, PatientOutcome, Period, PopulationDefinition, RecordOutcome,
-    ValueSource, calculate, local_date,
+    MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS, PatientOutcome, Period,
+    PopulationDefinition, RecordOutcome, Side, ValueSource, calculate, local_date,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 use rust_decimal::Decimal;
@@ -287,15 +296,127 @@ fn enrollment(record: &Value) -> Option<String> {
     })
 }
 
+/// The indicators another indicator's criteria may refer to, by `url|version` (#550).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Library {
+    indicators: BTreeMap<String, Indicator>,
+}
+
+impl Library {
+    /// A library of `indicators`; a later one replaces an earlier one with the same
+    /// `url|version`.
+    pub fn new(indicators: impl IntoIterator<Item = Indicator>) -> Self {
+        Self {
+            indicators: indicators
+                .into_iter()
+                .map(|indicator| (indicator.canonical(), indicator))
+                .collect(),
+        }
+    }
+
+    /// The indicator `measure` (`url|version`) names.
+    pub fn get(&self, measure: &str) -> Option<&Indicator> {
+        self.indicators.get(measure)
+    }
+}
+
+/// For each patient, the other indicators' sides they are in: `%indicators`.
+type Memberships = Vec<BTreeMap<Side, Vec<String>>>;
+
+/// Each patient's membership in the indicators `indicator` refers to, each evaluated over the
+/// same period and patients; `within` is the chain of indicators being evaluated, to refuse a
+/// circle.
+fn memberships<'a>(
+    engine: &'a dyn FhirPathEngine,
+    library: &'a Library,
+    indicator: &'a Indicator,
+    period: &'a Period,
+    patients: &'a [PatientRecords],
+    within: Vec<String>,
+) -> Pin<Box<dyn Future<Output = Result<Memberships, String>> + Send + 'a>> {
+    Box::pin(async move {
+        let mut out: Memberships = vec![BTreeMap::new(); patients.len()];
+        let mut evaluated: BTreeMap<&str, Evaluation> = BTreeMap::new();
+        for reference in &indicator.references {
+            let measure = reference.measure.as_str();
+            let Some(other) = library.get(measure) else {
+                return Err(format!(
+                    "{} refers to the indicator {measure}, which is not available",
+                    indicator.canonical()
+                ));
+            };
+            if within.iter().any(|c| c == measure) {
+                let mut circle = within.clone();
+                circle.push(measure.to_owned());
+                return Err(format!(
+                    "the indicators refer to each other in a circle: {}",
+                    circle.join(" → ")
+                ));
+            }
+            if reference.side == Side::Denominator && !other.calculation.has_denominator() {
+                return Err(format!(
+                    "{} refers to the denominator of {measure}, which has none",
+                    indicator.canonical()
+                ));
+            }
+            if !evaluated.contains_key(measure) {
+                let mut chain = within.clone();
+                chain.push(measure.to_owned());
+                let evaluation =
+                    evaluate_within(engine, library, other, period, patients, chain).await?;
+                evaluated.insert(measure, evaluation);
+            }
+            for (member, sides) in evaluated[measure].members.iter().zip(&mut out) {
+                let is_in = match reference.side {
+                    Side::Numerator => member.count > 0,
+                    Side::Denominator => member.denominator.unwrap_or_default() > 0,
+                };
+                let side = sides.entry(reference.side).or_default();
+                if is_in {
+                    side.push(measure.to_owned());
+                }
+            }
+        }
+        Ok(out)
+    })
+}
+
 /// `indicator` evaluated over `period` from each patient's records: the figure with what
 /// roll-up needs and, for each patient, every record of the indicator's basis with its part in
-/// it.
+/// it. The indicators its criteria refer to are taken from `library` and evaluated over the
+/// same period and patients first; one that is missing, or a circle, is an error.
 pub async fn evaluate(
     engine: &dyn FhirPathEngine,
+    library: &Library,
     indicator: &Indicator,
     period: &Period,
     patients: &[PatientRecords],
-) -> Evaluation {
+) -> Result<Evaluation, String> {
+    evaluate_within(
+        engine,
+        library,
+        indicator,
+        period,
+        patients,
+        vec![indicator.canonical()],
+    )
+    .await
+}
+
+async fn evaluate_within(
+    engine: &dyn FhirPathEngine,
+    library: &Library,
+    indicator: &Indicator,
+    period: &Period,
+    patients: &[PatientRecords],
+    within: Vec<String>,
+) -> Result<Evaluation, String> {
+    let memberships = memberships(engine, library, indicator, period, patients, within).await?;
+    let previous: Vec<String> = period
+        .previous_starts(PREVIOUS_PERIODS)
+        .iter()
+        .map(ToString::to_string)
+        .collect();
     let kinds: Vec<_> = indicator.populations.keys().copied().collect();
     let mut expressions = vec![indicator.period_date.clone()];
     expressions.extend(indicator.populations.values().cloned());
@@ -309,12 +430,21 @@ pub async fn evaluate(
     }
     let distinct = indicator.calculation == Calculation::Value(Aggregate::DistinctCount);
     let mut outcomes = Vec::with_capacity(patients.len());
-    for patient in patients {
+    for (patient, membership) in patients.iter().zip(&memberships) {
+        let sides = |side: Side| membership.get(&side).cloned().unwrap_or_default();
         let variables = BTreeMap::from([
             ("patient".to_owned(), patient.patient.clone()),
             ("records".to_owned(), patient.bundle()),
             ("periodStart".to_owned(), json!(period.start.to_string())),
             ("periodEnd".to_owned(), json!(period.end.to_string())),
+            ("previousPeriods".to_owned(), json!({ "start": previous })),
+            (
+                MEMBERSHIP_VARIABLE.to_owned(),
+                json!({
+                    "numerator": sides(Side::Numerator),
+                    "denominator": sides(Side::Denominator),
+                }),
+            ),
         ]);
         let mut records = Vec::new();
         let candidates = std::iter::once(&patient.patient).chain(&patient.records);
@@ -362,5 +492,5 @@ pub async fn evaluate(
             records,
         });
     }
-    calculate(indicator, period, &outcomes)
+    Ok(calculate(indicator, period, &outcomes))
 }

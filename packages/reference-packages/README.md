@@ -4,7 +4,7 @@ Published Definition packages the platform ships as references (configuration.md
 
 | Package | What | Issue |
 |---|---|---|
-| `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549 |
+| `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*, *ANC 1st visits with the next visit booked*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549, #550 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
 
@@ -18,6 +18,7 @@ Published Definition packages the platform ships as references (configuration.md
 - **`Measure/anc-first-visit-before-12-weeks`** (`proportion`, a percentage): the denominator is the same first visits; the numerator those where the gestational age Observation (LOINC `18185-9`) recorded at the visit, read through `%records`, is under 12 weeks.
 - **`Measure/anc-gestational-age-at-first-visit`** (`continuous-variable`, `median`): the gestational age at the first visit, each woman's first value.
 - **`Measure/anc-visits`** (`cohort`, counting visits): every ANC visit by a woman, first or follow-up.
+- **`Measure/anc-first-visit-next-visit-booked`** (`proportion`, #550): the denominator is the women in *ANC 1st visits*' numerator (`'https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0' in %indicators.numerator`); the numerator those whose booked next visit (an `Appointment`, read through `%records`) is within 4 weeks after the period's end.
 - **Test patients** (`tests/patient-*.json`, `type` `test-patient`), one Patient and their Encounters each, each ANC visit with its EpisodeOfCare (the enrollment) and, where measured, its gestational age:
 
 | Patient | Visits | March 2026 |
@@ -37,6 +38,8 @@ Published Definition packages the platform ships as references (configuration.md
 So March 2026 is 4, April 1 and 2026Q1 6.
 
 Gestational ages at first visits: Akello 16, Nakato 10 (14 at her follow-up), Namubiru 9, Nansubuga 8 then 11 at the duplicate, Auma 12, Atim 13, Nabirye 11. So in March, *ANC 1st visit before 12 weeks* is 3 of 4 (75%) and 2026Q1 3 of 6 (50%); the median gestational age at the first visit is 9.5 (10.5 taking the last value) and 2026Q1 11. *ANC visits* in March is 7 visits by 5 women; January to June, 13 visits by 8 women in 9 pregnancies.
+
+Next visits booked (`Appointment`, status `booked`): Akello 8 April, Nakato 28 April, Auma 15 April, Namubiru 6 May, Nansubuga 30 March (her 10 April one is cancelled). So in March, *ANC 1st visits with the next visit booked* is 2 of 4 (Akello and Nakato, 50%): Namubiru's is 5 weeks after the period's end and Nansubuga's before it.
 
 ## `lab/`: the laboratory test
 

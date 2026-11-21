@@ -100,6 +100,30 @@
         "system": "http://unitsofmeasure.org",
         "code": "wk"
       }
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "akello-next-1",
+      "status": "booked",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/akello"
+      },
+      "start": "2026-04-08T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/akello"
+          },
+          "status": "accepted"
+        }
+      ]
     }
   ]
 }

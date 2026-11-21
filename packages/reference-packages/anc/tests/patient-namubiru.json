@@ -103,6 +103,30 @@
         "system": "http://unitsofmeasure.org",
         "code": "wk"
       }
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "namubiru-next-1",
+      "status": "booked",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/namubiru"
+      },
+      "start": "2026-05-06T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/namubiru"
+          },
+          "status": "accepted"
+        }
+      ]
     }
   ]
 }
