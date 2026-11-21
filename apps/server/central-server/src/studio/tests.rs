@@ -2066,6 +2066,46 @@ async fn try_calculates_a_percentage_and_a_median_with_what_roll_up_needs() {
 }
 
 #[tokio::test]
+async fn try_evaluates_the_indicators_a_draft_refers_to_and_refuses_a_circle() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+    let measure = |file: &str| -> Value { serde_json::from_slice(&files[file]).expect("measure") };
+
+    // Is in ANC 1st visits' numerator, and the next visit is booked within 4 weeks after the
+    // period's end: Akello and Nakato of March's four.
+    let input = json!({
+        "measure": measure("Measure-anc-first-visit-next-visit-booked.json"),
+        "periodType": "monthly",
+        "period": "2026-03",
+    });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        (&body["value"], &body["count"], &body["denominator"]),
+        (&json!(50), &json!(2), &json!(4))
+    );
+    assert_eq!(body["errors"], json!([]));
+
+    // ANC 1st visits edited to require the indicator that requires it: a circle.
+    let mut first = measure("Measure-anc-first-visits.json");
+    first["group"][0]["population"][0]["criteria"]["expression"] = json!(
+        "'https://health.go.ug/fhir/Measure/anc-first-visit-next-visit-booked|1.0.0' in %indicators.denominator"
+    );
+    let input = json!({ "measure": first, "periodType": "monthly", "period": "2026-03" });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 422, "{body}");
+    assert!(
+        body["detail"]
+            .as_str()
+            .is_some_and(|d| d.contains("refer to each other in a circle")),
+        "{body}"
+    );
+}
+
+#[tokio::test]
 async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     let (publications, _dir) = publications().await;
     let files = anc_package();

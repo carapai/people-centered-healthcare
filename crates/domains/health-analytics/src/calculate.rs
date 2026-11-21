@@ -512,6 +512,7 @@ mod tests {
             cumulative: false,
             period_date: "Encounter.actualPeriod.start".into(),
             populations: BTreeMap::new(),
+            references: BTreeSet::new(),
             value: matches!(calculation, Calculation::Value(_)).then(|| IndicatorValue {
                 source: ValueSource::Expression("v".into()),
                 pick: Pick::First,

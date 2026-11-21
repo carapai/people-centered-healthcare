@@ -11,7 +11,9 @@
 //! 100 to 100,000), and a sum, average, median, minimum, maximum or distinct count of a value is
 //! `continuous-variable`, the value being its `measure-observation` with its aggregate method.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::membership::{Reference, references};
 
 /// The FHIRPath expression language, as a FHIR `Expression.language`.
 pub const FHIRPATH: &str = "text/fhirpath";
@@ -465,9 +467,16 @@ pub struct Indicator {
     pub period_date: String,
     /// Each population's FHIRPath criteria.
     pub populations: BTreeMap<PopulationKind, String>,
+    /// The other indicators' sides its criteria require a patient to be in (#550).
+    pub references: BTreeSet<Reference>,
 }
 
 impl Indicator {
+    /// Its canonical reference, `url|version`.
+    pub fn canonical(&self) -> String {
+        format!("{}|{}", self.url, self.version)
+    }
+
     /// The criteria of `population`.
     pub fn criteria(&self, population: PopulationKind) -> Option<&str> {
         self.populations.get(&population).map(String::as_str)
@@ -564,6 +573,7 @@ impl MeasureDefinition {
             problems.push("the indicator has more than one group".into());
         }
         let mut populations = BTreeMap::new();
+        let mut referred = BTreeSet::new();
         let mut observations = Vec::new();
         for population in &self.populations {
             let Some(code) = population.code.as_deref() else {
@@ -583,6 +593,10 @@ impl MeasureDefinition {
             let criteria = population.criteria.clone().unwrap_or_default();
             match criteria.fhirpath_text() {
                 Ok(text) => {
+                    match references(text) {
+                        Ok(found) => referred.extend(found),
+                        Err(why) => problems.push(format!("the indicator's {code} criteria {why}")),
+                    }
                     if populations.insert(kind, text.to_owned()).is_some() {
                         problems.push(format!("the indicator has two {code} populations"));
                     }
@@ -677,6 +691,12 @@ impl MeasureDefinition {
             }
             _ => {}
         }
+        let canonical = format!("{url}|{version}");
+        if referred.iter().any(|r: &Reference| r.measure == canonical) {
+            problems.push(format!(
+                "the indicator refers to itself ({canonical}): indicators may not refer to each other in a circle"
+            ));
+        }
         match (scoring, calculation) {
             (Some(scoring), Some(calculation)) if problems.is_empty() => Ok(Indicator {
                 url,
@@ -689,6 +709,7 @@ impl MeasureDefinition {
                 cumulative: self.cumulative.unwrap_or(false),
                 period_date,
                 populations,
+                references: referred,
                 value: value.map(|(_, value)| value),
             }),
             _ => Err(problems),
@@ -832,6 +853,58 @@ mod tests {
         );
         assert_eq!(indicator.criteria(PopulationKind::Numerator), None);
         assert!(anc_first_visits().problems().is_empty());
+    }
+
+    fn criteria(expression: &str) -> MeasureDefinition {
+        MeasureDefinition {
+            populations: vec![PopulationDefinition {
+                code: Some("initial-population".into()),
+                criteria: Some(Expression::fhirpath(expression)),
+                ..PopulationDefinition::default()
+            }],
+            ..anc_first_visits()
+        }
+    }
+
+    #[test]
+    fn an_indicator_keeps_the_other_indicators_its_criteria_refer_to() {
+        let other = "https://health.go.ug/fhir/Measure/anc-visits|1.0.0";
+        let indicator = criteria(&format!(
+            "'{other}' in %indicators.denominator and %patient.gender = 'female'"
+        ))
+        .indicator()
+        .expect("an indicator");
+        assert_eq!(
+            indicator.references,
+            BTreeSet::from([Reference {
+                measure: other.into(),
+                side: crate::membership::Side::Denominator,
+            }])
+        );
+        assert_eq!(
+            indicator.canonical(),
+            "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"
+        );
+    }
+
+    #[test]
+    fn an_indicator_may_not_refer_to_itself_or_to_an_unpinned_one() {
+        let itself = criteria(
+            "'https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0' in %indicators.numerator",
+        );
+        assert_eq!(
+            itself.problems(),
+            [
+                "the indicator refers to itself (https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0): indicators may not refer to each other in a circle"
+            ]
+        );
+        let unpinned = criteria("'https://x/Measure/a' in %indicators.numerator");
+        assert_eq!(
+            unpinned.problems(),
+            [
+                "the indicator's initial-population criteria refers to the indicator https://x/Measure/a, which is not pinned to a version (url|version)"
+            ]
+        );
     }
 
     #[test]

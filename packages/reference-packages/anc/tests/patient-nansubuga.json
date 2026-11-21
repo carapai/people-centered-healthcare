@@ -163,6 +163,54 @@
         "system": "http://unitsofmeasure.org",
         "code": "wk"
       }
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "nansubuga-next-1",
+      "status": "booked",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "start": "2026-03-30T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/nansubuga"
+          },
+          "status": "accepted"
+        }
+      ]
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "nansubuga-next-2",
+      "status": "cancelled",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "start": "2026-04-10T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/nansubuga"
+          },
+          "status": "accepted"
+        }
+      ]
     }
   ]
 }

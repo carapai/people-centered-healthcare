@@ -993,7 +993,7 @@
           "studio"
         ],
         "summary": "Documents and serves *Try*.",
-        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
+        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
         "operationId": "tryStudioIndicator",
         "parameters": [
           {
@@ -1058,7 +1058,7 @@
             }
           },
           "422": {
-            "description": "The Measure is not a usable indicator, or the period is not one of its type",
+            "description": "The Measure is not a usable indicator, the period is not one of its type, or it refers to an indicator the package does not hold or in a circle",
             "content": {
               "application/json": {
                 "schema": {

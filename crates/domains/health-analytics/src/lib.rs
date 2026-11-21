@@ -16,11 +16,20 @@
 //!   [`Summary`] carries what roll-up needs ([`Summary::roll_up`]). Each patient's membership
 //!   keeps every record's part, which is why they are counted or not.
 //!
+//! - **Membership in another indicator** ([`membership`], #550): a criterion may require a
+//!   patient to be in another indicator's numerator or denominator, pinned to its
+//!   `url|version`, written `'<url>|<version>' in %indicators.numerator`. Indicators that refer to
+//!   each other in a circle are refused ([`circles`]).
+//! - **Dates relative to the period** (#550): criteria compare a declared date with
+//!   `%periodStart` and `%periodEnd`, and *in the previous N periods* with the starts of the
+//!   periods before ([`Period::previous_starts`]), each of the Report's period type.
+//!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
 pub mod calculate;
 pub mod indicator;
+pub mod membership;
 pub mod period;
 
 pub use calculate::{
@@ -32,4 +41,5 @@ pub use indicator::{
     IndicatorValue, MeasureDefinition, Pick, PopulationDefinition, PopulationKind, RATE_FACTORS,
     Scoring, TimeUnit, ValueSource,
 };
-pub use period::{Period, PeriodError, PeriodType, local_date};
+pub use membership::{MEMBERSHIP_VARIABLE, Reference, Side, circles, references};
+pub use period::{PREVIOUS_PERIODS, Period, PeriodError, PeriodType, local_date};

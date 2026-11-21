@@ -199,6 +199,30 @@
         "system": "http://unitsofmeasure.org",
         "code": "wk"
       }
+    },
+    {
+      "resourceType": "Appointment",
+      "id": "auma-next-1",
+      "status": "booked",
+      "serviceType": [
+        {
+          "concept": {
+            "text": "Antenatal care"
+          }
+        }
+      ],
+      "subject": {
+        "reference": "Patient/auma"
+      },
+      "start": "2026-04-15T09:00:00+03:00",
+      "participant": [
+        {
+          "actor": {
+            "reference": "Patient/auma"
+          },
+          "status": "accepted"
+        }
+      ]
     }
   ]
 }

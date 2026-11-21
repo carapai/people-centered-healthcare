@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use health_analytics::{Calculation, Evaluation, Period, PeriodType, Reason, Values};
-use health_analytics_app::{PatientRecords, evaluate, is_test_patient, measure, test_patient};
+use health_analytics_app::{
+    Library, PatientRecords, evaluate, is_test_patient, measure, test_patient,
+};
 use health_fhir_validation::OctofhirEngine;
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
@@ -28,7 +30,15 @@ fn anc_measure(name: &str) -> Value {
 async fn evaluated(resource: &Value, kind: PeriodType, id: &str) -> Evaluation {
     let indicator = measure(resource).indicator().expect("indicator");
     let period = Period::parse(kind, id).expect("period");
-    evaluate(&OctofhirEngine::new(), &indicator, &period, &patients()).await
+    evaluate(
+        &OctofhirEngine::new(),
+        &Library::default(),
+        &indicator,
+        &period,
+        &patients(),
+    )
+    .await
+    .expect("evaluated")
 }
 
 fn people(evaluation: &Evaluation) -> Vec<&str> {
@@ -101,7 +111,15 @@ async fn the_same_indicator_counts_any_period_a_report_chooses() {
 async fn each_patient_says_why_they_are_counted_or_not() {
     let indicator = measure(&anc_first_visits()).indicator().expect("indicator");
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
-    let count = evaluate(&OctofhirEngine::new(), &indicator, &march, &patients()).await;
+    let count = evaluate(
+        &OctofhirEngine::new(),
+        &Library::default(),
+        &indicator,
+        &march,
+        &patients(),
+    )
+    .await
+    .expect("evaluated");
     let member = |patient: &str| {
         count
             .members
@@ -153,7 +171,15 @@ async fn the_period_and_the_patient_are_variables_of_the_criteria() {
     );
     let indicator = measure(&resource).indicator().expect("indicator");
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
-    let count = evaluate(&OctofhirEngine::new(), &indicator, &march, &patients()).await;
+    let count = evaluate(
+        &OctofhirEngine::new(),
+        &Library::default(),
+        &indicator,
+        &march,
+        &patients(),
+    )
+    .await
+    .expect("evaluated");
     let people: Vec<&str> = count.counted().map(|m| m.patient.as_str()).collect();
     assert_eq!(people, ["Patient/namubiru"]);
 }
@@ -165,7 +191,15 @@ async fn criteria_that_cannot_be_evaluated_are_reported_per_record() {
         json!("Encounter.type.coding.code");
     let indicator = measure(&resource).indicator().expect("indicator");
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
-    let count = evaluate(&OctofhirEngine::new(), &indicator, &march, &patients()).await;
+    let count = evaluate(
+        &OctofhirEngine::new(),
+        &Library::default(),
+        &indicator,
+        &march,
+        &patients(),
+    )
+    .await
+    .expect("evaluated");
     assert_eq!(count.summary.count, 0);
     let errors: Vec<(&str, &str)> = count.errors().collect();
     assert!(
@@ -178,7 +212,15 @@ async fn criteria_that_cannot_be_evaluated_are_reported_per_record() {
     let mut resource = anc_first_visits();
     resource["extension"][0]["valueExpression"]["expression"] = json!("Encounter.status");
     let indicator = measure(&resource).indicator().expect("indicator");
-    let count = evaluate(&OctofhirEngine::new(), &indicator, &march, &patients()).await;
+    let count = evaluate(
+        &OctofhirEngine::new(),
+        &Library::default(),
+        &indicator,
+        &march,
+        &patients(),
+    )
+    .await
+    .expect("evaluated");
     assert_eq!(count.summary.count, 0, "a status is no date");
 }
 
