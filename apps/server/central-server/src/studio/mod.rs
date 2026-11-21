@@ -40,12 +40,16 @@
 //! `/packages/{id}/decision-tables/` ([`decisions`]), and plays a draft in its sandbox at
 //! `/packages/{id}/workflows/sandbox` ([`sandbox`], #499).
 //!
+//! The form designer's *Import FHIR JSON* reads a pasted Questionnaire, converting R4 to R5 with
+//! `health-fhir-mapping`, at `/packages/{id}/questionnaires/import` ([`forms`], #853).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
 pub(crate) mod actions;
 pub(crate) mod decisions;
 mod dto;
+pub(crate) mod forms;
 pub(crate) mod sandbox;
 pub(crate) mod terminology;
 
@@ -136,6 +140,10 @@ pub(crate) fn router(
             post(decisions::check),
         )
         .route("/packages/{id}/workflows/sandbox", post(sandbox::play))
+        .route(
+            "/packages/{id}/questionnaires/import",
+            post(forms::import_questionnaire),
+        )
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))
         .with_state(Studio {

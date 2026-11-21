@@ -1,0 +1,16 @@
+[package]
+name = "health-fhir-mapping"
+description = "FHIR R4 to R5 conversion for boundary adapters and content import (ADR 0015, 0050), each conversion with its report."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "contracts"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json = { workspace = true }

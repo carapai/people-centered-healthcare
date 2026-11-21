@@ -1,4 +1,4 @@
-import type { StudioActionInput, StudioActionName, StudioFile, StudioNewDraft, StudioPackage, StudioPackagePage, StudioProblem } from '@health/api-client'
+import type { StudioActionInput, StudioActionName, StudioFhirVersion, StudioFile, StudioNewDraft, StudioPackage, StudioPackagePage, StudioProblem, StudioQuestionnaireImport } from '@health/api-client'
 
 import type { Transport } from '../../platform/types'
 
@@ -23,7 +23,7 @@ export class StudioError extends Error {
 
 export const studioKey = ['studio', 'packages'] as const
 
-type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'setStudioNote' | 'startStudioDraft' | 'commentStudioPackage'
+type Operation = 'listStudioPackages' | 'getStudioPackage' | 'takeStudioAction' | 'getStudioFile' | 'saveStudioFile' | 'removeStudioFile' | 'setStudioVersion' | 'setStudioNote' | 'startStudioDraft' | 'commentStudioPackage' | 'importStudioQuestionnaire'
 
 /** `body` checked against `operation`'s documented response for `status`; a refusal throws. */
 async function parsed<T>(operation: Operation, status: number, body: unknown): Promise<T> {
@@ -113,6 +113,14 @@ export async function setNote(transport: Transport, id: string, note: string, re
 export async function addComment(transport: Transport, id: string, text: string, about?: string): Promise<StudioPackagePage> {
   const response = await transport.request({ method: 'POST', path: `${packagePath(id)}/comments`, body: { text, ...(about === undefined || about === '' ? {} : { about }) } })
   return parsed<StudioPackagePage>('commentStudioPackage', response.status, response.body)
+}
+
+/** Central's reading of `text`, pasted in the form designer of draft `id`, as a Questionnaire in
+ * `version`: R4 is converted to R5 on the server (`health-fhir-mapping`), with its conversion
+ * report (#853). Nothing is saved. */
+export async function importQuestionnaire(transport: Transport, id: string, text: string, version: StudioFhirVersion): Promise<StudioQuestionnaireImport> {
+  const response = await transport.request({ method: 'POST', path: `${packagePath(id)}/questionnaires/import`, body: { text, version } })
+  return parsed<StudioQuestionnaireImport>('importStudioQuestionnaire', response.status, response.body)
 }
 
 /** Starts a draft: a copy of a published version (`copyOf`), or a blank new package. */

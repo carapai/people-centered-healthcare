@@ -1802,3 +1802,115 @@ async fn a_local_code_system_is_edited_code_by_code_and_its_version_follows() {
     assert_eq!(reason["summary"], "Code fits: definition changed");
     assert_eq!(reason["at"], "concept[fits].definition");
 }
+
+// The form designer's Import FHIR JSON (#497, #853): central converts R4 with health-fhir-mapping.
+
+#[tokio::test]
+async fn importing_an_r4_questionnaire_converts_it_on_the_server_with_its_report() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let path = format!("/packages/{ID}/questionnaires/import");
+    let r4 = json!({
+        "resourceType": "Questionnaire", "status": "active", "title": "ANC contact",
+        "item": [
+            { "linkId": "danger", "type": "choice", "text": "Danger signs" },
+            { "linkId": "other", "type": "open-choice", "text": "Other" }
+        ]
+    });
+
+    // Converted, with the server's report, and nothing blocking.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "text": r4.to_string(), "version": "R4" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["refusal"], Value::Null);
+    assert_eq!(body["blocked"], false);
+    assert_eq!(body["questionnaire"]["title"], "ANC contact");
+    assert_eq!(body["questionnaire"]["item"][0]["type"], "coding");
+    assert_eq!(
+        body["questionnaire"]["item"][0]["answerConstraint"],
+        "optionsOnly"
+    );
+    assert_eq!(
+        body["questionnaire"]["item"][1]["answerConstraint"],
+        "optionsOrString"
+    );
+    assert_eq!(
+        body["report"],
+        json!([
+            { "outcome": "converted", "code": "choice-to-coding", "at": "danger", "element": null, "type": null },
+            { "outcome": "converted", "code": "open-choice-to-coding", "at": "other", "element": null, "type": null }
+        ])
+    );
+
+    // What cannot be converted is reported and blocks the import.
+    let odd = json!({ "resourceType": "Questionnaire", "status": "active", "somethingElse": 1,
+        "item": [{ "linkId": "a", "type": "question" }] });
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "text": odd.to_string(), "version": "R4" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["blocked"], true);
+    assert_eq!(
+        body["report"],
+        json!([
+            { "outcome": "unconverted", "code": "unknown-element", "at": "Questionnaire", "element": "somethingElse", "type": null },
+            { "outcome": "unconverted", "code": "unknown-type", "at": "a", "element": null, "type": "question" }
+        ])
+    );
+
+    // Refusals: read as R5, R4 choice types; text that is not JSON.
+    for (text, version, refusal) in [
+        (r4.to_string(), "R5", "looks-r4"),
+        ("{".to_owned(), "R5", "not-json"),
+        (
+            r#"{"resourceType":"Patient"}"#.to_owned(),
+            "R4",
+            "not-questionnaire",
+        ),
+    ] {
+        let (status, body) = call(
+            &publications,
+            author(),
+            "POST",
+            &path,
+            Some(json!({ "text": text, "version": version })),
+        )
+        .await;
+        assert_eq!(status, 200, "{body}");
+        assert_eq!(body["refusal"], refusal);
+        assert_eq!(body["questionnaire"], Value::Null);
+        assert_eq!(body["blocked"], true);
+    }
+
+    // Only a Studio author, and only on a package version that exists.
+    let (status, _) = call(
+        &publications,
+        subject("bob", &["patient.read"]),
+        "POST",
+        &path,
+        Some(json!({ "text": r4.to_string(), "version": "R4" })),
+    )
+    .await;
+    assert_eq!(status, 403);
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        "/packages/ug.moh.none@1.0.0/questionnaires/import",
+        Some(json!({ "text": r4.to_string(), "version": "R4" })),
+    )
+    .await;
+    assert_eq!(status, 404);
+}

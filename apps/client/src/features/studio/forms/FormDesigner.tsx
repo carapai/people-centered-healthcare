@@ -10,9 +10,9 @@ import { usePlatform } from '../../../platform'
 import { FORM_LAYOUT_SCHEMA, fitting, type FormLayout, type Widget } from '../../forms/layout'
 import { QuestionnaireRenderer } from '../../forms/QuestionnaireRenderer'
 import { button, control } from '../../reception/styles'
-import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
+import { StudioError, fileQuery, importQuestionnaire, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
-import { blocks, pruneLayout, readQuestionnaire, replaceWith, type FhirVersion, type ImportRefusal, type ReportEntry } from './importing'
+import { importResult, pruneLayout, replaceWith, type FhirVersion, type ImportRefusal, type ImportResult, type ReportEntry } from './importing'
 import {
   ANSWER_TYPES,
   addOption,
@@ -308,6 +308,7 @@ function Designer({ id, path, draft, file, published: previous, layouts, mapping
       {imported && dirty ? <p role="status">{intl.formatMessage(m.fdImportReplaced)}</p> : null}
       {importing && editable ? (
         <Import
+          id={id}
           draft={form.questionnaire}
           onCancel={() => setImporting(false)}
           onReplace={(questionnaire) => {
@@ -848,37 +849,42 @@ function Records({ form, path, item, editable, onEditMapping }: { form: Form; pa
 
 function reportText(intl: IntlShape, entry: ReportEntry): string {
   switch (entry.code) {
-    case 'choice':
+    case 'choice-to-coding':
       return intl.formatMessage(m.fdRChoice, { at: entry.at })
-    case 'open-choice':
+    case 'open-choice-to-coding':
       return intl.formatMessage(m.fdROpenChoice, { at: entry.at })
     case 'source':
       return intl.formatMessage(m.fdRSource, { source: entry.source })
     case 'unknown-element':
-      return intl.formatMessage(m.fdRUnknown, { at: entry.at, element: entry.element })
+      return intl.formatMessage(m.fdRUnknown, { at: entry.at, element: entry.element ?? '' })
     case 'contained':
       return intl.formatMessage(m.fdRContained)
     case 'modifier-extension':
       return intl.formatMessage(m.fdRModifier, { at: entry.at })
     case 'unknown-type':
-      return intl.formatMessage(m.fdRType, { at: entry.at, type: entry.type })
+      return intl.formatMessage(m.fdRType, { at: entry.at, type: entry.type ?? '' })
   }
 }
 
 const refusalMessage = { 'not-json': m.fdImportNotJson, 'not-questionnaire': m.fdImportNotQuestionnaire, 'looks-r4': m.fdImportLooksR4 } as const satisfies Record<ImportRefusal, unknown>
 
 /**
- * Import FHIR JSON: a pasted Questionnaire, read as R5 or as R4 converted to R5, with its
- * conversion report; anything unconverted blocks it. It replaces the form until saved.
+ * Import FHIR JSON: a pasted Questionnaire, read by central as R5 or as R4 converted to R5, with
+ * the server's conversion report; anything unconverted blocks it. It replaces the form until saved.
  */
-function Import({ draft, onCancel, onReplace }: { draft: Questionnaire; onCancel: () => void; onReplace: (questionnaire: Questionnaire) => void }) {
+function Import({ id, draft, onCancel, onReplace }: { id: string; draft: Questionnaire; onCancel: () => void; onReplace: (questionnaire: Questionnaire) => void }) {
   const intl = useIntl()
+  const platform = usePlatform()
   const versionName = useId()
   const [text, setText] = useState('')
   const [version, setVersion] = useState<FhirVersion>('R5')
-  const [read, setRead] = useState<ReturnType<typeof readQuestionnaire> | null>(null)
+  const [read, setRead] = useState<ImportResult | null>(null)
+  const reading = useMutation({
+    mutationFn: async () => importResult(await importQuestionnaire(platform.transport, id, text, version)),
+    onSuccess: setRead,
+  })
   const result = read !== null && read.ok ? replaceWith(draft, read.questionnaire, read.report) : null
-  const blocked = result !== null && blocks(result.report)
+  const blocked = read !== null && read.ok && read.blocked
   return (
     <section aria-labelledby="fd-import" className={panel}>
       <h2 id="fd-import" className={subheading}>
@@ -893,6 +899,7 @@ function Import({ draft, onCancel, onReplace }: { draft: Questionnaire; onCancel
           onChange={(e) => {
             setText(e.target.value)
             setRead(null)
+            reading.reset()
           }}
         />
       </label>
@@ -908,6 +915,7 @@ function Import({ draft, onCancel, onReplace }: { draft: Questionnaire; onCancel
               onChange={() => {
                 setVersion(v)
                 setRead(null)
+                reading.reset()
               }}
             />
             {intl.formatMessage(v === 'R5' ? m.fdImportR5 : m.fdImportR4)}
@@ -915,13 +923,18 @@ function Import({ draft, onCancel, onReplace }: { draft: Questionnaire; onCancel
         ))}
       </fieldset>
       <div className={row}>
-        <button type="button" className={button} disabled={text.trim() === ''} onClick={() => setRead(readQuestionnaire(text, version))}>
+        <button type="button" className={button} disabled={text.trim() === '' || reading.isPending} onClick={() => reading.mutate()}>
           {intl.formatMessage(m.fdImportRead)}
         </button>
         <button type="button" className={small} onClick={onCancel}>
           {intl.formatMessage(m.fdImportCancel)}
         </button>
       </div>
+      {reading.error === null ? null : (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(m.fdImportFailed, { reason: reading.error instanceof StudioError ? reading.error.detail : String(reading.error) })}
+        </p>
+      )}
       {read !== null && !read.ok ? (
         <p role="alert" className={alert}>
           {intl.formatMessage(refusalMessage[read.refusal])}

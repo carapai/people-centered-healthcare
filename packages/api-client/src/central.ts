@@ -374,6 +374,27 @@ export const StudioConceptPage = z.object({
 })
 export type StudioConceptPage = z.infer<typeof StudioConceptPage>
 
+/** What a finding is. */
+export const StudioConversionCode = z.enum(["choice-to-coding", "open-choice-to-coding", "unknown-element", "contained", "modifier-extension", "unknown-type"])
+export type StudioConversionCode = z.infer<typeof StudioConversionCode>
+
+/** Whether a finding was converted. */
+export const StudioConversionOutcome = z.enum(["converted", "unconverted"])
+export type StudioConversionOutcome = z.infer<typeof StudioConversionOutcome>
+
+/** One line of the conversion report. */
+export const StudioConversionFinding = z.object({
+  /** `Questionnaire`, or the item's `linkId` (`?` when it has none). */
+  "at": z.string(),
+  "code": StudioConversionCode,
+  /** The element, for `unknown-element`. */
+  "element": z.string().nullable().optional(),
+  "outcome": StudioConversionOutcome,
+  /** The item type, for `unknown-type`. */
+  "type": z.string().nullable().optional(),
+})
+export type StudioConversionFinding = z.infer<typeof StudioConversionFinding>
+
 /** A sample value: a flag, a whole number or a code. */
 export const StudioSample = z.union([z.boolean(), integer, z.string()])
 export type StudioSample = z.infer<typeof StudioSample>
@@ -508,6 +529,10 @@ export const StudioExpansion = z.object({
 })
 export type StudioExpansion = z.infer<typeof StudioExpansion>
 
+/** The FHIR version a paste is read as. */
+export const StudioFhirVersion = z.enum(["R5", "R4"])
+export type StudioFhirVersion = z.infer<typeof StudioFhirVersion>
+
 /** One file of a package version, for an editor. */
 export const StudioFile = z.object({
   /** Its text. */
@@ -554,6 +579,10 @@ export const StudioHistoryEntry = z.object({
   "text": z.string().nullable().optional(),
 })
 export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
+
+/** Why a paste was not read at all. */
+export const StudioImportRefusal = z.enum(["not-json", "not-questionnaire", "looks-r4"])
+export type StudioImportRefusal = z.infer<typeof StudioImportRefusal>
 
 /** The kind of package, which decides its approvers. */
 export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
@@ -703,6 +732,26 @@ export const StudioProblem = z.object({
   "refusal": ActionRefusal.nullable().optional(),
 })
 export type StudioProblem = z.infer<typeof StudioProblem>
+
+/** A paste read: the R5 Questionnaire and its report, or why it was not read. */
+export const StudioQuestionnaireImport = z.object({
+  /** Whether something could not be converted, so the import must not go on. */
+  "blocked": z.boolean(),
+  "questionnaire": z.record(z.string(), z.unknown()).nullable().optional(),
+  "refusal": StudioImportRefusal.nullable().optional(),
+  /** What was converted, and what could not be. */
+  "report": z.array(StudioConversionFinding),
+})
+export type StudioQuestionnaireImport = z.infer<typeof StudioQuestionnaireImport>
+
+/** A pasted Questionnaire to read. */
+export const StudioQuestionnaireImportInput = z.object({
+  /** The text as pasted. */
+  "text": z.string(),
+  /** The FHIR version to read it as. */
+  "version": StudioFhirVersion,
+})
+export type StudioQuestionnaireImportInput = z.infer<typeof StudioQuestionnaireImportInput>
 
 /** An open Task. */
 export const StudioSandboxTask = z.object({
@@ -964,6 +1013,17 @@ export const operations = {
       404: StudioProblem,
       409: StudioProblem,
       412: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  importStudioQuestionnaire: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/questionnaires/import',
+    responses: {
+      200: StudioQuestionnaireImport,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
       500: StudioProblem,
     },
   },

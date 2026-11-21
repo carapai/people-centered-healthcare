@@ -1034,6 +1034,89 @@
         }
       }
     },
+    "/api/studio/packages/{id}/questionnaires/import": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves *Import FHIR JSON*.",
+        "description": "The form designer's Import FHIR JSON: reads the pasted text as an R5 Questionnaire, or as an R4 one converted to R5 by `health-fhir-mapping`, and answers it with its conversion report. A finding that was not converted blocks the import (`blocked`). Text that is not JSON, not a Questionnaire, or read as R5 but holding R4's choice item types is refused (`refusal`). Nothing is saved.",
+        "operationId": "importStudioQuestionnaire",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioQuestionnaireImportInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The paste read, or why it was not",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioQuestionnaireImport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/terminology/code-system-change": {
       "get": {
         "tags": [
@@ -3067,6 +3150,61 @@
           }
         }
       },
+      "StudioConversionCode": {
+        "type": "string",
+        "description": "What a finding is.",
+        "enum": [
+          "choice-to-coding",
+          "open-choice-to-coding",
+          "unknown-element",
+          "contained",
+          "modifier-extension",
+          "unknown-type"
+        ]
+      },
+      "StudioConversionFinding": {
+        "type": "object",
+        "description": "One line of the conversion report.",
+        "required": [
+          "outcome",
+          "code",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "`Questionnaire`, or the item's `linkId` (`?` when it has none)."
+          },
+          "code": {
+            "$ref": "#/components/schemas/StudioConversionCode"
+          },
+          "element": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The element, for `unknown-element`."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/StudioConversionOutcome"
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The item type, for `unknown-type`."
+          }
+        }
+      },
+      "StudioConversionOutcome": {
+        "type": "string",
+        "description": "Whether a finding was converted.",
+        "enum": [
+          "converted",
+          "unconverted"
+        ]
+      },
       "StudioDecisionCheck": {
         "type": "object",
         "description": "What the checks found.",
@@ -3472,6 +3610,14 @@
           }
         }
       },
+      "StudioFhirVersion": {
+        "type": "string",
+        "description": "The FHIR version a paste is read as.",
+        "enum": [
+          "R5",
+          "R4"
+        ]
+      },
       "StudioFile": {
         "type": "object",
         "description": "One file of a package version, for an editor.",
@@ -3604,6 +3750,15 @@
           "reassigned",
           "withdrawn",
           "commented"
+        ]
+      },
+      "StudioImportRefusal": {
+        "type": "string",
+        "description": "Why a paste was not read at all.",
+        "enum": [
+          "not-json",
+          "not-questionnaire",
+          "looks-r4"
         ]
       },
       "StudioNewDraft": {
@@ -4085,6 +4240,63 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "StudioQuestionnaireImport": {
+        "type": "object",
+        "description": "A paste read: the R5 Questionnaire and its report, or why it was not read.",
+        "required": [
+          "report",
+          "blocked"
+        ],
+        "properties": {
+          "blocked": {
+            "type": "boolean",
+            "description": "Whether something could not be converted, so the import must not go on."
+          },
+          "questionnaire": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "refusal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioImportRefusal",
+                "description": "Why it was not read; the other fields are then empty."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioConversionFinding"
+            },
+            "description": "What was converted, and what could not be."
+          }
+        }
+      },
+      "StudioQuestionnaireImportInput": {
+        "type": "object",
+        "description": "A pasted Questionnaire to read.",
+        "required": [
+          "text",
+          "version"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text as pasted."
+          },
+          "version": {
+            "$ref": "#/components/schemas/StudioFhirVersion",
+            "description": "The FHIR version to read it as."
           }
         }
       },

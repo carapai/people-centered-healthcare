@@ -24,6 +24,7 @@ health-financial-ledger = { workspace = true }
 health-client-registry = { workspace = true }
 health-activation = { workspace = true }
 health-configuration = { workspace = true }
+health-fhir-mapping = { workspace = true }
 health-fhir-search = { workspace = true }
 health-fhir-server = { workspace = true }
 health-fhir-validation = { workspace = true }
