@@ -1,5 +1,5 @@
-//! The reference packages in `packages/reference-packages/` publish (#109, #103): each passes
-//! validation, its extraction fixtures and its workflow scenarios, and a Workflow Definition Library holds exactly its
+//! The reference packages in `packages/reference-packages/` publish (#109, #103, #548): each
+//! passes validation, its extraction fixtures and its workflow scenarios, and a Workflow Definition Library holds exactly its
 //! readable source in `packages/reference-packages/sources/`.
 
 use std::path::{Path, PathBuf};
@@ -43,6 +43,11 @@ fn files(dir: &Path) -> Files {
 /// Drafts and submits the package in directory `package` as `id`, and returns any problems validation or
 /// simulation found.
 async fn submitted(package: &str, id: &str) -> (Stage, Vec<String>) {
+    submitted_files(&files(&root().join(package)), id).await
+}
+
+/// Drafts and submits `files` as `id`, and returns any problems validation or simulation found.
+async fn submitted_files(files: &Files, id: &str) -> (Stage, Vec<String>) {
     let connection = Connection::open(&Settings {
         target: Target::Memory,
         namespace: "central".into(),
@@ -63,8 +68,7 @@ async fn submitted(package: &str, id: &str) -> (Stage, Vec<String>) {
         Arc::new(WorkflowSandbox),
         "central",
     );
-    let files = files(&root().join(package));
-    publications.draft(&files, "ann").await.expect("draft");
+    publications.draft(files, "ann").await.expect("draft");
     let lifecycle = publications.submit(id, "ann").await.expect("submit");
     let (_, records) = publications.lifecycle(id).await.expect("records");
     let problems = match records.last().map(|r| &r.step) {
@@ -91,6 +95,50 @@ async fn the_opd_package_publishes() {
     assert_eq!(
         submitted("opd", "ug.moh.opd@1.0.0").await,
         (Stage::Review, Vec::new())
+    );
+}
+
+/// The ANC package (#548): the *ANC 1st visits* indicator and the test patients *Try* evaluates
+/// it over.
+#[tokio::test]
+async fn the_anc_package_publishes() {
+    assert_eq!(
+        submitted("anc", "ug.moh.anc@1.0.0").await,
+        (Stage::Review, Vec::new())
+    );
+}
+
+/// An indicator without its period date, or a test patient without a Patient, fails validation.
+#[tokio::test]
+async fn an_indicator_without_a_period_date_fails_validation() {
+    let mut files = files(&root().join("anc"));
+    let path = "Measure-anc-first-visits.json";
+    let mut measure: Value = serde_json::from_slice(&files[path]).expect("measure");
+    measure["extension"]
+        .as_array_mut()
+        .expect("extensions")
+        .retain(|e| {
+            !e["url"]
+                .as_str()
+                .is_some_and(|u| u.ends_with("/indicator-period-date"))
+        });
+    files.insert(path.into(), measure.to_string().into_bytes());
+    let patient = "tests/patient-akello.json";
+    let mut file: Value = serde_json::from_slice(&files[patient]).expect("patient");
+    file["resources"]
+        .as_array_mut()
+        .expect("resources")
+        .retain(|r| r["resourceType"] != "Patient");
+    files.insert(patient.into(), file.to_string().into_bytes());
+    assert_eq!(
+        submitted_files(&files, "ug.moh.anc@1.0.0").await,
+        (
+            Stage::Draft,
+            vec![
+                "Measure-anc-first-visits.json: the indicator has no period date: the declared date that places care in a Report's period".to_owned(),
+                "tests/patient-akello.json: the test patient needs one Patient, and it has 0".to_owned(),
+            ]
+        )
     );
 }
 

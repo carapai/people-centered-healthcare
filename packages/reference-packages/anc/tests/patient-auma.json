@@ -1,0 +1,113 @@
+{
+  "type": "test-patient",
+  "name": "Auma D.: her first ANC visit on 7 January, follow-ups on 4 February and 18 March",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "auma",
+      "name": [
+        {
+          "family": "Auma",
+          "given": [
+            "Doreen"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "1997-12-01"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "auma-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/auma"
+      },
+      "actualPeriod": {
+        "start": "2026-01-07T09:00:00+03:00"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "auma-visit-2",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "follow-up"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/auma"
+      },
+      "actualPeriod": {
+        "start": "2026-02-04T09:30:00+03:00"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "auma-visit-3",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "follow-up"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/auma"
+      },
+      "actualPeriod": {
+        "start": "2026-03-18T10:15:00+03:00"
+      }
+    }
+  ]
+}

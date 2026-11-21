@@ -1,0 +1,19 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "anc-visit-type",
+  "url": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+  "version": "1.0.0",
+  "name": "AncVisitType",
+  "status": "active",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "first",
+      "display": "ANC 1st visit"
+    },
+    {
+      "code": "follow-up",
+      "display": "ANC follow-up visit"
+    }
+  ]
+}

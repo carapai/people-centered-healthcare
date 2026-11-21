@@ -16,6 +16,7 @@ How program indicators are defined, computed, stored and synced. The decision is
 - **Periods follow when care happened,** not when it was entered. A late entry marks its period's report changed.
 - **Exact counts** go to MoH. Small-cell suppression is for public dashboards only, which are not in v1.
 - **Patient lists** (for example, who is overdue) are worklists on the node, not indicators.
+- **In code (#548):** `health-analytics` (definition, periods, counting) and `health-analytics-app` (evaluation on the FHIRPath engine). A Measure carries its period date in the `indicator-period-date` extension and what it counts in `indicator-counts`; `basis` names the record type its criteria read, and a count's criteria are its `initial-population`. Each record is evaluated with `%patient`, `%periodStart` and `%periodEnd`. Package test patients are `tests/` files of type `test-patient`; the reference is `packages/reference-packages/anc`.
 
 ## Reports
 

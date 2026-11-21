@@ -987,6 +987,99 @@
         }
       }
     },
+    "/api/studio/packages/{id}/indicators/try": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves *Try*.",
+        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date, and the criteria decide whether it counts; counting people, a person counts once. It answers the value and every test patient with each record's part, so the editor shows who is counted and why.",
+        "operationId": "tryStudioIndicator",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioIndicatorTryInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The value and who it counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioIndicatorTry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The Measure is not a usable indicator, the period is not one of its type, or evaluating this kind of indicator is not supported yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/note": {
       "put": {
         "tags": [
@@ -4009,6 +4102,140 @@
           "looks-r4"
         ]
       },
+      "StudioIndicatorPatient": {
+        "type": "object",
+        "description": "One test patient, counted or not.",
+        "required": [
+          "path",
+          "name",
+          "patient",
+          "counted",
+          "records"
+        ],
+        "properties": {
+          "counted": {
+            "type": "boolean",
+            "description": "Whether they are counted."
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The patient's name, if they have one."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the test patient shows."
+          },
+          "path": {
+            "type": "string",
+            "description": "The test patient's file."
+          },
+          "patient": {
+            "type": "string",
+            "description": "The patient (`Patient/…`)."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioIndicatorRecord"
+            },
+            "description": "Each of their records of the indicator's basis, with its part."
+          }
+        }
+      },
+      "StudioIndicatorRecord": {
+        "type": "object",
+        "description": "One record's part.",
+        "required": [
+          "reference",
+          "reason"
+        ],
+        "properties": {
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its period date, if it has one."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not be evaluated, if it could not."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/StudioRecordReason",
+            "description": "Why it counts or not."
+          },
+          "reference": {
+            "type": "string",
+            "description": "The record (`Encounter/…`)."
+          }
+        }
+      },
+      "StudioIndicatorTry": {
+        "type": "object",
+        "description": "What *Try* found.",
+        "required": [
+          "period",
+          "value",
+          "patients",
+          "errors"
+        ],
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Test patients that could not be read, and records that could not be evaluated."
+          },
+          "patients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioIndicatorPatient"
+            },
+            "description": "Every test patient, counted or not, in file order."
+          },
+          "period": {
+            "$ref": "#/components/schemas/StudioPeriod",
+            "description": "The period evaluated."
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The indicator's value: how many are counted.",
+            "minimum": 0
+          }
+        }
+      },
+      "StudioIndicatorTryInput": {
+        "type": "object",
+        "description": "*Try* on a draft indicator.",
+        "required": [
+          "measure",
+          "periodType",
+          "period"
+        ],
+        "properties": {
+          "measure": {
+            "type": "object",
+            "description": "The draft Measure, as the Studio holds it."
+          },
+          "period": {
+            "type": "string",
+            "description": "The period, written as its type writes it (`2026-03`, `2026W10`, `2026Q1`, …)."
+          },
+          "periodType": {
+            "$ref": "#/components/schemas/StudioPeriodType",
+            "description": "The period type a Report would choose."
+          }
+        }
+      },
       "StudioNewDraft": {
         "type": "object",
         "description": "How to start a draft: a copy of a published version, or a blank new package.",
@@ -4467,6 +4694,46 @@
           "string"
         ]
       },
+      "StudioPeriod": {
+        "type": "object",
+        "description": "The period evaluated.",
+        "required": [
+          "periodType",
+          "id",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string",
+            "description": "Its last day (`%periodEnd`)."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its id."
+          },
+          "periodType": {
+            "$ref": "#/components/schemas/StudioPeriodType",
+            "description": "Its type."
+          },
+          "start": {
+            "type": "string",
+            "description": "Its first day (`%periodStart`)."
+          }
+        }
+      },
+      "StudioPeriodType": {
+        "type": "string",
+        "description": "A kind of reporting period.",
+        "enum": [
+          "weekly",
+          "monthly",
+          "quarterly",
+          "semiAnnual",
+          "annual",
+          "financialJuly"
+        ]
+      },
       "StudioProblem": {
         "type": "object",
         "description": "Why a Studio request failed.",
@@ -4584,6 +4851,17 @@
             "description": "The ValueSet."
           }
         }
+      },
+      "StudioRecordReason": {
+        "type": "string",
+        "description": "Why a record counts or not.",
+        "enum": [
+          "meets",
+          "does-not-meet",
+          "outside-period",
+          "no-period-date",
+          "error"
+        ]
       },
       "StudioRefusalCode": {
         "type": "string",

@@ -1,0 +1,82 @@
+{
+  "type": "test-patient",
+  "name": "Nansubuga H.: her first ANC visit recorded twice, on 25 and 27 March",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "nansubuga",
+      "name": [
+        {
+          "family": "Nansubuga",
+          "given": [
+            "Hadijah"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "1999-07-03"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "nansubuga-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "actualPeriod": {
+        "start": "2026-03-25T10:00:00+03:00"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "nansubuga-visit-2",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "actualPeriod": {
+        "start": "2026-03-27T09:00:00+03:00"
+      }
+    }
+  ]
+}

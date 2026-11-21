@@ -1,0 +1,51 @@
+{
+  "type": "test-patient",
+  "name": "Atim G.: her first ANC visit on 27 February",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "atim",
+      "name": [
+        {
+          "family": "Atim",
+          "given": [
+            "Grace"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "2004-12-19"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "atim-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/atim"
+      },
+      "actualPeriod": {
+        "start": "2026-02-27T15:45:00+03:00"
+      }
+    }
+  ]
+}

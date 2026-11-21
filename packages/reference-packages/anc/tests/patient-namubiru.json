@@ -1,0 +1,54 @@
+{
+  "type": "test-patient",
+  "name": "Namubiru C.: her first ANC visit late on 31 March, entered on 3 April",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "namubiru",
+      "name": [
+        {
+          "family": "Namubiru",
+          "given": [
+            "Carol"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "1994-09-30"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "namubiru-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/namubiru"
+      },
+      "actualPeriod": {
+        "start": "2026-03-31T22:30:00+03:00"
+      },
+      "meta": {
+        "lastUpdated": "2026-04-03T08:05:00+03:00"
+      }
+    }
+  ]
+}
