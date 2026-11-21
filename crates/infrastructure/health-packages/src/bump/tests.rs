@@ -649,3 +649,53 @@ fn a_changed_question_text_is_described_with_its_path() {
     assert_eq!(found[0].at, "item[bp].item[bp-sys].text");
     assert_eq!(describe(&found[0]), "Item bp-sys: text reworded");
 }
+
+fn age_bands(title: &str, content: &str) -> Value {
+    use base64::Engine as _;
+    json!({
+        "resourceType": "Library",
+        "url": "https://x/Library/age-bands-anc",
+        "version": "1.0.0",
+        "name": "AgeBandsAnc",
+        "title": title,
+        "type": {"coding": [{"code": "age-band-set"}]},
+        "content": [{
+            "contentType": "application/vnd.health.age-band-set+json",
+            "data": base64::engine::general_purpose::STANDARD.encode(content),
+        }],
+    })
+}
+
+const ANC_BANDS: &str =
+    r#"{"unit": "years", "ageAt": "period-end", "bands": [{"from": 10, "to": 14}, {"from": 15}]}"#;
+
+#[test]
+fn changing_a_band_boundary_is_major_and_a_rename_a_patch() {
+    let v1 = age_bands("MoH ANC age bands", ANC_BANDS);
+    let moved = age_bands(
+        "MoH ANC age bands",
+        r#"{"unit": "years", "ageAt": "period-end", "bands": [{"from": 10, "to": 15}, {"from": 16}]}"#,
+    );
+    assert_eq!(found(&v1, &moved), ["bands Changed major"]);
+    assert_eq!(
+        describe(&changes(&v1, &moved)[0]),
+        "Bands changed",
+        "What changed names the bands"
+    );
+    let unit = age_bands(
+        "MoH ANC age bands",
+        r#"{"unit": "months", "ageAt": "period-end", "bands": [{"from": 10, "to": 14}, {"from": 15}]}"#,
+    );
+    assert_eq!(bump(&v1, &unit), Bump::Major);
+    let renamed = age_bands("MoH antenatal age bands", ANC_BANDS);
+    assert_eq!(found(&v1, &renamed), ["title Reworded patch"]);
+    let reencoded = age_bands(
+        "MoH ANC age bands",
+        "{\n  \"bands\": [{\"from\": 10, \"to\": 14}, {\"from\": 15}],\n  \"ageAt\": \"period-end\",\n  \"unit\": \"years\"\n}\n",
+    );
+    assert_eq!(
+        bump(&v1, &reencoded),
+        Bump::None,
+        "the same content, re-encoded"
+    );
+}

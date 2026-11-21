@@ -1,0 +1,24 @@
+{
+  "resourceType": "Library",
+  "id": "age-bands-anc",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/age-bands-anc",
+  "version": "1.0.0",
+  "name": "AgeBandsAnc",
+  "title": "MoH ANC age bands",
+  "description": "The age bands of the HMIS 105 antenatal care section: a woman's age in whole years at the end of the period.",
+  "type": {
+    "coding": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "code": "age-band-set"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.age-band-set+json",
+      "data": "ewogICJ1bml0IjogInllYXJzIiwKICAiYWdlQXQiOiAicGVyaW9kLWVuZCIsCiAgImJhbmRzIjogWwogICAgewogICAgICAiZnJvbSI6IDEwLAogICAgICAidG8iOiAxNAogICAgfSwKICAgIHsKICAgICAgImZyb20iOiAxNSwKICAgICAgInRvIjogMTkKICAgIH0sCiAgICB7CiAgICAgICJmcm9tIjogMjAsCiAgICAgICJ0byI6IDI0CiAgICB9LAogICAgewogICAgICAiZnJvbSI6IDI1CiAgICB9CiAgXQp9Cg=="
+    }
+  ]
+}

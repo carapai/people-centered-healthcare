@@ -1,4 +1,4 @@
-//! The reference packages in `packages/reference-packages/` publish (#109, #103, #548): each
+//! The reference packages in `packages/reference-packages/` publish (#109, #103, #548, #551): each
 //! passes validation, its extraction fixtures and its workflow scenarios, and a Workflow Definition Library holds exactly its
 //! readable source in `packages/reference-packages/sources/`.
 
@@ -195,6 +195,41 @@ fn holds_its_source(library: &str, source: &str) {
     assert_eq!(
         (library["url"].clone(), library["version"].clone()),
         (source_json["url"].clone(), source_json["version"].clone())
+    );
+}
+
+#[tokio::test]
+async fn the_core_package_publishes() {
+    let (stage, problems) = submitted("core", "ug.moh.core@1.0.0").await;
+    assert_eq!(stage, Stage::Review, "{problems:?}");
+}
+
+/// The Age Band Set Library at `library` holds exactly the readable content `source`.
+fn holds_its_bands(library: &str, source: &str) {
+    let library: Value =
+        serde_json::from_slice(&std::fs::read(root().join(library)).expect("library"))
+            .expect("json");
+    let content = STANDARD
+        .decode(library["content"][0]["data"].as_str().expect("data"))
+        .expect("base64");
+    let held: Value = serde_json::from_slice(&content).expect("bands");
+    let source_json: Value =
+        serde_json::from_slice(&std::fs::read(root().join(source)).expect("source")).expect("json");
+    assert_eq!(
+        held, source_json,
+        "regenerate the Library's content from {source}"
+    );
+}
+
+#[test]
+fn the_core_age_band_sets_are_their_sources() {
+    holds_its_bands(
+        "core/Library-age-bands-anc.json",
+        "sources/age-bands-anc.json",
+    );
+    holds_its_bands(
+        "core/Library-age-bands-outpatient.json",
+        "sources/age-bands-outpatient.json",
     );
 }
 

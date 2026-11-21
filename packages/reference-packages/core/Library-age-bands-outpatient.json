@@ -1,0 +1,24 @@
+{
+  "resourceType": "Library",
+  "id": "age-bands-outpatient",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/age-bands-outpatient",
+  "version": "1.0.0",
+  "name": "AgeBandsOutpatient",
+  "title": "MoH outpatient age bands",
+  "description": "The age bands of the HMIS 105 outpatient section: a patient's age in whole years on the day of the visit.",
+  "type": {
+    "coding": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "code": "age-band-set"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.age-band-set+json",
+      "data": "ewogICJ1bml0IjogInllYXJzIiwKICAiYWdlQXQiOiAicGVyaW9kLWRhdGUiLAogICJiYW5kcyI6IFsKICAgIHsKICAgICAgImZyb20iOiAwLAogICAgICAidG8iOiAwCiAgICB9LAogICAgewogICAgICAiZnJvbSI6IDEsCiAgICAgICJ0byI6IDQKICAgIH0sCiAgICB7CiAgICAgICJmcm9tIjogNSwKICAgICAgInRvIjogOQogICAgfSwKICAgIHsKICAgICAgImZyb20iOiAxMCwKICAgICAgInRvIjogMTkKICAgIH0sCiAgICB7CiAgICAgICJmcm9tIjogMjAKICAgIH0KICBdCn0K"
+    }
+  ]
+}

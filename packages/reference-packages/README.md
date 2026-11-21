@@ -5,10 +5,11 @@ Published Definition packages the platform ships as references (configuration.md
 | Package | What | Issue |
 |---|---|---|
 | `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*, *ANC 1st visits with the next visit booked*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549, #550 |
+| `core/` (`ug.moh.core`) | MoH's national core: the Age Band Sets HMIS reports disaggregate by (*MoH ANC age bands*, *MoH outpatient age bands*) | #551 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
 
-**Sources:** a Workflow Definition is inline, base64 content in its Library. Its readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
+**Sources:** a Workflow Definition, and an Age Band Set's bands, are inline, base64 content in their Library. The readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
 
 ## `anc/`: ANC indicators
 
@@ -40,6 +41,17 @@ So March 2026 is 4, April 1 and 2026Q1 6.
 Gestational ages at first visits: Akello 16, Nakato 10 (14 at her follow-up), Namubiru 9, Nansubuga 8 then 11 at the duplicate, Auma 12, Atim 13, Nabirye 11. So in March, *ANC 1st visit before 12 weeks* is 3 of 4 (75%) and 2026Q1 3 of 6 (50%); the median gestational age at the first visit is 9.5 (10.5 taking the last value) and 2026Q1 11. *ANC visits* in March is 7 visits by 5 women; January to June, 13 visits by 8 women in 9 pregnancies.
 
 Next visits booked (`Appointment`, status `booked`): Akello 8 April, Nakato 28 April, Auma 15 April, Namubiru 6 May, Nansubuga 30 March (her 10 April one is cancelled). So in March, *ANC 1st visits with the next visit booked* is 2 of 4 (Akello and Nakato, 50%): Namubiru's is 5 weeks after the period's end and Nansubuga's before it.
+
+## `core/`: MoH's Age Band Sets (#551; ADR 0071)
+
+Each is a `Library` of type `age-band-set` (`national-core`, so two approvers), its bands in whole years, both ends included:
+
+| Set | Age taken at | Bands |
+|---|---|---|
+| `Library/age-bands-anc`, *MoH ANC age bands* | the end of the period | 10–14, 15–19, 20–24, 25+ |
+| `Library/age-bands-outpatient`, *MoH outpatient age bands* | the date of the visit | 0, 1–4, 5–9, 10–19, 20+ |
+
+The local e2e backend publishes the package, so the Studio's *Age band sets* section shows both.
 
 ## `lab/`: the laboratory test
 

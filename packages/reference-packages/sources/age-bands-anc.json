@@ -1,0 +1,21 @@
+{
+  "unit": "years",
+  "ageAt": "period-end",
+  "bands": [
+    {
+      "from": 10,
+      "to": 14
+    },
+    {
+      "from": 15,
+      "to": 19
+    },
+    {
+      "from": 20,
+      "to": 24
+    },
+    {
+      "from": 25
+    }
+  ]
+}

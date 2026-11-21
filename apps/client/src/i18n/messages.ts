@@ -3040,29 +3040,29 @@ export const designMessages = defineMessages<DesignValues>({
   dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
   dhSection: {
     id: 'app.studio.home.section',
-    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} other {{section}}}',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} other {{section}}}',
     description: 'Studio: a section heading',
   },
   dhSectionHint: {
     id: 'app.studio.home.sectionHint',
     defaultMessage:
-      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} other {}}',
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} other {}}',
     description: 'Studio: what a section holds',
   },
   dhCount: {
     id: 'app.studio.home.count',
     defaultMessage:
-      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} other {{count}}}',
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} other {{count}}}',
     description: 'Studio: how many designs a section holds',
   },
   dhOpen: {
     id: 'app.studio.home.open',
-    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} other {Open}}',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} other {Open}}',
     description: 'Studio home: open a section',
   },
   dhNew: {
     id: 'app.studio.home.new',
-    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} other {New}}',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} other {New}}',
     description: 'Studio: start a new design',
   },
   dhSoon: { id: 'app.studio.home.soon', defaultMessage: 'Coming soon', description: 'Studio home: a design type whose editor is not built yet' },
@@ -3085,7 +3085,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhColChanged: { id: 'app.studio.design.colChanged', defaultMessage: 'Last change', description: 'Studio section: column' },
   dhKind: {
     id: 'app.studio.design.kind',
-    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} other {{kind}}}',
+    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} other {{kind}}}',
     description: 'Studio section: a design’s type',
   },
   dhStatus: {
@@ -3101,7 +3101,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
   dhEmpty: {
     id: 'app.studio.design.empty',
-    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} other {Nothing yet.}}',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} other {Nothing yet.}}',
     description: 'Studio section: nothing designed yet',
   },
   dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
@@ -3109,7 +3109,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
   dhNewHeading: {
     id: 'app.studio.design.newHeading',
-    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} other {New}}',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} other {New}}',
     description: 'Studio section: the New panel heading',
   },
   dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },
@@ -3139,4 +3139,101 @@ export const designMessages = defineMessages<DesignValues>({
   dhBarSubmitted: { id: 'app.studio.bar.submitted', defaultMessage: 'This package’s draft is submitted. It can be edited again if changes are requested.', description: 'Studio editor header: the draft is past Draft' },
   dhBarEditing: { id: 'app.studio.bar.editing', defaultMessage: 'Opening a draft…', description: 'Studio editor header: Edit pending' },
   dhBarEditFailed: { id: 'app.studio.bar.editFailed', defaultMessage: 'No draft was started: {reason}', description: 'Studio editor header: Edit failed' },
+})
+
+// An Age Band Set's table (#551; analytics.md § Age Band Sets and Population Estimates): name,
+// unit, the date age is taken at and the from–to rows, with gaps and overlaps flagged.
+type AgeBandValues = {
+  abLoading: {}
+  abUnreadable: { reason: string }
+  abTitle: {}
+  abUnit: {}
+  abUnitName: { unit: string }
+  abAgeAt: {}
+  abAgeAtName: { at: string }
+  abBands: {}
+  abFrom: {}
+  abTo: {}
+  abToHint: {}
+  abBand: {}
+  abRow: { row: number }
+  abOpen: {}
+  abAdd: {}
+  abRemove: { row: number }
+  abUp: { row: number }
+  abDown: { row: number }
+  abActions: {}
+  abProblems: { count: number }
+  abNoProblems: {}
+  abNoTitle: {}
+  abNoBands: {}
+  abNoFrom: { row: number }
+  abNegative: { row: number }
+  abGoesDown: { row: number }
+  abGap: { first: string; second: string; ages: string }
+  abOverlap: { first: string; second: string; ages: string }
+  abAge: { age: number; unit: string }
+  abAges: { from: number; to: number; unit: string }
+  abAgesOver: { from: number; unit: string }
+  abVersion: { version: string; reason: string; published: string }
+  abMajorPackage: {}
+  abSave: {}
+  abSaved: {}
+  abStale: {}
+  abReload: {}
+  abFailed: { reason: string }
+  abReadOnly: {}
+  abAuthority: {}
+}
+
+export const ageBandMessages = defineMessages<AgeBandValues>({
+  abLoading: { id: 'app.studio.ageBands.loading', defaultMessage: 'Loading the age band set…', description: 'Age band set editor: loading' },
+  abUnreadable: { id: 'app.studio.ageBands.unreadable', defaultMessage: 'This file is not an age band set the Studio can edit ({reason}). Open it in the file editor instead.', description: 'Age band set editor: the file cannot be read' },
+  abTitle: { id: 'app.studio.ageBands.title', defaultMessage: 'Name', description: 'Age band set editor: the set’s name' },
+  abUnit: { id: 'app.studio.ageBands.unit', defaultMessage: 'Unit', description: 'Age band set editor: the unit ages are counted in' },
+  abUnitName: { id: 'app.studio.ageBands.unitName', defaultMessage: '{unit, select, days {Days} weeks {Weeks} months {Months} years {Years} other {{unit}}}', description: 'Age band set editor: a unit' },
+  abAgeAt: { id: 'app.studio.ageBands.ageAt', defaultMessage: 'Age is taken at', description: 'Age band set editor: the date age is taken at' },
+  abAgeAtName: {
+    id: 'app.studio.ageBands.ageAtName',
+    defaultMessage: '{at, select, periodEnd {The end of the reporting period} periodStart {The start of the reporting period} periodDate {The date of the care counted} other {{at}}}',
+    description: 'Age band set editor: a date age is taken at',
+  },
+  abBands: { id: 'app.studio.ageBands.bands', defaultMessage: 'Bands', description: 'Age band set editor: the table of bands' },
+  abFrom: { id: 'app.studio.ageBands.from', defaultMessage: 'From', description: 'Age band set editor: column, the lowest age in a band' },
+  abTo: { id: 'app.studio.ageBands.to', defaultMessage: 'To', description: 'Age band set editor: column, the highest age in a band' },
+  abToHint: { id: 'app.studio.ageBands.toHint', defaultMessage: 'Both ages are included. Leave To empty for the last band to take every age above.', description: 'Age band set editor: how From and To work' },
+  abBand: { id: 'app.studio.ageBands.band', defaultMessage: 'Band', description: 'Age band set editor: column, the band as read' },
+  abRow: { id: 'app.studio.ageBands.row', defaultMessage: 'Band {row}', description: 'Age band set editor: a row' },
+  abOpen: { id: 'app.studio.ageBands.open', defaultMessage: 'and over', description: 'Age band set editor: an empty To' },
+  abAdd: { id: 'app.studio.ageBands.add', defaultMessage: 'Add a band', description: 'Age band set editor: add a row' },
+  abRemove: { id: 'app.studio.ageBands.remove', defaultMessage: 'Remove band {row}', description: 'Age band set editor: remove a row' },
+  abUp: { id: 'app.studio.ageBands.up', defaultMessage: 'Move band {row} up', description: 'Age band set editor: reorder' },
+  abDown: { id: 'app.studio.ageBands.down', defaultMessage: 'Move band {row} down', description: 'Age band set editor: reorder' },
+  abActions: { id: 'app.studio.ageBands.actions', defaultMessage: 'Actions', description: 'Age band set editor: column' },
+  abProblems: { id: 'app.studio.ageBands.problems', defaultMessage: '{count, plural, one {# problem} other {# problems}}', description: 'Age band set editor: problems heading' },
+  abNoProblems: { id: 'app.studio.ageBands.noProblems', defaultMessage: 'No gaps or overlaps.', description: 'Age band set editor: the bands are contiguous' },
+  abNoTitle: { id: 'app.studio.ageBands.noTitle', defaultMessage: 'The set has no name.', description: 'Age band set editor: problem' },
+  abNoBands: { id: 'app.studio.ageBands.noBands', defaultMessage: 'The set has no bands.', description: 'Age band set editor: problem' },
+  abNoFrom: { id: 'app.studio.ageBands.noFrom', defaultMessage: 'Band {row} has no From age.', description: 'Age band set editor: problem' },
+  abNegative: { id: 'app.studio.ageBands.negative', defaultMessage: 'Band {row} starts below zero.', description: 'Age band set editor: problem' },
+  abGoesDown: { id: 'app.studio.ageBands.goesDown', defaultMessage: 'Band {row} ends below where it starts.', description: 'Age band set editor: problem' },
+  abGap: { id: 'app.studio.ageBands.gap', defaultMessage: 'Gap between {first} and {second}: {ages} are in no band.', description: 'Age band set editor: problem' },
+  abOverlap: { id: 'app.studio.ageBands.overlap', defaultMessage: 'Overlap between {first} and {second}: {ages} are in both.', description: 'Age band set editor: problem' },
+  abAge: { id: 'app.studio.ageBands.age', defaultMessage: '{age} {unit}', description: 'Age band set editor: one age in a problem' },
+  abAges: { id: 'app.studio.ageBands.ages', defaultMessage: '{from}–{to} {unit}', description: 'Age band set editor: a range of ages in a problem' },
+  abAgesOver: { id: 'app.studio.ageBands.agesOver', defaultMessage: '{from} {unit} and over', description: 'Age band set editor: ages from one up, in a problem' },
+  abVersion: {
+    id: 'app.studio.ageBands.version',
+    defaultMessage:
+      '{reason, select, new {Version {version}: a first version.} unchanged {Version {version}: unchanged since it was published.} bands {Version {version}: the bands changed since {published}, so it is a major version. Indicators and reports pinned to {published} keep its bands.} renamed {Version {version}: only the name changed since {published}, a patch.} other {Version {version}}}',
+    description: 'Age band set editor: the version the set takes and why',
+  },
+  abMajorPackage: { id: 'app.studio.ageBands.majorPackage', defaultMessage: 'The package needs a major version too: change it on the draft page before submitting.', description: 'Age band set editor: a band change needs a major package version' },
+  abSave: { id: 'app.studio.ageBands.save', defaultMessage: 'Save', description: 'Age band set editor: save' },
+  abSaved: { id: 'app.studio.ageBands.saved', defaultMessage: 'Saved.', description: 'Age band set editor: saved' },
+  abStale: { id: 'app.studio.ageBands.stale', defaultMessage: 'Someone saved this draft since you opened it. Nothing was saved: reload to see their change.', description: 'Age band set editor: 412' },
+  abReload: { id: 'app.studio.ageBands.reload', defaultMessage: 'Reload', description: 'Age band set editor: reload after a 412' },
+  abFailed: { id: 'app.studio.ageBands.failed', defaultMessage: 'It was not saved: {reason}', description: 'Age band set editor: save failed' },
+  abReadOnly: { id: 'app.studio.ageBands.readOnly', defaultMessage: 'Read only: use Edit above to change it in a draft.', description: 'Age band set editor: not editable' },
+  abAuthority: { id: 'app.studio.ageBands.authority', defaultMessage: 'Check now on the draft page remains the authority.', description: 'Age band set editor: the flags are not the publication checks' },
 })

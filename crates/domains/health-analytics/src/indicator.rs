@@ -13,6 +13,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::age_bands::is_pinned;
 use crate::membership::{Reference, references};
 
 /// The FHIRPath expression language, as a FHIR `Expression.language`.
@@ -440,6 +441,8 @@ pub struct MeasureDefinition {
     pub populations: Vec<PopulationDefinition>,
     /// How many groups it has.
     pub groups: usize,
+    /// The Age Band Sets it disaggregates by, each as written: `url|version` (#551).
+    pub age_band_sets: Vec<String>,
 }
 
 /// An indicator without problems: what evaluation takes.
@@ -469,6 +472,8 @@ pub struct Indicator {
     pub populations: BTreeMap<PopulationKind, String>,
     /// The other indicators' sides its criteria require a patient to be in (#550).
     pub references: BTreeSet<Reference>,
+    /// The Age Band Sets it disaggregates by, each pinned to `url|version` (#551).
+    pub age_band_sets: Vec<String>,
 }
 
 impl Indicator {
@@ -691,6 +696,13 @@ impl MeasureDefinition {
             }
             _ => {}
         }
+        for set in &self.age_band_sets {
+            if !is_pinned(set) {
+                problems.push(format!(
+                    "the indicator disaggregates by the Age Band Set {set}, which is not pinned to a version (url|version)"
+                ));
+            }
+        }
         let canonical = format!("{url}|{version}");
         if referred.iter().any(|r: &Reference| r.measure == canonical) {
             problems.push(format!(
@@ -710,6 +722,7 @@ impl MeasureDefinition {
                 period_date,
                 populations,
                 references: referred,
+                age_band_sets: self.age_band_sets.clone(),
                 value: value.map(|(_, value)| value),
             }),
             _ => Err(problems),
@@ -837,6 +850,7 @@ mod tests {
                 ..PopulationDefinition::default()
             }],
             groups: 1,
+            age_band_sets: vec!["https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into()],
         }
     }
 
@@ -903,6 +917,25 @@ mod tests {
             unpinned.problems(),
             [
                 "the indicator's initial-population criteria refers to the indicator https://x/Measure/a, which is not pinned to a version (url|version)"
+            ]
+        );
+    }
+
+    #[test]
+    fn an_indicator_pins_the_age_band_sets_it_disaggregates_by() {
+        let indicator = anc_first_visits().indicator().expect("an indicator");
+        assert_eq!(
+            indicator.age_band_sets,
+            ["https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"]
+        );
+        let unpinned = MeasureDefinition {
+            age_band_sets: vec!["https://health.go.ug/fhir/Library/age-bands-anc".into()],
+            ..anc_first_visits()
+        };
+        assert_eq!(
+            unpinned.problems(),
+            [
+                "the indicator disaggregates by the Age Band Set https://health.go.ug/fhir/Library/age-bands-anc, which is not pinned to a version (url|version)"
             ]
         );
     }

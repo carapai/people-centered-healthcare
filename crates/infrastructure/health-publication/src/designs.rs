@@ -16,6 +16,8 @@ use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use health_analytics_app::is_age_band_set;
+
 use crate::workflows::workflow_definitions;
 use crate::{Error, Publications, failed, lifecycle_id};
 
@@ -35,6 +37,8 @@ pub enum DesignKind {
     ValueSet,
     /// A program's PlanDefinition, in the Program Designer.
     Program,
+    /// An Age Band Set Library, in the age band table (#551).
+    AgeBandSet,
 }
 
 /// One designed artefact, in the package version it opens in.
@@ -157,6 +161,7 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
             "ValueSet" => DesignKind::ValueSet,
             "PlanDefinition" => DesignKind::Program,
             "Library" if workflows.iter().any(|(p, _)| p == path) => DesignKind::Workflow,
+            "Library" => DesignKind::AgeBandSet,
             _ => continue,
         };
         let resource = packed
@@ -164,6 +169,9 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
             .get(path)
             .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
             .unwrap_or(Value::Null);
+        if kind == DesignKind::AgeBandSet && !is_age_band_set(&resource) {
+            continue;
+        }
         found.push(design(
             kind,
             title_of(&resource, path),

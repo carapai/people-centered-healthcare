@@ -28,6 +28,11 @@
 //!   (`numerator`, `denominator`), each `url|version`: a criterion reads it as
 //!   `'<url>|<version>' in %indicators.numerator`. Those indicators come from a [`Library`] and
 //!   are evaluated over the same period and patients first; a circle is refused (#550).
+//! - [`age_band_set`] reads a `Library` of type [`AGE_BAND_SET_TYPE`] as an Age Band Set (#551):
+//!   its `url`, `version` and `title`, and its inline content ([`AGE_BAND_SET_CONTENT`]),
+//!   `{"unit": "years", "ageAt": "period-end", "bands": [{"from": 10, "to": 14}, {"from": 25}]}`.
+//!   A Measure names the sets it disaggregates by on its first group's stratifiers, each with
+//!   [`AGE_BAND_SET`] (`valueCanonical`, `url|version`).
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -35,10 +40,14 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+pub use health_analytics::{AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE};
 use health_analytics::{
-    Aggregate, BetweenDefinition, Calculation, Evaluation, Expression, Indicator,
-    MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS, PatientOutcome, Period,
-    PopulationDefinition, RecordOutcome, Side, ValueSource, calculate, local_date,
+    AgeBandSetDefinition, Aggregate, BandDefinition, BetweenDefinition, Calculation, Evaluation,
+    Expression, Indicator, MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS,
+    PatientOutcome, Period, PopulationDefinition, RecordOutcome, Side, ValueSource, calculate,
+    local_date,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 use rust_decimal::Decimal;
@@ -61,6 +70,9 @@ pub const VALUE_PICK: &str = "https://carapai.github.io/people-centered-healthca
 /// sub-extensions `from` and `to` (`valueExpression`) and `unit` (`valueCode`: `days`, `weeks`,
 /// `months` or `years`).
 pub const VALUE_BETWEEN: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-value-between";
+/// On a Measure's stratifier: the Age Band Set it disaggregates by (`valueCanonical`,
+/// `url|version`).
+pub const AGE_BAND_SET: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-age-band-set";
 /// The R5 core extension naming a resource's episode of care.
 pub const WORKFLOW_EPISODE_OF_CARE: &str =
     "http://hl7.org/fhir/StructureDefinition/workflow-episodeOfCare";
@@ -125,7 +137,70 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
             .map(|e| expression(&e["valueExpression"]).unwrap_or_default()),
         populations,
         groups,
+        age_band_sets: resource["group"][0]["stratifier"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|s| extension(s, AGE_BAND_SET))
+            .map(|e| text(&e["valueCanonical"]).unwrap_or_default())
+            .collect(),
     }
+}
+
+/// Whether `resource` is an Age Band Set: a `Library` of type [`AGE_BAND_SET_TYPE`].
+pub fn is_age_band_set(resource: &Value) -> bool {
+    resource["resourceType"] == "Library"
+        && resource["type"]["coding"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|c| c["code"] == AGE_BAND_SET_TYPE)
+}
+
+/// The content of an Age Band Set `Library`: its first attachment, [`AGE_BAND_SET_CONTENT`]
+/// inline as base64 JSON.
+pub fn age_band_set_content(resource: &Value) -> Result<Value, String> {
+    let content = &resource["content"][0];
+    if content.is_null() {
+        return Err("is missing: the Library has no content".into());
+    }
+    if content["contentType"] != AGE_BAND_SET_CONTENT {
+        return Err(format!("is not {AGE_BAND_SET_CONTENT}"));
+    }
+    let data = content["data"]
+        .as_str()
+        .ok_or("is not inline: the attachment has no data")?;
+    let bytes = STANDARD
+        .decode(data)
+        .map_err(|e| format!("is not base64: {e}"))?;
+    serde_json::from_slice(&bytes).map_err(|e| format!("is not JSON: {e}"))
+}
+
+/// The Age Band Set a `Library` of type [`AGE_BAND_SET_TYPE`] defines, as written.
+pub fn age_band_set(resource: &Value) -> AgeBandSetDefinition {
+    let mut definition = AgeBandSetDefinition {
+        url: text(&resource["url"]),
+        version: text(&resource["version"]),
+        title: text(&resource["title"]).or_else(|| text(&resource["name"])),
+        ..AgeBandSetDefinition::default()
+    };
+    match age_band_set_content(resource) {
+        Ok(content) => {
+            definition.unit = text(&content["unit"]);
+            definition.age_at = text(&content["ageAt"]);
+            definition.bands = content["bands"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|band| BandDefinition {
+                    from: band["from"].as_i64(),
+                    to: band["to"].as_i64(),
+                })
+                .collect();
+        }
+        Err(why) => definition.unreadable = Some(why),
+    }
+    definition
 }
 
 /// One patient and their records.

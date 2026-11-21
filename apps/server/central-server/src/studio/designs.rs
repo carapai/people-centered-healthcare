@@ -25,6 +25,7 @@ pub(crate) enum StudioDesignKind {
     CodeSystem,
     ValueSet,
     Program,
+    AgeBandSet,
 }
 
 impl From<DesignKind> for StudioDesignKind {
@@ -36,6 +37,7 @@ impl From<DesignKind> for StudioDesignKind {
             DesignKind::CodeSystem => Self::CodeSystem,
             DesignKind::ValueSet => Self::ValueSet,
             DesignKind::Program => Self::Program,
+            DesignKind::AgeBandSet => Self::AgeBandSet,
         }
     }
 }

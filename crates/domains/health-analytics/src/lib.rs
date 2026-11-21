@@ -24,14 +24,24 @@
 //!   `%periodStart` and `%periodEnd`, and *in the previous N periods* with the starts of the
 //!   periods before ([`Period::previous_starts`]), each of the Report's period type.
 //!
+//! - **Age Band Sets** ([`age_bands`], #551): a published list of age ranges with the unit and
+//!   the date age is taken at. Validation refuses a gap or an overlap between bands. An
+//!   indicator pins the sets it disaggregates by (`url|version`) and keeps that version's bands
+//!   ([`pinned`]); disaggregating by them is #552.
+//!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
+pub mod age_bands;
 pub mod calculate;
 pub mod indicator;
 pub mod membership;
 pub mod period;
 
+pub use age_bands::{
+    AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE, AgeAt, AgeBand, AgeBandSet, AgeBandSetDefinition,
+    AgeUnit, BandDefinition, PinError, is_pinned, pinned,
+};
 pub use calculate::{
     Evaluation, Member, Observed, PatientOutcome, Reason, RecordOutcome, RecordPart, RollUpError,
     Summary, Values, calculate,

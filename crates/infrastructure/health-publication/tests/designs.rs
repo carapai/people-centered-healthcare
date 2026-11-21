@@ -163,7 +163,7 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
     assert_eq!(kinds, [(DesignKind::Form, first)]);
     assert_eq!(designs.designs[0].title, "anc-visit");
 
-    // A draft of the next version, with a workflow and its decision table and a ValueSet: they
+    // A draft of the next version, with an Age Band Set, a workflow and its decision table and a ValueSet: they
     // are read from the draft, which is its holder's.
     let mut files = package("ug.moh.anc", "1.1.0", "program", "1.0.0", items());
     let (path, bytes) = workflow("1.1.0");
@@ -174,6 +174,21 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
             "resourceType": "ValueSet", "id": "anc-visit-type", "title": "ANC visit type",
             "url": "http://health.go.ug/fhir/ValueSet/anc-visit-type", "version": "1.1.0",
             "status": "active"
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    files.insert(
+        "Library-age-bands-anc.json".into(),
+        json!({
+            "resourceType": "Library", "id": "age-bands-anc", "title": "ANC age bands",
+            "url": "http://health.go.ug/fhir/Library/age-bands-anc", "version": "1.1.0",
+            "status": "active", "type": {"coding": [{"code": "age-band-set"}]},
+            "content": [{
+                "contentType": "application/vnd.health.age-band-set+json",
+                // {"unit":"years","ageAt":"period-end","bands":[{"from":10}]}
+                "data": "eyJ1bml0IjoieWVhcnMiLCJhZ2VBdCI6InBlcmlvZC1lbmQiLCJiYW5kcyI6W3siZnJvbSI6MTB9XX0="
+            }]
         })
         .to_string()
         .into_bytes(),
@@ -203,6 +218,7 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
     assert_eq!(
         found,
         [
+            (DesignKind::AgeBandSet, "ANC age bands", None, second),
             (DesignKind::Workflow, "ANC visit", None, second),
             (DesignKind::DecisionTable, "risk", Some("risk"), second),
             (DesignKind::Form, "anc-visit", None, second),
