@@ -37,7 +37,8 @@
 //!
 //! The Workflow Studio (#498) reads the release's typed actions from `GET /workflow-actions`
 //! ([`actions`]). Its decision-table editor (#516) tries a patient and runs its checks under
-//! `/packages/{id}/decision-tables/` ([`decisions`]).
+//! `/packages/{id}/decision-tables/` ([`decisions`]), and plays a draft in its sandbox at
+//! `/packages/{id}/workflows/sandbox` ([`sandbox`], #499).
 //!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
@@ -45,6 +46,7 @@
 pub(crate) mod actions;
 pub(crate) mod decisions;
 mod dto;
+pub(crate) mod sandbox;
 pub(crate) mod terminology;
 
 use std::future::Future;
@@ -133,6 +135,7 @@ pub(crate) fn router(
             "/packages/{id}/decision-tables/check",
             post(decisions::check),
         )
+        .route("/packages/{id}/workflows/sandbox", post(sandbox::play))
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))
         .with_state(Studio {

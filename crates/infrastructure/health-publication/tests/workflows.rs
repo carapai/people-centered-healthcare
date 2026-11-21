@@ -397,3 +397,34 @@ async fn a_saved_decision_table_test_fails_submission_when_a_later_edit_changes_
         ]
     );
 }
+
+#[tokio::test]
+async fn a_sandbox_run_saved_as_a_scenario_passes_submission_unchanged() {
+    use health_workflow::definition::WorkflowDefinition;
+    use health_workflow::simulation::{Play, play, save};
+
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    // The Workflow Studio's sandbox plays the draft (#499) and *Save as scenario* writes the run.
+    let mut guarded = opd();
+    guarded["statechart"]["states"][0]["transitions"] = json!([
+        { "events": ["triaged"], "guard": "%urgent", "targets": ["done"] },
+        { "events": ["triaged"], "targets": ["consultation"] }
+    ]);
+    let definition: WorkflowDefinition =
+        serde_json::from_value(guarded.clone()).expect("definition");
+    let run: Play = serde_json::from_value(json!({
+        "guards": { "%urgent": false },
+        "moves": [{ "event": "triaged" }, { "event": "seen" }]
+    }))
+    .expect("run");
+    let played = play(&definition, &run).expect("plays");
+    assert_eq!(played.snapshots.len(), 3);
+    let scenario = save(&definition, &run, &played, "Routine visit");
+    let mut files = package("1.0.0", &guarded, "application/vnd.health.workflow+json");
+    files.insert(
+        "tests/routine-visit.json".into(),
+        serde_json::to_vec_pretty(&scenario).expect("json"),
+    );
+    let (stage, failures) = simulated(&publications, &files, "ug.moh.opd@1.0.0").await;
+    assert_eq!((stage, failures), (Stage::Review, Vec::new()));
+}

@@ -238,7 +238,8 @@ async fn session() {}
         studio::terminology::edit,
         studio::actions::list,
         studio::decisions::try_table,
-        studio::decisions::check
+        studio::decisions::check,
+        studio::sandbox::play
     ),
     components(schemas(SessionInfo))
 )]

@@ -1925,6 +1925,99 @@
         }
       }
     },
+    "/api/studio/packages/{id}/workflows/sandbox": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the sandbox.",
+        "description": "The Workflow Studio's sandbox: plays the posted (unsaved) draft Workflow Definition in the engine's simulation with every action stubbed, from the start through each move (an event or an ISO 8601 wait), with the author's guard answers and gate outcomes. It answers what held after each move: the configuration, the stubbed actions, the pending timers, the open Tasks and the events the configuration accepts. A move that would evaluate an unanswered guard is not taken and the guards are reported, never guessed. The run comes back as a `workflow-scenario` file for *Save as scenario*.",
+        "operationId": "playStudioWorkflowSandbox",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioSandboxInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioSandbox"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a Workflow Definition, an invalid statechart, or a malformed wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/{action}": {
       "post": {
         "tags": [
@@ -4064,6 +4157,219 @@
           }
         ],
         "description": "A sample value: a flag, a whole number or a code."
+      },
+      "StudioSandbox": {
+        "type": "object",
+        "description": "How the run went.",
+        "required": [
+          "guards",
+          "gates",
+          "steps",
+          "unanswered",
+          "scenario"
+        ],
+        "properties": {
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every Financial Gate of the definition."
+          },
+          "guards": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every guard of the definition, for the author to answer."
+          },
+          "refused": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the next move could not be taken, if it could not for another reason."
+          },
+          "scenario": {
+            "type": "string",
+            "description": "The run as the text of a `workflow-scenario` file of the package's `tests/` folder."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioSandboxStep"
+            },
+            "description": "The start, then each move taken."
+          },
+          "unanswered": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The guards the next move needs answered: it was not taken."
+          }
+        }
+      },
+      "StudioSandboxInput": {
+        "type": "object",
+        "description": "A sandbox run of a draft definition.",
+        "required": [
+          "definition"
+        ],
+        "properties": {
+          "definition": {
+            "type": "object",
+            "description": "The draft Workflow Definition, as the Studio holds it."
+          },
+          "gates": {
+            "type": "object",
+            "description": "The outcome of each Financial Gate, by canonical URL: `pass`, `defer` or `block`. An\nunanswered gate defers.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "guards": {
+            "type": "object",
+            "description": "The author's answer to each guard, by its expression.",
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "moves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioSandboxMove"
+            },
+            "description": "The moves so far, in order."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name the run takes as a scenario."
+          }
+        }
+      },
+      "StudioSandboxMove": {
+        "type": "object",
+        "description": "One move: an event to send, or a wait.",
+        "properties": {
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The event to send."
+          },
+          "wait": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How long to wait (ISO 8601), firing the timers that fall due."
+          }
+        }
+      },
+      "StudioSandboxStep": {
+        "type": "object",
+        "description": "What held at the start, or after a move.",
+        "required": [
+          "configuration",
+          "actions",
+          "timers",
+          "tasks",
+          "running",
+          "accepts",
+          "elapsed"
+        ],
+        "properties": {
+          "accepts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The events the configuration accepts."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The typed actions the move ran, stubbed (recorded, never carried out)."
+          },
+          "configuration": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The active states."
+          },
+          "elapsed": {
+            "type": "string",
+            "description": "How long since the start (ISO 8601)."
+          },
+          "running": {
+            "type": "boolean",
+            "description": "Whether the instance is still running."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioSandboxTask"
+            },
+            "description": "The open Tasks."
+          },
+          "timers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioSandboxTimer"
+            },
+            "description": "The pending timers, earliest first."
+          }
+        }
+      },
+      "StudioSandboxTask": {
+        "type": "object",
+        "description": "An open Task.",
+        "required": [
+          "state",
+          "status"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Its state."
+          },
+          "status": {
+            "type": "string",
+            "description": "`ready` or `in-progress`."
+          }
+        }
+      },
+      "StudioSandboxTimer": {
+        "type": "object",
+        "description": "A pending timer.",
+        "required": [
+          "event",
+          "dueIn"
+        ],
+        "properties": {
+          "dueIn": {
+            "type": "string",
+            "description": "How long until it falls due (ISO 8601)."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event it raises."
+          }
+        }
       },
       "StudioValueSet": {
         "type": "object",

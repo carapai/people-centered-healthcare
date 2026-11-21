@@ -154,3 +154,148 @@ fn a_gate_passes_defers_or_blocks_with_its_cashier_task() {
         Vec::<String>::new()
     );
 }
+
+// The Workflow Studio's sandbox (#499).
+
+fn moves(json: &str) -> Vec<Move> {
+    serde_json::from_str(json).expect("moves")
+}
+
+#[test]
+fn the_sandbox_shows_what_holds_at_the_start_with_actions_stubbed() {
+    let played = play(&definition(), &Play::default()).expect("plays");
+    assert_eq!(played.unanswered, Vec::<String>::new());
+    let [start] = played.snapshots.as_slice() else {
+        panic!("one snapshot: {played:?}");
+    };
+    assert_eq!(start.configuration, ["triage"]);
+    assert_eq!(start.actions, ["patient-flow/open-queue-entry@1"]);
+    assert_eq!(
+        start.timers,
+        [PendingTimer {
+            event: "triage.overdue".into(),
+            due_in: SignedDuration::from_hours(1)
+        }]
+    );
+    assert_eq!(
+        start.tasks,
+        [ExpectedTask {
+            state: "triage".into(),
+            status: "ready".into()
+        }]
+    );
+    assert_eq!(start.accepts, ["triage.overdue", "triaged"]);
+    assert!(start.running);
+    assert_eq!(start.elapsed, SignedDuration::ZERO);
+}
+
+#[test]
+fn an_unanswered_guard_is_reported_and_its_move_not_taken() {
+    let unanswered = Play {
+        moves: moves(r#"[{ "event": "triaged" }, { "event": "seen" }]"#),
+        ..Play::default()
+    };
+    let played = play(&definition(), &unanswered).expect("plays");
+    assert_eq!(played.unanswered, ["%urgent"]);
+    assert_eq!(played.snapshots.len(), 1, "only the start is shown");
+    assert_eq!(played.snapshots[0].configuration, ["triage"]);
+    assert_eq!(played.refused, None);
+
+    let answered = Play {
+        guards: BTreeMap::from([("%urgent".to_owned(), false)]),
+        ..unanswered
+    };
+    let played = play(&definition(), &answered).expect("plays");
+    assert_eq!(played.unanswered, Vec::<String>::new());
+    let configurations: Vec<_> = played
+        .snapshots
+        .iter()
+        .map(|s| s.configuration.clone())
+        .collect();
+    assert_eq!(configurations, [["triage"], ["consultation"], ["done"]]);
+    assert!(!played.snapshots[2].running);
+    assert_eq!(played.snapshots[2].accepts, Vec::<String>::new());
+}
+
+#[test]
+fn waiting_fires_the_timers_that_fall_due_and_a_bad_move_is_refused() {
+    let waits = Play {
+        moves: moves(
+            r#"[{ "wait": "PT30M" }, { "wait": "PT30M" }, { "event": "x", "wait": "PT1M" }]"#,
+        ),
+        ..Play::default()
+    };
+    let played = play(&definition(), &waits).expect("plays");
+    assert_eq!(played.snapshots.len(), 3);
+    assert_eq!(
+        played.snapshots[1].timers[0].due_in,
+        SignedDuration::from_mins(30)
+    );
+    assert_eq!(played.snapshots[2].actions, ["communication/notify@1"]);
+    assert_eq!(played.snapshots[2].timers, []);
+    assert_eq!(played.snapshots[2].elapsed, SignedDuration::from_hours(1));
+    assert_eq!(
+        played.refused.as_deref(),
+        Some("a step sends one event or waits, not both or neither")
+    );
+}
+
+#[test]
+fn a_run_saved_as_a_scenario_passes_unchanged() {
+    let run = Play {
+        guards: BTreeMap::from([
+            ("%urgent".to_owned(), false),
+            ("%never-asked".to_owned(), true),
+        ]),
+        gates: BTreeMap::new(),
+        moves: moves(r#"[{ "wait": "PT1H" }, { "event": "triaged" }, { "event": "seen" }]"#),
+    };
+    let played = play(&definition(), &run).expect("plays");
+    let scenario = save(&definition(), &run, &played, "Routine visit");
+    assert_eq!(scenario.kind, SCENARIO_TYPE);
+    assert_eq!(
+        scenario.definition,
+        "https://health.go.ug/fhir/Library/opd-visit|1.0.0"
+    );
+    // Only the answers the run used are kept.
+    assert_eq!(
+        scenario.guards,
+        BTreeMap::from([("%urgent".to_owned(), false)])
+    );
+    assert_eq!(scenario.steps.len(), 4);
+    assert_eq!(scenario.steps[0].event, None);
+    assert_eq!(scenario.steps[1].wait, Some(SignedDuration::from_hours(1)));
+    assert_eq!(
+        scenario.steps[2].expect.configuration.as_deref(),
+        Some(&["consultation".to_owned()][..])
+    );
+    assert_eq!(simulate(&definition(), &scenario), Vec::<String>::new());
+    // It survives being written to and read from its file.
+    let file: Scenario =
+        serde_json::from_str(&serde_json::to_string(&scenario).expect("json")).expect("read");
+    assert_eq!(simulate(&definition(), &file), Vec::<String>::new());
+}
+
+#[test]
+fn a_gate_answered_in_the_sandbox_is_kept_in_the_scenario() {
+    let gate = "https://health.go.ug/fhir/FinancialGate/before-lab".to_owned();
+    let run = Play {
+        guards: BTreeMap::new(),
+        gates: BTreeMap::from([(gate.clone(), "block".to_owned())]),
+        moves: moves(r#"[{ "event": "sent" }]"#),
+    };
+    let played = play(&gated(), &run).expect("plays");
+    assert_eq!(played.snapshots[1].configuration, ["payment"]);
+    assert_eq!(played.gates, BTreeMap::from([(gate, "block".to_owned())]));
+    let scenario = save(&gated(), &run, &played, "Blocked at the till");
+    assert_eq!(simulate(&gated(), &scenario), Vec::<String>::new());
+}
+
+#[test]
+fn guards_and_gates_list_each_once() {
+    assert_eq!(guards(&definition().statechart), ["%urgent"]);
+    assert_eq!(
+        gates(&gated().statechart),
+        ["https://health.go.ug/fhir/FinancialGate/before-lab"]
+    );
+}

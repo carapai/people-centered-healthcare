@@ -1,4 +1,4 @@
-import type { StudioDecisionCheck, StudioDecisionTry, StudioProblem, StudioSample, StudioWorkflowAction } from '@health/api-client'
+import type { StudioDecisionCheck, StudioDecisionTry, StudioProblem, StudioSample, StudioSandbox, StudioSandboxMove, StudioWorkflowAction } from '@health/api-client'
 
 import type { Transport } from '../../../platform/types'
 import { StudioError } from '../api'
@@ -75,4 +75,37 @@ export function checkTable(
   signal?: AbortSignal,
 ) {
   return post<StudioDecisionCheck>(transport, 'checkStudioDecisionTable', id, 'check', body, signal)
+}
+
+// The Workflow Studio's sandbox (#499): central plays the draft, unsaved edits included, in the
+// engine's simulation with every action stubbed, and answers each step. The browser keeps only
+// the author's answers and the moves; it never decides a transition.
+
+export type { StudioSandbox, StudioSandboxMove, StudioSandboxStep } from '@health/api-client'
+
+/** Plays `run` on draft `definition` from the start: what held after each move taken, the
+ * guards the next move needs answered, and the run as a `workflow-scenario` file. */
+export async function playSandbox(
+  transport: Transport,
+  id: string,
+  body: {
+    definition: WorkflowDefinition
+    guards: Record<string, boolean>
+    gates: Record<string, string>
+    moves: StudioSandboxMove[]
+    name?: string
+  },
+  signal?: AbortSignal,
+): Promise<StudioSandbox> {
+  const response = await transport.request({
+    method: 'POST',
+    path: `/studio/packages/${encodeURIComponent(id)}/workflows/sandbox`,
+    body,
+    ...(signal === undefined ? {} : { signal }),
+  })
+  const { parseResponse } = await import('@health/api-client')
+  const value = parseResponse('playStudioWorkflowSandbox', response.status, response.body)
+  if (response.status === 200) return value as StudioSandbox
+  const problem = value as StudioProblem | null
+  throw new StudioError(response.status, problem?.detail ?? '', problem?.refusal ?? null)
 }

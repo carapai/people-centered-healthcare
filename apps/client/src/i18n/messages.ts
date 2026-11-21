@@ -2710,3 +2710,93 @@ export const decisionMessages = defineMessages<DecisionValues>({
   dtFails: { id: 'app.studio.decision.fails', defaultMessage: 'Fails:', description: 'Decision tables: test fails' },
   dtNothing: { id: 'app.studio.decision.nothing', defaultMessage: 'nothing', description: 'Decision tables: no outcome' },
 })
+
+type SandboxValues = {
+  sbMode: {}
+  sbModeName: { mode: string }
+  sbHeading: {}
+  sbHint: {}
+  sbPlaying: {}
+  sbFailed: { reason: string }
+  sbUnanswered: { guards: string }
+  sbRefused: { reason: string }
+  sbGuards: {}
+  sbGuardsNone: {}
+  sbAnswer: { guard: string }
+  sbAnswerName: { answer: string }
+  sbGates: {}
+  sbGate: { gate: string }
+  sbOutcomeName: { outcome: string }
+  sbNow: { step: number }
+  sbConfiguration: {}
+  sbActions: {}
+  sbTasks: {}
+  sbTask: { state: string; status: string }
+  sbTimers: {}
+  sbTimer: { event: string; dueIn: string }
+  sbNone: {}
+  sbElapsed: { elapsed: string }
+  sbCompleted: {}
+  sbEvents: {}
+  sbEventsNone: {}
+  sbSend: { event: string }
+  sbWaitFor: { event: string; dueIn: string }
+  sbWait: {}
+  sbWaitButton: {}
+  sbUndo: {}
+  sbRestart: {}
+  sbHistory: {}
+  sbHistoryStart: { configuration: string }
+  sbHistoryMove: { kind: string; event: string; wait: string; configuration: string }
+  sbHistoryNotTaken: { kind: string; event: string; wait: string }
+  sbScenarioName: {}
+  sbSave: {}
+  sbSaved: { path: string }
+  sbSaveFailed: { reason: string }
+  sbActive: {}
+}
+
+export const sandboxMessages = defineMessages<SandboxValues>({
+  sbMode: { id: 'app.studio.sandbox.mode', defaultMessage: 'Right panel', description: 'Workflow sandbox: the group of mode buttons' },
+  sbModeName: { id: 'app.studio.sandbox.modeName', defaultMessage: '{mode, select, sandbox {Sandbox} other {Inspect}}', description: 'Workflow sandbox: a mode button' },
+  sbHeading: { id: 'app.studio.sandbox.heading', defaultMessage: 'Sandbox', description: 'Workflow sandbox: heading' },
+  sbHint: { id: 'app.studio.sandbox.hint', defaultMessage: 'Central plays the draft, unsaved edits included, with every action stubbed: nothing is carried out. Answer each guard; a move that needs an unanswered guard is not taken.', description: 'Workflow sandbox: hint' },
+  sbPlaying: { id: 'app.studio.sandbox.playing', defaultMessage: 'Playing…', description: 'Workflow sandbox: waiting for the server' },
+  sbFailed: { id: 'app.studio.sandbox.failed', defaultMessage: 'The sandbox could not play the draft: {reason}', description: 'Workflow sandbox: request failed' },
+  sbUnanswered: { id: 'app.studio.sandbox.unanswered', defaultMessage: 'The next move was not taken: answer {guards} first.', description: 'Workflow sandbox: unanswered guards' },
+  sbRefused: { id: 'app.studio.sandbox.refused', defaultMessage: 'The next move was not taken: {reason}', description: 'Workflow sandbox: move refused' },
+  sbGuards: { id: 'app.studio.sandbox.guards', defaultMessage: 'Guard answers', description: 'Workflow sandbox: heading' },
+  sbGuardsNone: { id: 'app.studio.sandbox.guardsNone', defaultMessage: 'The definition has no guards.', description: 'Workflow sandbox: no guards' },
+  sbAnswer: { id: 'app.studio.sandbox.answer', defaultMessage: 'Answer to {guard}', description: 'Workflow sandbox: field' },
+  sbAnswerName: { id: 'app.studio.sandbox.answerName', defaultMessage: '{answer, select, true {Holds} false {Does not hold} other {Not answered}}', description: 'Workflow sandbox: a guard answer' },
+  sbGates: { id: 'app.studio.sandbox.gates', defaultMessage: 'Payment gates', description: 'Workflow sandbox: heading' },
+  sbGate: { id: 'app.studio.sandbox.gate', defaultMessage: 'Outcome of {gate}', description: 'Workflow sandbox: field' },
+  sbOutcomeName: { id: 'app.studio.sandbox.outcomeName', defaultMessage: '{outcome, select, pass {Pass} block {Block} other {Defer}}', description: 'Workflow sandbox: a gate outcome' },
+  sbNow: { id: 'app.studio.sandbox.now', defaultMessage: '{step, plural, =0 {At the start} other {After move #}}', description: 'Workflow sandbox: heading of the current step' },
+  sbConfiguration: { id: 'app.studio.sandbox.configuration', defaultMessage: 'Active states', description: 'Workflow sandbox: heading' },
+  sbActions: { id: 'app.studio.sandbox.actions', defaultMessage: 'Actions (stubbed)', description: 'Workflow sandbox: heading' },
+  sbTasks: { id: 'app.studio.sandbox.tasks', defaultMessage: 'Open tasks', description: 'Workflow sandbox: heading' },
+  sbTask: { id: 'app.studio.sandbox.task', defaultMessage: '{state} ({status})', description: 'Workflow sandbox: an open task' },
+  sbTimers: { id: 'app.studio.sandbox.timers', defaultMessage: 'Pending timers', description: 'Workflow sandbox: heading' },
+  sbTimer: { id: 'app.studio.sandbox.timer', defaultMessage: '{event} in {dueIn}', description: 'Workflow sandbox: a pending timer' },
+  sbNone: { id: 'app.studio.sandbox.none', defaultMessage: 'None', description: 'Workflow sandbox: an empty list' },
+  sbElapsed: { id: 'app.studio.sandbox.elapsed', defaultMessage: 'Time since the start: {elapsed}', description: 'Workflow sandbox: elapsed time' },
+  sbCompleted: { id: 'app.studio.sandbox.completed', defaultMessage: 'The instance is complete.', description: 'Workflow sandbox: the instance finished' },
+  sbEvents: { id: 'app.studio.sandbox.events', defaultMessage: 'Send an event', description: 'Workflow sandbox: heading' },
+  sbEventsNone: { id: 'app.studio.sandbox.eventsNone', defaultMessage: 'No active state takes an event.', description: 'Workflow sandbox: no events' },
+  sbSend: { id: 'app.studio.sandbox.send', defaultMessage: 'Send {event}', description: 'Workflow sandbox: button' },
+  sbWaitFor: { id: 'app.studio.sandbox.waitFor', defaultMessage: 'Wait {dueIn} for {event}', description: 'Workflow sandbox: button' },
+  sbWait: { id: 'app.studio.sandbox.wait', defaultMessage: 'Wait (ISO 8601, e.g. PT30M)', description: 'Workflow sandbox: field' },
+  sbWaitButton: { id: 'app.studio.sandbox.waitButton', defaultMessage: 'Wait', description: 'Workflow sandbox: button' },
+  sbUndo: { id: 'app.studio.sandbox.undo', defaultMessage: 'Undo', description: 'Workflow sandbox: button' },
+  sbRestart: { id: 'app.studio.sandbox.restart', defaultMessage: 'Restart', description: 'Workflow sandbox: button' },
+  sbHistory: { id: 'app.studio.sandbox.history', defaultMessage: 'History', description: 'Workflow sandbox: heading' },
+  sbHistoryStart: { id: 'app.studio.sandbox.historyStart', defaultMessage: 'Started in {configuration}', description: 'Workflow sandbox: history entry' },
+  sbHistoryMove: { id: 'app.studio.sandbox.historyMove', defaultMessage: '{kind, select, wait {Waited {wait}} other {Sent {event}}} → {configuration}', description: 'Workflow sandbox: history entry' },
+  sbHistoryNotTaken: { id: 'app.studio.sandbox.historyNotTaken', defaultMessage: '{kind, select, wait {Waited {wait}} other {Sent {event}}}: not taken', description: 'Workflow sandbox: history entry not taken' },
+  sbScenarioName: { id: 'app.studio.sandbox.scenarioName', defaultMessage: 'Scenario name', description: 'Workflow sandbox: field' },
+  sbSave: { id: 'app.studio.sandbox.save', defaultMessage: 'Save as scenario', description: 'Workflow sandbox: button' },
+  sbSaved: { id: 'app.studio.sandbox.saved', defaultMessage: 'Saved as {path}. Submission runs it.', description: 'Workflow sandbox: scenario saved' },
+  sbSaveFailed: { id: 'app.studio.sandbox.saveFailed', defaultMessage: 'The scenario was not saved: {reason}', description: 'Workflow sandbox: scenario not saved' },
+  sbActive: { id: 'app.studio.sandbox.active', defaultMessage: 'active', description: 'Workflow sandbox: an active state in the outline' },
+})

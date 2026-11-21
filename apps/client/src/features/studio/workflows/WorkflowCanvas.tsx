@@ -4,20 +4,21 @@ import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
 import { useIntl } from 'react-intl'
 
-import { workflowMessages as m } from '../../../i18n/messages'
+import { sandboxMessages as bm, workflowMessages as m } from '../../../i18n/messages'
 import { arrange, LEAF_WIDTH } from './layout'
 import { activityOf, edgeId, edges, rows, triggerOf, type Selection, type State, type WorkflowDefinition } from './model'
 
 // The canvas (studio.md § The Workflow Studio): the statechart on @xyflow/react, laid out left
 // to right by `layout.ts`. Compound and parallel states are group nodes holding their children;
 // dragging from one state's right handle to another adds a transition. Problems are outlined in
-// red. React Flow's attribution link stays (studio.md). Zooming on scroll is off, so the page
+// red; in the sandbox, the active states are lit. React Flow's attribution link stays (studio.md). Zooming on scroll is off, so the page
 // scrolls over the canvas. Everything here can also be done from the outline and the inspector
 // with the keyboard alone (WCAG 2.2 AA, 2.5.7 Dragging Movements).
 
 interface StateData extends Record<string, unknown> {
   state: State
   flagged: boolean
+  active: boolean
   detail: string
 }
 
@@ -37,6 +38,7 @@ const node = css({
   '&[data-kind=parallel]': { borderStyle: 'dashed' },
   '&[data-kind=final]': { borderRadius: '2xl', borderWidth: '3px', borderStyle: 'double' },
   '&[data-flagged=true]': { borderColor: 'danger.text', borderWidth: '2px' },
+  '&[data-active=true]': { bg: 'accent.subtle', borderColor: 'accent.default', borderWidth: '3px' },
   '.selected > &': { outline: '3px solid', outlineColor: 'focusRing', outlineOffset: '1px' },
 })
 
@@ -44,7 +46,7 @@ function StateNode({ data }: NodeProps<Node<StateData>>) {
   const { state } = data
   const group = (state.children ?? []).length > 0
   return (
-    <div className={node} data-group={group} data-kind={state.kind} data-flagged={data.flagged}>
+    <div className={node} data-group={group} data-kind={state.kind} data-flagged={data.flagged} data-active={data.active}>
       <Handle type="target" position={Position.Left} />
       <div className={css({ fontWeight: 'semibold', overflowWrap: 'anywhere' })}>{state.id}</div>
       {data.detail === '' ? null : <div className={css({ color: 'fg.muted' })}>{data.detail}</div>}
@@ -60,12 +62,14 @@ export interface CanvasProps {
   selected: Selection | null
   /** The ids of the states and transitions a check is about. */
   flagged: Set<string>
+  /** The states active in the sandbox's last step, lit. */
+  active?: Set<string> | undefined
   onSelect: (selection: Selection | null) => void
   /** Adds a transition; absent when the draft is read only. */
   onConnect?: ((source: string, target: string) => void) | undefined
 }
 
-export function WorkflowCanvas({ definition, selected, flagged, onSelect, onConnect }: CanvasProps) {
+export function WorkflowCanvas({ definition, selected, flagged, active, onSelect, onConnect }: CanvasProps) {
   const intl = useIntl()
   const boxes = useMemo(() => arrange(definition), [definition])
   const selectedId = selected === null ? null : selected.kind === 'state' ? selected.id : edgeId(selected.source, selected.index)
@@ -87,10 +91,10 @@ export function WorkflowCanvas({ definition, selected, flagged, onSelect, onConn
       style: { width: box.width, height: box.height },
       width: box.width,
       height: box.height,
-      data: { state, flagged: flagged.has(state.id), detail: describe(state) },
+      data: { state, flagged: flagged.has(state.id), active: active?.has(state.id) ?? false, detail: describe(state) },
       selected: selectedId === state.id,
       draggable: false,
-      ariaLabel: intl.formatMessage(m.wsNodeLabel, { id: state.id, kind: state.kind }),
+      ariaLabel: `${intl.formatMessage(m.wsNodeLabel, { id: state.id, kind: state.kind })}${active?.has(state.id) === true ? `, ${intl.formatMessage(bm.sbActive)}` : ''}`,
       zIndex: depth,
     }
   })
