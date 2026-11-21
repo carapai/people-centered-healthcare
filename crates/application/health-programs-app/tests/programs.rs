@@ -100,6 +100,52 @@ fn a_program_plan_definition_is_read() {
         ["https://health.go.ug/fhir/Library/art-program-visit"]
     );
 
+    // Regimen templates: a stage's ordered rules, each counted among the regimens.
+    let mut templated = plan("art-program", "HIV care", None);
+    templated["action"] = json!([{
+        "linkId": "initiation",
+        "action": [
+            { "title": "Baseline CD4", "definitionCanonical": "https://health.go.ug/fhir/ActivityDefinition/order-cd4" },
+            { "selectionBehavior": "at-most-one", "action": [
+                { "title": "TLD with extra DTG",
+                  "condition": [{ "kind": "applicability", "expression": { "language": "text/fhirpath", "expression": "%patient.onTb" } }],
+                  "definitionCanonical": "https://health.go.ug/fhir/ActivityDefinition/tld-dtg|1.0.0",
+                  "documentation": [{ "type": "citation", "citation": "Guidelines 2024, 6.2" }] },
+                { "title": "TLD", "definitionCanonical": "https://health.go.ug/fhir/ActivityDefinition/tld|1.0.0" }
+            ] }
+        ]
+    }]);
+    let templated = program(&templated).expect("program");
+    assert_eq!(
+        templated
+            .regimen_rules
+            .iter()
+            .map(|r| (
+                r.stage.as_str(),
+                r.title.as_str(),
+                r.condition.as_deref(),
+                r.cites.clone()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            (
+                "initiation",
+                "TLD with extra DTG",
+                Some("%patient.onTb"),
+                vec!["Guidelines 2024, 6.2".to_owned()]
+            ),
+            ("initiation", "TLD", None, vec![])
+        ]
+    );
+    assert_eq!(
+        templated.regimens,
+        [
+            "https://health.go.ug/fhir/ActivityDefinition/art-program-first-line",
+            "https://health.go.ug/fhir/ActivityDefinition/tld-dtg|1.0.0",
+            "https://health.go.ug/fhir/ActivityDefinition/tld|1.0.0"
+        ]
+    );
+
     let mut order_set = plan("x", "X", None);
     order_set["type"]["coding"][0]["code"] = json!("order-set");
     assert!(matches!(

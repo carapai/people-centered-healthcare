@@ -18,6 +18,7 @@ fn art() -> Program {
         regimens: vec!["https://health.go.ug/fhir/ActivityDefinition/tdf-3tc-dtg".into()],
         questionnaires: vec![],
         sources: vec!["https://health.go.ug/protocols/consolidated-hiv-2024".into()],
+        regimen_rules: vec![],
     }
 }
 
@@ -170,6 +171,38 @@ fn regimens_cite_an_approved_source() {
         [
             "https://health.go.ug/fhir/ActivityDefinition/home-brew",
             "https://health.go.ug/fhir/ActivityDefinition/uncited"
+        ]
+    );
+}
+
+#[test]
+fn a_regimen_template_needs_its_condition_activity_and_an_approved_source() {
+    let rule =
+        |title: &str, condition: Option<&str>, activity: Option<&str>, cites: &str| RegimenRule {
+            stage: "initiation".into(),
+            title: title.into(),
+            condition: condition.map(str::to_owned),
+            activity: activity.map(str::to_owned),
+            cites: vec![cites.into()],
+        };
+    let source = "https://health.go.ug/protocols/consolidated-hiv-2024";
+    let tld = "https://health.go.ug/fhir/ActivityDefinition/tdf-3tc-dtg";
+    let mut program = art();
+    program.regimen_rules = vec![
+        rule("TLD", Some("%patient.weight() >= 30"), Some(tld), source),
+        rule("Blog", Some("true"), Some(tld), "https://example.org/blog"),
+        rule("Anyone", Some(" "), None, source),
+    ];
+    let found: Vec<(&str, RuleProblem)> = rule_problems(&program)
+        .into_iter()
+        .map(|(r, p)| (r.title.as_str(), p))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("Blog", RuleProblem::Unapproved),
+            ("Anyone", RuleProblem::NoCondition),
+            ("Anyone", RuleProblem::NoActivity)
         ]
     );
 }

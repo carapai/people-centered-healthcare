@@ -45,6 +45,7 @@ import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
 import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
+import { Route as StudioIdProgramsSplatRouteImport } from './routes/studio.$id_.programs.$'
 import { Route as StudioIdTerminologySplatRouteImport } from './routes/studio.$id_.terminology.$'
 import { Route as StudioIdWorkflowsSplatRouteImport } from './routes/studio.$id_.workflows.$'
 
@@ -228,6 +229,11 @@ const StudioIdFormsSplatRoute = StudioIdFormsSplatRouteImport.update({
   path: '/studio/$id/forms/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIdProgramsSplatRoute = StudioIdProgramsSplatRouteImport.update({
+  id: '/studio/$id_/programs/$',
+  path: '/studio/$id/programs/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioIdTerminologySplatRoute =
   StudioIdTerminologySplatRouteImport.update({
     id: '/studio/$id_/terminology/$',
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
   '/studio/$id/workflows/$': typeof StudioIdWorkflowsSplatRoute
 }
@@ -317,6 +324,7 @@ export interface FileRoutesByTo {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
   '/studio/$id/workflows/$': typeof StudioIdWorkflowsSplatRoute
 }
@@ -358,6 +366,7 @@ export interface FileRoutesById {
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
+  '/studio/$id_/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id_/terminology/$': typeof StudioIdTerminologySplatRoute
   '/studio/$id_/workflows/$': typeof StudioIdWorkflowsSplatRoute
 }
@@ -400,6 +409,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
+    | '/studio/$id/programs/$'
     | '/studio/$id/terminology/$'
     | '/studio/$id/workflows/$'
   fileRoutesByTo: FileRoutesByTo
@@ -440,6 +450,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
+    | '/studio/$id/programs/$'
     | '/studio/$id/terminology/$'
     | '/studio/$id/workflows/$'
   id:
@@ -480,6 +491,7 @@ export interface FileRouteTypes {
     | '/records/$type/$id'
     | '/studio/$id_/files/$'
     | '/studio/$id_/forms/$'
+    | '/studio/$id_/programs/$'
     | '/studio/$id_/terminology/$'
     | '/studio/$id_/workflows/$'
   fileRoutesById: FileRoutesById
@@ -521,6 +533,7 @@ export interface RootRouteChildren {
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
   StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
+  StudioIdProgramsSplatRoute: typeof StudioIdProgramsSplatRoute
   StudioIdTerminologySplatRoute: typeof StudioIdTerminologySplatRoute
   StudioIdWorkflowsSplatRoute: typeof StudioIdWorkflowsSplatRoute
 }
@@ -779,6 +792,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdFormsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id_/programs/$': {
+      id: '/studio/$id_/programs/$'
+      path: '/studio/$id/programs/$'
+      fullPath: '/studio/$id/programs/$'
+      preLoaderRoute: typeof StudioIdProgramsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/$id_/terminology/$': {
       id: '/studio/$id_/terminology/$'
       path: '/studio/$id/terminology/$'
@@ -833,6 +853,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecordsTypeIdRoute: RecordsTypeIdRoute,
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
   StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
+  StudioIdProgramsSplatRoute: StudioIdProgramsSplatRoute,
   StudioIdTerminologySplatRoute: StudioIdTerminologySplatRoute,
   StudioIdWorkflowsSplatRoute: StudioIdWorkflowsSplatRoute,
 }

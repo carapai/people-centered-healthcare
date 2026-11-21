@@ -12,7 +12,8 @@ test('the package list and a draft read from top to bottom, with refused actions
   await expect(page.getByRole('heading', { name: 'Studio', level: 1 })).toBeVisible()
   const grid = page.getByRole('grid', { name: 'Studio' })
   await expect(grid.getByText('ug.moh.opd', { exact: false })).toBeVisible()
-  await expect(grid.getByText('Nothing for you')).toBeVisible()
+  // The OPD draft and the ART program's, both waiting for their author.
+  await expect(grid.getByText('Nothing for you')).toHaveCount(2)
   await noViolations(page)
 
   await grid.getByRole('columnheader').first().focus()

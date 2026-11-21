@@ -1,0 +1,16 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "order-hiv-vl",
+  "url": "https://health.go.ug/fhir/ActivityDefinition/order-hiv-vl",
+  "version": "1.0.0",
+  "name": "OrderHivVl",
+  "title": "Order an HIV viral load",
+  "status": "active",
+  "kind": "ServiceRequest",
+  "relatedArtifact": [
+    {
+      "type": "derived-from",
+      "resource": "https://health.go.ug/protocols/consolidated-hiv-guidelines-2024"
+    }
+  ]
+}

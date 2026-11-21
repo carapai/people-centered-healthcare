@@ -1,0 +1,17 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "art-enrolment",
+  "url": "https://health.go.ug/fhir/Questionnaire/art-enrolment",
+  "version": "1.0.0",
+  "name": "ArtEnrolment",
+  "title": "HIV enrolment",
+  "status": "active",
+  "item": [
+    {
+      "linkId": "enrolled-on",
+      "text": "Date of enrolment",
+      "type": "date",
+      "required": true
+    }
+  ]
+}

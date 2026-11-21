@@ -1,0 +1,16 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "order-cd4",
+  "url": "https://health.go.ug/fhir/ActivityDefinition/order-cd4",
+  "version": "1.0.0",
+  "name": "OrderCd4",
+  "title": "Order a CD4 count",
+  "status": "active",
+  "kind": "ServiceRequest",
+  "relatedArtifact": [
+    {
+      "type": "derived-from",
+      "resource": "https://health.go.ug/protocols/consolidated-hiv-guidelines-2024"
+    }
+  ]
+}

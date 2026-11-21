@@ -11,6 +11,9 @@
 //!   enrols the patient in an episode of its own that names the old one (`transferred_from`).
 //! - **Regimens** come only from approved sources ([`unapproved_regimens`]): every regimen a
 //!   program uses cites one of the program's protocol sources.
+//! - **Regimen templates** ([`RegimenRule`], [`rule_problems`]) are an ordered list of rules at a
+//!   stage: the first whose condition holds chooses the regimen. Each rule needs its FHIRPath
+//!   condition, the ActivityDefinition it uses and one of the program's protocol sources.
 
 use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -48,6 +51,38 @@ pub struct Program {
     pub questionnaires: Vec<String>,
     /// The approved protocol sources it cites.
     pub sources: Vec<String>,
+    /// Its regimen templates, in order, at the stages that choose a regimen.
+    pub regimen_rules: Vec<RegimenRule>,
+}
+
+/// One regimen template (program-designer.md § The Program Designer): a rule of a stage's
+/// ordered list, of which the first whose condition holds chooses the regimen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegimenRule {
+    /// The care-workflow state it is chosen at.
+    pub stage: String,
+    /// What a person reads.
+    pub title: String,
+    /// When it applies: FHIRPath over the patient.
+    pub condition: Option<String>,
+    /// The ActivityDefinition (canonical) it uses.
+    pub activity: Option<String>,
+    /// The protocol sources it cites.
+    pub cites: Vec<String>,
+}
+
+/// Why a regimen template may not be published.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum RuleProblem {
+    /// No FHIRPath condition: it would match every patient.
+    #[error("has no FHIRPath condition")]
+    NoCondition,
+    /// It names no ActivityDefinition.
+    #[error("uses no ActivityDefinition")]
+    NoActivity,
+    /// It cites none of the program's approved protocol sources.
+    #[error("cites none of the program's approved protocol sources")]
+    Unapproved,
 }
 
 /// R5 EpisodeOfCare status.
@@ -358,6 +393,27 @@ pub fn unapproved_regimens(program: &Program, regimens: &[(String, Vec<String>)]
         .filter(|(_, cited)| !cited.iter().any(|c| program.sources.contains(c)))
         .map(|(regimen, _)| regimen.clone())
         .collect()
+}
+
+/// The problems with `program`'s regimen templates, each with its rule, in order.
+pub fn rule_problems(program: &Program) -> Vec<(&RegimenRule, RuleProblem)> {
+    let mut problems = Vec::new();
+    for rule in &program.regimen_rules {
+        if rule
+            .condition
+            .as_deref()
+            .is_none_or(|c| c.trim().is_empty())
+        {
+            problems.push((rule, RuleProblem::NoCondition));
+        }
+        if rule.activity.is_none() {
+            problems.push((rule, RuleProblem::NoActivity));
+        }
+        if !rule.cites.iter().any(|c| program.sources.contains(c)) {
+            problems.push((rule, RuleProblem::Unapproved));
+        }
+    }
+    problems
 }
 
 #[cfg(test)]

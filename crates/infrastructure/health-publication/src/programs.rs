@@ -2,12 +2,14 @@
 //! every ProgramPlanDefinition (`PlanDefinition` of type `clinical-protocol`) in a package must
 //! be a usable program definition, and every regimen it uses that the package holds (an
 //! `ActivityDefinition` it names as `composed-of`) must cite one of the program's approved
-//! protocol sources. Regimens are never hardcoded, and never from an unapproved source.
+//! protocol sources. Regimens are never hardcoded, and never from an unapproved source. Each
+//! regimen template (an ordered rule at a stage) needs its FHIRPath condition, its
+//! ActivityDefinition and one of the program's approved sources.
 //!
 //! A regimen the package does not hold comes from a dependency, whose own publication checked it.
 
 use health_packages::Packed;
-use health_programs::unapproved_regimens;
+use health_programs::{rule_problems, unapproved_regimens};
 use health_programs_app::program;
 use serde_json::Value;
 
@@ -86,6 +88,12 @@ pub(crate) fn problems(packed: &Packed) -> Vec<String> {
         for regimen in unapproved_regimens(&defined, &held) {
             problems.push(format!(
                 "{path}: the regimen {regimen} cites none of the program's approved protocol sources"
+            ));
+        }
+        for (rule, problem) in rule_problems(&defined) {
+            problems.push(format!(
+                "{path}: the regimen template \"{}\" at {} {problem}",
+                rule.title, rule.stage
             ));
         }
     }
