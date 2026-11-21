@@ -1,15 +1,15 @@
 import { css } from '@health/design-system/css'
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
+import { programMessages as pm, studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
-import { StudioError, actionInput, addComment, fileQuery, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
+import { StudioError, actionInput, addComment, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
-import { isWorkflowLibrary } from './workflows/model'
+import { useWorkflowFiles } from './workflowFiles'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '6', maxWidth: '5xl' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -108,6 +108,12 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                   <>
                     {' · '}
                     <WorkflowLink id={id} path={change.path} />
+                  </>
+                ) : null}
+                {isProgram(draft, change.resourceType) && change.change !== 'removed' ? (
+                  <>
+                    {' · '}
+                    <ProgramLink id={id} path={change.path} />
                   </>
                 ) : null}
                 {change.elements.length === 0 ? null : (
@@ -236,7 +242,9 @@ function ArtefactLink({ id, draft, workflows, path }: { id: string; draft: Studi
         ? ('/studio/$id/terminology/$' as const)
         : workflows.has(path)
           ? ('/studio/$id/workflows/$' as const)
-          : ('/studio/$id/files/$' as const)
+          : isProgram(draft, file.resourceType)
+            ? ('/studio/$id/programs/$' as const)
+            : ('/studio/$id/files/$' as const)
   return (
     <>
       <Link to={to} params={{ id, _splat: path }}>
@@ -331,6 +339,20 @@ function TerminologyLink({ id, path }: { id: string; path: string }) {
   )
 }
 
+/** A program package's PlanDefinitions open in the Program Designer (#500), which says so if
+ * one is not a clinical protocol. */
+const isProgram = (draft: StudioPackagePage, type: string | null | undefined) => draft.package.kind === 'program' && type === 'PlanDefinition'
+
+/** Opens a program's PlanDefinition in the Program Designer (#500). */
+function ProgramLink({ id, path }: { id: string; path: string }) {
+  const intl = useIntl()
+  return (
+    <Link to="/studio/$id/programs/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(pm.pdOpen, { path })}>
+      {intl.formatMessage(pm.pdOpenShort)}
+    </Link>
+  )
+}
+
 /** Opens a Workflow Definition in the Workflow Studio (#498). */
 function WorkflowLink({ id, path }: { id: string; path: string }) {
   const intl = useIntl()
@@ -339,24 +361,6 @@ function WorkflowLink({ id, path }: { id: string; path: string }) {
       {intl.formatMessage(wm.wsOpenShort)}
     </Link>
   )
-}
-
-/** The package's top-level Libraries that are Workflow Definitions: only their content says so. */
-function useWorkflowFiles(id: string, draft: StudioPackagePage): Set<string> {
-  const platform = usePlatform()
-  const libraries = draft.files.filter((f) => f.resourceType === 'Library' && !f.path.includes('/')).map((f) => f.path)
-  const read = useQueries({ queries: libraries.map((path) => ({ ...fileQuery(platform.transport, id, path), retry: false })) })
-  const out = new Set<string>()
-  libraries.forEach((path, n) => {
-    const content = read[n]?.data?.content
-    if (content === undefined) return
-    try {
-      if (isWorkflowLibrary(JSON.parse(content))) out.add(path)
-    } catch {
-      // Not JSON: not a workflow.
-    }
-  })
-  return out
 }
 
 /** The Draft Holder's one change note for the whole draft (#495): shown to everyone, and
@@ -478,6 +482,12 @@ function Files({ id, draft, workflows }: { id: string; draft: StudioPackagePage;
               <>
                 {' · '}
                 <WorkflowLink id={id} path={file.path} />
+              </>
+            ) : null}
+            {isProgram(draft, file.resourceType) ? (
+              <>
+                {' · '}
+                <ProgramLink id={id} path={file.path} />
               </>
             ) : null}
           </li>

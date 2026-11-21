@@ -120,3 +120,38 @@ async fn a_regimen_from_elsewhere_or_an_unusable_program_is_sent_back() {
         "{problems:?}"
     );
 }
+
+/// A stage's regimen templates, the first citing the approved source and the second citing
+/// nothing, with no condition.
+fn with_templates(mut plan: Value) -> Value {
+    plan["action"] = json!([{
+        "linkId": "initiation",
+        "action": [{
+            "title": "Regimen templates",
+            "selectionBehavior": "at-most-one",
+            "action": [
+                {
+                    "title": "TLD",
+                    "condition": [{ "kind": "applicability", "expression": { "language": "text/fhirpath", "expression": "%patient.weight() >= 30" } }],
+                    "definitionCanonical": format!("{REGIMEN}|1.0.0"),
+                    "documentation": [{ "type": "citation", "resource": SOURCE }]
+                },
+                { "title": "Anyone", "definitionCanonical": format!("{REGIMEN}|1.0.0") }
+            ]
+        }]
+    }]);
+    plan
+}
+
+#[tokio::test]
+async fn a_regimen_template_without_a_condition_or_an_approved_source_is_sent_back() {
+    let (stage, problems) = submit(&package(&with_templates(program()), &regimen(SOURCE))).await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        problems,
+        [
+            "PlanDefinition-art-program.json: the regimen template \"Anyone\" at initiation has no FHIRPath condition",
+            "PlanDefinition-art-program.json: the regimen template \"Anyone\" at initiation cites none of the program's approved protocol sources"
+        ]
+    );
+}

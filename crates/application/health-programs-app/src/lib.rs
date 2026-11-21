@@ -4,7 +4,11 @@
 //!   - the EpisodeOfCare type (`program-episode-type`) and eligibility (`program-eligibility`);
 //!   - its `relatedArtifact`s: `citation`, `documentation` and `justification` entries are the
 //!     approved protocol sources, and `composed-of` entries name its regimens
-//!     (`ActivityDefinition`s), Workflow Definitions (`Library`s) and forms (`Questionnaire`s).
+//!     (`ActivityDefinition`s), Workflow Definitions (`Library`s) and forms (`Questionnaire`s);
+//!   - its regimen templates: under a top-level `action` whose `linkId` names a care-workflow
+//!     state, a group with `selectionBehavior` `at-most-one` holds the rules in order, each with
+//!     its FHIRPath `applicability` condition, its ActivityDefinition (`definitionCanonical`,
+//!     also counted among the regimens) and the protocol it cites (`documentation`).
 //! - **Eligibility** ([`eligible`]): the FHIRPath over the patient, `%patient` being the
 //!   Patient; true only for a single `true`.
 //! - **Episodes** ([`Programs`]): enrolment, status and transfer, each one transaction holding
@@ -23,8 +27,8 @@ use health_persistence::{
     Transaction, WriteError, WriteRequest,
 };
 use health_programs::{
-    Coded, Enrolment, Episode, EpisodeStatus, Program, ProgramEvent, ProgramRefused, enrol,
-    open_guard,
+    Coded, Enrolment, Episode, EpisodeStatus, Program, ProgramEvent, ProgramRefused, RegimenRule,
+    enrol, open_guard,
 };
 use health_time::Timestamp;
 use serde_json::{Value, json};
@@ -143,15 +147,13 @@ pub fn program(plan: &Value) -> Result<Program, ProgramError> {
         regimens: Vec::new(),
         questionnaires: Vec::new(),
         sources: Vec::new(),
+        regimen_rules: regimen_rules(plan),
     };
     for artifact in plan["relatedArtifact"].as_array().into_iter().flatten() {
         let named = text(&artifact["resource"]);
         match artifact["type"].as_str() {
             Some("citation" | "documentation" | "justification") => {
-                if let Some(source) = named
-                    .or_else(|| text(&artifact["document"]["url"]))
-                    .or_else(|| text(&artifact["citation"]))
-                {
+                if let Some(source) = cited(artifact) {
                     program.sources.push(source);
                 }
             }
@@ -164,7 +166,65 @@ pub fn program(plan: &Value) -> Result<Program, ProgramError> {
             _ => {}
         }
     }
+    for rule in &program.regimen_rules {
+        if let Some(activity) = &rule.activity
+            && !program.regimens.contains(activity)
+        {
+            program.regimens.push(activity.clone());
+        }
+    }
     Ok(program)
+}
+
+/// What a citing `RelatedArtifact` names: its resource, its document's URL or its citation.
+fn cited(artifact: &Value) -> Option<String> {
+    text(&artifact["resource"])
+        .or_else(|| text(&artifact["document"]["url"]))
+        .or_else(|| text(&artifact["citation"]))
+}
+
+fn actions(action: &Value) -> impl Iterator<Item = &Value> {
+    action["action"].as_array().into_iter().flatten()
+}
+
+/// The regimen templates of `plan`, stage by stage, each list in its order.
+fn regimen_rules(plan: &Value) -> Vec<RegimenRule> {
+    let mut rules = Vec::new();
+    for stage in actions(plan) {
+        let Some(at) = text(&stage["linkId"]) else {
+            continue;
+        };
+        for group in actions(stage).filter(|g| g["selectionBehavior"] == "at-most-one") {
+            for rule in actions(group) {
+                let condition = rule["condition"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|c| c["kind"] == "applicability")
+                    .and_then(|c| text(&c["expression"]["expression"]));
+                let cites = rule["documentation"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|d| {
+                        matches!(
+                            d["type"].as_str(),
+                            Some("citation" | "documentation" | "justification")
+                        )
+                    })
+                    .filter_map(cited)
+                    .collect();
+                rules.push(RegimenRule {
+                    stage: at.clone(),
+                    title: text(&rule["title"]).unwrap_or_default(),
+                    condition,
+                    activity: text(&rule["definitionCanonical"]),
+                    cites,
+                });
+            }
+        }
+    }
+    rules
 }
 
 /// Whether `patient` meets `program`'s eligibility; a program without one takes everyone.

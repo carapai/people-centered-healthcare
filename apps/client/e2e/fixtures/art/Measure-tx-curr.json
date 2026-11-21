@@ -1,0 +1,9 @@
+{
+  "resourceType": "Measure",
+  "id": "tx-curr",
+  "url": "https://health.go.ug/fhir/Measure/tx-curr",
+  "version": "1.0.0",
+  "name": "TxCurr",
+  "title": "TX_CURR: currently on ART",
+  "status": "active"
+}

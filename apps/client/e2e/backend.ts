@@ -193,6 +193,11 @@ const authorToken = await signIn(CENTRAL, ORIGIN, USERS.author, 'KAM013')
 const author = (JSON.parse(Buffer.from(authorToken.split('.')[1] ?? '', 'base64url').toString()) as { sub: string }).sub
 const drafted = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/opd'), '--by', author], { env, stdio: 'inherit' })
 if (drafted.status !== 0) throw new Error('drafting the Studio package failed')
+// A synthetic ART program (#500), by the same author, for the Program Designer: its care
+// workflow's states, regimen templates, and a form, an ActivityDefinition and a Measure it names
+// but does not hold yet (e2e/fixtures/art). Not clinical guidance: the reference package is #117.
+const program = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, 'fixtures/art'), '--by', author], { env, stdio: 'inherit' })
+if (program.status !== 0) throw new Error('drafting the ART program package failed')
 if (seedPatients > 0) {
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)

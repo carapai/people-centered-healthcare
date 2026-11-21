@@ -2800,3 +2800,165 @@ export const sandboxMessages = defineMessages<SandboxValues>({
   sbSaveFailed: { id: 'app.studio.sandbox.saveFailed', defaultMessage: 'The scenario was not saved: {reason}', description: 'Workflow sandbox: scenario not saved' },
   sbActive: { id: 'app.studio.sandbox.active', defaultMessage: 'active', description: 'Workflow sandbox: an active state in the outline' },
 })
+
+type ProgramValues = {
+  pdOpen: { path: string }
+  pdOpenShort: {}
+  pdHeading: { title: string }
+  pdLoading: {}
+  pdRefused: { refusal: string }
+  pdFile: { path: string; url: string; version: string }
+  pdStrip: {}
+  pdWho: {}
+  pdEveryone: {}
+  pdEpisode: { type: string }
+  pdRunsOn: {}
+  pdNoCareWorkflow: {}
+  pdScopes: {}
+  pdScopesNone: {}
+  pdScope: { scope: string; version: string }
+  pdOpenText: {}
+  pdOverrides: { count: number }
+  pdBoard: {}
+  pdBoardHint: {}
+  pdNoBoard: {}
+  pdStage: { n: number; id: string }
+  pdFinal: {}
+  pdForm: {}
+  pdHappens: {}
+  pdNothingHappens: {}
+  pdInside: { states: string }
+  pdTask: { role: string; worklist: string }
+  pdGate: { gate: string }
+  pdInvoke: { src: string }
+  pdExecute: { action: string }
+  pdRaise: { event: string }
+  pdAssign: { field: string; value: string }
+  pdInvestigations: {}
+  pdRegimens: { count: number }
+  pdRegimensHint: {}
+  pdRule: { n: number; title: string }
+  pdRuleWhen: { condition: string }
+  pdRuleNoCondition: {}
+  pdRuleSource: { source: string }
+  pdRuleUncited: {}
+  pdRuleNoActivity: {}
+  pdMoveUp: { title: string }
+  pdMoveDown: { title: string }
+  pdMoved: {}
+  pdSchedule: {}
+  pdTimer: { event: string; after: string }
+  pdOutcomes: {}
+  pdIndicators: {}
+  pdLeaves: {}
+  pdLeavesFinal: {}
+  pdLeavesNever: {}
+  pdExit: { targets: string; events: string }
+  pdExitTimer: { targets: string; after: string }
+  pdExitEventless: { targets: string }
+  pdGuard: { guard: string }
+  pdKind: { kind: string }
+  pdWhere: { where: string; version: string }
+  pdOpenArtefact: { canonical: string }
+  pdCreate: {}
+  pdCreateLabel: { canonical: string }
+  pdCreateFailed: { reason: string }
+  pdReadOnly: { reason: string }
+  pdStale: {}
+  pdReload: {}
+  pdSaveFailed: { reason: string }
+  pdPanel: {}
+  pdPanelHint: {}
+  pdMissingFile: {}
+  pdStillMissing: { count: number }
+  pdNothingMissing: {}
+  pdGapMissing: { kind: string; canonical: string }
+  pdGapNoCareWorkflow: {}
+  pdGapUnknownStage: { stage: string }
+  pdGapUncited: { stage: string; title: string }
+  pdGapNoCondition: { stage: string; title: string }
+  pdGapNoActivity: { stage: string; title: string }
+  pdGapPinned: { kind: string; canonical: string; version: string }
+  pdAuthority: {}
+}
+
+export const programMessages = defineMessages<ProgramValues>({
+  pdOpen: { id: 'app.studio.program.open', defaultMessage: '{path} in the Program Designer', description: 'Program Designer: link from a program PlanDefinition to the Program Designer' },
+  pdOpenShort: { id: 'app.studio.program.openShort', defaultMessage: 'Program Designer', description: 'Program Designer: visible text of the link to it' },
+  pdHeading: { id: 'app.studio.program.heading', defaultMessage: 'Program Designer: {title}', description: 'Program Designer: heading' },
+  pdLoading: { id: 'app.studio.program.loading', defaultMessage: 'Loading the program…', description: 'Program Designer: loading' },
+  pdRefused: { id: 'app.studio.program.refused', defaultMessage: '{refusal, select, not_json {This file is not JSON.} other {This file is not a program: a PlanDefinition of type clinical-protocol.}}', description: 'Program Designer: the file cannot be opened' },
+  pdFile: { id: 'app.studio.program.file', defaultMessage: '{path} · {url}|{version}', description: 'Program Designer: the file and canonical being designed' },
+  pdStrip: { id: 'app.studio.program.strip', defaultMessage: 'The whole program', description: 'Program Designer: label of the strip across the top' },
+  pdWho: { id: 'app.studio.program.who', defaultMessage: 'Who it is for', description: 'Program Designer: the eligibility FHIRPath' },
+  pdEveryone: { id: 'app.studio.program.everyone', defaultMessage: 'Everyone: no eligibility rule', description: 'Program Designer: a program without eligibility' },
+  pdEpisode: { id: 'app.studio.program.episode', defaultMessage: 'Enrolment opens an EpisodeOfCare of type {type}', description: 'Program Designer: the episode type' },
+  pdRunsOn: { id: 'app.studio.program.runsOn', defaultMessage: 'Runs on', description: 'Program Designer: the care workflow' },
+  pdNoCareWorkflow: { id: 'app.studio.program.noCareWorkflow', defaultMessage: 'No care workflow: the plan names no Workflow Definition.', description: 'Program Designer: no care workflow' },
+  pdScopes: { id: 'app.studio.program.scopes', defaultMessage: 'Activated for', description: 'Program Designer: the scopes' },
+  pdScopesNone: { id: 'app.studio.program.scopesNone', defaultMessage: 'Not activated anywhere yet', description: 'Program Designer: no scopes' },
+  pdScope: { id: 'app.studio.program.scope', defaultMessage: '{scope} ({version})', description: 'Program Designer: a scope and the version active there' },
+  pdOpenText: { id: 'app.studio.program.openText', defaultMessage: 'Open', description: 'Program Designer: visible text of a link to an editor' },
+  pdOverrides: { id: 'app.studio.program.overrides', defaultMessage: '{count, plural, =0 {No override points: a facility admin may change nothing} one {# override point a facility admin may fill in} other {# override points a facility admin may fill in}}', description: 'Program Designer: the number of override points' },
+  pdBoard: { id: 'app.studio.program.board', defaultMessage: 'Journey', description: 'Program Designer: the journey board' },
+  pdBoardHint: { id: 'app.studio.program.boardHint', defaultMessage: 'One column per state of the care workflow. Add or reorder stages in the Workflow Studio.', description: 'Program Designer: what the board shows' },
+  pdNoBoard: { id: 'app.studio.program.noBoard', defaultMessage: 'The journey shows once the care workflow exists and can be read.', description: 'Program Designer: no board' },
+  pdStage: { id: 'app.studio.program.stage', defaultMessage: '{n}. {id}', description: 'Program Designer: a stage heading' },
+  pdFinal: { id: 'app.studio.program.final', defaultMessage: 'final', description: 'Program Designer: a final stage' },
+  pdForm: { id: 'app.studio.program.form', defaultMessage: 'Form', description: 'Program Designer: a stage form' },
+  pdHappens: { id: 'app.studio.program.happens', defaultMessage: 'What happens', description: 'Program Designer: a stage’s actions' },
+  pdNothingHappens: { id: 'app.studio.program.nothingHappens', defaultMessage: 'Nothing: the patient waits here', description: 'Program Designer: a stage with no actions' },
+  pdInside: { id: 'app.studio.program.inside', defaultMessage: 'Inside: {states}', description: 'Program Designer: the states inside a compound stage' },
+  pdTask: { id: 'app.studio.program.task', defaultMessage: 'A task for the {role} on the {worklist} worklist', description: 'Program Designer: a human task' },
+  pdGate: { id: 'app.studio.program.gate', defaultMessage: 'Waits for payment at {gate}', description: 'Program Designer: a payment gate' },
+  pdInvoke: { id: 'app.studio.program.invoke', defaultMessage: 'Runs the workflow {src}', description: 'Program Designer: a sub-workflow' },
+  pdExecute: { id: 'app.studio.program.execute', defaultMessage: 'Runs {action}', description: 'Program Designer: a typed action' },
+  pdRaise: { id: 'app.studio.program.raise', defaultMessage: 'Raises {event}', description: 'Program Designer: a raise action' },
+  pdAssign: { id: 'app.studio.program.assign', defaultMessage: 'Sets {field} to {value}', description: 'Program Designer: an assign action' },
+  pdInvestigations: { id: 'app.studio.program.investigations', defaultMessage: 'Investigations', description: 'Program Designer: heading' },
+  pdRegimens: { id: 'app.studio.program.regimens', defaultMessage: 'Regimen templates ({count})', description: 'Program Designer: heading' },
+  pdRegimensHint: { id: 'app.studio.program.regimensHint', defaultMessage: 'The first rule that matches the patient chooses the regimen, from the top down.', description: 'Program Designer: how regimen rules are taken' },
+  pdRule: { id: 'app.studio.program.rule', defaultMessage: '{n}. {title}', description: 'Program Designer: a regimen rule' },
+  pdRuleWhen: { id: 'app.studio.program.ruleWhen', defaultMessage: 'When {condition}', description: 'Program Designer: a regimen rule’s condition' },
+  pdRuleNoCondition: { id: 'app.studio.program.ruleNoCondition', defaultMessage: 'No condition: it would match every patient', description: 'Program Designer: a rule without a condition' },
+  pdRuleSource: { id: 'app.studio.program.ruleSource', defaultMessage: 'Cites {source}', description: 'Program Designer: the protocol a rule cites' },
+  pdRuleUncited: { id: 'app.studio.program.ruleUncited', defaultMessage: 'Cites no approved protocol source', description: 'Program Designer: a rule citing no approved source' },
+  pdRuleNoActivity: { id: 'app.studio.program.ruleNoActivity', defaultMessage: 'Uses no ActivityDefinition', description: 'Program Designer: a rule without an ActivityDefinition' },
+  pdMoveUp: { id: 'app.studio.program.moveUp', defaultMessage: 'Move “{title}” up', description: 'Program Designer: button' },
+  pdMoveDown: { id: 'app.studio.program.moveDown', defaultMessage: 'Move “{title}” down', description: 'Program Designer: button' },
+  pdMoved: { id: 'app.studio.program.moved', defaultMessage: 'The order is saved.', description: 'Program Designer: a reorder saved' },
+  pdSchedule: { id: 'app.studio.program.schedule', defaultMessage: 'Schedule', description: 'Program Designer: heading' },
+  pdTimer: { id: 'app.studio.program.timer', defaultMessage: '{event} after {after}', description: 'Program Designer: a timer' },
+  pdOutcomes: { id: 'app.studio.program.outcomes', defaultMessage: 'Outcomes', description: 'Program Designer: heading' },
+  pdIndicators: { id: 'app.studio.program.indicators', defaultMessage: 'Indicators', description: 'Program Designer: heading' },
+  pdLeaves: { id: 'app.studio.program.leaves', defaultMessage: 'Leaves when', description: 'Program Designer: heading' },
+  pdLeavesFinal: { id: 'app.studio.program.leavesFinal', defaultMessage: 'Never: the journey ends here', description: 'Program Designer: a final stage' },
+  pdLeavesNever: { id: 'app.studio.program.leavesNever', defaultMessage: 'No way out', description: 'Program Designer: a stage with no transitions' },
+  pdExit: { id: 'app.studio.program.exit', defaultMessage: '{events} → {targets}', description: 'Program Designer: an exit on events' },
+  pdExitTimer: { id: 'app.studio.program.exitTimer', defaultMessage: 'After {after} → {targets}', description: 'Program Designer: an exit on a timer' },
+  pdExitEventless: { id: 'app.studio.program.exitEventless', defaultMessage: 'As soon as it holds → {targets}', description: 'Program Designer: an eventless exit' },
+  pdGuard: { id: 'app.studio.program.guard', defaultMessage: 'if {guard}', description: 'Program Designer: an exit’s guard' },
+  pdKind: { id: 'app.studio.program.kind', defaultMessage: '{kind, select, Questionnaire {Form} Library {Workflow} ActivityDefinition {ActivityDefinition} Measure {Measure} other {{kind}}}', description: 'Program Designer: an artefact’s kind' },
+  pdWhere: { id: 'app.studio.program.where', defaultMessage: '{where, select, draft {in this draft, {version}} published {published, pinned to {version}} other {not created yet}}', description: 'Program Designer: where a linked artefact stands' },
+  pdOpenArtefact: { id: 'app.studio.program.openArtefact', defaultMessage: 'Open {canonical}', description: 'Program Designer: open an artefact in its editor' },
+  pdCreate: { id: 'app.studio.program.create', defaultMessage: 'Create', description: 'Program Designer: button' },
+  pdCreateLabel: { id: 'app.studio.program.createLabel', defaultMessage: 'Create {canonical}', description: 'Program Designer: accessible name of Create' },
+  pdCreateFailed: { id: 'app.studio.program.createFailed', defaultMessage: 'Not created. {reason}', description: 'Program Designer: a create refused' },
+  pdReadOnly: { id: 'app.studio.program.readOnly', defaultMessage: 'Read only: {reason}', description: 'Program Designer: the person may not edit' },
+  pdStale: { id: 'app.studio.program.stale', defaultMessage: 'Someone saved this draft since you opened it, so nothing was kept. Reload to see their change.', description: 'Program Designer: 412' },
+  pdReload: { id: 'app.studio.program.reload', defaultMessage: 'Reload', description: 'Program Designer: button' },
+  pdSaveFailed: { id: 'app.studio.program.saveFailed', defaultMessage: 'The order was not saved. {reason}', description: 'Program Designer: a reorder refused' },
+  pdPanel: { id: 'app.studio.program.panel', defaultMessage: 'Package', description: 'Program Designer: the package panel' },
+  pdPanelHint: { id: 'app.studio.program.panelHint', defaultMessage: 'Grouped by kind; the package keeps its artefacts side by side.', description: 'Program Designer: how files are grouped' },
+  pdMissingFile: { id: 'app.studio.program.missingFile', defaultMessage: 'missing', description: 'Program Designer: a missing file in the package panel' },
+  pdStillMissing: { id: 'app.studio.program.stillMissing', defaultMessage: 'Still missing ({count})', description: 'Program Designer: heading' },
+  pdNothingMissing: { id: 'app.studio.program.nothingMissing', defaultMessage: 'Nothing missing.', description: 'Program Designer: no gaps' },
+  pdGapMissing: { id: 'app.studio.program.gapMissing', defaultMessage: '{kind, select, Questionnaire {Form} Library {Workflow} other {{kind}}} {canonical} does not exist yet', description: 'Program Designer: a missing artefact' },
+  pdGapNoCareWorkflow: { id: 'app.studio.program.gapNoCareWorkflow', defaultMessage: 'The plan names no care workflow', description: 'Program Designer: gap' },
+  pdGapUnknownStage: { id: 'app.studio.program.gapUnknownStage', defaultMessage: 'The plan has investigations or regimens at {stage}, a state the care workflow does not have', description: 'Program Designer: gap' },
+  pdGapUncited: { id: 'app.studio.program.gapUncited', defaultMessage: 'The regimen template “{title}” at {stage} cites no approved protocol source', description: 'Program Designer: gap' },
+  pdGapNoCondition: { id: 'app.studio.program.gapNoCondition', defaultMessage: 'The regimen template “{title}” at {stage} has no FHIRPath condition', description: 'Program Designer: gap' },
+  pdGapNoActivity: { id: 'app.studio.program.gapNoActivity', defaultMessage: 'The regimen template “{title}” at {stage} uses no ActivityDefinition', description: 'Program Designer: gap' },
+  pdGapPinned: { id: 'app.studio.program.gapPinned', defaultMessage: '{kind, select, Questionnaire {Form} Library {Workflow} other {{kind}}} {canonical} is pinned, but the package holds {version}', description: 'Program Designer: gap' },
+  pdAuthority: { id: 'app.studio.program.authority', defaultMessage: 'Check now on the draft page remains the authority.', description: 'Program Designer: the gaps are not the publication checks' },
+})

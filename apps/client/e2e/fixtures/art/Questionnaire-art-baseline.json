@@ -1,0 +1,17 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "art-baseline",
+  "url": "https://health.go.ug/fhir/Questionnaire/art-baseline",
+  "version": "1.0.0",
+  "name": "ArtBaseline",
+  "title": "ART baseline assessment",
+  "status": "active",
+  "item": [
+    {
+      "linkId": "assessed-on",
+      "text": "Date of assessment",
+      "type": "date",
+      "required": true
+    }
+  ]
+}

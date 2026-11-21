@@ -1,0 +1,17 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "art-followup",
+  "url": "https://health.go.ug/fhir/Questionnaire/art-followup",
+  "version": "1.0.0",
+  "name": "ArtFollowup",
+  "title": "ART follow-up",
+  "status": "active",
+  "item": [
+    {
+      "linkId": "seen-on",
+      "text": "Date of visit",
+      "type": "date",
+      "required": true
+    }
+  ]
+}
