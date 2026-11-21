@@ -17,6 +17,28 @@
       "birthDate": "2004-12-19"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "atim-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/atim"
+      },
+      "period": {
+        "start": "2026-02-27"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "atim-visit-1",
       "status": "completed",
@@ -45,6 +67,38 @@
       },
       "actualPeriod": {
         "start": "2026-02-27T15:45:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/atim-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "atim-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/atim"
+      },
+      "encounter": {
+        "reference": "Encounter/atim-visit-1"
+      },
+      "effectiveDateTime": "2026-02-27T15:45:00+03:00",
+      "valueQuantity": {
+        "value": 13,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     }
   ]

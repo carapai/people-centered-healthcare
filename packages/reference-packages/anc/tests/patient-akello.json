@@ -17,6 +17,28 @@
       "birthDate": "2008-06-15"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "akello-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/akello"
+      },
+      "period": {
+        "start": "2026-03-11"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "akello-visit-1",
       "status": "completed",
@@ -45,6 +67,38 @@
       },
       "actualPeriod": {
         "start": "2026-03-11T11:20:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/akello-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "akello-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/akello"
+      },
+      "encounter": {
+        "reference": "Encounter/akello-visit-1"
+      },
+      "effectiveDateTime": "2026-03-11T11:20:00+03:00",
+      "valueQuantity": {
+        "value": 16,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     }
   ]

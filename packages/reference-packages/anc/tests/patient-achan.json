@@ -1,0 +1,226 @@
+{
+  "type": "test-patient",
+  "name": "Achan K.: two pregnancies, a follow-up on 10 February of one that began in November, and a first visit on 16 June for the next",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "achan",
+      "name": [
+        {
+          "family": "Achan",
+          "given": [
+            "Grace"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "2000-04-04"
+    },
+    {
+      "resourceType": "EpisodeOfCare",
+      "id": "achan-anc-1",
+      "status": "finished",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/achan"
+      },
+      "period": {
+        "start": "2025-11-12"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "achan-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/achan"
+      },
+      "actualPeriod": {
+        "start": "2025-11-12T09:00:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/achan-anc-1"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "achan-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/achan"
+      },
+      "encounter": {
+        "reference": "Encounter/achan-visit-1"
+      },
+      "effectiveDateTime": "2025-11-12T09:00:00+03:00",
+      "valueQuantity": {
+        "value": 9,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "achan-visit-2",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "follow-up"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/achan"
+      },
+      "actualPeriod": {
+        "start": "2026-02-10T10:30:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/achan-anc-1"
+        }
+      ]
+    },
+    {
+      "resourceType": "EpisodeOfCare",
+      "id": "achan-anc-2",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/achan"
+      },
+      "period": {
+        "start": "2026-06-16"
+      }
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "achan-visit-3",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/achan"
+      },
+      "actualPeriod": {
+        "start": "2026-06-16T08:45:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/achan-anc-2"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "achan-visit-3-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/achan"
+      },
+      "encounter": {
+        "reference": "Encounter/achan-visit-3"
+      },
+      "effectiveDateTime": "2026-06-16T08:45:00+03:00",
+      "valueQuantity": {
+        "value": 7,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
+      }
+    }
+  ]
+}

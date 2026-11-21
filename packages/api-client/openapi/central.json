@@ -993,7 +993,7 @@
           "studio"
         ],
         "summary": "Documents and serves *Try*.",
-        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date, and the criteria decide whether it counts; counting people, a person counts once. It answers the value and every test patient with each record's part, so the editor shows who is counted and why.",
+        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
         "operationId": "tryStudioIndicator",
         "parameters": [
           {
@@ -1058,7 +1058,7 @@
             }
           },
           "422": {
-            "description": "The Measure is not a usable indicator, the period is not one of its type, or evaluating this kind of indicator is not supported yet",
+            "description": "The Measure is not a usable indicator, or the period is not one of its type",
             "content": {
               "application/json": {
                 "schema": {
@@ -4110,12 +4110,28 @@
           "name",
           "patient",
           "counted",
+          "count",
           "records"
         ],
         "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many of their counted things are counted: once counting people, once per counted\nenrollment, visit or observation.",
+            "minimum": 0
+          },
           "counted": {
             "type": "boolean",
-            "description": "Whether they are counted."
+            "description": "Whether they are counted (in the numerator, if there is a denominator)."
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "How many of their counted things are in the denominator, if there is one.",
+            "minimum": 0
           },
           "display": {
             "type": [
@@ -4150,7 +4166,8 @@
         "description": "One record's part.",
         "required": [
           "reference",
-          "reason"
+          "reason",
+          "picked"
         ],
         "properties": {
           "date": {
@@ -4167,6 +4184,10 @@
             ],
             "description": "Why it could not be evaluated, if it could not."
           },
+          "picked": {
+            "type": "boolean",
+            "description": "Whether its value is the one taken for its counted thing (its person's or enrollment's\nfirst or last)."
+          },
           "reason": {
             "$ref": "#/components/schemas/StudioRecordReason",
             "description": "Why it counts or not."
@@ -4174,6 +4195,13 @@
           "reference": {
             "type": "string",
             "description": "The record (`Encounter/…`)."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its value, if the indicator takes one and it gave one: a number, or a code for a\ndistinct count."
           }
         }
       },
@@ -4182,11 +4210,31 @@
         "description": "What *Try* found.",
         "required": [
           "period",
-          "value",
+          "calculation",
+          "count",
           "patients",
           "errors"
         ],
         "properties": {
+          "calculation": {
+            "type": "string",
+            "description": "What the indicator calculates: `count`, `percentage`, `rate`, `ratio`, `sum`,\n`average`, `median`, `minimum`, `maximum` or `distinct-count`."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many are counted: the numerator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The denominator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
           "errors": {
             "type": "array",
             "items": {
@@ -4205,11 +4253,33 @@
             "$ref": "#/components/schemas/StudioPeriod",
             "description": "The period evaluated."
           },
-          "value": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The indicator's value: how many are counted.",
+          "ratePer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "A rate's factor (per 1,000, …).",
             "minimum": 0
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The figure, to two decimal places; none when the denominator is zero or no value was\ntaken."
+          },
+          "values": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioIndicatorValues",
+                "description": "The values taken, for a sum, average, median, minimum, maximum or distinct count."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -4233,6 +4303,45 @@
           "periodType": {
             "$ref": "#/components/schemas/StudioPeriodType",
             "description": "The period type a Report would choose."
+          }
+        }
+      },
+      "StudioIndicatorValues": {
+        "type": "object",
+        "description": "The values a continuous-variable indicator took, as roll-up needs them.",
+        "required": [
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many.",
+            "minimum": 0
+          },
+          "maximum": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The largest, if they are numbers."
+          },
+          "minimum": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The smallest, if they are numbers."
+          },
+          "sum": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Their sum, if they are numbers."
           }
         }
       },
@@ -4857,7 +4966,9 @@
         "description": "Why a record counts or not.",
         "enum": [
           "meets",
+          "denominator-only",
           "does-not-meet",
+          "no-enrollment",
           "outside-period",
           "no-period-date",
           "error"

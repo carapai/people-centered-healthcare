@@ -17,6 +17,25 @@
       "birthDate": "1996-02-14"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "kisakye-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/kisakye"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "kisakye-visit-1",
       "status": "planned",
@@ -42,7 +61,12 @@
       ],
       "subject": {
         "reference": "Patient/kisakye"
-      }
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/kisakye-anc"
+        }
+      ]
     }
   ]
 }

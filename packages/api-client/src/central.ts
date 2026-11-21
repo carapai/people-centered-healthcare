@@ -3,7 +3,7 @@
 
 import { z } from 'zod'
 
-import { integer } from './numbers'
+import { decimal, integer } from './numbers'
 
 /** Where a package version stands in the lifecycle. */
 export const PackageStage = z.enum(["draft", "validation", "simulation", "review", "approval", "published", "withdrawn"])
@@ -654,7 +654,7 @@ export const StudioImportRefusal = z.enum(["not-json", "not-questionnaire", "loo
 export type StudioImportRefusal = z.infer<typeof StudioImportRefusal>
 
 /** Why a record counts or not. */
-export const StudioRecordReason = z.enum(["meets", "does-not-meet", "outside-period", "no-period-date", "error"])
+export const StudioRecordReason = z.enum(["meets", "denominator-only", "does-not-meet", "no-enrollment", "outside-period", "no-period-date", "error"])
 export type StudioRecordReason = z.infer<typeof StudioRecordReason>
 
 /** One record's part. */
@@ -663,17 +663,25 @@ export const StudioIndicatorRecord = z.object({
   "date": z.string().nullable().optional(),
   /** Why it could not be evaluated, if it could not. */
   "error": z.string().nullable().optional(),
+  /** Whether its value is the one taken for its counted thing (its person's or enrollment's first or last). */
+  "picked": z.boolean(),
   /** Why it counts or not. */
   "reason": StudioRecordReason,
   /** The record (`Encounter/…`). */
   "reference": z.string(),
+  /** Its value, if the indicator takes one and it gave one: a number, or a code for a distinct count. */
+  "value": z.string().nullable().optional(),
 })
 export type StudioIndicatorRecord = z.infer<typeof StudioIndicatorRecord>
 
 /** One test patient, counted or not. */
 export const StudioIndicatorPatient = z.object({
-  /** Whether they are counted. */
+  /** How many of their counted things are counted: once counting people, once per counted enrollment, visit or observation. */
+  "count": integer,
+  /** Whether they are counted (in the numerator, if there is a denominator). */
   "counted": z.boolean(),
+  /** How many of their counted things are in the denominator, if there is one. */
+  "denominator": integer.nullable().optional(),
   /** The patient's name, if they have one. */
   "display": z.string().nullable().optional(),
   /** What the test patient shows. */
@@ -686,6 +694,19 @@ export const StudioIndicatorPatient = z.object({
   "records": z.array(StudioIndicatorRecord),
 })
 export type StudioIndicatorPatient = z.infer<typeof StudioIndicatorPatient>
+
+/** The values a continuous-variable indicator took, as roll-up needs them. */
+export const StudioIndicatorValues = z.object({
+  /** How many. */
+  "count": integer,
+  /** The largest, if they are numbers. */
+  "maximum": decimal.nullable().optional(),
+  /** The smallest, if they are numbers. */
+  "minimum": decimal.nullable().optional(),
+  /** Their sum, if they are numbers. */
+  "sum": decimal.nullable().optional(),
+})
+export type StudioIndicatorValues = z.infer<typeof StudioIndicatorValues>
 
 /** A kind of reporting period. */
 export const StudioPeriodType = z.enum(["weekly", "monthly", "quarterly", "semiAnnual", "annual", "financialJuly"])
@@ -706,14 +727,23 @@ export type StudioPeriod = z.infer<typeof StudioPeriod>
 
 /** What *Try* found. */
 export const StudioIndicatorTry = z.object({
+  /** What the indicator calculates: `count`, `percentage`, `rate`, `ratio`, `sum`, `average`, `median`, `minimum`, `maximum` or `distinct-count`. */
+  "calculation": z.string(),
+  /** How many are counted: the numerator of a percentage, rate or ratio. */
+  "count": integer,
+  /** The denominator of a percentage, rate or ratio. */
+  "denominator": integer.nullable().optional(),
   /** Test patients that could not be read, and records that could not be evaluated. */
   "errors": z.array(z.string()),
   /** Every test patient, counted or not, in file order. */
   "patients": z.array(StudioIndicatorPatient),
   /** The period evaluated. */
   "period": StudioPeriod,
-  /** The indicator's value: how many are counted. */
-  "value": integer,
+  /** A rate's factor (per 1,000, …). */
+  "ratePer": integer.nullable().optional(),
+  /** The figure, to two decimal places; none when the denominator is zero or no value was taken. */
+  "value": decimal.nullable().optional(),
+  "values": StudioIndicatorValues.nullable().optional(),
 })
 export type StudioIndicatorTry = z.infer<typeof StudioIndicatorTry>
 

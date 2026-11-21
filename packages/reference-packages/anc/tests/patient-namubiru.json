@@ -17,6 +17,28 @@
       "birthDate": "1994-09-30"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "namubiru-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/namubiru"
+      },
+      "period": {
+        "start": "2026-03-31"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "namubiru-visit-1",
       "status": "completed",
@@ -48,6 +70,38 @@
       },
       "meta": {
         "lastUpdated": "2026-04-03T08:05:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/namubiru-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "namubiru-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/namubiru"
+      },
+      "encounter": {
+        "reference": "Encounter/namubiru-visit-1"
+      },
+      "effectiveDateTime": "2026-03-31T22:30:00+03:00",
+      "valueQuantity": {
+        "value": 9,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     }
   ]

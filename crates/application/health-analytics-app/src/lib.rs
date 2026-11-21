@@ -7,21 +7,32 @@
 //!   `basis` (the type of record its criteria read), its first group's populations, and two
 //!   extensions, [`PERIOD_DATE`] (an `Expression`, required) and [`COUNTS`] (a code, people when
 //!   absent).
-//! - [`evaluate`] evaluates a count over one period: for each record of the basis, the period
-//!   date places it in the period or not, and the `initial-population` criteria decide whether
-//!   it counts. Each expression is evaluated with the record as its root and `%resource`,
-//!   `%patient` as the patient, and `%periodStart` and `%periodEnd` as the period's first and
-//!   last days (`YYYY-MM-DD`).
+//!   A rate carries its factor in [`RATE_PER`] (`valueInteger`), a cumulative indicator says so
+//!   in [`CUMULATIVE`] (`valueBoolean`), and a continuous-variable indicator's
+//!   `measure-observation` has its `aggregateMethod` (`sum`, `average`, `median`, `minimum`,
+//!   `maximum`, or `distinct-count`), its value as `criteria` or as [`VALUE_BETWEEN`] (the time
+//!   between two dates), and [`VALUE_PICK`] (`first` or `last`, first when absent) (#549).
+//! - [`evaluate`] evaluates an indicator over one period: for each record of the basis, the
+//!   period date places it in the period or not, each population's criteria decide whether it
+//!   counts, and the value is taken. Each expression is evaluated with the record as its root,
+//!   `%patient` as the patient, `%records` as a `collection` Bundle of the patient's other
+//!   resources (so a visit's criteria can read its observations:
+//!   `%records.entry.resource.ofType(Observation)`; a variable holds one item, so a Bundle carries
+//!   the many), and `%periodStart` and `%periodEnd` as the period's
+//!   first and last days (`YYYY-MM-DD`). A record's enrollment is its `episodeOfCare` or its
+//!   `workflow-episodeOfCare` extension.
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
 use std::collections::BTreeMap;
 
 use health_analytics::{
-    Count, CountError, Expression, Indicator, MeasureDefinition, PatientOutcome, Period,
-    PopulationDefinition, PopulationKind, RecordOutcome, Scoring, count, local_date,
+    Aggregate, BetweenDefinition, Calculation, Evaluation, Expression, Indicator,
+    MeasureDefinition, Observed, PatientOutcome, Period, PopulationDefinition, RecordOutcome,
+    ValueSource, calculate, local_date,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
+use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
 /// The indicator's period date: an `Expression` (`valueExpression`) giving the declared date
@@ -30,6 +41,20 @@ pub const PERIOD_DATE: &str = "https://carapai.github.io/people-centered-healthc
 /// What the indicator counts (`valueCode`): `people`, `enrollments`, `visits` or
 /// `observations`.
 pub const COUNTS: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-counts";
+/// A rate's factor (`valueInteger`): 100, 1000, 10000 or 100000.
+pub const RATE_PER: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-rate-per";
+/// Whether the indicator counts from the first record up to the period's end (`valueBoolean`).
+pub const CUMULATIVE: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-cumulative";
+/// On the `measure-observation`: which value of a counted thing is taken (`valueCode`, `first`
+/// or `last`).
+pub const VALUE_PICK: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-value-pick";
+/// On the `measure-observation`: its value as the time between two dates, with the
+/// sub-extensions `from` and `to` (`valueExpression`) and `unit` (`valueCode`: `days`, `weeks`,
+/// `months` or `years`).
+pub const VALUE_BETWEEN: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-value-between";
+/// The R5 core extension naming a resource's episode of care.
+pub const WORKFLOW_EPISODE_OF_CARE: &str =
+    "http://hl7.org/fhir/StructureDefinition/workflow-episodeOfCare";
 /// The `type` of a test patient in a package's `tests/`.
 pub const TEST_PATIENT_TYPE: &str = "test-patient";
 
@@ -69,6 +94,13 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
         .map(|p| PopulationDefinition {
             code: code(&p["code"]),
             criteria: expression(&p["criteria"]),
+            aggregate: code(&p["aggregateMethod"]),
+            pick: extension(p, VALUE_PICK).and_then(|e| text(&e["valueCode"])),
+            between: extension(p, VALUE_BETWEEN).map(|e| BetweenDefinition {
+                from: extension(e, "from").and_then(|f| expression(&f["valueExpression"])),
+                to: extension(e, "to").and_then(|t| expression(&t["valueExpression"])),
+                unit: extension(e, "unit").and_then(|u| text(&u["valueCode"])),
+            }),
         })
         .collect();
     MeasureDefinition {
@@ -78,6 +110,8 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
         scoring: code(&resource["scoring"]),
         basis: text(&resource["basis"]),
         counts: extension(resource, COUNTS).and_then(|e| text(&e["valueCode"])),
+        rate_per: extension(resource, RATE_PER).and_then(|e| e["valueInteger"].as_i64()),
+        cumulative: extension(resource, CUMULATIVE).and_then(|e| e["valueBoolean"].as_bool()),
         period_date: extension(resource, PERIOD_DATE)
             .map(|e| expression(&e["valueExpression"]).unwrap_or_default()),
         populations,
@@ -98,6 +132,16 @@ impl PatientRecords {
     /// The patient as a reference (`Patient/<id>`).
     pub fn reference(&self) -> String {
         reference(&self.patient)
+    }
+
+    /// Their other resources as a `collection` Bundle: `%records`.
+    pub fn bundle(&self) -> Value {
+        let entry: Vec<Value> = self
+            .records
+            .iter()
+            .map(|resource| json!({ "resource": resource }))
+            .collect();
+        json!({ "resourceType": "Bundle", "type": "collection", "entry": entry })
     }
 
     /// What a person reads for the patient: their first name, given names then family.
@@ -173,17 +217,6 @@ pub fn test_patient(file: &Value) -> Result<TestPatient, String> {
     })
 }
 
-/// Why an indicator was not evaluated.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum EvaluateError {
-    /// Evaluating an indicator of this scoring is not built yet.
-    #[error("evaluating a {} indicator is not supported yet", .0.code())]
-    Scoring(Scoring),
-    /// Counting this is not built yet.
-    #[error(transparent)]
-    Count(#[from] CountError),
-}
-
 /// The period date a FHIRPath result gives: the first item, read as a local date.
 fn period_date(
     result: Result<Vec<FhirPathItem>, String>,
@@ -205,43 +238,123 @@ fn meets(result: Result<Vec<FhirPathItem>, String>) -> Result<bool, String> {
     }
 }
 
-/// `indicator` evaluated over `period` from each patient's records: the count and, for each
-/// patient, every record of the indicator's basis with its part in it.
+fn decimal(text: &str) -> Result<Decimal, String> {
+    text.parse()
+        .map_err(|_| format!("the value {text} is not a number"))
+}
+
+/// The value a FHIRPath result gives: a number, or, for a distinct count, a code.
+fn observed(
+    result: Result<Vec<FhirPathItem>, String>,
+    distinct: bool,
+) -> Result<Option<Observed>, String> {
+    let items = result?;
+    let item = match items.as_slice() {
+        [] => return Ok(None),
+        [item] => item,
+        more => {
+            return Err(format!(
+                "the value gave {} items, not one (add .first() or narrow it)",
+                more.len()
+            ));
+        }
+    };
+    let number = match item {
+        FhirPathItem::Integer(n) => Some(Decimal::from(*n)),
+        FhirPathItem::Decimal(text) | FhirPathItem::Quantity { value: text, .. } => {
+            Some(decimal(text)?)
+        }
+        _ => None,
+    };
+    match (number, item, distinct) {
+        (Some(number), _, _) => Ok(Some(Observed::Number(number))),
+        (None, FhirPathItem::String(code) | FhirPathItem::Temporal(code), true) => {
+            Ok(Some(Observed::Code(code.clone())))
+        }
+        (None, FhirPathItem::Boolean(b), true) => Ok(Some(Observed::Code(b.to_string()))),
+        (None, other, _) => Err(format!(
+            "the value gave {other:?}, not {}",
+            if distinct { "a code" } else { "a number" }
+        )),
+    }
+}
+
+/// The enrollment a record belongs to: its `episodeOfCare`, or its `workflow-episodeOfCare`.
+fn enrollment(record: &Value) -> Option<String> {
+    text(&record["episodeOfCare"][0]["reference"]).or_else(|| {
+        extension(record, WORKFLOW_EPISODE_OF_CARE)
+            .and_then(|e| text(&e["valueReference"]["reference"]))
+    })
+}
+
+/// `indicator` evaluated over `period` from each patient's records: the figure with what
+/// roll-up needs and, for each patient, every record of the indicator's basis with its part in
+/// it.
 pub async fn evaluate(
     engine: &dyn FhirPathEngine,
     indicator: &Indicator,
     period: &Period,
     patients: &[PatientRecords],
-) -> Result<Count, EvaluateError> {
-    if indicator.scoring != Scoring::Cohort {
-        return Err(EvaluateError::Scoring(indicator.scoring));
+) -> Evaluation {
+    let kinds: Vec<_> = indicator.populations.keys().copied().collect();
+    let mut expressions = vec![indicator.period_date.clone()];
+    expressions.extend(indicator.populations.values().cloned());
+    let first_value = expressions.len();
+    match indicator.value.as_ref().map(|v| &v.source) {
+        Some(ValueSource::Expression(value)) => expressions.push(value.clone()),
+        Some(ValueSource::Between { from, to, .. }) => {
+            expressions.extend([from.clone(), to.clone()]);
+        }
+        None => {}
     }
-    // An Indicator has the populations its scoring needs.
-    let criteria = indicator
-        .criteria(PopulationKind::InitialPopulation)
-        .unwrap_or("false");
-    let expressions = [indicator.period_date.clone(), criteria.to_owned()];
+    let distinct = indicator.calculation == Calculation::Value(Aggregate::DistinctCount);
     let mut outcomes = Vec::with_capacity(patients.len());
     for patient in patients {
         let variables = BTreeMap::from([
             ("patient".to_owned(), patient.patient.clone()),
+            ("records".to_owned(), patient.bundle()),
             ("periodStart".to_owned(), json!(period.start.to_string())),
             ("periodEnd".to_owned(), json!(period.end.to_string())),
         ]);
         let mut records = Vec::new();
         let candidates = std::iter::once(&patient.patient).chain(&patient.records);
         for record in candidates.filter(|r| r["resourceType"] == indicator.basis.as_str()) {
-            let mut results = engine
+            let mut results: Vec<Result<Vec<FhirPathItem>, String>> = engine
                 .evaluate_with(record, &expressions, &variables)
                 .await
                 .into_iter()
-                .map(|r| r.map_err(|failure| failure.0));
-            let date = results.next().unwrap_or(Ok(Vec::new()));
-            let met = results.next().unwrap_or(Ok(Vec::new()));
+                .map(|r| r.map_err(|failure| failure.0))
+                .collect();
+            results.resize(expressions.len(), Ok(Vec::new()));
+            let mut value_results = results.split_off(first_value);
+            let date = period_date(results.remove(0));
+            let populations = kinds
+                .iter()
+                .copied()
+                .zip(results.into_iter().map(meets))
+                .collect();
+            let value = match indicator.value.as_ref().map(|v| &v.source) {
+                None => Ok(None),
+                Some(ValueSource::Expression(_)) => observed(value_results.remove(0), distinct),
+                Some(ValueSource::Between { unit, .. }) => {
+                    let to = period_date(value_results.remove(1));
+                    let from = period_date(value_results.remove(0));
+                    match (from, to) {
+                        (Ok(Some(from)), Ok(Some(to))) => unit
+                            .between(from, to)
+                            .map(|n| Some(Observed::Number(Decimal::from(n)))),
+                        (Err(why), _) => Err(format!("the value's first date: {why}")),
+                        (_, Err(why)) => Err(format!("the value's second date: {why}")),
+                        _ => Ok(None),
+                    }
+                }
+            };
             records.push(RecordOutcome {
                 reference: reference(record),
-                date: period_date(date),
-                meets: meets(met),
+                enrollment: enrollment(record),
+                date,
+                populations,
+                value,
             });
         }
         outcomes.push(PatientOutcome {
@@ -249,5 +362,5 @@ pub async fn evaluate(
             records,
         });
     }
-    Ok(count(indicator.counts, period, &outcomes)?)
+    calculate(indicator, period, &outcomes)
 }

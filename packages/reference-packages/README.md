@@ -4,18 +4,21 @@ Published Definition packages the platform ships as references (configuration.md
 
 | Package | What | Issue |
 |---|---|---|
-| `anc/` (`ug.moh.anc`) | The *ANC 1st visits* indicator (`Measure/anc-first-visits`), the ANC visit types, and the test patients the indicator editor's *Try* evaluates it over | #548 |
+| `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
 
 **Sources:** a Workflow Definition is inline, base64 content in its Library. Its readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
 
-## `anc/`: ANC 1st visits
+## `anc/`: ANC indicators
 
 - **`Measure/anc-first-visits`** counts women whose first antenatal care visit was in the period, each once (`cohort`, basis `Encounter`, counting people).
   - **Period date:** `Encounter.actualPeriod.start`, when the visit started.
   - **Criteria** (`initial-population`): the visit's type is `first` in `CodeSystem/anc-visit-type`, and `%patient.gender` is `female`.
-- **Test patients** (`tests/patient-*.json`, `type` `test-patient`), one Patient and their Encounters each:
+- **`Measure/anc-first-visit-before-12-weeks`** (`proportion`, a percentage): the denominator is the same first visits; the numerator those where the gestational age Observation (LOINC `18185-9`) recorded at the visit, read through `%records`, is under 12 weeks.
+- **`Measure/anc-gestational-age-at-first-visit`** (`continuous-variable`, `median`): the gestational age at the first visit, each woman's first value.
+- **`Measure/anc-visits`** (`cohort`, counting visits): every ANC visit by a woman, first or follow-up.
+- **Test patients** (`tests/patient-*.json`, `type` `test-patient`), one Patient and their Encounters each, each ANC visit with its EpisodeOfCare (the enrollment) and, where measured, its gestational age:
 
 | Patient | Visits | March 2026 |
 |---|---|---|
@@ -29,8 +32,11 @@ Published Definition packages the platform ships as references (configuration.md
 | Okello | an outpatient visit on 2 March | not counted |
 | Opio | a man whose visit was coded as a first ANC visit | not counted |
 | Kisakye | a first visit planned, not started | not counted (no period date) |
+| Achan | a first visit in November 2025, a follow-up on 10 February, then a new pregnancy's first visit on 16 June | not counted |
 
 So March 2026 is 4, April 1 and 2026Q1 6.
+
+Gestational ages at first visits: Akello 16, Nakato 10 (14 at her follow-up), Namubiru 9, Nansubuga 8 then 11 at the duplicate, Auma 12, Atim 13, Nabirye 11. So in March, *ANC 1st visit before 12 weeks* is 3 of 4 (75%) and 2026Q1 3 of 6 (50%); the median gestational age at the first visit is 9.5 (10.5 taking the last value) and 2026Q1 11. *ANC visits* in March is 7 visits by 5 women; January to June, 13 visits by 8 women in 9 pregnancies.
 
 ## `lab/`: the laboratory test
 

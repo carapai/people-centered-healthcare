@@ -2001,6 +2001,71 @@ fn anc_package() -> Files {
 }
 
 #[tokio::test]
+async fn try_calculates_a_percentage_and_a_median_with_what_roll_up_needs() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+    let measure = |file: &str| -> Value { serde_json::from_slice(&files[file]).expect("measure") };
+
+    let input = json!({
+        "measure": measure("Measure-anc-first-visit-before-12-weeks.json"),
+        "periodType": "monthly",
+        "period": "2026-03",
+    });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["calculation"], "percentage");
+    assert_eq!(body["value"], 75);
+    assert_eq!(
+        (&body["count"], &body["denominator"]),
+        (&json!(3), &json!(4))
+    );
+    assert_eq!(body["errors"], json!([]));
+    let akello = body["patients"]
+        .as_array()
+        .expect("patients")
+        .iter()
+        .find(|p| p["patient"] == "Patient/akello")
+        .expect("akello");
+    assert_eq!(
+        (&akello["count"], &akello["denominator"]),
+        (&json!(0), &json!(1))
+    );
+    assert_eq!(akello["records"][0]["reason"], "denominator-only");
+
+    let input = json!({
+        "measure": measure("Measure-anc-gestational-age-at-first-visit.json"),
+        "periodType": "monthly",
+        "period": "2026-03",
+    });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["calculation"], "median");
+    assert_eq!(body["value"], 9.5);
+    assert_eq!(
+        body["values"],
+        json!({ "count": 4, "sum": 43, "minimum": 8, "maximum": 16 })
+    );
+    let nansubuga = body["patients"]
+        .as_array()
+        .expect("patients")
+        .iter()
+        .find(|p| p["patient"] == "Patient/nansubuga")
+        .expect("nansubuga");
+    assert_eq!(
+        nansubuga["records"]
+            .as_array()
+            .expect("records")
+            .iter()
+            .map(|r| (r["value"].clone(), r["picked"].clone()))
+            .collect::<Vec<_>>(),
+        [(json!("8"), json!(true)), (json!("11"), json!(false))]
+    );
+}
+
+#[tokio::test]
 async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     let (publications, _dir) = publications().await;
     let files = anc_package();
@@ -2023,10 +2088,13 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
         body["period"],
         json!({ "periodType": "monthly", "id": "2026-03", "start": "2026-03-01", "end": "2026-03-31" })
     );
+    assert_eq!(body["calculation"], "count");
     assert_eq!(body["value"], 4);
+    assert_eq!(body["count"], 4);
+    assert_eq!(body["denominator"], Value::Null);
     assert_eq!(body["errors"], json!([]));
     let patients = body["patients"].as_array().expect("patients");
-    assert_eq!(patients.len(), 10);
+    assert_eq!(patients.len(), 11);
     let counted: Vec<&str> = patients
         .iter()
         .filter(|p| p["counted"] == true)
@@ -2050,8 +2118,8 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     assert_eq!(
         nakato["records"],
         json!([
-            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null },
-            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null }
+            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null, "value": null, "picked": false },
+            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null, "value": null, "picked": false }
         ])
     );
     let auma = patients
@@ -2076,8 +2144,7 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     assert_eq!(status, 200, "{body}");
     assert_eq!(body["value"], 7);
 
-    // A Measure without a period date, a period not of its type, or a calculation not built yet
-    // is refused.
+    // A Measure without a period date, or a period not of its type, is refused.
     let mut undated = measure.clone();
     undated["extension"] = json!([]);
     for (input, why) in [
@@ -2101,6 +2168,7 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
             "{body}"
         );
     }
+    // Counting visits, Nansubuga's two first-visit records count twice.
     let mut visits = measure.clone();
     visits["extension"][1]["valueCode"] = json!("visits");
     let (status, body) = call(
@@ -2111,8 +2179,8 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
         Some(json!({ "measure": visits, "periodType": "monthly", "period": "2026-03" })),
     )
     .await;
-    assert_eq!(status, 422);
-    assert_eq!(body["detail"], "counting visits is not supported yet");
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["value"], 5);
 
     // It needs a Studio permission, and a package version that exists.
     let input = json!({ "measure": measure, "periodType": "monthly", "period": "2026-03" });
