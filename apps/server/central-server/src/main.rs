@@ -220,6 +220,7 @@ async fn session() {}
     paths(
         session,
         studio::list,
+        studio::designs::list,
         studio::page,
         studio::act,
         studio::start,

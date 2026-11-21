@@ -1,0 +1,12 @@
+{
+  "name": "ug.moh.clinic",
+  "version": "1.0.0",
+  "fhirVersions": [
+    "5.0.0"
+  ],
+  "kind": "national-core",
+  "platform": {
+    "minSoftware": "0.1.0",
+    "formatVersion": 1
+  }
+}

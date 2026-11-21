@@ -356,6 +356,7 @@ const INVENTORY: &[Mounted] = &[
         gate: Gate::Staff,
         paths: &[
             "/packages",
+            "/designs",
             "/packages/{id}",
             "/packages/{id}/{action}",
             "/packages/{id}/files/{*path}",

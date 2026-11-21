@@ -1,0 +1,23 @@
+{
+  "resourceType": "Library",
+  "id": "outreach-visit",
+  "url": "https://health.go.ug/fhir/Library/outreach-visit",
+  "version": "1.0.0",
+  "name": "OutreachVisit",
+  "title": "Outreach visit",
+  "status": "active",
+  "type": {
+    "coding": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.workflow+json",
+      "data": "ewogICJ1cmwiOiAiaHR0cHM6Ly9oZWFsdGguZ28udWcvZmhpci9MaWJyYXJ5L291dHJlYWNoLXZpc2l0IiwKICAidmVyc2lvbiI6ICIxLjAuMCIsCiAgInN0YXRlY2hhcnQiOiB7CiAgICAiaW5pdGlhbCI6IFsKICAgICAgIndhaXRpbmciCiAgICBdLAogICAgInN0YXRlcyI6IFsKICAgICAgewogICAgICAgICJpZCI6ICJ3YWl0aW5nIiwKICAgICAgICAia2luZCI6ICJhdG9taWMiLAogICAgICAgICJ0cmFuc2l0aW9ucyI6IFsKICAgICAgICAgIHsKICAgICAgICAgICAgImV2ZW50cyI6IFsKICAgICAgICAgICAgICAib3V0cmVhY2guc2VlbiIKICAgICAgICAgICAgXSwKICAgICAgICAgICAgInRhcmdldHMiOiBbCiAgICAgICAgICAgICAgInNlZW4iCiAgICAgICAgICAgIF0KICAgICAgICAgIH0KICAgICAgICBdCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiaWQiOiAic2VlbiIsCiAgICAgICAgImtpbmQiOiAiZmluYWwiCiAgICAgIH0KICAgIF0KICB9Cn0="
+    }
+  ]
+}

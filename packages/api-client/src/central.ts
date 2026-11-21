@@ -483,6 +483,75 @@ export const StudioDecisionTryInput = z.object({
 })
 export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
 
+/** What kind of design an artefact is: the Studio's sections. */
+export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program"])
+export type StudioDesignKind = z.infer<typeof StudioDesignKind>
+
+/** One designed artefact, in the package version it opens in. */
+export const StudioDesign = z.object({
+  /** Its kind. */
+  "kind": StudioDesignKind,
+  /** The package name. */
+  "package": z.string(),
+  /** The package version it opens in (`name@version`): the open draft, else the latest published version. */
+  "packageId": z.string(),
+  /** Its file in the package; a decision table's is its Workflow Definition's. */
+  "path": z.string(),
+  /** A decision table's id in its Workflow Definition. */
+  "table": z.string().nullable().optional(),
+  /** Its title, else its name, id or path; a decision table's id. */
+  "title": z.string(),
+  /** Its canonical URL. */
+  "url": z.string().nullable().optional(),
+  /** Its version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioDesign = z.infer<typeof StudioDesign>
+
+/** A package's open draft. */
+export const StudioDesignDraft = z.object({
+  /** Its Draft Holder (an account id). */
+  "holder": z.string(),
+  /** `name@version`. */
+  "id": z.string(),
+  /** Whether the signed-in person holds it. */
+  "mine": z.boolean(),
+  /** Where it stands: draft to approval. */
+  "stage": PackageStage,
+})
+export type StudioDesignDraft = z.infer<typeof StudioDesignDraft>
+
+/** The kind of package, which decides its approvers. */
+export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
+export type StudioPackageKind = z.infer<typeof StudioPackageKind>
+
+/** A package that holds designs. */
+export const StudioDesignPackage = z.object({
+  /** The canonical base new artefacts take, from its manifest's URL. */
+  "canonical": z.string().nullable().optional(),
+  /** When the version its designs are read from last changed. */
+  "changed": z.string().nullable().optional(),
+  "draft": StudioDesignDraft.nullable().optional(),
+  /** Its kind. */
+  "kind": StudioPackageKind,
+  /** The package name. */
+  "name": z.string(),
+  /** Its latest published version (`name@version`). */
+  "published": z.string().nullable().optional(),
+  /** Its title. */
+  "title": z.string().nullable().optional(),
+})
+export type StudioDesignPackage = z.infer<typeof StudioDesignPackage>
+
+/** Every design across packages, and the packages. */
+export const StudioDesigns = z.object({
+  /** The designs, by package, then path. */
+  "designs": z.array(StudioDesign),
+  /** Every package with an open draft or a published version, by name. */
+  "packages": z.array(StudioDesignPackage),
+})
+export type StudioDesigns = z.infer<typeof StudioDesigns>
+
 /** Which ValueSet to expand. */
 export const StudioExpandInput = z.object({
   /** At most this many codes (200 unless asked, 1000 at most). */
@@ -583,10 +652,6 @@ export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 /** Why a paste was not read at all. */
 export const StudioImportRefusal = z.enum(["not-json", "not-questionnaire", "looks-r4"])
 export type StudioImportRefusal = z.infer<typeof StudioImportRefusal>
-
-/** The kind of package, which decides its approvers. */
-export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
-export type StudioPackageKind = z.infer<typeof StudioPackageKind>
 
 /** How to start a draft: a copy of a published version, or a blank new package. */
 export const StudioNewDraft = z.object({
@@ -877,6 +942,17 @@ export const operations = {
     responses: {
       200: SessionInfo,
       401: null,
+    },
+  },
+  listStudioDesigns: {
+    method: 'GET',
+    path: '/api/studio/designs',
+    responses: {
+      200: StudioDesigns,
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
+      500: StudioProblem,
     },
   },
   startStudioDraft: {

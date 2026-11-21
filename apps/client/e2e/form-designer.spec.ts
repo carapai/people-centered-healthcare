@@ -10,7 +10,8 @@ import { USERS } from './users'
 test('the author designs the triage form, watching the preview, and saves it', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible()
   // It opens from the changed Questionnaire.
   await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'Questionnaire-opd-triage.json in the form designer' }).click()
@@ -74,7 +75,8 @@ test('the author designs the triage form, watching the preview, and saves it', a
 test('the author sets what answers become a record, and imports an R4 form through the conversion report', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'Questionnaire-opd-triage.json in the form designer' }).click()
   await expect(page.getByText('What answers become is in Library-opd-triage-mapping.json.')).toBeVisible()
   const questions = page.getByRole('navigation', { name: 'Questions' })
@@ -144,7 +146,8 @@ test('the author sets what answers become a record, and imports an R4 form throu
 test('the author binds the triage category to a ValueSet through the picker', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'CodeSystem-triage-category.json in the terminology browser' }).click()
   const valueSet = page.getByRole('region', { name: 'ValueSet', exact: true })
   const concepts = page.getByRole('region', { name: 'Concepts of TriageCategory' })

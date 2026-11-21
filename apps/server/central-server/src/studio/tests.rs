@@ -804,6 +804,7 @@ fn the_openapi_document_describes_the_studio() {
     let document = crate::openapi().to_json().expect("json");
     for operation in [
         "listStudioPackages",
+        "listStudioDesigns",
         "getStudioPackage",
         "takeStudioAction",
         "startStudioDraft",
@@ -1913,4 +1914,66 @@ async fn importing_an_r4_questionnaire_converts_it_on_the_server_with_its_report
     )
     .await;
     assert_eq!(status, 404);
+}
+
+// The Studio home and its sections (#855).
+
+#[tokio::test]
+async fn the_designs_say_which_package_version_each_opens_in_and_whose_draft_it_is() {
+    let (publications, _dir) = publications().await;
+    let author = || subject("ann", &["metadata.author"]);
+    publish(&publications, &package()).await;
+
+    // Published only: the form opens in the published version, and nobody holds a draft.
+    let (status, body) = call(&publications, author(), "GET", "/designs", None).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["packages"][0]["name"], "ug.moh.anc");
+    assert_eq!(body["packages"][0]["published"], ID);
+    assert_eq!(body["packages"][0]["draft"], Value::Null);
+    assert_eq!(body["packages"][0]["canonical"], "http://health.go.ug/fhir");
+    assert_eq!(body["designs"][0]["kind"], "form");
+    assert_eq!(body["designs"][0]["packageId"], ID);
+    assert_eq!(body["designs"][0]["path"], "Questionnaire-anc-visit.json");
+
+    // *Edit* starts the next version: the form now opens in the draft, which is ann's.
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        "/drafts",
+        Some(json!({ "copyOf": ID })),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let (_, body) = call(&publications, author(), "GET", "/designs?kind=form", None).await;
+    let draft = &body["packages"][0]["draft"];
+    assert_eq!(draft["id"], "ug.moh.anc@1.1.0-draft");
+    assert_eq!(draft["stage"], "draft");
+    assert_eq!(draft["mine"], true);
+    assert_eq!(body["designs"][0]["packageId"], "ug.moh.anc@1.1.0-draft");
+    let (_, theirs) = call(
+        &publications,
+        subject("rita", &["metadata.review"]),
+        "GET",
+        "/designs",
+        None,
+    )
+    .await;
+    assert_eq!(theirs["packages"][0]["draft"]["mine"], false);
+
+    // Another kind keeps none of them; a kind that is not one is refused.
+    let (_, body) = call(
+        &publications,
+        author(),
+        "GET",
+        "/designs?kind=workflow",
+        None,
+    )
+    .await;
+    assert_eq!(body["designs"], json!([]));
+    assert_eq!(body["packages"].as_array().map(Vec::len), Some(1));
+    let (status, _) = call(&publications, author(), "GET", "/designs?kind=poem", None).await;
+    assert_eq!(status, 400);
+    let (status, _) = call(&publications, subject("x", &[]), "GET", "/designs", None).await;
+    assert_eq!(status, 403);
 }
