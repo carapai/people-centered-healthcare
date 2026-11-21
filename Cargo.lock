@@ -734,6 +734,7 @@ dependencies = [
  "health-client-registry",
  "health-configuration",
  "health-consent",
+ "health-fhir-mapping",
  "health-fhir-search",
  "health-fhir-server",
  "health-fhir-validation",
@@ -2715,6 +2716,13 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "health-fhir-mapping"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

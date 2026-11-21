@@ -1,101 +1,34 @@
+import type { StudioConversionFinding, StudioFhirVersion, StudioImportRefusal, StudioQuestionnaireImport } from '@health/api-client'
 import type { Questionnaire, QuestionnaireItem } from '@health/fhir-types'
 
 import type { FormLayout } from '../../forms/layout'
 
-// Import FHIR JSON (studio.md § The form designer; metadata.md § Importing R4 content; #497): a
-// pasted Questionnaire replaces the form. R4 content is converted to R5 first, and each import
-// answers a conversion report: what was converted, and what could not be, which blocks the
-// import, so nothing unconverted reaches the draft. The draft keeps its own id, url, version and
-// status, and the pasted Questionnaire's canonical is kept as its source in `derivedFrom`.
+// Import FHIR JSON (studio.md § The form designer; metadata.md § Importing R4 content; #497,
+// #853): a pasted Questionnaire replaces the form. Central reads it, converting R4 to R5 with
+// `health-fhir-mapping` (ADRs 0015, 0050): no R4 conversion happens here. Each import answers the
+// server's conversion report: what was converted, and what could not be, which blocks the import,
+// so nothing unconverted reaches the draft. The draft keeps its own id, url, version and status,
+// and the pasted Questionnaire's canonical is kept as its source in `derivedFrom`.
 
 /** The FHIR version a pasted Questionnaire is read as. */
-export type FhirVersion = 'R5' | 'R4'
-
-/** One line of the conversion report. `at` is `Questionnaire` or the item's linkId. */
-export type ReportEntry =
-  | { outcome: 'converted'; code: 'choice'; at: string }
-  | { outcome: 'converted'; code: 'open-choice'; at: string }
-  | { outcome: 'converted'; code: 'source'; at: string; source: string }
-  | { outcome: 'unconverted'; code: 'unknown-element'; at: string; element: string }
-  | { outcome: 'unconverted'; code: 'contained'; at: string }
-  | { outcome: 'unconverted'; code: 'modifier-extension'; at: string }
-  | { outcome: 'unconverted'; code: 'unknown-type'; at: string; type: string }
+export type FhirVersion = StudioFhirVersion
 
 /** Why a paste is not read at all. */
-export type ImportRefusal = 'not-json' | 'not-questionnaire' | 'looks-r4'
+export type ImportRefusal = StudioImportRefusal
 
-export type ImportResult = { ok: true; questionnaire: Questionnaire; report: ReportEntry[] } | { ok: false; refusal: ImportRefusal }
+/** One line of the report: the server's conversion findings, then the source this import keeps. */
+export type ReportEntry = StudioConversionFinding | { outcome: 'converted'; code: 'source'; at: string; source: string }
 
-// The elements of an R5 Questionnaire and of its items. R4's are a subset of these, so an
-// element outside the list is one neither version knows, or one this import cannot carry.
-const QUESTIONNAIRE_ELEMENTS = new Set([
-  'resourceType', 'id', 'meta', 'implicitRules', 'language', 'text', 'contained', 'extension', 'modifierExtension',
-  'url', 'identifier', 'version', 'versionAlgorithmString', 'versionAlgorithmCoding', 'name', 'title', 'derivedFrom', 'status',
-  'experimental', 'subjectType', 'date', 'publisher', 'contact', 'description', 'useContext', 'jurisdiction', 'purpose',
-  'copyright', 'copyrightLabel', 'approvalDate', 'lastReviewDate', 'effectivePeriod', 'code', 'item',
-])
-const ITEM_ELEMENTS = new Set([
-  'id', 'extension', 'modifierExtension', 'linkId', 'definition', 'code', 'prefix', 'text', 'type', 'enableWhen', 'enableBehavior',
-  'disabledDisplay', 'required', 'repeats', 'readOnly', 'maxLength', 'answerConstraint', 'answerValueSet', 'answerOption', 'initial', 'item',
-])
-const R5_TYPES = new Set(['group', 'display', 'boolean', 'decimal', 'integer', 'date', 'dateTime', 'time', 'string', 'text', 'url', 'coding', 'attachment', 'reference', 'quantity'])
-// R4's two choice types became `coding`, with `answerConstraint` saying whether free text is allowed.
-const R4_CHOICES: Record<string, 'optionsOnly' | 'optionsOrString'> = { choice: 'optionsOnly', 'open-choice': 'optionsOrString' }
+/** Central's reading of a paste: the R5 Questionnaire and its report, or why it was not read. */
+/** `blocked` is the server's: something could not be converted. */
+export type ImportResult = { ok: true; questionnaire: Questionnaire; report: StudioConversionFinding[]; blocked: boolean } | { ok: false; refusal: ImportRefusal }
 
-/** An element name with its primitive extension's `_` removed. */
-const bare = (key: string) => (key.startsWith('_') ? key.slice(1) : key)
-
-/** The objects in a JSON array, or none. */
-const itemsOf = (items: unknown): Record<string, unknown>[] => (Array.isArray(items) ? items.filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null) : [])
-
-/** Reads `text` as a Questionnaire in `version`, converting R4 to R5, with its report. */
-export function readQuestionnaire(text: string, version: FhirVersion): ImportResult {
-  let value: unknown
-  try {
-    value = JSON.parse(text)
-  } catch {
-    return { ok: false, refusal: 'not-json' }
-  }
-  if (typeof value !== 'object' || value === null || Array.isArray(value) || (value as { resourceType?: unknown }).resourceType !== 'Questionnaire') return { ok: false, refusal: 'not-questionnaire' }
-  const source = value as Record<string, unknown>
-  const report: ReportEntry[] = []
-  const r4Types = new Set(Object.keys(R4_CHOICES))
-
-  // An R5 paste holding R4's choice types was meant to be read as R4.
-  if (version === 'R5') {
-    const walk = (items: unknown): boolean => itemsOf(items).some((item) => r4Types.has(String(item.type)) || walk(item.item))
-    if (walk(source.item)) return { ok: false, refusal: 'looks-r4' }
-  }
-
-  for (const key of Object.keys(source)) if (!QUESTIONNAIRE_ELEMENTS.has(bare(key))) report.push({ outcome: 'unconverted', code: 'unknown-element', at: 'Questionnaire', element: key })
-  if (Array.isArray(source.contained) && source.contained.length > 0) report.push({ outcome: 'unconverted', code: 'contained', at: 'Questionnaire' })
-  if (Array.isArray(source.modifierExtension) && source.modifierExtension.length > 0) report.push({ outcome: 'unconverted', code: 'modifier-extension', at: 'Questionnaire' })
-
-  const convert = (items: unknown): QuestionnaireItem[] =>
-    itemsOf(items).map((item) => {
-      const at = typeof item.linkId === 'string' && item.linkId !== '' ? item.linkId : '?'
-      for (const key of Object.keys(item)) if (!ITEM_ELEMENTS.has(bare(key))) report.push({ outcome: 'unconverted', code: 'unknown-element', at, element: key })
-      if (Array.isArray(item.modifierExtension) && item.modifierExtension.length > 0) report.push({ outcome: 'unconverted', code: 'modifier-extension', at })
-      const out: Record<string, unknown> = { ...item }
-      const type = String(item.type)
-      const constraint = version === 'R4' ? R4_CHOICES[type] : undefined
-      if (constraint !== undefined) {
-        out.type = 'coding'
-        // An answerConstraint already there (an R5 element in R4 content) is left as it says.
-        if (out.answerConstraint === undefined) out.answerConstraint = constraint
-        report.push({ outcome: 'converted', code: type === 'choice' ? 'choice' : 'open-choice', at })
-      } else if (!R5_TYPES.has(type)) report.push({ outcome: 'unconverted', code: 'unknown-type', at, type })
-      if (item.item !== undefined) out.item = convert(item.item)
-      return out as unknown as QuestionnaireItem
-    })
-
-  const questionnaire = { ...source, item: convert(source.item) } as unknown as Questionnaire
-  if (questionnaire.item?.length === 0) delete questionnaire.item
-  return { ok: true, questionnaire, report }
+/** The server's answer as an import result. */
+export function importResult(answer: StudioQuestionnaireImport): ImportResult {
+  if (answer.refusal !== null && answer.refusal !== undefined) return { ok: false, refusal: answer.refusal }
+  if (answer.questionnaire === null || answer.questionnaire === undefined) return { ok: false, refusal: 'not-questionnaire' }
+  return { ok: true, questionnaire: answer.questionnaire as unknown as Questionnaire, report: answer.report, blocked: answer.blocked }
 }
-
-/** Whether the report blocks the import: something could not be converted. */
-export const blocks = (report: readonly ReportEntry[]) => report.some((entry) => entry.outcome === 'unconverted')
 
 /**
  * The draft's Questionnaire replaced by `imported`: the draft keeps its id, url, version and

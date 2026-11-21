@@ -1,6 +1,8 @@
 // Boundary checks that oxlint cannot express (client-application.md, ADR 0037):
 // - feature and route code never checks which runtime it runs in;
-// - browser storage APIs appear only in the preferences allowlist.
+// - browser storage APIs appear only in the preferences allowlist;
+// - no FHIR R4 conversion: it lives only in `health-fhir-mapping` on the server (ADRs 0015, 0050;
+//   #853). R4-only Questionnaire item types and R4 element names are the tell.
 // Usage: bun scripts/check-boundaries.ts [srcDir]
 
 import { readdir, readFile } from 'node:fs/promises'
@@ -21,6 +23,13 @@ const storageApis: [RegExp, string][] = [
   [/\bindexedDB\b/, 'IndexedDB'],
   [/navigator\.storage\b|getDirectory\s*\(/, 'OPFS'],
   [/\bcaches\.open\b/, 'the Cache API'],
+]
+
+/** What only R4 → R5 conversion code would name: R4's `open-choice` Questionnaire item type
+ * (R5 has none; its report code is `open-choice-to-coding`), and a table named for R4. */
+const r4Conversion: [RegExp, string][] = [
+  [/['"`]open-choice['"`]/, "R4's open-choice item type"],
+  [/\bR4_[A-Z]/, 'an R4 conversion table'],
 ]
 
 /**
@@ -54,6 +63,9 @@ for await (const path of sourceFiles(srcDir)) {
       for (const [pattern, what] of runtimeChecks) {
         if (pattern.test(line)) problems.push(`${at}: feature code must not check ${what}; use Platform.capabilities`)
       }
+    }
+    for (const [pattern, what] of r4Conversion) {
+      if (pattern.test(line)) problems.push(`${at}: ${what}: FHIR R4 is converted on the server by health-fhir-mapping, never in the client (ADRs 0015, 0050)`)
     }
     if (!storageAllowlist.has(file)) {
       for (const [pattern, what] of storageApis) {

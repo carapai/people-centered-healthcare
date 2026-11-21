@@ -21,7 +21,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | `health-fhir-models` | crate | Facade over a generated R5 model; internals in [fhir-r5-model.md](fhir-r5-model.md) |
 | `health-fhir-validation` | crate | Pure; wraps the FHIRPath engine |
 | `health-fhir-search` | crate | Parsed search AST + SearchParameter registry only; SurrealQL translation lives in `health-surrealdb` |
-| `health-fhir-mapping` | crate | |
+| `health-fhir-mapping` | crate | R4 → R5 conversion with a conversion report, on the JSON; today the Studio's Questionnaire import (#853) |
 | `health-fhir-extraction` | crate | Pure SDC template-extraction executor and `$populate` evaluator; see [questionnaire-extraction.md](questionnaire-extraction.md) |
 | `health-sync-protocol` | crate | Wire types and the shared client and apply logic; see [synchronization.md](synchronization.md) |
 | `health-persistence` | crate | Moved here from §17 (ADR 0005): pure unit-of-work, outbox and versioning traits |

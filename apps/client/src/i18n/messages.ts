@@ -1754,6 +1754,7 @@ type StudioValues = {
   fdImportNotJson: {}
   fdImportNotQuestionnaire: {}
   fdImportLooksR4: {}
+  fdImportFailed: { reason: string }
   fdImportReport: { count: number }
   fdImportBlocked: {}
   fdImportClean: {}
@@ -2018,6 +2019,7 @@ export const studioMessages = defineMessages<StudioValues>({
   fdImportNotJson: { id: 'app.studio.formDesigner.importNotJson', defaultMessage: 'This is not JSON.', description: 'Studio: import refusal' },
   fdImportNotQuestionnaire: { id: 'app.studio.formDesigner.importNotQuestionnaire', defaultMessage: 'This is not a Questionnaire.', description: 'Studio: import refusal' },
   fdImportLooksR4: { id: 'app.studio.formDesigner.importLooksR4', defaultMessage: 'It uses R4’s choice types: read it as R4.', description: 'Studio: import refusal' },
+  fdImportFailed: { id: 'app.studio.formDesigner.importFailed', defaultMessage: 'Central could not read it. {reason}', description: 'Studio: the import request failed' },
   fdImportReport: { id: 'app.studio.formDesigner.importReport', defaultMessage: '{count, plural, =0 {Conversion report: nothing to convert} one {Conversion report: # line} other {Conversion report: # lines}}', description: 'Studio: conversion report heading' },
   fdImportBlocked: { id: 'app.studio.formDesigner.importBlocked', defaultMessage: 'Some of it could not be converted, so it cannot replace the form.', description: 'Studio: import blocked by the report' },
   fdImportClean: { id: 'app.studio.formDesigner.importClean', defaultMessage: 'It replaces every question of the form. The draft keeps its url, version and status.', description: 'Studio: import ready' },
