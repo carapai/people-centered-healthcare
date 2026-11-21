@@ -55,7 +55,7 @@ Status: **accepted** (ADRs 0005, 0006). Produced while resolving the Wayfinder t
 | Crate | Notes |
 |---|---|
 | `health-<context>-app` | One per Bounded Context, e.g. `health-clinical-records-app`, `health-finance-app`; created with the context's first use case |
-| `health-analytics-app` | Analytics: a Measure read as an indicator and evaluated over each patient's records for one period, on the FHIRPath engine every node runs (ADR 0068; #548) |
+| `health-analytics-app` | Analytics: a Measure read as an indicator and evaluated over each patient's records for one period, on the FHIRPath engine every node runs: counts, percentages, rates, ratios and summarised values (ADR 0068; #548, #549) |
 | `health-billing-app` | Billing: charge capture from clinical events, priced, kept once and posted to the ledger, with reversals on cancellation (#121) |
 | `health-encounters-app` | Encounters: check-in and the Encounter's status, each with its guard, FHIR Encounter and outbox event (#102) |
 | `health-equipment-app` | Equipment as FHIR Device resources of category *equipment*, registered once per unit, changed by the facility that holds it, and handed over between facilities by central; receiving reaches it through inventory's `EquipmentIntake` port (#453; ADR 0064) |

@@ -17,6 +17,28 @@
       "birthDate": "1999-07-03"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "nansubuga-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/nansubuga"
+      },
+      "period": {
+        "start": "2026-03-25"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "nansubuga-visit-1",
       "status": "completed",
@@ -45,6 +67,38 @@
       },
       "actualPeriod": {
         "start": "2026-03-25T10:00:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/nansubuga-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "nansubuga-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "encounter": {
+        "reference": "Encounter/nansubuga-visit-1"
+      },
+      "effectiveDateTime": "2026-03-25T10:00:00+03:00",
+      "valueQuantity": {
+        "value": 8,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     },
     {
@@ -76,6 +130,38 @@
       },
       "actualPeriod": {
         "start": "2026-03-27T09:00:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/nansubuga-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "nansubuga-visit-2-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/nansubuga"
+      },
+      "encounter": {
+        "reference": "Encounter/nansubuga-visit-2"
+      },
+      "effectiveDateTime": "2026-03-27T09:00:00+03:00",
+      "valueQuantity": {
+        "value": 11,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     }
   ]

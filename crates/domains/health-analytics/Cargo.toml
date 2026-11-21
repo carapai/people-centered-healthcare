@@ -1,6 +1,6 @@
 [package]
 name = "health-analytics"
-description = "Indicators (analytics.md; ADR 0068; #548): a Measure's definition and its problems, the reporting periods care is placed in, and who a count indicator counts."
+description = "Indicators (analytics.md; ADR 0068; #548): a Measure's definition and its problems, the reporting periods care is placed in, and what an indicator calculates over a period, with what roll-up needs."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,5 +15,6 @@ workspace = true
 
 [dependencies]
 jiff = { workspace = true }
+rust_decimal = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

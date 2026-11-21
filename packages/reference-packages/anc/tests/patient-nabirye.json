@@ -17,6 +17,28 @@
       "birthDate": "2011-08-09"
     },
     {
+      "resourceType": "EpisodeOfCare",
+      "id": "nabirye-anc",
+      "status": "active",
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/program",
+              "code": "anc"
+            }
+          ],
+          "text": "Antenatal care"
+        }
+      ],
+      "patient": {
+        "reference": "Patient/nabirye"
+      },
+      "period": {
+        "start": "2026-04-08"
+      }
+    },
+    {
       "resourceType": "Encounter",
       "id": "nabirye-visit-1",
       "status": "completed",
@@ -45,6 +67,38 @@
       },
       "actualPeriod": {
         "start": "2026-04-08T14:00:00+03:00"
+      },
+      "episodeOfCare": [
+        {
+          "reference": "EpisodeOfCare/nabirye-anc"
+        }
+      ]
+    },
+    {
+      "resourceType": "Observation",
+      "id": "nabirye-visit-1-ga",
+      "status": "final",
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": "18185-9",
+            "display": "Gestational age"
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/nabirye"
+      },
+      "encounter": {
+        "reference": "Encounter/nabirye-visit-1"
+      },
+      "effectiveDateTime": "2026-04-08T14:00:00+03:00",
+      "valueQuantity": {
+        "value": 11,
+        "unit": "weeks",
+        "system": "http://unitsofmeasure.org",
+        "code": "wk"
       }
     }
   ]

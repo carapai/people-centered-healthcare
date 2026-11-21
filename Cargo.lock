@@ -763,6 +763,7 @@ dependencies = [
  "http-body-util",
  "jiff",
  "p256",
+ "rust_decimal",
  "serde",
  "serde_json",
  "surrealdb",
@@ -2323,6 +2324,7 @@ name = "health-analytics"
 version = "0.1.0"
 dependencies = [
  "jiff",
+ "rust_decimal",
  "serde",
  "thiserror 2.0.21",
 ]
@@ -2334,8 +2336,8 @@ dependencies = [
  "health-analytics",
  "health-fhir-validation",
  "jiff",
+ "rust_decimal",
  "serde_json",
- "thiserror 2.0.21",
  "tokio",
 ]
 
