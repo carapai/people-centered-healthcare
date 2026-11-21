@@ -20,7 +20,8 @@ async function openDesigner(page: Page) {
 test('the ART program assembles on the journey board; its regimen rules are reordered and a missing form is created', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.art', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.art', { exact: false }).click()
   await openDesigner(page)
 
   // One column per state of the care workflow, in its order.

@@ -1,21 +1,23 @@
 import { DataTable, emptyView, type DataTableColumn, type DataTableView } from '@health/design-system'
 import { css } from '@health/design-system/css'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { studioMessages as m } from '../../i18n/messages'
+import { designMessages as dm, studioMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
 import { StudioError, packageQuery, packagesQuery, startDraft, studioKey, type StudioPackage, type StudioPackageKind } from './api'
+import { designsKey } from './designs'
 import { actionLabel, refusalText, stageLabel } from './wording'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '4', maxWidth: '6xl' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
 
 /**
- * The Studio's package list (studio.md § The package workspace; #492): one row per package with
+ * The Studio's package list (studio.md § The package workspace; #492), its Packages section since
+ * the Studio starts from what is designed (#855): one row per package with
  * its title, name and kind, its version and bump, its status and Draft Holder, the signed-in person's
  * next step, and the scopes it is active in. The server works out the next step.
  */
@@ -56,7 +58,11 @@ export function PackagesPage() {
   ]
   return (
     <section className={page}>
-      <h1 className={heading}>{intl.formatMessage(m.sdTitle)}</h1>
+      <div>
+        <Link to="/studio">{intl.formatMessage(dm.dhHome)}</Link>
+      </div>
+      <h1 className={heading}>{intl.formatMessage(dm.dhPackages)}</h1>
+      <p className={css({ color: 'fg.muted' })}>{intl.formatMessage(dm.dhPackagesHint)}</p>
       {packages.data === undefined ? (
         packages.isPending ? (
           <p role="status">{intl.formatMessage(m.sdLoading)}</p>
@@ -70,7 +76,7 @@ export function PackagesPage() {
       ) : (
         <>
           <p className={css({ color: 'fg.muted' })}>{intl.formatMessage(m.sdHint)}</p>
-          <DataTable caption={intl.formatMessage(m.sdTitle)} columns={columns} data={packages.data} getRowId={(row) => row.id} view={view} onViewChange={setView} onRowActivate={open} />
+          <DataTable caption={intl.formatMessage(dm.dhPackages)} columns={columns} data={packages.data} getRowId={(row) => row.id} view={view} onViewChange={setView} onRowActivate={open} />
         </>
       )}
       {packages.data === undefined ? null : <NewPackage />}
@@ -94,6 +100,7 @@ function NewPackage() {
     onSuccess: async (next) => {
       queryClient.setQueryData(packageQuery(platform.transport, next.package.id).queryKey, next)
       await queryClient.invalidateQueries({ queryKey: studioKey, exact: true })
+      await queryClient.invalidateQueries({ queryKey: designsKey, exact: true })
       await navigate({ to: '/studio/$id', params: { id: next.package.id } })
     },
   })

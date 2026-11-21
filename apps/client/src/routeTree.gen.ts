@@ -39,6 +39,12 @@ import { Route as StockReceiveRouteImport } from './routes/stock.receive'
 import { Route as StockRequisitionsRouteImport } from './routes/stock.requisitions'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioIdRouteImport } from './routes/studio.$id'
+import { Route as StudioConceptsRouteImport } from './routes/studio.concepts'
+import { Route as StudioDecisionTablesRouteImport } from './routes/studio.decision-tables'
+import { Route as StudioFormsRouteImport } from './routes/studio.forms'
+import { Route as StudioPackagesRouteImport } from './routes/studio.packages'
+import { Route as StudioProgramsRouteImport } from './routes/studio.programs'
+import { Route as StudioWorkflowsRouteImport } from './routes/studio.workflows'
 import { Route as SyncConflictsRouteImport } from './routes/sync.conflicts'
 import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
@@ -199,6 +205,36 @@ const StudioIdRoute = StudioIdRouteImport.update({
   path: '/studio/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioConceptsRoute = StudioConceptsRouteImport.update({
+  id: '/studio/concepts',
+  path: '/studio/concepts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioDecisionTablesRoute = StudioDecisionTablesRouteImport.update({
+  id: '/studio/decision-tables',
+  path: '/studio/decision-tables',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioFormsRoute = StudioFormsRouteImport.update({
+  id: '/studio/forms',
+  path: '/studio/forms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioPackagesRoute = StudioPackagesRouteImport.update({
+  id: '/studio/packages',
+  path: '/studio/packages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioProgramsRoute = StudioProgramsRouteImport.update({
+  id: '/studio/programs',
+  path: '/studio/programs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioWorkflowsRoute = StudioWorkflowsRouteImport.update({
+  id: '/studio/workflows',
+  path: '/studio/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SyncConflictsRoute = SyncConflictsRouteImport.update({
   id: '/sync/conflicts',
   path: '/sync/conflicts',
@@ -273,6 +309,12 @@ export interface FileRoutesByFullPath {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/decision-tables': typeof StudioDecisionTablesRoute
+  '/studio/forms': typeof StudioFormsRoute
+  '/studio/packages': typeof StudioPackagesRoute
+  '/studio/programs': typeof StudioProgramsRoute
+  '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
@@ -314,6 +356,12 @@ export interface FileRoutesByTo {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/decision-tables': typeof StudioDecisionTablesRoute
+  '/studio/forms': typeof StudioFormsRoute
+  '/studio/packages': typeof StudioPackagesRoute
+  '/studio/programs': typeof StudioProgramsRoute
+  '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal': typeof PortalIndexRoute
@@ -356,6 +404,12 @@ export interface FileRoutesById {
   '/stock/receive': typeof StockReceiveRoute
   '/stock/requisitions': typeof StockRequisitionsRoute
   '/studio/$id': typeof StudioIdRoute
+  '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/decision-tables': typeof StudioDecisionTablesRoute
+  '/studio/forms': typeof StudioFormsRoute
+  '/studio/packages': typeof StudioPackagesRoute
+  '/studio/programs': typeof StudioProgramsRoute
+  '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
   '/portal/': typeof PortalIndexRoute
@@ -399,6 +453,12 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/concepts'
+    | '/studio/decision-tables'
+    | '/studio/forms'
+    | '/studio/packages'
+    | '/studio/programs'
+    | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
@@ -440,6 +500,12 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/concepts'
+    | '/studio/decision-tables'
+    | '/studio/forms'
+    | '/studio/packages'
+    | '/studio/programs'
+    | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal'
@@ -481,6 +547,12 @@ export interface FileRouteTypes {
     | '/stock/receive'
     | '/stock/requisitions'
     | '/studio/$id'
+    | '/studio/concepts'
+    | '/studio/decision-tables'
+    | '/studio/forms'
+    | '/studio/packages'
+    | '/studio/programs'
+    | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
     | '/portal/'
@@ -523,6 +595,12 @@ export interface RootRouteChildren {
   StockReceiveRoute: typeof StockReceiveRoute
   StockRequisitionsRoute: typeof StockRequisitionsRoute
   StudioIdRoute: typeof StudioIdRoute
+  StudioConceptsRoute: typeof StudioConceptsRoute
+  StudioDecisionTablesRoute: typeof StudioDecisionTablesRoute
+  StudioFormsRoute: typeof StudioFormsRoute
+  StudioPackagesRoute: typeof StudioPackagesRoute
+  StudioProgramsRoute: typeof StudioProgramsRoute
+  StudioWorkflowsRoute: typeof StudioWorkflowsRoute
   SyncConflictsRoute: typeof SyncConflictsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
   PortalIndexRoute: typeof PortalIndexRoute
@@ -750,6 +828,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/concepts': {
+      id: '/studio/concepts'
+      path: '/studio/concepts'
+      fullPath: '/studio/concepts'
+      preLoaderRoute: typeof StudioConceptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/decision-tables': {
+      id: '/studio/decision-tables'
+      path: '/studio/decision-tables'
+      fullPath: '/studio/decision-tables'
+      preLoaderRoute: typeof StudioDecisionTablesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/forms': {
+      id: '/studio/forms'
+      path: '/studio/forms'
+      fullPath: '/studio/forms'
+      preLoaderRoute: typeof StudioFormsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/packages': {
+      id: '/studio/packages'
+      path: '/studio/packages'
+      fullPath: '/studio/packages'
+      preLoaderRoute: typeof StudioPackagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/programs': {
+      id: '/studio/programs'
+      path: '/studio/programs'
+      fullPath: '/studio/programs'
+      preLoaderRoute: typeof StudioProgramsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/workflows': {
+      id: '/studio/workflows'
+      path: '/studio/workflows'
+      fullPath: '/studio/workflows'
+      preLoaderRoute: typeof StudioWorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sync/conflicts': {
       id: '/sync/conflicts'
       path: '/sync/conflicts'
@@ -843,6 +963,12 @@ const rootRouteChildren: RootRouteChildren = {
   StockReceiveRoute: StockReceiveRoute,
   StockRequisitionsRoute: StockRequisitionsRoute,
   StudioIdRoute: StudioIdRoute,
+  StudioConceptsRoute: StudioConceptsRoute,
+  StudioDecisionTablesRoute: StudioDecisionTablesRoute,
+  StudioFormsRoute: StudioFormsRoute,
+  StudioPackagesRoute: StudioPackagesRoute,
+  StudioProgramsRoute: StudioProgramsRoute,
+  StudioWorkflowsRoute: StudioWorkflowsRoute,
   SyncConflictsRoute: SyncConflictsRoute,
   TillSuperviseRoute: TillSuperviseRoute,
   PortalIndexRoute: PortalIndexRoute,

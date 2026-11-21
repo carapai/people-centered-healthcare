@@ -11,7 +11,8 @@ import { USERS } from './users'
 test('the author builds a ValueSet from the triage code system in the terminology browser', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'CodeSystem-triage-category.json in the terminology browser' }).click()
   await expect(page.getByRole('heading', { name: 'Terminology: TriageCategory', level: 1 })).toBeVisible()
   const systems = page.getByRole('navigation', { name: 'Code systems' })
@@ -68,7 +69,8 @@ test('the author builds a ValueSet from the triage code system in the terminolog
 test('the author adds a code under another to the triage code system, renames it and deletes it', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'What changed' }).getByRole('link', { name: 'CodeSystem-triage-category.json in the terminology browser' }).click()
   const concepts = page.getByRole('region', { name: 'Concepts of TriageCategory' })
   await concepts.getByRole('button', { name: '+ under urgent' }).click()

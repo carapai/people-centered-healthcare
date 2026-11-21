@@ -19,7 +19,8 @@ async function play(page: Page, name: RegExp) {
 test('the author plays the OPD draft in the sandbox, answers a guard, undoes a move and saves the run as a scenario', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'Files' }).getByRole('link', { name: 'Library-opd-visit.json in the Workflow Studio' }).click()
   await expect(page.getByRole('heading', { name: 'Workflow Studio: OPD visit', level: 1 })).toBeVisible()
   const states = page.getByRole('navigation', { name: 'States' })

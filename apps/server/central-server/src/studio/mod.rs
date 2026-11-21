@@ -40,6 +40,9 @@
 //! `/packages/{id}/decision-tables/` ([`decisions`]), and plays a draft in its sandbox at
 //! `/packages/{id}/workflows/sandbox` ([`sandbox`], #499).
 //!
+//! The Studio home and its sections (#855) read every design across packages from `GET /designs`
+//! ([`designs`]).
+//!
 //! The form designer's *Import FHIR JSON* reads a pasted Questionnaire, converting R4 to R5 with
 //! `health-fhir-mapping`, at `/packages/{id}/questionnaires/import` ([`forms`], #853).
 //!
@@ -48,6 +51,7 @@
 
 pub(crate) mod actions;
 pub(crate) mod decisions;
+pub(crate) mod designs;
 mod dto;
 pub(crate) mod forms;
 pub(crate) mod sandbox;
@@ -97,6 +101,7 @@ pub(crate) fn router(
 ) -> Router {
     Router::new()
         .route("/packages", get(list))
+        .route("/designs", get(designs::list))
         .route("/packages/{id}", get(page))
         .route("/packages/{id}/{action}", post(act))
         .route(

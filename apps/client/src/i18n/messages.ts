@@ -2964,3 +2964,179 @@ export const programMessages = defineMessages<ProgramValues>({
   pdGapPinned: { id: 'app.studio.program.gapPinned', defaultMessage: '{kind, select, Questionnaire {Form} Library {Workflow} other {{kind}}} {canonical} is pinned, but the package holds {version}', description: 'Program Designer: gap' },
   pdAuthority: { id: 'app.studio.program.authority', defaultMessage: 'Check now on the draft page remains the authority.', description: 'Program Designer: the gaps are not the publication checks' },
 })
+
+// The Studio home and its sections (#855; studio.md § The Studio home): what a person designs,
+// with the packages behind the editors.
+type DesignValues = {
+  dhIntro: {}
+  dhLoading: {}
+  dhSection: { section: string }
+  dhSectionHint: { section: string }
+  dhCount: { section: string; count: number }
+  dhOpen: { section: string }
+  dhNew: { section: string }
+  dhSoon: {}
+  dhSoonHint: {}
+  dhPackages: {}
+  dhPackagesHint: {}
+  dhPackagesCount: { count: number }
+  dhPackagesOpen: {}
+  dhIndicators: {}
+  dhIndicatorsHint: {}
+  dhReports: {}
+  dhReportsHint: {}
+  dhDashboards: {}
+  dhDashboardsHint: {}
+  dhHome: {}
+  dhColTitle: {}
+  dhColType: {}
+  dhColPackage: {}
+  dhColStatus: {}
+  dhColChanged: {}
+  dhKind: { kind: string }
+  dhStatus: { status: string; holder: string }
+  dhStatusAny: {}
+  dhSomeone: {}
+  dhPackageAll: {}
+  dhSearch: {}
+  dhFilterPackage: {}
+  dhFilterStatus: {}
+  dhEmpty: { section: string }
+  dhNoMatch: {}
+  dhTableHint: {}
+  dhNever: {}
+  dhNewHeading: { section: string }
+  dhNewPackage: {}
+  dhNewInDraft: { title: string; id: string }
+  dhNewNextVersion: { title: string; id: string }
+  dhNewBlank: {}
+  dhNewBlankName: {}
+  dhNewBlankTitle: {}
+  dhNewBlankKind: {}
+  dhNewBlankCanonical: {}
+  dhNewWhat: {}
+  dhNewWorkflow: {}
+  dhNewNoWorkflow: {}
+  dhNewTitle: {}
+  dhNewCreate: {}
+  dhNewCancel: {}
+  dhNewFailed: { reason: string }
+  dhNewNoPackage: {}
+  dhBarLabel: {}
+  dhBarPackage: { title: string; name: string; version: string; stage: string }
+  dhBarDraftPage: {}
+  dhBarPackagePage: {}
+  dhBarEdit: {}
+  dhBarEditStart: { name: string }
+  dhBarEditReuse: { id: string }
+  dhBarHeld: { holder: string }
+  dhBarSubmitted: {}
+  dhBarEditing: {}
+  dhBarEditFailed: { reason: string }
+}
+
+export const designMessages = defineMessages<DesignValues>({
+  dhIntro: { id: 'app.studio.home.intro', defaultMessage: 'Design forms, workflows, concepts and decision rules. Each design lives in a package; drafts, review and publishing are handled behind the editors.', description: 'Studio home: what it is for' },
+  dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
+  dhSection: {
+    id: 'app.studio.home.section',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} other {{section}}}',
+    description: 'Studio: a section heading',
+  },
+  dhSectionHint: {
+    id: 'app.studio.home.sectionHint',
+    defaultMessage:
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} other {}}',
+    description: 'Studio: what a section holds',
+  },
+  dhCount: {
+    id: 'app.studio.home.count',
+    defaultMessage:
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} other {{count}}}',
+    description: 'Studio: how many designs a section holds',
+  },
+  dhOpen: {
+    id: 'app.studio.home.open',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} other {Open}}',
+    description: 'Studio home: open a section',
+  },
+  dhNew: {
+    id: 'app.studio.home.new',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} other {New}}',
+    description: 'Studio: start a new design',
+  },
+  dhSoon: { id: 'app.studio.home.soon', defaultMessage: 'Coming soon', description: 'Studio home: a design type whose editor is not built yet' },
+  dhSoonHint: { id: 'app.studio.home.soonHint', defaultMessage: 'Its editor is not built yet.', description: 'Studio home: why a section cannot be opened' },
+  dhPackages: { id: 'app.studio.home.packages', defaultMessage: 'Packages', description: 'Studio: the packages section heading' },
+  dhPackagesHint: { id: 'app.studio.home.packagesHint', defaultMessage: 'The packages your designs live in: check, submit, review, approve, publish and activate them.', description: 'Studio home: the packages section' },
+  dhPackagesCount: { id: 'app.studio.home.packagesCount', defaultMessage: '{count, plural, =0 {No packages} one {# package} other {# packages}}', description: 'Studio home: how many packages' },
+  dhPackagesOpen: { id: 'app.studio.home.packagesOpen', defaultMessage: 'Open the packages', description: 'Studio home: open the package list' },
+  dhIndicators: { id: 'app.studio.home.indicators', defaultMessage: 'Indicators', description: 'Studio home: indicators section' },
+  dhIndicatorsHint: { id: 'app.studio.home.indicatorsHint', defaultMessage: 'Counts and rates over care, tried on sample patients.', description: 'Studio home: indicators section' },
+  dhReports: { id: 'app.studio.home.reports', defaultMessage: 'Reports', description: 'Studio home: reports section' },
+  dhReportsHint: { id: 'app.studio.home.reportsHint', defaultMessage: 'Indicators grouped by period, with their DHIS2 mappings.', description: 'Studio home: reports section' },
+  dhDashboards: { id: 'app.studio.home.dashboards', defaultMessage: 'Dashboards', description: 'Studio home: dashboards section' },
+  dhDashboardsHint: { id: 'app.studio.home.dashboardsHint', defaultMessage: 'Charts and tables of indicators for each level of care.', description: 'Studio home: dashboards section' },
+  dhHome: { id: 'app.studio.home.back', defaultMessage: 'Back to the Studio', description: 'Studio: back to the home' },
+  dhColTitle: { id: 'app.studio.design.colTitle', defaultMessage: 'Title', description: 'Studio section: column' },
+  dhColType: { id: 'app.studio.design.colType', defaultMessage: 'Type', description: 'Studio section: column' },
+  dhColPackage: { id: 'app.studio.design.colPackage', defaultMessage: 'Package', description: 'Studio section: column' },
+  dhColStatus: { id: 'app.studio.design.colStatus', defaultMessage: 'Status', description: 'Studio section: column' },
+  dhColChanged: { id: 'app.studio.design.colChanged', defaultMessage: 'Last change', description: 'Studio section: column' },
+  dhKind: {
+    id: 'app.studio.design.kind',
+    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} other {{kind}}}',
+    description: 'Studio section: a design’s type',
+  },
+  dhStatus: {
+    id: 'app.studio.design.status',
+    defaultMessage: '{status, select, published {Published} yours {In your draft} theirs {In {holder}’s draft} submitted {Submitted for review} other {{status}}}',
+    description: 'Studio section: where a design stands',
+  },
+  dhSomeone: { id: 'app.studio.design.someone', defaultMessage: 'someone else', description: 'Studio section: status filter, a draft held by another person' },
+  dhStatusAny: { id: 'app.studio.design.statusAny', defaultMessage: 'Any status', description: 'Studio section: status filter' },
+  dhPackageAll: { id: 'app.studio.design.packageAll', defaultMessage: 'All packages', description: 'Studio section: package filter' },
+  dhSearch: { id: 'app.studio.design.search', defaultMessage: 'Search', description: 'Studio section: search field' },
+  dhFilterPackage: { id: 'app.studio.design.filterPackage', defaultMessage: 'Package', description: 'Studio section: package filter' },
+  dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
+  dhEmpty: {
+    id: 'app.studio.design.empty',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} other {Nothing yet.}}',
+    description: 'Studio section: nothing designed yet',
+  },
+  dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
+  dhTableHint: { id: 'app.studio.design.tableHint', defaultMessage: 'Click a row to open it in its editor, or move with the arrow keys and press Enter.', description: 'Studio section: how to use the table' },
+  dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
+  dhNewHeading: {
+    id: 'app.studio.design.newHeading',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} other {New}}',
+    description: 'Studio section: the New panel heading',
+  },
+  dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },
+  dhNewInDraft: { id: 'app.studio.design.newInDraft', defaultMessage: '{title}: your draft {id}', description: 'Studio New: a draft the person holds' },
+  dhNewNextVersion: { id: 'app.studio.design.newNextVersion', defaultMessage: '{title}: start the next version of {id}', description: 'Studio New: a published package' },
+  dhNewBlank: { id: 'app.studio.design.newBlank', defaultMessage: 'A new package', description: 'Studio New: a new package' },
+  dhNewBlankName: { id: 'app.studio.design.newBlankName', defaultMessage: 'Package name (e.g. ug.moh.anc)', description: 'Studio New: new package name' },
+  dhNewBlankTitle: { id: 'app.studio.design.newBlankTitle', defaultMessage: 'Package title', description: 'Studio New: new package title' },
+  dhNewBlankKind: { id: 'app.studio.design.newBlankKind', defaultMessage: 'Package kind', description: 'Studio New: new package kind' },
+  dhNewBlankCanonical: { id: 'app.studio.design.newBlankCanonical', defaultMessage: 'Canonical base URL (e.g. https://health.go.ug/fhir)', description: 'Studio New: new package canonical base' },
+  dhNewWhat: { id: 'app.studio.design.newWhat', defaultMessage: 'What to create', description: 'Studio New: code system or value set' },
+  dhNewWorkflow: { id: 'app.studio.design.newWorkflow', defaultMessage: 'In which workflow', description: 'Studio New: the workflow a decision table goes in' },
+  dhNewNoWorkflow: { id: 'app.studio.design.newNoWorkflow', defaultMessage: 'A decision table lives in a workflow. Create a workflow first in a package you can edit.', description: 'Studio New: no workflow to put a table in' },
+  dhNewTitle: { id: 'app.studio.design.newTitle', defaultMessage: 'Title', description: 'Studio New: the design’s title' },
+  dhNewCreate: { id: 'app.studio.design.newCreate', defaultMessage: 'Create and open', description: 'Studio New: create the design and open its editor' },
+  dhNewCancel: { id: 'app.studio.design.newCancel', defaultMessage: 'Cancel', description: 'Studio New: close the panel' },
+  dhNewFailed: { id: 'app.studio.design.newFailed', defaultMessage: 'It was not created: {reason}', description: 'Studio New: failed' },
+  dhNewNoPackage: { id: 'app.studio.design.newNoPackage', defaultMessage: 'Choose a package.', description: 'Studio New: no package chosen' },
+  dhBarLabel: { id: 'app.studio.bar.label', defaultMessage: 'Where this design lives', description: 'Studio editor header: landmark name' },
+  dhBarPackage: { id: 'app.studio.bar.package', defaultMessage: 'Package {title} ({name}), version {version}: {stage}', description: 'Studio editor header: the package and draft' },
+  dhBarDraftPage: { id: 'app.studio.bar.draftPage', defaultMessage: 'Open the draft page', description: 'Studio editor header: link to check, submit, diff and discuss' },
+  dhBarPackagePage: { id: 'app.studio.bar.packagePage', defaultMessage: 'Open the package page', description: 'Studio editor header: link to a published package' },
+  dhBarEdit: { id: 'app.studio.bar.edit', defaultMessage: 'Edit', description: 'Studio editor header: start or reuse a draft to edit this design' },
+  dhBarEditStart: { id: 'app.studio.bar.editStart', defaultMessage: 'Starts the next version of {name} as your draft.', description: 'Studio editor header: what Edit does' },
+  dhBarEditReuse: { id: 'app.studio.bar.editReuse', defaultMessage: 'Opens it in your draft {id}.', description: 'Studio editor header: what Edit does' },
+  dhBarHeld: { id: 'app.studio.bar.held', defaultMessage: '{holder} holds this package’s draft. Ask them to hand it over to edit it.', description: 'Studio editor header: someone else is editing' },
+  dhBarSubmitted: { id: 'app.studio.bar.submitted', defaultMessage: 'This package’s draft is submitted. It can be edited again if changes are requested.', description: 'Studio editor header: the draft is past Draft' },
+  dhBarEditing: { id: 'app.studio.bar.editing', defaultMessage: 'Opening a draft…', description: 'Studio editor header: Edit pending' },
+  dhBarEditFailed: { id: 'app.studio.bar.editFailed', defaultMessage: 'No draft was started: {reason}', description: 'Studio editor header: Edit failed' },
+})

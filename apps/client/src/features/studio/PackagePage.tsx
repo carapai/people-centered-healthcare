@@ -32,7 +32,7 @@ export function PackagePage({ id }: { id: string }) {
   return (
     <section className={page}>
       <div>
-        <Link to="/studio">{intl.formatMessage(m.sdBack)}</Link>
+        <Link to="/studio/packages">{intl.formatMessage(m.sdBack)}</Link>
       </div>
       {draft.data === undefined ? (
         draft.isPending ? (

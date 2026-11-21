@@ -198,6 +198,24 @@ if (drafted.status !== 0) throw new Error('drafting the Studio package failed')
 // but does not hold yet (e2e/fixtures/art). Not clinical guidance: the reference package is #117.
 const program = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, 'fixtures/art'), '--by', author], { env, stdio: 'inherit' })
 if (program.status !== 0) throw new Error('drafting the ART program package failed')
+// A published package with a workflow (#855), so the Studio's sections show a published design
+// that Edit starts the next version of (e2e/fixtures/clinic). Drafted by the author, reviewed and
+// approved by two others, and published; it needs the publication-signing key made above.
+if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
+  const clinic = resolve(import.meta.dirname, 'fixtures/clinic')
+  const id = 'ug.moh.clinic@1.0.0'
+  for (const step of [
+    ['draft', clinic, '--by', author],
+    ['submit', id, '--by', author],
+    ['review', id, '--by', 'e2e-reviewer-cli'],
+    ['approve', id, '--by', 'e2e-approver-cli'],
+    ['approve', id, '--by', 'e2e-second-approver-cli'],
+    ['publish', id, '--by', 'e2e-publisher-cli'],
+  ]) {
+    const done = spawnSync(centralBin, ['package', ...step], { env, stdio: 'inherit' })
+    if (done.status !== 0) throw new Error(`${step[0]} of the clinic package failed`)
+  }
+}
 if (seedPatients > 0) {
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)

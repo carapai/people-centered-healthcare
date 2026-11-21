@@ -112,9 +112,10 @@ const outlineButton = css({
  * in the middle and the selected state or transition in the inspector on the right, with the
  * publication checks above, rerun on every edit. It saves the Library through the same path as
  * the file editor (#494), with the draft's revision as `If-Match`, so a stale tab is refused with
- * 412 and keeps nothing. A state the previous published version has keeps its id.
+ * 412 and keeps nothing. A state the previous published version has keeps its id. `table` opens
+ * one of its decision tables at once (the Studio's Decision tables section, #855).
  */
-export function WorkflowStudio({ id, path }: { id: string; path: string }) {
+export function WorkflowStudio({ id, path, table }: { id: string; path: string; table?: string }) {
   const intl = useIntl()
   const platform = usePlatform()
   const draft = useQuery(packageQuery(platform.transport, id))
@@ -151,6 +152,7 @@ export function WorkflowStudio({ id, path }: { id: string; path: string }) {
           key={reloads}
           id={id}
           path={path}
+          {...(table === undefined ? {} : { table })}
           draft={draft.data}
           file={file.data}
           published={published !== null && 'definition' in published ? published.definition : null}
@@ -167,6 +169,7 @@ export function WorkflowStudio({ id, path }: { id: string; path: string }) {
 interface LoadedProps {
   id: string
   path: string
+  table?: string
   draft: StudioPackagePage
   file: StudioFile
   published: WorkflowDefinition | null
@@ -188,7 +191,7 @@ function Loaded(props: LoadedProps) {
 const sameSelection = (a: Selection | null, b: Selection) =>
   a !== null && (a.kind === 'state' ? b.kind === 'state' && a.id === b.id : b.kind === 'transition' && a.source === b.source && a.index === b.index)
 
-function Studio({ id, path, draft, file, published, onReload, library, initial }: LoadedProps & { library: Library; initial: WorkflowDefinition }) {
+function Studio({ id, path, table: opening, draft, file, published, onReload, library, initial }: LoadedProps & { library: Library; initial: WorkflowDefinition }) {
   const intl = useIntl()
   const platform = usePlatform()
   const queryClient = useQueryClient()
@@ -196,7 +199,10 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const [saved, setSaved] = useState(() => JSON.stringify(initial))
   const [revision, setRevision] = useState(file.revision)
   const [selected, setSelected] = useState<Selection | null>(() => (initial.statechart.states[0] === undefined ? null : { kind: 'state', id: initial.statechart.states[0].id }))
-  const [table, setTable] = useState<number | null>(null)
+  const [table, setTable] = useState<number | null>(() => {
+    const index = (initial.decisionTables ?? []).findIndex((t) => t.id === opening)
+    return index >= 0 ? index : null
+  })
   const [mode, setMode] = useState<'inspect' | 'sandbox'>('inspect')
   const [run, setRun] = useState<Run>(emptyRun)
   const catalogue = useQuery(workflowActionsQuery(platform.transport))

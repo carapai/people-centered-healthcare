@@ -35,7 +35,8 @@ async function requirement(page: Page, name: string, resourceType: string, paths
 test('the author builds named rules as condition trees, tries a patient, saves a test case and sees the shadowed rule never fire', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await page.getByRole('grid', { name: 'Studio' }).getByText('ug.moh.opd', { exact: false }).click()
+  await press(page, 'Open the packages', 'link')
+  await page.getByRole('grid', { name: 'Packages' }).getByText('ug.moh.opd', { exact: false }).click()
   await page.getByRole('region', { name: 'Files' }).getByRole('link', { name: 'Library-opd-visit.json in the Workflow Studio' }).click()
   await expect(page.getByRole('heading', { name: 'Workflow Studio: OPD visit', level: 1 })).toBeVisible()
 

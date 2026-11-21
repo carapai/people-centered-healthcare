@@ -30,6 +30,79 @@
         }
       }
     },
+    "/api/studio/designs": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the designs.",
+        "description": "What the Studio designs, across packages (central only): every form, workflow, decision table, code system, value set and program, each read from its package's open draft when it has one and otherwise from its latest published version; and every such package with its latest published version and its open draft, saying whether the signed-in person holds it. Needs a `metadata.*` or `configuration.activate` permission.",
+        "operationId": "listStudioDesigns",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Only the designs of this kind",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/StudioDesignKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The designs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioDesigns"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a kind of design",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/drafts": {
       "post": {
         "tags": [
@@ -3435,6 +3508,181 @@
           "table": {
             "type": "string",
             "description": "The table's id."
+          }
+        }
+      },
+      "StudioDesign": {
+        "type": "object",
+        "description": "One designed artefact, in the package version it opens in.",
+        "required": [
+          "kind",
+          "title",
+          "path",
+          "package",
+          "packageId"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/StudioDesignKind",
+            "description": "Its kind."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package name."
+          },
+          "packageId": {
+            "type": "string",
+            "description": "The package version it opens in (`name@version`): the open draft, else the latest\npublished version."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its file in the package; a decision table's is its Workflow Definition's."
+          },
+          "table": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A decision table's id in its Workflow Definition."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, else its name, id or path; a decision table's id."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its canonical URL."
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its version."
+          }
+        }
+      },
+      "StudioDesignDraft": {
+        "type": "object",
+        "description": "A package's open draft.",
+        "required": [
+          "id",
+          "stage",
+          "holder",
+          "mine"
+        ],
+        "properties": {
+          "holder": {
+            "type": "string",
+            "description": "Its Draft Holder (an account id)."
+          },
+          "id": {
+            "type": "string",
+            "description": "`name@version`."
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "Whether the signed-in person holds it."
+          },
+          "stage": {
+            "$ref": "#/components/schemas/PackageStage",
+            "description": "Where it stands: draft to approval."
+          }
+        }
+      },
+      "StudioDesignKind": {
+        "type": "string",
+        "description": "What kind of design an artefact is: the Studio's sections.",
+        "enum": [
+          "form",
+          "workflow",
+          "decision-table",
+          "code-system",
+          "value-set",
+          "program"
+        ]
+      },
+      "StudioDesignPackage": {
+        "type": "object",
+        "description": "A package that holds designs.",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "canonical": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The canonical base new artefacts take, from its manifest's URL."
+          },
+          "changed": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the version its designs are read from last changed."
+          },
+          "draft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioDesignDraft",
+                "description": "Its open draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StudioPackageKind",
+            "description": "Its kind."
+          },
+          "name": {
+            "type": "string",
+            "description": "The package name."
+          },
+          "published": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its latest published version (`name@version`)."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title."
+          }
+        }
+      },
+      "StudioDesigns": {
+        "type": "object",
+        "description": "Every design across packages, and the packages.",
+        "required": [
+          "packages",
+          "designs"
+        ],
+        "properties": {
+          "designs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDesign"
+            },
+            "description": "The designs, by package, then path."
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDesignPackage"
+            },
+            "description": "Every package with an open draft or a published version, by name."
           }
         }
       },
