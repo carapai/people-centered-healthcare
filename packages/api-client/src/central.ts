@@ -222,6 +222,57 @@ export const StudioCodeSystem = z.object({
 })
 export type StudioCodeSystem = z.infer<typeof StudioCodeSystem>
 
+/** A ValueSet, as a list names it. */
+export const StudioValueSet = z.object({
+  /** Whether it is this package's own (a draft, when this package version is one). */
+  "own": z.boolean(),
+  /** The package it comes from, `name@version`. */
+  "package": z.string(),
+  /** Its file in that package. */
+  "path": z.string(),
+  /** Its `title`, or its `name`. */
+  "title": z.string().nullable().optional(),
+  /** Its canonical URL. */
+  "url": z.string(),
+  /** Its version. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioValueSet = z.infer<typeof StudioValueSet>
+
+/** A ValueSet drawing on the CodeSystem, and what the CodeSystem's change does to it. */
+export const StudioReach = z.object({
+  /** The form questions that bind it. */
+  "boundBy": z.array(StudioBinding),
+  /** The codes it gains for new forms. */
+  "gained": z.array(StudioCode),
+  /** The codes it loses for new forms (retired or removed): records that hold them still resolve. */
+  "lost": z.array(StudioCode),
+  /** The ValueSet. */
+  "valueSet": StudioValueSet,
+})
+export type StudioReach = z.infer<typeof StudioReach>
+
+/** A draft CodeSystem's next version and why, and what its change reaches. */
+export const StudioCodeSystemChange = z.object({
+  /** The bump its changes need together. */
+  "bump": SemverBump,
+  /** Each change, with the bump it needs and a plain line for why. */
+  "changes": z.array(StudioElementChange),
+  /** The version its change calls for; none when it was never published. */
+  "next": z.string().nullable().optional(),
+  /** Its file in the draft. */
+  "path": z.string(),
+  /** Its version in the package's previous published version; none when never published. */
+  "published": z.string().nullable().optional(),
+  /** Each ValueSet drawing on it, with the codes it gains or loses. */
+  "reaches": z.array(StudioReach),
+  /** Its canonical URL. */
+  "url": z.string(),
+  /** Its version as saved. */
+  "version": z.string().nullable().optional(),
+})
+export type StudioCodeSystemChange = z.infer<typeof StudioCodeSystemChange>
+
 /** The code systems, this package's own first. */
 export const StudioCodeSystems = z.object({
   /** The code systems. */
@@ -251,23 +302,6 @@ export const StudioCompensation = z.object({
 })
 export type StudioCompensation = z.infer<typeof StudioCompensation>
 
-/** A ValueSet, as a list names it. */
-export const StudioValueSet = z.object({
-  /** Whether it is this package's own (a draft, when this package version is one). */
-  "own": z.boolean(),
-  /** The package it comes from, `name@version`. */
-  "package": z.string(),
-  /** Its file in that package. */
-  "path": z.string(),
-  /** Its `title`, or its `name`. */
-  "title": z.string().nullable().optional(),
-  /** Its canonical URL. */
-  "url": z.string(),
-  /** Its version. */
-  "version": z.string().nullable().optional(),
-})
-export type StudioValueSet = z.infer<typeof StudioValueSet>
-
 /** One concept read in full. */
 export const StudioConcept = z.object({
   /** How many concepts are directly under it. */
@@ -280,6 +314,8 @@ export const StudioConcept = z.object({
   "definition": z.string().nullable().optional(),
   /** Its display. */
   "display": z.string().nullable().optional(),
+  /** Whether it is published: the package's previous published version holds it, so it cannot be deleted, have its code changed or move, only be retired (#524). */
+  "fixed": z.boolean(),
   /** Whether it is inactive (retired). */
   "inactive": z.boolean(),
   /** The codes directly above it. */
@@ -288,6 +324,31 @@ export const StudioConcept = z.object({
   "valueSets": z.array(StudioValueSet),
 })
 export type StudioConcept = z.infer<typeof StudioConcept>
+
+/** What an edit does. */
+export const StudioConceptEditKind = z.enum(["add", "change", "delete", "retire"])
+export type StudioConceptEditKind = z.infer<typeof StudioConceptEditKind>
+
+/** One edit to a draft CodeSystem's concepts. */
+export const StudioConceptEditInput = z.object({
+  /** The code: the new one to add, or the one to change, delete or retire. */
+  "code": z.string(),
+  /** Its definition, for an add or a change. */
+  "definition": z.string().nullable().optional(),
+  /** Its display, for an add or a change. */
+  "display": z.string().nullable().optional(),
+  /** What the edit does. */
+  "edit": StudioConceptEditKind,
+  /** For a change, the code from now on (only a new code's may change); the same code if none. */
+  "newCode": z.string().nullable().optional(),
+  /** Why, for reviewers: it joins the draft's discussion, naming the CodeSystem. */
+  "note": z.string().nullable().optional(),
+  /** The code it goes under, for an add or a change; the top level if none. */
+  "parent": z.string().nullable().optional(),
+  /** The CodeSystem's file in the draft. */
+  "path": z.string(),
+})
+export type StudioConceptEditInput = z.infer<typeof StudioConceptEditInput>
 
 /** A concept, as a row of the hierarchy or of a search. */
 export const StudioConceptRow = z.object({
@@ -828,6 +889,19 @@ export const operations = {
       500: StudioProblem,
     },
   },
+  getStudioCodeSystemChange: {
+    method: 'GET',
+    path: '/api/studio/packages/{id}/terminology/code-system-change',
+    responses: {
+      200: StudioCodeSystemChange,
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
   listStudioCodeSystems: {
     method: 'GET',
     path: '/api/studio/packages/{id}/terminology/code-systems',
@@ -861,6 +935,20 @@ export const operations = {
       401: StudioProblem,
       403: StudioProblem,
       404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  editStudioConcept: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/terminology/edit',
+    responses: {
+      200: StudioPackagePage,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      409: StudioProblem,
+      412: StudioProblem,
+      422: StudioProblem,
       500: StudioProblem,
     },
   },

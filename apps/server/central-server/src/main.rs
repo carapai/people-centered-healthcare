@@ -234,6 +234,8 @@ async fn session() {}
         studio::terminology::concept,
         studio::terminology::list_value_sets,
         studio::terminology::expand,
+        studio::terminology::code_system_change,
+        studio::terminology::edit,
         studio::actions::list,
         studio::decisions::try_table,
         studio::decisions::check

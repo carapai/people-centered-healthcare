@@ -1,3 +1,4 @@
+import type { StudioConceptEditInput } from '@health/api-client'
 import type { ValueSet, ValueSetCompose, ValueSetComposeInclude } from '@health/fhir-types'
 
 // A draft ValueSet's compose, edited from the terminology browser (studio.md § Terminology;
@@ -158,3 +159,46 @@ export function suggestWidget(codes: number): 'radio' | 'select' | 'search' {
 
 /** What a binding records: `url|version`. */
 export const bindingOf = (url: string, version: string | null | undefined) => (version === null || version === undefined || version === '' ? url : `${url}|${version}`)
+
+// Editing a local CodeSystem's concepts (#524): the server applies each edit, keeps a published
+// code fixed, and works out the version; these build what is sent and what the form offers.
+
+/** What the concept form offers: a published (fixed) code keeps its code and parent and can only
+ * be retired, once; a new code can be renamed, moved or deleted. */
+export function conceptActions(concept: { fixed: boolean; inactive: boolean }) {
+  return { rename: !concept.fixed, move: !concept.fixed, remove: !concept.fixed, retire: concept.fixed && !concept.inactive }
+}
+
+/** The concept form's fields, as typed. */
+export type ConceptFields = { code: string; display: string; definition: string; parent: string; note: string }
+
+const given = (text: string) => {
+  const trimmed = text.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
+const shared = (fields: ConceptFields) => {
+  const display = given(fields.display)
+  const definition = given(fields.definition)
+  const parent = given(fields.parent)
+  const note = given(fields.note)
+  return { ...(display === undefined ? {} : { display }), ...(definition === undefined ? {} : { definition }), ...(parent === undefined ? {} : { parent }), ...(note === undefined ? {} : { note }) }
+}
+
+/** A new code in the CodeSystem at `path`. */
+export function addCode(path: string, fields: ConceptFields): StudioConceptEditInput {
+  return { path, edit: 'add', code: fields.code.trim(), ...shared(fields) }
+}
+
+/** Code `code` changed as the form says: its parent is sent as it stands, so an emptied one
+ * moves a new code to the top level. */
+export function changeCode(path: string, code: string, fields: ConceptFields): StudioConceptEditInput {
+  const newCode = fields.code.trim()
+  return { path, edit: 'change', code, ...(newCode === '' || newCode === code ? {} : { newCode }), ...shared(fields) }
+}
+
+/** Code `code` deleted (a new one) or retired (a published one), with an optional note. */
+export function dropCode(path: string, edit: 'delete' | 'retire', code: string, note: string): StudioConceptEditInput {
+  const said = given(note)
+  return { path, edit, code, ...(said === undefined ? {} : { note: said }) }
+}

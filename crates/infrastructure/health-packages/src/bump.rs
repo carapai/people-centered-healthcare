@@ -32,7 +32,9 @@
 //! **CodeSystem** concepts are matched by `code`, at any depth:
 //! - a removed code is major, an added one minor;
 //! - a code under another parent is major (subsumption changes);
-//! - `display`, `definition` and designations need a patch;
+//! - `display` and designations need a patch, and so does a definition given where there was
+//!   none; a changed or removed definition is major, since it redefines the code
+//!   (terminology.md; #524);
 //! - a concept's properties, such as marking it inactive, need a minor;
 //! - `count` needs nothing; property and filter definitions removed are major, added minor.
 //!
@@ -457,14 +459,26 @@ fn code_system(old: &Map<String, Value>, new: &Map<String, Value>, found: &mut F
                     found.add(join(&place, "parent"), Nature::Changed, Bump::Major);
                 }
                 if let (Some(old), Some(new)) = (concept.as_object(), next.as_object()) {
+                    match (old.get("definition"), new.get("definition")) {
+                        (None, Some(_)) => {
+                            found.add(join(&place, "definition"), Nature::Added, Bump::Patch);
+                        }
+                        (Some(_), None) => {
+                            found.add(join(&place, "definition"), Nature::Removed, Bump::Major);
+                        }
+                        (Some(was), Some(is)) if was != is => {
+                            found.add(join(&place, "definition"), Nature::Changed, Bump::Major);
+                        }
+                        _ => {}
+                    }
                     rest(
                         old,
                         new,
                         &place,
-                        &["code", "concept"],
+                        &["code", "concept", "definition"],
                         found,
                         |name| match name {
-                            "display" | "definition" | "designation" => Some(Bump::Patch),
+                            "display" | "designation" => Some(Bump::Patch),
                             "property" => Some(Bump::Minor),
                             _ => None,
                         },

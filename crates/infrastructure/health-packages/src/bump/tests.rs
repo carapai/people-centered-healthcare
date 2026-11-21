@@ -311,6 +311,38 @@ fn code_system_concepts() {
     );
 }
 
+#[test]
+fn redefining_a_code_is_major_and_defining_one_a_patch() {
+    // terminology.md: removing or redefining a code is major (#524).
+    let before = code_system(json!([
+        {"code": "fits", "display": "Convulsions", "definition": "Fits of any kind"},
+        {"code": "fever", "display": "Fever"}
+    ]));
+    let redefined = with(
+        before.clone(),
+        "/concept/0/definition",
+        json!("Generalised fits only"),
+    );
+    assert_eq!(
+        found(&before, &redefined),
+        ["concept[fits].definition Changed major"]
+    );
+    let defined = with(
+        before.clone(),
+        "/concept/1/definition",
+        json!("Temperature above 37.5"),
+    );
+    assert_eq!(
+        found(&before, &defined),
+        ["concept[fever].definition Added patch"]
+    );
+    let undefined = without(before.clone(), "/concept/0/definition");
+    assert_eq!(
+        found(&before, &undefined),
+        ["concept[fits].definition Removed major"]
+    );
+}
+
 fn value_set(compose: Value) -> Value {
     json!({
         "resourceType": "ValueSet",

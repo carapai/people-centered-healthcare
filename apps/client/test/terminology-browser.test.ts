@@ -1,7 +1,7 @@
 import type { ValueSet } from '@health/fhir-types'
 import { describe, expect, test } from 'vitest'
 
-import { bindingOf, excludeCode, includeCode, includeUnder, newValueSet, removeListed, removeRule, rules, suggestWidget, valueSetPath } from '../src/features/studio/terminology/model'
+import { addCode, bindingOf, changeCode, conceptActions, dropCode, excludeCode, includeCode, includeUnder, newValueSet, removeListed, removeRule, rules, suggestWidget, valueSetPath } from '../src/features/studio/terminology/model'
 
 // The terminology browser's ValueSet editing (#523): what each action writes into the compose.
 // The server expands the result; the acceptance criteria's expansions are tested there.
@@ -82,5 +82,28 @@ describe('a new ValueSet and binding it', () => {
   test('a binding records url|version', () => {
     expect(bindingOf(blank.url ?? '', '1.0.0')).toBe('https://health.go.ug/fhir/ValueSet/danger-signs|1.0.0')
     expect(bindingOf('urn:x', null)).toBe('urn:x')
+  })
+})
+
+// Editing a local CodeSystem's concepts (#524): what the form sends and offers. The server keeps
+// a published code fixed and works out the version; its tests cover the acceptance criteria.
+describe('editing a local CodeSystem', () => {
+  const path = 'CodeSystem-anc-signs.json'
+  const fields = { code: ' spotting ', display: 'Spotting', definition: '  ', parent: 'bleeding', note: 'IMCI 2024 adds this sign' }
+
+  test('a code added under another is sent with its parent and note, blanks left out', () => {
+    expect(addCode(path, fields)).toEqual({ path, edit: 'add', code: 'spotting', display: 'Spotting', parent: 'bleeding', note: 'IMCI 2024 adds this sign' })
+  })
+
+  test('a change sends a new code only when it differs, and no parent for the top level', () => {
+    expect(changeCode(path, 'spotting', { ...fields, parent: '', note: '' })).toEqual({ path, edit: 'change', code: 'spotting', display: 'Spotting' })
+    expect(changeCode(path, 'spoting', { ...fields, definition: 'Light bleeding' })).toMatchObject({ code: 'spoting', newCode: 'spotting', definition: 'Light bleeding' })
+    expect(dropCode(path, 'retire', 'fits', ' ')).toEqual({ path, edit: 'retire', code: 'fits' })
+  })
+
+  test('a published code is only retired, once; a new one is renamed, moved or deleted', () => {
+    expect(conceptActions({ fixed: true, inactive: false })).toEqual({ rename: false, move: false, remove: false, retire: true })
+    expect(conceptActions({ fixed: true, inactive: true }).retire).toBe(false)
+    expect(conceptActions({ fixed: false, inactive: false })).toEqual({ rename: true, move: true, remove: true, retire: false })
   })
 })

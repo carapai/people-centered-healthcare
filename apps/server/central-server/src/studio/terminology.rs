@@ -13,22 +13,36 @@
 //! - `POST expand`: a ValueSet's expansion (one held, by `url`, or an unsaved one sent as
 //!   `valueSet`), with its change against the published expansion and the forms that bind it.
 //!   The form designer's ValueSet picker uses it and `value-sets` too.
+//!
+//! Editing a local CodeSystem's concepts (#524):
+//!
+//! - `GET code-system-change`: a draft CodeSystem's **Version** (the next version and every
+//!   change that calls for it, by terminology.md's rules, against the package's previous
+//!   published version) and **What it reaches**: each ValueSet drawing on it, with the codes it
+//!   gains or loses for new forms, and the form questions that bind it.
+//! - `POST edit`: one edit to its concepts (add, change, delete or retire), with `If-Match` as
+//!   for a save. A published code is only ever retired; the CodeSystem takes the next version.
+//!   An optional note joins the draft's discussion, naming the CodeSystem.
 
 use std::collections::BTreeMap;
 
 use axum::extract::{Path, RawQuery, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use health_access_policy::Subject;
 use health_configuration::package::PackageKind;
+use health_packages::concepts::{ConceptEdit, versioning};
 use health_publication::terminology::StudioTerminology;
 use health_terminology::{Contains, Content, ExpandRequest, Terminology, compare};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
-use super::{Studio, StudioProblem, author, failure, problem};
+use super::dto::{SemverBump, StudioElementChange, StudioPackagePage};
+use super::{
+    Studio, StudioProblem, answer, author, editor, failure, if_match, precondition_failed, problem,
+};
 
 /// Concepts on a page unless asked for fewer.
 const CONCEPTS: usize = 50;
@@ -133,6 +147,9 @@ pub(crate) struct StudioConcept {
     pub(crate) parents: Vec<String>,
     /// How many concepts are directly under it.
     pub(crate) children: u64,
+    /// Whether it is published: the package's previous published version holds it, so it cannot
+    /// be deleted, have its code changed or move, only be retired (#524).
+    pub(crate) fixed: bool,
     /// The ValueSets that contain it.
     pub(crate) value_sets: Vec<StudioValueSet>,
 }
@@ -495,6 +512,12 @@ pub(crate) async fn concept(
         Ok(found) => found,
         Err(error) => return wrong(&error),
     };
+    let fixed = sources.previous.as_ref().is_some_and(|previous| {
+        previous
+            .terminology
+            .lookup(&found.system, None, &found.concept.code)
+            .is_ok()
+    });
     let containing = value_sets(&sources)
         .into_iter()
         .filter(|v| {
@@ -514,6 +537,7 @@ pub(crate) async fn concept(
         definition: found.concept.definition,
         parents: found.parents,
         children: found.children.len() as u64,
+        fixed,
         value_sets: containing,
     })
     .into_response()
@@ -561,6 +585,27 @@ pub(crate) async fn list_value_sets(
         })
         .collect();
     Json(StudioValueSets { value_sets: found }).into_response()
+}
+
+/// The form questions, in every part, that bind ValueSet `url`.
+fn bindings(sources: &StudioTerminology, url: &str) -> Vec<StudioBinding> {
+    sources
+        .parts()
+        .flat_map(|part| {
+            part.catalogue
+                .bindings
+                .iter()
+                .filter(|b| b.value_set.split('|').next() == Some(url))
+                .map(|b| StudioBinding {
+                    package: part.id.clone(),
+                    path: b.path.clone(),
+                    questionnaire: b.questionnaire.clone(),
+                    title: b.title.clone(),
+                    link_id: b.link_id.clone(),
+                    value_set: b.value_set.clone(),
+                })
+        })
+        .collect()
 }
 
 fn codes(contains: &[Contains]) -> Vec<StudioCode> {
@@ -670,23 +715,7 @@ pub(crate) async fn expand(
     } else {
         None
     };
-    let bound_by = sources
-        .parts()
-        .flat_map(|part| {
-            part.catalogue
-                .bindings
-                .iter()
-                .filter(|b| b.value_set.split('|').next() == Some(url.as_str()))
-                .map(|b| StudioBinding {
-                    package: part.id.clone(),
-                    path: b.path.clone(),
-                    questionnaire: b.questionnaire.clone(),
-                    title: b.title.clone(),
-                    link_id: b.link_id.clone(),
-                    value_set: b.value_set.clone(),
-                })
-        })
-        .collect();
+    let bound_by = bindings(&sources, &url);
     Json(StudioExpansion {
         value_set: page.value_set,
         total: page.total as u64,
@@ -695,4 +724,270 @@ pub(crate) async fn expand(
         bound_by,
     })
     .into_response()
+}
+
+// Editing a local CodeSystem's concepts (#524).
+
+/// A ValueSet drawing on the CodeSystem, and what the CodeSystem's change does to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReach {
+    /// The ValueSet.
+    pub(crate) value_set: StudioValueSet,
+    /// The codes it gains for new forms.
+    pub(crate) gained: Vec<StudioCode>,
+    /// The codes it loses for new forms (retired or removed): records that hold them still
+    /// resolve.
+    pub(crate) lost: Vec<StudioCode>,
+    /// The form questions that bind it.
+    pub(crate) bound_by: Vec<StudioBinding>,
+}
+
+/// A draft CodeSystem's next version and why, and what its change reaches.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioCodeSystemChange {
+    /// Its canonical URL.
+    pub(crate) url: String,
+    /// Its file in the draft.
+    pub(crate) path: String,
+    /// Its version as saved.
+    pub(crate) version: Option<String>,
+    /// Its version in the package's previous published version; none when never published.
+    pub(crate) published: Option<String>,
+    /// The version its change calls for; none when it was never published.
+    pub(crate) next: Option<String>,
+    /// The bump its changes need together.
+    pub(crate) bump: SemverBump,
+    /// Each change, with the bump it needs and a plain line for why.
+    pub(crate) changes: Vec<StudioElementChange>,
+    /// Each ValueSet drawing on it, with the codes it gains or loses.
+    pub(crate) reaches: Vec<StudioReach>,
+}
+
+/// What an edit does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum StudioConceptEditKind {
+    /// Adds a new code.
+    Add,
+    /// Changes a code's display and definition, and a new code's code and parent too.
+    Change,
+    /// Deletes a new code.
+    Delete,
+    /// Retires a code: kept, so records still resolve, no longer offered on forms.
+    Retire,
+}
+
+/// One edit to a draft CodeSystem's concepts.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioConceptEditInput {
+    /// The CodeSystem's file in the draft.
+    pub(crate) path: String,
+    /// What the edit does.
+    pub(crate) edit: StudioConceptEditKind,
+    /// The code: the new one to add, or the one to change, delete or retire.
+    pub(crate) code: String,
+    /// For a change, the code from now on (only a new code's may change); the same code if none.
+    pub(crate) new_code: Option<String>,
+    /// Its display, for an add or a change.
+    pub(crate) display: Option<String>,
+    /// Its definition, for an add or a change.
+    pub(crate) definition: Option<String>,
+    /// The code it goes under, for an add or a change; the top level if none.
+    pub(crate) parent: Option<String>,
+    /// Why, for reviewers: it joins the draft's discussion, naming the CodeSystem.
+    pub(crate) note: Option<String>,
+}
+
+impl StudioConceptEditInput {
+    fn edit(&self) -> ConceptEdit {
+        let code = self.code.trim().to_owned();
+        let parent = self
+            .parent
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .map(str::to_owned);
+        match self.edit {
+            StudioConceptEditKind::Add => ConceptEdit::Add {
+                code,
+                display: self.display.clone(),
+                definition: self.definition.clone(),
+                parent,
+            },
+            StudioConceptEditKind::Change => ConceptEdit::Change {
+                new_code: self
+                    .new_code
+                    .as_deref()
+                    .map_or_else(|| code.clone(), |c| c.trim().to_owned()),
+                code,
+                display: self.display.clone(),
+                definition: self.definition.clone(),
+                parent,
+            },
+            StudioConceptEditKind::Delete => ConceptEdit::Delete { code },
+            StudioConceptEditKind::Retire => ConceptEdit::Retire { code },
+        }
+    }
+}
+
+/// The codes `reference` offers new forms (inactive ones left out); none if it cannot be
+/// expanded over `terminology`, as when the code system it draws on is new.
+fn offered(terminology: &Terminology, reference: &str) -> Vec<Contains> {
+    let forms = ExpandRequest {
+        active_only: true,
+        ..ExpandRequest::default()
+    };
+    terminology
+        .expand(reference, &forms)
+        .map(|expansion| expansion.contains)
+        .unwrap_or_default()
+}
+
+/// Documents and serves a draft CodeSystem's version and reach.
+#[utoipa::path(get, path = "/api/studio/packages/{id}/terminology/code-system-change", tag = "studio", operation_id = "getStudioCodeSystemChange",
+    description = "A draft's own CodeSystem, as saved: **Version**, the version its change calls for against the package's previous published version and each change that calls for it (adding or retiring a code is minor, a display a patch, redefining or removing a code major); and **What it reaches**, each ValueSet drawing on it with the codes it gains or loses for new forms, and the form questions that bind it.",
+    params(
+        ("id" = String, Path, description = "`name@version`"),
+        ("path" = String, Query, description = "The CodeSystem's file in the draft"),
+    ),
+    responses(
+        (status = 200, description = "Its version and reach", body = StudioCodeSystemChange),
+        (status = 400, description = "No path", body = StudioProblem),
+        (status = 401, description = "Not signed in", body = StudioProblem),
+        (status = 403, description = "No Studio permission", body = StudioProblem),
+        (status = 404, description = "No such package version or file", body = StudioProblem),
+        (status = 422, description = "Not a local CodeSystem, or a package's terminology cannot be read", body = StudioProblem),
+        (status = 500, description = "The package store failed", body = StudioProblem),
+    ))]
+pub(crate) async fn code_system_change(
+    State(studio): State<Studio>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    RawQuery(query): RawQuery,
+) -> Response {
+    let params = params(query.as_deref());
+    let Some(path) = params.get("path") else {
+        return problem(StatusCode::BAD_REQUEST, "say which CodeSystem file", None);
+    };
+    let sources = match sources(&studio, subject, &id).await {
+        Ok(sources) => sources,
+        Err(response) => return *response,
+    };
+    let draft = match studio.publications.draft_code_system(&id, path).await {
+        Ok(draft) => draft,
+        Err(error) => return failure(&error),
+    };
+    let found = versioning(draft.previous.as_ref(), &draft.current);
+    let text = |name: &str| {
+        draft
+            .current
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    let url = text("url").unwrap_or_default();
+    let version = text("version");
+    // What new forms were offered with the published CodeSystem in its place.
+    let after = sources.current();
+    let mut before = after.clone();
+    before.remove_code_system(&url, version.as_deref());
+    if let Some(previous) = &draft.previous {
+        match health_packages::terminology::code_system("published", previous) {
+            Ok(published) => before.add_code_system(published),
+            Err(error) => {
+                return problem(StatusCode::UNPROCESSABLE_ENTITY, error.to_string(), None);
+            }
+        }
+    }
+    let listed = value_sets(&sources);
+    let reaches = after
+        .value_sets_on(&url)
+        .into_iter()
+        .filter_map(|named| {
+            let value_set = listed
+                .iter()
+                .find(|v| reference(&v.url, v.version.as_deref()) == named)?
+                .clone();
+            let change = compare(&offered(&before, &named), &offered(&after, &named));
+            let bound_by = bindings(&sources, &value_set.url);
+            Some(StudioReach {
+                value_set,
+                gained: codes(&change.added),
+                lost: codes(&change.removed),
+                bound_by,
+            })
+        })
+        .collect();
+    Json(StudioCodeSystemChange {
+        url,
+        path: draft.path.clone(),
+        version,
+        published: found.published,
+        next: found.next,
+        bump: found.bump.into(),
+        changes: found
+            .changes
+            .iter()
+            .map(|change| StudioElementChange {
+                at: change.at.clone(),
+                change: change.nature.into(),
+                bump: change.bump.into(),
+                summary: health_packages::bump::describe(change),
+            })
+            .collect(),
+        reaches,
+    })
+    .into_response()
+}
+
+/// Documents and makes one edit to a draft CodeSystem's concepts.
+#[utoipa::path(post, path = "/api/studio/packages/{id}/terminology/edit", tag = "studio", operation_id = "editStudioConcept",
+    description = "One edit to a draft's own CodeSystem: add a code (at the top or under another), change one (its display and definition; a new code's code and parent too), delete a new code, or retire one (kept, so records that hold it still resolve, and no longer offered on forms). A published code cannot be deleted, renamed or moved. The CodeSystem takes the version its change calls for. A `note` joins the draft's discussion, naming the CodeSystem, for reviewers. `If-Match` as for a save. Needs `metadata.author`. Answers the page as it is now.",
+    params(
+        ("id" = String, Path, description = "`name@version`"),
+        ("If-Match" = String, Header, description = "The draft's revision, as its ETag"),
+    ),
+    request_body = StudioConceptEditInput,
+    responses(
+        (status = 200, description = "Saved; the page as it is now", body = StudioPackagePage, headers(("ETag" = String, description = "The draft's new revision"))),
+        (status = 401, description = "Not signed in", body = StudioProblem),
+        (status = 403, description = "No metadata.author permission", body = StudioProblem),
+        (status = 404, description = "No such package version or file", body = StudioProblem),
+        (status = 409, description = "The draft is no longer in Draft, or not the Draft Holder", body = StudioProblem),
+        (status = 412, description = "If-Match is missing or stale: reload", body = StudioProblem),
+        (status = 422, description = "Refused: a published code deleted, renamed or moved, a code taken, an unknown parent, or not a local CodeSystem", body = StudioProblem),
+        (status = 500, description = "The package store failed", body = StudioProblem),
+    ))]
+pub(crate) async fn edit(
+    State(studio): State<Studio>,
+    subject: Option<Extension<Subject>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(input): Json<StudioConceptEditInput>,
+) -> Response {
+    let subject = match editor(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let Some(expected) = if_match(&headers) else {
+        return precondition_failed();
+    };
+    match studio
+        .publications
+        .edit_concept(
+            &id,
+            &input.path,
+            &input.edit(),
+            input.note.as_deref(),
+            &subject.account,
+            expected,
+        )
+        .await
+    {
+        Ok(_) => answer(&studio, &subject, &id, StatusCode::OK).await,
+        Err(error) => failure(&error),
+    }
 }

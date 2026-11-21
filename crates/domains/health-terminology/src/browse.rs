@@ -149,6 +149,34 @@ impl Terminology {
         }
     }
 
+    /// No longer holds code system `url` at `version` (or the version-less one), so another
+    /// version can stand in for it: the Studio compares a draft's code system with its
+    /// published one this way (#524).
+    pub fn remove_code_system(&mut self, url: &str, version: Option<&str>) {
+        if let Some(versions) = self.code_systems.get_mut(url) {
+            versions.remove(version.unwrap_or_default());
+            if versions.is_empty() {
+                self.code_systems.remove(url);
+            }
+        }
+    }
+
+    /// The canonical (`url|version`) of every ValueSet held whose compose draws on code system
+    /// `system` directly, in an include or an exclude.
+    pub fn value_sets_on(&self, system: &str) -> Vec<String> {
+        self.value_sets
+            .values()
+            .flat_map(BTreeMap::values)
+            .filter(|v| {
+                v.include
+                    .iter()
+                    .chain(&v.exclude)
+                    .any(|rule| rule.system.as_deref() == Some(system))
+            })
+            .map(|v| label(&v.url, v.version.as_deref()))
+            .collect()
+    }
+
     fn held(&self, system: &str, version: Option<&str>) -> Result<&CodeSystem, Error> {
         resolve(&self.code_systems, system, version)
             .ok_or_else(|| Error::UnknownCodeSystem(label(system, version)))

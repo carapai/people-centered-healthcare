@@ -1,17 +1,19 @@
-import type { StudioCodeSystem, StudioConcept, StudioConceptPage, StudioExpandInput, StudioExpansion, StudioProblem, StudioValueSet } from '@health/api-client'
+import type { StudioCodeSystem, StudioCodeSystemChange, StudioConcept, StudioConceptEditInput, StudioConceptPage, StudioExpandInput, StudioExpansion, StudioPackagePage, StudioProblem, StudioValueSet } from '@health/api-client'
 import type { ValueSet } from '@health/fhir-types'
 
 import type { Transport } from '../../../platform/types'
-import { StudioError, studioKey } from '../api'
+import { StudioError, ifMatch, studioKey } from '../api'
 
 // The terminology a package version is authored against (studio.md § Terminology; #523), read
 // from `/api/studio/packages/{id}/terminology/` at central. Search and the hierarchy run on the
 // server a page at a time, so a large code system such as ICD-11 never loads in the browser.
 // The form designer's ValueSet picker (#497) uses `valueSetsQuery` and `expandValueSet` too.
+// A local CodeSystem's concepts are edited one at a time on the server (#524), which keeps a
+// published code fixed and works out the version and what the change reaches.
 
-export type { StudioCode, StudioCodeSystem, StudioConcept, StudioConceptPage, StudioConceptRow, StudioExpansion, StudioValueSet } from '@health/api-client'
+export type { StudioCode, StudioCodeSystem, StudioCodeSystemChange, StudioConcept, StudioConceptEditInput, StudioConceptPage, StudioConceptRow, StudioExpansion, StudioValueSet } from '@health/api-client'
 
-type Operation = 'listStudioCodeSystems' | 'listStudioConcepts' | 'getStudioConcept' | 'listStudioValueSets' | 'expandStudioValueSet'
+type Operation = 'listStudioCodeSystems' | 'listStudioConcepts' | 'getStudioConcept' | 'listStudioValueSets' | 'expandStudioValueSet' | 'getStudioCodeSystemChange' | 'editStudioConcept'
 
 async function parsed<T>(operation: Operation, status: number, body: unknown): Promise<T> {
   const { parseResponse } = await import('@health/api-client')
@@ -94,4 +96,22 @@ export async function expandValueSet(transport: Transport, id: string, ask: Expa
   const body: Omit<StudioExpandInput, 'valueSet'> & { valueSet?: ValueSet } = 'valueSet' in ask ? { valueSet: ask.valueSet, ...page } : { url: ask.url, ...(ask.version === null || ask.version === undefined ? {} : { version: ask.version }), ...page }
   const response = await transport.request({ method: 'POST', path: `${base(id)}/expand`, body, ...withSignal(signal) })
   return parsed<StudioExpansion>('expandStudioValueSet', response.status, response.body)
+}
+
+/** A draft CodeSystem's next version and why, and the ValueSets (and forms) its change reaches. */
+export function codeSystemChangeQuery(transport: Transport, id: string, path: string) {
+  return {
+    queryKey: [...terminologyKey(id), 'code-system-change', path] as const,
+    queryFn: async ({ signal }: Signal = {}): Promise<StudioCodeSystemChange> => {
+      const response = await transport.request({ method: 'GET', path: `${base(id)}/code-system-change${query({ path })}`, ...withSignal(signal) })
+      return parsed<StudioCodeSystemChange>('getStudioCodeSystemChange', response.status, response.body)
+    },
+  }
+}
+
+/** One edit to draft `id`'s CodeSystem, read at `revision`: the server refuses a published code
+ * deleted, renamed or moved, and answers the page as it is now. */
+export async function editConcept(transport: Transport, id: string, edit: StudioConceptEditInput, revision: number): Promise<StudioPackagePage> {
+  const response = await transport.request({ method: 'POST', path: `${base(id)}/edit`, headers: ifMatch(revision), body: edit })
+  return parsed<StudioPackagePage>('editStudioConcept', response.status, response.body)
 }

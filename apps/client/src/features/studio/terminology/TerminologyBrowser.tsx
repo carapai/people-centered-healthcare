@@ -10,6 +10,7 @@ import { usePlatform } from '../../../platform'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
+import { AddCode, CodeSystemChange, EditCode, type Authoring } from './CodeSystemEditor'
 import { codeSystemsQuery, conceptQuery, conceptsQuery, expandValueSet, terminologyKey, type StudioCodeSystem, type StudioConceptRow, type StudioExpansion } from './api'
 import { codeKey, excludeCode, includeCode, includeUnder, newValueSet, removeListed, removeRule, rules, valueSetPath, type Rule } from './model'
 
@@ -72,6 +73,11 @@ const reasonOf = (intl: ReturnType<typeof useIntl>, error: unknown) =>
  * ValueSet open, a concept is added alone, added with everything under it (an `is-a` filter), or
  * excluded, and concepts already in it are ticked. Saving goes through the file editor's path,
  * with the draft's revision as `If-Match`.
+ *
+ * In a draft, a local CodeSystem of the package is edited here too (#524): the tree gains *Add
+ * a code* and *+ under*, the concept panel becomes a form, and beside the tree the next version
+ * and what the change reaches are shown, all worked out on the server. External code systems
+ * stay read only.
  */
 export function TerminologyBrowser({ id, path }: { id: string; path: string }) {
   const intl = useIntl()
@@ -146,6 +152,15 @@ function Browser({ id, path, draft, file, onReload }: { id: string; path: string
   const stale = save.error instanceof StudioError && save.error.status === 412
   const chosen = systems.data?.find((s) => s.url === system?.url && (system.version === undefined || s.version === system.version))
   const title = valueSet === null ? (first.kind === 'CodeSystem' ? first.title : path) : (valueSet.title ?? valueSet.name ?? valueSet.url ?? path)
+  const authoring: Authoring | null =
+    draft.editable && chosen !== undefined && chosen.own && !chosen.external && chosen.path !== null && chosen.path !== undefined
+      ? {
+          path: chosen.path,
+          revision,
+          onSaved: (next) => setRevision(next.revision),
+          onReload,
+        }
+      : null
   if (first.kind === 'other') {
     return <p className={muted}>{intl.formatMessage(m.tbNotTerminology)}</p>
   }
@@ -194,6 +209,7 @@ function Browser({ id, path, draft, file, onReload }: { id: string; path: string
           selected={selected}
           onSelect={setSelected}
           onEdit={edit}
+          authoring={authoring}
         />
         <section aria-labelledby="tb-value-set" className={panel}>
           <h2 id="tb-value-set" className={subheading}>
@@ -265,6 +281,7 @@ function Concepts({
   selected,
   onSelect,
   onEdit,
+  authoring,
 }: {
   id: string
   system: StudioCodeSystem | undefined
@@ -273,8 +290,10 @@ function Concepts({
   selected: string | null
   onSelect: (code: string | null) => void
   onEdit: (next: ValueSet) => void
+  authoring: Authoring | null
 }) {
   const intl = useIntl()
+  const [adding, setAdding] = useState<{ parent: string | undefined } | null>(null)
   const searchId = useId()
   const hintId = useId()
   const [text, setText] = useState('')
@@ -289,6 +308,13 @@ function Concepts({
       ) : (
         <>
           <h2 className={subheading}>{intl.formatMessage(m.tbConcepts, { title: label })}</h2>
+          {authoring === null ? null : (
+            <div>
+              <button type="button" className={button} onClick={() => setAdding({ parent: undefined })}>
+                {intl.formatMessage(m.ceAddCode)}
+              </button>
+            </div>
+          )}
           <form
             role="search"
             className={css({ display: 'flex', flexWrap: 'wrap', gap: '2', alignItems: 'flex-end' })}
@@ -320,8 +346,36 @@ function Concepts({
               </button>
             )}
           </form>
-          <ConceptList key={`${system.url}|${searched}`} id={id} system={system} text={searched} parent={undefined} ticked={ticked} selected={selected} onSelect={onSelect} />
-          {selected === null ? null : <Selected id={id} system={system} code={selected} valueSet={valueSet} editable={editable} onEdit={onEdit} />}
+          <ConceptList
+            key={`${system.url}|${searched}`}
+            id={id}
+            system={system}
+            text={searched}
+            parent={undefined}
+            ticked={ticked}
+            selected={selected}
+            onSelect={(code) => {
+              setAdding(null)
+              onSelect(code)
+            }}
+            onAddUnder={authoring === null ? undefined : (code) => setAdding({ parent: code })}
+          />
+          {authoring !== null && adding !== null ? (
+            <AddCode
+              key={adding.parent ?? ''}
+              id={id}
+              authoring={authoring}
+              parent={adding.parent}
+              onAdded={(code) => {
+                setAdding(null)
+                onSelect(code)
+              }}
+              onCancel={() => setAdding(null)}
+            />
+          ) : selected === null ? null : (
+            <Selected id={id} system={system} code={selected} valueSet={valueSet} editable={editable} onEdit={onEdit} authoring={authoring} onSelect={onSelect} />
+          )}
+          {authoring === null ? null : <CodeSystemChange id={id} path={authoring.path} />}
         </>
       )}
     </section>
@@ -337,6 +391,7 @@ function ConceptList({
   ticked,
   selected,
   onSelect,
+  onAddUnder,
 }: {
   id: string
   system: StudioCodeSystem
@@ -345,6 +400,7 @@ function ConceptList({
   ticked: Set<string>
   selected: string | null
   onSelect: (code: string) => void
+  onAddUnder: ((code: string) => void) | undefined
 }) {
   const intl = useIntl()
   const platform = usePlatform()
@@ -366,7 +422,7 @@ function ConceptList({
       {text === '' ? null : <p role="status">{data.total === 0 ? intl.formatMessage(m.tbNoneFound) : intl.formatMessage(m.tbFound, { total: data.total, shown: data.concepts.length })}</p>}
       <ul className={cx(list, parent === undefined ? undefined : nested)}>
         {data.concepts.map((concept) => (
-          <ConceptItem key={concept.code} id={id} system={system} concept={concept} tree={text === ''} ticked={ticked} selected={selected} onSelect={onSelect} />
+          <ConceptItem key={concept.code} id={id} system={system} concept={concept} tree={text === ''} ticked={ticked} selected={selected} onSelect={onSelect} onAddUnder={onAddUnder} />
         ))}
       </ul>
       {data.concepts.length < data.total ? (
@@ -388,6 +444,7 @@ function ConceptItem({
   ticked,
   selected,
   onSelect,
+  onAddUnder,
 }: {
   id: string
   system: StudioCodeSystem
@@ -396,6 +453,7 @@ function ConceptItem({
   ticked: Set<string>
   selected: string | null
   onSelect: (code: string) => void
+  onAddUnder: ((code: string) => void) | undefined
 }) {
   const intl = useIntl()
   const [open, setOpen] = useState(false)
@@ -421,13 +479,44 @@ function ConceptItem({
         </button>
         {included ? <span className={tag}>{intl.formatMessage(m.tbIncluded)}</span> : null}
         {concept.inactive ? <span className={tag}>{intl.formatMessage(m.tbInactive)}</span> : null}
+        {onAddUnder === undefined ? null : (
+          <button
+            type="button"
+            className={small}
+            onClick={() => {
+              setOpen(true)
+              onAddUnder(concept.code)
+            }}
+          >
+            {intl.formatMessage(m.ceAddUnder)}
+            <span className={css({ srOnly: true })}> {concept.code}</span>
+          </button>
+        )}
       </div>
-      {open ? <ConceptList id={id} system={system} text="" parent={concept.code} ticked={ticked} selected={selected} onSelect={onSelect} /> : null}
+      {open ? <ConceptList id={id} system={system} text="" parent={concept.code} ticked={ticked} selected={selected} onSelect={onSelect} onAddUnder={onAddUnder} /> : null}
     </li>
   )
 }
 
-function Selected({ id, system, code, valueSet, editable, onEdit }: { id: string; system: StudioCodeSystem; code: string; valueSet: ValueSet | null; editable: boolean; onEdit: (next: ValueSet) => void }) {
+function Selected({
+  id,
+  system,
+  code,
+  valueSet,
+  editable,
+  onEdit,
+  authoring,
+  onSelect,
+}: {
+  id: string
+  system: StudioCodeSystem
+  code: string
+  valueSet: ValueSet | null
+  editable: boolean
+  onEdit: (next: ValueSet) => void
+  authoring: Authoring | null
+  onSelect: (code: string | null) => void
+}) {
   const intl = useIntl()
   const platform = usePlatform()
   const concept = useQuery({ ...conceptQuery(platform.transport, id, system.url, system.version ?? undefined, code), retry: false })
@@ -447,10 +536,12 @@ function Selected({ id, system, code, valueSet, editable, onEdit }: { id: string
         )
       ) : (
         <>
+          {authoring === null ? null : <EditCode key={`${data.code}:${concept.dataUpdatedAt}`} id={id} authoring={authoring} concept={data} onRenamed={onSelect} />}
           <p>
             <strong>{data.display ?? data.code}</strong>
           </p>
           <p className={muted}>{intl.formatMessage(m.tbConceptCode, { code: data.code, system: data.codeSystem })}</p>
+          {data.inactive ? <p className={tag}>{intl.formatMessage(m.ceRetired)}</p> : null}
           <p className={muted}>{data.parents.length === 0 ? intl.formatMessage(m.tbTopLevel) : intl.formatMessage(m.tbParents, { parents: data.parents.join(', ') })}</p>
           {data.definition === null || data.definition === undefined ? null : (
             <div>
