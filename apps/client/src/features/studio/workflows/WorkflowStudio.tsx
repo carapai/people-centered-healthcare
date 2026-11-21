@@ -1,15 +1,15 @@
 import { css, cx } from '@health/design-system/css'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useId, useRef, useState } from 'react'
 import { useIntl, type IntlShape } from 'react-intl'
 
-import { decisionMessages as dm, studioMessages as sm, workflowMessages as m } from '../../../i18n/messages'
+import { decisionMessages as dm, sandboxMessages as bm, studioMessages as sm, workflowMessages as m } from '../../../i18n/messages'
 import { usePlatform } from '../../../platform'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
-import { workflowActionsQuery } from './api'
+import { playSandbox, workflowActionsQuery } from './api'
 import { DecisionTableEditor } from './DecisionTableEditor'
 import { addTable } from './decisions'
 import {
@@ -64,6 +64,8 @@ import {
   type Value,
   type WorkflowDefinition,
 } from './model'
+import { SandboxPanel } from './SandboxPanel'
+import { activeStates, emptyRun, type Run } from './sandbox'
 import { WorkflowCanvas } from './WorkflowCanvas'
 
 const page = css({ display: 'flex', flexDirection: 'column', gap: '4' })
@@ -101,6 +103,7 @@ const outlineButton = css({
   overflowWrap: 'anywhere',
   '&[aria-current=true]': { bg: 'accent.subtle', fontWeight: 'semibold' },
   '&[data-flagged=true]': { outline: '2px solid', outlineColor: 'danger.text' },
+  '&[data-active=true]': { borderLeft: '4px solid', borderLeftColor: 'accent.default' },
 })
 
 /**
@@ -194,6 +197,8 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const [revision, setRevision] = useState(file.revision)
   const [selected, setSelected] = useState<Selection | null>(() => (initial.statechart.states[0] === undefined ? null : { kind: 'state', id: initial.statechart.states[0].id }))
   const [table, setTable] = useState<number | null>(null)
+  const [mode, setMode] = useState<'inspect' | 'sandbox'>('inspect')
+  const [run, setRun] = useState<Run>(emptyRun)
   const catalogue = useQuery(workflowActionsQuery(platform.transport))
   const actions = catalogue.data
   const editable = draft.editable
@@ -202,6 +207,17 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
   const found = problems(definition, actions)
   const outlined = flagged(found)
   const fixed = publishedIds(published)
+  // The sandbox (#499): central replays the run on the draft as it is now, unsaved edits
+  // included, and answers every step; what is lit comes from its last step.
+  const sandboxBody = { definition, ...run }
+  const sandbox = useQuery({
+    queryKey: ['studio', 'sandbox', id, sandboxBody] as const,
+    queryFn: ({ signal }) => playSandbox(platform.transport, id, sandboxBody, signal),
+    enabled: mode === 'sandbox',
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
+  const active = mode === 'sandbox' ? activeStates(sandbox.data) : new Set<string>()
 
   const save = useMutation({
     mutationFn: () => saveFile(platform.transport, id, path, JSON.stringify(writeDefinition(library, definition), null, 2), revision),
@@ -311,15 +327,42 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
             }}
           />
           <div className={columns}>
-            <Outline definition={definition} selected={selected} outlined={outlined} editable={editable} onSelect={setSelected} onChange={change} />
+            <Outline definition={definition} selected={selected} outlined={outlined} active={active} editable={editable} onSelect={setSelected} onChange={change} />
             <section aria-labelledby="ws-canvas" className={panel}>
               <h2 id="ws-canvas" className={subheading}>
                 {intl.formatMessage(m.wsCanvasHeading)}
               </h2>
               {editable ? <p className={muted}>{intl.formatMessage(m.wsCanvasHint)}</p> : null}
-              <WorkflowCanvas definition={definition} selected={selected} flagged={outlined} onSelect={setSelected} onConnect={editable ? connect : undefined} />
+              <WorkflowCanvas definition={definition} selected={selected} flagged={outlined} active={active} onSelect={setSelected} onConnect={editable ? connect : undefined} />
             </section>
-            <section aria-labelledby="ws-inspect" className={panel}>
+            <section aria-labelledby={mode === 'sandbox' ? 'ws-sandbox' : 'ws-inspect'} className={panel}>
+              <div role="group" aria-label={intl.formatMessage(bm.sbMode)} className={row}>
+                {(['inspect', 'sandbox'] as const).map((which) => (
+                  <button key={which} type="button" className={small} aria-pressed={mode === which} onClick={() => setMode(which)}>
+                    {intl.formatMessage(bm.sbModeName, { mode: which })}
+                  </button>
+                ))}
+              </div>
+              {mode === 'sandbox' ? (
+                <>
+                  <h2 id="ws-sandbox" className={subheading}>
+                    {intl.formatMessage(bm.sbHeading)}
+                  </h2>
+                  <SandboxPanel
+                    id={id}
+                    run={run}
+                    played={sandbox.data}
+                    playing={sandbox.isFetching}
+                    error={sandbox.error}
+                    editable={editable}
+                    revision={revision}
+                    files={draft.files.map((f) => f.path)}
+                    onRun={setRun}
+                    onSaved={savedOther}
+                  />
+                </>
+              ) : (
+                <>
               <h2 id="ws-inspect" className={subheading}>
                 {intl.formatMessage(m.wsInspect)}
               </h2>
@@ -347,6 +390,8 @@ function Studio({ id, path, draft, file, published, onReload, library, initial }
                   onChange={change}
                   onSelect={setSelected}
                 />
+              )}
+                </>
               )}
             </section>
           </div>
@@ -506,13 +551,15 @@ interface OutlineProps {
   definition: WorkflowDefinition
   selected: Selection | null
   outlined: Set<string>
+  /** The states active in the sandbox's last step. */
+  active: Set<string>
   editable: boolean
   onSelect: (selection: Selection) => void
   onChange: (definition: WorkflowDefinition) => void
 }
 
 /** The states as a tree, each with its exits under it. */
-function Outline({ definition, selected, outlined, editable, onSelect, onChange }: OutlineProps) {
+function Outline({ definition, selected, outlined, active, editable, onSelect, onChange }: OutlineProps) {
   const intl = useIntl()
   const add = (parent: string | null) => {
     const added = addState(definition, parent)
@@ -531,10 +578,12 @@ function Outline({ definition, selected, outlined, editable, onSelect, onChange 
               type="button"
               aria-current={sameSelection(selected, { kind: 'state', id: state.id }) ? 'true' : undefined}
               data-flagged={outlined.has(state.id)}
+              data-active={active.has(state.id)}
               className={outlineButton}
               onClick={() => onSelect({ kind: 'state', id: state.id })}
             >
               {state.id} <span className={muted}>{intl.formatMessage(m.wsKindName, { kind: state.kind })}</span>
+              {active.has(state.id) ? <span className={css({ ml: '1', fontSize: 'sm', fontWeight: 'semibold' })}>· {intl.formatMessage(bm.sbActive)}</span> : null}
             </button>
             {(state.transitions ?? []).length === 0 ? null : (
               <ul className={css({ pl: '3', display: 'flex', flexDirection: 'column' })}>

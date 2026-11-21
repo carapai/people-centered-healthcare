@@ -1429,6 +1429,155 @@ async fn the_decision_table_editor_tries_a_patient_and_checks_the_draft_table() 
     assert_eq!(status, 403);
 }
 
+// The Workflow Studio's sandbox (#499).
+
+/// A draft visit: triage (a nurse's task, opening a queue entry, overdue after an hour), then a
+/// consultation unless urgent.
+fn visit() -> Value {
+    json!({
+        "url": "http://health.go.ug/fhir/Library/anc-visit", "version": "1.0.0",
+        "statechart": { "states": [
+            { "id": "triage", "kind": "atomic",
+              "task": { "role": "nurse", "worklist": "opd-triage" },
+              "on_entry": [[{ "kind": "execute", "action": "patient-flow/open-queue-entry@1" }]],
+              "timers": [{ "after": "PT1H", "event": "triage.overdue" }],
+              "transitions": [
+                { "events": ["triaged"], "guard": "%urgent", "targets": ["done"] },
+                { "events": ["triaged"], "targets": ["consultation"] }
+              ] },
+            { "id": "consultation", "kind": "atomic",
+              "transitions": [{ "events": ["seen"], "targets": ["done"] }] },
+            { "id": "done", "kind": "final" }
+        ] }
+    })
+}
+
+#[tokio::test]
+async fn the_sandbox_plays_a_draft_step_by_step_and_reports_an_unanswered_guard() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let path = format!("/packages/{ID}/workflows/sandbox");
+
+    // Every step comes from the server: the start, with its stubbed action, task and timer.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "definition": visit() })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["guards"], json!(["%urgent"]));
+    assert_eq!(body["gates"], json!([]));
+    let start = &body["steps"][0];
+    assert_eq!(start["configuration"], json!(["triage"]));
+    assert_eq!(start["actions"], json!(["patient-flow/open-queue-entry@1"]));
+    assert_eq!(
+        start["timers"],
+        json!([{ "event": "triage.overdue", "dueIn": "PT1H" }])
+    );
+    assert_eq!(
+        start["tasks"],
+        json!([{ "state": "triage", "status": "ready" }])
+    );
+    assert_eq!(start["accepts"], json!(["triaged"]));
+    assert_eq!(start["elapsed"], "PT0S");
+
+    // An unanswered guard is reported and its move not taken.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "definition": visit(), "moves": [{ "event": "triaged" }] })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["unanswered"], json!(["%urgent"]));
+    assert_eq!(body["steps"].as_array().expect("steps").len(), 1);
+
+    // Answered, the run goes on; waiting fires the timer.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({
+            "definition": visit(), "guards": { "%urgent": false }, "name": "Routine visit",
+            "moves": [{ "wait": "PT1H" }, { "event": "triaged" }, { "event": "seen" }]
+        })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["unanswered"], json!([]));
+    assert_eq!(body["refused"], Value::Null);
+    let steps = body["steps"].as_array().expect("steps");
+    assert_eq!(steps.len(), 4);
+    assert_eq!(steps[1]["timers"], json!([]));
+    assert_eq!(steps[1]["elapsed"], "PT1H");
+    assert_eq!(steps[2]["configuration"], json!(["consultation"]));
+    assert_eq!(steps[3]["running"], false);
+
+    // The run as a scenario: the answers it used and each step's configuration as expected,
+    // passing in submission's simulation unchanged.
+    let scenario: Value =
+        serde_json::from_str(body["scenario"].as_str().expect("the file")).expect("json");
+    let scenario = &scenario;
+    assert_eq!(scenario["type"], "workflow-scenario");
+    assert_eq!(scenario["name"], "Routine visit");
+    assert_eq!(
+        scenario["definition"],
+        "http://health.go.ug/fhir/Library/anc-visit|1.0.0"
+    );
+    assert_eq!(scenario["guards"], json!({ "%urgent": false }));
+    assert_eq!(
+        scenario["steps"][2],
+        json!({ "event": "triaged", "expect": {
+            "configuration": ["consultation"], "actions": [], "timers": [], "tasks": [], "running": true
+        } })
+    );
+    let definition: health_workflow::definition::WorkflowDefinition =
+        serde_json::from_value(visit()).expect("definition");
+    let scenario = serde_json::from_value(scenario.clone()).expect("scenario");
+    assert_eq!(
+        health_workflow::simulation::simulate(&definition, &scenario),
+        Vec::<String>::new()
+    );
+
+    // A malformed wait or statechart is refused; like every Studio call it needs a permission.
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "definition": visit(), "moves": [{ "wait": "an hour" }] })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    let mut broken = visit();
+    broken["statechart"]["initial"] = json!(["nowhere"]);
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "definition": broken })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    let (status, _) = call(
+        &publications,
+        subject("cy", &["queues.work"]),
+        "POST",
+        &path,
+        Some(json!({ "definition": visit() })),
+    )
+    .await;
+    assert_eq!(status, 403);
+}
+
 // Editing a local CodeSystem's concepts (#524).
 
 #[tokio::test]

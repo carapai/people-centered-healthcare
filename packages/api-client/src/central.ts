@@ -704,6 +704,84 @@ export const StudioProblem = z.object({
 })
 export type StudioProblem = z.infer<typeof StudioProblem>
 
+/** An open Task. */
+export const StudioSandboxTask = z.object({
+  /** Its state. */
+  "state": z.string(),
+  /** `ready` or `in-progress`. */
+  "status": z.string(),
+})
+export type StudioSandboxTask = z.infer<typeof StudioSandboxTask>
+
+/** A pending timer. */
+export const StudioSandboxTimer = z.object({
+  /** How long until it falls due (ISO 8601). */
+  "dueIn": z.string(),
+  /** The event it raises. */
+  "event": z.string(),
+})
+export type StudioSandboxTimer = z.infer<typeof StudioSandboxTimer>
+
+/** What held at the start, or after a move. */
+export const StudioSandboxStep = z.object({
+  /** The events the configuration accepts. */
+  "accepts": z.array(z.string()),
+  /** The typed actions the move ran, stubbed (recorded, never carried out). */
+  "actions": z.array(z.string()),
+  /** The active states. */
+  "configuration": z.array(z.string()),
+  /** How long since the start (ISO 8601). */
+  "elapsed": z.string(),
+  /** Whether the instance is still running. */
+  "running": z.boolean(),
+  /** The open Tasks. */
+  "tasks": z.array(StudioSandboxTask),
+  /** The pending timers, earliest first. */
+  "timers": z.array(StudioSandboxTimer),
+})
+export type StudioSandboxStep = z.infer<typeof StudioSandboxStep>
+
+/** How the run went. */
+export const StudioSandbox = z.object({
+  /** Every Financial Gate of the definition. */
+  "gates": z.array(z.string()),
+  /** Every guard of the definition, for the author to answer. */
+  "guards": z.array(z.string()),
+  /** Why the next move could not be taken, if it could not for another reason. */
+  "refused": z.string().nullable().optional(),
+  /** The run as the text of a `workflow-scenario` file of the package's `tests/` folder. */
+  "scenario": z.string(),
+  /** The start, then each move taken. */
+  "steps": z.array(StudioSandboxStep),
+  /** The guards the next move needs answered: it was not taken. */
+  "unanswered": z.array(z.string()),
+})
+export type StudioSandbox = z.infer<typeof StudioSandbox>
+
+/** One move: an event to send, or a wait. */
+export const StudioSandboxMove = z.object({
+  /** The event to send. */
+  "event": z.string().nullable().optional(),
+  /** How long to wait (ISO 8601), firing the timers that fall due. */
+  "wait": z.string().nullable().optional(),
+})
+export type StudioSandboxMove = z.infer<typeof StudioSandboxMove>
+
+/** A sandbox run of a draft definition. */
+export const StudioSandboxInput = z.object({
+  /** The draft Workflow Definition, as the Studio holds it. */
+  "definition": z.object({}),
+  /** The outcome of each Financial Gate, by canonical URL: `pass`, `defer` or `block`. An unanswered gate defers. */
+  "gates": z.record(z.string(), z.string()).optional(),
+  /** The author's answer to each guard, by its expression. */
+  "guards": z.record(z.string(), z.boolean()).optional(),
+  /** The moves so far, in order. */
+  "moves": z.array(StudioSandboxMove).optional(),
+  /** The name the run takes as a scenario. */
+  "name": z.string().nullable().optional(),
+})
+export type StudioSandboxInput = z.infer<typeof StudioSandboxInput>
+
 /** The ValueSets of the package version and of the published packages. */
 export const StudioValueSets = z.object({
   /** The ValueSets, this package's own first. */
@@ -987,6 +1065,18 @@ export const operations = {
       404: StudioProblem,
       409: StudioProblem,
       412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  playStudioWorkflowSandbox: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/workflows/sandbox',
+    responses: {
+      200: StudioSandbox,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
       422: StudioProblem,
       500: StudioProblem,
     },

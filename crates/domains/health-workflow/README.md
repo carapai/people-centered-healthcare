@@ -87,6 +87,12 @@ Workflow simulation (#101): `simulate(definition, scenario)` runs a package `tes
 
 The interpreter evaluates a transition's guard only once its event matches.
 
+The Workflow Studio's sandbox (#499) runs on the same run:
+
+- **`play(definition, Play)`:** the author's guard answers, gate outcomes and moves (an event or a wait), from the start. Each move taken gives a `Snapshot`: the configuration, the stubbed actions it ran, the pending timers (event and when due), the open Tasks, `running`, the events the configuration accepts (`accepts`) and the time since the start. A move that would evaluate an unanswered guard is not taken: `unanswered` lists the guards instead of guessing.
+- **`save(definition, play, played, name)`:** the run as a `Scenario`: the start and each move taken, each expecting what its snapshot showed, with only the answers and gate outcomes the run used. It passes `simulate` unchanged.
+- **`guards` and `gates`:** every guard and Financial Gate of a statechart, for the author to answer.
+
 ## Financial Gates
 
 A `State` may name a `gate` (ADR 0033; #122).
