@@ -1,0 +1,24 @@
+[package]
+name = "health-analytics-app"
+description = "Indicators evaluated (analytics.md; ADR 0068; #548): a FHIR R5 Measure read as an indicator, and its FHIRPath criteria evaluated over each patient's records for one reporting period."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "application"
+context = "analytics"
+
+[lints]
+workspace = true
+
+[dependencies]
+health-analytics = { workspace = true }
+health-fhir-validation = { workspace = true }
+jiff = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

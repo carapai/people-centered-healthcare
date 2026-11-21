@@ -2941,6 +2941,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "health-analytics"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "health-analytics-app"
+version = "0.1.0"
+dependencies = [
+ "health-analytics",
+ "health-fhir-validation",
+ "jiff",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "health-audit"
 version = "0.1.0"
 dependencies = [
@@ -3722,6 +3742,7 @@ name = "health-publication"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "health-analytics-app",
  "health-audit",
  "health-clinical-documentation-app",
  "health-configuration",

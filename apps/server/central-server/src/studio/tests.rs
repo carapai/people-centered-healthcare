@@ -1977,3 +1977,161 @@ async fn the_designs_say_which_package_version_each_opens_in_and_whose_draft_it_
     let (status, _) = call(&publications, subject("x", &[]), "GET", "/designs", None).await;
     assert_eq!(status, 403);
 }
+
+/// The ANC reference package's files: *ANC 1st visits* and its test patients (#548).
+fn anc_package() -> Files {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages/anc");
+    let mut files = Files::new();
+    for sub in ["", "tests"] {
+        for entry in std::fs::read_dir(dir.join(sub)).expect("dir") {
+            let path = entry.expect("entry").path();
+            if path.is_file() {
+                let name = path.file_name().expect("name").to_string_lossy();
+                let key = if sub.is_empty() {
+                    name.into_owned()
+                } else {
+                    format!("{sub}/{name}")
+                };
+                files.insert(key, std::fs::read(&path).expect("read"));
+            }
+        }
+    }
+    files
+}
+
+#[tokio::test]
+async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    let measure: Value =
+        serde_json::from_slice(&files["Measure-anc-first-visits.json"]).expect("measure");
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &try_path,
+        Some(json!({ "measure": measure, "periodType": "monthly", "period": "2026-03" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body["period"],
+        json!({ "periodType": "monthly", "id": "2026-03", "start": "2026-03-01", "end": "2026-03-31" })
+    );
+    assert_eq!(body["value"], 4);
+    assert_eq!(body["errors"], json!([]));
+    let patients = body["patients"].as_array().expect("patients");
+    assert_eq!(patients.len(), 10);
+    let counted: Vec<&str> = patients
+        .iter()
+        .filter(|p| p["counted"] == true)
+        .map(|p| p["patient"].as_str().expect("patient"))
+        .collect();
+    assert_eq!(
+        counted,
+        [
+            "Patient/akello",
+            "Patient/nakato",
+            "Patient/namubiru",
+            "Patient/nansubuga"
+        ]
+    );
+    let nakato = patients
+        .iter()
+        .find(|p| p["patient"] == "Patient/nakato")
+        .expect("nakato");
+    assert_eq!(nakato["path"], "tests/patient-nakato.json");
+    assert_eq!(nakato["display"], "Annet Nakato");
+    assert_eq!(
+        nakato["records"],
+        json!([
+            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null },
+            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null }
+        ])
+    );
+    let auma = patients
+        .iter()
+        .find(|p| p["patient"] == "Patient/auma")
+        .expect("auma");
+    assert_eq!(auma["counted"], false);
+    assert_eq!(auma["records"][0]["reason"], "outside-period");
+
+    // An unsaved edit is what is tried: without the sex condition, Opio counts too.
+    let mut edited = measure.clone();
+    edited["group"][0]["population"][0]["criteria"]["expression"] =
+        json!("Encounter.type.coding.where(code = 'first').exists()");
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &try_path,
+        Some(json!({ "measure": edited, "periodType": "quarterly", "period": "2026Q1" })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["value"], 7);
+
+    // A Measure without a period date, a period not of its type, or a calculation not built yet
+    // is refused.
+    let mut undated = measure.clone();
+    undated["extension"] = json!([]);
+    for (input, why) in [
+        (
+            json!({ "measure": undated, "periodType": "monthly", "period": "2026-03" }),
+            "has no period date",
+        ),
+        (
+            json!({ "measure": measure, "periodType": "monthly", "period": "2026Q1" }),
+            "is not a Monthly period",
+        ),
+        (
+            json!({ "measure": { "resourceType": "Measure" }, "periodType": "annual", "period": "2026" }),
+            "is not a usable indicator",
+        ),
+    ] {
+        let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+        assert_eq!(status, 422, "{body}");
+        assert!(
+            body["detail"].as_str().expect("detail").contains(why),
+            "{body}"
+        );
+    }
+    let mut visits = measure.clone();
+    visits["extension"][1]["valueCode"] = json!("visits");
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &try_path,
+        Some(json!({ "measure": visits, "periodType": "monthly", "period": "2026-03" })),
+    )
+    .await;
+    assert_eq!(status, 422);
+    assert_eq!(body["detail"], "counting visits is not supported yet");
+
+    // It needs a Studio permission, and a package version that exists.
+    let input = json!({ "measure": measure, "periodType": "monthly", "period": "2026-03" });
+    let (status, _) = call(
+        &publications,
+        subject("x", &[]),
+        "POST",
+        &try_path,
+        Some(input.clone()),
+    )
+    .await;
+    assert_eq!(status, 403);
+    let (status, _) = call(
+        &publications,
+        author(),
+        "POST",
+        "/packages/ug.moh.anc@9.9.9/indicators/try",
+        Some(input),
+    )
+    .await;
+    assert_eq!(status, 404);
+}

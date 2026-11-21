@@ -1,0 +1,19 @@
+[package]
+name = "health-analytics"
+description = "Indicators (analytics.md; ADR 0068; #548): a Measure's definition and its problems, the reporting periods care is placed in, and who a count indicator counts."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.health]
+layer = "domain"
+context = "analytics"
+
+[lints]
+workspace = true
+
+[dependencies]
+jiff = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

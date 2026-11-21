@@ -1,0 +1,51 @@
+{
+  "type": "test-patient",
+  "name": "Opio I.: a man whose visit on 10 March was coded as a first ANC visit",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "opio",
+      "name": [
+        {
+          "family": "Opio",
+          "given": [
+            "Isaac"
+          ]
+        }
+      ],
+      "gender": "male",
+      "birthDate": "1985-05-05"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "opio-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/opio"
+      },
+      "actualPeriod": {
+        "start": "2026-03-10T12:00:00+03:00"
+      }
+    }
+  ]
+}

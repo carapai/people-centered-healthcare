@@ -39,6 +39,9 @@
 //!   Validation refuses a pack whose target has no published version in the major it targets,
 //!   and the semver check compares its translations (`health_configuration::language`).
 //!
+//! - **Indicators** (ADR 0068; #548): validation refuses a `Measure` that is not a usable
+//!   indicator, one without a period date among them, and a malformed test patient.
+//!
 //! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
 //!   settings against the latest published version of each base package they name, and
 //!   [`Publications::activate`] refuses a base version that would orphan, or put outside its
@@ -82,6 +85,7 @@ pub mod designs;
 pub mod discussion;
 pub mod editing;
 mod extraction;
+mod indicators;
 mod programs;
 pub mod studio;
 pub mod terminology;
@@ -509,6 +513,7 @@ impl Publications {
         problems.extend(workflows::problems(packed, &self.actions));
         problems.extend(extraction::problems(packed).await);
         problems.extend(programs::problems(packed));
+        problems.extend(indicators::problems(packed));
         if packed.contents.package.kind == PackageKind::Language
             && let Some(translates) = &packed.contents.package.translates
             && translates.major().is_some()

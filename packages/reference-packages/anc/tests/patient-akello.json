@@ -1,0 +1,51 @@
+{
+  "type": "test-patient",
+  "name": "Akello B.: her first ANC visit on 11 March",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "akello",
+      "name": [
+        {
+          "family": "Akello",
+          "given": [
+            "Brenda"
+          ]
+        }
+      ],
+      "gender": "female",
+      "birthDate": "2008-06-15"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "akello-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/anc-visit-type",
+              "code": "first"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/akello"
+      },
+      "actualPeriod": {
+        "start": "2026-03-11T11:20:00+03:00"
+      }
+    }
+  ]
+}

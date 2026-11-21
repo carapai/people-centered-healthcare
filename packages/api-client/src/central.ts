@@ -653,6 +653,81 @@ export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 export const StudioImportRefusal = z.enum(["not-json", "not-questionnaire", "looks-r4"])
 export type StudioImportRefusal = z.infer<typeof StudioImportRefusal>
 
+/** Why a record counts or not. */
+export const StudioRecordReason = z.enum(["meets", "does-not-meet", "outside-period", "no-period-date", "error"])
+export type StudioRecordReason = z.infer<typeof StudioRecordReason>
+
+/** One record's part. */
+export const StudioIndicatorRecord = z.object({
+  /** Its period date, if it has one. */
+  "date": z.string().nullable().optional(),
+  /** Why it could not be evaluated, if it could not. */
+  "error": z.string().nullable().optional(),
+  /** Why it counts or not. */
+  "reason": StudioRecordReason,
+  /** The record (`Encounter/…`). */
+  "reference": z.string(),
+})
+export type StudioIndicatorRecord = z.infer<typeof StudioIndicatorRecord>
+
+/** One test patient, counted or not. */
+export const StudioIndicatorPatient = z.object({
+  /** Whether they are counted. */
+  "counted": z.boolean(),
+  /** The patient's name, if they have one. */
+  "display": z.string().nullable().optional(),
+  /** What the test patient shows. */
+  "name": z.string(),
+  /** The test patient's file. */
+  "path": z.string(),
+  /** The patient (`Patient/…`). */
+  "patient": z.string(),
+  /** Each of their records of the indicator's basis, with its part. */
+  "records": z.array(StudioIndicatorRecord),
+})
+export type StudioIndicatorPatient = z.infer<typeof StudioIndicatorPatient>
+
+/** A kind of reporting period. */
+export const StudioPeriodType = z.enum(["weekly", "monthly", "quarterly", "semiAnnual", "annual", "financialJuly"])
+export type StudioPeriodType = z.infer<typeof StudioPeriodType>
+
+/** The period evaluated. */
+export const StudioPeriod = z.object({
+  /** Its last day (`%periodEnd`). */
+  "end": z.string(),
+  /** Its id. */
+  "id": z.string(),
+  /** Its type. */
+  "periodType": StudioPeriodType,
+  /** Its first day (`%periodStart`). */
+  "start": z.string(),
+})
+export type StudioPeriod = z.infer<typeof StudioPeriod>
+
+/** What *Try* found. */
+export const StudioIndicatorTry = z.object({
+  /** Test patients that could not be read, and records that could not be evaluated. */
+  "errors": z.array(z.string()),
+  /** Every test patient, counted or not, in file order. */
+  "patients": z.array(StudioIndicatorPatient),
+  /** The period evaluated. */
+  "period": StudioPeriod,
+  /** The indicator's value: how many are counted. */
+  "value": integer,
+})
+export type StudioIndicatorTry = z.infer<typeof StudioIndicatorTry>
+
+/** *Try* on a draft indicator. */
+export const StudioIndicatorTryInput = z.object({
+  /** The draft Measure, as the Studio holds it. */
+  "measure": z.object({}),
+  /** The period, written as its type writes it (`2026-03`, `2026W10`, `2026Q1`, …). */
+  "period": z.string(),
+  /** The period type a Report would choose. */
+  "periodType": StudioPeriodType,
+})
+export type StudioIndicatorTryInput = z.infer<typeof StudioIndicatorTryInput>
+
 /** How to start a draft: a copy of a published version, or a blank new package. */
 export const StudioNewDraft = z.object({
   /** The canonical base of a blank package's artefacts, e.g. `http://health.go.ug/fhir`. */
@@ -1075,6 +1150,18 @@ export const operations = {
       404: StudioProblem,
       409: StudioProblem,
       412: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  tryStudioIndicator: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/indicators/try',
+    responses: {
+      200: StudioIndicatorTry,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
       422: StudioProblem,
       500: StudioProblem,
     },

@@ -1,0 +1,51 @@
+{
+  "type": "test-patient",
+  "name": "Okello E.: an outpatient visit on 2 March",
+  "resources": [
+    {
+      "resourceType": "Patient",
+      "id": "okello",
+      "name": [
+        {
+          "family": "Okello",
+          "given": [
+            "Emmanuel"
+          ]
+        }
+      ],
+      "gender": "male",
+      "birthDate": "1990-04-22"
+    },
+    {
+      "resourceType": "Encounter",
+      "id": "okello-visit-1",
+      "status": "completed",
+      "class": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+              "code": "AMB"
+            }
+          ]
+        }
+      ],
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "https://health.go.ug/fhir/CodeSystem/visit-type",
+              "code": "opd"
+            }
+          ]
+        }
+      ],
+      "subject": {
+        "reference": "Patient/okello"
+      },
+      "actualPeriod": {
+        "start": "2026-03-02T08:40:00+03:00"
+      }
+    }
+  ]
+}

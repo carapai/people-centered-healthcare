@@ -46,6 +46,9 @@
 //! The form designer's *Import FHIR JSON* reads a pasted Questionnaire, converting R4 to R5 with
 //! `health-fhir-mapping`, at `/packages/{id}/questionnaires/import` ([`forms`], #853).
 //!
+//! The indicator editor's *Try* evaluates a draft Measure over the package's test patients for a
+//! period at `/packages/{id}/indicators/try` ([`indicators`], #548).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
@@ -54,6 +57,7 @@ pub(crate) mod decisions;
 pub(crate) mod designs;
 mod dto;
 pub(crate) mod forms;
+pub(crate) mod indicators;
 pub(crate) mod sandbox;
 pub(crate) mod terminology;
 
@@ -87,7 +91,7 @@ pub(crate) struct Studio {
     publications: Publications,
     signer: Option<Arc<LocalSigner>>,
     accounts: Accounts,
-    /// The FHIRPath engine decision tables are tried on, built on first use.
+    /// The FHIRPath engine decision tables and indicators are tried on, built on first use.
     engine: Arc<OctofhirEngine>,
 }
 
@@ -148,6 +152,10 @@ pub(crate) fn router(
         .route(
             "/packages/{id}/questionnaires/import",
             post(forms::import_questionnaire),
+        )
+        .route(
+            "/packages/{id}/indicators/try",
+            post(indicators::try_indicator),
         )
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))

@@ -4,10 +4,33 @@ Published Definition packages the platform ships as references (configuration.md
 
 | Package | What | Issue |
 |---|---|---|
+| `anc/` (`ug.moh.anc`) | The *ANC 1st visits* indicator (`Measure/anc-first-visits`), the ANC visit types, and the test patients the indicator editor's *Try* evaluates it over | #548 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
 
 **Sources:** a Workflow Definition is inline, base64 content in its Library. Its readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
+
+## `anc/`: ANC 1st visits
+
+- **`Measure/anc-first-visits`** counts women whose first antenatal care visit was in the period, each once (`cohort`, basis `Encounter`, counting people).
+  - **Period date:** `Encounter.actualPeriod.start`, when the visit started.
+  - **Criteria** (`initial-population`): the visit's type is `first` in `CodeSystem/anc-visit-type`, and `%patient.gender` is `female`.
+- **Test patients** (`tests/patient-*.json`, `type` `test-patient`), one Patient and their Encounters each:
+
+| Patient | Visits | March 2026 |
+|---|---|---|
+| Akello | first on 11 March | counted |
+| Nakato | first on 4 March, follow-up on 28 March | counted once |
+| Namubiru | first at 22:30 on 31 March, entered on 3 April | counted (care counts when it happened) |
+| Nansubuga | first recorded twice, 25 and 27 March | counted once |
+| Auma | first on 7 January, follow-ups in February and March | not counted |
+| Atim | first on 27 February | not counted |
+| Nabirye | first on 8 April | not counted (counted in April) |
+| Okello | an outpatient visit on 2 March | not counted |
+| Opio | a man whose visit was coded as a first ANC visit | not counted |
+| Kisakye | a first visit planned, not started | not counted (no period date) |
+
+So March 2026 is 4, April 1 and 2026Q1 6.
 
 ## `lab/`: the laboratory test
 
