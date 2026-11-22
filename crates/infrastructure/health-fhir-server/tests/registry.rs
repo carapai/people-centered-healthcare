@@ -58,6 +58,7 @@ fn subject(account: &str, facility: &str, permissions: &[&str]) -> Subject {
         programs: BTreeSet::new(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     }
 }
 

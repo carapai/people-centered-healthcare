@@ -17,6 +17,7 @@ members = [
     "crates/domains/health-care-journeys",
     "crates/domains/health-care-plans",
     "crates/domains/health-client-registry",
+    "crates/domains/health-facility-registry",
     "crates/domains/health-clinical-documentation",
     "crates/domains/health-configuration",
     "crates/domains/health-authority-leases",
@@ -109,6 +110,7 @@ health-backup = { path = "crates/infrastructure/health-backup" }
 health-care-journeys = { path = "crates/domains/health-care-journeys" }
 health-care-plans = { path = "crates/domains/health-care-plans" }
 health-client-registry = { path = "crates/domains/health-client-registry" }
+health-facility-registry = { path = "crates/domains/health-facility-registry" }
 health-clinical-documentation = { path = "crates/domains/health-clinical-documentation" }
 health-authority-leases = { path = "crates/domains/health-authority-leases" }
 health-consent = { path = "crates/domains/health-consent" }

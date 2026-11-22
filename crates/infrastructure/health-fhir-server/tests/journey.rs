@@ -101,6 +101,7 @@ fn subject(permissions: Permissions, programs: &[&str]) -> Subject {
         programs: programs.iter().map(|p| (*p).to_owned()).collect(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     }
 }
 

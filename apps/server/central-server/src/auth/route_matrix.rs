@@ -40,6 +40,7 @@ const AUTH: &str = "crates/infrastructure/health-auth/src/";
 const SYNC: &str = "crates/infrastructure/health-sync-server/src/";
 const PROVISIONING: &str = "crates/infrastructure/health-provisioning/src/";
 const STUDIO: &str = "apps/server/central-server/src/studio/";
+const CENTRAL: &str = "apps/server/central-server/src/";
 
 /// Every router central mounts (`routes`), with each route it declares.
 const INVENTORY: &[Mounted] = &[
@@ -382,6 +383,12 @@ const INVENTORY: &[Mounted] = &[
         ],
     },
     Mounted {
+        file: "central-server/src/places.rs",
+        prefix: "/api/places",
+        gate: Gate::Staff,
+        paths: &["/area", "/nhfr/preview", "/nhfr/apply"],
+    },
+    Mounted {
         file: "health-provisioning/src/routes.rs",
         prefix: "/api",
         gate: Gate::Public,
@@ -409,6 +416,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("health-sync-server/src/", SYNC),
     ("health-provisioning/src/", PROVISIONING),
     ("central-server/src/studio/", STUDIO),
+    ("central-server/src/", CENTRAL),
 ];
 
 /// The paths a source file declares with `.route("…"`.
@@ -726,6 +734,10 @@ const UNPERMITTED_SERVED: &[(&str, &str)] = &[
     ("/api/session", "who the caller is"),
     ("/api/events", "the caller's own change hints"),
     ("/api/inbox", "the caller's own inbox"),
+    (
+        "/api/places/area",
+        "the caller's own place and the places below it, from the global facility registry",
+    ),
     (
         "/fhir/_history",
         "system history, filtered to the records the caller may list",

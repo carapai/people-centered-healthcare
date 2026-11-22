@@ -5,7 +5,7 @@ import { join } from 'node:path'
  * `{phone} {code}` line each (#111; there is no SMS provider yet, #235). */
 export const OTP_OUTBOX = join(tmpdir(), 'health-e2e-otp-outbox')
 
-// The e2e users, provisioned by backend.ts at KAM013.
+// The e2e users, provisioned by backend.ts at KAM013, or at the place a user names.
 export const USERS = {
   clerk: { username: 'e2e-clerk', password: 'tumbling otter quarry seven', roles: 'clerk' },
   reviewer: { username: 'e2e-reviewer', password: 'patient heron basket ninety', roles: 'reviewer' },
@@ -25,6 +25,9 @@ export const USERS = {
   coauthor: { username: 'e2e-coauthor', password: 'meadow falcon ribbon twenty', roles: 'author' },
   approver: { username: 'e2e-approver', password: 'juniper walrus anchor fifty', roles: 'approver' },
   publisher: { username: 'e2e-publisher', password: 'cinder otter gazebo sixty', roles: 'publisher' },
+  // A role held at a district, not a facility (ADR 0094; #869): signs in for Kampala district,
+  // whose area lists its facilities from the NHFR sample, and reads no patient-level records.
+  district: { username: 'e2e-district', password: 'kestrel lagoon pillar thirteen', roles: 'district', place: 'district-kampala' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
 } as const
@@ -56,6 +59,7 @@ export const ADMIN_PERMISSIONS = [
   'payments.cash',
   'payments.refund',
   'payments.supervise',
+  'places.manage',
   'pharmacy.dispense',
   'pharmacy.view',
   'pricing.approve',

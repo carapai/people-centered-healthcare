@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { accessMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, studioMessages, triageMessages, worklistMessages } from '../i18n/messages'
+import { accessMessages, areaMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, studioMessages, triageMessages, worklistMessages } from '../i18n/messages'
 import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
@@ -96,6 +96,12 @@ function Home() {
               <li>
                 <Link to="/inbox">{intl.formatMessage(inboxMessages.ibTitle)}</Link>
               </li>
+              {/* Places and areas are central's (ADR 0094): the session's place and its facilities. */}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/area">{intl.formatMessage(areaMessages.arTitle)}</Link>
+                </li>
+              ) : null}
               {/* The Studio is central's only (studio.md § Scope). */}
               {platform.capabilities.studio ? (
                 <li>

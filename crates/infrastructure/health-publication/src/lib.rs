@@ -46,6 +46,11 @@
 //!   `age-band-set`) with a gap or an overlap between its bands, and
 //!   [`Publications::age_band_sets`] lists every published version, which pinned indicators keep.
 //!
+//! - **Administrative areas** (ADR 0094; #869): validation refuses a package's regions and
+//!   districts (a `Library` of type `administrative-areas`) with a code used twice or a district
+//!   in no listed region, and [`Publications::administrative_areas`] reads the newest published
+//!   ones for the facility registry's NHFR import.
+//!
 //! - **Reports** (ADR 0070, ADR 0072; #556): a Report (`configuration/reports/<id>.json`, schema
 //!   `report/1`) belongs in a Reporting package; validation refuses one whose indicators or Age
 //!   Band Sets are not pinned and published, or that runs above facility level with a median, a
@@ -90,6 +95,7 @@ use sha2::Digest as _;
 use uuid::Uuid;
 
 mod age_bands;
+mod areas;
 pub mod decisions;
 pub mod designs;
 pub mod discussion;
@@ -528,6 +534,7 @@ impl Publications {
         problems.extend(programs::problems(packed));
         problems.extend(indicators::problems(packed));
         problems.extend(age_bands::problems(packed));
+        problems.extend(areas::problems(packed));
         if !reports_in(packed).is_empty() {
             let catalogue = self.catalogue(tx, packed).await?;
             problems.extend(reports::problems(packed, &catalogue));

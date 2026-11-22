@@ -62,6 +62,7 @@ fn app(store: &SurrealStore, facility: &str, permissions: &[&str]) -> Router {
             programs: BTreeSet::new(),
             purpose: Some("TREAT".into()),
             break_glass: None,
+            area: false,
         }))
 }
 

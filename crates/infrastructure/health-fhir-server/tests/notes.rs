@@ -67,6 +67,7 @@ fn notes(server: &FhirServer, account: &str, facility: &str, permissions: &[&str
         programs: BTreeSet::new(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     }))
 }
 

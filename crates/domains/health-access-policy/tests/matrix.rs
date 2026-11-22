@@ -44,6 +44,7 @@ fn subject(name: &str) -> Subject {
             .collect::<BTreeSet<_>>(),
         purpose: purpose.then(|| "TREAT".into()),
         break_glass: None,
+        area: false,
     };
     match name {
         "clinician" => base(
@@ -471,4 +472,75 @@ fn searches_of_facility_scope_types_stay_in_the_subjects_facility() {
     assert_eq!(filter(&central, "Observation", Some("Patient/p1")), None);
     // Global types are never facility-isolated.
     assert_eq!(filter(&edge, "Patient", None), None);
+}
+
+/// ADR 0094: a session at a district, region or the national place is refused every
+/// patient-level read and search, whatever its roles grant and even under break-glass, at
+/// central as on an edge; registries such as Organization stay open to it.
+#[test]
+fn an_area_session_reads_no_patient_level_records() {
+    let mut district = subject("clinician");
+    district.facility = "district-kampala".into();
+    district.area = true;
+    district.break_glass = Some(
+        BreakGlassPolicy::default()
+            .grant(
+                &district,
+                "patient-1",
+                BTG,
+                "an emergency at the district",
+                now(),
+            )
+            .expect("grant")
+            .0,
+    );
+    for pdp in [pdp(), pdp().with_scope(NodeScope::Central)] {
+        for resource in ["Patient", "Observation", "Encounter", "Appointment"] {
+            let access = Access {
+                resource_type: resource,
+                interaction: Interaction::Read,
+                facility: None,
+                labels: &[],
+                patient: Some("patient-1"),
+            };
+            assert_eq!(
+                pdp.decide(&district, &access, now()),
+                Decision::Deny(Deny::AreaSession),
+                "{resource}"
+            );
+            assert_eq!(
+                pdp.search_filter(&district, resource, Some("patient-1"), now()),
+                Err(Deny::AreaSession),
+                "{resource}"
+            );
+        }
+        let organization = Access {
+            resource_type: "Organization",
+            interaction: Interaction::Read,
+            facility: None,
+            labels: &[],
+            patient: None,
+        };
+        assert_eq!(
+            pdp.decide(&district, &organization, now()),
+            Decision::Permit(Vec::new())
+        );
+        assert!(
+            pdp.search_filter(&district, "Location", None, now())
+                .is_ok()
+        );
+    }
+    // The same roles at a facility read as before.
+    let facility = subject("clinician");
+    let access = Access {
+        resource_type: "Patient",
+        interaction: Interaction::Read,
+        facility: None,
+        labels: &[],
+        patient: Some("patient-1"),
+    };
+    assert_eq!(
+        pdp().decide(&facility, &access, now()),
+        Decision::Permit(Vec::new())
+    );
 }

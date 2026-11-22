@@ -22,6 +22,7 @@ use crate::jose::{TokenSigner, b64, sha256_b64, verify_dpop};
 use crate::otp::{PhoneOtp, PhoneSignIn, code_matches, hash_code, new_code};
 use crate::snapshot::{SnapshotGate, token_claims};
 use crate::store::{AuthStore, AuthorizationCode, Session};
+use health_facility_registry::PlaceLevel;
 use health_identity::snapshot::PermissionSnapshot;
 
 /// A registered public client (authorization code with PKCE; no client secret).
@@ -411,7 +412,7 @@ fn login_page(p: &AuthorizeParams, error: Option<&str>) -> String {
          <form method=\"post\" action=\"authorize\">{hidden}\
          <label for=\"username\">Username</label><input id=\"username\" name=\"username\" autocomplete=\"username\" required>\
          <label for=\"password\">Password</label><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required>\
-         <label for=\"facility\">Facility (if you work at more than one)</label><input id=\"facility\" name=\"facility\">\
+         <label for=\"facility\">Facility or district (if you work at more than one place)</label><input id=\"facility\" name=\"facility\">\
          <button type=\"submit\">Sign in</button></form></main></html>"
     )
 }
@@ -521,7 +522,7 @@ const LOGIN_REFUSED: &str = "The username or password is incorrect, or the accou
 
 /// Shown when the user works at several facilities and named none of them.
 const CHOOSE_FACILITY: &str =
-    "You work at more than one facility: enter the one you are signing in for.";
+    "You work at more than one place: enter the facility or district you are signing in for.";
 
 /// Where a sign-in's facility comes from.
 enum FacilityChoice {
@@ -877,9 +878,13 @@ impl<S: AuthStore> Inner<S> {
         auth_time: Timestamp,
         refresh: &str,
         nonce: Option<&str>,
-        snapshot: Option<&PermissionSnapshot>,
+        snapshot: Option<(&PermissionSnapshot, PlaceLevel)>,
         now: Timestamp,
     ) -> Value {
+        let (snapshot, level) = match snapshot {
+            Some((snapshot, level)) => (Some(snapshot), Some(level)),
+            None => (None, None),
+        };
         // No token outlives the session's cap or the user's permission snapshot.
         let mut expires = self.config.session.access_expiry(auth_time, now);
         if let Some(snapshot) = snapshot {
@@ -905,6 +910,11 @@ impl<S: AuthStore> Inner<S> {
             && let Value::Object(extra) = token_claims(snapshot)
         {
             object.extend(extra);
+        }
+        // The level of the place the session acts for (ADR 0094): `facility` for a facility, as
+        // every session was before, or `district`, `region` or `national` for an area.
+        if let Some(level) = level {
+            claims["place-level"] = json!(level.code());
         }
         let mut response = json!({
             "access_token": self.signer.sign(&claims),
@@ -934,6 +944,20 @@ impl<S: AuthStore> Inner<S> {
             response["id_token"] = json!(self.signer.sign_id_token(&id));
         }
         response
+    }
+
+    /// The level of the place `facility` (ADR 0094): the national place for the reserved code
+    /// `central`; otherwise as the facility registry holds it, and a facility when the registry
+    /// does not hold it (or cannot be read), so a facility session is as it always was.
+    async fn place_level(&self, facility: Option<&str>) -> PlaceLevel {
+        match facility {
+            Some(health_facility_registry::NATIONAL) => PlaceLevel::National,
+            Some(code) => match self.store.place_level(code).await {
+                Ok(Some(level)) => level,
+                _ => PlaceLevel::Facility,
+            },
+            None => PlaceLevel::Facility,
+        }
     }
 
     /// The facility a sign-in acts for: the edge's own; at central the one the user named, or
@@ -1164,12 +1188,13 @@ async fn authorization_code<S: AuthStore>(
     if inner.store.put_session(session.clone()).await.is_err() {
         return oauth_error(StatusCode::SERVICE_UNAVAILABLE, "temporarily_unavailable");
     }
+    let level = inner.place_level(session.facility.as_deref()).await;
     let body = inner.tokens(
         &session,
         stored.auth_time,
         &refresh,
         stored.nonce.as_deref(),
-        snapshot.as_ref(),
+        snapshot.as_ref().map(|s| (s, level)),
         now,
     );
     (no_store(), Json(body)).into_response()
@@ -1231,7 +1256,15 @@ async fn refresh<S: AuthStore>(
         Ok(true) => {}
         _ => return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"),
     }
-    let mut body = inner.tokens(&session, auth_time, &next, None, snapshot.as_ref(), now);
+    let level = inner.place_level(session.facility.as_deref()).await;
+    let mut body = inner.tokens(
+        &session,
+        auth_time,
+        &next,
+        None,
+        snapshot.as_ref().map(|s| (s, level)),
+        now,
+    );
     // A refresh does not re-authenticate, so it issues no new ID token.
     if let Some(object) = body.as_object_mut() {
         object.remove("id_token");
@@ -1442,7 +1475,15 @@ async fn unlock<S: AuthStore>(
         Ok(true) => {}
         _ => return oauth_error(StatusCode::UNAUTHORIZED, "invalid_grant"),
     }
-    let mut body = inner.tokens(&session, auth_time, &next, None, snapshot.as_ref(), now);
+    let level = inner.place_level(session.facility.as_deref()).await;
+    let mut body = inner.tokens(
+        &session,
+        auth_time,
+        &next,
+        None,
+        snapshot.as_ref().map(|s| (s, level)),
+        now,
+    );
     // A PIN does not authenticate a sign-in, so it issues no ID token.
     if let Some(object) = body.as_object_mut() {
         object.remove("id_token");
@@ -1494,6 +1535,9 @@ pub struct Principal {
     pub session: Uuid,
     /// The facility the session acts for, when the node keeps snapshots (ADR 0056).
     pub facility: Option<String>,
+    /// The level of the place the session acts for (ADR 0094): a facility unless the token
+    /// says otherwise.
+    pub place_level: PlaceLevel,
     /// The version of the permission snapshot the token was issued under.
     pub snapshot_version: Option<u64>,
     /// Whether it is a patient's (a patient client's phone account), not staff.
@@ -1617,6 +1661,10 @@ impl<S: AuthStore> AccessVerifier<S> {
                 scopes,
                 session,
                 facility: claims["facility"].as_str().map(str::to_owned),
+                place_level: claims["place-level"]
+                    .as_str()
+                    .and_then(|l| l.parse().ok())
+                    .unwrap_or_default(),
                 snapshot_version: claims["snapshot_version"].as_u64(),
             }),
             _ => Err(AccessError::InvalidToken),
@@ -1688,5 +1736,6 @@ async fn session_info<S: AuthStore>(
         "scope": principal.scopes.to_string(),
         "session": principal.session.to_string(),
         "facility": principal.facility,
+        "place_level": principal.facility.as_ref().map(|_| principal.place_level.code()),
     })))
 }

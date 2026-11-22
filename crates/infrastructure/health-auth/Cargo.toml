@@ -22,10 +22,13 @@ health-access-policy = { workspace = true }
 hkdf = { workspace = true }
 health-audit = { workspace = true }
 health-consent = { workspace = true }
+health-facility-registry = { workspace = true }
 health-http = { workspace = true }
+health-identifiers = { workspace = true }
 health-identity = { workspace = true }
 health-identity-app = { workspace = true }
 health-persistence = { workspace = true }
+health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
 health-time = { workspace = true }
 jiff = { workspace = true }
@@ -42,7 +45,6 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 health-pki = { workspace = true }
-health-identifiers = { workspace = true }
 jiff = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
 health-fhir-search = { workspace = true }

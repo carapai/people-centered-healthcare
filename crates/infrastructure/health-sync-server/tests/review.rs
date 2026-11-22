@@ -95,6 +95,7 @@ fn app(store: &SurrealStore, permissions: &[&str]) -> Router {
         programs: BTreeSet::new(),
         purpose: None,
         break_glass: None,
+        area: false,
     };
     review_router(store.clone(), Auditor::new("central", Vec::new())).layer(Extension(subject))
 }

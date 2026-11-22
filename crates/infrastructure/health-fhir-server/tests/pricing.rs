@@ -47,6 +47,7 @@ fn as_(server: &FhirServer, account: &str, permissions: &[&str]) -> Router {
         programs: BTreeSet::new(),
         purpose: None,
         break_glass: None,
+        area: false,
     }))
 }
 

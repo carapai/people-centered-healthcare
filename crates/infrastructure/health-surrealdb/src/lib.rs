@@ -37,6 +37,7 @@ pub mod ownership;
 mod packages;
 mod payments;
 mod phone;
+mod places;
 mod pricing;
 mod releases;
 mod review;

@@ -79,6 +79,7 @@ fn staff(permissions: &[&str]) -> Subject {
         programs: BTreeSet::new(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     }
 }
 

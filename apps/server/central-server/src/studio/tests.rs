@@ -93,6 +93,7 @@ fn subject(account: &str, permissions: &[&str]) -> Subject {
         programs: BTreeSet::new(),
         purpose: None,
         break_glass: None,
+        area: false,
     }
 }
 

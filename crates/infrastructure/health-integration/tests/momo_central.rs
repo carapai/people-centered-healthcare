@@ -95,6 +95,7 @@ fn as_(service: &Arc<MomoService<Mock>>, facility: &str, permissions: &[&str]) -
         programs: BTreeSet::new(),
         purpose: Some("PAY".into()),
         break_glass: None,
+        area: false,
     }))
 }
 

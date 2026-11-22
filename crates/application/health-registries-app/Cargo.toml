@@ -14,7 +14,9 @@ context = "registries"
 workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 health-client-registry = { workspace = true }
+health-facility-registry = { workspace = true }
 health-identifiers = { workspace = true }
 health-persistence = { workspace = true }
 health-time = { workspace = true }

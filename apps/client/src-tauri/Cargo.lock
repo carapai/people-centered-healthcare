@@ -2986,10 +2986,13 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-consent",
+ "health-facility-registry",
  "health-http",
+ "health-identifiers",
  "health-identity",
  "health-identity-app",
  "health-persistence",
+ "health-registries-app",
  "health-surrealdb",
  "health-time",
  "hkdf 0.12.4",
@@ -3253,6 +3256,16 @@ dependencies = [
  "health-time",
  "rust_decimal",
  "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "health-facility-registry"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "serde",
  "thiserror 2.0.21",
  "uuid",
 ]
@@ -3756,6 +3769,7 @@ dependencies = [
  "health-audit",
  "health-clinical-documentation-app",
  "health-configuration",
+ "health-facility-registry",
  "health-fhir-extraction",
  "health-fhir-validation",
  "health-files",
@@ -3763,6 +3777,7 @@ dependencies = [
  "health-persistence",
  "health-programs",
  "health-programs-app",
+ "health-registries-app",
  "health-surrealdb",
  "health-terminology",
  "health-time",
@@ -3780,7 +3795,9 @@ dependencies = [
 name = "health-registries-app"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "health-client-registry",
+ "health-facility-registry",
  "health-identifiers",
  "health-persistence",
  "health-time",
@@ -3821,6 +3838,7 @@ dependencies = [
  "health-coverage",
  "health-encounters",
  "health-equipment-app",
+ "health-facility-registry",
  "health-fhir-search",
  "health-financial-ledger",
  "health-identifiers",

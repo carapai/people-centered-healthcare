@@ -567,6 +567,25 @@ impl AuthStore for SurrealAuthStore {
         Ok(done)
     }
 
+    async fn place_level(
+        &self,
+        code: &str,
+    ) -> Result<Option<health_facility_registry::PlaceLevel>, StoreError> {
+        let Ok(id) =
+            health_identifiers::ResourceId::from_uuid(health_facility_registry::place_id(code))
+        else {
+            return Ok(None);
+        };
+        let organization: health_persistence::ResourceType =
+            "Organization".parse().map_err(failed)?;
+        let mut tx = self.begin().await?;
+        let stored = tx.read(&organization, id).await.map_err(failed)?;
+        Ok(stored
+            .filter(|s| !s.version.deleted)
+            .and_then(|s| serde_json::from_str::<Value>(s.json.as_str()).ok())
+            .and_then(|o| health_registries_app::places::level_of(&o)))
+    }
+
     async fn facilities(&self, account: AccountId) -> Result<Vec<String>, StoreError> {
         let mut tx = self.begin().await?;
         tx.auth_snapshot_facilities(account).await.map_err(failed)

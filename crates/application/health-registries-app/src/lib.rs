@@ -10,11 +10,15 @@
 //!   the same facility, after a preview and a person's approval. The duplicate becomes
 //!   inactive and `replaced-by` the other; no reference to it is rewritten.
 //!
+//! - [`places`]: the facility registry's places as Organizations, and applying an NHFR import
+//!   (ADR 0094).
+//!
 //! Each use case is one transaction with optimistic version checks, and every version it writes
 //! goes through the [`AuditTrail`] port in that transaction.
 
 pub mod fhir;
 pub mod matching;
+pub mod places;
 pub mod register;
 pub mod review;
 

@@ -240,6 +240,16 @@ pub trait AuthStore: Send + Sync {
         let _ = (account, facility);
         async { Ok(None) }
     }
+    /// The level of the place with `code` in the facility registry (ADR 0094), when the
+    /// registry holds it. The default holds no places, so every session is a facility's.
+    fn place_level(
+        &self,
+        code: &str,
+    ) -> impl Future<Output = Result<Option<health_facility_registry::PlaceLevel>, StoreError>> + Send
+    {
+        let _ = code;
+        async { Ok(None) }
+    }
     /// The facilities `account` holds snapshots for, sorted. The default has none.
     fn facilities(
         &self,
