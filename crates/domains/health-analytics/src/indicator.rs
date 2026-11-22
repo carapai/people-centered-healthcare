@@ -72,7 +72,10 @@ impl Scoring {
 }
 
 /// A population of a Measure (FHIR `measure-population`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum PopulationKind {
     /// Everything with care in the period that the indicator considers. A count's criteria.
     InitialPopulation,

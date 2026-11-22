@@ -176,28 +176,42 @@ impl Period {
     }
 }
 
+/// The id of the period of type `kind` that holds `date`.
+fn id_of(kind: PeriodType, date: Date) -> String {
+    match kind {
+        PeriodType::Weekly => {
+            let week = date.iso_week_date();
+            format!("{}W{:02}", week.year(), week.week())
+        }
+        PeriodType::Monthly => format!("{}-{:02}", date.year(), date.month()),
+        PeriodType::Quarterly => format!("{}Q{}", date.year(), (date.month() - 1) / 3 + 1),
+        PeriodType::SemiAnnual => format!("{}S{}", date.year(), (date.month() - 1) / 6 + 1),
+        PeriodType::Annual => date.year().to_string(),
+        PeriodType::FinancialJuly if date.month() >= 7 => format!("{}July", date.year()),
+        PeriodType::FinancialJuly => format!("{}July", date.year() - 1),
+    }
+}
+
 impl Period {
+    /// The period of type `kind` that holds `date`: where care on that date counts (#554).
+    pub fn of(kind: PeriodType, date: Date) -> Self {
+        let id = id_of(kind, date);
+        Self::parse(kind, &id).unwrap_or(Self {
+            kind,
+            id,
+            start: date,
+            end: date,
+        })
+    }
+
+    /// The period of its type just after this one.
+    pub fn next(&self) -> Option<Self> {
+        Some(Self::of(self.kind, self.end.tomorrow().ok()?))
+    }
+
     /// The period of its type just before this one, for a Report's % change (ADR 0072).
     pub fn previous(&self) -> Option<Self> {
-        let start = *self.previous_starts(1).first()?;
-        let end = self.start.yesterday().ok()?;
-        let id = match self.kind {
-            PeriodType::Weekly => {
-                let week = start.iso_week_date();
-                format!("{}W{:02}", week.year(), week.week())
-            }
-            PeriodType::Monthly => format!("{}-{:02}", start.year(), start.month()),
-            PeriodType::Quarterly => format!("{}Q{}", start.year(), (start.month() - 1) / 3 + 1),
-            PeriodType::SemiAnnual => format!("{}S{}", start.year(), (start.month() - 1) / 6 + 1),
-            PeriodType::Annual => start.year().to_string(),
-            PeriodType::FinancialJuly => format!("{}July", start.year()),
-        };
-        Some(Self {
-            kind: self.kind,
-            id,
-            start,
-            end,
-        })
+        Some(Self::of(self.kind, self.start.yesterday().ok()?))
     }
 }
 
@@ -321,6 +335,27 @@ mod tests {
                 "{id}"
             );
         }
+    }
+
+    #[test]
+    fn a_date_is_in_the_period_of_each_type_that_holds_it() {
+        for (kind, day, id) in [
+            (PeriodType::Weekly, "2026-01-01", "2026W01"),
+            (PeriodType::Weekly, "2027-01-01", "2026W53"),
+            (PeriodType::Monthly, "2026-03-31", "2026-03"),
+            (PeriodType::Quarterly, "2026-04-01", "2026Q2"),
+            (PeriodType::SemiAnnual, "2026-06-30", "2026S1"),
+            (PeriodType::Annual, "2026-12-31", "2026"),
+            (PeriodType::FinancialJuly, "2026-06-30", "2025July"),
+            (PeriodType::FinancialJuly, "2026-07-01", "2026July"),
+        ] {
+            let period = Period::of(kind, date(day));
+            assert_eq!(period, Period::parse(kind, id).expect("period"), "{day}");
+            assert!(period.contains(date(day)), "{day}");
+        }
+        let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
+        assert_eq!(march.next().expect("next").id, "2026-04");
+        assert_eq!(march.next().and_then(|p| p.previous()), Some(march));
     }
 
     #[test]

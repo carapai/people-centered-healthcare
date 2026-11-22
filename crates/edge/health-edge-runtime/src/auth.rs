@@ -381,6 +381,15 @@ pub(crate) fn routes(
         Some(blobs) => clinical.with_attachments(blobs.clone()),
         None => clinical,
     };
+    // Indicators (#554): this facility's, computed from the change log with the active
+    // packages' Measures, offline.
+    if let Some(blobs) = &blobs {
+        health_node_api::indicators::spawn_indicators(
+            clinical.store().clone(),
+            blobs.clone(),
+            facility.clone(),
+        );
+    }
     health_node_api::workflows::spawn_upkeep(workflows, clinical.store().clone(), blobs);
     // Its desktops' staff, for sign-in while the edge cannot be reached (#133).
     let desktops = DesktopAccounts {

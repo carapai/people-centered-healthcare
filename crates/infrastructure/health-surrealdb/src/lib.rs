@@ -15,6 +15,7 @@
 //! - [`search`] runs FHIR searches as record-id range scans and backfills new parameters.
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
+mod analytics;
 mod auth;
 mod blocking;
 mod change_log;

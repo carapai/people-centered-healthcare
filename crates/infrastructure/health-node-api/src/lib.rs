@@ -15,6 +15,9 @@
 //! - **Workflows** (#100): with [`Clinical::with_workflows`], **`/api/workflow`** runs the engine
 //!   over the node's store, and [`workflows::spawn_upkeep`] fires its timers, judges the
 //!   candidates other nodes send, and runs the active packages' definitions.
+//! - **Indicators** (#554): [`indicators::spawn_indicators`] computes the facility's indicators
+//!   from the node's change log, with the active packages' Measures, and keeps a summary
+//!   `MeasureReport` per indicator, period and facility.
 //! - **Search** uses the parameters central does (`health_fhir_server::search_registry`), and a
 //!   submitted form is re-validated against its Questionnaire and extracted (#103), with the
 //!   definitions central sends down.
@@ -44,6 +47,7 @@ use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use tower::ServiceExt as _;
 
+pub mod indicators;
 pub mod workflows;
 
 pub use health_fhir_server::WorkflowConfig;
