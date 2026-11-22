@@ -12,6 +12,7 @@
 
 import type { StudioArtefactChange, StudioPackageFile } from '@health/api-client'
 
+import { newIndicator } from '../indicators/indicator'
 import { isWorkflowLibrary, WORKFLOW_CONTENT_TYPE, type Action, type State, type Timer, type Value, type WorkflowDefinition } from '../workflows/model'
 
 /** A PlanDefinition as JSON. */
@@ -500,14 +501,15 @@ export function newArtefact(linked: Linked, packageVersion: string, taken: strin
     case 'ActivityDefinition':
       return { path, resource: { resourceType: 'ActivityDefinition', ...common } }
     case 'Measure':
-      return { path, resource: { resourceType: 'Measure', ...common } }
+      return { path, resource: newIndicator(common) }
   }
 }
 
-/** The editor an artefact opens in: the form designer, the Workflow Studio, or else the file
- * editor (the ActivityDefinition and Measure editors are not built yet). */
-export function editorOf(kind: string | null, path: string, workflows: Set<string>): 'forms' | 'workflows' | 'terminology' | 'programs' | 'files' {
+/** The editor an artefact opens in: the form designer, the Workflow Studio, the indicator
+ * editor, or else the file editor (the ActivityDefinition editor is not built yet). */
+export function editorOf(kind: string | null, path: string, workflows: Set<string>): 'forms' | 'workflows' | 'terminology' | 'programs' | 'indicators' | 'files' {
   if (kind === 'Questionnaire') return 'forms'
+  if (kind === 'Measure') return 'indicators'
   if (kind === 'CodeSystem' || kind === 'ValueSet') return 'terminology'
   if (kind === 'Library' && workflows.has(path)) return 'workflows'
   return 'files'

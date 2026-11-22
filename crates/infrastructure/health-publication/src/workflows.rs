@@ -107,7 +107,8 @@ pub(crate) fn problems(packed: &Packed, catalog: &[ActionDescriptor]) -> Vec<Str
 ///
 /// It runs the package's decision-table test cases too (`decision-table-test`, #516): each
 /// table decides again for the case's inputs on the FHIRPath engine, and an outcome other than
-/// the one the case keeps fails it.
+/// the one the case keeps fails it, and the package's indicator tests (`indicator-test`, #537):
+/// each indicator is evaluated again over the test patients for its test's period.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WorkflowSandbox;
 
@@ -166,6 +167,7 @@ async fn run(package: &Packed) -> Vec<String> {
                 .map(|problem| format!("{path}: {problem}")),
         );
     }
+    failed.extend(crate::indicators::run_tests(&engine, package).await);
     failed
 }
 

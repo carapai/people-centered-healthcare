@@ -2981,8 +2981,6 @@ type DesignValues = {
   dhPackagesHint: {}
   dhPackagesCount: { count: number }
   dhPackagesOpen: {}
-  dhIndicators: {}
-  dhIndicatorsHint: {}
   dhReports: {}
   dhReportsHint: {}
   dhDashboards: {}
@@ -3040,29 +3038,29 @@ export const designMessages = defineMessages<DesignValues>({
   dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
   dhSection: {
     id: 'app.studio.home.section',
-    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} other {{section}}}',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} other {{section}}}',
     description: 'Studio: a section heading',
   },
   dhSectionHint: {
     id: 'app.studio.home.sectionHint',
     defaultMessage:
-      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} other {}}',
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} other {}}',
     description: 'Studio: what a section holds',
   },
   dhCount: {
     id: 'app.studio.home.count',
     defaultMessage:
-      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} other {{count}}}',
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} other {{count}}}',
     description: 'Studio: how many designs a section holds',
   },
   dhOpen: {
     id: 'app.studio.home.open',
-    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} other {Open}}',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} other {Open}}',
     description: 'Studio home: open a section',
   },
   dhNew: {
     id: 'app.studio.home.new',
-    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} other {New}}',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} other {New}}',
     description: 'Studio: start a new design',
   },
   dhSoon: { id: 'app.studio.home.soon', defaultMessage: 'Coming soon', description: 'Studio home: a design type whose editor is not built yet' },
@@ -3071,8 +3069,6 @@ export const designMessages = defineMessages<DesignValues>({
   dhPackagesHint: { id: 'app.studio.home.packagesHint', defaultMessage: 'The packages your designs live in: check, submit, review, approve, publish and activate them.', description: 'Studio home: the packages section' },
   dhPackagesCount: { id: 'app.studio.home.packagesCount', defaultMessage: '{count, plural, =0 {No packages} one {# package} other {# packages}}', description: 'Studio home: how many packages' },
   dhPackagesOpen: { id: 'app.studio.home.packagesOpen', defaultMessage: 'Open the packages', description: 'Studio home: open the package list' },
-  dhIndicators: { id: 'app.studio.home.indicators', defaultMessage: 'Indicators', description: 'Studio home: indicators section' },
-  dhIndicatorsHint: { id: 'app.studio.home.indicatorsHint', defaultMessage: 'Counts and rates over care, tried on sample patients.', description: 'Studio home: indicators section' },
   dhReports: { id: 'app.studio.home.reports', defaultMessage: 'Reports', description: 'Studio home: reports section' },
   dhReportsHint: { id: 'app.studio.home.reportsHint', defaultMessage: 'Indicators grouped by period, with their DHIS2 mappings.', description: 'Studio home: reports section' },
   dhDashboards: { id: 'app.studio.home.dashboards', defaultMessage: 'Dashboards', description: 'Studio home: dashboards section' },
@@ -3101,7 +3097,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
   dhEmpty: {
     id: 'app.studio.design.empty',
-    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} other {Nothing yet.}}',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} other {Nothing yet.}}',
     description: 'Studio section: nothing designed yet',
   },
   dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
@@ -3109,7 +3105,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
   dhNewHeading: {
     id: 'app.studio.design.newHeading',
-    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} other {New}}',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} other {New}}',
     description: 'Studio section: the New panel heading',
   },
   dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },
@@ -3236,4 +3232,278 @@ export const ageBandMessages = defineMessages<AgeBandValues>({
   abFailed: { id: 'app.studio.ageBands.failed', defaultMessage: 'It was not saved: {reason}', description: 'Age band set editor: save failed' },
   abReadOnly: { id: 'app.studio.ageBands.readOnly', defaultMessage: 'Read only: use Edit above to change it in a draft.', description: 'Age band set editor: not editable' },
   abAuthority: { id: 'app.studio.ageBands.authority', defaultMessage: 'Check now on the draft page remains the authority.', description: 'Age band set editor: the flags are not the publication checks' },
+})
+
+// The indicator editor (#537; studio.md § Indicators): the definition, the condition trees and
+// Try over the package's test patients.
+type IndicatorValues = {
+  inSaveTest: {}
+  inTestSaved: { path: string }
+  inTestUnsaved: {}
+  inOpen: { path: string }
+  inOpenShort: {}
+  inLoading: {}
+  inUnreadable: { reason: string }
+  inReadOnly: {}
+  inProblems: { count: number }
+  inNoProblems: {}
+  inAuthority: {}
+  inNoTitle: {}
+  inNoPeriodDate: {}
+  inNoValue: {}
+  inUnpinned: { measure: string }
+  inItself: {}
+  inUnknown: { measure: string }
+  inCircle: { through: string }
+  inNoDisaggregationName: { at: number }
+  inTwice: { name: string }
+  inDefinition: {}
+  inTitle: {}
+  inDescription: {}
+  inCounts: {}
+  inCountsName: { counts: string }
+  inBasis: {}
+  inPeriodDate: {}
+  inPeriodDateHint: {}
+  inDateName: { date: string }
+  inCalculates: {}
+  inCalculation: {}
+  inCalculationName: { calculation: string }
+  inRatePer: {}
+  inPick: {}
+  inPickName: { pick: string }
+  inCumulative: {}
+  inValue: {}
+  inValueField: {}
+  inValueBetween: {}
+  inValueExpression: {}
+  inValueFrom: {}
+  inValueTo: {}
+  inValueUnit: {}
+  inUnitName: { unit: string }
+  inNumerator: {}
+  inNumeratorHint: {}
+  inCounted: {}
+  inCountedHint: {}
+  inDenominator: {}
+  inDenominatorHint: {}
+  inAddDenominator: {}
+  inRemoveDenominator: {}
+  inCompiled: {}
+  inCompiledOf: { side: string }
+  inGroup: { at: string; join: string }
+  inJoin: { at: string }
+  inJoinName: { join: string }
+  inEmptyGroup: {}
+  inAddCondition: { at: string }
+  inAddDate: { at: string }
+  inAddMember: { at: string }
+  inAddGroup: { at: string }
+  inAddRaw: { at: string }
+  inRemove: { at: string }
+  inRaw: { at: string }
+  inInput: { at: string }
+  inOperator: { at: string }
+  inKind: { at: string }
+  inKindName: { kind: string }
+  inLiteral: { at: string }
+  inMemberIsIn: {}
+  inMemberOf: {}
+  inMemberSide: { at: string }
+  inMemberMeasure: { at: string }
+  inMemberChoose: {}
+  inMemberOption: { title: string; canonical: string }
+  inSideName: { side: string }
+  inDateInput: { at: string }
+  inDateOp: { at: string }
+  inDateOpName: { op: string }
+  inAnchor: { at: string; name: string }
+  inAnchorDate: { at: string; name: string }
+  inAnchorName: { anchor: string }
+  inFrom: {}
+  inTo: {}
+  inAnd: {}
+  inAmount: { at: string }
+  inUnit: { at: string }
+  inDirection: { at: string }
+  inDirectionName: { direction: string }
+  inPeriods: { at: string }
+  inPeriodsWord: {}
+  inDisaggregations: {}
+  inDisaggregationsHint: {}
+  inNoDisaggregations: {}
+  inByAge: {}
+  inByCode: {}
+  inAgeSet: { at: number }
+  inCodedName: { at: number }
+  inCodedCriteria: { at: number }
+  inRemoveDisaggregation: { at: number }
+  inAddAge: {}
+  inAddCoded: {}
+  inSave: {}
+  inSaved: {}
+  inStale: {}
+  inReload: {}
+  inFailed: { reason: string }
+  inTry: {}
+  inTryHint: {}
+  inPeriodType: {}
+  inPeriodTypeName: { type: string }
+  inPeriod: {}
+  inPeriodExample: { type: string }
+  inTrying: {}
+  inTryFailed: { reason: string }
+  inPeriodRange: { id: string; start: string; end: string }
+  inFigure: {}
+  inValueShown: { value: string; calculation: string; per: number }
+  inParts: { count: number; denominator: number }
+  inCountShown: { count: number }
+  inValuesShown: { count: number; sum: string; minimum: string; maximum: string }
+  inByTitle: { title: string }
+  inBandColumn: {}
+  inNumeratorColumn: {}
+  inCountColumn: {}
+  inDenominatorColumn: {}
+  inValueColumn: {}
+  inErrors: {}
+  inPatients: { counted: number; total: number }
+  inPatientLine: { name: string; counted: string; count: number; denominator: string }
+  inReason: { reason: string }
+  inRecordValue: { value: string; picked: string }
+}
+
+export const indicatorMessages = defineMessages<IndicatorValues>({
+  inSaveTest: { id: 'app.studio.indicator.saveTest', defaultMessage: 'Save as test', description: 'Indicator editor: keep what Try gave in tests/' },
+  inTestSaved: { id: 'app.studio.indicator.testSaved', defaultMessage: 'Saved as {path}. Submission fails if a later edit changes these figures.', description: 'Indicator editor: the test was saved' },
+  inTestUnsaved: { id: 'app.studio.indicator.testUnsaved', defaultMessage: 'Save the indicator first: a test keeps what the saved indicator gives.', description: 'Indicator editor: why Save as test is off' },
+  inOpen: { id: 'app.studio.indicator.open', defaultMessage: 'Open in the indicator editor: {path}', description: 'Draft page: open a Measure' },
+  inOpenShort: { id: 'app.studio.indicator.openShort', defaultMessage: 'Open in the indicator editor', description: 'Draft page: open a Measure' },
+  inLoading: { id: 'app.studio.indicator.loading', defaultMessage: 'Loading the indicator…', description: 'Indicator editor' },
+  inUnreadable: { id: 'app.studio.indicator.unreadable', defaultMessage: 'This file is not an indicator the Studio can edit ({reason}). Open it in the file editor instead.', description: 'Indicator editor' },
+  inReadOnly: { id: 'app.studio.indicator.readOnly', defaultMessage: 'Read only. Press Edit to change it in your draft.', description: 'Indicator editor' },
+  inProblems: { id: 'app.studio.indicator.problems', defaultMessage: '{count, plural, one {# problem} other {# problems}}', description: 'Indicator editor' },
+  inNoProblems: { id: 'app.studio.indicator.noProblems', defaultMessage: 'No problems found while editing.', description: 'Indicator editor' },
+  inAuthority: { id: 'app.studio.indicator.authority', defaultMessage: 'Check now on the draft page remains the authority: Validation refuses the same problems.', description: 'Indicator editor' },
+  inNoTitle: { id: 'app.studio.indicator.noTitle', defaultMessage: 'The indicator has no name.', description: 'Indicator editor' },
+  inNoPeriodDate: { id: 'app.studio.indicator.noPeriodDate', defaultMessage: 'The indicator has no period date: choose the date that places care in a Report’s period.', description: 'Indicator editor' },
+  inNoValue: { id: 'app.studio.indicator.noValue', defaultMessage: 'The indicator takes a value but says none.', description: 'Indicator editor' },
+  inUnpinned: { id: 'app.studio.indicator.unpinned', defaultMessage: '{measure} is not pinned to a version.', description: 'Indicator editor' },
+  inItself: { id: 'app.studio.indicator.itself', defaultMessage: 'The indicator refers to itself.', description: 'Indicator editor' },
+  inUnknown: { id: 'app.studio.indicator.unknown', defaultMessage: '{measure} is not an indicator of this package.', description: 'Indicator editor' },
+  inCircle: { id: 'app.studio.indicator.circle', defaultMessage: 'The indicators refer to each other in a circle: this one → {through} → this one.', description: 'Indicator editor' },
+  inNoDisaggregationName: { id: 'app.studio.indicator.noDisaggregationName', defaultMessage: 'Disaggregation {at} has no name.', description: 'Indicator editor' },
+  inTwice: { id: 'app.studio.indicator.twice', defaultMessage: 'The indicator is disaggregated by {name} twice.', description: 'Indicator editor' },
+  inDefinition: { id: 'app.studio.indicator.definition', defaultMessage: 'Definition', description: 'Indicator editor' },
+  inTitle: { id: 'app.studio.indicator.title', defaultMessage: 'Name', description: 'Indicator editor' },
+  inDescription: { id: 'app.studio.indicator.description', defaultMessage: 'Description', description: 'Indicator editor' },
+  inCounts: { id: 'app.studio.indicator.counts', defaultMessage: 'What is counted', description: 'Indicator editor' },
+  inCountsName: { id: 'app.studio.indicator.countsName', defaultMessage: '{counts, select, people {People, each once} enrollments {Enrollments, each once} visits {Visits} observations {Observations} other {{counts}}}', description: 'Indicator editor' },
+  inBasis: { id: 'app.studio.indicator.basis', defaultMessage: 'Records it reads', description: 'Indicator editor' },
+  inPeriodDate: { id: 'app.studio.indicator.periodDate', defaultMessage: 'Period date', description: 'Indicator editor' },
+  inPeriodDateHint: { id: 'app.studio.indicator.periodDateHint', defaultMessage: 'The declared date that places care in a Report’s period. Required.', description: 'Indicator editor' },
+  inDateName: { id: 'app.studio.indicator.dateName', defaultMessage: '{date, select, visitStart {When the visit started} visitEnd {When the visit ended} observed {When it was observed} enrollmentStart {When the enrollment started} enrollmentEnd {When the enrollment ended} birthDate {Date of birth} nextAppointment {Next booked appointment} lastMenstrualPeriod {Last menstrual period} other {{date}}}', description: 'Indicator editor' },
+  inCalculates: { id: 'app.studio.indicator.calculates', defaultMessage: 'What it calculates', description: 'Indicator editor' },
+  inCalculation: { id: 'app.studio.indicator.calculation', defaultMessage: 'Calculation', description: 'Indicator editor' },
+  inCalculationName: { id: 'app.studio.indicator.calculationName', defaultMessage: '{calculation, select, count {Count} percentage {Percentage (× 100)} rate {Rate} ratio {Ratio} sum {Sum of a value} average {Average of a value} median {Median of a value} minimum {Minimum of a value} maximum {Maximum of a value} distinctCount {Count of distinct values} other {{calculation}}}', description: 'Indicator editor' },
+  inRatePer: { id: 'app.studio.indicator.ratePer', defaultMessage: 'Per', description: 'Indicator editor' },
+  inPick: { id: 'app.studio.indicator.pick', defaultMessage: 'Each one’s value', description: 'Indicator editor' },
+  inPickName: { id: 'app.studio.indicator.pickName', defaultMessage: '{pick, select, last {The last in the period} other {The first in the period}}', description: 'Indicator editor' },
+  inCumulative: { id: 'app.studio.indicator.cumulative', defaultMessage: 'Cumulative: count from the first record up to the end of the period', description: 'Indicator editor' },
+  inValue: { id: 'app.studio.indicator.value', defaultMessage: 'The value', description: 'Indicator editor' },
+  inValueField: { id: 'app.studio.indicator.valueField', defaultMessage: 'A field', description: 'Indicator editor' },
+  inValueBetween: { id: 'app.studio.indicator.valueBetween', defaultMessage: 'Time between two dates', description: 'Indicator editor' },
+  inValueExpression: { id: 'app.studio.indicator.valueExpression', defaultMessage: 'The value’s FHIRPath', description: 'Indicator editor' },
+  inValueFrom: { id: 'app.studio.indicator.valueFrom', defaultMessage: 'From date', description: 'Indicator editor' },
+  inValueTo: { id: 'app.studio.indicator.valueTo', defaultMessage: 'To date', description: 'Indicator editor' },
+  inValueUnit: { id: 'app.studio.indicator.valueUnit', defaultMessage: 'In', description: 'Indicator editor' },
+  inUnitName: { id: 'app.studio.indicator.unitName', defaultMessage: '{unit, select, days {days} weeks {weeks} months {months} years {years} other {{unit}}}', description: 'Indicator editor' },
+  inNumerator: { id: 'app.studio.indicator.numerator', defaultMessage: 'Numerator', description: 'Indicator editor' },
+  inNumeratorHint: { id: 'app.studio.indicator.numeratorHint', defaultMessage: 'Of those in the denominator, the ones counted.', description: 'Indicator editor' },
+  inCounted: { id: 'app.studio.indicator.counted', defaultMessage: 'Counted', description: 'Indicator editor' },
+  inCountedHint: { id: 'app.studio.indicator.countedHint', defaultMessage: 'The records with care in the period that are counted.', description: 'Indicator editor' },
+  inDenominator: { id: 'app.studio.indicator.denominator', defaultMessage: 'Denominator', description: 'Indicator editor' },
+  inDenominatorHint: { id: 'app.studio.indicator.denominatorHint', defaultMessage: 'The records with care in the period the numerator is a share of.', description: 'Indicator editor' },
+  inAddDenominator: { id: 'app.studio.indicator.addDenominator', defaultMessage: '+ Add denominator', description: 'Indicator editor' },
+  inRemoveDenominator: { id: 'app.studio.indicator.removeDenominator', defaultMessage: 'Remove denominator', description: 'Indicator editor' },
+  inCompiled: { id: 'app.studio.indicator.compiled', defaultMessage: 'Saved as FHIRPath:', description: 'Indicator editor' },
+  inCompiledOf: { id: 'app.studio.indicator.compiledOf', defaultMessage: '{side} as FHIRPath', description: 'Indicator editor' },
+  inGroup: { id: 'app.studio.indicator.group', defaultMessage: 'Group {at}: {join}', description: 'Indicator editor' },
+  inJoin: { id: 'app.studio.indicator.join', defaultMessage: 'Group {at} joins its conditions by', description: 'Indicator editor' },
+  inJoinName: { id: 'app.studio.indicator.joinName', defaultMessage: '{join, select, all {All of these} any {Any of these} not {None of these} other {{join}}}', description: 'Indicator editor' },
+  inEmptyGroup: { id: 'app.studio.indicator.emptyGroup', defaultMessage: 'Everyone: no condition yet.', description: 'Indicator editor' },
+  inAddCondition: { id: 'app.studio.indicator.addCondition', defaultMessage: '+ condition', description: 'Indicator editor' },
+  inAddDate: { id: 'app.studio.indicator.addDate', defaultMessage: '+ date', description: 'Indicator editor' },
+  inAddMember: { id: 'app.studio.indicator.addMember', defaultMessage: '+ in another indicator', description: 'Indicator editor' },
+  inAddGroup: { id: 'app.studio.indicator.addGroup', defaultMessage: '+ group', description: 'Indicator editor' },
+  inAddRaw: { id: 'app.studio.indicator.addRaw', defaultMessage: '+ FHIRPath', description: 'Indicator editor' },
+  inRemove: { id: 'app.studio.indicator.remove', defaultMessage: 'Remove what is at {at}', description: 'Indicator editor' },
+  inRaw: { id: 'app.studio.indicator.raw', defaultMessage: 'FHIRPath at {at}', description: 'Indicator editor' },
+  inInput: { id: 'app.studio.indicator.input', defaultMessage: 'Field at {at}', description: 'Indicator editor' },
+  inOperator: { id: 'app.studio.indicator.operator', defaultMessage: 'Comparison at {at}', description: 'Indicator editor' },
+  inKind: { id: 'app.studio.indicator.kind', defaultMessage: 'Kind of value at {at}', description: 'Indicator editor' },
+  inKindName: { id: 'app.studio.indicator.kindName', defaultMessage: '{kind, select, boolean {yes/no} number {number} code {code} other {{kind}}}', description: 'Indicator editor' },
+  inLiteral: { id: 'app.studio.indicator.literal', defaultMessage: 'Value at {at}', description: 'Indicator editor' },
+  inMemberIsIn: { id: 'app.studio.indicator.memberIsIn', defaultMessage: 'is in', description: 'Indicator editor' },
+  inMemberOf: { id: 'app.studio.indicator.memberOf', defaultMessage: 'of', description: 'Indicator editor' },
+  inMemberSide: { id: 'app.studio.indicator.memberSide', defaultMessage: 'Side at {at}', description: 'Indicator editor' },
+  inMemberMeasure: { id: 'app.studio.indicator.memberMeasure', defaultMessage: 'Indicator at {at}', description: 'Indicator editor' },
+  inMemberChoose: { id: 'app.studio.indicator.memberChoose', defaultMessage: 'Choose an indicator', description: 'Indicator editor' },
+  inMemberOption: { id: 'app.studio.indicator.memberOption', defaultMessage: '{title} ({canonical})', description: 'Indicator editor' },
+  inSideName: { id: 'app.studio.indicator.sideName', defaultMessage: '{side, select, numerator {the numerator} denominator {the denominator} other {{side}}}', description: 'Indicator editor' },
+  inDateInput: { id: 'app.studio.indicator.dateInput', defaultMessage: 'Date at {at}', description: 'Indicator editor' },
+  inDateOp: { id: 'app.studio.indicator.dateOp', defaultMessage: 'Date condition at {at}', description: 'Indicator editor' },
+  inDateOpName: { id: 'app.studio.indicator.dateOpName', defaultMessage: '{op, select, inPeriod {is in the reporting period} on {is on} before {is before} after {is after} between {is between} within {is within} previous {is in the previous} empty {is empty} notEmpty {is not empty} other {{op}}}', description: 'Indicator editor' },
+  inAnchor: { id: 'app.studio.indicator.anchor', defaultMessage: 'Date {name} at {at}', description: 'Indicator editor' },
+  inAnchorDate: { id: 'app.studio.indicator.anchorDate', defaultMessage: 'Fixed date {name} at {at}', description: 'Indicator editor' },
+  inAnchorName: { id: 'app.studio.indicator.anchorName', defaultMessage: '{anchor, select, periodStart {the period’s start} periodEnd {the period’s end} other {a fixed date}}', description: 'Indicator editor' },
+  inFrom: { id: 'app.studio.indicator.from', defaultMessage: 'from', description: 'Indicator editor' },
+  inTo: { id: 'app.studio.indicator.to', defaultMessage: 'to', description: 'Indicator editor' },
+  inAnd: { id: 'app.studio.indicator.and', defaultMessage: 'and', description: 'Indicator editor' },
+  inAmount: { id: 'app.studio.indicator.amount', defaultMessage: 'How many at {at}', description: 'Indicator editor' },
+  inUnit: { id: 'app.studio.indicator.unit', defaultMessage: 'Unit at {at}', description: 'Indicator editor' },
+  inDirection: { id: 'app.studio.indicator.direction', defaultMessage: 'Before or after at {at}', description: 'Indicator editor' },
+  inDirectionName: { id: 'app.studio.indicator.directionName', defaultMessage: '{direction, select, before {before} other {after}}', description: 'Indicator editor' },
+  inPeriods: { id: 'app.studio.indicator.periods', defaultMessage: 'How many periods at {at}', description: 'Indicator editor' },
+  inPeriodsWord: { id: 'app.studio.indicator.periodsWord', defaultMessage: 'periods', description: 'Indicator editor' },
+  inDisaggregations: { id: 'app.studio.indicator.disaggregations', defaultMessage: 'Disaggregations', description: 'Indicator editor' },
+  inDisaggregationsHint: { id: 'app.studio.indicator.disaggregationsHint', defaultMessage: 'Each has a not recorded band, so the bands always add up to the total.', description: 'Indicator editor' },
+  inNoDisaggregations: { id: 'app.studio.indicator.noDisaggregations', defaultMessage: 'Not disaggregated.', description: 'Indicator editor' },
+  inByAge: { id: 'app.studio.indicator.byAge', defaultMessage: 'By age:', description: 'Indicator editor' },
+  inByCode: { id: 'app.studio.indicator.byCode', defaultMessage: 'By a coded value:', description: 'Indicator editor' },
+  inAgeSet: { id: 'app.studio.indicator.ageSet', defaultMessage: 'Age band set of disaggregation {at}', description: 'Indicator editor' },
+  inCodedName: { id: 'app.studio.indicator.codedName', defaultMessage: 'Name of disaggregation {at}', description: 'Indicator editor' },
+  inCodedCriteria: { id: 'app.studio.indicator.codedCriteria', defaultMessage: 'FHIRPath giving the code of disaggregation {at}', description: 'Indicator editor' },
+  inRemoveDisaggregation: { id: 'app.studio.indicator.removeDisaggregation', defaultMessage: 'Remove disaggregation {at}', description: 'Indicator editor' },
+  inAddAge: { id: 'app.studio.indicator.addAge', defaultMessage: '+ age bands', description: 'Indicator editor' },
+  inAddCoded: { id: 'app.studio.indicator.addCoded', defaultMessage: '+ coded value', description: 'Indicator editor' },
+  inSave: { id: 'app.studio.indicator.save', defaultMessage: 'Save', description: 'Indicator editor' },
+  inSaved: { id: 'app.studio.indicator.saved', defaultMessage: 'Saved.', description: 'Indicator editor' },
+  inStale: { id: 'app.studio.indicator.stale', defaultMessage: 'Someone saved this draft since you opened it, so nothing was saved. Reload to see their changes.', description: 'Indicator editor' },
+  inReload: { id: 'app.studio.indicator.reload', defaultMessage: 'Reload', description: 'Indicator editor' },
+  inFailed: { id: 'app.studio.indicator.failed', defaultMessage: 'It was not saved: {reason}', description: 'Indicator editor' },
+  inTry: { id: 'app.studio.indicator.try', defaultMessage: 'Try', description: 'Indicator editor' },
+  inTryHint: { id: 'app.studio.indicator.tryHint', defaultMessage: 'Central evaluates this definition, unsaved edits included, over the package’s test patients.', description: 'Indicator editor' },
+  inPeriodType: { id: 'app.studio.indicator.periodType', defaultMessage: 'Period type', description: 'Indicator editor' },
+  inPeriodTypeName: { id: 'app.studio.indicator.periodTypeName', defaultMessage: '{type, select, weekly {Weekly} monthly {Monthly} quarterly {Quarterly} semiAnnual {Six-monthly} annual {Yearly} financialJuly {Financial year from July} other {{type}}}', description: 'Indicator editor' },
+  inPeriod: { id: 'app.studio.indicator.period', defaultMessage: 'Period', description: 'Indicator editor' },
+  inPeriodExample: { id: 'app.studio.indicator.periodExample', defaultMessage: '{type, select, weekly {e.g. 2026W10} monthly {e.g. 2026-03} quarterly {e.g. 2026Q1} semiAnnual {e.g. 2026S1} annual {e.g. 2026} financialJuly {e.g. 2025July} other {}}', description: 'Indicator editor' },
+  inTrying: { id: 'app.studio.indicator.trying', defaultMessage: 'Trying…', description: 'Indicator editor' },
+  inTryFailed: { id: 'app.studio.indicator.tryFailed', defaultMessage: 'It could not be tried: {reason}', description: 'Indicator editor' },
+  inPeriodRange: { id: 'app.studio.indicator.periodRange', defaultMessage: '{id}: {start} to {end}', description: 'Indicator editor' },
+  inFigure: { id: 'app.studio.indicator.figure', defaultMessage: 'The figure', description: 'Indicator editor' },
+  inValueShown: { id: 'app.studio.indicator.valueShown', defaultMessage: '{calculation, select, percentage {{value}%} rate {{value} per {per}} other {{value}}}', description: 'Indicator editor' },
+  inParts: { id: 'app.studio.indicator.parts', defaultMessage: 'Numerator {count} of denominator {denominator}', description: 'Indicator editor' },
+  inCountShown: { id: 'app.studio.indicator.countShown', defaultMessage: '{count} counted', description: 'Indicator editor' },
+  inValuesShown: { id: 'app.studio.indicator.valuesShown', defaultMessage: '{count} values: sum {sum}, from {minimum} to {maximum}', description: 'Indicator editor' },
+  inByTitle: { id: 'app.studio.indicator.byTitle', defaultMessage: 'By {title}', description: 'Indicator editor' },
+  inBandColumn: { id: 'app.studio.indicator.bandColumn', defaultMessage: 'Band', description: 'Indicator editor' },
+  inNumeratorColumn: { id: 'app.studio.indicator.numeratorColumn', defaultMessage: 'Numerator', description: 'Indicator editor' },
+  inCountColumn: { id: 'app.studio.indicator.countColumn', defaultMessage: 'Count', description: 'Indicator editor' },
+  inDenominatorColumn: { id: 'app.studio.indicator.denominatorColumn', defaultMessage: 'Denominator', description: 'Indicator editor' },
+  inValueColumn: { id: 'app.studio.indicator.valueColumn', defaultMessage: 'Value', description: 'Indicator editor' },
+  inErrors: { id: 'app.studio.indicator.errors', defaultMessage: 'Errors', description: 'Indicator editor' },
+  inPatients: { id: 'app.studio.indicator.patients', defaultMessage: 'Test patients: {counted} of {total} counted', description: 'Indicator editor' },
+  inPatientLine: { id: 'app.studio.indicator.patientLine', defaultMessage: '{name}: {counted, select, true {counted {count}} other {not counted}}{denominator, select, none {} other { · denominator {denominator}}}', description: 'Indicator editor' },
+  inReason: { id: 'app.studio.indicator.reason', defaultMessage: '{reason, select, meets {counted} denominatorOnly {in the denominator only} doesNotMeet {does not meet the conditions} noEnrollment {belongs to no enrollment} outsidePeriod {outside the period} noPeriodDate {has no period date} error {could not be evaluated} other {{reason}}}', description: 'Indicator editor' },
+  inRecordValue: { id: 'app.studio.indicator.recordValue', defaultMessage: 'value {value}{picked, select, true { (taken)} other {}}', description: 'Indicator editor' },
 })

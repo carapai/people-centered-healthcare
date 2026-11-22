@@ -220,6 +220,11 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
     }
   }
 }
+// The ANC reference package (#548–#552; packages/reference-packages/anc), drafted by the author:
+// its indicators, disaggregated by the national core's ANC age bands published above, and its test
+// patients, which the indicator editor's Try evaluates (#537).
+const anc = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/anc'), '--by', author], { env, stdio: 'inherit' })
+if (anc.status !== 0) throw new Error('drafting the ANC reference package failed')
 if (seedPatients > 0) {
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)

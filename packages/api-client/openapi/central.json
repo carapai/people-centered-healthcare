@@ -3749,7 +3749,8 @@
           "code-system",
           "value-set",
           "program",
-          "age-band-set"
+          "age-band-set",
+          "indicator"
         ]
       },
       "StudioDesignPackage": {

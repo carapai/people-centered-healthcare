@@ -24,7 +24,7 @@ Layer: **infrastructure**. Central's publication lifecycle for Published Definit
      - **`WorkflowSandbox`** (#101) runs every `tests/` JSON file of type `workflow-scenario` against the package's definition it names, on the same interpreter, with stubbed actions and guards (`health_workflow::simulation`).
      - It also runs every `tests/` file of type `decision-table-test` (#516): the table it names decides again for the case's inputs on the FHIRPath engine (`decisions`), and an outcome other than the one kept fails it.
      - **Failures:** every scenario and test case must pass, and one naming a definition the package does not hold fails.
-     - **Other cases:** indicator cases are not run yet.
+     - It also runs every `tests/` file of type `indicator-test` (#537), which the indicator editor's *Save as test* writes: the indicator it names (`url|version`) is evaluated again for the test's period over the package's test patients (`indicators::run_tests`, on `health-analytics-app`), and a count, denominator or value other than the one kept fails it. Disaggregations are not compared.
      - **`NoSandbox`** runs none, for tests of the other steps.
 
   A failure returns the draft to Draft, with every problem in its record.

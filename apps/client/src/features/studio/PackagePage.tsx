@@ -4,7 +4,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { programMessages as pm, studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
+import { indicatorMessages as im, programMessages as pm, studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
 import { StudioError, actionInput, addComment, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
@@ -114,6 +114,12 @@ function Draft({ id, draft }: { id: string; draft: StudioPackagePage }) {
                   <>
                     {' · '}
                     <ProgramLink id={id} path={change.path} />
+                  </>
+                ) : null}
+                {change.resourceType === 'Measure' && change.change !== 'removed' ? (
+                  <>
+                    {' · '}
+                    <IndicatorLink id={id} path={change.path} />
                   </>
                 ) : null}
                 {change.elements.length === 0 ? null : (
@@ -244,7 +250,9 @@ function ArtefactLink({ id, draft, workflows, path }: { id: string; draft: Studi
           ? ('/studio/$id/workflows/$' as const)
           : isProgram(draft, file.resourceType)
             ? ('/studio/$id/programs/$' as const)
-            : ('/studio/$id/files/$' as const)
+            : file.resourceType === 'Measure'
+              ? ('/studio/$id/indicators/$' as const)
+              : ('/studio/$id/files/$' as const)
   return (
     <>
       <Link to={to} params={{ id, _splat: path }}>
@@ -349,6 +357,16 @@ function ProgramLink({ id, path }: { id: string; path: string }) {
   return (
     <Link to="/studio/$id/programs/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(pm.pdOpen, { path })}>
       {intl.formatMessage(pm.pdOpenShort)}
+    </Link>
+  )
+}
+
+/** Opens a Measure in the indicator editor (#537). */
+function IndicatorLink({ id, path }: { id: string; path: string }) {
+  const intl = useIntl()
+  return (
+    <Link to="/studio/$id/indicators/$" params={{ id, _splat: path }} aria-label={intl.formatMessage(im.inOpen, { path })}>
+      {intl.formatMessage(im.inOpenShort)}
     </Link>
   )
 }
@@ -488,6 +506,12 @@ function Files({ id, draft, workflows }: { id: string; draft: StudioPackagePage;
               <>
                 {' · '}
                 <ProgramLink id={id} path={file.path} />
+              </>
+            ) : null}
+            {file.resourceType === 'Measure' ? (
+              <>
+                {' · '}
+                <IndicatorLink id={id} path={file.path} />
               </>
             ) : null}
           </li>

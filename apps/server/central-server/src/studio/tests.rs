@@ -2079,6 +2079,45 @@ async fn try_calculates_a_percentage_and_a_median_with_what_roll_up_needs() {
     );
 }
 
+/// The indicator editor's acceptance (#537): *ANC 1st visit before 12 weeks* built as the
+/// editor writes it (`apps/client/test/indicator-editor.test.ts`), a numerator GA < 12 over a
+/// denominator *is in ANC 1st visits' numerator* and *none of these: age < 10*, counts as the
+/// reference indicator does.
+#[tokio::test]
+async fn an_indicator_built_in_the_editor_counts_as_the_reference_one() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+    let mut built: Value =
+        serde_json::from_slice(&files["Measure-anc-first-visit-before-12-weeks.json"])
+            .expect("measure");
+    let ga = "%records.entry.resource.ofType(Observation).where(encounter.reference = 'Encounter/' + %resource.id and code.coding.where(system = 'http://loinc.org' and code = '18185-9').exists()).value.value";
+    built["group"][0]["population"][1]["criteria"]["expression"] = json!(
+        "'https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0' in %indicators.numerator and ((%patient.birthDate.toDate() >= %periodEnd.toDate() - 120 months and %patient.birthDate.toDate() < %periodEnd.toDate())).not()"
+    );
+    built["group"][0]["population"][2]["criteria"]["expression"] = json!(format!("{ga} < 12"));
+    let mut counts = Vec::new();
+    for measure in [
+        built,
+        serde_json::from_slice(&files["Measure-anc-first-visit-before-12-weeks.json"])
+            .expect("measure"),
+    ] {
+        let input = json!({ "measure": measure, "periodType": "quarterly", "period": "2026Q1" });
+        let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+        assert_eq!(status, 200, "{body}");
+        assert_eq!(body["errors"], json!([]), "{body}");
+        counts.push((
+            body["value"].clone(),
+            body["count"].clone(),
+            body["denominator"].clone(),
+        ));
+    }
+    assert_eq!(counts[0], counts[1]);
+    assert!(counts[0].2.as_u64().is_some_and(|d| d > 0), "{counts:?}");
+}
+
 #[tokio::test]
 async fn try_gives_the_figure_per_band_and_each_records_band() {
     let (publications, _dir) = publications().await;

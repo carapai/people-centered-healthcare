@@ -163,8 +163,8 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
     assert_eq!(kinds, [(DesignKind::Form, first)]);
     assert_eq!(designs.designs[0].title, "anc-visit");
 
-    // A draft of the next version, with an Age Band Set, a workflow and its decision table and a ValueSet: they
-    // are read from the draft, which is its holder's.
+    // A draft of the next version, with an Age Band Set, a workflow and its decision table, an
+    // indicator and a ValueSet: they are read from the draft, which is its holder's.
     let mut files = package("ug.moh.anc", "1.1.0", "program", "1.0.0", items());
     let (path, bytes) = workflow("1.1.0");
     files.insert(path, bytes);
@@ -189,6 +189,25 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
                 // {"unit":"years","ageAt":"period-end","bands":[{"from":10}]}
                 "data": "eyJ1bml0IjoieWVhcnMiLCJhZ2VBdCI6InBlcmlvZC1lbmQiLCJiYW5kcyI6W3siZnJvbSI6MTB9XX0="
             }]
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    files.insert(
+        "Measure-anc-visits.json".into(),
+        json!({
+            "resourceType": "Measure", "id": "anc-visits", "title": "ANC visits",
+            "url": "http://health.go.ug/fhir/Measure/anc-visits", "version": "1.1.0",
+            "status": "active", "basis": "Encounter",
+            "scoring": {"coding": [{"code": "cohort"}]},
+            "extension": [{
+                "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-period-date",
+                "valueExpression": {"language": "text/fhirpath", "expression": "Encounter.actualPeriod.start"}
+            }],
+            "group": [{"population": [{
+                "code": {"coding": [{"code": "initial-population"}]},
+                "criteria": {"language": "text/fhirpath", "expression": "true"}
+            }]}]
         })
         .to_string()
         .into_bytes(),
@@ -221,6 +240,7 @@ async fn designs_are_read_from_the_open_draft_else_the_latest_published_version(
             (DesignKind::AgeBandSet, "ANC age bands", None, second),
             (DesignKind::Workflow, "ANC visit", None, second),
             (DesignKind::DecisionTable, "risk", Some("risk"), second),
+            (DesignKind::Indicator, "ANC visits", None, second),
             (DesignKind::Form, "anc-visit", None, second),
             (DesignKind::ValueSet, "ANC visit type", None, second),
         ]
