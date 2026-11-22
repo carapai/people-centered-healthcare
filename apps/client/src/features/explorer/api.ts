@@ -26,6 +26,24 @@ export interface ExplorerIndicator {
   rollsUp: boolean
   /** Its threshold bands (a legend set), lowest first; none when it has none (#600). */
   thresholds: ThresholdBand[]
+  /** What it is broken down by (#601): by an Age Band Set's bands or by a coded value's. */
+  disaggregations: ExplorerDisaggregation[]
+}
+
+/** A disaggregation an indicator offers, by its name. */
+export interface ExplorerDisaggregation {
+  name: string
+  by: 'age' | 'code'
+}
+
+/** The band every disaggregation has for a counted thing with no value (`health_analytics::NOT_RECORDED`). */
+export const NOT_RECORDED = 'not-recorded'
+
+/** The disaggregations every one of `indicators` offers, by name, in the first one's order: what the figures may be split by. */
+export function sharedDisaggregations(explorer: Explorer, indicators: readonly string[]): ExplorerDisaggregation[] {
+  const offered = indicators.map((m) => explorer.indicators.find((i) => i.measure === m)?.disaggregations ?? [])
+  const [first, ...rest] = offered
+  return (first ?? []).filter((d) => rest.every((other) => other.some((o) => o.name === d.name)))
 }
 
 /** How a figure in a threshold band reads. */
@@ -63,6 +81,8 @@ export interface Question {
   from: string
   to: string
   places: string[]
+  /** The disaggregation each figure is split by (#601), one every indicator offers; none for totals only. */
+  disaggregation?: string
 }
 
 /** A facility that has not reported for a period: missing, never zero. */
@@ -86,6 +106,15 @@ export interface Cell {
   expected?: number
   missing?: MissingFacility[]
   computedAt?: string | null
+  /** Split by the question's disaggregation: each band's figure, in the summary's order (#601). */
+  bands?: BandFigure[]
+}
+
+/** One band's figure: recomputed at central from the band's own summed parts, never an average. */
+export interface BandFigure {
+  code: string
+  /** Exact decimal text; null when the band's denominator is zero. */
+  value: string | null
 }
 
 /** The explorer's answer (`POST /api/analytics/explore`). */
@@ -121,7 +150,7 @@ export function explorerQuery(transport: Transport) {
       const response = await transport.request({ method: 'GET', path: '/analytics/explorer', ...(signal === undefined ? {} : { signal }) })
       if (response.status !== 200 || typeof response.body !== 'object' || response.body === null) throw new ExplorerError(response.status, detailOf(response.body))
       const explorer = response.body as Explorer
-      return { ...explorer, indicators: explorer.indicators.map((i) => ({ ...i, per: i.per === null ? null : Number(i.per), thresholds: i.thresholds ?? [] })) }
+      return { ...explorer, indicators: explorer.indicators.map((i) => ({ ...i, per: i.per === null ? null : Number(i.per), thresholds: i.thresholds ?? [], disaggregations: i.disaggregations ?? [] })) }
     },
   }
 }
@@ -213,6 +242,9 @@ export type VisualizationType = 'column' | 'line' | 'table' | 'single'
 /** How a table lays out its figures. */
 export type TableLayout = 'placesByIndicators' | 'indicatorsByPeriods'
 
+/** What a chart's series are (#601): the indicators, the places, or the bands of the question's disaggregation. */
+export type SeriesBy = 'indicator' | 'place' | 'band'
+
 /**
  * What a Visualization shows: the question asked and how its answer is drawn. Switching the type
  * keeps the question; a saved Visualization (#602) is this with a title.
@@ -221,12 +253,15 @@ export interface Visualization {
   type: VisualizationType
   question: Question
   layout: TableLayout
+  series: SeriesBy
 }
 
-/** One series of a chart: an indicator at a place. */
+/** One series of a chart: an indicator at a place, or one band of it. */
 export interface Series {
   indicator: string
   place: string
+  /** The disaggregation band, when the series are bands. */
+  band: string | null
   label: string
   /** By period, in the answer's order; null where there is no figure. */
   values: (number | null)[]
@@ -302,10 +337,10 @@ export interface Table {
 
 /**
  * The figures of `answer` as a table: places down the side and indicators across (each period's
- * own column when there is more than one), or each indicator at each place down the side and the
- * periods across.
+ * own column when there is more than one), or the chart's series (`by`, #601) down the side and
+ * the periods across.
  */
-export function tableOf(answer: Answer, explorer: Explorer, question: Question, layout: TableLayout): Table {
+export function tableOf(answer: Answer, explorer: Explorer, question: Question, layout: TableLayout, by: SeriesBy = 'indicator', bandName: (code: string) => string = (c) => c): Table {
   const { title, placeName, bands } = namer(explorer)
   const cell = (indicator: string, period: string, place: string): TableCell => {
     const value = figureOf(answer, indicator, period, place)
@@ -321,28 +356,76 @@ export function tableOf(answer: Answer, explorer: Explorer, question: Question, 
   }
   return {
     columns: periods.map((period) => ({ key: period, label: period })),
-    rows: question.indicators.flatMap((indicator) =>
-      question.places.map((place) => ({
-        key: `${indicator} ${place}`,
-        label: question.places.length > 1 ? `${title(indicator)}, ${placeName(place)}` : title(indicator),
-        cells: periods.map((period) => cell(indicator, period, place)),
-      })),
-    ),
+    rows: chartSeries(answer, explorer, question, by, bandName).map((s) => ({
+      key: `${s.indicator} ${s.place} ${s.band ?? ''}`,
+      label: s.label,
+      cells: s.values.map((value) => ({ indicator: s.indicator, value, tone: toneOf(s.thresholds, value) })),
+    })),
   }
 }
 
-/** The chart's series: each indicator at each place, the periods along the axis. */
-export function chartSeries(answer: Answer, explorer: Explorer, question: Question): Series[] {
+/** The band codes `answer` has for `indicator`, in the order the summaries give them, *not recorded* last. */
+export function bandsOf(answer: Answer, indicator: string): string[] {
+  const codes: string[] = []
+  for (const cell of answer.cells) {
+    if (cell.indicator !== indicator) continue
+    for (const band of cell.bands ?? []) if (!codes.includes(band.code)) codes.push(band.code)
+  }
+  return [...codes.filter((c) => c !== NOT_RECORDED), ...codes.filter((c) => c === NOT_RECORDED)]
+}
+
+/** A band's figure in `answer` for an indicator, period and place, as a number; null where there is none. */
+function bandFigureOf(answer: Answer, indicator: string, period: string, place: string, band: string): number | null {
+  const cell = answer.cells.find((c) => c.indicator === indicator && c.place === place && c.period === period)
+  const value = cell?.bands?.find((b) => b.code === band)?.value
+  return value == null ? null : Number(value)
+}
+
+/**
+ * The chart's series, the periods along the axis (#601): by indicator, each indicator at each
+ * place; by place, each place for each indicator, named by the place; by band, each band of the
+ * question's disaggregation for each indicator at each place, named by the band. A label names
+ * the other dimensions only when the question has more than one of them. `bandName` names a band
+ * (*not recorded* is the page's to translate).
+ */
+export function chartSeries(answer: Answer, explorer: Explorer, question: Question, by: SeriesBy = 'indicator', bandName: (code: string) => string = (c) => c): Series[] {
   const { title, placeName, bands } = namer(explorer)
+  const manyIndicators = question.indicators.length > 1
+  const manyPlaces = question.places.length > 1
   const series: Series[] = []
   for (const indicator of question.indicators) {
     for (const place of question.places) {
+      const thresholds = bands(indicator)
+      if (by === 'band' && question.disaggregation !== undefined) {
+        for (const band of bandsOf(answer, indicator)) {
+          const values = answer.periods.map((period) => bandFigureOf(answer, indicator, period.id, place, band))
+          const label = [bandName(band), ...(manyIndicators ? [title(indicator)] : []), ...(manyPlaces ? [placeName(place)] : [])].join(', ')
+          series.push({ indicator, place, band, label, values, thresholds })
+        }
+        continue
+      }
       const values = answer.periods.map((period) => figureOf(answer, indicator, period.id, place))
-      const label = question.places.length > 1 ? `${title(indicator)}, ${placeName(place)}` : title(indicator)
-      series.push({ indicator, place, label, values, thresholds: bands(indicator) })
+      const label = by === 'place' ? (manyIndicators ? `${placeName(place)}, ${title(indicator)}` : placeName(place)) : manyPlaces ? `${title(indicator)}, ${placeName(place)}` : title(indicator)
+      series.push({ indicator, place, band: null, label, values, thresholds })
     }
   }
   return series
+}
+
+/**
+ * `shown` with a question the explorer can answer (#601): the disaggregation is dropped once an
+ * indicator picked does not offer it, and band series need one.
+ */
+export function fitted(explorer: Explorer, shown: Visualization): Visualization {
+  const { disaggregation, ...rest } = shown.question
+  const kept = disaggregation !== undefined && sharedDisaggregations(explorer, rest.indicators).some((d) => d.name === disaggregation)
+  return { ...shown, question: kept ? { ...rest, disaggregation } : rest, series: !kept && shown.series === 'band' ? 'indicator' : shown.series }
+}
+
+/** The places directly under `place` in the session's area: what *each area under my place* picks. */
+export function childAreas(explorer: Explorer): string[] {
+  const root = explorer.place?.code
+  return root === undefined ? [] : explorer.places.filter((p) => p.parent === root).map((p) => p.code)
 }
 
 /** The newest time any figure in `answer` was computed. */

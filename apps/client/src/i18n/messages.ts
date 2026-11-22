@@ -755,6 +755,15 @@ type ExplorerValues = {
   exBandFrom: { from: string }
   exBandBetween: { from: string; to: string }
   exBandEvery: {}
+  exDisaggregation: {}
+  exNoDisaggregation: {}
+  exSeriesBy: {}
+  exSeriesBy_indicator: {}
+  exSeriesBy_place: {}
+  exSeriesBy_band: {}
+  exNotRecorded: {}
+  exChildAreas: { place: string }
+  exBandHeader: {}
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -822,6 +831,15 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   exBandFrom: { id: 'app.explorer.band.from', defaultMessage: '{from} and above', description: 'Data explorer: a band with no upper bound' },
   exBandBetween: { id: 'app.explorer.band.between', defaultMessage: '{from} to under {to}', description: 'Data explorer: a band from one figure up to another' },
   exBandEvery: { id: 'app.explorer.band.every', defaultMessage: 'every figure', description: 'Data explorer: a band with no bounds' },
+  exDisaggregation: { id: 'app.explorer.disaggregation', defaultMessage: 'Disaggregation', description: 'Data explorer: what the figures are split by' },
+  exNoDisaggregation: { id: 'app.explorer.noDisaggregation', defaultMessage: 'None (totals only)', description: 'Data explorer: the figures are not split' },
+  exSeriesBy: { id: 'app.explorer.seriesBy', defaultMessage: 'Series', description: 'Data explorer: what each series of a chart is' },
+  exSeriesBy_indicator: { id: 'app.explorer.seriesBy.indicator', defaultMessage: 'Indicators', description: 'Data explorer: a series per indicator' },
+  exSeriesBy_place: { id: 'app.explorer.seriesBy.place', defaultMessage: 'Places', description: 'Data explorer: a series per place' },
+  exSeriesBy_band: { id: 'app.explorer.seriesBy.band', defaultMessage: 'Bands', description: 'Data explorer: a series per disaggregation band' },
+  exNotRecorded: { id: 'app.explorer.notRecorded', defaultMessage: 'Not recorded', description: 'Data explorer: the band of everything with no value for the disaggregation' },
+  exChildAreas: { id: 'app.explorer.childAreas', defaultMessage: 'Each area under {place}', description: 'Data explorer: pick every place directly under the user’s place' },
+  exBandHeader: { id: 'app.explorer.bandHeader', defaultMessage: 'Band', description: 'Data explorer: the table row header when the rows are disaggregation bands' },
 })
 
 type AccessValues = {

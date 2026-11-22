@@ -189,7 +189,7 @@ async fn explore_route(
     Json(json!({
         "where": "central",
         "periods": periods_json(&question.periods),
-        "cells": cells_json(&cells, &names),
+        "cells": cells_json(&cells, &names, question.disaggregation.as_deref()),
     }))
     .into_response()
 }

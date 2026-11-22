@@ -1,7 +1,7 @@
 // Sample indicator summaries for a local backend (#599): central-server receives them at startup
 // (HEALTH_DEV_INDICATOR_SUMMARIES) as if the facilities' edges had synced them, since a local
 // backend has no edges computing indicators. They are summary MeasureReports of the sample
-// indicators (e2e/fixtures/indicators; malaria test positivity's for #600), written as health-analytics-app's `report` writes them,
+// indicators (e2e/fixtures/indicators; malaria test positivity's for #600; ANC 1st visits by age band for #601), written as health-analytics-app's `report` writes them,
 // for KAM013, KAM020 and WAK001; KAM031 never syncs, so it shows as missing in Kampala.
 
 const MEASURES = 'https://health.go.ug/fhir/Measure/'
@@ -108,6 +108,18 @@ function positiveOutOf20(facility: string, period: Period, today: Date): number 
   return 3 + (figure(facility, period, 0) % 7)
 }
 
+/** The ANC age bands (the national core's age-bands-anc), then the band of a woman with no birth date. */
+const AGE_BANDS = ['10-14', '15-19', '20-24', '25+', 'not-recorded']
+/** Roughly how a facility's first visits fall across them, in twentieths. */
+const AGE_SHARES = [1, 5, 7, 6]
+
+/** `visits` split across the ANC age bands, adding up to `visits` (#601): one stratum per band. */
+function byAgeBand(visits: number): object[] {
+  const counts = AGE_SHARES.map((share) => Math.floor((visits * share) / 20))
+  counts.push(visits - counts.reduce((a, b) => a + b, 0))
+  return AGE_BANDS.map((code, i) => ({ value: { text: code }, population: [population('initial-population', counts[i] ?? 0)], measureScoreQuantity: { value: counts[i] ?? 0 } }))
+}
+
 /** Every sample summary, as `health_sync_protocol::IndicatorSummary` JSON, up to `today`. */
 export function sampleSummaries(today: Date): object[] {
   const periods = [...recent('weekly', today, 16), ...recent('monthly', today, 12), ...recent('quarterly', today, 6), ...recent('financialJuly', today, 3)]
@@ -122,7 +134,7 @@ export function sampleSummaries(today: Date): object[] {
       const visits = figure(facility, period, scale)
       const early = Math.round(visits * (0.3 + (visits % 5) / 20))
       const weeks = 14 + (visits % 9)
-      out.push(report(FIRST_VISITS, period, facility, { population: [population('initial-population', visits)], measureScoreQuantity: { value: visits } }, computed))
+      out.push(report(FIRST_VISITS, period, facility, { population: [population('initial-population', visits)], measureScoreQuantity: { value: visits }, stratifier: [{ code: { text: 'Age band' }, stratum: byAgeBand(visits) }] }, computed))
       out.push(
         report(BEFORE_12_WEEKS, period, facility, { population: [population('numerator', early), population('denominator', visits)], measureScoreQuantity: { value: Math.round((early * 10_000) / visits) / 100 } }, computed),
       )

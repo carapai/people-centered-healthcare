@@ -77,3 +77,39 @@ test('switching chart type keeps the selection, a single number shows its change
   await expect(legend).toBeVisible()
   await noViolations(page)
 })
+
+// #601: disaggregation and series. The sample ANC 1st visits are split by MoH's ANC age bands
+// at every facility (e2e/summaries.ts), and Kampala's bands are rolled up from their summed parts.
+test('ANC 1st visits by age band show a series per band, and series by place compare the areas under Kampala', async ({ page }) => {
+  await signIn(page, USERS.district)
+  await press(page, 'Data explorer', 'link')
+  const pickers = page.getByRole('form', { name: 'What to show' })
+  const card = page.getByRole('article', { name: 'Visualization' })
+  const visits = 'ANC 1st visits (sample)'
+  await pickers.getByRole('checkbox', { name: 'ANC 1st visit before 12 weeks (sample)' }).uncheck()
+  await pickers.getByRole('checkbox', { name: visits }).check()
+  const series = pickers.getByRole('group', { name: 'Series' })
+  // No disaggregation picked: no band series.
+  await expect(series.getByRole('button', { name: 'Bands' })).toBeDisabled()
+  await pickers.getByRole('combobox', { name: 'Disaggregation' }).selectOption('Age band')
+  await expect(series.getByRole('button', { name: 'Bands' })).toHaveAttribute('aria-pressed', 'true')
+  const key = card.locator('figcaption')
+  await expect(key).toContainText('15-19')
+  await expect(key).toContainText('25+')
+  await expect(key).toContainText('Not recorded')
+  const table = card.getByRole('table', { name: 'Figures' })
+  await expect(table.getByRole('rowheader')).toHaveText(['10-14', '15-19', '20-24', '25+', 'Not recorded'])
+  await noViolations(page)
+
+  // A median has no age bands: picking it drops the disaggregation.
+  await pickers.getByRole('checkbox', { name: 'Median gestational age at ANC 1st visit (sample)' }).check()
+  await expect(pickers.getByRole('combobox', { name: 'Disaggregation' })).toHaveValue('')
+  await pickers.getByRole('checkbox', { name: 'Median gestational age at ANC 1st visit (sample)' }).uncheck()
+
+  // Series by place: Kampala's facilities over the months, each its own series.
+  await pickers.getByRole('button', { name: 'Each area under Kampala' }).click()
+  await series.getByRole('button', { name: 'Places' }).click()
+  await expect(pickers.getByRole('checkbox', { name: 'Kampala' })).not.toBeChecked()
+  await expect(table.getByRole('rowheader')).toHaveText(['Kisenyi HC IV', 'Kawempe HC III', 'Kitebi HC III'])
+  await noViolations(page)
+})

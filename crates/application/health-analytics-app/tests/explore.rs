@@ -6,8 +6,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use health_analytics::{
-    Aggregate, Calculation, Counts, Indicator, IndicatorStore as _, Period, PeriodType,
-    StoredSummary, Summary, Values,
+    Aggregate, Band, Calculation, Counts, Disaggregated, Disaggregation, DisaggregationSource,
+    Indicator, IndicatorStore as _, NOT_RECORDED, Period, PeriodType, StoredSummary, Summary,
+    Values,
 };
 use health_analytics_app::explore::{
     ExplorePlace, Figure, OwnSummaries, cells_json, explore, indicator_json,
@@ -165,7 +166,7 @@ async fn a_district_s_months_count_its_reported_facilities_and_list_the_missing_
     assert_eq!(rolled.completeness(), (2, 3));
     assert_eq!(rolled.missing[0].facility, "KAM031");
     let names = BTreeMap::from([("KAM031".to_owned(), "Kitebi HC III".to_owned())]);
-    let json = cells_json(&cells, &names);
+    let json = cells_json(&cells, &names, None);
     assert_eq!(json[0]["value"], "10");
     assert_eq!(json[0]["reported"], 2);
     assert_eq!(json[0]["expected"], 3);
@@ -194,7 +195,7 @@ async fn a_facility_s_median_shows_at_facility_level() {
     )
     .await
     .expect("explored");
-    assert_eq!(cells_json(&cells, &BTreeMap::new())[0]["value"], "14");
+    assert_eq!(cells_json(&cells, &BTreeMap::new(), None)[0]["value"], "14");
 }
 
 #[tokio::test]
@@ -222,7 +223,7 @@ async fn an_edge_explores_its_own_months_offline() {
     )
     .await
     .expect("explored");
-    let json = cells_json(&cells, &BTreeMap::new());
+    let json = cells_json(&cells, &BTreeMap::new(), None);
     assert_eq!(json[0]["value"], "5");
     assert_eq!(json[0]["computedAt"], "2026-04-01T06:00:00Z");
     // Nothing counted in April: the facility computed it, so it is zero, not missing.
@@ -332,5 +333,231 @@ fn an_indicator_s_threshold_bands_reach_the_explorer() {
     assert_eq!(
         indicator_json(&visits())["thresholds"],
         serde_json::json!([])
+    );
+}
+
+const AGE: &str = "age";
+
+/// ANC 1st visits by age band.
+fn visits_by_age() -> Indicator {
+    let mut indicator = visits();
+    indicator.disaggregations = vec![Disaggregation {
+        name: AGE.into(),
+        source: DisaggregationSource::AgeBands("https://x/AgeBandSet/anc|1.0.0".into()),
+    }];
+    indicator
+}
+
+/// Positivity by age band.
+fn positivity_by_age() -> Indicator {
+    let mut indicator = indicator("positivity", Calculation::Percentage);
+    indicator.disaggregations = visits_by_age().disaggregations;
+    indicator
+}
+
+/// A summary with its parts per age band, each `(code, count, denominator)`.
+fn by_age(indicator: &Indicator, bands: &[(&str, u64, Option<u64>)]) -> Summary {
+    let part = |count: u64, denominator: Option<u64>| {
+        let mut part = Summary::roll_up(
+            indicator.calculation,
+            &[Summary {
+                calculation: indicator.calculation,
+                value: None,
+                count,
+                denominator,
+                values: None,
+                disaggregations: Vec::new(),
+            }],
+        )
+        .expect("a part");
+        part.disaggregations.clear();
+        part
+    };
+    let mut whole = part(
+        bands.iter().map(|b| b.1).sum(),
+        denominator_sum(bands.iter().map(|b| b.2)),
+    );
+    whole.disaggregations = vec![Disaggregated {
+        name: AGE.into(),
+        bands: bands
+            .iter()
+            .map(|(code, count, denominator)| Band {
+                code: (*code).into(),
+                summary: part(*count, *denominator),
+            })
+            .collect(),
+    }];
+    whole
+}
+
+fn denominator_sum(parts: impl Iterator<Item = Option<u64>>) -> Option<u64> {
+    parts.sum()
+}
+
+fn stored_summary(
+    indicator: &Indicator,
+    period: &Period,
+    facility: &str,
+    summary: &Summary,
+) -> StoredSummary {
+    StoredSummary {
+        measure: indicator.canonical(),
+        period: period.clone(),
+        facility: facility.into(),
+        report: measure_report(
+            &indicator.canonical(),
+            period,
+            facility,
+            summary,
+            "2026-04-01T06:00:00Z",
+        )
+        .to_string(),
+    }
+}
+
+/// #601: ANC 1st visits by age band show one series per band, each summed over the district.
+#[tokio::test]
+async fn anc_first_visits_by_age_band_give_one_figure_per_band() {
+    let central = store().await;
+    let march = month("2026-03");
+    let anc = visits_by_age();
+    synced(
+        &central,
+        "KAM013",
+        &[stored_summary(
+            &anc,
+            &march,
+            "KAM013",
+            &by_age(&anc, &[("15-19", 1, None), ("20-24", 3, None)]),
+        )],
+    )
+    .await;
+    synced(
+        &central,
+        "KAM020",
+        &[stored_summary(
+            &anc,
+            &march,
+            "KAM020",
+            &by_age(
+                &anc,
+                &[
+                    ("15-19", 2, None),
+                    ("20-24", 1, None),
+                    (NOT_RECORDED, 1, None),
+                ],
+            ),
+        )],
+    )
+    .await;
+    let mut tx = central.begin().await.expect("begin");
+    let cells = explore(
+        &mut tx,
+        &[anc],
+        &[march],
+        &[place("district-kampala", &["KAM013", "KAM020"])],
+    )
+    .await
+    .expect("explored");
+    drop(tx);
+    let json = cells_json(&cells, &BTreeMap::new(), Some(AGE));
+    assert_eq!(json[0]["value"], "8");
+    assert_eq!(
+        json[0]["bands"],
+        serde_json::json!([
+            { "code": "15-19", "value": "3" },
+            { "code": "20-24", "value": "4" },
+            { "code": NOT_RECORDED, "value": "1" },
+        ])
+    );
+    // Not split, no bands.
+    assert!(
+        cells_json(&cells, &BTreeMap::new(), None)[0]
+            .get("bands")
+            .is_none()
+    );
+}
+
+/// #601: a band's percentage over a district is its summed numerators over its summed
+/// denominators, never the average of the facilities' percentages.
+#[tokio::test]
+async fn a_band_s_percentage_rolls_up_from_summed_parts_never_averaged() {
+    let central = store().await;
+    let march = month("2026-03");
+    let positivity = positivity_by_age();
+    // In 15-19, 1 of 2 (50%) at KAM013 and 9 of 10 (90%) at KAM020: 10 of 12, not 70%.
+    synced(
+        &central,
+        "KAM013",
+        &[stored_summary(
+            &positivity,
+            &march,
+            "KAM013",
+            &by_age(&positivity, &[("15-19", 1, Some(2))]),
+        )],
+    )
+    .await;
+    synced(
+        &central,
+        "KAM020",
+        &[stored_summary(
+            &positivity,
+            &march,
+            "KAM020",
+            &by_age(&positivity, &[("15-19", 9, Some(10))]),
+        )],
+    )
+    .await;
+    let mut tx = central.begin().await.expect("begin");
+    let cells = explore(
+        &mut tx,
+        &[positivity],
+        &[march],
+        &[place("district-kampala", &["KAM013", "KAM020"])],
+    )
+    .await
+    .expect("explored");
+    drop(tx);
+    let json = cells_json(&cells, &BTreeMap::new(), Some(AGE));
+    assert_eq!(json[0]["bands"][0]["value"], "83.33");
+}
+
+#[test]
+fn a_question_splits_by_a_disaggregation_every_indicator_has() {
+    use health_analytics_app::explore::read_question;
+    use serde_json::json;
+    let offered = [visits_by_age(), weeks()];
+    let ask = |indicators: Vec<String>, by: serde_json::Value| {
+        read_question(
+            &json!({
+                "indicators": indicators,
+                "periodType": "monthly", "from": "2026-01", "to": "2026-03",
+                "places": ["district-kampala"],
+                "disaggregation": by,
+            }),
+            &offered,
+        )
+    };
+    let question = ask(vec![visits_by_age().canonical()], json!(AGE)).expect("question");
+    assert_eq!(question.disaggregation.as_deref(), Some(AGE));
+    assert_eq!(
+        ask(vec![visits_by_age().canonical()], json!(null))
+            .expect("question")
+            .disaggregation,
+        None
+    );
+    // The median is not broken down by age, and a disaggregation is named by text.
+    assert!(
+        ask(
+            vec![visits_by_age().canonical(), weeks().canonical()],
+            json!(AGE)
+        )
+        .is_err()
+    );
+    assert!(ask(vec![visits_by_age().canonical()], json!("sex")).is_err());
+    assert!(ask(vec![visits_by_age().canonical()], json!(3)).is_err());
+    assert_eq!(
+        indicator_json(&visits_by_age())["disaggregations"],
+        json!([{ "name": AGE, "by": "age" }])
     );
 }
