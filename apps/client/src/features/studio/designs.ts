@@ -3,6 +3,7 @@ import type { StudioDesign, StudioDesignKind, StudioDesignPackage, StudioDesigns
 import type { Transport } from '../../platform/types'
 import { StudioError, studioKey } from './api'
 import { newAgeBandSet } from './indicators/ageBands'
+import { newIndicator } from './indicators/indicator'
 import { newArtefact } from './programs/model'
 import { addTable } from './workflows/decisions'
 import { readDefinition, writeDefinition } from './workflows/model'
@@ -37,7 +38,7 @@ export function designsQuery(transport: Transport) {
 export const icu = (id: string) => id.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
 
 /** The Studio's sections: what a person designs. */
-export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands'
+export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands' | 'indicators'
 
 /** Each section and the kinds of design it lists, in the order the home shows them. */
 export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKind[]; creates: boolean }[] = [
@@ -47,6 +48,7 @@ export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKin
   { id: 'decision-tables', kinds: ['decision-table'], creates: true },
   { id: 'programs', kinds: ['program'], creates: false },
   { id: 'age-bands', kinds: ['age-band-set'], creates: true },
+  { id: 'indicators', kinds: ['indicator'], creates: true },
 ]
 
 export const sectionOf = (id: SectionId) => sections.find((s) => s.id === id) ?? sections[0]!
@@ -105,6 +107,8 @@ export function editorOf(design: Pick<StudioDesign, 'kind' | 'path' | 'table'>, 
       return { to: '/studio/$id/programs/$', params: { id, _splat: design.path } } as const
     case 'age-band-set':
       return { to: '/studio/$id/age-bands/$', params: { id, _splat: design.path } } as const
+    case 'indicator':
+      return { to: '/studio/$id/indicators/$', params: { id, _splat: design.path } } as const
   }
 }
 
@@ -151,16 +155,15 @@ export function slug(title: string): string {
   )
 }
 
-/** What *New* creates, for a section: a form, a workflow, a code system, a value set or an Age
- * Band Set. A
- * decision table goes into a workflow instead ([`withNewTable`]). */
-export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set'
+/** What *New* creates, for a section: a form, a workflow, a code system, a value set, an Age
+ * Band Set or an indicator. A decision table goes into a workflow instead ([`withNewTable`]). */
+export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set' | 'indicator'
 
 /** A new, empty design of `kind` titled `title`, at a top-level path the package does not use
  * yet, its url under the package's canonical base and its version the package's. */
 export function newDesign(kind: NewKind, title: string, canonical: string, packageVersion: string, taken: readonly string[]): { path: string; resource: Record<string, unknown> } {
   const id = slug(title)
-  const type = { form: 'Questionnaire', workflow: 'Library', 'code-system': 'CodeSystem', 'value-set': 'ValueSet', 'age-band-set': 'Library' }[kind]
+  const type = { form: 'Questionnaire', workflow: 'Library', 'code-system': 'CodeSystem', 'value-set': 'ValueSet', 'age-band-set': 'Library', indicator: 'Measure' }[kind]
   const url = `${canonical.replace(/\/+$/, '')}/${type}/${id}`
   if (kind === 'form' || kind === 'workflow') {
     const made = newArtefact({ kind: kind === 'form' ? 'Questionnaire' : 'Library', canonical: url, url, pinned: null, where: 'missing', path: null, version: null }, packageVersion, [...taken])
@@ -175,6 +178,7 @@ export function newDesign(kind: NewKind, title: string, canonical: string, packa
     .join('')
   const common = { id, url, version: packageVersion, name: /^[A-Za-z]/.test(name) ? name : `X${name}`, title: title.trim(), status: 'draft' }
   if (kind === 'age-band-set') return { path, resource: newAgeBandSet(common) }
+  if (kind === 'indicator') return { path, resource: newIndicator(common) }
   return kind === 'code-system'
     ? { path, resource: { resourceType: 'CodeSystem', ...common, content: 'complete', concept: [] } }
     : { path, resource: { resourceType: 'ValueSet', ...common, compose: { include: [] } } }

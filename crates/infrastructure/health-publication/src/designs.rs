@@ -39,6 +39,8 @@ pub enum DesignKind {
     Program,
     /// An Age Band Set Library, in the age band table (#551).
     AgeBandSet,
+    /// An indicator's Measure, in the indicator editor (#537).
+    Indicator,
 }
 
 /// One designed artefact, in the package version it opens in.
@@ -160,6 +162,7 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
             "CodeSystem" => DesignKind::CodeSystem,
             "ValueSet" => DesignKind::ValueSet,
             "PlanDefinition" => DesignKind::Program,
+            "Measure" => DesignKind::Indicator,
             "Library" if workflows.iter().any(|(p, _)| p == path) => DesignKind::Workflow,
             "Library" => DesignKind::AgeBandSet,
             _ => continue,

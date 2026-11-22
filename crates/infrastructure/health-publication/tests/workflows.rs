@@ -428,3 +428,76 @@ async fn a_sandbox_run_saved_as_a_scenario_passes_submission_unchanged() {
     let (stage, failures) = simulated(&publications, &files, "ug.moh.opd@1.0.0").await;
     assert_eq!((stage, failures), (Stage::Review, Vec::new()));
 }
+
+/// The ANC reference package at `version` (packages/reference-packages/anc), its tests and the
+/// national core's ANC age bands it pins.
+fn anc(version: &str) -> Files {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages");
+    let mut files = Files::new();
+    for sub in ["", "tests"] {
+        for entry in std::fs::read_dir(root.join("anc").join(sub)).expect("dir") {
+            let path = entry.expect("entry").path();
+            if path.is_file() {
+                let name = path
+                    .file_name()
+                    .expect("name")
+                    .to_string_lossy()
+                    .into_owned();
+                let key = if sub.is_empty() {
+                    name
+                } else {
+                    format!("{sub}/{name}")
+                };
+                files.insert(key, std::fs::read(&path).expect("read"));
+            }
+        }
+    }
+    files.insert(
+        "Library-age-bands-anc.json".into(),
+        std::fs::read(root.join("core/Library-age-bands-anc.json")).expect("read"),
+    );
+    for name in ["package.json", "Library-manifest.json"] {
+        let mut value: Value = serde_json::from_slice(&files[name]).expect("json");
+        value["version"] = json!(version);
+        files.insert(name.into(), value.to_string().into_bytes());
+    }
+    files
+}
+
+#[tokio::test]
+async fn a_saved_indicator_test_fails_submission_when_a_later_edit_changes_its_counts() {
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    // The indicator editor's *Save as test* (#537) keeps what Try gave for March: 3 of 4.
+    let path = "tests/indicator-anc-first-visit-before-12-weeks-2026-03.json";
+    let test = json!({
+        "type": "indicator-test", "name": "ANC 1st visit before 12 weeks, 2026-03",
+        "measure": "https://health.go.ug/fhir/Measure/anc-first-visit-before-12-weeks|1.0.0",
+        "periodType": "monthly", "period": "2026-03",
+        "expect": { "count": 3, "denominator": 4, "value": "75" }
+    })
+    .to_string()
+    .into_bytes();
+    let mut passing = anc("1.0.0");
+    passing.insert(path.into(), test.clone());
+    let (stage, failures) = simulated(&publications, &passing, "ug.moh.anc@1.0.0").await;
+    assert_eq!((stage, failures), (Stage::Review, Vec::new()));
+
+    // A later edit lowers the numerator's gestational age to under 9 weeks: the counts change.
+    let mut edited = anc("1.0.1");
+    let file = "Measure-anc-first-visit-before-12-weeks.json";
+    let mut measure: Value = serde_json::from_slice(&edited[file]).expect("measure");
+    let numerator = &mut measure["group"][0]["population"][2]["criteria"]["expression"];
+    *numerator = json!(numerator.as_str().expect("text").replace("< 12", "< 9"));
+    edited.insert(file.into(), measure.to_string().into_bytes());
+    edited.insert(path.into(), test);
+    let (stage, failures) = simulated(&publications, &edited, "ug.moh.anc@1.0.1").await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].starts_with(&format!(
+            "{path}: ANC 1st visit before 12 weeks, 2026-03: https://health.go.ug/fhir/Measure/anc-first-visit-before-12-weeks|1.0.0 for 2026-03 expected 75 (count 3, denominator 4), got "
+        )),
+        "{failures:?}"
+    );
+}

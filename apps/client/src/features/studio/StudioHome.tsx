@@ -36,6 +36,8 @@ function SectionLink({ section, isNew, children }: { section: SectionId; isNew?:
       return <Link to="/studio/programs" search={search}>{children}</Link>
     case 'age-bands':
       return <Link to="/studio/age-bands" search={search}>{children}</Link>
+    case 'indicators':
+      return <Link to="/studio/indicators" search={search}>{children}</Link>
   }
 }
 
@@ -43,7 +45,7 @@ export { SectionLink }
 
 /**
  * The Studio's home (studio.md § The Studio home; #855): what a person designs, one card per
- * kind with how many there are, *Open* and *New*. Indicators, reports and dashboards are shown,
+ * kind with how many there are, *Open* and *New*. Reports and dashboards are shown,
  * marked coming soon, until their editors exist. The packages, for checking, review, approval and
  * publication, are one more card.
  */
@@ -86,7 +88,6 @@ export function StudioHome() {
           })}
           {(
             [
-              [dm.dhIndicators, dm.dhIndicatorsHint],
               [dm.dhReports, dm.dhReportsHint],
               [dm.dhDashboards, dm.dhDashboardsHint],
             ] as const

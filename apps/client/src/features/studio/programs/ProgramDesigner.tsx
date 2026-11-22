@@ -173,7 +173,7 @@ function Designer({ id, path, draft, plan, onReload }: LoadedProps & { plan: Pla
     },
     onSuccess: async ({ next, path: made, kind }) => {
       await settle(next)
-      const editor = kind === 'Questionnaire' ? '/studio/$id/forms/$' : kind === 'Library' ? '/studio/$id/workflows/$' : '/studio/$id/files/$'
+      const editor = kind === 'Questionnaire' ? '/studio/$id/forms/$' : kind === 'Library' ? '/studio/$id/workflows/$' : kind === 'Measure' ? '/studio/$id/indicators/$' : '/studio/$id/files/$'
       await navigate({ to: editor, params: { id, _splat: made } })
     },
   })
@@ -499,6 +499,12 @@ function EditorLink({ id, kind, path, workflows, label, children }: { id: string
     case 'terminology':
       return (
         <Link to="/studio/$id/terminology/$" params={{ id, _splat: path }} aria-label={label}>
+          {text}
+        </Link>
+      )
+    case 'indicators':
+      return (
+        <Link to="/studio/$id/indicators/$" params={{ id, _splat: path }} aria-label={label}>
           {text}
         </Link>
       )

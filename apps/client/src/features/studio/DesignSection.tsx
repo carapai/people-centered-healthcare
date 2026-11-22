@@ -56,6 +56,8 @@ export function useOpenDesign() {
         return navigate({ to: target.to, params: target.params })
       case '/studio/$id/age-bands/$':
         return navigate({ to: target.to, params: target.params })
+      case '/studio/$id/indicators/$':
+        return navigate({ to: target.to, params: target.params })
     }
   }
 }
@@ -201,7 +203,7 @@ function NewDesign({ section, designs, onCancel }: { section: SectionId; designs
   const choices = packageChoices(designs).filter((c) => !tables || workflows.some((w) => w.package === c.name))
   const [chosen, setChosen] = useState<string>(choices[0]?.name ?? (tables ? '' : '*new'))
   const [title, setTitle] = useState('')
-  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : 'form')
+  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : section === 'indicators' ? 'indicator' : 'form')
   const [blank, setBlank] = useState({ name: '', title: '', kind: 'program' as StudioPackageKind, canonical: '' })
   const inPackage = useMemo(() => workflows.filter((w) => w.package === chosen), [workflows, chosen])
   const [workflow, setWorkflow] = useState('')

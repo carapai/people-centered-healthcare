@@ -205,10 +205,10 @@ describe('Create', () => {
     expect('definition' in opened ? (opened.definition as WorkflowDefinition) : opened).toMatchObject({ url: `${B}/Library/art-care`, version: '2.0.0', statechart: { states: [{ id: 'start', kind: 'final' }] } })
   })
 
-  test('a missing Measure opens in the file editor', () => {
+  test('a missing Measure is created as a count and opens in the indicator editor', () => {
     const made = newArtefact(missing(`${B}/Measure/art-tracing`, 'Measure'), '1.0.0', [])
-    expect(made.resource).toMatchObject({ resourceType: 'Measure', name: 'ArtTracing' })
-    expect(editorOf('Measure', made.path, new Set())).toBe('files')
+    expect(made.resource).toMatchObject({ resourceType: 'Measure', name: 'ArtTracing', scoring: { coding: [{ code: 'cohort' }] }, basis: 'Encounter' })
+    expect(editorOf('Measure', made.path, new Set())).toBe('indicators')
   })
 })
 

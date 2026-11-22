@@ -19,7 +19,8 @@ test('the Studio home shows the design sections, and Forms lists the OPD form', 
   await press(page, 'Studio', 'link')
   for (const section of ['Forms', 'Workflows', 'Concepts & value sets', 'Decision tables', 'Age band sets', 'Indicators', 'Reports', 'Dashboards', 'Packages'])
     await expect(page.getByRole('heading', { name: section, level: 2, exact: true })).toBeVisible()
-  await expect(page.getByRole('article', { name: 'Indicators' }).getByText('Coming soon')).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Reports' }).getByText('Coming soon')).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Indicators' }).getByText(/\d+ indicators?/)).toBeVisible()
   await expect(page.getByRole('article', { name: 'Forms' }).getByText(/\d+ forms?/)).toBeVisible()
   await noViolations(page)
 
