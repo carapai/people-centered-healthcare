@@ -53,6 +53,9 @@ pub struct Subject {
     pub purpose: Option<PurposeOfUse>,
     /// An active break-glass grant, if any.
     pub break_glass: Option<BreakGlass>,
+    /// Whether the session acts for an area (a district, region or the national place) rather
+    /// than a facility (ADR 0094): it never reads patient-level records.
+    pub area: bool,
 }
 
 /// One access to decide.
@@ -97,6 +100,9 @@ pub enum Deny {
     /// Sensitive records need a declared purpose of use.
     #[error("access to sensitive records needs a purpose of use")]
     PurposeRequired,
+    /// A session acting for an area reads no patient-level records (ADR 0094).
+    #[error("a session for a district, region or the country reads no patient-level records")]
+    AreaSession,
 }
 
 /// The answer.
@@ -172,6 +178,11 @@ impl Pdp {
 
     /// Decides one access at `now`.
     pub fn decide(&self, subject: &Subject, access: &Access<'_>, now: Timestamp) -> Decision {
+        // An area session never reads patient-level records, whatever its roles; break-glass is
+        // for one patient at a facility, so it does not open them either.
+        if subject.area && crate::area::is_patient_level(access.resource_type) {
+            return Decision::Deny(Deny::AreaSession);
+        }
         if !subject
             .permissions
             .allows(access.resource_type, access.interaction)
@@ -226,6 +237,9 @@ impl Pdp {
         patient: Option<&str>,
         now: Timestamp,
     ) -> Result<SearchFilter, Deny> {
+        if subject.area && crate::area::is_patient_level(resource_type) {
+            return Err(Deny::AreaSession);
+        }
         if !subject
             .permissions
             .allows(resource_type, Interaction::Search)

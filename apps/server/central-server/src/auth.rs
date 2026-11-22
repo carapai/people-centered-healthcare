@@ -392,6 +392,23 @@ pub(crate) fn routes(
                 )),
             );
         }
+        // The facility registry's places (#869): the session's area, and the NHFR import.
+        api = api.nest(
+            "/places",
+            crate::places::router(
+                fhir_store.clone(),
+                settings
+                    .files
+                    .as_ref()
+                    .map(|blobs| publications(fhir_store.clone(), blobs.clone())),
+                Auditor::new("central", sensitive(policy)),
+            )
+            .layer(axum::middleware::from_fn(signed_in))
+            .layer(axum::middleware::from_fn_with_state(
+                subjects.clone(),
+                subject_layer,
+            )),
+        );
         let Routes {
             fhir,
             reviews,
@@ -1033,6 +1050,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/pharmacy/{*rest}", service.clone())
         .route_service("/api/laboratory/{*rest}", service.clone())
         .route_service("/api/studio/{*rest}", service.clone())
+        .route_service("/api/places/{*rest}", service.clone())
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
         .route_service("/api/care-plans/{*rest}", service.clone())
@@ -1608,6 +1626,180 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     }
 
+    /// ADR 0094 (#869): a user with a role at a district signs in for it, their token says so,
+    /// their area lists the district's facilities, and they read no patient-level records even
+    /// though their role maps to `Patient.rs`; a facility session is as before.
+    #[tokio::test]
+    async fn a_district_session_has_an_area_and_reads_no_patients() {
+        use health_facility_registry::{
+            AdministrativeAreas, Area, District, parse_nhfr_csv, plan_import,
+        };
+
+        struct NoAudit;
+        impl health_registries_app::AuditTrail<health_surrealdb::SurrealTx> for NoAudit {
+            async fn written(
+                &self,
+                _tx: &mut health_surrealdb::SurrealTx,
+                _actor: &str,
+                _reason: &str,
+                _json: &health_persistence::RawJson,
+            ) -> Result<(), health_persistence::WriteError> {
+                Ok(())
+            }
+            async fn recorded(
+                &self,
+                _tx: &mut health_surrealdb::SurrealTx,
+                _actor: &str,
+                _reason: &str,
+                _what: &str,
+            ) -> Result<(), health_persistence::WriteError> {
+                Ok(())
+            }
+        }
+
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "central".into(),
+            database: "places".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock));
+        let areas = AdministrativeAreas {
+            national: Some("Ministry of Health".into()),
+            regions: vec![Area {
+                code: "region-central".into(),
+                name: "Central".into(),
+            }],
+            districts: vec![
+                District {
+                    code: "district-kampala".into(),
+                    name: "Kampala".into(),
+                    region: "region-central".into(),
+                },
+                District {
+                    code: "district-wakiso".into(),
+                    name: "Wakiso".into(),
+                    region: "region-central".into(),
+                },
+            ],
+        };
+        let rows = parse_nhfr_csv(
+            "nhfr_id,name,district,status\n\
+             KAM013,Kisenyi HC IV,district-kampala,open\n\
+             KAM020,Kawempe HC III,district-kampala,open\n\
+             WAK001,Wakiso HC IV,district-wakiso,open\n",
+        )
+        .expect("rows");
+        let plan =
+            plan_import(&health_facility_registry::Places::default(), &areas, &rows).expect("plan");
+        health_registries_app::places::apply_import(&store, &NoAudit, "test", &plan)
+            .await
+            .expect("import");
+
+        let key = [6u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": { "district": ["Patient.rs", "Organization.rs"], "clinician": ["Patient.crs"] },
+            "labels": [],
+        }))
+        .expect("policy");
+        provision_at(
+            &connection,
+            &key,
+            &policy,
+            "okot",
+            &["district"],
+            "district-kampala",
+        )
+        .await;
+        provision(&connection, &key, &policy, "nakato", &["clinician"]).await;
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+        let claims = |bearer: &str| -> serde_json::Value {
+            let payload = bearer
+                .rsplit(' ')
+                .next()
+                .and_then(|t| t.split('.').nth(1))
+                .expect("payload");
+            serde_json::from_slice(
+                &base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload)
+                    .expect("base64"),
+            )
+            .expect("claims")
+        };
+
+        let district = sign_in(&app, "okot").await;
+        assert_eq!(claims(&district)["facility"], "district-kampala");
+        assert_eq!(claims(&district)["place-level"], "district");
+        let (status, body, _) =
+            send(&app, authorized("GET", "/api/places/area", &district, None)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let area: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(area["level"], "district");
+        assert_eq!(area["place"]["name"], "Kampala");
+        assert_eq!(area["facilities"], serde_json::json!(["KAM013", "KAM020"]));
+        let (status, body, _) =
+            send(&app, authorized("GET", "/api/session", &district, None)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(body.contains("\"place_level\":\"district\""), "{body}");
+        // Patient-level reads and searches are refused, whatever the role maps to.
+        for path in ["/fhir/Patient", "/fhir/Observation"] {
+            let (status, body, _) = send(&app, authorized("GET", path, &district, None)).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{path}: {body}");
+        }
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "GET",
+                "/fhir/Patient/018f0000-0000-7000-8000-000000000000",
+                &district,
+                None,
+            ),
+        )
+        .await;
+        assert!(
+            matches!(status, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND),
+            "{status}: {body}"
+        );
+        // The registry stays open to it.
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/fhir/Organization", &district, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // Importing needs places.manage.
+        let (status, _, _) = send(
+            &app,
+            authorized("POST", "/api/places/nhfr/preview", &district, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        // A facility session is as before: `place-level` says facility, and patients are read.
+        let clinician = sign_in(&app, "nakato").await;
+        assert_eq!(claims(&clinician)["facility"], "KAM013");
+        assert_eq!(claims(&clinician)["place-level"], "facility");
+        let (status, body, _) =
+            send(&app, authorized("GET", "/fhir/Patient", &clinician, None)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/places/area", &clinician, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let area: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(area["level"], "facility");
+        assert_eq!(area["facilities"], serde_json::json!(["KAM013"]));
+    }
+
     /// Provisions `username` at KAM013 with `roles`, as the workforce registry will.
     async fn provision(
         connection: &Connection,
@@ -1615,6 +1807,18 @@ mod tests {
         policy: &AccessPolicy,
         username: &str,
         roles: &[&str],
+    ) {
+        provision_at(connection, key, policy, username, roles, "KAM013").await;
+    }
+
+    /// Provisions `username` with `roles` held at the place `place` (ADR 0094).
+    async fn provision_at(
+        connection: &Connection,
+        key: &[u8; 32],
+        policy: &AccessPolicy,
+        username: &str,
+        roles: &[&str],
+        place: &str,
     ) {
         use health_auth::SnapshotSigner;
         use health_identity::snapshot::{PermissionSnapshot, RoleAssignment};
@@ -1640,7 +1844,7 @@ mod tests {
         let issued = health_time::Timestamp::now();
         let snapshot = PermissionSnapshot {
             account,
-            facility: "KAM013".into(),
+            facility: place.into(),
             roles: roles
                 .iter()
                 .map(|r| RoleAssignment {
@@ -1658,7 +1862,7 @@ mod tests {
             .sign(&snapshot, &policy.roles)
             .expect("sign");
         store
-            .put_snapshot(account, "KAM013", &jws)
+            .put_snapshot(account, place, &jws)
             .await
             .expect("snapshot");
     }

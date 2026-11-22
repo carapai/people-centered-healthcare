@@ -8,10 +8,13 @@
 //!   matching program assignment, and the access must declare a purpose of use.
 //! - **Break-glass:** one patient, one hour, a `BTG` reason and free text; it opens sensitive and
 //!   other-facility records of that patient only, and every use is reported for audit.
+//! - **Areas** (ADR 0094): a session acting for a district, region or the national place never
+//!   reads or searches patient-level records ([`is_patient_level`]).
 //!
 //! [`Pdp::decide`] answers one access; [`Pdp::search_filter`] gives what a search must exclude,
 //! so restricted records are filtered inside the database query.
 
+mod area;
 mod break_glass;
 mod decision;
 mod facility;
@@ -19,6 +22,7 @@ mod patient;
 mod permission;
 mod purpose;
 
+pub use area::{PATIENT_COMPARTMENT_TYPES, is_patient_level};
 pub use break_glass::{
     BREAK_GLASS_PERMISSION, BTG, BreakGlass, BreakGlassEvent, BreakGlassPolicy, BreakGlassRefused,
 };

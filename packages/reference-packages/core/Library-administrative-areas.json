@@ -1,0 +1,24 @@
+{
+  "resourceType": "Library",
+  "id": "administrative-areas",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/administrative-areas",
+  "version": "1.0.0",
+  "name": "AdministrativeAreas",
+  "title": "Uganda's regions and districts",
+  "description": "The regions and districts the facility registry places facilities in (ADR 0094): the NHFR import links each facility to its district by code. A sample of the country's districts; boundaries are not shipped yet.",
+  "type": {
+    "coding": [
+      {
+        "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+        "code": "administrative-areas"
+      }
+    ]
+  },
+  "content": [
+    {
+      "contentType": "application/vnd.health.administrative-areas+json",
+      "data": "ewogICJuYXRpb25hbCI6ICJNaW5pc3RyeSBvZiBIZWFsdGgiLAogICJyZWdpb25zIjogWwogICAgeyAiY29kZSI6ICJyZWdpb24tY2VudHJhbCIsICJuYW1lIjogIkNlbnRyYWwiIH0sCiAgICB7ICJjb2RlIjogInJlZ2lvbi1lYXN0ZXJuIiwgIm5hbWUiOiAiRWFzdGVybiIgfSwKICAgIHsgImNvZGUiOiAicmVnaW9uLW5vcnRoZXJuIiwgIm5hbWUiOiAiTm9ydGhlcm4iIH0sCiAgICB7ICJjb2RlIjogInJlZ2lvbi13ZXN0ZXJuIiwgIm5hbWUiOiAiV2VzdGVybiIgfQogIF0sCiAgImRpc3RyaWN0cyI6IFsKICAgIHsgImNvZGUiOiAiZGlzdHJpY3Qta2FtcGFsYSIsICJuYW1lIjogIkthbXBhbGEiLCAicmVnaW9uIjogInJlZ2lvbi1jZW50cmFsIiB9LAogICAgeyAiY29kZSI6ICJkaXN0cmljdC13YWtpc28iLCAibmFtZSI6ICJXYWtpc28iLCAicmVnaW9uIjogInJlZ2lvbi1jZW50cmFsIiB9LAogICAgeyAiY29kZSI6ICJkaXN0cmljdC1tdWtvbm8iLCAibmFtZSI6ICJNdWtvbm8iLCAicmVnaW9uIjogInJlZ2lvbi1jZW50cmFsIiB9LAogICAgeyAiY29kZSI6ICJkaXN0cmljdC1qaW5qYSIsICJuYW1lIjogIkppbmphIiwgInJlZ2lvbiI6ICJyZWdpb24tZWFzdGVybiIgfSwKICAgIHsgImNvZGUiOiAiZGlzdHJpY3QtbWJhbGUiLCAibmFtZSI6ICJNYmFsZSIsICJyZWdpb24iOiAicmVnaW9uLWVhc3Rlcm4iIH0sCiAgICB7ICJjb2RlIjogImRpc3RyaWN0LWd1bHUiLCAibmFtZSI6ICJHdWx1IiwgInJlZ2lvbiI6ICJyZWdpb24tbm9ydGhlcm4iIH0sCiAgICB7ICJjb2RlIjogImRpc3RyaWN0LW1iYXJhcmEiLCAibmFtZSI6ICJNYmFyYXJhIiwgInJlZ2lvbiI6ICJyZWdpb24td2VzdGVybiIgfQogIF0KfQo="
+    }
+  ]
+}

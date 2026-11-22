@@ -40,6 +40,7 @@ fn subject(account: &str, facility: &str, permissions: &[&str]) -> Extension<Sub
         programs: BTreeSet::new(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     })
 }
 

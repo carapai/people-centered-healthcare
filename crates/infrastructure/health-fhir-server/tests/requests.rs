@@ -62,6 +62,7 @@ fn staff(facility: &str, permissions: &[&str]) -> Extension<Subject> {
         programs: BTreeSet::new(),
         purpose: Some("TREAT".into()),
         break_glass: None,
+        area: false,
     })
 }
 

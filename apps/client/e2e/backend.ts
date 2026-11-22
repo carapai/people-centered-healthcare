@@ -141,7 +141,7 @@ const env = {
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], author: ['metadata.author'], approver: ['metadata.approve'], publisher: ['metadata.publish', 'configuration.activate'], admin: ADMIN_PERMISSIONS },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], district: ['Organization.rs', 'Location.rs'], author: ['metadata.author'], approver: ['metadata.approve'], publisher: ['metadata.publish', 'configuration.activate'], admin: ADMIN_PERMISSIONS },
       labels: [],
     }),
   ),
@@ -173,7 +173,7 @@ async function waitFor(url: string, timeoutMs: number): Promise<void> {
 children.push(spawn(surrealBin, ['start', '--log', 'warn', '--bind', `127.0.0.1:${DB_PORT}`, '--user', 'root', '--pass', dbPassword, 'memory'], { stdio: 'inherit' }))
 await waitFor(`http://127.0.0.1:${DB_PORT}/health`, 30_000)
 for (const user of Object.values(USERS)) {
-  const provisioned = spawnSync(centralBin, ['provision', user.username, 'KAM013', user.roles], {
+  const provisioned = spawnSync(centralBin, ['provision', user.username, 'place' in user ? user.place : 'KAM013', user.roles], {
     env: { ...env, HEALTH_PROVISION_PASSWORD_FILE: file(`${user.username}-password`, user.password) },
     stdio: 'inherit',
   })
@@ -218,6 +218,21 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
       const done = spawnSync(centralBin, ['package', ...step], { env, stdio: 'inherit' })
       if (done.status !== 0) throw new Error(`${step[0]} of ${id} failed`)
     }
+  }
+}
+// The facility registry's places (#869; ADR 0094): the admin previews and imports the NHFR sample
+// (e2e/fixtures/nhfr-sample.csv), whose facilities lie in the national core's districts published
+// above, so e2e-district's area (Kampala) lists KAM013 and two more.
+if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
+  const admin = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
+  const nhfr = readFileSync(resolve(import.meta.dirname, 'fixtures/nhfr-sample.csv'), 'utf8')
+  for (const step of ['preview', 'apply']) {
+    const response = await fetch(`${CENTRAL}/api/places/nhfr/${step}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${admin}`, 'content-type': 'text/csv' },
+      body: nhfr,
+    })
+    if (!response.ok) throw new Error(`the NHFR ${step} failed: ${response.status} ${await response.text()}`)
   }
 }
 // The ANC reference package (#548–#552; packages/reference-packages/anc), drafted by the author:

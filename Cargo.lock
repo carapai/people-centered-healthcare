@@ -725,6 +725,7 @@ name = "central-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "form_urlencoded",
  "health-access-policy",
  "health-activation",
@@ -736,6 +737,7 @@ dependencies = [
  "health-client-registry",
  "health-configuration",
  "health-consent",
+ "health-facility-registry",
  "health-fhir-mapping",
  "health-fhir-search",
  "health-fhir-server",
@@ -2372,6 +2374,7 @@ dependencies = [
  "health-access-policy",
  "health-audit",
  "health-consent",
+ "health-facility-registry",
  "health-fhir-search",
  "health-http",
  "health-identifiers",
@@ -2379,6 +2382,7 @@ dependencies = [
  "health-identity-app",
  "health-persistence",
  "health-pki",
+ "health-registries-app",
  "health-surrealdb",
  "health-time",
  "hkdf 0.12.4",
@@ -2739,6 +2743,16 @@ dependencies = [
 [[package]]
 name = "health-errors"
 version = "0.1.0"
+
+[[package]]
+name = "health-facility-registry"
+version = "0.1.0"
+dependencies = [
+ "health-persistence",
+ "serde",
+ "thiserror 2.0.21",
+ "uuid",
+]
 
 [[package]]
 name = "health-fhir-extraction"
@@ -3375,6 +3389,7 @@ dependencies = [
  "health-audit",
  "health-clinical-documentation-app",
  "health-configuration",
+ "health-facility-registry",
  "health-fhir-extraction",
  "health-fhir-validation",
  "health-files",
@@ -3383,6 +3398,7 @@ dependencies = [
  "health-pki",
  "health-programs",
  "health-programs-app",
+ "health-registries-app",
  "health-surrealdb",
  "health-terminology",
  "health-time",
@@ -3402,7 +3418,9 @@ dependencies = [
 name = "health-registries-app"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "health-client-registry",
+ "health-facility-registry",
  "health-fhir-search",
  "health-fhir-validation",
  "health-identifiers",
@@ -3451,6 +3469,7 @@ dependencies = [
  "health-encounters",
  "health-equipment",
  "health-equipment-app",
+ "health-facility-registry",
  "health-fhir-search",
  "health-financial-ledger",
  "health-identifiers",

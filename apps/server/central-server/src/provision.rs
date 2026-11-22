@@ -2,7 +2,9 @@
 //! Account with a signed permission snapshot at `facility`, until the workforce registry provisions
 //! staff (offline-auth.md § Permission snapshots). The password is read from
 //! `HEALTH_PROVISION_PASSWORD_FILE`, and must pass the password policy and the breached-password
-//! list (15 characters at central, where sign-in has no device factor).
+//! list (15 characters at central, where sign-in has no device factor). `facility` may be any
+//! place (ADR 0094): a district's or region's code, or `central` for the national place, gives
+//! the roles over that place's area.
 //!
 //! `central-server provision bundle …` exports a facility's provisioning bundle for one edge
 //! (ADR 0059).

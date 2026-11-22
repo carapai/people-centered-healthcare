@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccessRouteImport } from './routes/access'
+import { Route as AreaRouteImport } from './routes/area'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as ConsultationRouteImport } from './routes/consultation'
 import { Route as EnrollRouteImport } from './routes/enroll'
@@ -69,6 +70,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccessRoute = AccessRouteImport.update({
   id: '/access',
   path: '/access',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AreaRoute = AreaRouteImport.update({
+  id: '/area',
+  path: '/area',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CallbackRoute = CallbackRouteImport.update({
@@ -321,6 +327,7 @@ const StudioIdWorkflowsSplatRoute = StudioIdWorkflowsSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/access': typeof AccessRoute
+  '/area': typeof AreaRoute
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/access': typeof AccessRoute
+  '/area': typeof AreaRoute
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
@@ -428,6 +436,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/access': typeof AccessRoute
+  '/area': typeof AreaRoute
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
@@ -483,6 +492,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/access'
+    | '/area'
     | '/callback'
     | '/consultation'
     | '/enroll'
@@ -536,6 +546,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/access'
+    | '/area'
     | '/callback'
     | '/consultation'
     | '/enroll'
@@ -589,6 +600,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/access'
+    | '/area'
     | '/callback'
     | '/consultation'
     | '/enroll'
@@ -643,6 +655,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccessRoute: typeof AccessRoute
+  AreaRoute: typeof AreaRoute
   CallbackRoute: typeof CallbackRoute
   ConsultationRoute: typeof ConsultationRoute
   EnrollRoute: typeof EnrollRoute
@@ -708,6 +721,13 @@ declare module '@tanstack/react-router' {
       path: '/access'
       fullPath: '/access'
       preLoaderRoute: typeof AccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/area': {
+      id: '/area'
+      path: '/area'
+      fullPath: '/area'
+      preLoaderRoute: typeof AreaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/callback': {
@@ -1059,6 +1079,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccessRoute: AccessRoute,
+  AreaRoute: AreaRoute,
   CallbackRoute: CallbackRoute,
   ConsultationRoute: ConsultationRoute,
   EnrollRoute: EnrollRoute,

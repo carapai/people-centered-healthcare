@@ -184,6 +184,9 @@ impl<S: AuthStore> Subjects<S> {
             .current_snapshot(principal.account, facility)
             .await?;
         let mut subject = subject_of(&snapshot, &self.roles, purpose.clone());
+        // A session at a district, region or the national place reads no patient-level records
+        // (ADR 0094); the level is the token's, which central signed at sign-in.
+        subject.area = principal.place_level.is_area();
         let grant = self
             .verifier
             .store()

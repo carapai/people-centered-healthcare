@@ -17,6 +17,7 @@ mod backup;
 mod config;
 mod node;
 mod package;
+mod places;
 mod provision;
 mod recovery;
 mod release;

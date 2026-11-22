@@ -22,6 +22,7 @@ health-audit = { workspace = true }
 health-auth = { workspace = true }
 health-backup = { workspace = true }
 health-consent = { workspace = true }
+health-facility-registry = { workspace = true }
 health-financial-ledger = { workspace = true }
 health-client-registry = { workspace = true }
 health-activation = { workspace = true }
@@ -62,6 +63,7 @@ utoipa = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
 health-surrealdb = { workspace = true, features = ["remote"] }
 http-body-util = { workspace = true }
 serde_json = { workspace = true }

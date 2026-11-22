@@ -28,6 +28,7 @@ pub fn subject_of(
         programs: snapshot.programs.iter().cloned().collect(),
         purpose: Some(purpose),
         break_glass: None,
+        area: false,
     }
 }
 

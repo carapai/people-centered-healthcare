@@ -5,7 +5,7 @@ Published Definition packages the platform ships as references (configuration.md
 | Package | What | Issue |
 |---|---|---|
 | `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*, *ANC 1st visits with the next visit booked*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549, #550, #552 |
-| `core/` (`ug.moh.core`) | MoH's national core: the Age Band Sets HMIS reports disaggregate by (*MoH ANC age bands*, *MoH outpatient age bands*) | #551 |
+| `core/` (`ug.moh.core`) | MoH's national core: the Age Band Sets HMIS reports disaggregate by (*MoH ANC age bands*, *MoH outpatient age bands*), and the regions and districts places sit in | #551, #869 |
 | `hmis/` (`ug.moh.hmis`) | A Reporting package: the HMIS 105 antenatal care Report (`configuration/reports/hmis-105-anc.json`, monthly, facility to national: ANC attendance by MoH's ANC age bands with row totals and % change, sent to DHIS2, and the timing of the 1st visit) and the facility's ANC monitoring (facility only: the median gestational age at the 1st visit, a line list of ANC clients with their latest gestational age, and one of the 1st visits counted) | #556 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
@@ -54,6 +54,10 @@ Each is a `Library` of type `age-band-set` (`national-core`, so two approvers), 
 | `Library/age-bands-outpatient`, *MoH outpatient age bands* | the date of the visit | 0, 1–4, 5–9, 10–19, 20+ |
 
 The local e2e backend publishes the package, so the Studio's *Age band sets* section shows both.
+
+### Regions and districts (#869; ADR 0094)
+
+`Library/administrative-areas` (type `administrative-areas`, content `application/vnd.health.administrative-areas+json`) lists a sample of the country's regions and districts: Central (Kampala, Wakiso, Mukono), Eastern (Jinja, Mbale), Northern (Gulu) and Western (Mbarara), coded `region-…` and `district-…`. The facility registry's NHFR import links each facility to its district by that code and refuses a district not listed here. Boundaries are not shipped yet.
 
 ## `lab/`: the laboratory test
 

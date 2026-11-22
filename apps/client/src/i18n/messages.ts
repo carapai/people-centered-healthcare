@@ -656,6 +656,49 @@ export const enrollmentMessages = defineMessages<EnrollmentValues>({
   enFailed: { id: 'app.enroll.failed', defaultMessage: 'The request failed: {reason}.', description: 'Device enrollment: a request failed; reason is a code' },
 })
 
+type AreaValues = {
+  arTitle: {}
+  arLoading: {}
+  arFailed: {}
+  arNotHere: {}
+  arPlace: { name: string; level: string }
+  arAreaIntro: { count: number }
+  arCode: {}
+  arName: {}
+  arCareLevel: {}
+  arStatus: {}
+  arOpen: {}
+  arClosed: {}
+  arLevel_facility: {}
+  arLevel_district: {}
+  arLevel_region: {}
+  arLevel_national: {}
+}
+
+// The area page's strings (features/area; ADR 0094).
+export const areaMessages = defineMessages<AreaValues>({
+  arTitle: { id: 'app.area.title', defaultMessage: 'My area', description: 'Area page heading and home link' },
+  arLoading: { id: 'app.area.loading', defaultMessage: 'Loading…', description: 'Area page: loading' },
+  arFailed: { id: 'app.area.failed', defaultMessage: 'Your area could not be loaded. Please try again.', description: 'Area page: loading failed' },
+  arNotHere: { id: 'app.area.notHere', defaultMessage: 'Areas are kept at central.', description: 'Area page: shown away from central' },
+  arPlace: { id: 'app.area.place', defaultMessage: 'You are signed in for {name} ({level}).', description: 'Area page: the place the session acts for and its level' },
+  arAreaIntro: {
+    id: 'app.area.intro',
+    defaultMessage: '{count, plural, one {# facility is} other {# facilities are}} in your area. You see their summaries and reports, not patient records.',
+    description: 'Area page: how many facilities the area holds',
+  },
+  arCode: { id: 'app.area.code', defaultMessage: 'Code', description: 'Area page: facility code column' },
+  arName: { id: 'app.area.name', defaultMessage: 'Facility', description: 'Area page: facility name column' },
+  arCareLevel: { id: 'app.area.careLevel', defaultMessage: 'Level of care', description: 'Area page: the NHFR level of care column' },
+  arStatus: { id: 'app.area.status', defaultMessage: 'Status', description: 'Area page: open or closed column' },
+  arOpen: { id: 'app.area.open', defaultMessage: 'Open', description: 'Area page: the facility is open' },
+  arClosed: { id: 'app.area.closed', defaultMessage: 'Closed', description: 'Area page: the NHFR lists the facility as closed' },
+  arLevel_facility: { id: 'app.area.level.facility', defaultMessage: 'facility', description: 'Area page: place level' },
+  arLevel_district: { id: 'app.area.level.district', defaultMessage: 'district', description: 'Area page: place level' },
+  arLevel_region: { id: 'app.area.level.region', defaultMessage: 'region', description: 'Area page: place level' },
+  arLevel_national: { id: 'app.area.level.national', defaultMessage: 'national', description: 'Area page: place level' },
+})
+
 type AccessValues = {
   acTitle: {}
   acIntro: {}
