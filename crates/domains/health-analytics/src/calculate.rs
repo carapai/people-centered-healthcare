@@ -23,6 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use jiff::civil::Date;
 use rust_decimal::{Decimal, RoundingStrategy};
 
+use crate::age_bands::{AgeBandSet, pinned};
+use crate::disaggregation::{DisaggregationSource, NOT_RECORDED};
 use crate::indicator::{Aggregate, Calculation, Counts, Indicator, Pick, PopulationKind};
 use crate::period::Period;
 
@@ -59,6 +61,9 @@ pub struct RecordOutcome {
     /// Its value, if the indicator takes one and it gives one, or why it could not be
     /// evaluated.
     pub value: Result<Option<Observed>, String>,
+    /// Its band in each of the indicator's disaggregations, in order: a code, none when it has
+    /// no value (*not recorded*), or why it could not be evaluated (#552).
+    pub strata: Vec<Result<Option<String>, String>>,
 }
 
 /// One patient's records, each as it came out.
@@ -103,6 +108,8 @@ pub struct RecordPart {
     pub value: Result<Option<Observed>, String>,
     /// Whether its value is the one taken for its counted thing.
     pub picked: bool,
+    /// Its band in each of the indicator's disaggregations, as evaluated (#552).
+    pub strata: Vec<Result<Option<String>, String>>,
 }
 
 impl RecordPart {
@@ -153,6 +160,29 @@ pub struct Summary {
     pub denominator: Option<u64>,
     /// The values of a continuous-variable indicator.
     pub values: Option<Values>,
+    /// The parts per band of each disaggregation, in the indicator's order; each band's
+    /// summary has none of its own (#552).
+    pub disaggregations: Vec<Disaggregated>,
+}
+
+/// An indicator's parts by one disaggregation (#552).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Disaggregated {
+    /// The disaggregation's name.
+    pub name: String,
+    /// Its bands: an Age Band Set's in its order, or the codes found, then
+    /// [`NOT_RECORDED`]. They add up to the whole.
+    pub bands: Vec<Band>,
+}
+
+/// One band's part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Band {
+    /// Its code: an age band's (`15-19`, `25+`), a coded value, or [`NOT_RECORDED`].
+    pub code: String,
+    /// The figure within the band, with what roll-up needs: a percentage's numerator and
+    /// denominator are both the band's.
+    pub summary: Summary,
 }
 
 /// Why summaries could not be rolled up.
@@ -229,12 +259,55 @@ impl Summary {
                 maximum: numbers(|v| v.maximum).max(),
             }
         });
+        let mut disaggregations: Vec<Disaggregated> = Vec::new();
+        for part in parts {
+            for by in &part.disaggregations {
+                let at = match disaggregations.iter().position(|d| d.name == by.name) {
+                    Some(at) => at,
+                    None => {
+                        disaggregations.push(Disaggregated {
+                            name: by.name.clone(),
+                            bands: Vec::new(),
+                        });
+                        disaggregations.len() - 1
+                    }
+                };
+                for band in &by.bands {
+                    if !disaggregations[at]
+                        .bands
+                        .iter()
+                        .any(|b| b.code == band.code)
+                    {
+                        disaggregations[at].bands.push(Band {
+                            code: band.code.clone(),
+                            summary: band.summary.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        for disaggregated in &mut disaggregations {
+            // Not recorded stays last whatever each part found.
+            disaggregated.bands.sort_by_key(|b| b.code == NOT_RECORDED);
+            for band in &mut disaggregated.bands {
+                let same: Vec<Self> = parts
+                    .iter()
+                    .flat_map(|p| &p.disaggregations)
+                    .filter(|d| d.name == disaggregated.name)
+                    .flat_map(|d| &d.bands)
+                    .filter(|b| b.code == band.code)
+                    .map(|b| b.summary.clone())
+                    .collect();
+                band.summary = Self::roll_up(calculation, &same)?;
+            }
+        }
         Ok(Self {
             calculation,
             value: figure(calculation, count, denominator, values.as_ref()),
             count,
             denominator,
             values,
+            disaggregations,
         })
     }
 }
@@ -258,14 +331,21 @@ impl Evaluation {
     /// evaluated, with why.
     pub fn errors(&self) -> impl Iterator<Item = (&str, &str)> {
         self.members.iter().flat_map(|m| {
-            m.records
-                .iter()
-                .filter_map(|r| match (&r.reason, &r.value) {
-                    (Reason::Error(why), _) | (Reason::Meets, Err(why)) => {
-                        Some((r.reference.as_str(), why.as_str()))
-                    }
+            m.records.iter().flat_map(|r| {
+                let value = match (&r.reason, &r.value) {
+                    (Reason::Error(why), _) | (Reason::Meets, Err(why)) => Some(why.as_str()),
                     _ => None,
-                })
+                };
+                let placed = matches!(r.reason, Reason::Meets | Reason::DenominatorOnly);
+                let strata = r.strata.iter().filter_map(move |s| match s {
+                    Err(why) if placed => Some(why.as_str()),
+                    _ => None,
+                });
+                value
+                    .into_iter()
+                    .chain(strata)
+                    .map(move |why| (r.reference.as_str(), why))
+            })
         })
     }
 }
@@ -327,6 +407,7 @@ fn part(indicator: &Indicator, period: &Period, record: &RecordOutcome) -> Recor
         reason,
         value: record.value.clone(),
         picked: false,
+        strata: record.strata.clone(),
     }
 }
 
@@ -349,82 +430,41 @@ fn median(mut numbers: Vec<Decimal>) -> Option<Decimal> {
     }
 }
 
-/// `indicator` calculated over `period` from each patient's records.
-pub fn calculate(
-    indicator: &Indicator,
-    period: &Period,
-    patients: &[PatientOutcome],
-) -> Evaluation {
-    let mut members = Vec::with_capacity(patients.len());
+/// One counted thing (a person, an enrollment, a visit or an observation) in the denominator,
+/// or counted when there is none.
+struct Counted {
+    /// Whether it is in the numerator (or counted).
+    numerator: bool,
+    /// The value taken of it, if any.
+    value: Option<Observed>,
+    /// Its band in each disaggregation.
+    bands: Vec<String>,
+}
+
+/// The summary of `counted`, without disaggregations.
+fn summarize<'a>(indicator: &Indicator, counted: impl Iterator<Item = &'a Counted>) -> Summary {
+    let mut count = 0;
+    let mut in_denominator = 0;
     let mut taken = Vec::new();
-    for patient in patients {
-        let mut records: Vec<RecordPart> = patient
-            .records
-            .iter()
-            .map(|r| part(indicator, period, r))
-            .collect();
-        let mut numerator = BTreeSet::new();
-        let mut denominator = BTreeSet::new();
-        // Each counted thing's records in the numerator, as indexes, in the order given.
-        let mut by_unit: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
-        for (index, (record, outcome)) in records.iter().zip(&patient.records).enumerate() {
-            let key = unit(indicator, &patient.patient, outcome);
-            match record.reason {
-                Reason::Meets => {
-                    numerator.insert(key);
-                    denominator.insert(key);
-                    by_unit.entry(key).or_default().push(index);
-                }
-                Reason::DenominatorOnly => {
-                    denominator.insert(key);
-                }
-                _ => {}
-            }
+    for thing in counted {
+        in_denominator += 1;
+        if thing.numerator {
+            count += 1;
         }
-        if let Some(value) = &indicator.value {
-            for indexes in by_unit.values() {
-                let mut with_value: Vec<usize> = indexes
-                    .iter()
-                    .copied()
-                    .filter(|i| matches!(records[*i].value, Ok(Some(_))))
-                    .collect();
-                // Stable: records on the same date keep the order given.
-                with_value.sort_by_key(|i| records[*i].date);
-                let picked = match value.pick {
-                    Pick::First => with_value.first(),
-                    Pick::Last => with_value.last(),
-                };
-                if let Some(&i) = picked {
-                    records[i].picked = true;
-                    if let Ok(Some(observed)) = &records[i].value {
-                        taken.push(observed.clone());
-                    }
-                }
-            }
-        }
-        members.push(Member {
-            patient: patient.patient.clone(),
-            count: numerator.len() as u64,
-            denominator: indicator
-                .calculation
-                .has_denominator()
-                .then_some(denominator.len() as u64),
-            records,
-        });
+        taken.extend(thing.value.iter());
     }
-    let count = members.iter().map(|m| m.count).sum();
     let denominator = indicator
         .calculation
         .has_denominator()
-        .then(|| members.iter().filter_map(|m| m.denominator).sum());
+        .then_some(in_denominator);
+    let numbers: Vec<Decimal> = taken
+        .iter()
+        .filter_map(|o| match o {
+            Observed::Number(n) => Some(*n),
+            Observed::Code(_) => None,
+        })
+        .collect();
     let values = indicator.value.as_ref().map(|_| {
-        let numbers: Vec<Decimal> = taken
-            .iter()
-            .filter_map(|o| match o {
-                Observed::Number(n) => Some(*n),
-                Observed::Code(_) => None,
-            })
-            .collect();
         let numeric = numbers.len() == taken.len();
         Values {
             count: taken.len() as u64,
@@ -434,35 +474,144 @@ pub fn calculate(
         }
     });
     let value = match indicator.calculation {
-        Calculation::Value(Aggregate::Median) => {
-            let numbers = taken
-                .iter()
-                .filter_map(|o| match o {
-                    Observed::Number(n) => Some(*n),
-                    Observed::Code(_) => None,
-                })
-                .collect();
-            median(numbers).map(rounded)
-        }
+        Calculation::Value(Aggregate::Median) => median(numbers).map(rounded),
         Calculation::Value(Aggregate::DistinctCount) => Some(Decimal::from(
-            taken
-                .iter()
-                .map(Observed::key)
-                .collect::<BTreeSet<_>>()
-                .len(),
+            taken.iter().map(|o| o.key()).collect::<BTreeSet<_>>().len(),
         )),
         calculation => figure(calculation, count, denominator, values.as_ref()),
     };
-    Evaluation {
-        summary: Summary {
-            calculation: indicator.calculation,
-            value,
-            count,
-            denominator,
-            values,
-        },
-        members,
+    Summary {
+        calculation: indicator.calculation,
+        value,
+        count,
+        denominator,
+        values,
+        disaggregations: Vec::new(),
     }
+}
+
+/// The band a record's stratum puts it in.
+fn band(stratum: Option<&Result<Option<String>, String>>) -> String {
+    match stratum {
+        Some(Ok(Some(code))) => code.clone(),
+        _ => NOT_RECORDED.to_owned(),
+    }
+}
+
+/// `indicator` calculated over `period` from each patient's records. Each record's strata are
+/// its band in each of the indicator's disaggregations; `sets` are the Age Band Sets they may
+/// pin, so that a pinned set's every band is shown, counted or not, in its order.
+pub fn calculate(
+    indicator: &Indicator,
+    period: &Period,
+    patients: &[PatientOutcome],
+    sets: &[AgeBandSet],
+) -> Evaluation {
+    let mut members = Vec::with_capacity(patients.len());
+    let mut counted: Vec<Counted> = Vec::new();
+    for patient in patients {
+        let mut records: Vec<RecordPart> = patient
+            .records
+            .iter()
+            .map(|r| part(indicator, period, r))
+            .collect();
+        // Each counted thing's records in the denominator (or counted), and those in the
+        // numerator, as indexes, in the order given.
+        let mut by_unit: BTreeMap<&str, (Vec<usize>, Vec<usize>)> = BTreeMap::new();
+        for (index, (record, outcome)) in records.iter().zip(&patient.records).enumerate() {
+            let key = unit(indicator, &patient.patient, outcome);
+            match record.reason {
+                Reason::Meets => {
+                    let entry = by_unit.entry(key).or_default();
+                    entry.0.push(index);
+                    entry.1.push(index);
+                }
+                Reason::DenominatorOnly => by_unit.entry(key).or_default().0.push(index),
+                _ => {}
+            }
+        }
+        let mut count = 0;
+        for (within, numerator) in by_unit.values() {
+            let mut value = None;
+            if let Some(how) = &indicator.value {
+                let mut with_value: Vec<usize> = numerator
+                    .iter()
+                    .copied()
+                    .filter(|i| matches!(records[*i].value, Ok(Some(_))))
+                    .collect();
+                // Stable: records on the same date keep the order given.
+                with_value.sort_by_key(|i| records[*i].date);
+                let picked = match how.pick {
+                    Pick::First => with_value.first(),
+                    Pick::Last => with_value.last(),
+                };
+                if let Some(&i) = picked {
+                    records[i].picked = true;
+                    if let Ok(Some(observed)) = &records[i].value {
+                        value = Some(observed.clone());
+                    }
+                }
+            }
+            let mut first = within.clone();
+            first.sort_by_key(|i| records[*i].date);
+            let strata = first.first().map(|i| &patient.records[*i].strata);
+            let bands = (0..indicator.disaggregations.len())
+                .map(|d| band(strata.and_then(|s| s.get(d))))
+                .collect();
+            if !numerator.is_empty() {
+                count += 1;
+            }
+            counted.push(Counted {
+                numerator: !numerator.is_empty(),
+                value,
+                bands,
+            });
+        }
+        members.push(Member {
+            patient: patient.patient.clone(),
+            count,
+            denominator: indicator
+                .calculation
+                .has_denominator()
+                .then_some(by_unit.len() as u64),
+            records,
+        });
+    }
+    let mut summary = summarize(indicator, counted.iter());
+    summary.disaggregations = indicator
+        .disaggregations
+        .iter()
+        .enumerate()
+        .map(|(d, disaggregation)| {
+            let mut codes: Vec<String> = match &disaggregation.source {
+                DisaggregationSource::AgeBands(set) => pinned(set, sets)
+                    .map(|set| set.bands.iter().map(|b| b.code()).collect())
+                    .unwrap_or_default(),
+                DisaggregationSource::Coded(_) => Vec::new(),
+            };
+            let mut found: Vec<&String> = counted.iter().map(|c| &c.bands[d]).collect();
+            found.sort();
+            found.dedup();
+            for code in found {
+                if code != NOT_RECORDED && !codes.contains(code) {
+                    codes.push(code.clone());
+                }
+            }
+            codes.push(NOT_RECORDED.to_owned());
+            Disaggregated {
+                name: disaggregation.name.clone(),
+                bands: codes
+                    .into_iter()
+                    .map(|code| {
+                        let summary =
+                            summarize(indicator, counted.iter().filter(|c| c.bands[d] == code));
+                        Band { code, summary }
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+    Evaluation { summary, members }
 }
 
 #[cfg(test)]
@@ -489,6 +638,7 @@ mod tests {
                 .map(|(k, r)| (*k, r.map_err(str::to_owned)))
                 .collect(),
             value: Ok(None),
+            strata: Vec::new(),
         }
     }
 
@@ -513,7 +663,7 @@ mod tests {
             period_date: "Encounter.actualPeriod.start".into(),
             populations: BTreeMap::new(),
             references: BTreeSet::new(),
-            age_band_sets: Vec::new(),
+            disaggregations: Vec::new(),
             value: matches!(calculation, Calculation::Value(_)).then(|| IndicatorValue {
                 source: ValueSource::Expression("v".into()),
                 pick: Pick::First,
@@ -548,6 +698,7 @@ mod tests {
             &indicator(Calculation::Count, Counts::People),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(count.summary.count, 2);
         assert_eq!(count.summary.value, Some(Decimal::from(2)));
@@ -568,11 +719,17 @@ mod tests {
             &indicator(Calculation::Count, Counts::Visits),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(visits.summary.count, 3);
         let mut cumulative = indicator(Calculation::Count, Counts::Visits);
         cumulative.cumulative = true;
-        assert_eq!(calculate(&cumulative, &march(), &patients).summary.count, 4);
+        assert_eq!(
+            calculate(&cumulative, &march(), &patients, &[])
+                .summary
+                .count,
+            4
+        );
     }
 
     #[test]
@@ -594,6 +751,7 @@ mod tests {
             &indicator(Calculation::Count, Counts::Enrollments),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(count.summary.count, 2);
         assert_eq!(count.members[0].records[3].reason, Reason::NoEnrollment);
@@ -653,8 +811,12 @@ mod tests {
             },
         ];
         let figure = |calculation| {
-            let evaluation =
-                calculate(&indicator(calculation, Counts::People), &march(), &patients);
+            let evaluation = calculate(
+                &indicator(calculation, Counts::People),
+                &march(),
+                &patients,
+                &[],
+            );
             (
                 evaluation.summary.count,
                 evaluation.summary.denominator,
@@ -677,6 +839,7 @@ mod tests {
             &indicator(Calculation::Percentage, Counts::People),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(
             evaluation.members[1].records[0].reason,
@@ -689,6 +852,7 @@ mod tests {
             calculate(
                 &indicator(Calculation::Percentage, Counts::People),
                 &march(),
+                &[],
                 &[]
             )
             .summary
@@ -745,7 +909,7 @@ mod tests {
             if let Some(value) = indicator.value.as_mut() {
                 value.pick = pick;
             }
-            calculate(&indicator, &march(), &valued_patients())
+            calculate(&indicator, &march(), &valued_patients(), &[])
         };
         let value = |aggregate, pick| of(aggregate, pick).summary.value.map(|v| v.to_string());
         // First values: 10, 8, 16, 9. Last: 14, 8, 16, 9.
@@ -776,7 +940,7 @@ mod tests {
         let mut visits = indicator(Calculation::Value(Aggregate::Sum), Counts::Visits);
         visits.basis = "Encounter".into();
         assert_eq!(
-            calculate(&visits, &march(), &valued_patients())
+            calculate(&visits, &march(), &valued_patients(), &[])
                 .summary
                 .value,
             Some(Decimal::from(57))
@@ -798,6 +962,7 @@ mod tests {
             &indicator(Calculation::Value(Aggregate::DistinctCount), Counts::Visits),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(evaluation.summary.value, Some(Decimal::from(2)));
         assert_eq!(evaluation.summary.values.and_then(|v| v.sum), None);
@@ -826,6 +991,7 @@ mod tests {
             &indicator(Calculation::Value(Aggregate::Sum), Counts::Visits),
             &march(),
             &patients,
+            &[],
         );
         assert_eq!(
             evaluation.errors().collect::<Vec<_>>(),
@@ -847,6 +1013,7 @@ mod tests {
             count,
             denominator,
             values,
+            disaggregations: Vec::new(),
         };
         // Two facilities' percentages, 1 of 4 and 3 of 6, give 4 of 10 (40%), not the average
         // of 25% and 50%.
@@ -909,10 +1076,251 @@ mod tests {
             &indicator(average, Counts::People),
             &march(),
             &valued_patients(),
+            &[],
         );
         let rolled =
             Summary::roll_up(average, std::slice::from_ref(&evaluated.summary)).expect("rolled up");
         assert_eq!(rolled, evaluated.summary);
         assert_eq!(Scoring::Cohort, Calculation::Count.scoring());
+    }
+
+    fn age_bands() -> AgeBandSet {
+        use crate::age_bands::{AgeAt, AgeBand, AgeUnit};
+        AgeBandSet {
+            url: "https://health.go.ug/fhir/Library/age-bands-anc".into(),
+            version: "1.0.0".into(),
+            title: "MoH ANC age bands".into(),
+            unit: AgeUnit::Years,
+            age_at: AgeAt::PeriodEnd,
+            bands: vec![
+                AgeBand {
+                    from: 10,
+                    to: Some(14),
+                },
+                AgeBand {
+                    from: 15,
+                    to: Some(19),
+                },
+                AgeBand {
+                    from: 20,
+                    to: Some(24),
+                },
+                AgeBand { from: 25, to: None },
+            ],
+        }
+    }
+
+    fn by(name: &str, source: DisaggregationSource) -> crate::disaggregation::Disaggregation {
+        crate::disaggregation::Disaggregation {
+            name: name.into(),
+            source,
+        }
+    }
+
+    fn in_band(
+        reference: &str,
+        day: &str,
+        sides: &[(PopulationKind, Result<bool, &str>)],
+        strata: &[Result<Option<&str>, &str>],
+    ) -> RecordOutcome {
+        RecordOutcome {
+            strata: strata
+                .iter()
+                .map(|s| s.map(|c| c.map(str::to_owned)).map_err(str::to_owned))
+                .collect(),
+            ..record(reference, Some(day), sides)
+        }
+    }
+
+    fn bands(summary: &Summary, at: usize) -> Vec<(&str, u64, Option<u64>, Option<Decimal>)> {
+        summary.disaggregations[at]
+            .bands
+            .iter()
+            .map(|b| {
+                (
+                    b.code.as_str(),
+                    b.summary.count,
+                    b.summary.denominator,
+                    b.summary.value,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_bands_add_up_to_the_total_with_a_not_recorded_band() {
+        let set = age_bands();
+        let mut count = indicator(Calculation::Count, Counts::People);
+        count.disaggregations = vec![
+            by("age", DisaggregationSource::AgeBands(set.canonical())),
+            by("hiv-status", DisaggregationSource::Coded("v".into())),
+        ];
+        let one = |patient: &str, strata: &[Result<Option<&str>, &str>]| PatientOutcome {
+            patient: format!("Patient/{patient}"),
+            records: vec![in_band(
+                &format!("Encounter/{patient}"),
+                "2026-03-10",
+                &ip(Ok(true)),
+                strata,
+            )],
+        };
+        let patients = [
+            one("a", &[Ok(Some("15-19")), Ok(Some("positive"))]),
+            one("b", &[Ok(Some("25+")), Ok(Some("negative"))]),
+            one("c", &[Ok(Some("25+")), Ok(None)]),
+            // No birth date, and an HIV status that could not be read.
+            one("d", &[Ok(None), Err("the code gave 2 items")]),
+        ];
+        let evaluated = calculate(&count, &march(), &patients, std::slice::from_ref(&set));
+        let n = |n: i64| Some(Decimal::from(n));
+        assert_eq!(evaluated.summary.count, 4);
+        assert_eq!(
+            bands(&evaluated.summary, 0),
+            [
+                ("10-14", 0, None, n(0)),
+                ("15-19", 1, None, n(1)),
+                ("20-24", 0, None, n(0)),
+                ("25+", 2, None, n(2)),
+                (NOT_RECORDED, 1, None, n(1)),
+            ]
+        );
+        assert_eq!(
+            bands(&evaluated.summary, 1),
+            [
+                ("negative", 1, None, n(1)),
+                ("positive", 1, None, n(1)),
+                (NOT_RECORDED, 2, None, n(2)),
+            ]
+        );
+        for by in &evaluated.summary.disaggregations {
+            let total: u64 = by.bands.iter().map(|b| b.summary.count).sum();
+            assert_eq!(total, evaluated.summary.count, "{} adds up", by.name);
+        }
+        assert_eq!(
+            evaluated.errors().collect::<Vec<_>>(),
+            [("Encounter/d", "the code gave 2 items")]
+        );
+        // Without the pinned set at hand, only the bands found are shown.
+        assert_eq!(
+            bands(&calculate(&count, &march(), &patients, &[]).summary, 0)
+                .iter()
+                .map(|b| b.0)
+                .collect::<Vec<_>>(),
+            ["15-19", "25+", NOT_RECORDED]
+        );
+    }
+
+    #[test]
+    fn a_counted_thing_falls_in_the_band_of_its_first_record() {
+        let mut count = indicator(Calculation::Count, Counts::People);
+        count.disaggregations = vec![by("visit-type", DisaggregationSource::Coded("v".into()))];
+        let patients = [PatientOutcome {
+            patient: "Patient/a".into(),
+            records: vec![
+                in_band(
+                    "Encounter/2",
+                    "2026-03-20",
+                    &ip(Ok(true)),
+                    &[Ok(Some("follow-up"))],
+                ),
+                in_band(
+                    "Encounter/1",
+                    "2026-03-02",
+                    &ip(Ok(true)),
+                    &[Ok(Some("first"))],
+                ),
+                // Not counted, so not her band.
+                in_band(
+                    "Encounter/0",
+                    "2026-03-01",
+                    &ip(Ok(false)),
+                    &[Ok(Some("other"))],
+                ),
+            ],
+        }];
+        let evaluated = calculate(&count, &march(), &patients, &[]);
+        assert_eq!(
+            bands(&evaluated.summary, 0),
+            [
+                ("first", 1, None, Some(Decimal::ONE)),
+                (NOT_RECORDED, 0, None, Some(Decimal::ZERO)),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_percentage_per_band_uses_the_denominator_within_that_band() {
+        use PopulationKind::{Denominator, InitialPopulation, Numerator};
+        let mut percentage = indicator(Calculation::Percentage, Counts::People);
+        percentage.disaggregations =
+            vec![by("hiv-status", DisaggregationSource::Coded("v".into()))];
+        let sides = |numerator: bool| {
+            vec![
+                (InitialPopulation, Ok(true)),
+                (Denominator, Ok(true)),
+                (Numerator, Ok(numerator)),
+            ]
+        };
+        let one = |patient: &str, numerator: bool, status: Option<&str>| PatientOutcome {
+            patient: format!("Patient/{patient}"),
+            records: vec![in_band(
+                &format!("Encounter/{patient}"),
+                "2026-03-10",
+                &sides(numerator),
+                &[Ok(status)],
+            )],
+        };
+        // Positive: 1 of 1; negative: 1 of 3; not recorded: 0 of 1. In all, 2 of 5.
+        let patients = [
+            one("a", true, Some("positive")),
+            one("b", true, Some("negative")),
+            one("c", false, Some("negative")),
+            one("d", false, Some("negative")),
+            one("e", false, None),
+        ];
+        let evaluated = calculate(&percentage, &march(), &patients, &[]);
+        assert_eq!(
+            (evaluated.summary.count, evaluated.summary.denominator),
+            (2, Some(5))
+        );
+        assert_eq!(evaluated.summary.value, Some(Decimal::from(40)));
+        assert_eq!(
+            bands(&evaluated.summary, 0),
+            [
+                (
+                    "negative",
+                    1,
+                    Some(3),
+                    Some("33.33".parse().expect("decimal"))
+                ),
+                ("positive", 1, Some(1), Some(Decimal::from(100))),
+                (NOT_RECORDED, 0, Some(1), Some(Decimal::ZERO)),
+            ]
+        );
+        // Facilities roll up band by band, from the summed parts.
+        let rolled = Summary::roll_up(
+            Calculation::Percentage,
+            &[evaluated.summary.clone(), evaluated.summary.clone()],
+        )
+        .expect("rolled up");
+        assert_eq!(
+            bands(&rolled, 0),
+            [
+                (
+                    "negative",
+                    2,
+                    Some(6),
+                    Some("33.33".parse().expect("decimal"))
+                ),
+                ("positive", 2, Some(2), Some(Decimal::from(100))),
+                (NOT_RECORDED, 0, Some(2), Some(Decimal::ZERO)),
+            ]
+        );
+        let alone = Summary::roll_up(
+            Calculation::Percentage,
+            std::slice::from_ref(&evaluated.summary),
+        )
+        .expect("rolled up");
+        assert_eq!(alone, evaluated.summary);
     }
 }

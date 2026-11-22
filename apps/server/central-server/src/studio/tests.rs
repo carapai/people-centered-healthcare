@@ -1978,8 +1978,22 @@ async fn the_designs_say_which_package_version_each_opens_in_and_whose_draft_it_
     assert_eq!(status, 403);
 }
 
-/// The ANC reference package's files: *ANC 1st visits* and its test patients (#548).
+/// The ANC reference package's files: *ANC 1st visits* and its test patients (#548), with
+/// MoH's ANC age bands, which *ANC 1st visits* is disaggregated by (#552), beside them as a set
+/// of the draft's own.
 fn anc_package() -> Files {
+    let mut files = anc_package_alone();
+    let bands = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages/core/Library-age-bands-anc.json");
+    files.insert(
+        "Library-age-bands-anc.json".into(),
+        std::fs::read(bands).expect("read"),
+    );
+    files
+}
+
+/// The ANC reference package's files as they are.
+fn anc_package_alone() -> Files {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../packages/reference-packages/anc");
     let mut files = Files::new();
@@ -2062,6 +2076,97 @@ async fn try_calculates_a_percentage_and_a_median_with_what_roll_up_needs() {
             .map(|r| (r["value"].clone(), r["picked"].clone()))
             .collect::<Vec<_>>(),
         [(json!("8"), json!(true)), (json!("11"), json!(false))]
+    );
+}
+
+#[tokio::test]
+async fn try_gives_the_figure_per_band_and_each_records_band() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    publications.draft(&files, "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+    let measure = |file: &str| -> Value { serde_json::from_slice(&files[file]).expect("measure") };
+
+    // ANC 1st visits by MoH's ANC age bands: the bands add up to March's four.
+    let input = json!({
+        "measure": measure("Measure-anc-first-visits.json"),
+        "periodType": "monthly",
+        "period": "2026-03",
+    });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    let band = |code: &str, label: &str, count: u64| json!({ "code": code, "label": label, "value": count, "count": count, "denominator": null, "values": null });
+    assert_eq!(
+        body["disaggregations"],
+        json!([{
+            "name": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0",
+            "title": "MoH ANC age bands",
+            "bands": [
+                band("10-14", "10–14 years", 0),
+                band("15-19", "15–19 years", 1),
+                band("20-24", "20–24 years", 1),
+                band("25+", "25+ years", 2),
+                band("not-recorded", "Not recorded", 0),
+            ],
+        }])
+    );
+
+    // By a coded value too: an HIV status no test patient has is not recorded for all four.
+    let mut by_status = measure("Measure-anc-first-visits.json");
+    by_status["group"][0]["stratifier"]
+        .as_array_mut()
+        .expect("stratifiers")
+        .push(json!({
+            "code": { "coding": [{ "code": "hiv-status" }] },
+            "criteria": {
+                "language": "text/fhirpath",
+                "expression": "%records.entry.resource.ofType(Observation).where(code.coding.code = '55277-8').value.coding.code.first()"
+            }
+        }));
+    let input = json!({ "measure": by_status, "periodType": "monthly", "period": "2026-03" });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body["disaggregations"][1],
+        json!({
+            "name": "hiv-status",
+            "title": "hiv-status",
+            "bands": [band("not-recorded", "Not recorded", 4)],
+        })
+    );
+    let akello = body["patients"]
+        .as_array()
+        .expect("patients")
+        .iter()
+        .find(|p| p["patient"] == "Patient/akello")
+        .expect("akello");
+    assert_eq!(
+        akello["records"][0]["bands"],
+        json!(["15-19", "not-recorded"])
+    );
+}
+
+/// A set neither published nor in the draft cannot be disaggregated by (#552).
+#[tokio::test]
+async fn try_refuses_an_age_band_set_it_cannot_find() {
+    let author = || subject("ann", &["metadata.author"]);
+    let try_path = format!("/packages/{ID}/indicators/try");
+    let (publications, _dir) = publications().await;
+    let files = anc_package_alone();
+    publications.draft(&files, "ann").await.expect("draft");
+    let input = json!({
+        "measure": serde_json::from_slice::<Value>(&files["Measure-anc-first-visits.json"]).expect("measure"),
+        "periodType": "monthly",
+        "period": "2026-03",
+    });
+    let (status, body) = call(&publications, author(), "POST", &try_path, Some(input)).await;
+    assert_eq!(status, 422, "{body}");
+    assert!(
+        body["detail"].as_str().is_some_and(|d| d.contains(
+            "no published Age Band Set is https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"
+        )),
+        "{body}"
     );
 }
 
@@ -2158,8 +2263,8 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     assert_eq!(
         nakato["records"],
         json!([
-            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null, "value": null, "picked": false },
-            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null, "value": null, "picked": false }
+            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null, "value": null, "picked": false, "bands": ["20-24"] },
+            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null, "value": null, "picked": false, "bands": ["20-24"] }
         ])
     );
     let auma = patients

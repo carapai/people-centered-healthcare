@@ -2814,6 +2814,59 @@
           }
         }
       },
+      "StudioBand": {
+        "type": "object",
+        "description": "One band's figure, its numerator and denominator both within the band.",
+        "required": [
+          "code",
+          "label",
+          "count"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Its code: an age band's (`15-19`, `25+`), a coded value, or `not-recorded`."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many are counted in the band: its numerator.",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The band's denominator, for a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "label": {
+            "type": "string",
+            "description": "What a person reads: `15–19 years`, the code, or *Not recorded*."
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The figure within the band, to two decimal places."
+          },
+          "values": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioIndicatorValues",
+                "description": "The values taken in the band."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "StudioBinding": {
         "type": "object",
         "description": "A form question that binds the ValueSet.",
@@ -3780,6 +3833,32 @@
           }
         }
       },
+      "StudioDisaggregation": {
+        "type": "object",
+        "description": "The figure per band of one disaggregation: the bands add up to the whole.",
+        "required": [
+          "name",
+          "title",
+          "bands"
+        ],
+        "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioBand"
+            },
+            "description": "Its bands: an Age Band Set's in its order, or the codes found, then `not-recorded`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name: the stratifier's code, or the Age Band Set's `url|version`."
+          },
+          "title": {
+            "type": "string",
+            "description": "What a person reads: the Age Band Set's title, or the name."
+          }
+        }
+      },
       "StudioElementChange": {
         "type": "object",
         "description": "One changed element of a changed artefact.",
@@ -4168,9 +4247,17 @@
         "required": [
           "reference",
           "reason",
-          "picked"
+          "picked",
+          "bands"
         ],
         "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its band in each of the indicator's disaggregations, in order: a band's code, or\n`not-recorded` (#552)."
+          },
           "date": {
             "type": [
               "string",
@@ -4213,6 +4300,7 @@
           "period",
           "calculation",
           "count",
+          "disaggregations",
           "patients",
           "errors"
         ],
@@ -4235,6 +4323,13 @@
             "format": "int64",
             "description": "The denominator of a percentage, rate or ratio.",
             "minimum": 0
+          },
+          "disaggregations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDisaggregation"
+            },
+            "description": "The figure per band of each of the indicator's disaggregations, in order (#552)."
           },
           "errors": {
             "type": "array",

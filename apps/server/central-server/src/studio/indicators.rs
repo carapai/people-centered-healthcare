@@ -9,15 +9,22 @@
 //! value was the one taken (#549). Criteria may read `%periodStart`, `%periodEnd` and
 //! `%previousPeriods`, and refer to another indicator of the package by `url|version`
 //! (`%indicators`), which is evaluated over the same period and test patients first (#550).
+//! The figure is also given per band of each of the indicator's disaggregations (#552): an Age
+//! Band Set pinned to `url|version`, looked up among every published version and the draft's own
+//! sets, or a coded value, each with a *not recorded* band; each record says its band.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use health_access_policy::Subject;
-use health_analytics::{Calculation, Observed, Period, PeriodType, Reason};
+use health_analytics::{
+    AgeBandSet, Calculation, DisaggregationSource, Indicator, NOT_RECORDED, Observed, Period,
+    PeriodType, Reason, Summary, pinned,
+};
 use health_analytics_app::{
-    Library, PatientRecords, evaluate, is_test_patient, measure, test_patient,
+    Library, PatientRecords, age_band_set, evaluate, is_age_band_set, is_test_patient, measure,
+    test_patient,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -122,6 +129,9 @@ pub(crate) struct StudioIndicatorRecord {
     /// Whether its value is the one taken for its counted thing (its person's or enrollment's
     /// first or last).
     pub(crate) picked: bool,
+    /// Its band in each of the indicator's disaggregations, in order: a band's code, or
+    /// `not-recorded` (#552).
+    pub(crate) bands: Vec<String>,
 }
 
 /// One test patient, counted or not.
@@ -168,10 +178,43 @@ pub(crate) struct StudioIndicatorTry {
     pub(crate) denominator: Option<u64>,
     /// The values taken, for a sum, average, median, minimum, maximum or distinct count.
     pub(crate) values: Option<StudioIndicatorValues>,
+    /// The figure per band of each of the indicator's disaggregations, in order (#552).
+    pub(crate) disaggregations: Vec<StudioDisaggregation>,
     /// Every test patient, counted or not, in file order.
     pub(crate) patients: Vec<StudioIndicatorPatient>,
     /// Test patients that could not be read, and records that could not be evaluated.
     pub(crate) errors: Vec<String>,
+}
+
+/// The figure per band of one disaggregation: the bands add up to the whole.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioDisaggregation {
+    /// Its name: the stratifier's code, or the Age Band Set's `url|version`.
+    pub(crate) name: String,
+    /// What a person reads: the Age Band Set's title, or the name.
+    pub(crate) title: String,
+    /// Its bands: an Age Band Set's in its order, or the codes found, then `not-recorded`.
+    pub(crate) bands: Vec<StudioBand>,
+}
+
+/// One band's figure, its numerator and denominator both within the band.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioBand {
+    /// Its code: an age band's (`15-19`, `25+`), a coded value, or `not-recorded`.
+    pub(crate) code: String,
+    /// What a person reads: `15–19 years`, the code, or *Not recorded*.
+    pub(crate) label: String,
+    /// The figure within the band, to two decimal places.
+    #[schema(value_type = Option<f64>)]
+    pub(crate) value: Option<serde_json::Number>,
+    /// How many are counted in the band: its numerator.
+    pub(crate) count: u64,
+    /// The band's denominator, for a percentage, rate or ratio.
+    pub(crate) denominator: Option<u64>,
+    /// The values taken in the band.
+    pub(crate) values: Option<StudioIndicatorValues>,
 }
 
 /// The values a continuous-variable indicator took, as roll-up needs them.
@@ -206,6 +249,60 @@ fn shown_value(value: &Result<Option<Observed>, String>) -> Option<String> {
         Ok(Some(Observed::Code(code))) => Some(code.clone()),
         _ => None,
     }
+}
+
+fn values(summary: &Summary) -> Option<StudioIndicatorValues> {
+    summary.values.as_ref().map(|v| StudioIndicatorValues {
+        count: v.count,
+        sum: v.sum.map(exact),
+        minimum: v.minimum.map(exact),
+        maximum: v.maximum.map(exact),
+    })
+}
+
+/// The disaggregations of `summary`, titled and labelled from the indicator and its sets.
+fn disaggregations(
+    indicator: &Indicator,
+    summary: &Summary,
+    sets: &[AgeBandSet],
+) -> Vec<StudioDisaggregation> {
+    indicator
+        .disaggregations
+        .iter()
+        .zip(&summary.disaggregations)
+        .map(|(disaggregation, by)| {
+            let set = match &disaggregation.source {
+                DisaggregationSource::AgeBands(reference) => pinned(reference, sets).ok(),
+                DisaggregationSource::Coded(_) => None,
+            };
+            StudioDisaggregation {
+                name: by.name.clone(),
+                title: set.map_or_else(|| by.name.clone(), |s| s.title.clone()),
+                bands: by
+                    .bands
+                    .iter()
+                    .map(|band| StudioBand {
+                        code: band.code.clone(),
+                        label: if band.code == NOT_RECORDED {
+                            "Not recorded".to_owned()
+                        } else {
+                            set.and_then(|s| {
+                                s.bands
+                                    .iter()
+                                    .find(|b| b.code() == band.code)
+                                    .map(|b| b.label(s.unit))
+                            })
+                            .unwrap_or_else(|| band.code.clone())
+                        },
+                        value: band.summary.value.map(exact),
+                        count: band.summary.count,
+                        denominator: band.summary.denominator,
+                        values: values(&band.summary),
+                    })
+                    .collect(),
+            }
+        })
+        .collect()
 }
 
 fn unprocessable(detail: impl Into<String>) -> Response {
@@ -263,6 +360,10 @@ pub(crate) async fn try_indicator(
         Ok(period) => period,
         Err(error) => return unprocessable(error.to_string()),
     };
+    let mut sets: Vec<AgeBandSet> = match studio.publications.age_band_sets().await {
+        Ok(published) => published.into_iter().map(|p| p.set).collect(),
+        Err(error) => return failure(&error),
+    };
     let mut errors = Vec::new();
     let mut tested = Vec::new();
     let mut indicators = Vec::new();
@@ -270,6 +371,14 @@ pub(crate) async fn try_indicator(
         let Ok(file) = serde_json::from_slice::<Value>(bytes) else {
             continue;
         };
+        if is_age_band_set(&file) {
+            // The draft's own sets, as it holds them, stand in for a published version.
+            if let Ok(set) = age_band_set(&file).age_band_set() {
+                sets.retain(|s| s.canonical() != set.canonical());
+                sets.push(set);
+            }
+            continue;
+        }
         if file["resourceType"] == "Measure" {
             indicators.extend(measure(&file).indicator().ok());
             continue;
@@ -288,7 +397,7 @@ pub(crate) async fn try_indicator(
     let records: Vec<PatientRecords> = tested.iter().map(|(_, t)| t.records.clone()).collect();
     // The posted Measure stands in for its saved file.
     indicators.push(indicator.clone());
-    let library = Library::new(indicators);
+    let library = Library::new(indicators).with_age_band_sets(sets.clone());
     let count = match evaluate(
         studio.engine.as_ref(),
         &library,
@@ -329,6 +438,14 @@ pub(crate) async fn try_indicator(
                         error,
                         value: shown_value(&record.value),
                         picked: record.picked,
+                        bands: record
+                            .strata
+                            .iter()
+                            .map(|s| match s {
+                                Ok(Some(code)) => code.clone(),
+                                _ => NOT_RECORDED.to_owned(),
+                            })
+                            .collect(),
                     }
                 })
                 .collect(),
@@ -350,12 +467,8 @@ pub(crate) async fn try_indicator(
         value: summary.value.map(exact),
         count: summary.count,
         denominator: summary.denominator,
-        values: summary.values.as_ref().map(|v| StudioIndicatorValues {
-            count: v.count,
-            sum: v.sum.map(exact),
-            minimum: v.minimum.map(exact),
-            maximum: v.maximum.map(exact),
-        }),
+        values: values(summary),
+        disaggregations: disaggregations(&indicator, summary, &sets),
         patients,
         errors,
     })

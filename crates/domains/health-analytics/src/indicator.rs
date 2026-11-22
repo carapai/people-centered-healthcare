@@ -13,7 +13,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::age_bands::is_pinned;
+use crate::disaggregation::{Disaggregation, DisaggregationDefinition, DisaggregationSource};
 use crate::membership::{Reference, references};
 
 /// The FHIRPath expression language, as a FHIR `Expression.language`.
@@ -390,7 +390,7 @@ impl Expression {
     }
 
     /// The FHIRPath it holds, or why it holds none.
-    fn fhirpath_text(&self) -> Result<&str, String> {
+    pub(crate) fn fhirpath_text(&self) -> Result<&str, String> {
         match (self.language.as_deref(), self.expression.as_deref()) {
             (Some(FHIRPATH), Some(text)) if !text.trim().is_empty() => Ok(text),
             (Some(FHIRPATH), _) => Err("has no expression".into()),
@@ -441,8 +441,8 @@ pub struct MeasureDefinition {
     pub populations: Vec<PopulationDefinition>,
     /// How many groups it has.
     pub groups: usize,
-    /// The Age Band Sets it disaggregates by, each as written: `url|version` (#551).
-    pub age_band_sets: Vec<String>,
+    /// What it is broken down by: its first group's stratifiers, in order (#551, #552).
+    pub disaggregations: Vec<DisaggregationDefinition>,
 }
 
 /// An indicator without problems: what evaluation takes.
@@ -472,14 +472,25 @@ pub struct Indicator {
     pub populations: BTreeMap<PopulationKind, String>,
     /// The other indicators' sides its criteria require a patient to be in (#550).
     pub references: BTreeSet<Reference>,
-    /// The Age Band Sets it disaggregates by, each pinned to `url|version` (#551).
-    pub age_band_sets: Vec<String>,
+    /// What it is broken down by, in order (#552).
+    pub disaggregations: Vec<Disaggregation>,
 }
 
 impl Indicator {
     /// Its canonical reference, `url|version`.
     pub fn canonical(&self) -> String {
         format!("{}|{}", self.url, self.version)
+    }
+
+    /// The Age Band Sets it disaggregates by, each pinned to `url|version` (#551).
+    pub fn age_band_sets(&self) -> Vec<&str> {
+        self.disaggregations
+            .iter()
+            .filter_map(|d| match &d.source {
+                DisaggregationSource::AgeBands(set) => Some(set.as_str()),
+                DisaggregationSource::Coded(_) => None,
+            })
+            .collect()
     }
 
     /// The criteria of `population`.
@@ -696,11 +707,22 @@ impl MeasureDefinition {
             }
             _ => {}
         }
-        for set in &self.age_band_sets {
-            if !is_pinned(set) {
-                problems.push(format!(
-                    "the indicator disaggregates by the Age Band Set {set}, which is not pinned to a version (url|version)"
-                ));
+        let mut disaggregations: Vec<Disaggregation> = Vec::new();
+        for (n, written) in self.disaggregations.iter().enumerate() {
+            match written.disaggregation(n + 1) {
+                Ok(disaggregation) => {
+                    if disaggregations
+                        .iter()
+                        .any(|d| d.name == disaggregation.name)
+                    {
+                        problems.push(format!(
+                            "the indicator disaggregates by {} twice",
+                            disaggregation.name
+                        ));
+                    }
+                    disaggregations.push(disaggregation);
+                }
+                Err(found) => problems.extend(found),
             }
         }
         let canonical = format!("{url}|{version}");
@@ -722,7 +744,7 @@ impl MeasureDefinition {
                 period_date,
                 populations,
                 references: referred,
-                age_band_sets: self.age_band_sets.clone(),
+                disaggregations,
                 value: value.map(|(_, value)| value),
             }),
             _ => Err(problems),
@@ -850,7 +872,10 @@ mod tests {
                 ..PopulationDefinition::default()
             }],
             groups: 1,
-            age_band_sets: vec!["https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into()],
+            disaggregations: vec![DisaggregationDefinition {
+                age_band_set: Some("https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into()),
+                ..DisaggregationDefinition::default()
+            }],
         }
     }
 
@@ -925,17 +950,72 @@ mod tests {
     fn an_indicator_pins_the_age_band_sets_it_disaggregates_by() {
         let indicator = anc_first_visits().indicator().expect("an indicator");
         assert_eq!(
-            indicator.age_band_sets,
+            indicator.age_band_sets(),
             ["https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"]
         );
         let unpinned = MeasureDefinition {
-            age_band_sets: vec!["https://health.go.ug/fhir/Library/age-bands-anc".into()],
+            disaggregations: vec![DisaggregationDefinition {
+                age_band_set: Some("https://health.go.ug/fhir/Library/age-bands-anc".into()),
+                ..DisaggregationDefinition::default()
+            }],
             ..anc_first_visits()
         };
         assert_eq!(
             unpinned.problems(),
             [
                 "the indicator disaggregates by the Age Band Set https://health.go.ug/fhir/Library/age-bands-anc, which is not pinned to a version (url|version)"
+            ]
+        );
+    }
+
+    #[test]
+    fn an_indicator_disaggregates_by_age_bands_or_by_a_coded_value() {
+        let hiv = DisaggregationDefinition {
+            code: Some("hiv-status".into()),
+            criteria: Some(Expression::fhirpath("%patient.extension.value.code")),
+            ..DisaggregationDefinition::default()
+        };
+        let mut measure = anc_first_visits();
+        measure.disaggregations.push(hiv.clone());
+        let indicator = measure.indicator().expect("an indicator");
+        assert_eq!(
+            indicator.disaggregations,
+            [
+                Disaggregation {
+                    name: "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into(),
+                    source: DisaggregationSource::AgeBands(
+                        "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into()
+                    ),
+                },
+                Disaggregation {
+                    name: "hiv-status".into(),
+                    source: DisaggregationSource::Coded("%patient.extension.value.code".into()),
+                },
+            ]
+        );
+        let measure = MeasureDefinition {
+            disaggregations: vec![
+                hiv.clone(),
+                hiv.clone(),
+                DisaggregationDefinition {
+                    criteria: Some(Expression::fhirpath("%patient.gender")),
+                    ..DisaggregationDefinition::default()
+                },
+                DisaggregationDefinition::default(),
+                DisaggregationDefinition {
+                    age_band_set: Some("https://x/Library/a|1".into()),
+                    ..hiv
+                },
+            ],
+            ..anc_first_visits()
+        };
+        assert_eq!(
+            measure.problems(),
+            [
+                "the indicator disaggregates by hiv-status twice",
+                "disaggregation 3 has no code: the name a Report shows it by",
+                "disaggregation 4 names neither an Age Band Set nor the expression giving its code",
+                "disaggregation 5 is both by an Age Band Set and by a coded value",
             ]
         );
     }
