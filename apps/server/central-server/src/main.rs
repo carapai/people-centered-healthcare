@@ -12,6 +12,7 @@
 //! `tools/codegen` generates `@health/api-client` from it (client-application.md § Types).
 
 mod activation;
+mod analytics;
 mod auth;
 mod backup;
 mod config;
@@ -129,6 +130,15 @@ async fn open_database(
                     match seed::run(&store, path).await {
                         Ok(added) => tracing::info!(added, "development FHIR seed written"),
                         Err(reason) => tracing::error!(error.kind = reason, "seed refused"),
+                    }
+                }
+                if let Some(path) = &config.dev_indicator_summaries {
+                    let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock));
+                    match seed::indicator_summaries(&store, path).await {
+                        Ok(received) => {
+                            tracing::info!(received, "development indicator summaries received");
+                        }
+                        Err(reason) => tracing::error!(error.kind = reason, "summaries refused"),
                     }
                 }
                 // Package activation (#89): the national set, and the definitions it serves.

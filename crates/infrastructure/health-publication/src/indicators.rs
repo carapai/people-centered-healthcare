@@ -199,3 +199,39 @@ pub(crate) async fn run_tests(engine: &dyn FhirPathEngine, package: &Packed) -> 
     }
     failed
 }
+
+impl crate::Publications {
+    /// Every indicator of every published package version, by `url|version` (#599): what
+    /// central's data explorer offers and rolls up, since only published indicators are computed
+    /// on the edges.
+    pub async fn published_indicators(
+        &self,
+    ) -> Result<Vec<health_analytics::Indicator>, crate::Error> {
+        use health_configuration::lifecycle::{Lifecycle, Stage};
+        let mut tx = self.begin().await?;
+        let lifecycles = tx.package_lifecycles().await.map_err(crate::failed)?;
+        drop(tx);
+        let mut found = BTreeMap::new();
+        for json in lifecycles {
+            let lifecycle: Lifecycle = serde_json::from_str(&json).map_err(crate::failed)?;
+            if lifecycle.stage != Stage::Published {
+                continue;
+            }
+            let packed = self.packed(&lifecycle.content).await?;
+            for (path, bytes) in &packed.files {
+                if path.contains('/') || !path.ends_with(".json") {
+                    continue;
+                }
+                let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
+                    continue;
+                };
+                if value["resourceType"] == "Measure"
+                    && let Ok(indicator) = measure(&value).indicator()
+                {
+                    found.insert(indicator.canonical(), indicator);
+                }
+            }
+        }
+        Ok(found.into_values().collect())
+    }
+}

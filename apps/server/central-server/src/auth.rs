@@ -409,6 +409,25 @@ pub(crate) fn routes(
                 subject_layer,
             )),
         );
+        // The data explorer (#599): figures from the facilities' synced summaries, over the
+        // session's area.
+        api = api.nest(
+            "/analytics",
+            crate::analytics::router(
+                fhir_store.clone(),
+                crate::analytics::Catalogue::Published(
+                    settings
+                        .files
+                        .as_ref()
+                        .map(|blobs| publications(fhir_store.clone(), blobs.clone())),
+                ),
+            )
+            .layer(axum::middleware::from_fn(signed_in))
+            .layer(axum::middleware::from_fn_with_state(
+                subjects.clone(),
+                subject_layer,
+            )),
+        );
         let Routes {
             fhir,
             reviews,
@@ -1051,6 +1070,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/laboratory/{*rest}", service.clone())
         .route_service("/api/studio/{*rest}", service.clone())
         .route_service("/api/places/{*rest}", service.clone())
+        .route_service("/api/analytics/{*rest}", service.clone())
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
         .route_service("/api/care-plans/{*rest}", service.clone())

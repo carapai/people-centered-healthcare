@@ -1,0 +1,65 @@
+{
+  "resourceType": "Measure",
+  "id": "sample-anc-first-visits",
+  "url": "https://health.go.ug/fhir/Measure/sample-anc-first-visits",
+  "version": "1.0.0",
+  "name": "SampleAncFirstVisits",
+  "title": "ANC 1st visits (sample)",
+  "status": "active",
+  "description": "A sample for the data explorer on a local backend (#599): Women whose first antenatal care visit was in the period, each counted once (HMIS 105, ANC 1st visit).",
+  "extension": [
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-period-date",
+      "valueExpression": {
+        "language": "text/fhirpath",
+        "expression": "Encounter.actualPeriod.start",
+        "description": "When the visit started"
+      }
+    },
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-counts",
+      "valueCode": "people"
+    }
+  ],
+  "scoring": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/measure-scoring",
+        "code": "cohort"
+      }
+    ]
+  },
+  "basis": "Encounter",
+  "group": [
+    {
+      "population": [
+        {
+          "code": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-population",
+                "code": "initial-population"
+              }
+            ]
+          },
+          "description": "A first ANC visit by a woman",
+          "criteria": {
+            "language": "text/fhirpath",
+            "expression": "Encounter.type.coding.where(system = 'https://health.go.ug/fhir/CodeSystem/anc-visit-type' and code = 'first').exists() and %patient.gender = 'female'"
+          }
+        }
+      ],
+      "stratifier": [
+        {
+          "extension": [
+            {
+              "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-age-band-set",
+              "valueCanonical": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"
+            }
+          ],
+          "description": "By MoH's ANC age bands: the woman's age in whole years at the end of the period"
+        }
+      ]
+    }
+  ]
+}

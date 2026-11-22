@@ -215,6 +215,69 @@ impl Period {
     }
 }
 
+/// The period types dashboards offer (ADR 0075): weeks, months, quarters and financial years.
+/// Every Facility Edge Node computes each indicator for them, whatever its Reports ask for.
+pub const STANDARD_PERIODS: [PeriodType; 4] = [
+    PeriodType::Weekly,
+    PeriodType::Monthly,
+    PeriodType::Quarterly,
+    PeriodType::FinancialJuly,
+];
+
+/// The most periods a range may hold: two years of weeks.
+pub const MOST_PERIODS: usize = 106;
+
+/// Why a range of periods could not be read.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RangeError {
+    /// One end is not a period of the type.
+    #[error(transparent)]
+    Period(#[from] PeriodError),
+    /// The type is not one dashboards offer.
+    #[error("{0:?} is not a standard period type: pick weeks, months, quarters or financial years")]
+    NotStandard(PeriodType),
+    /// The first period is after the last.
+    #[error("{from} is after {to}")]
+    Backwards {
+        /// The first period.
+        from: String,
+        /// The last period.
+        to: String,
+    },
+    /// It holds more than [`MOST_PERIODS`].
+    #[error("a range holds at most {MOST_PERIODS} periods")]
+    TooLong,
+}
+
+impl Period {
+    /// The standard periods of type `kind` from `from` to `to`, both included (ADR 0075): a
+    /// range of whole periods, never arbitrary dates, since a summary cannot be split.
+    pub fn range(kind: PeriodType, from: &str, to: &str) -> Result<Vec<Self>, RangeError> {
+        if !STANDARD_PERIODS.contains(&kind) {
+            return Err(RangeError::NotStandard(kind));
+        }
+        let first = Self::parse(kind, from)?;
+        let last = Self::parse(kind, to)?;
+        if first.start > last.start {
+            return Err(RangeError::Backwards {
+                from: first.id,
+                to: last.id,
+            });
+        }
+        let mut periods = vec![first];
+        while let Some(current) = periods.last()
+            && current.start < last.start
+        {
+            if periods.len() == MOST_PERIODS {
+                return Err(RangeError::TooLong);
+            }
+            let Some(next) = current.next() else { break };
+            periods.push(next);
+        }
+        Ok(periods)
+    }
+}
+
 /// How many periods back *in the previous N periods* can reach: `%previousPeriods.start` holds
 /// this many starts.
 pub const PREVIOUS_PERIODS: usize = 60;
@@ -378,6 +441,56 @@ mod tests {
         assert_eq!(local_date("2026-03"), None);
         assert_eq!(local_date("2026"), None);
         assert_eq!(local_date("not a date"), None);
+    }
+
+    #[test]
+    fn a_range_is_whole_standard_periods_from_the_first_to_the_last() {
+        let ids = |kind, from, to| -> Vec<String> {
+            Period::range(kind, from, to)
+                .expect("range")
+                .into_iter()
+                .map(|p| p.id)
+                .collect()
+        };
+        assert_eq!(
+            ids(PeriodType::Monthly, "2025-11", "2026-02"),
+            ["2025-11", "2025-12", "2026-01", "2026-02"]
+        );
+        assert_eq!(ids(PeriodType::Quarterly, "2026Q1", "2026Q1"), ["2026Q1"]);
+        assert_eq!(
+            ids(PeriodType::Weekly, "2025W52", "2026W02"),
+            ["2025W52", "2026W01", "2026W02"]
+        );
+        assert_eq!(
+            ids(PeriodType::FinancialJuly, "2024July", "2025July"),
+            ["2024July", "2025July"]
+        );
+    }
+
+    #[test]
+    fn a_range_of_dates_or_of_other_types_is_refused() {
+        assert!(matches!(
+            Period::range(PeriodType::Monthly, "2026-01-05", "2026-02-10"),
+            Err(RangeError::Period(_))
+        ));
+        assert_eq!(
+            Period::range(PeriodType::Annual, "2025", "2026"),
+            Err(RangeError::NotStandard(PeriodType::Annual))
+        );
+        assert!(matches!(
+            Period::range(PeriodType::Monthly, "2026-03", "2026-01"),
+            Err(RangeError::Backwards { .. })
+        ));
+        assert_eq!(
+            Period::range(PeriodType::Weekly, "2020W01", "2026W01"),
+            Err(RangeError::TooLong)
+        );
+        assert_eq!(
+            Period::range(PeriodType::Weekly, "2024W01", "2025W52")
+                .expect("two years")
+                .len(),
+            104
+        );
     }
 
     #[test]

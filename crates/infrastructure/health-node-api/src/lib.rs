@@ -17,7 +17,8 @@
 //!   candidates other nodes send, and runs the active packages' definitions.
 //! - **Indicators** (#554): [`indicators::spawn_indicators`] computes the facility's indicators
 //!   from the node's change log, with the active packages' Measures, and keeps a summary
-//!   `MeasureReport` per indicator, period and facility.
+//!   `MeasureReport` per indicator, period and facility. With [`Clinical::with_explorer`],
+//!   **`/api/analytics`** answers the data explorer from them, offline ([`analytics`], #599).
 //! - **Search** uses the parameters central does (`health_fhir_server::search_registry`), and a
 //!   submitted form is re-validated against its Questionnaire and extracted (#103), with the
 //!   definitions central sends down.
@@ -47,6 +48,7 @@ use health_surrealdb::{Connection, SurrealStore};
 use health_time::SystemClock;
 use tower::ServiceExt as _;
 
+pub mod analytics;
 pub mod indicators;
 pub mod workflows;
 
@@ -70,6 +72,9 @@ pub struct Clinical {
     payments: Option<(health_fhir_server::PaymentConfig, Router)>,
     /// The node's attachment store: attachments not held there read as pending (ADR 0021).
     attachments: Option<health_files::FsBlobStore>,
+    /// The data explorer at `/api/analytics` (#599): the package tarballs its indicators are
+    /// read from, and the facility.
+    explorer: Option<(health_files::FsBlobStore, String)>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
 }
 
@@ -113,6 +118,7 @@ impl Clinical {
             workflows: None,
             payments: None,
             attachments: None,
+            explorer: None,
             built: Arc::new(RwLock::new(None)),
         }
     }
@@ -121,6 +127,14 @@ impl Clinical {
     #[must_use]
     pub fn with_attachments(mut self, blobs: health_files::FsBlobStore) -> Self {
         self.attachments = Some(blobs);
+        self
+    }
+
+    /// Answers the data explorer at `/api/analytics` (#599) from `facility`'s own summaries, with
+    /// the active packages' indicators read from `blobs`.
+    #[must_use]
+    pub fn with_explorer(mut self, blobs: health_files::FsBlobStore, facility: &str) -> Self {
+        self.explorer = Some((blobs, facility.to_owned()));
         self
     }
 
@@ -201,7 +215,14 @@ impl Clinical {
         let layer =
             axum::middleware::from_fn_with_state(subjects, subject_layer::<SurrealAuthStore>);
         let signed = || axum::middleware::from_fn(signed_in);
+        let analytics = match &self.explorer {
+            Some((blobs, facility)) => {
+                analytics::router(self.store.clone(), blobs.clone(), facility.clone())
+            }
+            None => Router::new(),
+        };
         Router::new()
+            .nest("/api/analytics", analytics.layer(signed()))
             .nest("/api/fhir", fhir.clone().router())
             // Inside the subject layer: refused before it is read without credentials (#140).
             .nest("/api/reception", fhir.reception_router().layer(signed()))
@@ -238,9 +259,9 @@ impl Clinical {
         Ok(Some(router))
     }
 
-    /// `/api/fhir`, `/api/reception`, `/api/consultation`, `/api/notes`, `/api/workflow` and
-    /// `/api/payments`, to be put behind the device gate. Without workflows or payments, those
-    /// answer 404.
+    /// `/api/fhir`, `/api/reception`, `/api/consultation`, `/api/notes`, `/api/workflow`,
+    /// `/api/payments` and `/api/analytics`, to be put behind the device gate. Without workflows,
+    /// payments or the explorer, those answer 404.
     pub fn routes(self) -> Router {
         let mut router = Router::new();
         for prefix in [
@@ -250,6 +271,7 @@ impl Clinical {
             "/api/notes",
             "/api/workflow",
             "/api/payments",
+            "/api/analytics",
         ] {
             router = router
                 .route(prefix, any(serve))

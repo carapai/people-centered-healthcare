@@ -16,6 +16,7 @@ import { join, resolve } from 'node:path'
 
 import { activity } from './activity'
 import { seed, signIn } from './seed'
+import { sampleSummaries } from './summaries'
 import { ADMIN_PERMISSIONS, OTP_OUTBOX, USERS } from './users'
 
 // Ports may be moved, e.g. to run a second backend beside one already running, with the app's
@@ -138,10 +139,13 @@ const env = {
       JSON.parse(readFileSync(new URL('../../../packages/reference-packages/sources/lab-test.json', import.meta.url), 'utf8')),
     ]),
   ),
+  // Sample indicator summaries for the data explorer (#599; e2e/summaries.ts), received at startup
+  // as if KAM013's, KAM020's and WAK001's edges had synced them; KAM031 never has.
+  HEALTH_DEV_INDICATOR_SUMMARIES: file('indicator-summaries.json', JSON.stringify(sampleSummaries(new Date()))),
   HEALTH_ACCESS_POLICY_FILE: file(
     'access-policy.json',
     JSON.stringify({
-      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], district: ['Organization.rs', 'Location.rs'], author: ['metadata.author'], approver: ['metadata.approve'], publisher: ['metadata.publish', 'configuration.activate'], admin: ADMIN_PERMISSIONS },
+      roles: { clerk: ['Patient.crs', 'caregiver.manage', 'encounters.checkin', 'queues.view'], reviewer: ['Patient.crus', 'registry.review'], storekeeper: ['stock.manage'], cashier: ['payments.cash'], supervisor: ['payments.cash', 'payments.supervise'], nurse: ['workflow.work', 'Questionnaire.rs', 'QuestionnaireResponse.crus', 'Patient.crs', 'queues.view', 'queues.work', 'Observation.crus', 'encounters.manage'], clinician: ['Patient.rs', 'ServiceRequest.rs', 'Appointment.rs', 'AllergyIntolerance.rs', 'Condition.rs', 'MedicationRequest.rs', 'Observation.rs', 'Encounter.rs', 'EpisodeOfCare.rs', 'queues.view', 'queues.work', 'encounters.manage', 'consultation.document', 'orders.request', 'medications.prescribe', 'results.review', 'workflow.work', 'DiagnosticReport.rs', 'Composition.rs', 'careplans.manage'], pharmacist: ['Patient.rs', 'pharmacy.view', 'pharmacy.dispense'], labtech: ['Patient.rs', 'workflow.work', 'laboratory.work', 'laboratory.verify'], studio: ['metadata.review', 'metadata.approve'], district: ['Organization.rs', 'Location.rs', 'reporting.view'], author: ['metadata.author'], approver: ['metadata.approve'], publisher: ['metadata.publish', 'configuration.activate'], admin: ADMIN_PERMISSIONS },
       labels: [],
     }),
   ),
@@ -206,6 +210,9 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
   for (const [source, id] of [
     [resolve(import.meta.dirname, 'fixtures/clinic'), 'ug.moh.clinic@1.0.0'],
     [resolve(import.meta.dirname, '../../../packages/reference-packages/core'), 'ug.moh.core@1.0.0'],
+    // Sample indicators (e2e/fixtures/indicators), published so the data explorer offers them
+    // over the sample summaries (#599); after the core, whose ANC age bands they pin.
+    [resolve(import.meta.dirname, 'fixtures/indicators'), 'ug.moh.sample-indicators@1.0.0'],
   ] as const) {
     for (const step of [
       ['draft', source, '--by', author],
