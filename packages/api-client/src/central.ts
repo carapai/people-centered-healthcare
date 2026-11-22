@@ -148,6 +148,35 @@ export const StudioArtefactChange = z.object({
 })
 export type StudioArtefactChange = z.infer<typeof StudioArtefactChange>
 
+/** The values a continuous-variable indicator took, as roll-up needs them. */
+export const StudioIndicatorValues = z.object({
+  /** How many. */
+  "count": integer,
+  /** The largest, if they are numbers. */
+  "maximum": decimal.nullable().optional(),
+  /** The smallest, if they are numbers. */
+  "minimum": decimal.nullable().optional(),
+  /** Their sum, if they are numbers. */
+  "sum": decimal.nullable().optional(),
+})
+export type StudioIndicatorValues = z.infer<typeof StudioIndicatorValues>
+
+/** One band's figure, its numerator and denominator both within the band. */
+export const StudioBand = z.object({
+  /** Its code: an age band's (`15-19`, `25+`), a coded value, or `not-recorded`. */
+  "code": z.string(),
+  /** How many are counted in the band: its numerator. */
+  "count": integer,
+  /** The band's denominator, for a percentage, rate or ratio. */
+  "denominator": integer.nullable().optional(),
+  /** What a person reads: `15–19 years`, the code, or *Not recorded*. */
+  "label": z.string(),
+  /** The figure within the band, to two decimal places. */
+  "value": decimal.nullable().optional(),
+  "values": StudioIndicatorValues.nullable().optional(),
+})
+export type StudioBand = z.infer<typeof StudioBand>
+
 /** A form question that binds the ValueSet. */
 export const StudioBinding = z.object({
   /** The question's `linkId`. */
@@ -552,6 +581,17 @@ export const StudioDesigns = z.object({
 })
 export type StudioDesigns = z.infer<typeof StudioDesigns>
 
+/** The figure per band of one disaggregation: the bands add up to the whole. */
+export const StudioDisaggregation = z.object({
+  /** Its bands: an Age Band Set's in its order, or the codes found, then `not-recorded`. */
+  "bands": z.array(StudioBand),
+  /** Its name: the stratifier's code, or the Age Band Set's `url|version`. */
+  "name": z.string(),
+  /** What a person reads: the Age Band Set's title, or the name. */
+  "title": z.string(),
+})
+export type StudioDisaggregation = z.infer<typeof StudioDisaggregation>
+
 /** Which ValueSet to expand. */
 export const StudioExpandInput = z.object({
   /** At most this many codes (200 unless asked, 1000 at most). */
@@ -659,6 +699,8 @@ export type StudioRecordReason = z.infer<typeof StudioRecordReason>
 
 /** One record's part. */
 export const StudioIndicatorRecord = z.object({
+  /** Its band in each of the indicator's disaggregations, in order: a band's code, or `not-recorded` (#552). */
+  "bands": z.array(z.string()),
   /** Its period date, if it has one. */
   "date": z.string().nullable().optional(),
   /** Why it could not be evaluated, if it could not. */
@@ -695,19 +737,6 @@ export const StudioIndicatorPatient = z.object({
 })
 export type StudioIndicatorPatient = z.infer<typeof StudioIndicatorPatient>
 
-/** The values a continuous-variable indicator took, as roll-up needs them. */
-export const StudioIndicatorValues = z.object({
-  /** How many. */
-  "count": integer,
-  /** The largest, if they are numbers. */
-  "maximum": decimal.nullable().optional(),
-  /** The smallest, if they are numbers. */
-  "minimum": decimal.nullable().optional(),
-  /** Their sum, if they are numbers. */
-  "sum": decimal.nullable().optional(),
-})
-export type StudioIndicatorValues = z.infer<typeof StudioIndicatorValues>
-
 /** A kind of reporting period. */
 export const StudioPeriodType = z.enum(["weekly", "monthly", "quarterly", "semiAnnual", "annual", "financialJuly"])
 export type StudioPeriodType = z.infer<typeof StudioPeriodType>
@@ -733,6 +762,8 @@ export const StudioIndicatorTry = z.object({
   "count": integer,
   /** The denominator of a percentage, rate or ratio. */
   "denominator": integer.nullable().optional(),
+  /** The figure per band of each of the indicator's disaggregations, in order (#552). */
+  "disaggregations": z.array(StudioDisaggregation),
   /** Test patients that could not be read, and records that could not be evaluated. */
   "errors": z.array(z.string()),
   /** Every test patient, counted or not, in file order. */

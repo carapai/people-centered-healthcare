@@ -4,7 +4,7 @@ Published Definition packages the platform ships as references (configuration.md
 
 | Package | What | Issue |
 |---|---|---|
-| `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*, *ANC 1st visits with the next visit booked*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549, #550 |
+| `anc/` (`ug.moh.anc`) | The ANC indicators (*ANC 1st visits*, *ANC 1st visit before 12 weeks*, the median gestational age at the first visit, *ANC visits*, *ANC 1st visits with the next visit booked*), the ANC visit types, and the test patients the indicator editor's *Try* evaluates them over | #548, #549, #550, #552 |
 | `core/` (`ug.moh.core`) | MoH's national core: the Age Band Sets HMIS reports disaggregate by (*MoH ANC age bands*, *MoH outpatient age bands*) | #551 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
 | `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
@@ -16,6 +16,7 @@ Published Definition packages the platform ships as references (configuration.md
 - **`Measure/anc-first-visits`** counts women whose first antenatal care visit was in the period, each once (`cohort`, basis `Encounter`, counting people).
   - **Period date:** `Encounter.actualPeriod.start`, when the visit started.
   - **Criteria** (`initial-population`): the visit's type is `first` in `CodeSystem/anc-visit-type`, and `%patient.gender` is `female`.
+  - **Disaggregated** (#552) by MoH's ANC age bands, `https://health.go.ug/fhir/Library/age-bands-anc|1.0.0` in `core/`: in March 2026, 15–19 Akello (17), 20–24 Nakato (23), 25+ Namubiru (31) and Nansubuga (26), none 10–14 or not recorded.
 - **`Measure/anc-first-visit-before-12-weeks`** (`proportion`, a percentage): the denominator is the same first visits; the numerator those where the gestational age Observation (LOINC `18185-9`) recorded at the visit, read through `%records`, is under 12 weeks.
 - **`Measure/anc-gestational-age-at-first-visit`** (`continuous-variable`, `median`): the gestational age at the first visit, each woman's first value.
 - **`Measure/anc-visits`** (`cohort`, counting visits): every ANC visit by a woman, first or follow-up.

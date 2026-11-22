@@ -40,7 +40,24 @@ fn patients() -> Vec<PatientRecords> {
         .collect()
 }
 
-/// Every ANC indicator, as *Try* and the edge take them.
+/// MoH's Age Band Sets, from the national core reference package (#551).
+fn moh_age_bands() -> Vec<health_analytics::AgeBandSet> {
+    let core =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../packages/reference-packages/core");
+    [
+        "Library-age-bands-anc.json",
+        "Library-age-bands-outpatient.json",
+    ]
+    .iter()
+    .map(|name| {
+        health_analytics_app::age_band_set(&read(&core.join(name)))
+            .age_band_set()
+            .expect("a set")
+    })
+    .collect()
+}
+
+/// Every ANC indicator, as *Try* and the edge take them, with MoH's Age Band Sets.
 fn library() -> Library {
     Library::new(
         std::fs::read_dir(anc())
@@ -53,6 +70,7 @@ fn library() -> Library {
             })
             .map(|p| measure(&read(&p)).indicator().expect("indicator")),
     )
+    .with_age_band_sets(moh_age_bands())
 }
 
 /// A count of people with an Encounter in the period meeting `criteria`.
@@ -321,7 +339,7 @@ async fn is_in_anc_first_visits_numerator_gives_the_same_people_as_evaluating_it
     ] {
         let direct = evaluated(
             &anc_measure("anc-first-visits"),
-            &Library::default(),
+            &Library::default().with_age_band_sets(moh_age_bands()),
             kind,
             id,
             &patients(),

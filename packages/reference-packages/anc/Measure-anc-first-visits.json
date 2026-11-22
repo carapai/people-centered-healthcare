@@ -48,6 +48,17 @@
             "expression": "Encounter.type.coding.where(system = 'https://health.go.ug/fhir/CodeSystem/anc-visit-type' and code = 'first').exists() and %patient.gender = 'female'"
           }
         }
+      ],
+      "stratifier": [
+        {
+          "extension": [
+            {
+              "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-age-band-set",
+              "valueCanonical": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"
+            }
+          ],
+          "description": "By MoH's ANC age bands: the woman's age in whole years at the end of the period"
+        }
       ]
     }
   ]

@@ -281,7 +281,7 @@ async fn an_indicator_pinned_to_version_1_keeps_its_bands_after_version_2_is_pub
         ["1.0.0 in ug.moh.core@1.0.0", "2.0.0 in ug.moh.core@2.0.0"]
     );
     let set = pinned(
-        &indicator.age_band_sets[0],
+        indicator.age_band_sets()[0],
         published.iter().map(|p| &p.set),
     )
     .expect("the pinned set");

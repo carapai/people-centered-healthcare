@@ -33,6 +33,12 @@
 //!   `{"unit": "years", "ageAt": "period-end", "bands": [{"from": 10, "to": 14}, {"from": 25}]}`.
 //!   A Measure names the sets it disaggregates by on its first group's stratifiers, each with
 //!   [`AGE_BAND_SET`] (`valueCanonical`, `url|version`).
+//! - **Disaggregations** (#552) are the first group's stratifiers, in order: one with
+//!   [`AGE_BAND_SET`] puts each record in the band of the patient's age (`%patient.birthDate`)
+//!   at the set's date (the period's start or end, or the record's period date); one with
+//!   `criteria` (FHIRPath, evaluated like the populations') puts it in the band of the code it
+//!   gives, named by the stratifier's `code`. No birth date, an age in no band, or no code is
+//!   *not recorded*. The pinned sets come from the [`Library`].
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -44,10 +50,10 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 pub use health_analytics::{AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE};
 use health_analytics::{
-    AgeBandSetDefinition, Aggregate, BandDefinition, BetweenDefinition, Calculation, Evaluation,
-    Expression, Indicator, MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS,
-    PatientOutcome, Period, PopulationDefinition, RecordOutcome, Side, ValueSource, calculate,
-    local_date,
+    AgeAt, AgeBandSet, AgeBandSetDefinition, Aggregate, BandDefinition, BetweenDefinition,
+    Calculation, DisaggregationDefinition, DisaggregationSource, Evaluation, Expression, Indicator,
+    MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS, PatientOutcome, Period,
+    PopulationDefinition, RecordOutcome, Side, ValueSource, calculate, local_date, pinned,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 use rust_decimal::Decimal;
@@ -137,12 +143,16 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
             .map(|e| expression(&e["valueExpression"]).unwrap_or_default()),
         populations,
         groups,
-        age_band_sets: resource["group"][0]["stratifier"]
+        disaggregations: resource["group"][0]["stratifier"]
             .as_array()
             .into_iter()
             .flatten()
-            .filter_map(|s| extension(s, AGE_BAND_SET))
-            .map(|e| text(&e["valueCanonical"]).unwrap_or_default())
+            .map(|s| DisaggregationDefinition {
+                code: code(&s["code"]).or_else(|| text(&s["code"]["text"])),
+                age_band_set: extension(s, AGE_BAND_SET)
+                    .map(|e| text(&e["valueCanonical"]).unwrap_or_default()),
+                criteria: expression(&s["criteria"]),
+            })
             .collect(),
     }
 }
@@ -375,6 +385,7 @@ fn enrollment(record: &Value) -> Option<String> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Library {
     indicators: BTreeMap<String, Indicator>,
+    age_band_sets: Vec<AgeBandSet>,
 }
 
 impl Library {
@@ -386,7 +397,21 @@ impl Library {
                 .into_iter()
                 .map(|indicator| (indicator.canonical(), indicator))
                 .collect(),
+            age_band_sets: Vec::new(),
         }
+    }
+
+    /// The library with `sets`, every published version of each, that indicators pin to
+    /// disaggregate by age (#552).
+    #[must_use]
+    pub fn with_age_band_sets(mut self, sets: impl IntoIterator<Item = AgeBandSet>) -> Self {
+        self.age_band_sets.extend(sets);
+        self
+    }
+
+    /// The Age Band Sets it holds.
+    pub fn age_band_sets(&self) -> &[AgeBandSet] {
+        &self.age_band_sets
     }
 
     /// The indicator `measure` (`url|version`) names.
@@ -437,8 +462,13 @@ fn memberships<'a>(
             if !evaluated.contains_key(measure) {
                 let mut chain = within.clone();
                 chain.push(measure.to_owned());
+                // Membership needs no bands.
+                let other = Indicator {
+                    disaggregations: Vec::new(),
+                    ..other.clone()
+                };
                 let evaluation =
-                    evaluate_within(engine, library, other, period, patients, chain).await?;
+                    evaluate_within(engine, library, &other, period, patients, chain).await?;
                 evaluated.insert(measure, evaluation);
             }
             for (member, sides) in evaluated[measure].members.iter().zip(&mut out) {
@@ -503,6 +533,22 @@ async fn evaluate_within(
         }
         None => {}
     }
+    let first_stratum = expressions.len();
+    let mut strata = Vec::with_capacity(indicator.disaggregations.len());
+    for disaggregation in &indicator.disaggregations {
+        match &disaggregation.source {
+            DisaggregationSource::AgeBands(reference) => {
+                let set = pinned(reference, library.age_band_sets()).map_err(|why| {
+                    format!("{} cannot be disaggregated: {why}", indicator.canonical())
+                })?;
+                strata.push(Stratum::Age(set));
+            }
+            DisaggregationSource::Coded(code) => {
+                strata.push(Stratum::Coded(expressions.len()));
+                expressions.push(code.clone());
+            }
+        }
+    }
     let distinct = indicator.calculation == Calculation::Value(Aggregate::DistinctCount);
     let mut outcomes = Vec::with_capacity(patients.len());
     for (patient, membership) in patients.iter().zip(&memberships) {
@@ -531,8 +577,16 @@ async fn evaluate_within(
                 .map(|r| r.map_err(|failure| failure.0))
                 .collect();
             results.resize(expressions.len(), Ok(Vec::new()));
+            let stratum_results = results.split_off(first_stratum);
             let mut value_results = results.split_off(first_value);
             let date = period_date(results.remove(0));
+            let strata = strata
+                .iter()
+                .map(|stratum| match stratum {
+                    Stratum::Age(set) => Ok(age_band(set, &patient.patient, period, &date)),
+                    Stratum::Coded(at) => coded(stratum_results[at - first_stratum].clone()),
+                })
+                .collect();
             let populations = kinds
                 .iter()
                 .copied()
@@ -560,6 +614,7 @@ async fn evaluate_within(
                 date,
                 populations,
                 value,
+                strata,
             });
         }
         outcomes.push(PatientOutcome {
@@ -567,5 +622,67 @@ async fn evaluate_within(
             records,
         });
     }
-    Ok(calculate(indicator, period, &outcomes))
+    Ok(calculate(
+        indicator,
+        period,
+        &outcomes,
+        library.age_band_sets(),
+    ))
+}
+
+/// How a record's band in one disaggregation is found.
+enum Stratum<'a> {
+    /// By the patient's age, in a pinned set.
+    Age(&'a AgeBandSet),
+    /// By the code an expression gives, at this index among the expressions.
+    Coded(usize),
+}
+
+/// The band of the patient's age in `set`, at the set's date; none without a birth date, before
+/// it, or at an age in none of the bands.
+fn age_band(
+    set: &AgeBandSet,
+    patient: &Value,
+    period: &Period,
+    date: &Result<Option<jiff::civil::Date>, String>,
+) -> Option<String> {
+    let birth = patient["birthDate"].as_str().and_then(local_date)?;
+    let at = match set.age_at {
+        AgeAt::PeriodStart => period.start,
+        AgeAt::PeriodEnd => period.end,
+        AgeAt::PeriodDate => (*date).clone().ok().flatten()?,
+    };
+    let age = set.unit.age(birth, at)?;
+    set.band(age).map(|band| band.code())
+}
+
+/// The code a FHIRPath result gives a coded disaggregation: none when it gives nothing.
+fn coded(result: Result<Vec<FhirPathItem>, String>) -> Result<Option<String>, String> {
+    let items = result?;
+    let item = match items.as_slice() {
+        [] => return Ok(None),
+        [item] => item,
+        more => {
+            return Err(format!(
+                "the disaggregation's code gave {} items, not one (add .first() or narrow it)",
+                more.len()
+            ));
+        }
+    };
+    match item {
+        FhirPathItem::String(code) | FhirPathItem::Temporal(code) | FhirPathItem::Decimal(code) => {
+            Ok(Some(code.clone()))
+        }
+        FhirPathItem::Integer(n) => Ok(Some(n.to_string())),
+        FhirPathItem::Boolean(b) => Ok(Some(b.to_string())),
+        FhirPathItem::Element(element) => match text(&element["code"]).or_else(|| code(element)) {
+            Some(code) => Ok(Some(code)),
+            None => Err(format!(
+                "the disaggregation's code gave {element}, not a code or a Coding"
+            )),
+        },
+        FhirPathItem::Quantity { value, .. } => Err(format!(
+            "the disaggregation's code gave the quantity {value}, not a code"
+        )),
+    }
 }

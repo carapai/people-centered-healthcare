@@ -27,12 +27,29 @@ fn anc_measure(name: &str) -> Value {
     read(&anc().join(format!("Measure-{name}.json")))
 }
 
+/// MoH's Age Band Sets, from the national core reference package (#551).
+fn moh_age_bands() -> Vec<health_analytics::AgeBandSet> {
+    let core =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../packages/reference-packages/core");
+    [
+        "Library-age-bands-anc.json",
+        "Library-age-bands-outpatient.json",
+    ]
+    .iter()
+    .map(|name| {
+        health_analytics_app::age_band_set(&read(&core.join(name)))
+            .age_band_set()
+            .expect("a set")
+    })
+    .collect()
+}
+
 async fn evaluated(resource: &Value, kind: PeriodType, id: &str) -> Evaluation {
     let indicator = measure(resource).indicator().expect("indicator");
     let period = Period::parse(kind, id).expect("period");
     evaluate(
         &OctofhirEngine::new(),
-        &Library::default(),
+        &Library::default().with_age_band_sets(moh_age_bands()),
         &indicator,
         &period,
         &patients(),
@@ -113,7 +130,7 @@ async fn each_patient_says_why_they_are_counted_or_not() {
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
     let count = evaluate(
         &OctofhirEngine::new(),
-        &Library::default(),
+        &Library::default().with_age_band_sets(moh_age_bands()),
         &indicator,
         &march,
         &patients(),
@@ -173,7 +190,7 @@ async fn the_period_and_the_patient_are_variables_of_the_criteria() {
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
     let count = evaluate(
         &OctofhirEngine::new(),
-        &Library::default(),
+        &Library::default().with_age_band_sets(moh_age_bands()),
         &indicator,
         &march,
         &patients(),
@@ -193,7 +210,7 @@ async fn criteria_that_cannot_be_evaluated_are_reported_per_record() {
     let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
     let count = evaluate(
         &OctofhirEngine::new(),
-        &Library::default(),
+        &Library::default().with_age_band_sets(moh_age_bands()),
         &indicator,
         &march,
         &patients(),
@@ -214,7 +231,7 @@ async fn criteria_that_cannot_be_evaluated_are_reported_per_record() {
     let indicator = measure(&resource).indicator().expect("indicator");
     let count = evaluate(
         &OctofhirEngine::new(),
-        &Library::default(),
+        &Library::default().with_age_band_sets(moh_age_bands()),
         &indicator,
         &march,
         &patients(),
