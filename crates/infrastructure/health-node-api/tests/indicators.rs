@@ -393,3 +393,79 @@ async fn recomputing_from_scratch_gives_what_the_incremental_path_gives() {
         .expect("recompute");
     assert_eq!(every_summary(&store).await, incremental);
 }
+
+/// #599: a facility user explores their facility's months on the edge, offline: the figures
+/// are the summaries this node computed, a median shows at facility level, and another place
+/// is refused.
+#[tokio::test]
+async fn a_facility_user_explores_their_facility_s_months_offline() {
+    use health_node_api::analytics::{explore_here, explorer_here};
+    let store = store().await;
+    let indicators = indicators();
+    let now = at("2026-04-03");
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("first run");
+    for (name, day) in [
+        ("auma", "2026-02-10"),
+        ("achan", "2026-03-04"),
+        ("atim", "2026-03-20"),
+    ] {
+        write(&store, &woman(name)).await;
+        write(&store, &first_visit(&format!("{name}-1"), name, day)).await;
+    }
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("run");
+
+    let offered = indicators.indicators();
+    let explorer = explorer_here(&store, offered, FACILITY).await;
+    assert_eq!(explorer["where"], "facility");
+    assert_eq!(explorer["place"]["code"], FACILITY);
+    let median = offered
+        .iter()
+        .find(|i| {
+            matches!(
+                i.calculation,
+                health_analytics::Calculation::Value(health_analytics::Aggregate::Median)
+            )
+        })
+        .expect("a median indicator")
+        .canonical();
+    let question = json!({
+        "indicators": [FIRST_VISITS, median],
+        "periodType": "monthly",
+        "from": "2026-01",
+        "to": "2026-03",
+        "places": [FACILITY],
+    });
+    let now: jiff::Timestamp = "2026-04-03T07:00:00Z".parse().expect("now");
+    let answer = explore_here(&store, offered, FACILITY, &question, now)
+        .await
+        .expect("explored");
+    let values: Vec<&Value> = answer["cells"]
+        .as_array()
+        .expect("cells")
+        .iter()
+        .filter(|c| c["indicator"] == FIRST_VISITS)
+        .map(|c| &c["value"])
+        .collect();
+    assert_eq!(values, [&json!("0"), &json!("1"), &json!("2")]);
+    // The median is the facility's own, not refused as above facility level.
+    assert!(
+        answer["cells"]
+            .as_array()
+            .expect("cells")
+            .iter()
+            .all(|c| c["facilityOnly"].is_null()),
+        "{answer}"
+    );
+
+    // Districts are explored at central.
+    let mut elsewhere = question.clone();
+    elsewhere["places"] = json!(["district-kampala"]);
+    let (status, _) = explore_here(&store, offered, FACILITY, &elsewhere, now)
+        .await
+        .expect_err("refused");
+    assert_eq!(status.as_u16(), 403);
+}

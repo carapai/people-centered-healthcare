@@ -15,6 +15,7 @@ import { Route as AreaRouteImport } from './routes/area'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as ConsultationRouteImport } from './routes/consultation'
 import { Route as EnrollRouteImport } from './routes/enroll'
+import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LaboratoryRouteImport } from './routes/laboratory'
@@ -90,6 +91,11 @@ const ConsultationRoute = ConsultationRouteImport.update({
 const EnrollRoute = EnrollRouteImport.update({
   id: '/enroll',
   path: '/enroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreRoute = ExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FormsRoute = FormsRouteImport.update({
@@ -331,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
+  '/explore': typeof ExploreRoute
   '/forms': typeof FormsRoute
   '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
@@ -385,6 +392,7 @@ export interface FileRoutesByTo {
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
+  '/explore': typeof ExploreRoute
   '/forms': typeof FormsRoute
   '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
@@ -440,6 +448,7 @@ export interface FileRoutesById {
   '/callback': typeof CallbackRoute
   '/consultation': typeof ConsultationRoute
   '/enroll': typeof EnrollRoute
+  '/explore': typeof ExploreRoute
   '/forms': typeof FormsRoute
   '/inbox': typeof InboxRoute
   '/laboratory': typeof LaboratoryRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/consultation'
     | '/enroll'
+    | '/explore'
     | '/forms'
     | '/inbox'
     | '/laboratory'
@@ -550,6 +560,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/consultation'
     | '/enroll'
+    | '/explore'
     | '/forms'
     | '/inbox'
     | '/laboratory'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/callback'
     | '/consultation'
     | '/enroll'
+    | '/explore'
     | '/forms'
     | '/inbox'
     | '/laboratory'
@@ -659,6 +671,7 @@ export interface RootRouteChildren {
   CallbackRoute: typeof CallbackRoute
   ConsultationRoute: typeof ConsultationRoute
   EnrollRoute: typeof EnrollRoute
+  ExploreRoute: typeof ExploreRoute
   FormsRoute: typeof FormsRoute
   InboxRoute: typeof InboxRoute
   LaboratoryRoute: typeof LaboratoryRoute
@@ -749,6 +762,13 @@ declare module '@tanstack/react-router' {
       path: '/enroll'
       fullPath: '/enroll'
       preLoaderRoute: typeof EnrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore': {
+      id: '/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof ExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forms': {
@@ -1083,6 +1103,7 @@ const rootRouteChildren: RootRouteChildren = {
   CallbackRoute: CallbackRoute,
   ConsultationRoute: ConsultationRoute,
   EnrollRoute: EnrollRoute,
+  ExploreRoute: ExploreRoute,
   FormsRoute: FormsRoute,
   InboxRoute: InboxRoute,
   LaboratoryRoute: LaboratoryRoute,

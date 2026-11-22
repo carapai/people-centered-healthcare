@@ -699,6 +699,85 @@ export const areaMessages = defineMessages<AreaValues>({
   arLevel_national: { id: 'app.area.level.national', defaultMessage: 'national', description: 'Area page: place level' },
 })
 
+type ExplorerValues = {
+  exTitle: {}
+  exLoading: {}
+  exFailed: {}
+  exForbidden: {}
+  exPickers: {}
+  exData: {}
+  exNoIndicators: {}
+  exPeriods: {}
+  exPeriodType: {}
+  exPeriodType_weekly: {}
+  exPeriodType_monthly: {}
+  exPeriodType_quarterly: {}
+  exPeriodType_financialJuly: {}
+  exFrom: {}
+  exTo: {}
+  exPlaces: {}
+  exVisualization: {}
+  exPickSomething: {}
+  exChartLabel: { indicators: string; from: string; to: string }
+  exFigures: {}
+  exSeries: {}
+  exWhereCentral: {}
+  exWhereFacility: {}
+  exAsOf: { at: string }
+  exNeverComputed: {}
+  exCompletenessTitle: {}
+  exCompleteness: { period: string; place: string; reported: number; expected: number }
+  exMissingTitle: {}
+  exMissingLine: { period: string; place: string; facilities: string }
+  exNeverSynced: { name: string }
+  exLastSynced: { name: string; at: string }
+  exFacilityOnly: { indicator: string }
+}
+
+// The data explorer's strings (features/explorer; ADR 0075).
+export const explorerMessages = defineMessages<ExplorerValues>({
+  exTitle: { id: 'app.explorer.title', defaultMessage: 'Data explorer', description: 'Data explorer heading and home link' },
+  exLoading: { id: 'app.explorer.loading', defaultMessage: 'Loading…', description: 'Data explorer: loading' },
+  exFailed: { id: 'app.explorer.failed', defaultMessage: 'The figures could not be loaded. Please try again.', description: 'Data explorer: loading failed' },
+  exForbidden: { id: 'app.explorer.forbidden', defaultMessage: 'Exploring indicators needs the reporting.view permission.', description: 'Data explorer: the user may not explore' },
+  exPickers: { id: 'app.explorer.pickers', defaultMessage: 'What to show', description: 'Data explorer: the pickers form' },
+  exData: { id: 'app.explorer.data', defaultMessage: 'Data', description: 'Data explorer: the indicators picker' },
+  exNoIndicators: { id: 'app.explorer.noIndicators', defaultMessage: 'No indicators are published yet.', description: 'Data explorer: nothing to pick' },
+  exPeriods: { id: 'app.explorer.periods', defaultMessage: 'Periods', description: 'Data explorer: the periods picker' },
+  exPeriodType: { id: 'app.explorer.periodType', defaultMessage: 'Period type', description: 'Data explorer: weeks, months, quarters or financial years' },
+  exPeriodType_weekly: { id: 'app.explorer.periodType.weekly', defaultMessage: 'Weeks', description: 'Data explorer: period type' },
+  exPeriodType_monthly: { id: 'app.explorer.periodType.monthly', defaultMessage: 'Months', description: 'Data explorer: period type' },
+  exPeriodType_quarterly: { id: 'app.explorer.periodType.quarterly', defaultMessage: 'Quarters', description: 'Data explorer: period type' },
+  exPeriodType_financialJuly: { id: 'app.explorer.periodType.financialJuly', defaultMessage: 'Financial years (July)', description: 'Data explorer: period type' },
+  exFrom: { id: 'app.explorer.from', defaultMessage: 'From', description: 'Data explorer: the first period' },
+  exTo: { id: 'app.explorer.to', defaultMessage: 'To', description: 'Data explorer: the last period' },
+  exPlaces: { id: 'app.explorer.places', defaultMessage: 'Places', description: 'Data explorer: the places picker' },
+  exVisualization: { id: 'app.explorer.visualization', defaultMessage: 'Visualization', description: 'Data explorer: the chart card' },
+  exPickSomething: { id: 'app.explorer.pickSomething', defaultMessage: 'Pick at least one indicator and one place.', description: 'Data explorer: nothing picked' },
+  exChartLabel: { id: 'app.explorer.chartLabel', defaultMessage: 'Column chart of {indicators}, {from} to {to}', description: 'Data explorer: the chart, for screen readers' },
+  exFigures: { id: 'app.explorer.figures', defaultMessage: 'Figures', description: 'Data explorer: the table of the charted figures' },
+  exSeries: { id: 'app.explorer.series', defaultMessage: 'Indicator', description: 'Data explorer: the figures table row header' },
+  exWhereCentral: { id: 'app.explorer.whereCentral', defaultMessage: 'Rolled up at central from the facilities’ summaries.', description: 'Data explorer: where the figures were computed' },
+  exWhereFacility: { id: 'app.explorer.whereFacility', defaultMessage: 'Computed on this facility.', description: 'Data explorer: where the figures were computed' },
+  exAsOf: { id: 'app.explorer.asOf', defaultMessage: 'Newest summary computed {at}.', description: 'Data explorer: freshness' },
+  exNeverComputed: { id: 'app.explorer.neverComputed', defaultMessage: 'No summary has been computed for these periods.', description: 'Data explorer: no figures at all' },
+  exCompletenessTitle: { id: 'app.explorer.completenessTitle', defaultMessage: 'Reporting completeness', description: 'Data explorer: completeness list' },
+  exCompleteness: {
+    id: 'app.explorer.completeness',
+    defaultMessage: '{period}, {place}: {reported} of {expected, plural, one {# facility} other {# facilities}} reported.',
+    description: 'Data explorer: facilities reported out of expected for the latest period',
+  },
+  exMissingTitle: { id: 'app.explorer.missingTitle', defaultMessage: 'Missing, not counted as zero:', description: 'Data explorer: facilities that have not synced' },
+  exMissingLine: { id: 'app.explorer.missingLine', defaultMessage: '{period}, {place}: {facilities}', description: 'Data explorer: the facilities missing for a period and place' },
+  exNeverSynced: { id: 'app.explorer.neverSynced', defaultMessage: '{name} (never synced)', description: 'Data explorer: a missing facility that has never synced' },
+  exLastSynced: { id: 'app.explorer.lastSynced', defaultMessage: '{name} (last synced {at})', description: 'Data explorer: a missing facility and its last sync' },
+  exFacilityOnly: {
+    id: 'app.explorer.facilityOnly',
+    defaultMessage: '{indicator} shows at facility level only: a median or a distinct count cannot be rebuilt from the facilities’ summaries.',
+    description: 'Data explorer: why a median is absent above facility level',
+  },
+})
+
 type AccessValues = {
   acTitle: {}
   acIntro: {}

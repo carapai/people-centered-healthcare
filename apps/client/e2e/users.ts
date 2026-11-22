@@ -26,7 +26,8 @@ export const USERS = {
   approver: { username: 'e2e-approver', password: 'juniper walrus anchor fifty', roles: 'approver' },
   publisher: { username: 'e2e-publisher', password: 'cinder otter gazebo sixty', roles: 'publisher' },
   // A role held at a district, not a facility (ADR 0094; #869): signs in for Kampala district,
-  // whose area lists its facilities from the NHFR sample, and reads no patient-level records.
+  // whose area lists its facilities from the NHFR sample, and reads no patient-level records;
+  // it explores the area's indicator summaries (#599).
   district: { username: 'e2e-district', password: 'kestrel lagoon pillar thirteen', roles: 'district', place: 'district-kampala' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
@@ -71,6 +72,7 @@ export const ADMIN_PERMISSIONS = [
   'queues.view',
   'queues.work',
   'registry.review',
+  'reporting.view',
   'results.review',
   'stock.manage',
   'sync.resolve-conflicts',

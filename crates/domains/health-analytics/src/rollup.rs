@@ -4,7 +4,8 @@
 //!
 //! - **Summed parts.** The figure is recomputed from the facilities' summed counts, numerators,
 //!   denominators and values ([`Summary::roll_up`]), never by averaging their figures, and each
-//!   disaggregation band the same way. A median or a distinct count stays at facility level.
+//!   disaggregation band the same way. A median or a distinct count stays at facility level: one
+//!   facility's is its own figure, and over several there is none.
 //! - **Missing, never zero.** A facility has reported for a period when it has a summary for it,
 //!   or its summaries synced at or after the period's first day (UTC) with none for it: no care
 //!   it counts happened there, so it adds nothing. Any other facility is *missing*, shown with its
@@ -134,12 +135,16 @@ pub fn roll_up_facilities(
             });
         }
     }
-    let summary = if reported.is_empty() {
-        if let Calculation::Value(aggregate) = calculation
-            && !aggregate.rolls_up()
-        {
-            return Err(RollUpError::FacilityOnly(aggregate));
-        }
+    let facility_only = match calculation {
+        Calculation::Value(aggregate) if !aggregate.rolls_up() => Some(aggregate),
+        _ => None,
+    };
+    let summary = if seen.len() == 1 && facility_only.is_some() {
+        // One facility is facility level: its own figure, a median too, needs no rolling up.
+        parts.pop()
+    } else if let Some(aggregate) = facility_only {
+        return Err(RollUpError::FacilityOnly(aggregate));
+    } else if reported.is_empty() {
         None
     } else {
         Some(Summary::roll_up(calculation, &parts)?)
@@ -302,7 +307,7 @@ mod tests {
         assert_eq!((band.count, band.denominator), (4, Some(8)));
         assert_eq!(band.value, Some(Decimal::new(50, 0)));
 
-        for facilities in [names(&["A"]), Vec::new()] {
+        for facilities in [names(&["A", "B"]), Vec::new()] {
             assert_eq!(
                 roll_up_facilities(
                     Calculation::Value(Aggregate::Median),
@@ -314,5 +319,53 @@ mod tests {
                 Err(RollUpError::FacilityOnly(Aggregate::Median))
             );
         }
+    }
+
+    #[test]
+    fn one_facility_s_median_is_its_own_figure() {
+        let median = |weeks: i64| Summary {
+            calculation: Calculation::Value(Aggregate::Median),
+            value: Some(Decimal::from(weeks)),
+            count: 3,
+            denominator: None,
+            values: None,
+            disaggregations: Vec::new(),
+        };
+        let summaries = BTreeMap::from([
+            ("A".to_owned(), (median(14), at("2026-04-01T06:00:00Z"))),
+            ("B".to_owned(), (median(20), at("2026-04-01T06:00:00Z"))),
+        ]);
+        let synced = BTreeMap::new();
+        let one = roll_up_facilities(
+            Calculation::Value(Aggregate::Median),
+            &march(),
+            &names(&["A", "A"]),
+            &summaries,
+            &synced,
+        )
+        .expect("facility level");
+        assert_eq!(one.summary, Some(median(14)));
+        assert_eq!(one.completeness(), (1, 1));
+        // One facility that has not reported is missing, with no figure.
+        let none = roll_up_facilities(
+            Calculation::Value(Aggregate::Median),
+            &march(),
+            &names(&["C"]),
+            &summaries,
+            &synced,
+        )
+        .expect("facility level");
+        assert_eq!((none.completeness(), none.summary), ((0, 1), None));
+        // Two are above facility level.
+        assert_eq!(
+            roll_up_facilities(
+                Calculation::Value(Aggregate::Median),
+                &march(),
+                &names(&["A", "B"]),
+                &summaries,
+                &synced,
+            ),
+            Err(RollUpError::FacilityOnly(Aggregate::Median))
+        );
     }
 }

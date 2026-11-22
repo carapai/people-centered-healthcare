@@ -34,12 +34,7 @@ pub const INTERVAL: Duration = Duration::from_secs(5);
 const PAGE: usize = 500;
 
 /// The period types dashboards offer (ADR 0075), computed whatever the Reports.
-pub const STANDARD_PERIODS: [PeriodType; 4] = [
-    PeriodType::Weekly,
-    PeriodType::Monthly,
-    PeriodType::Quarterly,
-    PeriodType::FinancialJuly,
-];
+pub use health_analytics::STANDARD_PERIODS;
 
 /// The indicators in `packages` (each package's files by path), for `facility`: every top-level
 /// `Measure` that reads as an indicator, the Age Band Sets they may pin, and the period types of
@@ -183,7 +178,19 @@ async fn reload(
     if last.as_ref() == Some(&json) {
         return Ok(None);
     }
-    let active: ActiveSet = match &json {
+    let indicators = read(store, blobs, facility, json.as_deref()).await?;
+    *last = Some(json);
+    Ok(Some(indicators))
+}
+
+/// The indicators of the active set written as `json` (none: nothing is active).
+async fn read(
+    store: &SurrealStore,
+    blobs: &FsBlobStore,
+    facility: &str,
+    json: Option<&str>,
+) -> Result<Indicators, String> {
+    let active: ActiveSet = match json {
         Some(json) => serde_json::from_str(json).map_err(failed)?,
         None => ActiveSet::new(),
     };
@@ -195,8 +202,21 @@ async fn reload(
     for problem in problems {
         tracing::warn!(%problem, "an active Measure is not computed");
     }
-    *last = Some(json);
-    Ok(Some(indicators))
+    Ok(indicators)
+}
+
+/// The active packages' indicators now, for `facility` (their tarballs in `blobs`): what the
+/// data explorer offers (#599).
+pub async fn active(
+    store: &SurrealStore,
+    blobs: &FsBlobStore,
+    facility: &str,
+) -> Result<Indicators, String> {
+    let json = {
+        let mut tx = store.begin().await.map_err(failed)?;
+        tx.active_packages().await.map_err(failed)?
+    };
+    read(store, blobs, facility, json.as_deref()).await
 }
 
 /// Computes `facility`'s indicators over `store` until the process ends, with the active

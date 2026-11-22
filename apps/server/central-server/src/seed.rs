@@ -79,3 +79,45 @@ pub(crate) async fn run(store: &SurrealStore, path: &Path) -> Result<usize, &'st
     }
     Ok(added)
 }
+
+/// Receives the development indicator summaries at `path` (`HEALTH_DEV_INDICATOR_SUMMARIES`,
+/// #599): a JSON list of `health_sync_protocol::IndicatorSummary`, each held to what the sync
+/// endpoint holds an edge's to, kept per facility as if its edge had synced it now, and each
+/// facility named recorded as synced. Receiving the same file again changes nothing but the
+/// last sync. Answers how many summaries were received.
+pub(crate) async fn indicator_summaries(
+    store: &SurrealStore,
+    path: &Path,
+) -> Result<usize, &'static str> {
+    tracing::warn!("receiving development indicator summaries, not an edge's");
+    let text =
+        std::fs::read_to_string(path).map_err(|_| "cannot read HEALTH_DEV_INDICATOR_SUMMARIES")?;
+    let summaries: Vec<health_sync_protocol::IndicatorSummary> = serde_json::from_str(&text)
+        .map_err(|_| "HEALTH_DEV_INDICATOR_SUMMARIES is not a list of summaries")?;
+    if summaries
+        .iter()
+        .any(|s| health_sync_protocol::summary_problem(s).is_some())
+    {
+        return Err("HEALTH_DEV_INDICATOR_SUMMARIES holds a summary the sync endpoint refuses");
+    }
+    let mut tx = store
+        .begin()
+        .await
+        .map_err(|_| "the database is unavailable")?;
+    let mut facilities = std::collections::BTreeSet::new();
+    for summary in &summaries {
+        tx.receive_indicator_summary("dev-seed", summary)
+            .await
+            .map_err(|_| "a development summary cannot be kept")?;
+        facilities.insert(summary.facility.as_str());
+    }
+    for facility in facilities {
+        tx.indicator_summaries_synced(facility, "dev-seed")
+            .await
+            .map_err(|_| "a facility's sync cannot be recorded")?;
+    }
+    tx.commit()
+        .await
+        .map_err(|_| "the summaries cannot be kept")?;
+    Ok(summaries.len())
+}

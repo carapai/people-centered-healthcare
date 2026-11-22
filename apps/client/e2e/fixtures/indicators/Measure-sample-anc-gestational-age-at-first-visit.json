@@ -1,0 +1,102 @@
+{
+  "resourceType": "Measure",
+  "id": "sample-anc-gestational-age-at-first-visit",
+  "url": "https://health.go.ug/fhir/Measure/sample-anc-gestational-age-at-first-visit",
+  "version": "1.0.0",
+  "name": "SampleAncGestationalAgeAtFirstVisit",
+  "title": "Median gestational age at ANC 1st visit (sample)",
+  "status": "active",
+  "description": "A sample for the data explorer on a local backend (#599): The median gestational age, in weeks, at women's first antenatal care visit in the period, taking each woman's first recorded value.",
+  "extension": [
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-period-date",
+      "valueExpression": {
+        "language": "text/fhirpath",
+        "expression": "Encounter.actualPeriod.start",
+        "description": "When the visit started"
+      }
+    },
+    {
+      "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-counts",
+      "valueCode": "people"
+    }
+  ],
+  "scoring": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/measure-scoring",
+        "code": "continuous-variable"
+      }
+    ]
+  },
+  "basis": "Encounter",
+  "group": [
+    {
+      "population": [
+        {
+          "id": "initial-population",
+          "code": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-population",
+                "code": "initial-population"
+              }
+            ]
+          },
+          "description": "Everyone with care in the period",
+          "criteria": {
+            "language": "text/fhirpath",
+            "expression": "true"
+          }
+        },
+        {
+          "id": "measure-population",
+          "code": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-population",
+                "code": "measure-population"
+              }
+            ]
+          },
+          "description": "A first ANC visit by a woman",
+          "criteria": {
+            "language": "text/fhirpath",
+            "expression": "Encounter.type.coding.where(system = 'https://health.go.ug/fhir/CodeSystem/anc-visit-type' and code = 'first').exists() and %patient.gender = 'female'"
+          }
+        },
+        {
+          "id": "measure-observation",
+          "code": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-population",
+                "code": "measure-observation"
+              }
+            ]
+          },
+          "description": "The gestational age recorded at the visit, in weeks",
+          "criteria": {
+            "language": "text/fhirpath",
+            "expression": "%records.entry.resource.ofType(Observation).where(encounter.reference = 'Encounter/' + %resource.id and code.coding.where(system = 'http://loinc.org' and code = '18185-9').exists()).value.value"
+          },
+          "extension": [
+            {
+              "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-value-pick",
+              "valueCode": "first"
+            }
+          ],
+          "inputPopulationId": "measure-population",
+          "aggregateMethod": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/measure-aggregate-method",
+                "code": "median"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

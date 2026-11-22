@@ -378,7 +378,9 @@ pub(crate) fn routes(
     let clinical = clinical.with_workflows(workflows.clone());
     let blobs = health_files::FsBlobStore::open(config.data_dir.with_file_name("files")).ok();
     let clinical = match &blobs {
-        Some(blobs) => clinical.with_attachments(blobs.clone()),
+        Some(blobs) => clinical
+            .with_attachments(blobs.clone())
+            .with_explorer(blobs.clone(), facility),
         None => clinical,
     };
     // Indicators (#554): this facility's, computed from the change log with the active
