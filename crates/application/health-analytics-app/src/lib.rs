@@ -12,6 +12,8 @@
 //!   `measure-observation` has its `aggregateMethod` (`sum`, `average`, `median`, `minimum`,
 //!   `maximum`, or `distinct-count`), its value as `criteria` or as [`VALUE_BETWEEN`] (the time
 //!   between two dates), and [`VALUE_PICK`] (`first` or `last`, first when absent) (#549).
+//!   Threshold bands, which Visualizations colour figures by, are [`THRESHOLD`] extensions, one
+//!   per band (#600).
 //! - [`evaluate`] evaluates an indicator over one period: for each record of the basis, the
 //!   period date places it in the period or not, each population's criteria decide whether it
 //!   counts, and the value is taken. Each expression is evaluated with the record as its root,
@@ -61,7 +63,8 @@ use health_analytics::{
     AgeAt, AgeBandSet, AgeBandSetDefinition, Aggregate, BandDefinition, BetweenDefinition,
     Calculation, DisaggregationDefinition, DisaggregationSource, Evaluation, Expression, Indicator,
     MEMBERSHIP_VARIABLE, MeasureDefinition, Observed, PREVIOUS_PERIODS, PatientOutcome, Period,
-    PopulationDefinition, RecordOutcome, Side, ValueSource, calculate, local_date, pinned,
+    PopulationDefinition, RecordOutcome, Side, ThresholdDefinition, ValueSource, calculate,
+    local_date, pinned,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 
@@ -95,6 +98,10 @@ pub const VALUE_BETWEEN: &str = "https://carapai.github.io/people-centered-healt
 /// On a Measure's stratifier: the Age Band Set it disaggregates by (`valueCanonical`,
 /// `url|version`).
 pub const AGE_BAND_SET: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-age-band-set";
+/// The indicator's threshold bands (#600), one extension per band, with the sub-extensions
+/// `from` and `to` (`valueDecimal`, either absent for no bound; `from` inclusive, `to`
+/// exclusive) and `tone` (`valueCode`: `good`, `warning` or `bad`).
+pub const THRESHOLD: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-threshold";
 /// The R5 core extension naming a resource's episode of care.
 pub const WORKFLOW_EPISODE_OF_CARE: &str =
     "http://hl7.org/fhir/StructureDefinition/workflow-episodeOfCare";
@@ -103,6 +110,15 @@ pub const TEST_PATIENT_TYPE: &str = "test-patient";
 
 fn text(value: &Value) -> Option<String> {
     value.as_str().map(str::to_owned)
+}
+
+/// A decimal as exact text: a JSON number as written (`arbitrary_precision`), or text.
+fn decimal_text(value: &Value) -> Option<String> {
+    match value {
+        Value::Number(n) => Some(n.to_string()),
+        Value::String(s) => Some(s.clone()),
+        _ => None,
+    }
 }
 
 fn code(concept: &Value) -> Option<String> {
@@ -159,6 +175,17 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
             .map(|e| expression(&e["valueExpression"]).unwrap_or_default()),
         populations,
         groups,
+        thresholds: resource["extension"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|e| e["url"] == THRESHOLD)
+            .map(|e| ThresholdDefinition {
+                from: extension(e, "from").and_then(|f| decimal_text(&f["valueDecimal"])),
+                to: extension(e, "to").and_then(|t| decimal_text(&t["valueDecimal"])),
+                tone: extension(e, "tone").and_then(|t| text(&t["valueCode"])),
+            })
+            .collect(),
         disaggregations: resource["group"][0]["stratifier"]
             .as_array()
             .into_iter()

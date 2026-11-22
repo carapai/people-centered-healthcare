@@ -1,13 +1,14 @@
 // Sample indicator summaries for a local backend (#599): central-server receives them at startup
 // (HEALTH_DEV_INDICATOR_SUMMARIES) as if the facilities' edges had synced them, since a local
 // backend has no edges computing indicators. They are summary MeasureReports of the sample
-// indicators (e2e/fixtures/indicators), written as health-analytics-app's `report` writes them,
+// indicators (e2e/fixtures/indicators; malaria test positivity's for #600), written as health-analytics-app's `report` writes them,
 // for KAM013, KAM020 and WAK001; KAM031 never syncs, so it shows as missing in Kampala.
 
 const MEASURES = 'https://health.go.ug/fhir/Measure/'
 export const FIRST_VISITS = `${MEASURES}sample-anc-first-visits|1.0.0`
 export const BEFORE_12_WEEKS = `${MEASURES}sample-anc-first-visit-before-12-weeks|1.0.0`
 export const GESTATIONAL_AGE = `${MEASURES}sample-anc-gestational-age-at-first-visit|1.0.0`
+export const MALARIA_POSITIVITY = `${MEASURES}sample-malaria-test-positivity|1.0.0`
 const PERIOD_TYPE = 'https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-period-type'
 const POPULATION = 'http://terminology.hl7.org/CodeSystem/measure-population'
 
@@ -93,6 +94,20 @@ function report(measure: string, period: Period, facility: string, group: object
   }
 }
 
+/**
+ * Malaria test positivity's share positive in `period`, out of 20: in quarters, 9 (45%, in the
+ * *bad* band) this quarter and 6 (30%, a *warning*) the quarter before, at every facility, so
+ * Kampala's rolled-up figure is the same (#600); elsewhere a steady 3 to 9.
+ */
+function positiveOutOf20(facility: string, period: Period, today: Date): number {
+  if (period.kind === 'quarterly') {
+    const current = periodOf('quarterly', today)
+    if (period.id === current.id) return 9
+    if (period.id === periodOf('quarterly', new Date(current.start.getTime() - 86_400_000)).id) return 6
+  }
+  return 3 + (figure(facility, period, 0) % 7)
+}
+
 /** Every sample summary, as `health_sync_protocol::IndicatorSummary` JSON, up to `today`. */
 export function sampleSummaries(today: Date): object[] {
   const periods = [...recent('weekly', today, 16), ...recent('monthly', today, 12), ...recent('quarterly', today, 6), ...recent('financialJuly', today, 3)]
@@ -112,6 +127,11 @@ export function sampleSummaries(today: Date): object[] {
         report(BEFORE_12_WEEKS, period, facility, { population: [population('numerator', early), population('denominator', visits)], measureScoreQuantity: { value: Math.round((early * 10_000) / visits) / 100 } }, computed),
       )
       out.push(report(GESTATIONAL_AGE, period, facility, { population: [population('measure-population', visits)], measureScoreQuantity: { value: weeks } }, computed))
+      const tested = 20 * visits
+      const positive = positiveOutOf20(facility, period, today) * visits
+      out.push(
+        report(MALARIA_POSITIVITY, period, facility, { population: [population('numerator', positive), population('denominator', tested)], measureScoreQuantity: { value: Math.round((positive * 10_000) / tested) / 100 } }, computed),
+      )
     }
   }
   return out

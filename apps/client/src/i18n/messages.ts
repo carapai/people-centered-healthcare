@@ -732,6 +732,29 @@ type ExplorerValues = {
   exNeverSynced: { name: string }
   exLastSynced: { name: string; at: string }
   exFacilityOnly: { indicator: string }
+  exChartType: {}
+  exType_column: {}
+  exType_line: {}
+  exType_table: {}
+  exType_single: {}
+  exLayout: {}
+  exLayout_placesByIndicators: {}
+  exLayout_indicatorsByPeriods: {}
+  exPlace: {}
+  exLineChartLabel: { indicators: string; from: string; to: string }
+  exSingleNumbers: {}
+  exPercent: { value: string }
+  exChange: { change: string; period: string; previous: string }
+  exNoChange: { period: string }
+  exTone_good: {}
+  exTone_warning: {}
+  exTone_bad: {}
+  exLegend: { indicator: string }
+  exBand: { range: string; tone: string }
+  exBandBelow: { to: string }
+  exBandFrom: { from: string }
+  exBandBetween: { from: string; to: string }
+  exBandEvery: {}
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -776,6 +799,29 @@ export const explorerMessages = defineMessages<ExplorerValues>({
     defaultMessage: '{indicator} shows at facility level only: a median or a distinct count cannot be rebuilt from the facilities’ summaries.',
     description: 'Data explorer: why a median is absent above facility level',
   },
+  exChartType: { id: 'app.explorer.chartType', defaultMessage: 'Chart type', description: 'Data explorer: the Visualization type buttons' },
+  exType_column: { id: 'app.explorer.type.column', defaultMessage: 'Column', description: 'Data explorer: Visualization type' },
+  exType_line: { id: 'app.explorer.type.line', defaultMessage: 'Line', description: 'Data explorer: Visualization type' },
+  exType_table: { id: 'app.explorer.type.table', defaultMessage: 'Table', description: 'Data explorer: Visualization type' },
+  exType_single: { id: 'app.explorer.type.single', defaultMessage: 'Single number', description: 'Data explorer: Visualization type' },
+  exLayout: { id: 'app.explorer.layout', defaultMessage: 'Table layout', description: 'Data explorer: how the table lays out its figures' },
+  exLayout_placesByIndicators: { id: 'app.explorer.layout.placesByIndicators', defaultMessage: 'Places × indicators', description: 'Data explorer: places down the side, indicators across' },
+  exLayout_indicatorsByPeriods: { id: 'app.explorer.layout.indicatorsByPeriods', defaultMessage: 'Indicators × periods', description: 'Data explorer: indicators down the side, periods across' },
+  exPlace: { id: 'app.explorer.place', defaultMessage: 'Place', description: 'Data explorer: the table row header when places are down the side' },
+  exLineChartLabel: { id: 'app.explorer.lineChartLabel', defaultMessage: 'Line chart of {indicators}, {from} to {to}', description: 'Data explorer: the line chart, for screen readers' },
+  exSingleNumbers: { id: 'app.explorer.singleNumbers', defaultMessage: 'Single numbers', description: 'Data explorer: the single-number tiles' },
+  exPercent: { id: 'app.explorer.percent', defaultMessage: '{value}%', description: 'Data explorer: a percentage figure' },
+  exChange: { id: 'app.explorer.change', defaultMessage: '{change} on {period} ({previous})', description: 'Data explorer: a single number’s change on the period before, and that period’s figure' },
+  exNoChange: { id: 'app.explorer.noChange', defaultMessage: 'No figure for {period} to compare with', description: 'Data explorer: no figure for the period before' },
+  exTone_good: { id: 'app.explorer.tone.good', defaultMessage: 'Good', description: 'Data explorer: a threshold band' },
+  exTone_warning: { id: 'app.explorer.tone.warning', defaultMessage: 'Warning', description: 'Data explorer: a threshold band' },
+  exTone_bad: { id: 'app.explorer.tone.bad', defaultMessage: 'Bad', description: 'Data explorer: a threshold band' },
+  exLegend: { id: 'app.explorer.legend', defaultMessage: '{indicator} thresholds', description: 'Data explorer: an indicator’s threshold legend' },
+  exBand: { id: 'app.explorer.band', defaultMessage: '{range}: {tone}', description: 'Data explorer: one threshold band in a legend' },
+  exBandBelow: { id: 'app.explorer.band.below', defaultMessage: 'below {to}', description: 'Data explorer: a band with no lower bound' },
+  exBandFrom: { id: 'app.explorer.band.from', defaultMessage: '{from} and above', description: 'Data explorer: a band with no upper bound' },
+  exBandBetween: { id: 'app.explorer.band.between', defaultMessage: '{from} to under {to}', description: 'Data explorer: a band from one figure up to another' },
+  exBandEvery: { id: 'app.explorer.band.every', defaultMessage: 'every figure', description: 'Data explorer: a band with no bounds' },
 })
 
 type AccessValues = {

@@ -45,6 +45,7 @@ fn indicator(name: &str, calculation: Calculation) -> Indicator {
         populations: BTreeMap::new(),
         references: BTreeSet::new(),
         disaggregations: Vec::new(),
+        thresholds: Vec::new(),
         value: None,
     }
 }
@@ -276,4 +277,60 @@ fn a_question_names_offered_indicators_and_whole_standard_periods() {
         &offered,
     );
     assert!(unknown.is_err());
+}
+
+/// #600: a Measure's threshold bands (a legend set) reach the explorer, lowest first, each bound
+/// exact decimal text, for every Visualization to colour figures by.
+#[test]
+fn an_indicator_s_threshold_bands_reach_the_explorer() {
+    let band = |from: Option<&str>, to: Option<&str>, tone: &str| {
+        let mut parts = Vec::new();
+        if let Some(from) = from {
+            parts.push(serde_json::json!({ "url": "from", "valueDecimal": serde_json::Number::from_string_unchecked(from.into()) }));
+        }
+        if let Some(to) = to {
+            parts.push(serde_json::json!({ "url": "to", "valueDecimal": serde_json::Number::from_string_unchecked(to.into()) }));
+        }
+        parts.push(serde_json::json!({ "url": "tone", "valueCode": tone }));
+        serde_json::json!({ "url": health_analytics_app::THRESHOLD, "extension": parts })
+    };
+    let resource = serde_json::json!({
+        "resourceType": "Measure",
+        "url": "https://x/Measure/malaria-positivity",
+        "version": "1.0.0",
+        "title": "Malaria test positivity",
+        "scoring": { "coding": [{ "code": "proportion" }] },
+        "basis": "Observation",
+        "extension": [
+            { "url": health_analytics_app::PERIOD_DATE, "valueExpression": { "language": "text/fhirpath", "expression": "Observation.effective" } },
+            band(Some("40.0"), None, "bad"),
+            band(None, Some("20"), "good"),
+            band(Some("20"), Some("40"), "warning"),
+        ],
+        "group": [{ "population": [
+            { "code": { "coding": [{ "code": "initial-population" }] }, "criteria": { "language": "text/fhirpath", "expression": "true" } },
+            { "code": { "coding": [{ "code": "denominator" }] }, "criteria": { "language": "text/fhirpath", "expression": "true" } },
+            { "code": { "coding": [{ "code": "numerator" }] }, "criteria": { "language": "text/fhirpath", "expression": "true" } },
+        ] }],
+    });
+    let indicator = health_analytics_app::measure(&resource)
+        .indicator()
+        .expect("indicator");
+    assert_eq!(
+        health_analytics::tone_of(&indicator.thresholds, Decimal::new(45, 0)),
+        Some(health_analytics::Tone::Bad),
+        "a positivity of 45% is bad"
+    );
+    assert_eq!(
+        indicator_json(&indicator)["thresholds"],
+        serde_json::json!([
+            { "from": null, "to": "20", "tone": "good" },
+            { "from": "20", "to": "40", "tone": "warning" },
+            { "from": "40", "to": null, "tone": "bad" },
+        ])
+    );
+    assert_eq!(
+        indicator_json(&visits())["thresholds"],
+        serde_json::json!([])
+    );
 }

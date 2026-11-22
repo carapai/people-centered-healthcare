@@ -46,6 +46,10 @@
 //!   facilities from their summed parts ([`roll_up_facilities`]), with the facilities that have
 //!   not reported shown as missing, never as zero.
 //!
+//! - **Threshold bands** ([`threshold`], #600): an indicator may carry a legend set, ranges of
+//!   its figure read as good, warning or bad, which every Visualization colours figures by.
+//!   Bands never overlap ([`threshold_bands`]).
+//!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
@@ -58,6 +62,7 @@ pub mod period;
 pub mod report;
 pub mod rollup;
 pub mod store;
+pub mod threshold;
 
 pub use age_bands::{
     AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE, AgeAt, AgeBand, AgeBandSet, AgeBandSetDefinition,
@@ -89,3 +94,4 @@ pub use rollup::{
     FacilitySummaries, FacilitySummary, Missing, Reported, RolledUp, roll_up_facilities,
 };
 pub use store::{IndicatorStore, MemberKey, Position, StoredSummary, periods_with_care};
+pub use threshold::{ThresholdBand, ThresholdDefinition, Tone, threshold_bands, tone_of};
