@@ -279,3 +279,34 @@ fn line_list_columns_fit_their_rows() {
         ]
     );
 }
+
+#[test]
+fn each_problem_says_which_section_it_is_in() {
+    let mut untitled = table(json!([{ "id": "first", "indicator": FIRST, "label": "" }]));
+    untitled["id"] = json!("timing");
+    let located = report(
+        json!([]),
+        json!([
+            table(json!([{ "id": "first", "indicator": FIRST, "label": "ANC 1st visit" }])),
+            untitled
+        ]),
+    )
+    .located_problems(&catalogue());
+    let at: Vec<(Option<usize>, &str)> = located
+        .iter()
+        .map(|p| (p.section, p.message.as_str()))
+        .collect();
+    assert_eq!(
+        at,
+        [
+            (
+                None,
+                "the Report runs for no level: choose facility, district, region or national"
+            ),
+            (
+                Some(1),
+                "section 2 (2.1 ANC attendance)'s row 1 has no label"
+            ),
+        ]
+    );
+}

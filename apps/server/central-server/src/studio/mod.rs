@@ -49,6 +49,9 @@
 //! The indicator editor's *Try* evaluates a draft Measure over the package's test patients for a
 //! period at `/packages/{id}/indicators/try` ([`indicators`], #548).
 //!
+//! The Report designer's preview computes a draft Report's table rows over test patients, with
+//! Validation's problems, at `/packages/{id}/reports/preview` ([`reports`], #559).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
@@ -58,6 +61,7 @@ pub(crate) mod designs;
 mod dto;
 pub(crate) mod forms;
 pub(crate) mod indicators;
+pub(crate) mod reports;
 pub(crate) mod sandbox;
 pub(crate) mod terminology;
 
@@ -157,6 +161,7 @@ pub(crate) fn router(
             "/packages/{id}/indicators/try",
             post(indicators::try_indicator),
         )
+        .route("/packages/{id}/reports/preview", post(reports::preview))
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))
         .with_state(Studio {

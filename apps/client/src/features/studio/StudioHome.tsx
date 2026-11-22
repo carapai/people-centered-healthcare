@@ -47,8 +47,8 @@ export { SectionLink }
 
 /**
  * The Studio's home (studio.md § The Studio home; #855): what a person designs, one card per
- * kind with how many there are, *Open* and *New*. Reports (#556) are listed and open in the file
- * editor until the Report designer (#559) exists; dashboards are shown, marked coming soon. The packages, for checking, review, approval and
+ * kind with how many there are, *Open* and *New*. Reports (#556) open in the Report designer
+ * (#559); dashboards are shown, marked coming soon. The packages, for checking, review, approval and
  * publication, are one more card.
  */
 export function StudioHome() {

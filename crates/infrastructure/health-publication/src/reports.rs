@@ -11,13 +11,13 @@
 use health_analytics::{Catalogue, REPORTS_FOLDER, ReportDefinition};
 use health_analytics_app::measure;
 use health_configuration::lifecycle::{Lifecycle, Stage};
-use health_configuration::package::PackageKind;
-use health_packages::{Packed, REPORT};
+use health_configuration::package::{INDEX, PackageKind};
+use health_packages::{Files, Packed, REPORT};
 use health_surrealdb::SurrealTx;
 use serde_json::Value;
 
 use crate::age_bands::age_band_sets_in;
-use crate::{Error, Publications, failed};
+use crate::{Error, Publications, failed, lifecycle_id};
 
 /// The package's Reports, each with its file, as written or why it cannot be read.
 pub fn reports_in(packed: &Packed) -> Vec<(String, Result<ReportDefinition, String>)> {
@@ -114,5 +114,70 @@ impl Publications {
             }
         }
         Ok(catalogue)
+    }
+}
+
+/// A package version the Report designer's preview reads indicators and test patients from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourcePackage {
+    /// `name@version`.
+    pub id: String,
+    /// Whether it is published; otherwise it is an open draft.
+    pub published: bool,
+    /// Its files.
+    pub files: Files,
+}
+
+/// What the Report designer's preview reads (#559; studio.md § Reports): the Reporting
+/// package's draft, what Validation lets its Reports pin, and the other package versions in the
+/// Studio, published or in an open draft, whose indicators and test patients it computes
+/// with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportSources {
+    /// The draft's files, without the generated index.
+    pub draft: Files,
+    /// What its Reports can pin: every published version's indicators and Age Band Sets, and
+    /// the draft's own.
+    pub catalogue: Catalogue,
+    /// Every other package version that is published or an open draft, published first.
+    pub packages: Vec<SourcePackage>,
+}
+
+impl Publications {
+    /// What the Report designer's preview of draft `id` reads.
+    pub async fn report_sources(&self, id: &str) -> Result<ReportSources, Error> {
+        let mut tx = self.begin().await?;
+        let (lifecycle, _) = self.load(&mut tx, id).await?;
+        let packed = self.packed(&lifecycle.content).await?;
+        let mut catalogue = Catalogue::default();
+        add(&mut catalogue, &packed);
+        let lifecycles = tx.package_lifecycles().await.map_err(failed)?;
+        drop(tx);
+        let mut packages = Vec::new();
+        for json in lifecycles {
+            let other: Lifecycle = serde_json::from_str(&json).map_err(failed)?;
+            let other_id = lifecycle_id(&other);
+            if other_id == id || other.stage == Stage::Withdrawn {
+                continue;
+            }
+            let published = other.stage == Stage::Published;
+            let other_packed = self.packed(&other.content).await?;
+            if published {
+                add(&mut catalogue, &other_packed);
+            }
+            packages.push(SourcePackage {
+                id: other_id,
+                published,
+                files: other_packed.files,
+            });
+        }
+        packages.sort_by_key(|p| !p.published);
+        let mut draft = packed.files;
+        draft.remove(INDEX);
+        Ok(ReportSources {
+            draft,
+            catalogue,
+            packages,
+        })
     }
 }

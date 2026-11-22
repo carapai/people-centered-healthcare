@@ -304,6 +304,15 @@ pub struct ReportDefinition {
     pub sections: Vec<Section>,
 }
 
+/// One of Validation's problems with a Report, and the section it is in, if any.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportProblem {
+    /// The section's index, or none for the Report's own settings.
+    pub section: Option<usize>,
+    /// What is wrong.
+    pub message: String,
+}
+
 /// The indicators and Age Band Sets a Report can pin: those published, and the package's own.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Catalogue {
@@ -346,6 +355,16 @@ impl ReportDefinition {
 
     /// Every reason this is not a usable Report, for Validation, given what it can pin.
     pub fn problems(&self, catalogue: &Catalogue) -> Vec<String> {
+        self.located_problems(catalogue)
+            .into_iter()
+            .map(|problem| problem.message)
+            .collect()
+    }
+
+    /// [`Self::problems`], each with the section it is in, so the Report designer shows it
+    /// beside that section (#559).
+    pub fn located_problems(&self, catalogue: &Catalogue) -> Vec<ReportProblem> {
+        let mut located = Vec::new();
         let mut problems = Vec::new();
         if blank(&self.id) {
             problems.push("the Report has no id".to_owned());
@@ -364,6 +383,10 @@ impl ReportDefinition {
         }
         let above = self.above_facility();
         let mut ids = BTreeSet::new();
+        located.extend(problems.drain(..).map(|message| ReportProblem {
+            section: None,
+            message,
+        }));
         for (n, section) in self.sections.iter().enumerate() {
             let name = if blank(section.title()) {
                 format!("section {}", n + 1)
@@ -394,8 +417,12 @@ impl ReportDefinition {
                     problems.extend(list_problems(list, &name, catalogue));
                 }
             }
+            located.extend(problems.drain(..).map(|message| ReportProblem {
+                section: Some(n),
+                message,
+            }));
         }
-        problems
+        located
     }
 }
 

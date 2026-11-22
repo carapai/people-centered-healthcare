@@ -954,6 +954,120 @@ export const StudioQuestionnaireImportInput = z.object({
 })
 export type StudioQuestionnaireImportInput = z.infer<typeof StudioQuestionnaireImportInput>
 
+/** A band a section lays out. */
+export const StudioReportBand = z.object({
+  /** Its code: an age band's, a coded value, or `not-recorded`. */
+  "code": z.string(),
+  /** What a person reads. */
+  "label": z.string(),
+})
+export type StudioReportBand = z.infer<typeof StudioReportBand>
+
+/** One of a section's Disaggregations, with its bands in order. */
+export const StudioReportBands = z.object({
+  /** Its bands: an Age Band Set's in its order, or the codes the rows found, then `not-recorded`. */
+  "bands": z.array(StudioReportBand),
+  /** Its name, as an indicator's disaggregation is named: the Age Band Set's `url|version`, or the code. */
+  "name": z.string(),
+  /** What a person reads: the Age Band Set's title, or the code. */
+  "title": z.string(),
+})
+export type StudioReportBands = z.infer<typeof StudioReportBands>
+
+/** A test patient a row counted, and in which bands. */
+export const StudioReportCounted = z.object({
+  /** For each counted record, its band in each of the indicator's disaggregations, in order. */
+  "bands": z.array(z.array(z.string())),
+  /** What the test patient shows. */
+  "name": z.string(),
+})
+export type StudioReportCounted = z.infer<typeof StudioReportCounted>
+
+/** An indicator's figure over one period: the whole, and each band of its disaggregations. */
+export const StudioReportFigures = z.object({
+  /** How many are counted: the numerator of a percentage, rate or ratio. */
+  "count": integer,
+  /** The denominator of a percentage, rate or ratio. */
+  "denominator": integer.nullable().optional(),
+  /** The figure per band of each of the indicator's disaggregations. */
+  "disaggregations": z.array(StudioDisaggregation),
+  /** The figure, to two decimal places; none when the denominator is zero or no value was taken. */
+  "value": decimal.nullable().optional(),
+})
+export type StudioReportFigures = z.infer<typeof StudioReportFigures>
+
+/** The indicator a row shows, as found. */
+export const StudioReportIndicator = z.object({
+  /** What it calculates: `count`, `percentage`, `rate`, `ratio`, `sum`, `average`, `median`, `minimum`, `maximum` or `distinct-count`. */
+  "calculation": z.string(),
+  /** The package version it was taken from (`name@version`). */
+  "package": z.string(),
+  /** Whether that version is published; otherwise it is an open draft. */
+  "published": z.boolean(),
+  /** Its title. */
+  "title": z.string(),
+})
+export type StudioReportIndicator = z.infer<typeof StudioReportIndicator>
+
+/** One of Validation's problems with the Report. */
+export const StudioReportProblem = z.object({
+  /** What is wrong. */
+  "message": z.string(),
+  /** The section it is in (its index), or none for the Report's settings. */
+  "section": integer.nullable().optional(),
+})
+export type StudioReportProblem = z.infer<typeof StudioReportProblem>
+
+/** One indicator row's preview. */
+export const StudioReportRow = z.object({
+  /** Who it counted in the period. */
+  "counted": z.array(StudioReportCounted),
+  "current": StudioReportFigures.nullable().optional(),
+  /** Why it could not be computed, if it could not. */
+  "error": z.string().nullable().optional(),
+  "indicator": StudioReportIndicator.nullable().optional(),
+  "previous": StudioReportFigures.nullable().optional(),
+  /** The row's id. */
+  "row": z.string(),
+})
+export type StudioReportRow = z.infer<typeof StudioReportRow>
+
+/** One section's preview; a line list's is empty. */
+export const StudioReportSection = z.object({
+  /** The section's Disaggregations, in order, with their bands. */
+  "disaggregations": z.array(StudioReportBands),
+  /** Its rows, in order. */
+  "rows": z.array(StudioReportRow),
+})
+export type StudioReportSection = z.infer<typeof StudioReportSection>
+
+/** The preview of a draft Report. */
+export const StudioReportPreview = z.object({
+  /** Test patients that could not be read. */
+  "errors": z.array(z.string()),
+  /** How many test patients were read. */
+  "patients": integer,
+  /** The period computed. */
+  "period": StudioPeriod,
+  "previous": StudioPeriod.nullable().optional(),
+  /** Validation's problems, as they stand. */
+  "problems": z.array(StudioReportProblem),
+  /** Each section, in order. */
+  "sections": z.array(StudioReportSection),
+  /** The package versions whose test patients were read. */
+  "sources": z.array(z.string()),
+})
+export type StudioReportPreview = z.infer<typeof StudioReportPreview>
+
+/** The preview of a draft Report. */
+export const StudioReportPreviewInput = z.object({
+  /** The period, of the Report's period type, written as its type writes it (`2026-03`). */
+  "period": z.string(),
+  /** The draft Report, as the designer holds it (`report/1`). */
+  "report": z.object({}),
+})
+export type StudioReportPreviewInput = z.infer<typeof StudioReportPreviewInput>
+
 /** An open Task. */
 export const StudioSandboxTask = z.object({
   /** Its state. */
@@ -1248,6 +1362,18 @@ export const operations = {
       401: StudioProblem,
       403: StudioProblem,
       404: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  previewStudioReport: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/reports/preview',
+    responses: {
+      200: StudioReportPreview,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
+      422: StudioProblem,
       500: StudioProblem,
     },
   },

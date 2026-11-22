@@ -126,17 +126,18 @@ test('Concepts & value sets and Decision tables list and create the same way', a
   await expect(row.getByText('In your draft')).toBeVisible()
 })
 
-// #556: Reports in the HMIS Reporting package (ug.moh.hmis), the author's draft, are listed and
-// open in the file editor until the Report designer (#559).
-test('Reports lists the HMIS package’s Reports and opens one in the file editor', async ({ page }) => {
+// #556, #559: Reports in the HMIS Reporting package (ug.moh.hmis), the author's draft, are listed
+// and open in the Report designer; New report creates one (e2e/report-designer.spec.ts).
+test('Reports lists the HMIS package’s Reports and opens one in the Report designer', async ({ page }) => {
   await signIn(page, USERS.author)
   await openSection(page, 'reports')
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible()
   const grid = page.getByRole('grid', { name: 'Reports' })
   await expect(grid.getByText('ANC facility monitoring')).toBeVisible()
   await expect(grid.getByRole('row').filter({ hasText: 'HMIS 105 · 2 Antenatal care' }).getByText('In your draft')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'New report' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New report' })).toBeVisible()
   await noViolations(page)
   await grid.getByText('HMIS 105 · 2 Antenatal care').click()
-  await expect(page.getByRole('heading', { name: 'configuration/reports/hmis-105-anc.json in ug.moh.hmis@1.0.0', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'HMIS 105 · 2 Antenatal care', level: 1 })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Outline' })).toBeVisible()
 })

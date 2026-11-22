@@ -2387,3 +2387,118 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     .await;
     assert_eq!(status, 404);
 }
+
+/// The HMIS Reporting package's files (#556; `packages/reference-packages/hmis`), its Reports
+/// under `configuration/reports/`.
+fn hmis_package() -> Files {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages/hmis");
+    let mut files = Files::new();
+    for sub in ["", "configuration/reports"] {
+        for entry in std::fs::read_dir(dir.join(sub)).expect("dir") {
+            let path = entry.expect("entry").path();
+            if path.is_file() {
+                let name = path.file_name().expect("name").to_string_lossy();
+                let key = if sub.is_empty() {
+                    name.into_owned()
+                } else {
+                    format!("{sub}/{name}")
+                };
+                files.insert(key, std::fs::read(&path).expect("read"));
+            }
+        }
+    }
+    files
+}
+
+/// The Report designer's preview (#559): the HMIS 105 ANC Report over the ANC package's test
+/// patients, while the ANC indicators are still a draft. Validation's problems say which section
+/// each is in; each row's figures are the indicator's own, per band, for the period and the one
+/// before.
+#[tokio::test]
+async fn the_report_preview_computes_each_row_over_test_patients_with_validations_problems() {
+    let (publications, _dir) = publications().await;
+    let anc = anc_package();
+    publications.draft(&anc, "ann").await.expect("draft anc");
+    let hmis = hmis_package();
+    publications.draft(&hmis, "ann").await.expect("draft hmis");
+    let author = || subject("ann", &["metadata.author"]);
+    let report: Value =
+        serde_json::from_slice(&hmis["configuration/reports/hmis-105-anc.json"]).expect("report");
+    let preview_path = "/packages/ug.moh.hmis@1.0.0/reports/preview";
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (status, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["period"]["id"], "2026-03");
+    assert_eq!(body["previous"]["id"], "2026-02");
+    assert_eq!(body["sources"], json!(["ug.moh.hmis@1.0.0", ID]));
+    // The ANC indicators and age bands are only drafted: Validation asks for them published,
+    // in the section that pins them.
+    let problems = body["problems"].as_array().expect("problems");
+    assert!(
+        problems.iter().any(|p| p["section"] == 0
+            && p["message"].as_str().is_some_and(|m| m.contains(
+                "no published indicator is https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"
+            ))),
+        "{problems:?}"
+    );
+    assert!(
+        problems.iter().all(|p| p["section"].is_number()),
+        "{problems:?}"
+    );
+
+    let attendance = &body["sections"][0];
+    let bands: Vec<&str> = attendance["disaggregations"][0]["bands"]
+        .as_array()
+        .expect("bands")
+        .iter()
+        .filter_map(|b| b["code"].as_str())
+        .collect();
+    assert_eq!(bands.last(), Some(&"not-recorded"));
+    assert!(bands.len() > 2, "{bands:?}");
+    let first = &attendance["rows"][0];
+    assert_eq!(first["row"], "first-visits");
+    assert_eq!(first["indicator"]["package"], ID);
+    assert_eq!(first["indicator"]["published"], false);
+    assert_eq!(first["indicator"]["calculation"], "count");
+    // The row's figures are the indicator's own, as Try gives them.
+    let measure: Value =
+        serde_json::from_slice(&anc["Measure-anc-first-visits.json"]).expect("measure");
+    for (period, figures) in [("2026-03", "current"), ("2026-02", "previous")] {
+        let tried = json!({ "measure": measure, "periodType": "monthly", "period": period });
+        let (_, tried) = call(
+            &publications,
+            author(),
+            "POST",
+            &format!("/packages/{ID}/indicators/try"),
+            Some(tried),
+        )
+        .await;
+        assert_eq!(first[figures]["count"], tried["count"], "{period}");
+        assert_eq!(
+            first[figures]["disaggregations"], tried["disaggregations"],
+            "{period}"
+        );
+    }
+    let counted = first["counted"].as_array().expect("counted");
+    assert_eq!(
+        counted.len() as u64,
+        first["current"]["count"].as_u64().expect("count")
+    );
+    assert!(counted.iter().all(|c| c["bands"][0][0].is_string()));
+    let timing = &body["sections"][1];
+    assert_eq!(timing["rows"][0]["indicator"]["calculation"], "percentage");
+    assert_eq!(timing["disaggregations"], json!([]));
+    // Without % change, a section has no previous figures.
+    let mut unchanged = report.clone();
+    unchanged["sections"][1]["change"] = json!(false);
+    let input = json!({ "report": unchanged, "period": "2026-03" });
+    let (_, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert!(body["sections"][1]["rows"][0]["previous"].is_null());
+    assert!(body["sections"][1]["rows"][0]["current"]["denominator"].is_number());
+
+    // A period not of the Report's type is refused.
+    let input = json!({ "report": report, "period": "2026Q1" });
+    let (status, _) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert_eq!(status, 422);
+}

@@ -70,6 +70,6 @@ pub use membership::{MEMBERSHIP_VARIABLE, Reference, Side, circles, references};
 pub use period::{PREVIOUS_PERIODS, Period, PeriodError, PeriodType, local_date};
 pub use report::{
     ATTRIBUTES, AttributeOf, Axis, Catalogue, Code, Enrollments, IndicatorRow, Level,
-    LineListSection, ListColumn, ListPick, REPORTS_FOLDER, ReportDefinition, RowPer, Section,
-    SectionDisaggregation, TableSection, attribute,
+    LineListSection, ListColumn, ListPick, REPORTS_FOLDER, ReportDefinition, ReportProblem, RowPer,
+    Section, SectionDisaggregation, TableSection, attribute,
 };
