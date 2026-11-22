@@ -15,18 +15,23 @@
 //! 4. **Break-glass grants** made or acknowledged here go up, so their review starts when they
 //!    reach central.
 //! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
-//! 6. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
+//! 6. **Indicator summaries.** While the node is compatible and computes indicators, the summary
+//!    `MeasureReport`s whose figures central does not hold go up, with those forgotten since,
+//!    to `/sync/v1/indicator-summaries` (#555). Only summaries leave the facility; the post is
+//!    made each round, even with none, so central knows when the facility last synced.
+//! 7. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
-//! 7. **Pre-fetch.** The attachments of pulled records whose type is pre-fetched
+//! 8. **Pre-fetch.** The attachments of pulled records whose type is pre-fetched
 //!    (`health_sync_protocol::PREFETCH`, e.g. signed consent scans) are fetched now rather than
 //!    when first opened. One central cannot serve yet stays queued for the next round.
-//! 8. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
+//! 9. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
 //!    packages its activation records want, fetching each tarball from central by its sha-256,
 //!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
 //!    does not have yet go up to `/sync/v1/activation-reports`.
-//! 9. **Releases.** With [`Releases`](releases::Releases), the node works out the release its roll-out records allow,
-//!    keeps its desktops' artifacts if it is an edge, and fetches and stages its own when that
-//!    release is newer than the one it runs, resuming downloads over rounds ([`releases`]; #136).
+//! 10. **Releases.** With [`Releases`](releases::Releases), the node works out the release its
+//!     roll-out records allow, keeps its desktops' artifacts if it is an edge, and fetches and
+//!     stages its own when that release is newer than the one it runs, resuming downloads over
+//!     rounds ([`releases`]; #136).
 //!
 //! Between rounds the task waits for central's "cursor advanced" hint on `/sync/v1/events`, or
 //! for the polling interval. While central cannot be reached, the interval doubles, up to 30
@@ -121,6 +126,8 @@ pub struct Round {
     pub transfers: (usize, usize),
     /// The verdict central gave.
     pub verdict: Option<Verdict>,
+    /// Indicator summaries, and removals of them, central took (#555).
+    pub summaries: usize,
     /// The package switch, or failed activation, this round brought (#89).
     pub activation: Option<health_activation::Outcome>,
     /// What the roll-out meant for this node this round (#136).
@@ -674,6 +681,15 @@ impl Sync {
             );
             return Ok(round);
         }
+        // A summary central refuses does not fail the round: the records synced all the same.
+        match self.send_indicator_summaries().await {
+            Ok(sent) => round.summaries = sent,
+            Err(error) => tracing::warn!(
+                alert = "indicator-summaries-unsent",
+                %error,
+                "central has not taken this facility's indicator summaries"
+            ),
+        }
         // Lane by lane, most urgent first, each from its own cursor.
         for lane in Lane::PULLED {
             let replica = SurrealReplica::new(&self.store, central, lane);
@@ -731,6 +747,47 @@ impl Sync {
             }
         }
         Ok(round)
+    }
+
+    /// Sends central this facility's indicator summaries whose figures it does not hold, and the
+    /// removals of those forgotten here since, a batch at a time; with none, an empty list, so
+    /// central records the sync (#555). A node that does not compute indicators sends nothing.
+    /// The number central took.
+    pub async fn send_indicator_summaries(&self) -> Result<usize, String> {
+        /// Summaries per request.
+        const SUMMARIES: usize = 200;
+        /// Requests per round, so a first sync of years of summaries spreads over rounds.
+        const REQUESTS: usize = 50;
+        if !self
+            .store
+            .computes_indicators()
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            return Ok(0);
+        }
+        let mut sent = 0;
+        for _ in 0..REQUESTS {
+            let unsent = self
+                .store
+                .unsent_indicator_summaries(SUMMARIES)
+                .await
+                .map_err(|e| e.to_string())?;
+            self.post(
+                "/sync/v1/indicator-summaries",
+                serde_json::to_vec(&unsent).map_err(|e| e.to_string())?,
+            )
+            .await?;
+            if unsent.is_empty() {
+                break;
+            }
+            self.store
+                .indicator_summaries_sent(&unsent)
+                .await
+                .map_err(|e| e.to_string())?;
+            sent += unsent.len();
+        }
+        Ok(sent)
     }
 
     /// Sends central the activation reports it does not have yet, so a failed rollout is seen

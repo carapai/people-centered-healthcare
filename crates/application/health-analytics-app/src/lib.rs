@@ -43,6 +43,8 @@
 //!   ([`outcomes`]) for the periods they have care in, evaluated again when they change, and each
 //!   period's summary, calculated again from it and stored as a summary `MeasureReport`
 //!   ([`report`]).
+//! - **At central** ([`rollup`], #555): [`roll_up`] reads each facility's synced summaries back
+//!   and rolls them up over a set of facilities from their summed parts.
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -63,8 +65,10 @@ use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 
 pub mod incremental;
 pub mod report;
+pub mod rollup;
 
 pub use incremental::{Indicators, Refreshed};
+pub use rollup::roll_up;
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 

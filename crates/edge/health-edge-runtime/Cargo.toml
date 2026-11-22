@@ -67,6 +67,7 @@ uuid = { workspace = true }
 windows-service = { workspace = true }
 
 [dev-dependencies]
+health-analytics = { workspace = true }
 health-surrealdb = { workspace = true, features = ["embedded", "memory"] }
 http-body-util = { workspace = true }
 rcgen = { workspace = true }

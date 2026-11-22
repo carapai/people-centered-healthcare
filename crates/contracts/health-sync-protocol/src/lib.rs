@@ -18,6 +18,8 @@
 //! - **Item states** ([`ItemState`]): the outbox item's life cycle.
 //! - **Attachments** ([`blob_refs`], [`BlobStatus`]): blobs referenced by `Attachment.url`, sent
 //!   after their resource in resumable 1 MiB chunks.
+//! - **Indicator summaries** ([`IndicatorSummary`], [`summary_problem`]): only summary
+//!   `MeasureReport`s leave the facility, and nothing in one can name a patient (#555).
 //! - **NDJSON bodies** ([`to_ndjson`], [`from_ndjson`]), sent zstd-compressed ([`compress`],
 //!   [`decompress`]) with `Content-Encoding: zstd`.
 
@@ -34,6 +36,7 @@ mod push;
 mod receive;
 mod snapshot;
 mod state;
+mod summaries;
 
 pub use blobs::{
     BLOB_URL_PREFIX, BlobStatus, CHUNK_SIZE, MAX_BLOB_SIZE, PENDING_EXTENSION, PREFETCH, blob_refs,
@@ -57,3 +60,4 @@ pub use push::{Group, GroupError, MAX_BATCH_BYTES, MAX_BATCH_ITEMS, batches, gro
 pub use receive::{Authority, GroupResult, Outcome, Reason, Receipt, receive};
 pub use snapshot::{SnapshotEvent, decoder, read_snapshot};
 pub use state::{Answer, Event, InvalidTransition, ItemState};
+pub use summaries::{IndicatorSummary, SUMMARY_ELEMENTS, summary_problem};

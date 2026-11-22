@@ -160,6 +160,10 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("indicator_member", "analytics"),
     ("indicator_summary", "analytics"),
     ("indicator_state", "analytics"),
+    // Summaries synced to central, and kept there per facility (#555).
+    ("indicator_summary_upstream", "analytics"),
+    ("facility_indicator_summary", "analytics"),
+    ("facility_indicator_sync", "analytics"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),
     ("stock_movement", "inventory"),

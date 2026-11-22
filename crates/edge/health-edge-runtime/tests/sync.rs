@@ -489,6 +489,86 @@ async fn a_grant_made_offline_reaches_central_s_review_queue_due_from_arrival() 
     assert_eq!(sync.round().await.expect("round").grants, 0, "sent once");
 }
 
+/// A summary `MeasureReport` of ANC 1st visits at this facility, as the edge computes it.
+fn anc_summary(count: u64) -> health_analytics::StoredSummary {
+    let march = health_analytics::Period::parse(health_analytics::PeriodType::Monthly, "2026-03")
+        .expect("march");
+    health_analytics::StoredSummary {
+        measure: "https://x/Measure/anc1|1.0.0".into(),
+        period: march,
+        facility: FACILITY.into(),
+        report: json!({
+            "resourceType": "MeasureReport",
+            "meta": {"tag": [{"system": "urn:health:facility", "code": FACILITY}]},
+            "status": "complete",
+            "type": "summary",
+            "measure": "https://x/Measure/anc1|1.0.0",
+            "date": "2026-04-01T06:00:00Z",
+            "reporter": {"identifier": {"system": "urn:health:facility", "value": FACILITY}},
+            "period": {"start": "2026-03-01", "end": "2026-03-31"},
+            "group": [{"population": [{"code": {"coding": [{"code": "initial-population"}]}, "count": count}]}]
+        })
+        .to_string(),
+    }
+}
+
+#[tokio::test]
+async fn indicator_summaries_reach_central_and_nothing_patient_level_does() {
+    use health_analytics::{FacilitySummaries as _, IndicatorStore as _, Position};
+
+    let central = central().await;
+    let edge = store("edge").await;
+    let march = anc_summary(0).period;
+    let mut tx = edge.begin().await.expect("begin");
+    tx.set_indicator_position(&Position {
+        epoch: "e".into(),
+        seq: 0,
+    })
+    .await
+    .expect("position");
+    tx.put_summary(&anc_summary(3)).await.expect("summary");
+    tx.commit().await.expect("commit");
+
+    let sync = central.sync(&edge, &central.origin);
+    assert_eq!(sync.round().await.expect("round").summaries, 1);
+    assert_eq!(sync.round().await.expect("round").summaries, 0, "sent once");
+    let mut tx = central.store.begin().await.expect("begin");
+    let kept = tx
+        .facility_summaries("https://x/Measure/anc1|1.0.0", &march)
+        .await
+        .expect("kept");
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].facility, FACILITY);
+    let report: Value = serde_json::from_str(&kept[0].report).expect("json");
+    assert_eq!(report["group"][0]["population"][0]["count"], 3);
+    assert!(
+        tx.summaries_synced()
+            .await
+            .expect("synced")
+            .contains_key(FACILITY),
+        "the facility's last sync is kept"
+    );
+    drop(tx);
+
+    // A summary that names a patient is refused, and the round goes on.
+    let mut named = anc_summary(4);
+    let mut report: Value = serde_json::from_str(&named.report).expect("json");
+    report["subject"] = json!({"reference": "Patient/p-1"});
+    named.report = report.to_string();
+    let mut tx = edge.begin().await.expect("begin");
+    tx.put_summary(&named).await.expect("summary");
+    tx.commit().await.expect("commit");
+    assert_eq!(sync.round().await.expect("round").summaries, 0);
+    let mut tx = central.store.begin().await.expect("begin");
+    let kept = tx
+        .facility_summaries("https://x/Measure/anc1|1.0.0", &march)
+        .await
+        .expect("kept");
+    let report: Value = serde_json::from_str(&kept[0].report).expect("json");
+    assert_eq!(report["group"][0]["population"][0]["count"], 3, "unchanged");
+    assert!(!kept[0].report.contains("Patient/"));
+}
+
 /// A package `ug.moh.anc@version` with one Questionnaire, depending on `dependencies`.
 fn anc_package(version: &str, dependencies: Value) -> health_packages::Files {
     let file = |path: &str, json: Value| (path.to_owned(), json.to_string().into_bytes());

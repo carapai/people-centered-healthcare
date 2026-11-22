@@ -16,6 +16,7 @@
 //! - [`ownership`] declares which Owner each table and record belongs to.
 
 mod analytics;
+pub use analytics::figures_hash;
 mod auth;
 mod blocking;
 mod change_log;
