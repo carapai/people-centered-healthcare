@@ -28,6 +28,12 @@
 //!   received; `POST /sync/v1/transfers/inbound` answers those in transit to it (#247).
 //! - `POST /sync/v1/activation-reports` takes the node's package activation reports, `[{"id",
 //!   "report"}]`, kept per node; a failed activation raises `package-activation-failed` (#89).
+//! - `POST /sync/v1/indicator-summaries` takes the facility's indicator summaries, a list of
+//!   [`IndicatorSummary`](health_sync_protocol::IndicatorSummary)s, each a summary
+//!   `MeasureReport` replacing the one central holds or the removal of one, and records that
+//!   the facility's summaries synced. Every summary must be the peer's facility's, and nothing
+//!   in one may name a patient ([`summary_problem`](health_sync_protocol::summary_problem));
+//!   otherwise none is kept (#555).
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -189,6 +195,7 @@ impl SyncServer {
             .route("/sync/v1/transfers", post(transfers))
             .route("/sync/v1/transfers/inbound", post(inbound_transfers))
             .route("/sync/v1/activation-reports", post(activation_reports))
+            .route("/sync/v1/indicator-summaries", post(indicator_summaries))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(health_sync_protocol::MAX_DECODED))
             .layer(axum::middleware::from_fn(zstd_bodies))
@@ -860,6 +867,98 @@ async fn activation_reports(
     }
     axum::Json(json!({ "received": reports.iter().map(|(id, _)| id).collect::<Vec<_>>() }))
         .into_response()
+}
+
+/// The facility's indicator summaries (#555; ADR 0068: only summaries leave the facility): each
+/// kept per facility, a corrected one replacing the old and a forgotten one removed, and the
+/// facility's last sync recorded so that a facility that has not synced shows as missing. A
+/// summary of another facility, or one holding anything a summary does not, refuses the lot.
+async fn indicator_summaries(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    extensions: Extensions,
+    body: Bytes,
+) -> Response {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let SyncScope::Facility(facility) = &peer.scope else {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "indicator summaries come from a facility",
+        );
+    };
+    match server.verdict(&peer).await {
+        Ok(Verdict::Compatible) => {}
+        Ok(_) => {
+            return problem(
+                StatusCode::CONFLICT,
+                "central takes no summaries from a node it holds for review",
+            );
+        }
+        Err(response) => return *response,
+    }
+    let Ok(summaries) =
+        serde_json::from_slice::<Vec<health_sync_protocol::IndicatorSummary>>(&body)
+    else {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "the body is not a list of summaries",
+        );
+    };
+    for summary in &summaries {
+        if summary.facility != *facility {
+            return problem(
+                StatusCode::FORBIDDEN,
+                format!("a summary of {} is not this facility's", summary.facility),
+            );
+        }
+        if let Some(why) = health_sync_protocol::summary_problem(summary) {
+            tracing::warn!(
+                alert = "indicator-summary-refused",
+                node = %peer.id,
+                measure = %summary.measure,
+                period = %summary.period,
+                "{why}"
+            );
+            return problem(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!(
+                    "the summary of {} for {} is refused: {why}",
+                    summary.measure, summary.period
+                ),
+            );
+        }
+    }
+    let mut tx = match health_persistence::Store::begin(&server.inner.store).await {
+        Ok(tx) => tx,
+        Err(error) => return failed(error),
+    };
+    let node = peer.id.to_string();
+    for summary in &summaries {
+        if let Err(error) = tx.receive_indicator_summary(&node, summary).await {
+            return match error {
+                health_persistence::WriteError::Store(error) => failed(error),
+                _ => problem(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("the summary of {} is not one", summary.measure),
+                ),
+            };
+        }
+    }
+    if let Err(error) = tx.indicator_summaries_synced(facility, &node).await {
+        return failed(error);
+    }
+    if let Err(error) = health_persistence::Transaction::commit(tx).await {
+        return failed(error);
+    }
+    axum::Json(json!({ "received": summaries.len() })).into_response()
 }
 
 /// The facility's inter-facility transfers (#247): kept, with the source's lines authoritative,

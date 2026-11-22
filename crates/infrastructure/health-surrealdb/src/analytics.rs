@@ -2,13 +2,24 @@
 //! `health_analytics::IndicatorStore` over the transaction. Membership is keyed
 //! `[measure, period_type, period, patient]` and summaries `[measure, period_type, period,
 //! facility]`, so a period's membership is one record-id range.
+//!
+//! Summaries sync to central (migration `0063_indicator_summary_sync`; #555): each summary keeps
+//! its figures' hash and whether central holds them, and `indicator_summary_upstream` what central
+//! holds, so a summary computed again with the same figures is not sent again and one forgotten
+//! is removed there. Central keeps each facility's in `facility_indicator_summary` and when its
+//! summaries last synced in `facility_indicator_sync`.
+
+use std::collections::BTreeMap;
 
 use health_analytics::{
-    IndicatorStore, MemberKey, PatientOutcome, Period, PeriodType, Position, StoredSummary,
+    FacilitySummaries, FacilitySummary, IndicatorStore, MemberKey, PatientOutcome, Period,
+    PeriodType, Position, StoredSummary,
 };
-use health_persistence::{ResourceType, StoreError, WriteError};
+use health_persistence::{ResourceType, Store as _, StoreError, Transaction as _, WriteError};
+use health_sync_protocol::IndicatorSummary;
+use sha2::{Digest as _, Sha256};
 
-use crate::store::{SurrealTx, table};
+use crate::store::{SurrealStore, SurrealTx, table};
 
 /// Patients with more records than this are read up to it.
 const MOST_RECORDS: usize = 100_000;
@@ -30,6 +41,26 @@ fn kind_of(name: &str) -> Result<PeriodType, StoreError> {
 
 fn store_error(error: impl std::fmt::Display) -> WriteError {
     WriteError::Store(StoreError::Unavailable(error.to_string()))
+}
+
+/// The hash of a summary's figures: its `MeasureReport` without the time it was computed, so a
+/// summary computed again with the same figures has the same hash.
+pub fn figures_hash(report: &str) -> String {
+    let figures = match serde_json::from_str::<serde_json::Value>(report) {
+        Ok(serde_json::Value::Object(mut map)) => {
+            map.remove("date");
+            serde_json::Value::Object(map).to_string()
+        }
+        _ => report.to_owned(),
+    };
+    Sha256::digest(figures.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+fn timestamp(text: &str) -> Result<jiff::Timestamp, StoreError> {
+    text.parse().map_err(|_| invalid())
 }
 
 fn patient_type() -> Result<ResourceType, StoreError> {
@@ -121,7 +152,11 @@ impl IndicatorStore for SurrealTx {
         self.run(
             "UPSERT type::record('indicator_summary', [$m, $k, $p, $f]) CONTENT { \
              measure: $m, period_type: $k, period: $p, facility: $f, start: $start, end: $end, \
-             report: $report, computed_at: time::now() } RETURN NONE",
+             report: $report, hash: $hash, computed_at: time::now(), \
+             sent: type::record('indicator_summary_upstream', [$m, $k, $p, $f]).hash = $hash } \
+             RETURN NONE; \
+             UPDATE type::record('indicator_summary_upstream', [$m, $k, $p, $f]) \
+             SET removed = false RETURN NONE",
             vec![
                 ("m", summary.measure.clone()),
                 ("k", kind),
@@ -130,6 +165,7 @@ impl IndicatorStore for SurrealTx {
                 ("start", summary.period.start.to_string()),
                 ("end", summary.period.end.to_string()),
                 ("report", summary.report.clone()),
+                ("hash", figures_hash(&summary.report)),
             ],
         )
         .await?;
@@ -143,7 +179,9 @@ impl IndicatorStore for SurrealTx {
         facility: &str,
     ) -> Result<(), WriteError> {
         self.run(
-            "DELETE type::record('indicator_summary', [$m, $k, $p, $f]) RETURN NONE",
+            "DELETE type::record('indicator_summary', [$m, $k, $p, $f]) RETURN NONE; \
+             UPDATE type::record('indicator_summary_upstream', [$m, $k, $p, $f]) \
+             SET removed = true RETURN NONE",
             vec![
                 ("m", measure.to_owned()),
                 ("k", kind_name(period.kind)),
@@ -182,7 +220,8 @@ impl IndicatorStore for SurrealTx {
 
     async fn clear_indicators(&mut self) -> Result<(), WriteError> {
         self.run(
-            "DELETE indicator_member RETURN NONE; DELETE indicator_summary RETURN NONE",
+            "DELETE indicator_member RETURN NONE; DELETE indicator_summary RETURN NONE; \
+             UPDATE indicator_summary_upstream SET removed = true RETURN NONE",
             vec![],
         )
         .await?;
@@ -285,5 +324,202 @@ impl IndicatorStore for SurrealTx {
             .into_iter()
             .filter_map(|r| r.into_iter().next())
             .collect())
+    }
+}
+
+/// The `[measure, period_type, period, facility]` binds of a synced summary.
+fn summary_key(summary: &IndicatorSummary) -> Vec<(&'static str, String)> {
+    vec![
+        ("m", summary.measure.clone()),
+        ("k", summary.period_type.clone()),
+        ("p", summary.period.clone()),
+        ("f", summary.facility.clone()),
+    ]
+}
+
+impl SurrealStore {
+    /// Whether this node computes indicators: they have stood somewhere on its change log.
+    pub async fn computes_indicators(&self) -> Result<bool, StoreError> {
+        let mut tx = self.begin().await?;
+        Ok(tx.indicator_position().await?.is_some())
+    }
+
+    /// Up to `limit` summaries central does not hold the figures of, then up to `limit`
+    /// removals of summaries forgotten here since central took them (#555).
+    pub async fn unsent_indicator_summaries(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<IndicatorSummary>, StoreError> {
+        let mut tx = self.begin().await?;
+        let puts = tx
+            .rows(
+                &format!(
+                    "SELECT VALUE [measure, period_type, period, facility, hash, report] \
+                     FROM indicator_summary WHERE sent = false LIMIT {limit}"
+                ),
+                vec![],
+            )
+            .await?;
+        let removed = tx
+            .rows(
+                &format!(
+                    "SELECT VALUE record::id(id) FROM indicator_summary_upstream \
+                     WHERE removed = true LIMIT {limit}"
+                ),
+                vec![],
+            )
+            .await?;
+        drop(tx);
+        let mut out = Vec::new();
+        for row in puts {
+            let Ok([measure, period_type, period, facility, hash, report]) =
+                <[String; 6]>::try_from(row)
+            else {
+                return Err(invalid());
+            };
+            out.push(IndicatorSummary {
+                measure,
+                period_type,
+                period,
+                facility,
+                hash,
+                report: Some(serde_json::from_str(&report).map_err(|_| invalid())?),
+            });
+        }
+        for key in removed {
+            let Ok([measure, period_type, period, facility]) = <[String; 4]>::try_from(key) else {
+                return Err(invalid());
+            };
+            out.push(IndicatorSummary {
+                measure,
+                period_type,
+                period,
+                facility,
+                hash: String::new(),
+                report: None,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Records that central holds `sent`: each summary's figures, and each removal. A summary
+    /// computed again since with other figures stays unsent, and one forgotten since stays to be
+    /// removed.
+    pub async fn indicator_summaries_sent(
+        &self,
+        sent: &[IndicatorSummary],
+    ) -> Result<(), WriteError> {
+        let mut tx = self.begin().await?;
+        for summary in sent {
+            let mut binds = summary_key(summary);
+            let sql = if summary.report.is_some() {
+                binds.push(("hash", summary.hash.clone()));
+                "UPSERT type::record('indicator_summary_upstream', [$m, $k, $p, $f]) CONTENT { \
+                 hash: $hash, \
+                 removed: !record::exists(type::record('indicator_summary', [$m, $k, $p, $f])) } \
+                 RETURN NONE; \
+                 UPDATE type::record('indicator_summary', [$m, $k, $p, $f]) SET sent = true \
+                 WHERE hash = $hash RETURN NONE"
+            } else {
+                // Central holds nothing for it now, whatever was computed here meanwhile.
+                "DELETE type::record('indicator_summary_upstream', [$m, $k, $p, $f]) RETURN NONE; \
+                 UPDATE type::record('indicator_summary', [$m, $k, $p, $f]) SET sent = false \
+                 RETURN NONE"
+            };
+            tx.run(sql, binds).await?;
+        }
+        tx.commit().await
+    }
+}
+
+impl SurrealTx {
+    /// Keeps a facility's summary at central, replacing the one it corrects, or removes it when
+    /// it was forgotten at the facility (#555). `node` is the edge that sent it.
+    pub async fn receive_indicator_summary(
+        &mut self,
+        node: &str,
+        summary: &IndicatorSummary,
+    ) -> Result<(), WriteError> {
+        let mut binds = summary_key(summary);
+        let Some(report) = &summary.report else {
+            self.run(
+                "DELETE type::record('facility_indicator_summary', [$m, $k, $p, $f]) RETURN NONE",
+                binds,
+            )
+            .await?;
+            return Ok(());
+        };
+        let computed_at = report["date"].as_str().unwrap_or_default().to_owned();
+        binds.extend([
+            ("node", node.to_owned()),
+            ("report", report.to_string()),
+            ("at", computed_at),
+        ]);
+        self.run(
+            "UPSERT type::record('facility_indicator_summary', [$m, $k, $p, $f]) CONTENT { \
+             measure: $m, period_type: $k, period: $p, facility: $f, node: $node, \
+             report: $report, computed_at: <datetime>$at, received_at: time::now() } RETURN NONE",
+            binds,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Records that `facility`'s summaries synced now, from `node`.
+    pub async fn indicator_summaries_synced(
+        &mut self,
+        facility: &str,
+        node: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('facility_indicator_sync', $f) CONTENT { node: $node, \
+             synced_at: time::now() } RETURN NONE",
+            vec![("f", facility.to_owned()), ("node", node.to_owned())],
+        )
+        .await?;
+        Ok(())
+    }
+}
+
+impl FacilitySummaries for SurrealTx {
+    async fn facility_summaries(
+        &mut self,
+        measure: &str,
+        period: &Period,
+    ) -> Result<Vec<FacilitySummary>, StoreError> {
+        self.rows(
+            "SELECT VALUE [facility, report, <string>computed_at] FROM facility_indicator_summary \
+             WHERE measure = $m AND period_type = $k AND period = $p ORDER BY facility",
+            vec![
+                ("m", measure.to_owned()),
+                ("k", kind_name(period.kind)),
+                ("p", period.id.clone()),
+            ],
+        )
+        .await?
+        .into_iter()
+        .map(|row| match <[String; 3]>::try_from(row) {
+            Ok([facility, report, computed_at]) => Ok(FacilitySummary {
+                facility,
+                report,
+                computed_at: timestamp(&computed_at)?,
+            }),
+            Err(_) => Err(invalid()),
+        })
+        .collect()
+    }
+
+    async fn summaries_synced(&mut self) -> Result<BTreeMap<String, jiff::Timestamp>, StoreError> {
+        self.rows(
+            "SELECT VALUE [<string>record::id(id), <string>synced_at] FROM facility_indicator_sync",
+            vec![],
+        )
+        .await?
+        .into_iter()
+        .map(|row| match <[String; 2]>::try_from(row) {
+            Ok([facility, at]) => Ok((facility, timestamp(&at)?)),
+            Err(_) => Err(invalid()),
+        })
+        .collect()
     }
 }

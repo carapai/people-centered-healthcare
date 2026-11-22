@@ -42,6 +42,9 @@
 //! - **On each node** ([`store`], #554): each patient's membership per indicator and period, kept
 //!   for the periods they have care in ([`periods_with_care`]), and a summary per indicator,
 //!   period and facility, calculated again from the kept membership whenever a patient changes.
+//! - **At central** ([`rollup`], #555): each facility's synced summaries, rolled up over a set of
+//!   facilities from their summed parts ([`roll_up_facilities`]), with the facilities that have
+//!   not reported shown as missing, never as zero.
 //!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
@@ -53,6 +56,7 @@ pub mod indicator;
 pub mod membership;
 pub mod period;
 pub mod report;
+pub mod rollup;
 pub mod store;
 
 pub use age_bands::{
@@ -77,5 +81,8 @@ pub use report::{
     ATTRIBUTES, AttributeOf, Axis, Catalogue, Code, Enrollments, IndicatorRow, Level,
     LineListSection, ListColumn, ListPick, REPORTS_FOLDER, ReportDefinition, ReportProblem, RowPer,
     Section, SectionDisaggregation, TableSection, attribute,
+};
+pub use rollup::{
+    FacilitySummaries, FacilitySummary, Missing, Reported, RolledUp, roll_up_facilities,
 };
 pub use store::{IndicatorStore, MemberKey, Position, StoredSummary, periods_with_care};

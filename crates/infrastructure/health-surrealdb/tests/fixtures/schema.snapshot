@@ -669,6 +669,19 @@ DEFINE TABLE explanation_of_benefit_history TYPE NORMAL SCHEMAFULL PERMISSIONS N
   DEFINE FIELD version_id ON explanation_of_benefit_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON explanation_of_benefit_history TYPE int PERMISSIONS FULL
   DEFINE INDEX explanation_of_benefit_history_last_updated ON explanation_of_benefit_history FIELDS last_updated, version_seq
+DEFINE TABLE facility_indicator_summary TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD computed_at ON facility_indicator_summary TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD facility ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD measure ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD node ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD period ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD period_type ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD received_at ON facility_indicator_summary TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD report ON facility_indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE INDEX facility_indicator_summary_period ON facility_indicator_summary FIELDS measure, period_type, period
+DEFINE TABLE facility_indicator_sync TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD node ON facility_indicator_sync TYPE string PERMISSIONS FULL
+  DEFINE FIELD synced_at ON facility_indicator_sync TYPE datetime PERMISSIONS FULL
 DEFINE TABLE family_member_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON family_member_history TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON family_member_history TYPE array<record> DEFAULT [] PERMISSIONS FULL
@@ -900,12 +913,19 @@ DEFINE TABLE indicator_summary TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD computed_at ON indicator_summary TYPE datetime PERMISSIONS FULL
   DEFINE FIELD end ON indicator_summary TYPE string PERMISSIONS FULL
   DEFINE FIELD facility ON indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD hash ON indicator_summary TYPE string DEFAULT '' PERMISSIONS FULL
   DEFINE FIELD measure ON indicator_summary TYPE string PERMISSIONS FULL
   DEFINE FIELD period ON indicator_summary TYPE string PERMISSIONS FULL
   DEFINE FIELD period_type ON indicator_summary TYPE string PERMISSIONS FULL
   DEFINE FIELD report ON indicator_summary TYPE string PERMISSIONS FULL
+  DEFINE FIELD sent ON indicator_summary TYPE bool DEFAULT false PERMISSIONS FULL
   DEFINE FIELD start ON indicator_summary TYPE string PERMISSIONS FULL
   DEFINE INDEX indicator_summary_period ON indicator_summary FIELDS period_type, period
+  DEFINE INDEX indicator_summary_sent ON indicator_summary FIELDS sent
+DEFINE TABLE indicator_summary_upstream TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD hash ON indicator_summary_upstream TYPE string PERMISSIONS FULL
+  DEFINE FIELD removed ON indicator_summary_upstream TYPE bool DEFAULT false PERMISSIONS FULL
+  DEFINE INDEX indicator_summary_upstream_removed ON indicator_summary_upstream FIELDS removed
 DEFINE TABLE insurance_plan TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON insurance_plan TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON insurance_plan TYPE array<record> DEFAULT [] PERMISSIONS FULL
