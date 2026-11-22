@@ -62,7 +62,7 @@ Decided in [ADR 0075](../adr/0075-dashboards-read-indicator-reports-only-over-st
 - **The data explorer** pivots indicators by place, period and Disaggregation, and saves Visualizations.
 - **Standard Dashboards** ship in the Reporting package. **Saved Dashboards** are user content (`analytics.author`), shared with a person, role or place level.
 - **Scope, freshness and completeness:**
-  - Users see their assigned area.
+  - Users see their assigned area: the place their role is held at and everything below it (ADR 0094).
   - Each Visualization shows when its data was computed and how many facilities have reported.
   - A facility that has not synced shows as missing, never as zero.
 - **Maps:** facility points from the NHFR, and boundaries from the national core package.
