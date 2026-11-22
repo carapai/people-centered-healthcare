@@ -39,6 +39,10 @@
 //!   that runs above facility level, and indicators or Age Band Sets not pinned to
 //!   `url|version`.
 //!
+//! - **On each node** ([`store`], #554): each patient's membership per indicator and period, kept
+//!   for the periods they have care in ([`periods_with_care`]), and a summary per indicator,
+//!   period and facility, calculated again from the kept membership whenever a patient changes.
+//!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
@@ -49,6 +53,7 @@ pub mod indicator;
 pub mod membership;
 pub mod period;
 pub mod report;
+pub mod store;
 
 pub use age_bands::{
     AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE, AgeAt, AgeBand, AgeBandSet, AgeBandSetDefinition,
@@ -73,3 +78,4 @@ pub use report::{
     LineListSection, ListColumn, ListPick, REPORTS_FOLDER, ReportDefinition, ReportProblem, RowPer,
     Section, SectionDisaggregation, TableSection, attribute,
 };
+pub use store::{IndicatorStore, MemberKey, Position, StoredSummary, periods_with_care};

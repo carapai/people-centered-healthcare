@@ -39,6 +39,10 @@
 //!   `criteria` (FHIRPath, evaluated like the populations') puts it in the band of the code it
 //!   gives, named by the stratifier's `code`. No birth date, an age in no band, or no code is
 //!   *not recorded*. The pinned sets come from the [`Library`].
+//! - **On each node** ([`incremental`], #554): [`Indicators`] keeps each patient's membership
+//!   ([`outcomes`]) for the periods they have care in, evaluated again when they change, and each
+//!   period's summary, calculated again from it and stored as a summary `MeasureReport`
+//!   ([`report`]).
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -56,6 +60,11 @@ use health_analytics::{
     PopulationDefinition, RecordOutcome, Side, ValueSource, calculate, local_date, pinned,
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
+
+pub mod incremental;
+pub mod report;
+
+pub use incremental::{Indicators, Refreshed};
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
@@ -516,6 +525,44 @@ async fn evaluate_within(
     patients: &[PatientRecords],
     within: Vec<String>,
 ) -> Result<Evaluation, String> {
+    let outcomes = outcomes_within(engine, library, indicator, period, patients, within).await?;
+    Ok(calculate(
+        indicator,
+        period,
+        &outcomes,
+        library.age_band_sets(),
+    ))
+}
+
+/// How each patient's records of `indicator`'s basis came out over `period`, before they are
+/// counted: what a node keeps as each patient's membership (#554). Counting them
+/// (`health_analytics::calculate`) gives what [`evaluate`] gives.
+pub async fn outcomes(
+    engine: &dyn FhirPathEngine,
+    library: &Library,
+    indicator: &Indicator,
+    period: &Period,
+    patients: &[PatientRecords],
+) -> Result<Vec<PatientOutcome>, String> {
+    outcomes_within(
+        engine,
+        library,
+        indicator,
+        period,
+        patients,
+        vec![indicator.canonical()],
+    )
+    .await
+}
+
+async fn outcomes_within(
+    engine: &dyn FhirPathEngine,
+    library: &Library,
+    indicator: &Indicator,
+    period: &Period,
+    patients: &[PatientRecords],
+    within: Vec<String>,
+) -> Result<Vec<PatientOutcome>, String> {
     let memberships = memberships(engine, library, indicator, period, patients, within).await?;
     let previous: Vec<String> = period
         .previous_starts(PREVIOUS_PERIODS)
@@ -622,12 +669,7 @@ async fn evaluate_within(
             records,
         });
     }
-    Ok(calculate(
-        indicator,
-        period,
-        &outcomes,
-        library.age_band_sets(),
-    ))
+    Ok(outcomes)
 }
 
 /// How a record's band in one disaggregation is found.

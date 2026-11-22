@@ -156,6 +156,10 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("payment_exception", "payments"),
     ("provider_request", "payments"),
     ("break_glass", "identity"),
+    // Indicators computed on the node (#554).
+    ("indicator_member", "analytics"),
+    ("indicator_summary", "analytics"),
+    ("indicator_state", "analytics"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),
     ("stock_movement", "inventory"),

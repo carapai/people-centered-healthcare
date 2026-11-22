@@ -29,7 +29,8 @@ use crate::indicator::{Aggregate, Calculation, Counts, Indicator, Pick, Populati
 use crate::period::Period;
 
 /// A value of a counted thing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Observed {
     /// A number: a sum, average, median, minimum or maximum takes these.
     Number(Decimal),
@@ -47,8 +48,8 @@ impl Observed {
     }
 }
 
-/// How one record came out.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// How one record came out: what an edge keeps of each patient's membership (#554).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RecordOutcome {
     /// The record, as a reference (`Encounter/…`).
     pub reference: String,
@@ -67,7 +68,7 @@ pub struct RecordOutcome {
 }
 
 /// One patient's records, each as it came out.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PatientOutcome {
     /// The patient, as a reference (`Patient/…`).
     pub patient: String,

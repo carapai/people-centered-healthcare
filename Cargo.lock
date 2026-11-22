@@ -2323,6 +2323,7 @@ dependencies = [
 name = "health-analytics"
 version = "0.1.0"
 dependencies = [
+ "health-persistence",
  "jiff",
  "rust_decimal",
  "serde",
@@ -2337,6 +2338,10 @@ dependencies = [
  "base64 0.22.1",
  "health-analytics",
  "health-fhir-validation",
+ "health-identifiers",
+ "health-persistence",
+ "health-surrealdb",
+ "health-time",
  "jiff",
  "rust_decimal",
  "serde_json",
@@ -3062,24 +3067,30 @@ dependencies = [
  "axum",
  "health-access-policy",
  "health-activation",
+ "health-analytics",
+ "health-analytics-app",
  "health-audit",
  "health-auth",
  "health-client-registry",
  "health-configuration",
  "health-fhir-search",
  "health-fhir-server",
+ "health-fhir-validation",
  "health-files",
  "health-identifiers",
+ "health-packages",
  "health-persistence",
  "health-publication",
  "health-registries-app",
  "health-surrealdb",
  "health-time",
  "health-workflow-app",
+ "jiff",
  "serde_json",
  "tokio",
  "tower",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3427,6 +3438,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "health-access-policy",
+ "health-analytics",
  "health-audit",
  "health-authority-leases",
  "health-billing",
