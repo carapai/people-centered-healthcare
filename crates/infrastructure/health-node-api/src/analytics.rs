@@ -104,7 +104,7 @@ pub async fn explore_here(
     Ok(json!({
         "where": "facility",
         "periods": periods_json(&question.periods),
-        "cells": cells_json(&cells, &names),
+        "cells": cells_json(&cells, &names, question.disaggregation.as_deref()),
     }))
 }
 

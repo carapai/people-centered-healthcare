@@ -17,8 +17,8 @@
 use std::collections::BTreeMap;
 
 use health_analytics::{
-    Aggregate, Calculation, FacilitySummaries, FacilitySummary, Indicator, IndicatorStore, Period,
-    RolledUp,
+    Aggregate, Calculation, DisaggregationSource, FacilitySummaries, FacilitySummary, Indicator,
+    IndicatorStore, Period, RolledUp, Summary,
 };
 use health_persistence::StoreError;
 use jiff::Timestamp;
@@ -169,6 +169,17 @@ pub fn indicator_json(indicator: &Indicator) -> Value {
         "title": indicator.title,
         "calculation": calculation_code(indicator.calculation),
         "per": per,
+        "disaggregations": indicator
+            .disaggregations
+            .iter()
+            .map(|d| json!({
+                "name": d.name,
+                "by": match d.source {
+                    DisaggregationSource::AgeBands(_) => "age",
+                    DisaggregationSource::Coded(_) => "code",
+                },
+            }))
+            .collect::<Vec<_>>(),
         "rollsUp": !matches!(
             indicator.calculation,
             Calculation::Value(aggregate) if !aggregate.rolls_up()
@@ -185,9 +196,15 @@ pub fn indicator_json(indicator: &Indicator) -> Value {
     })
 }
 
+fn figure_text(summary: &Summary) -> Value {
+    json!(summary.value.map(|v| v.normalize().to_string()))
+}
+
 /// `cells` as the explorer reads them, naming each missing facility from `names`. A figure is
-/// exact decimal text.
-pub fn cells_json(cells: &[Cell], names: &BTreeMap<String, String>) -> Value {
+/// exact decimal text. Split by the disaggregation named `by` (#601), each rolled-up figure also
+/// carries its `bands`, in the summary's order (an Age Band Set's, or the codes found, then
+/// *not recorded*): each band's figure recomputed from its own summed parts, never an average.
+pub fn cells_json(cells: &[Cell], names: &BTreeMap<String, String>, by: Option<&str>) -> Value {
     let name = |code: &str| names.get(code).cloned().unwrap_or_else(|| code.to_owned());
     let cells: Vec<Value> = cells
         .iter()
@@ -204,13 +221,17 @@ pub fn cells_json(cells: &[Cell], names: &BTreeMap<String, String>) -> Value {
                 }
                 Figure::Rolled(rolled) => {
                     let (reported, expected) = rolled.completeness();
-                    out["value"] = json!(
-                        rolled
+                    out["value"] = rolled.summary.as_ref().map_or(Value::Null, figure_text);
+                    if let Some(by) = by {
+                        out["bands"] = rolled
                             .summary
-                            .as_ref()
-                            .and_then(|s| s.value)
-                            .map(|v| v.normalize().to_string())
-                    );
+                            .iter()
+                            .flat_map(|s| &s.disaggregations)
+                            .filter(|d| d.name == by)
+                            .flat_map(|d| &d.bands)
+                            .map(|b| json!({ "code": b.code, "value": figure_text(&b.summary) }))
+                            .collect();
+                    }
                     out["reported"] = json!(reported);
                     out["expected"] = json!(expected);
                     out["computedAt"] = json!(rolled.computed_at.map(|t| t.to_string()));
@@ -241,7 +262,8 @@ pub const MOST_PLACES: usize = 60;
 pub const MOST_CELLS: usize = 6000;
 
 /// What the explorer asks: `{"indicators": ["url|version"], "periodType": "monthly", "from":
-/// "2026-01", "to": "2026-06", "places": ["district-kampala"]}`.
+/// "2026-01", "to": "2026-06", "places": ["district-kampala"]}`, optionally split by one
+/// disaggregation every indicator asked has: `"disaggregation": "age"` (#601).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Question {
     /// The indicators, from those offered, in the order asked.
@@ -251,6 +273,8 @@ pub struct Question {
     /// The places' codes, in the order asked, each once; whether the session may see them is
     /// the caller's to check.
     pub places: Vec<String>,
+    /// The disaggregation each figure is split by, by name; every indicator has it.
+    pub disaggregation: Option<String>,
 }
 
 /// Reads `body` as a [`Question`] over the indicators `offered`, or says why it cannot be asked.
@@ -288,6 +312,19 @@ pub fn read_question(body: &Value, offered: &[Indicator]) -> Result<Question, St
                 .ok_or(format!("{m} is not an indicator offered here"))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let disaggregation = match &body["disaggregation"] {
+        Value::Null => None,
+        Value::String(name) => {
+            if let Some(lacking) = indicators
+                .iter()
+                .find(|i| !i.disaggregations.iter().any(|d| d.name == *name))
+            {
+                return Err(format!("{} is not disaggregated by {name}", lacking.title));
+            }
+            Some(name.clone())
+        }
+        _ => return Err("`disaggregation` is not a name".into()),
+    };
     let kind = serde_json::from_value(body["periodType"].clone())
         .map_err(|_| "`periodType` is not a period type".to_owned())?;
     let end = |name: &str| {
@@ -305,6 +342,7 @@ pub fn read_question(body: &Value, offered: &[Indicator]) -> Result<Question, St
         indicators,
         periods,
         places,
+        disaggregation,
     })
 }
 

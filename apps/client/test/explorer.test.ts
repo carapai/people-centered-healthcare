@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, type Question, type ThresholdBand, answerQuery, chartSeries, explorerQuery, newestComputed, periodOf, previousPeriod, recentPeriods, singleNumbers, tableOf, toneOf } from '../src/features/explorer/api'
+import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type Question, type ThresholdBand, answerQuery, bandsOf, chartSeries, childAreas, explorerQuery, fitted, newestComputed, periodOf, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from '../src/features/explorer/api'
 import { fakeTransport } from './fake'
 
 const explorer: Explorer = {
@@ -11,8 +11,8 @@ const explorer: Explorer = {
     { code: 'KAM031', name: 'Kitebi HC III', level: 'facility', parent: 'district-kampala' },
   ],
   indicators: [
-    { measure: 'https://x/Measure/anc1|1.0.0', title: 'ANC 1st visits', calculation: 'count', per: null, rollsUp: true, thresholds: [] },
-    { measure: 'https://x/Measure/ga|1.0.0', title: 'Gestational age at 1st visit', calculation: 'median', per: null, rollsUp: false, thresholds: [] },
+    { measure: 'https://x/Measure/anc1|1.0.0', title: 'ANC 1st visits', calculation: 'count', per: null, rollsUp: true, thresholds: [], disaggregations: [{ name: 'Age band', by: 'age' }] },
+    { measure: 'https://x/Measure/ga|1.0.0', title: 'Gestational age at 1st visit', calculation: 'median', per: null, rollsUp: false, thresholds: [], disaggregations: [] },
   ],
   periodTypes: ['weekly', 'monthly', 'quarterly', 'financialJuly'],
 }
@@ -81,7 +81,7 @@ describe('visualizations', () => {
     { from: '20', to: '40', tone: 'warning' },
     { from: '40', to: null, tone: 'bad' },
   ]
-  const withPositivity: Explorer = { ...explorer, indicators: [...explorer.indicators, { measure: positivity, title: 'Malaria test positivity', calculation: 'percentage', per: null, rollsUp: true, thresholds: bands }] }
+  const withPositivity: Explorer = { ...explorer, indicators: [...explorer.indicators, { measure: positivity, title: 'Malaria test positivity', calculation: 'percentage', per: null, rollsUp: true, thresholds: bands, disaggregations: [] }] }
 
   test('a malaria positivity of 45% is in the bad band, 39.99% in the warning one, and an indicator without bands has no tone', () => {
     expect(toneOf(bands, 45)).toBe('bad')
@@ -146,5 +146,63 @@ describe('visualizations', () => {
   test('the chart series carry their indicator’s bands', () => {
     const q: Question = { ...question, indicators: [positivity] }
     expect(chartSeries(answer, withPositivity, q).map((s) => s.thresholds)).toEqual([bands, bands])
+  })
+})
+
+// #601: disaggregation and series.
+const band = (code: string, value: string | null) => ({ code, value })
+describe('disaggregation and series', () => {
+  const anc = question.indicators[0] ?? ''
+  const median = explorer.indicators[1]?.measure ?? ''
+  const byAge: Question = { ...question, places: ['district-kampala'], disaggregation: 'Age band' }
+  const split: Answer = {
+    ...answer,
+    cells: [
+      { ...answer.cells[0], indicator: anc, period: '2026-02', place: 'district-kampala', value: '6', bands: [band('15-19', '2'), band(NOT_RECORDED, '1'), band('20-24', '3')] },
+      { ...answer.cells[1], indicator: anc, period: '2026-03', place: 'district-kampala', value: '10', bands: [band('15-19', '4'), band('20-24', '5'), band('25+', '1')] },
+    ],
+  }
+
+  test('ANC 1st visits by age band show one series per band, not recorded last', () => {
+    expect(bandsOf(split, anc)).toEqual(['15-19', '20-24', '25+', NOT_RECORDED])
+    const series = chartSeries(split, explorer, byAge, 'band', (c) => (c === NOT_RECORDED ? 'Not recorded' : c))
+    expect(series.map((s) => [s.label, s.band, s.values])).toEqual([
+      ['15-19', '15-19', [2, 4]],
+      ['20-24', '20-24', [3, 5]],
+      ['25+', '25+', [null, 1]],
+      ['Not recorded', NOT_RECORDED, [1, null]],
+    ])
+    // The table under the chart has the same rows.
+    expect(tableOf(split, explorer, byAge, 'indicatorsByPeriods', 'band').rows.map((r) => r.label)).toEqual(['15-19', '20-24', '25+', NOT_RECORDED])
+    // Bands without a disaggregation asked are the totals.
+    const { disaggregation: _d, ...totals } = byAge
+    expect(chartSeries(split, explorer, totals, 'band').map((s) => s.values)).toEqual([[6, 10]])
+  })
+
+  test('series by place compare the child areas, each named by its place', () => {
+    expect(childAreas(explorer)).toEqual(['KAM013', 'KAM031'])
+    const q: Question = { ...question, places: ['KAM013', 'KAM031'] }
+    const a: Answer = { ...answer, cells: ['KAM013', 'KAM031'].flatMap((place, k) => ['2026-02', '2026-03'].map((period, i) => ({ indicator: anc, period, place, value: String(k * 10 + i), computedAt: null }))) }
+    expect(chartSeries(a, explorer, q, 'place').map((s) => [s.label, s.values])).toEqual([
+      ['Kisenyi HC IV', [0, 1]],
+      ['Kitebi HC III', [10, 11]],
+    ])
+  })
+
+  test('a disaggregation is offered when every indicator picked has it, and dropped when one does not', () => {
+    expect(sharedDisaggregations(explorer, [anc]).map((d) => d.name)).toEqual(['Age band'])
+    expect(sharedDisaggregations(explorer, [anc, median])).toEqual([])
+    const shown = { type: 'column' as const, question: byAge, layout: 'placesByIndicators' as const, series: 'band' as const }
+    expect(fitted(explorer, shown)).toEqual(shown)
+    const both = fitted(explorer, { ...shown, question: { ...byAge, indicators: [anc, median] } })
+    expect(both.question.disaggregation).toBeUndefined()
+    expect(both.series).toBe('indicator')
+  })
+
+  test('the question names its disaggregation, and the explorer reads each indicator\'s', async () => {
+    const transport = fakeTransport((request) => ({ body: request.method === 'GET' ? { ...explorer, indicators: explorer.indicators.map(({ disaggregations: _d, ...i }) => i) } : split }))
+    expect((await explorerQuery(transport).queryFn({})).indicators.map((i) => i.disaggregations)).toEqual([[], []])
+    expect((await answerQuery(transport, byAge).queryFn({})).cells[0]?.bands).toEqual(split.cells[0]?.bands)
+    expect(transport.sent[1]?.body).toMatchObject({ disaggregation: 'Age band' })
   })
 })

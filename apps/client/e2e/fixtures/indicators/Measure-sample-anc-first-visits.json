@@ -51,6 +51,9 @@
       ],
       "stratifier": [
         {
+          "code": {
+            "text": "Age band"
+          },
           "extension": [
             {
               "url": "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-age-band-set",

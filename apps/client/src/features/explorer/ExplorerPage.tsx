@@ -5,7 +5,7 @@ import { useIntl } from 'react-intl'
 
 import { explorerMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
-import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, type PeriodType, type Question, type Series, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, explorerQuery, newestComputed, previousPeriod, recentPeriods, singleNumbers, tableOf, toneOf } from './api'
+import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, explorerQuery, fitted, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
 
 const layout = css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', md: '18rem 1fr' }, alignItems: 'start' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -23,6 +23,7 @@ const TONE_CELL: Record<Tone, { background: string; color: string }> = {
 }
 const TYPES: VisualizationType[] = ['column', 'line', 'table', 'single']
 const LAYOUTS: TableLayout[] = ['placesByIndicators', 'indicatorsByPeriods']
+const SERIES: SeriesBy[] = ['indicator', 'place', 'band']
 const pressable = css({
   border: '1px solid',
   borderColor: 'border.control',
@@ -40,6 +41,7 @@ const OFFERED: Record<PeriodType, number> = { weekly: 52, monthly: 24, quarterly
 const STARTING: Record<PeriodType, number> = { weekly: 12, monthly: 6, quarterly: 4, financialJuly: 3 }
 
 const toggle = (list: string[], item: string) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
+
 
 function defaultQuestion(explorer: Explorer, kind: PeriodType = 'monthly'): Question {
   const periods = recentPeriods(kind, new Date(), STARTING[kind])
@@ -83,9 +85,12 @@ function Explore({ explorer }: { explorer: Explorer }) {
   const intl = useIntl()
   const { transport } = usePlatform()
   // The chart type and table layout are kept apart from the question: switching them keeps the selection.
-  const [shown, setShown] = useState<Shown>(() => ({ type: 'column', question: defaultQuestion(explorer), layout: 'placesByIndicators' }))
+  const [shown, setShownAs] = useState<Shown>(() => ({ type: 'column', question: defaultQuestion(explorer), layout: 'placesByIndicators', series: 'indicator' }))
+  const setShown = (next: Shown) => setShownAs(fitted(explorer, next))
   const { question } = shown
   const setQuestion = (next: Question) => setShown({ ...shown, question: next })
+  const splits = sharedDisaggregations(explorer, question.indicators)
+  const children = childAreas(explorer)
   const ready = question.indicators.length > 0 && question.places.length > 0
   const answer = useQuery({ ...answerQuery(transport, question), enabled: ready, placeholderData: keepPreviousData })
   // A single number shows its change on the period before the range's last; ask for it when the range does not hold it.
@@ -114,7 +119,7 @@ function Explore({ explorer }: { explorer: Explorer }) {
             <legend>{intl.formatMessage(m.exPeriods)}</legend>
             <label className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
               {intl.formatMessage(m.exPeriodType)}
-              <select className={field} value={question.periodType} onChange={(e) => setQuestion({ ...defaultQuestion(explorer, e.target.value as PeriodType), indicators: question.indicators, places: question.places })}>
+              <select className={field} value={question.periodType} onChange={(e) => setQuestion({ ...defaultQuestion(explorer, e.target.value as PeriodType), indicators: question.indicators, places: question.places, ...(question.disaggregation === undefined ? {} : { disaggregation: question.disaggregation }) })}>
                 {explorer.periodTypes.map((kind) => (
                   <option key={kind} value={kind}>
                     {periodTypeName(kind)}
@@ -151,6 +156,40 @@ function Explore({ explorer }: { explorer: Explorer }) {
                 <span>{place.name}</span>
               </label>
             ))}
+            {explorer.place !== null && children.length > 0 ? (
+              <button type="button" className={pressable} aria-pressed={question.places.length === children.length && children.every((c) => question.places.includes(c))} onClick={() => setQuestion({ ...question, places: children })}>
+                {intl.formatMessage(m.exChildAreas, { place: explorer.place.name })}
+              </button>
+            ) : null}
+          </fieldset>
+          <label className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontWeight: 'semibold' })}>
+              {intl.formatMessage(m.exDisaggregation)}
+              <select
+                className={cx(field, css({ fontWeight: 'normal' }))}
+                value={question.disaggregation ?? ''}
+                onChange={(e) => {
+                  const { disaggregation: _dropped, ...rest } = question
+                  const name = e.target.value
+                  setShown({ ...shown, question: name === '' ? rest : { ...rest, disaggregation: name }, series: name === '' ? (shown.series === 'band' ? 'indicator' : shown.series) : 'band' })
+                }}
+              >
+                <option value="">{intl.formatMessage(m.exNoDisaggregation)}</option>
+                {splits.map((d) => (
+                  <option key={d.name} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          <fieldset className={group}>
+            <legend>{intl.formatMessage(m.exSeriesBy)}</legend>
+            <div className={css({ display: 'flex', gap: '2', flexWrap: 'wrap' })}>
+              {SERIES.map((by) => (
+                <button key={by} type="button" className={pressable} aria-pressed={shown.series === by} disabled={by === 'band' && question.disaggregation === undefined} onClick={() => setShown({ ...shown, series: by })}>
+                  {intl.formatMessage(m[`exSeriesBy_${by}`])}
+                </button>
+              ))}
+            </div>
           </fieldset>
         </form>
         <article className={panel} aria-label={intl.formatMessage(m.exVisualization)}>
@@ -192,7 +231,8 @@ function Explore({ explorer }: { explorer: Explorer }) {
 function Visualization({ explorer, shown, answer, before }: { explorer: Explorer; shown: Shown; answer: Answer; before: Answer | undefined }) {
   const intl = useIntl()
   const { question } = shown
-  const series = chartSeries(answer, explorer, question)
+  const bandName = (code: string) => (code === NOT_RECORDED ? intl.formatMessage(m.exNotRecorded) : code)
+  const series = chartSeries(answer, explorer, question, shown.series, bandName)
   const newest = newestComputed(answer)
   const indicatorOf = (measure: string) => explorer.indicators.find((i) => i.measure === measure)
   const title = (measure: string) => indicatorOf(measure)?.title ?? measure
@@ -229,7 +269,10 @@ function Visualization({ explorer, shown, answer, before }: { explorer: Explorer
           ))}
         </ul>
       ) : null}
-      {shown.type === 'single' ? null : <FiguresTable table={shown.type === 'table' ? tableOf(answer, explorer, question, shown.layout) : tableOf(answer, explorer, question, 'indicatorsByPeriods')} corner={intl.formatMessage(shown.type === 'table' && shown.layout === 'placesByIndicators' ? m.exPlace : m.exSeries)} />}
+      {shown.type === 'single' ? null : <FiguresTable
+          table={tableOf(answer, explorer, question, shown.type === 'table' ? shown.layout : 'indicatorsByPeriods', shown.series, bandName)}
+          corner={intl.formatMessage(shown.type === 'table' && shown.layout === 'placesByIndicators' ? m.exPlace : shown.series === 'band' && question.disaggregation !== undefined ? m.exBandHeader : shown.series === 'place' ? m.exPlace : m.exSeries)}
+        />}
       {banded.length > 0 ? (
         <div className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' })}>
           {banded.map((indicator) => (
@@ -373,7 +416,7 @@ function SeriesKey({ series }: { series: Series[] }) {
   return (
     <figcaption className={css({ display: 'flex', gap: '3', flexWrap: 'wrap', fontSize: 'xs' })}>
       {series.map((s, k) => (
-        <span key={`${s.indicator} ${s.place}`} className={cx(css({ display: 'inline-flex', gap: '1', alignItems: 'center' }))}>
+        <span key={`${s.indicator} ${s.place} ${s.band ?? ''}`} className={cx(css({ display: 'inline-flex', gap: '1', alignItems: 'center' }))}>
           <span aria-hidden="true" style={{ width: 10, height: 10, background: SERIES_COLORS[k % SERIES_COLORS.length], display: 'inline-block' }} />
           {s.label}
         </span>
@@ -400,7 +443,7 @@ function LineChart({ series, periods, label }: { series: Series[]; periods: stri
             else runs[runs.length - 1]?.push(`${x(i)},${y(value)}`)
           })
           return (
-            <g key={`${s.indicator} ${s.place}`}>
+            <g key={`${s.indicator} ${s.place} ${s.band ?? ''}`}>
               {runs
                 .filter((run) => run.length > 1)
                 .map((run) => (
