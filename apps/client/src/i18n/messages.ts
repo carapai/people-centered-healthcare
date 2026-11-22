@@ -3503,3 +3503,253 @@ export const indicatorMessages = defineMessages<IndicatorValues>({
   inReason: { id: 'app.studio.indicator.reason', defaultMessage: '{reason, select, meets {counted} denominatorOnly {in the denominator only} doesNotMeet {does not meet the conditions} noEnrollment {belongs to no enrollment} outsidePeriod {outside the period} noPeriodDate {has no period date} error {could not be evaluated} other {{reason}}}', description: 'Indicator editor' },
   inRecordValue: { id: 'app.studio.indicator.recordValue', defaultMessage: 'value {value}{picked, select, true { (taken)} other {}}', description: 'Indicator editor' },
 })
+
+type ReportValues = {
+  rdLoading: {}
+  rdUnreadable: { reason: string }
+  rdReadOnly: {}
+  rdOpen: { path: string }
+  rdOpenShort: {}
+  rdOutline: {}
+  rdSections: {}
+  rdNoSections: {}
+  rdUntitled: {}
+  rdTableSummary: { rows: number; by: number; sent: string }
+  rdListSummary: { rowPer: string; columns: number }
+  rdProblemCount: { count: number }
+  rdNewTable: {}
+  rdAddTable: {}
+  rdNewList: {}
+  rdAddLineList: {}
+  rdSave: {}
+  rdSaved: {}
+  rdStale: {}
+  rdReload: {}
+  rdFailed: { reason: string }
+  rdPreview: {}
+  rdPeriod: {}
+  rdPeriodExample: { example: string }
+  rdLevelShown: {}
+  rdLevel: { level: string }
+  rdPreviewFailed: { reason: string }
+  rdComputing: {}
+  rdPreviewHint: { patients: number; sources: string; start: string; end: string }
+  rdListRows: {}
+  rdListFacility: {}
+  rdTitle: {}
+  rdId: {id: string; path: string}
+  rdPeriodType: {}
+  rdPeriodTypeName: { type: string }
+  rdLevels: {}
+  rdSectionTitle: {}
+  rdSectionId: {}
+  rdMoveSectionUp: {}
+  rdMoveSectionDown: {}
+  rdRemoveSection: {}
+  rdDisaggregations: {}
+  rdNoDisaggregations: {}
+  rdAxis: {}
+  rdAxisOf: { name: string }
+  rdAxisName: { axis: string }
+  rdRemoveNamed: { name: string }
+  rdSetToAdd: {}
+  rdAddAgeBands: {}
+  rdCode: {}
+  rdExpression: {}
+  rdAddCoded: {}
+  rdOptions: {}
+  rdOption: { option: string }
+  rdIndicators: {}
+  rdIndicatorToAdd: {}
+  rdAddIndicator: {}
+  rdRowLabel: { at: number }
+  rdRowId: { at: number }
+  rdRowIndicator: { at: number }
+  rdUnknownIndicator: {}
+  rdCalculation: { calculation: string }
+  rdFacilityOnly: {}
+  rdNotACount: {}
+  rdDraftOnly: { package: string }
+  rdNotBrokenDown: { name: string }
+  rdMoveUpNamed: { name: string }
+  rdMoveDownNamed: { name: string }
+  rdRowPer: {}
+  rdRowPerName: { rowPer: string }
+  rdProgram: {}
+  rdEnrollments: {}
+  rdEnrollmentsName: { which: string }
+  rdVisitTypes: {}
+  rdAllVisits: {}
+  rdVisitTypeSystem: { at: number }
+  rdVisitTypeCode: { at: number }
+  rdAddVisitType: {}
+  rdCountedBy: {}
+  rdCountedByNone: {}
+  rdColumns: {}
+  rdColumnLabel: { at: number }
+  rdColumnId: { at: number }
+  rdColumnAttribute: { at: number }
+  rdColumnSystem: { at: number }
+  rdColumnCode: { at: number }
+  rdColumnPick: { at: number }
+  rdPick: { pick: string }
+  rdAttributeToAdd: {}
+  rdAddAttribute: {}
+  rdConceptLabel: {}
+  rdConceptSystem: {}
+  rdConceptCode: {}
+  rdAddConcept: {}
+  rdValidation: {}
+  rdChecking: {}
+  rdNoProblems: {}
+  rdAuthority: {}
+  rdNotShown: { reason: string; name: string }
+  rdNa: {}
+  rdValueShown: { value: string; calculation: string }
+  rdIndicatorColumn: {}
+  rdTotal: {}
+  rdValue: {}
+  rdChangeColumn: {}
+  rdCell: {}
+  rdCellCount: { count: number }
+  rdCellParts: { count: number; denominator: number }
+  rdCellPrevious: { period: string; value: string }
+  rdCellNobody: {}
+  rdCellCounted: { names: string }
+  rdCellMapping: {}
+  rdDhis2: {}
+  rdDhis2Hint: {}
+  rdDhis2None: {}
+  rdDhis2Section: {}
+  rdDhis2Row: {}
+  rdDhis2Bands: {}
+  rdDhis2Element: {}
+  rdDhis2Combo: {}
+  rdSentIfMapped: {}
+  rdNotMapped: {}
+}
+
+export const reportMessages = defineMessages<ReportValues>({
+  rdLoading: { id: 'app.studio.report.loading', defaultMessage: 'Loading the Report…', description: 'Report designer' },
+  rdUnreadable: { id: 'app.studio.report.unreadable', defaultMessage: 'This file is not a Report the designer can edit ({reason}). Open it in the file editor instead.', description: 'Report designer' },
+  rdReadOnly: { id: 'app.studio.report.readOnly', defaultMessage: 'Read only. Press Edit to change it in your draft.', description: 'Report designer' },
+  rdOpen: { id: 'app.studio.report.open', defaultMessage: 'Open in the Report designer: {path}', description: 'Report designer' },
+  rdOpenShort: { id: 'app.studio.report.openShort', defaultMessage: 'Open in the Report designer', description: 'Draft page: open a Report' },
+  rdOutline: { id: 'app.studio.report.outline', defaultMessage: 'Outline', description: 'Report designer' },
+  rdSections: { id: 'app.studio.report.sections', defaultMessage: 'Sections', description: 'Report designer' },
+  rdNoSections: { id: 'app.studio.report.noSections', defaultMessage: 'No sections yet: add a table section or a line list.', description: 'Report designer' },
+  rdUntitled: { id: 'app.studio.report.untitled', defaultMessage: 'Untitled section', description: 'Report designer' },
+  rdTableSummary: { id: 'app.studio.report.tableSummary', defaultMessage: 'Table · {rows, plural, =0 {no indicators} one {# indicator} other {# indicators}}{by, plural, =0 {} one { · by # disaggregation} other { · by # disaggregations}}{sent, select, true { · sent to DHIS2} other {}}', description: 'Report designer' },
+  rdListSummary: { id: 'app.studio.report.listSummary', defaultMessage: 'Line list · one row per {rowPer, select, visit {visit} other {enrollment}} · {columns, plural, =0 {no columns} one {# column} other {# columns}}', description: 'Report designer' },
+  rdProblemCount: { id: 'app.studio.report.problemCount', defaultMessage: '{count, plural, one {# problem} other {# problems}}', description: 'Report designer' },
+  rdNewTable: { id: 'app.studio.report.newTable', defaultMessage: 'New table section', description: 'Report designer' },
+  rdAddTable: { id: 'app.studio.report.addTable', defaultMessage: '+ table section', description: 'Report designer' },
+  rdNewList: { id: 'app.studio.report.newList', defaultMessage: 'New line list', description: 'Report designer' },
+  rdAddLineList: { id: 'app.studio.report.addLineList', defaultMessage: '+ line list', description: 'Report designer' },
+  rdSave: { id: 'app.studio.report.save', defaultMessage: 'Save', description: 'Report designer' },
+  rdSaved: { id: 'app.studio.report.saved', defaultMessage: 'Saved.', description: 'Report designer' },
+  rdStale: { id: 'app.studio.report.stale', defaultMessage: 'Someone saved this draft since you opened it. Nothing was kept: reload to see their changes.', description: 'Report designer' },
+  rdReload: { id: 'app.studio.report.reload', defaultMessage: 'Reload', description: 'Report designer' },
+  rdFailed: { id: 'app.studio.report.failed', defaultMessage: 'Saving failed: {reason}', description: 'Report designer' },
+  rdPreview: { id: 'app.studio.report.preview', defaultMessage: 'Preview', description: 'Report designer' },
+  rdPeriod: { id: 'app.studio.report.period', defaultMessage: 'Period', description: 'Report designer' },
+  rdPeriodExample: { id: 'app.studio.report.periodExample', defaultMessage: 'Written like {example}', description: 'Report designer' },
+  rdLevelShown: { id: 'app.studio.report.levelShown', defaultMessage: 'Level', description: 'Report designer' },
+  rdLevel: { id: 'app.studio.report.level', defaultMessage: '{level, select, facility {Facility} district {District} region {Region} national {National} other {{level}}}', description: 'Report designer' },
+  rdPreviewFailed: { id: 'app.studio.report.previewFailed', defaultMessage: 'The preview failed: {reason}', description: 'Report designer' },
+  rdComputing: { id: 'app.studio.report.computing', defaultMessage: 'Computing…', description: 'Report designer' },
+  rdPreviewHint: { id: 'app.studio.report.previewHint', defaultMessage: '{start} to {end}, over {patients, plural, one {# test patient} other {# test patients}} of {sources}. Click a cell to open its section.', description: 'Report designer' },
+  rdListRows: { id: 'app.studio.report.listRows', defaultMessage: 'Its rows are patient-level and run on the facility’s edge; they are not previewed yet.', description: 'Report designer' },
+  rdListFacility: { id: 'app.studio.report.listFacility', defaultMessage: 'Line lists run at facility level only: choose Facility to see it.', description: 'Report designer' },
+  rdTitle: { id: 'app.studio.report.title', defaultMessage: 'Title', description: 'Report designer' },
+  rdId: { id: 'app.studio.report.id', defaultMessage: 'Id {id}, kept at {path}', description: 'Report designer' },
+  rdPeriodType: { id: 'app.studio.report.periodType', defaultMessage: 'Period type', description: 'Report designer' },
+  rdPeriodTypeName: { id: 'app.studio.report.periodTypeName', defaultMessage: '{type, select, weekly {Weekly} monthly {Monthly} quarterly {Quarterly} semiAnnual {Semi-annual} annual {Annual} financialJuly {Financial year from July} other {{type}}}', description: 'Report designer' },
+  rdLevels: { id: 'app.studio.report.levels', defaultMessage: 'Levels it runs for', description: 'Report designer' },
+  rdSectionTitle: { id: 'app.studio.report.sectionTitle', defaultMessage: 'Section title', description: 'Report designer' },
+  rdSectionId: { id: 'app.studio.report.sectionId', defaultMessage: 'Section id', description: 'Report designer' },
+  rdMoveSectionUp: { id: 'app.studio.report.moveSectionUp', defaultMessage: 'Move section up', description: 'Report designer' },
+  rdMoveSectionDown: { id: 'app.studio.report.moveSectionDown', defaultMessage: 'Move section down', description: 'Report designer' },
+  rdRemoveSection: { id: 'app.studio.report.removeSection', defaultMessage: 'Remove section', description: 'Report designer' },
+  rdDisaggregations: { id: 'app.studio.report.disaggregations', defaultMessage: 'Disaggregations', description: 'Report designer' },
+  rdNoDisaggregations: { id: 'app.studio.report.noDisaggregations', defaultMessage: 'None: one figure per indicator.', description: 'Report designer' },
+  rdAxis: { id: 'app.studio.report.axis', defaultMessage: 'on', description: 'Report designer' },
+  rdAxisOf: { id: 'app.studio.report.axisOf', defaultMessage: 'Lay {name} out on', description: 'Report designer' },
+  rdAxisName: { id: 'app.studio.report.axisName', defaultMessage: '{axis, select, rows {rows} other {columns}}', description: 'Report designer' },
+  rdRemoveNamed: { id: 'app.studio.report.removeNamed', defaultMessage: 'Remove {name}', description: 'Report designer' },
+  rdSetToAdd: { id: 'app.studio.report.setToAdd', defaultMessage: 'Age band set to add', description: 'Report designer' },
+  rdAddAgeBands: { id: 'app.studio.report.addAgeBands', defaultMessage: '+ age bands', description: 'Report designer' },
+  rdCode: { id: 'app.studio.report.code', defaultMessage: 'Coded value: its name', description: 'Report designer' },
+  rdExpression: { id: 'app.studio.report.expression', defaultMessage: 'FHIRPath giving the code', description: 'Report designer' },
+  rdAddCoded: { id: 'app.studio.report.addCoded', defaultMessage: '+ coded value', description: 'Report designer' },
+  rdOptions: { id: 'app.studio.report.options', defaultMessage: 'Options', description: 'Report designer' },
+  rdOption: { id: 'app.studio.report.option', defaultMessage: '{option, select, columnTotals {Column totals (a Total row under each indicator)} rowTotals {Row totals (a Total column)} change {% change from the previous period} sendToDhis2 {Send to DHIS2} other {{option}}}', description: 'Report designer' },
+  rdIndicators: { id: 'app.studio.report.indicators', defaultMessage: 'Indicators', description: 'Report designer' },
+  rdIndicatorToAdd: { id: 'app.studio.report.indicatorToAdd', defaultMessage: 'Indicator to add', description: 'Report designer' },
+  rdAddIndicator: { id: 'app.studio.report.addIndicator', defaultMessage: '+ indicator', description: 'Report designer' },
+  rdRowLabel: { id: 'app.studio.report.rowLabel', defaultMessage: 'Label of row {at}', description: 'Report designer' },
+  rdRowId: { id: 'app.studio.report.rowId', defaultMessage: 'Id of row {at}', description: 'Report designer' },
+  rdRowIndicator: { id: 'app.studio.report.rowIndicator', defaultMessage: 'Indicator of row {at}', description: 'Report designer' },
+  rdUnknownIndicator: { id: 'app.studio.report.unknownIndicator', defaultMessage: 'not found among published indicators or drafts', description: 'Report designer' },
+  rdCalculation: { id: 'app.studio.report.calculation', defaultMessage: '{calculation, select, count {count} percentage {percentage} rate {rate} ratio {ratio} sum {sum} average {average} median {median} minimum {minimum} maximum {maximum} distinctCount {distinct count} other {{calculation}}}', description: 'Report designer' },
+  rdFacilityOnly: { id: 'app.studio.report.facilityOnly', defaultMessage: 'facility only: it cannot be rebuilt from facility summaries', description: 'Report designer' },
+  rdNotACount: { id: 'app.studio.report.notACount', defaultMessage: 'not a count', description: 'Report designer' },
+  rdDraftOnly: { id: 'app.studio.report.draftOnly', defaultMessage: 'only in the draft {package}: publish it before this Report', description: 'Report designer' },
+  rdNotBrokenDown: { id: 'app.studio.report.notBrokenDown', defaultMessage: 'Not broken down by {name}: its cells show n/a. A note, not an error.', description: 'Report designer' },
+  rdMoveUpNamed: { id: 'app.studio.report.moveUpNamed', defaultMessage: 'Move {name} up', description: 'Report designer' },
+  rdMoveDownNamed: { id: 'app.studio.report.moveDownNamed', defaultMessage: 'Move {name} down', description: 'Report designer' },
+  rdRowPer: { id: 'app.studio.report.rowPer', defaultMessage: 'One row per', description: 'Report designer' },
+  rdRowPerName: { id: 'app.studio.report.rowPerName', defaultMessage: '{rowPer, select, visit {visit (of chosen types, in the period)} other {enrollment in the program}}', description: 'Report designer' },
+  rdProgram: { id: 'app.studio.report.program', defaultMessage: 'Program (canonical URL)', description: 'Report designer' },
+  rdEnrollments: { id: 'app.studio.report.enrollments', defaultMessage: 'Enrollments', description: 'Report designer' },
+  rdEnrollmentsName: { id: 'app.studio.report.enrollmentsName', defaultMessage: '{which, select, started {started in the period} other {active during the period}}', description: 'Report designer' },
+  rdVisitTypes: { id: 'app.studio.report.visitTypes', defaultMessage: 'Visit types', description: 'Report designer' },
+  rdAllVisits: { id: 'app.studio.report.allVisits', defaultMessage: 'None: every visit in the program.', description: 'Report designer' },
+  rdVisitTypeSystem: { id: 'app.studio.report.visitTypeSystem', defaultMessage: 'System of visit type {at}', description: 'Report designer' },
+  rdVisitTypeCode: { id: 'app.studio.report.visitTypeCode', defaultMessage: 'Code of visit type {at}', description: 'Report designer' },
+  rdAddVisitType: { id: 'app.studio.report.addVisitType', defaultMessage: '+ visit type', description: 'Report designer' },
+  rdCountedBy: { id: 'app.studio.report.countedBy', defaultMessage: 'Only those counted by', description: 'Report designer' },
+  rdCountedByNone: { id: 'app.studio.report.countedByNone', defaultMessage: 'No indicator: everyone in the program', description: 'Report designer' },
+  rdColumns: { id: 'app.studio.report.columns', defaultMessage: 'Columns', description: 'Report designer' },
+  rdColumnLabel: { id: 'app.studio.report.columnLabel', defaultMessage: 'Heading of column {at}', description: 'Report designer' },
+  rdColumnId: { id: 'app.studio.report.columnId', defaultMessage: 'Id of column {at}', description: 'Report designer' },
+  rdColumnAttribute: { id: 'app.studio.report.columnAttribute', defaultMessage: 'Attribute of column {at}', description: 'Report designer' },
+  rdColumnSystem: { id: 'app.studio.report.columnSystem', defaultMessage: 'Concept system of column {at}', description: 'Report designer' },
+  rdColumnCode: { id: 'app.studio.report.columnCode', defaultMessage: 'Concept code of column {at}', description: 'Report designer' },
+  rdColumnPick: { id: 'app.studio.report.columnPick', defaultMessage: 'Values shown in column {at}', description: 'Report designer' },
+  rdPick: { id: 'app.studio.report.pick', defaultMessage: '{pick, select, latest {the latest} first {the first} all {all, with dates} count {times recorded} other {{pick}}}', description: 'Report designer' },
+  rdAttributeToAdd: { id: 'app.studio.report.attributeToAdd', defaultMessage: 'Attribute to add', description: 'Report designer' },
+  rdAddAttribute: { id: 'app.studio.report.addAttribute', defaultMessage: '+ attribute', description: 'Report designer' },
+  rdConceptLabel: { id: 'app.studio.report.conceptLabel', defaultMessage: 'Concept column heading', description: 'Report designer' },
+  rdConceptSystem: { id: 'app.studio.report.conceptSystem', defaultMessage: 'Concept system', description: 'Report designer' },
+  rdConceptCode: { id: 'app.studio.report.conceptCode', defaultMessage: 'Concept code', description: 'Report designer' },
+  rdAddConcept: { id: 'app.studio.report.addConcept', defaultMessage: '+ concept', description: 'Report designer' },
+  rdValidation: { id: 'app.studio.report.validation', defaultMessage: 'Validation', description: 'Report designer' },
+  rdChecking: { id: 'app.studio.report.checking', defaultMessage: 'Checking…', description: 'Report designer' },
+  rdNoProblems: { id: 'app.studio.report.noProblems', defaultMessage: 'No problems found.', description: 'Report designer' },
+  rdAuthority: { id: 'app.studio.report.authority', defaultMessage: 'As Validation would refuse it, checked on central as you edit. Check now on the draft page remains the authority.', description: 'Report designer' },
+  rdNotShown: { id: 'app.studio.report.notShown', defaultMessage: '{reason, select, notBrokenDown {The indicator is not broken down by {name}.} crossed {Crossed bands are computed when the Report runs.} facilityOnly {A median or distinct count cannot be rebuilt from facility summaries, so it shows at facility level only.} noIndicator {No indicator is pinned here.} other {Not computed yet.}}', description: 'Report designer' },
+  rdNa: { id: 'app.studio.report.na', defaultMessage: 'n/a', description: 'Report designer' },
+  rdValueShown: { id: 'app.studio.report.valueShown', defaultMessage: '{calculation, select, percentage {{value}%} other {{value}}}', description: 'Report designer' },
+  rdIndicatorColumn: { id: 'app.studio.report.indicatorColumn', defaultMessage: 'Indicator', description: 'Report designer' },
+  rdTotal: { id: 'app.studio.report.total', defaultMessage: 'Total', description: 'Report designer' },
+  rdValue: { id: 'app.studio.report.value', defaultMessage: 'Value', description: 'Report designer' },
+  rdChangeColumn: { id: 'app.studio.report.changeColumn', defaultMessage: '% change', description: 'Report designer' },
+  rdCell: { id: 'app.studio.report.cell', defaultMessage: 'Selected cell', description: 'Report designer' },
+  rdCellCount: { id: 'app.studio.report.cellCount', defaultMessage: 'Counted: {count}', description: 'Report designer' },
+  rdCellParts: { id: 'app.studio.report.cellParts', defaultMessage: 'Numerator {count} of denominator {denominator}', description: 'Report designer' },
+  rdCellPrevious: { id: 'app.studio.report.cellPrevious', defaultMessage: 'Previous period ({period}): {value}', description: 'Report designer' },
+  rdCellNobody: { id: 'app.studio.report.cellNobody', defaultMessage: 'Nobody counted.', description: 'Report designer' },
+  rdCellCounted: { id: 'app.studio.report.cellCounted', defaultMessage: 'Who it counted: {names}', description: 'Report designer' },
+  rdCellMapping: { id: 'app.studio.report.cellMapping', defaultMessage: 'DHIS2 mapping: none yet. Mappings are added with #560.', description: 'Report designer' },
+  rdDhis2: { id: 'app.studio.report.dhis2', defaultMessage: 'DHIS2 mapping', description: 'Report designer' },
+  rdDhis2Hint: { id: 'app.studio.report.dhis2Hint', defaultMessage: 'Every cell of the sections sent to DHIS2, each to be mapped to a data element and category option combo with effective dates (#560). Totals and not recorded bands are sent only if mapped.', description: 'Report designer' },
+  rdDhis2None: { id: 'app.studio.report.dhis2None', defaultMessage: 'No section is sent to DHIS2.', description: 'Report designer' },
+  rdDhis2Section: { id: 'app.studio.report.dhis2Section', defaultMessage: 'Section', description: 'Report designer' },
+  rdDhis2Row: { id: 'app.studio.report.dhis2Row', defaultMessage: 'Indicator', description: 'Report designer' },
+  rdDhis2Bands: { id: 'app.studio.report.dhis2Bands', defaultMessage: 'Bands', description: 'Report designer' },
+  rdDhis2Element: { id: 'app.studio.report.dhis2Element', defaultMessage: 'Data element', description: 'Report designer' },
+  rdDhis2Combo: { id: 'app.studio.report.dhis2Combo', defaultMessage: 'Category option combo', description: 'Report designer' },
+  rdSentIfMapped: { id: 'app.studio.report.sentIfMapped', defaultMessage: '(sent only if mapped)', description: 'Report designer' },
+  rdNotMapped: { id: 'app.studio.report.notMapped', defaultMessage: 'Not mapped yet', description: 'Report designer' },
+})

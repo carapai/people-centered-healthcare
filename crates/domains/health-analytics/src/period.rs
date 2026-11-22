@@ -176,6 +176,31 @@ impl Period {
     }
 }
 
+impl Period {
+    /// The period of its type just before this one, for a Report's % change (ADR 0072).
+    pub fn previous(&self) -> Option<Self> {
+        let start = *self.previous_starts(1).first()?;
+        let end = self.start.yesterday().ok()?;
+        let id = match self.kind {
+            PeriodType::Weekly => {
+                let week = start.iso_week_date();
+                format!("{}W{:02}", week.year(), week.week())
+            }
+            PeriodType::Monthly => format!("{}-{:02}", start.year(), start.month()),
+            PeriodType::Quarterly => format!("{}Q{}", start.year(), (start.month() - 1) / 3 + 1),
+            PeriodType::SemiAnnual => format!("{}S{}", start.year(), (start.month() - 1) / 6 + 1),
+            PeriodType::Annual => start.year().to_string(),
+            PeriodType::FinancialJuly => format!("{}July", start.year()),
+        };
+        Some(Self {
+            kind: self.kind,
+            id,
+            start,
+            end,
+        })
+    }
+}
+
 /// How many periods back *in the previous N periods* can reach: `%previousPeriods.start` holds
 /// this many starts.
 pub const PREVIOUS_PERIODS: usize = 60;
@@ -274,6 +299,28 @@ mod tests {
             starts(PeriodType::FinancialJuly, "2025July", 2),
             ["2024-07-01", "2023-07-01"]
         );
+    }
+
+    #[test]
+    fn the_previous_period_is_the_one_before_of_the_same_type() {
+        for (kind, id, previous) in [
+            (PeriodType::Weekly, "2026W01", "2025W52"),
+            (PeriodType::Monthly, "2026-01", "2025-12"),
+            (PeriodType::Quarterly, "2026Q1", "2025Q4"),
+            (PeriodType::SemiAnnual, "2026S2", "2026S1"),
+            (PeriodType::Annual, "2026", "2025"),
+            (PeriodType::FinancialJuly, "2025July", "2024July"),
+        ] {
+            let before = Period::parse(kind, id)
+                .expect("period")
+                .previous()
+                .expect("previous");
+            assert_eq!(
+                before,
+                Period::parse(kind, previous).expect("previous"),
+                "{id}"
+            );
+        }
     }
 
     #[test]

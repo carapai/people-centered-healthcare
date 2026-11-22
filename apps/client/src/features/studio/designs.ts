@@ -4,6 +4,7 @@ import type { Transport } from '../../platform/types'
 import { StudioError, studioKey } from './api'
 import { newAgeBandSet } from './indicators/ageBands'
 import { newIndicator } from './indicators/indicator'
+import { REPORTS_FOLDER, newReport, reportPath, unique, writeReport } from './reports/report'
 import { newArtefact } from './programs/model'
 import { addTable } from './workflows/decisions'
 import { readDefinition, writeDefinition } from './workflows/model'
@@ -49,8 +50,8 @@ export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKin
   { id: 'programs', kinds: ['program'], creates: false },
   { id: 'age-bands', kinds: ['age-band-set'], creates: true },
   { id: 'indicators', kinds: ['indicator'], creates: true },
-  // Reporting packages' Reports (#556); they open in the file editor until the Report designer (#559).
-  { id: 'reports', kinds: ['report'], creates: false },
+  // Reporting packages' Reports (#556), in the Report designer (#559).
+  { id: 'reports', kinds: ['report'], creates: true },
 ]
 
 export const sectionOf = (id: SectionId) => sections.find((s) => s.id === id) ?? sections[0]!
@@ -112,7 +113,7 @@ export function editorOf(design: Pick<StudioDesign, 'kind' | 'path' | 'table'>, 
     case 'indicator':
       return { to: '/studio/$id/indicators/$', params: { id, _splat: design.path } } as const
     case 'report':
-      return { to: '/studio/$id/files/$', params: { id, _splat: design.path } } as const
+      return { to: '/studio/$id/reports/$', params: { id, _splat: design.path } } as const
   }
 }
 
@@ -160,13 +161,22 @@ export function slug(title: string): string {
 }
 
 /** What *New* creates, for a section: a form, a workflow, a code system, a value set, an Age
- * Band Set or an indicator. A decision table goes into a workflow instead ([`withNewTable`]). */
-export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set' | 'indicator'
+ * Band Set, an indicator or a Report. A decision table goes into a workflow instead
+ * ([`withNewTable`]). */
+export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set' | 'indicator' | 'report'
 
 /** A new, empty design of `kind` titled `title`, at a top-level path the package does not use
  * yet, its url under the package's canonical base and its version the package's. */
 export function newDesign(kind: NewKind, title: string, canonical: string, packageVersion: string, taken: readonly string[]): { path: string; resource: Record<string, unknown> } {
   const id = slug(title)
+  if (kind === 'report') {
+    // A Report lives at configuration/reports/<id>.json, its id its file's name (#559).
+    const reportId = unique(
+      id,
+      taken.filter((p) => p.startsWith(REPORTS_FOLDER) && p.endsWith('.json')).map((p) => p.slice(REPORTS_FOLDER.length, -'.json'.length)),
+    )
+    return { path: reportPath(reportId), resource: writeReport(newReport(reportId, title.trim())) }
+  }
   const type = { form: 'Questionnaire', workflow: 'Library', 'code-system': 'CodeSystem', 'value-set': 'ValueSet', 'age-band-set': 'Library', indicator: 'Measure' }[kind]
   const url = `${canonical.replace(/\/+$/, '')}/${type}/${id}`
   if (kind === 'form' || kind === 'workflow') {

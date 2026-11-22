@@ -88,8 +88,8 @@ describe('sections', () => {
     expect(editorOf(designs.designs[1]!, 'x@1')).toMatchObject({ search: {} })
     expect(editorOf(designs.designs[4]!, 'x@1').to).toBe('/studio/$id/terminology/$')
     // A Report opens in the file editor until the Report designer (#559).
-    expect(editorOf(designs.designs[6]!, 'ug.moh.hmis@1.0.0')).toEqual({ to: '/studio/$id/files/$', params: { id: 'ug.moh.hmis@1.0.0', _splat: 'configuration/reports/hmis-105-anc.json' } })
-    expect(sections.find((s) => s.id === 'reports')?.creates).toBe(false)
+    expect(editorOf(designs.designs[6]!, 'ug.moh.hmis@1.0.0')).toEqual({ to: '/studio/$id/reports/$', params: { id: 'ug.moh.hmis@1.0.0', _splat: 'configuration/reports/hmis-105-anc.json' } })
+    expect(sections.find((s) => s.id === 'reports')?.creates).toBe(true)
   })
 })
 

@@ -1283,6 +1283,99 @@
         }
       }
     },
+    "/api/studio/packages/{id}/reports/preview": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the Report designer's preview.",
+        "description": "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole and each band of the indicator's disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
+        "operationId": "previewStudioReport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioReportPreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioReportPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The posted Report cannot be read, or the period is not one of its type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/terminology/code-system-change": {
       "get": {
         "tags": [
@@ -5087,6 +5180,330 @@
           "not-published",
           "other"
         ]
+      },
+      "StudioReportBand": {
+        "type": "object",
+        "description": "A band a section lays out.",
+        "required": [
+          "code",
+          "label"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Its code: an age band's, a coded value, or `not-recorded`."
+          },
+          "label": {
+            "type": "string",
+            "description": "What a person reads."
+          }
+        }
+      },
+      "StudioReportBands": {
+        "type": "object",
+        "description": "One of a section's Disaggregations, with its bands in order.",
+        "required": [
+          "name",
+          "title",
+          "bands"
+        ],
+        "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportBand"
+            },
+            "description": "Its bands: an Age Band Set's in its order, or the codes the rows found, then\n`not-recorded`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name, as an indicator's disaggregation is named: the Age Band Set's `url|version`,\nor the code."
+          },
+          "title": {
+            "type": "string",
+            "description": "What a person reads: the Age Band Set's title, or the code."
+          }
+        }
+      },
+      "StudioReportCounted": {
+        "type": "object",
+        "description": "A test patient a row counted, and in which bands.",
+        "required": [
+          "name",
+          "bands"
+        ],
+        "properties": {
+          "bands": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "For each counted record, its band in each of the indicator's disaggregations, in order."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the test patient shows."
+          }
+        }
+      },
+      "StudioReportFigures": {
+        "type": "object",
+        "description": "An indicator's figure over one period: the whole, and each band of its disaggregations.",
+        "required": [
+          "count",
+          "disaggregations"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many are counted: the numerator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The denominator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "disaggregations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDisaggregation"
+            },
+            "description": "The figure per band of each of the indicator's disaggregations."
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The figure, to two decimal places; none when the denominator is zero or no value was\ntaken."
+          }
+        }
+      },
+      "StudioReportIndicator": {
+        "type": "object",
+        "description": "The indicator a row shows, as found.",
+        "required": [
+          "title",
+          "calculation",
+          "package",
+          "published"
+        ],
+        "properties": {
+          "calculation": {
+            "type": "string",
+            "description": "What it calculates: `count`, `percentage`, `rate`, `ratio`, `sum`, `average`,\n`median`, `minimum`, `maximum` or `distinct-count`."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package version it was taken from (`name@version`)."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether that version is published; otherwise it is an open draft."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          }
+        }
+      },
+      "StudioReportPreview": {
+        "type": "object",
+        "description": "The preview of a draft Report.",
+        "required": [
+          "period",
+          "problems",
+          "sections",
+          "sources",
+          "patients",
+          "errors"
+        ],
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Test patients that could not be read."
+          },
+          "patients": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many test patients were read.",
+            "minimum": 0
+          },
+          "period": {
+            "$ref": "#/components/schemas/StudioPeriod",
+            "description": "The period computed."
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioPeriod",
+                "description": "The period before, for % change."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportProblem"
+            },
+            "description": "Validation's problems, as they stand."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportSection"
+            },
+            "description": "Each section, in order."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The package versions whose test patients were read."
+          }
+        }
+      },
+      "StudioReportPreviewInput": {
+        "type": "object",
+        "description": "The preview of a draft Report.",
+        "required": [
+          "report",
+          "period"
+        ],
+        "properties": {
+          "period": {
+            "type": "string",
+            "description": "The period, of the Report's period type, written as its type writes it (`2026-03`)."
+          },
+          "report": {
+            "type": "object",
+            "description": "The draft Report, as the designer holds it (`report/1`)."
+          }
+        }
+      },
+      "StudioReportProblem": {
+        "type": "object",
+        "description": "One of Validation's problems with the Report.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "What is wrong."
+          },
+          "section": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The section it is in (its index), or none for the Report's settings.",
+            "minimum": 0
+          }
+        }
+      },
+      "StudioReportRow": {
+        "type": "object",
+        "description": "One indicator row's preview.",
+        "required": [
+          "row",
+          "counted"
+        ],
+        "properties": {
+          "counted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportCounted"
+            },
+            "description": "Who it counted in the period."
+          },
+          "current": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioReportFigures",
+                "description": "Its figures for the period."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not be computed, if it could not."
+          },
+          "indicator": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioReportIndicator",
+                "description": "The indicator, if it was found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioReportFigures",
+                "description": "Its figures for the period before, when the section shows % change."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row": {
+            "type": "string",
+            "description": "The row's id."
+          }
+        }
+      },
+      "StudioReportSection": {
+        "type": "object",
+        "description": "One section's preview; a line list's is empty.",
+        "required": [
+          "disaggregations",
+          "rows"
+        ],
+        "properties": {
+          "disaggregations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportBands"
+            },
+            "description": "The section's Disaggregations, in order, with their bands."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportRow"
+            },
+            "description": "Its rows, in order."
+          }
+        }
       },
       "StudioSample": {
         "oneOf": [

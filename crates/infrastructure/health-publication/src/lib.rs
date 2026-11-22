@@ -104,7 +104,7 @@ mod workflows;
 
 pub use age_bands::{PublishedAgeBandSet, age_band_sets_in};
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
-pub use reports::reports_in;
+pub use reports::{ReportSources, SourcePackage, reports_in};
 pub use workflows::{WorkflowSandbox, workflow_definitions};
 
 pub use health_workflow_actions::ActionDescriptor;

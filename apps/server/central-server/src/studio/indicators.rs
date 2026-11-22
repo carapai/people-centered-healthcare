@@ -51,6 +51,19 @@ pub(crate) enum StudioPeriodType {
     FinancialJuly,
 }
 
+impl From<PeriodType> for StudioPeriodType {
+    fn from(value: PeriodType) -> Self {
+        match value {
+            PeriodType::Weekly => Self::Weekly,
+            PeriodType::Monthly => Self::Monthly,
+            PeriodType::Quarterly => Self::Quarterly,
+            PeriodType::SemiAnnual => Self::SemiAnnual,
+            PeriodType::Annual => Self::Annual,
+            PeriodType::FinancialJuly => Self::FinancialJuly,
+        }
+    }
+}
+
 impl From<StudioPeriodType> for PeriodType {
     fn from(value: StudioPeriodType) -> Self {
         match value {
@@ -235,7 +248,7 @@ pub(crate) struct StudioIndicatorValues {
 }
 
 /// A decimal as an exact JSON number.
-fn exact(value: Decimal) -> serde_json::Number {
+pub(crate) fn exact(value: Decimal) -> serde_json::Number {
     value
         .normalize()
         .to_string()
@@ -261,7 +274,7 @@ fn values(summary: &Summary) -> Option<StudioIndicatorValues> {
 }
 
 /// The disaggregations of `summary`, titled and labelled from the indicator and its sets.
-fn disaggregations(
+pub(crate) fn disaggregations(
     indicator: &Indicator,
     summary: &Summary,
     sets: &[AgeBandSet],
