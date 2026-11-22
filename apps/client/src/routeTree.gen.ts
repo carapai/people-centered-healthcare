@@ -46,6 +46,7 @@ import { Route as StudioFormsRouteImport } from './routes/studio.forms'
 import { Route as StudioIndicatorsRouteImport } from './routes/studio.indicators'
 import { Route as StudioPackagesRouteImport } from './routes/studio.packages'
 import { Route as StudioProgramsRouteImport } from './routes/studio.programs'
+import { Route as StudioReportsRouteImport } from './routes/studio.reports'
 import { Route as StudioWorkflowsRouteImport } from './routes/studio.workflows'
 import { Route as SyncConflictsRouteImport } from './routes/sync.conflicts'
 import { Route as TillIndexRouteImport } from './routes/till.index'
@@ -244,6 +245,11 @@ const StudioProgramsRoute = StudioProgramsRouteImport.update({
   path: '/studio/programs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioReportsRoute = StudioReportsRouteImport.update({
+  id: '/studio/reports',
+  path: '/studio/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioWorkflowsRoute = StudioWorkflowsRouteImport.update({
   id: '/studio/workflows',
   path: '/studio/workflows',
@@ -340,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
   '/studio/programs': typeof StudioProgramsRoute
+  '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
   '/studio/programs': typeof StudioProgramsRoute
+  '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -443,6 +451,7 @@ export interface FileRoutesById {
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
   '/studio/programs': typeof StudioProgramsRoute
+  '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
   '/sync/conflicts': typeof SyncConflictsRoute
   '/till/supervise': typeof TillSuperviseRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/studio/indicators'
     | '/studio/packages'
     | '/studio/programs'
+    | '/studio/reports'
     | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/studio/indicators'
     | '/studio/packages'
     | '/studio/programs'
+    | '/studio/reports'
     | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
@@ -598,6 +609,7 @@ export interface FileRouteTypes {
     | '/studio/indicators'
     | '/studio/packages'
     | '/studio/programs'
+    | '/studio/reports'
     | '/studio/workflows'
     | '/sync/conflicts'
     | '/till/supervise'
@@ -650,6 +662,7 @@ export interface RootRouteChildren {
   StudioIndicatorsRoute: typeof StudioIndicatorsRoute
   StudioPackagesRoute: typeof StudioPackagesRoute
   StudioProgramsRoute: typeof StudioProgramsRoute
+  StudioReportsRoute: typeof StudioReportsRoute
   StudioWorkflowsRoute: typeof StudioWorkflowsRoute
   SyncConflictsRoute: typeof SyncConflictsRoute
   TillSuperviseRoute: typeof TillSuperviseRoute
@@ -929,6 +942,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioProgramsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/reports': {
+      id: '/studio/reports'
+      path: '/studio/reports'
+      fullPath: '/studio/reports'
+      preLoaderRoute: typeof StudioReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/workflows': {
       id: '/studio/workflows'
       path: '/studio/workflows'
@@ -1050,6 +1070,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioIndicatorsRoute: StudioIndicatorsRoute,
   StudioPackagesRoute: StudioPackagesRoute,
   StudioProgramsRoute: StudioProgramsRoute,
+  StudioReportsRoute: StudioReportsRoute,
   StudioWorkflowsRoute: StudioWorkflowsRoute,
   SyncConflictsRoute: SyncConflictsRoute,
   TillSuperviseRoute: TillSuperviseRoute,

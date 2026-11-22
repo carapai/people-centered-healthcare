@@ -27,6 +27,7 @@ pub(crate) enum StudioDesignKind {
     Program,
     AgeBandSet,
     Indicator,
+    Report,
 }
 
 impl From<DesignKind> for StudioDesignKind {
@@ -40,6 +41,7 @@ impl From<DesignKind> for StudioDesignKind {
             DesignKind::Program => Self::Program,
             DesignKind::AgeBandSet => Self::AgeBandSet,
             DesignKind::Indicator => Self::Indicator,
+            DesignKind::Report => Self::Report,
         }
     }
 }

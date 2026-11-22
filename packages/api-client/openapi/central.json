@@ -3750,7 +3750,8 @@
           "value-set",
           "program",
           "age-band-set",
-          "indicator"
+          "indicator",
+          "report"
         ]
       },
       "StudioDesignPackage": {
@@ -4680,7 +4681,8 @@
           "program",
           "country-configuration",
           "override",
-          "language"
+          "language",
+          "reporting"
         ]
       },
       "StudioPackageList": {

@@ -58,6 +58,9 @@ pub enum PackageKind {
     Override,
     /// One language's wording for another package's forms and code lists (ADR 0066).
     Language,
+    /// Reports: indicators laid out for one period type and the levels they run for (ADR 0070,
+    /// ADR 0072).
+    Reporting,
 }
 
 /// What software a package needs (configuration.md § Distribution and activation on nodes).

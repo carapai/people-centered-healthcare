@@ -513,7 +513,7 @@ export const StudioDecisionTryInput = z.object({
 export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
 
 /** What kind of design an artefact is: the Studio's sections. */
-export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set", "indicator"])
+export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set", "indicator", "report"])
 export type StudioDesignKind = z.infer<typeof StudioDesignKind>
 
 /** One designed artefact, in the package version it opens in. */
@@ -551,7 +551,7 @@ export const StudioDesignDraft = z.object({
 export type StudioDesignDraft = z.infer<typeof StudioDesignDraft>
 
 /** The kind of package, which decides its approvers. */
-export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language"])
+export const StudioPackageKind = z.enum(["national-core", "terminology", "program", "country-configuration", "override", "language", "reporting"])
 export type StudioPackageKind = z.infer<typeof StudioPackageKind>
 
 /** A package that holds designs. */

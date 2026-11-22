@@ -38,7 +38,7 @@ export function designsQuery(transport: Transport) {
 export const icu = (id: string) => id.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
 
 /** The Studio's sections: what a person designs. */
-export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands' | 'indicators'
+export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands' | 'indicators' | 'reports'
 
 /** Each section and the kinds of design it lists, in the order the home shows them. */
 export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKind[]; creates: boolean }[] = [
@@ -49,6 +49,8 @@ export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKin
   { id: 'programs', kinds: ['program'], creates: false },
   { id: 'age-bands', kinds: ['age-band-set'], creates: true },
   { id: 'indicators', kinds: ['indicator'], creates: true },
+  // Reporting packages' Reports (#556); they open in the file editor until the Report designer (#559).
+  { id: 'reports', kinds: ['report'], creates: false },
 ]
 
 export const sectionOf = (id: SectionId) => sections.find((s) => s.id === id) ?? sections[0]!
@@ -109,6 +111,8 @@ export function editorOf(design: Pick<StudioDesign, 'kind' | 'path' | 'table'>, 
       return { to: '/studio/$id/age-bands/$', params: { id, _splat: design.path } } as const
     case 'indicator':
       return { to: '/studio/$id/indicators/$', params: { id, _splat: design.path } } as const
+    case 'report':
+      return { to: '/studio/$id/files/$', params: { id, _splat: design.path } } as const
   }
 }
 

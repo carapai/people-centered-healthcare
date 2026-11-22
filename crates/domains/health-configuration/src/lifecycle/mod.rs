@@ -87,7 +87,10 @@ impl fmt::Display for Stage {
 pub fn approvals_required(kind: PackageKind) -> usize {
     match kind {
         PackageKind::NationalCore | PackageKind::Terminology | PackageKind::Program => 2,
-        PackageKind::CountryConfiguration | PackageKind::Override | PackageKind::Language => 1,
+        PackageKind::CountryConfiguration
+        | PackageKind::Override
+        | PackageKind::Language
+        | PackageKind::Reporting => 1,
     }
 }
 

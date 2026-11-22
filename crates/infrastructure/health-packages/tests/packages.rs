@@ -462,6 +462,46 @@ fn the_release_reads_form_layouts() {
     ));
 }
 
+#[test]
+fn the_release_reads_reports() {
+    let schemas = schemas();
+    assert!(schemas.uris().any(|uri| uri == health_packages::REPORT));
+    let pki = pki();
+    let report = |value: serde_json::Value| {
+        let mut files = files();
+        files.insert(
+            "configuration/reports/hmis-105-anc.json".into(),
+            value.to_string().into_bytes(),
+        );
+        publish(&files, &schemas, &pki.signer, at(SIGNED))
+    };
+    assert!(
+        report(serde_json::json!({
+            "$schema": health_packages::REPORT,
+            "id": "hmis-105-anc", "title": "HMIS 105 ANC", "periodType": "monthly",
+            "levels": ["facility", "district"],
+            "sections": [
+                { "kind": "table", "id": "a", "title": "Attendance",
+                  "disaggregations": [{ "ageBandSet": "https://x/Library/b|1.0.0", "axis": "columns" }],
+                  "rows": [{ "id": "r", "indicator": "https://x/Measure/m|1.0.0", "label": "M" }],
+                  "rowTotals": true, "sendToDhis2": true },
+                { "kind": "lineList", "id": "l", "title": "Clients", "rowPer": "visit",
+                  "program": "https://x/PlanDefinition/anc",
+                  "columns": [{ "id": "n", "label": "Name", "attribute": "person.name" }] }
+            ]
+        }))
+        .is_ok()
+    );
+    for wrong in [
+        serde_json::json!({ "$schema": health_packages::REPORT, "id": "r", "title": "R", "periodType": "fortnightly" }),
+        serde_json::json!({ "$schema": health_packages::REPORT, "id": "r", "title": "R", "periodType": "monthly", "levels": ["village"] }),
+        serde_json::json!({ "$schema": health_packages::REPORT, "id": "r", "title": "R", "periodType": "monthly",
+            "sections": [{ "kind": "chart", "id": "c", "title": "C" }] }),
+    ] {
+        assert!(matches!(report(wrong), Err(Error::Configuration { .. })));
+    }
+}
+
 /// `files()` with the `ug-address` profile, its snapshot edited by `edit`.
 fn with_profile(edit: impl FnOnce(&mut serde_json::Value)) -> Files {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(

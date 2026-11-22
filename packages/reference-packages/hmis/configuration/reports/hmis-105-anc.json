@@ -1,0 +1,39 @@
+{
+  "$schema": "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1",
+  "id": "hmis-105-anc",
+  "title": "HMIS 105 · 2 Antenatal care",
+  "periodType": "monthly",
+  "levels": ["facility", "district", "region", "national"],
+  "sections": [
+    {
+      "kind": "table",
+      "id": "attendance",
+      "title": "2.1 ANC attendance",
+      "disaggregations": [
+        { "ageBandSet": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0", "axis": "columns" }
+      ],
+      "rows": [
+        { "id": "first-visits", "indicator": "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0", "label": "ANC 1st visit for women" },
+        { "id": "visits", "indicator": "https://health.go.ug/fhir/Measure/anc-visits|1.0.0", "label": "ANC visits (all)" }
+      ],
+      "columnTotals": false,
+      "rowTotals": true,
+      "change": true,
+      "sendToDhis2": true
+    },
+    {
+      "kind": "table",
+      "id": "timing",
+      "title": "2.2 Timing of the 1st visit",
+      "disaggregations": [],
+      "rows": [
+        { "id": "before-12-weeks", "indicator": "https://health.go.ug/fhir/Measure/anc-first-visit-before-12-weeks|1.0.0", "label": "ANC 1st visit before 12 weeks (%)" },
+        { "id": "next-visit-booked", "indicator": "https://health.go.ug/fhir/Measure/anc-first-visit-next-visit-booked|1.0.0", "label": "ANC 1st visits with the next visit booked (%)" }
+      ],
+      "columnTotals": false,
+      "rowTotals": false,
+      "change": true,
+      "sendToDhis2": false
+    }
+  ]
+}

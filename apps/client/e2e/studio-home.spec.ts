@@ -19,7 +19,8 @@ test('the Studio home shows the design sections, and Forms lists the OPD form', 
   await press(page, 'Studio', 'link')
   for (const section of ['Forms', 'Workflows', 'Concepts & value sets', 'Decision tables', 'Age band sets', 'Indicators', 'Reports', 'Dashboards', 'Packages'])
     await expect(page.getByRole('heading', { name: section, level: 2, exact: true })).toBeVisible()
-  await expect(page.getByRole('article', { name: 'Reports' }).getByText('Coming soon')).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Dashboards' }).getByText('Coming soon')).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Reports' }).getByText(/\d+ reports?/)).toBeVisible()
   await expect(page.getByRole('article', { name: 'Indicators' }).getByText(/\d+ indicators?/)).toBeVisible()
   await expect(page.getByRole('article', { name: 'Forms' }).getByText(/\d+ forms?/)).toBeVisible()
   await noViolations(page)
@@ -123,4 +124,19 @@ test('Concepts & value sets and Decision tables list and create the same way', a
   await openSection(page, 'decision tables')
   const row = page.getByRole('grid', { name: 'Decision tables' }).getByRole('row').filter({ hasText: 'follow-up' })
   await expect(row.getByText('In your draft')).toBeVisible()
+})
+
+// #556: Reports in the HMIS Reporting package (ug.moh.hmis), the author's draft, are listed and
+// open in the file editor until the Report designer (#559).
+test('Reports lists the HMIS package’s Reports and opens one in the file editor', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await openSection(page, 'reports')
+  await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible()
+  const grid = page.getByRole('grid', { name: 'Reports' })
+  await expect(grid.getByText('ANC facility monitoring')).toBeVisible()
+  await expect(grid.getByRole('row').filter({ hasText: 'HMIS 105 · 2 Antenatal care' }).getByText('In your draft')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New report' })).toHaveCount(0)
+  await noViolations(page)
+  await grid.getByText('HMIS 105 · 2 Antenatal care').click()
+  await expect(page.getByRole('heading', { name: 'configuration/reports/hmis-105-anc.json in ug.moh.hmis@1.0.0', level: 1 })).toBeVisible()
 })

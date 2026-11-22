@@ -33,6 +33,12 @@
 //!   add up to the total. Each counted thing falls in one band, its first record's in the
 //!   denominator, and the [`Summary`] carries each band's parts, which roll up like the whole.
 //!
+//! - **Reports** ([`report`], #556): configuration in a Reporting package laying out indicators
+//!   for one period type and the levels it runs for, in table and line list sections.
+//!   [`ReportDefinition::problems`] refuses medians, distinct counts and line lists in a Report
+//!   that runs above facility level, and indicators or Age Band Sets not pinned to
+//!   `url|version`.
+//!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
@@ -42,6 +48,7 @@ pub mod disaggregation;
 pub mod indicator;
 pub mod membership;
 pub mod period;
+pub mod report;
 
 pub use age_bands::{
     AGE_BAND_SET_CONTENT, AGE_BAND_SET_TYPE, AgeAt, AgeBand, AgeBandSet, AgeBandSetDefinition,
@@ -61,3 +68,8 @@ pub use indicator::{
 };
 pub use membership::{MEMBERSHIP_VARIABLE, Reference, Side, circles, references};
 pub use period::{PREVIOUS_PERIODS, Period, PeriodError, PeriodType, local_date};
+pub use report::{
+    ATTRIBUTES, AttributeOf, Axis, Catalogue, Code, Enrollments, IndicatorRow, Level,
+    LineListSection, ListColumn, ListPick, REPORTS_FOLDER, ReportDefinition, RowPer, Section,
+    SectionDisaggregation, TableSection, attribute,
+};
