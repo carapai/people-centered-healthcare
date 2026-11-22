@@ -665,6 +665,7 @@ mod tests {
             populations: BTreeMap::new(),
             references: BTreeSet::new(),
             disaggregations: Vec::new(),
+            thresholds: Vec::new(),
             value: matches!(calculation, Calculation::Value(_)).then(|| IndicatorValue {
                 source: ValueSource::Expression("v".into()),
                 pick: Pick::First,

@@ -6,6 +6,7 @@ Layer: **application** (analytics). Indicators evaluated (analytics.md; ADR 0068
   - `scoring` (a `measure-scoring` code) and `basis` (the type of record the criteria read, e.g. `Encounter`);
   - the first group's populations, each by its `measure-population` code with its `criteria`;
   - `indicator-period-date` (`valueExpression`, required), `indicator-counts` (`valueCode`: `people` when absent), `indicator-rate-per` (`valueInteger`) and `indicator-cumulative` (`valueBoolean`), all under `https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/`;
+  - `indicator-threshold`, one per threshold band (#600): sub-extensions `from` and `to` (`valueDecimal`, either absent for no bound) and `tone` (`valueCode`: `good`, `warning` or `bad`); Validation refuses overlapping bands, and the explorer lists them with each indicator;
   - on the `measure-observation`: `aggregateMethod`, its value as `criteria` or `indicator-value-between` (`from`, `to`, `unit`), and `indicator-value-pick` (`first` or `last`).
 - **`evaluate(engine, library, indicator, period, patients)`** evaluates any indicator for one period. For each record of the basis, the period date, every population's criteria and the value are evaluated with:
   - the record as the root and `%resource`;

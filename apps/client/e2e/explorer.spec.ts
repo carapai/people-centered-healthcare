@@ -29,3 +29,51 @@ test('a district user explores their district: a column chart, the missing facil
   await pickers.getByRole('checkbox', { name: 'Median gestational age at ANC 1st visit (sample)' }).check()
   await expect(card.getByText(/Median gestational age at ANC 1st visit \(sample\) shows at facility level only/)).toBeVisible()
 })
+
+// #600: line, table and single-number Visualizations, coloured by threshold bands. The sample
+// malaria test positivity (e2e/fixtures/indicators) is 45% at every facility this quarter, in
+// its *bad* band (40% and above), and 30% the quarter before (e2e/summaries.ts).
+test('switching chart type keeps the selection, a single number shows its change, and 45% positivity is bad', async ({ page }) => {
+  await signIn(page, USERS.district)
+  await press(page, 'Data explorer', 'link')
+  const pickers = page.getByRole('form', { name: 'What to show' })
+  const card = page.getByRole('article', { name: 'Visualization' })
+  const positivity = 'Malaria test positivity (sample)'
+  await pickers.getByRole('checkbox', { name: 'ANC 1st visit before 12 weeks (sample)' }).uncheck()
+  await pickers.getByRole('checkbox', { name: positivity }).check()
+  await pickers.getByLabel('Period type').selectOption({ label: 'Quarters' })
+  // This quarter alone: the single number asks for the quarter before itself.
+  const quarters = await pickers.getByLabel('From').getByRole('option').allTextContents()
+  const [previous, current] = quarters.slice(-2)
+  await pickers.getByLabel('From').selectOption(current ?? '')
+
+  const types = card.getByRole('group', { name: 'Chart type' })
+  await types.getByRole('button', { name: 'Single number' }).click()
+  const tile = card.getByRole('list', { name: 'Single numbers' }).getByRole('listitem', { name: positivity })
+  await expect(tile).toContainText('45%')
+  await expect(tile).toHaveAttribute('data-tone', 'bad')
+  await expect(tile).toContainText('Bad')
+  await expect(tile).toContainText(`+15 on ${previous} (30%)`)
+  const legend = card.getByRole('list', { name: `${positivity} thresholds` })
+  await expect(legend.getByRole('listitem')).toHaveText(['below 20: Good', '20 to under 40: Warning', '40 and above: Bad'])
+  await noViolations(page)
+
+  // The selection is kept through every type.
+  await types.getByRole('button', { name: 'Line' }).click()
+  await expect(types.getByRole('button', { name: 'Line' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(card.getByRole('img', { name: `Line chart of ${positivity}, ${current} to ${current}` })).toBeVisible()
+  await types.getByRole('button', { name: 'Table' }).click()
+  await expect(pickers.getByRole('checkbox', { name: positivity })).toBeChecked()
+  await expect(pickers.getByLabel('Period type')).toHaveValue('quarterly')
+  await expect(pickers.getByLabel('From')).toHaveValue(current ?? '')
+  await expect(pickers.getByRole('checkbox', { name: 'Kampala' })).toBeChecked()
+  const table = card.getByRole('table', { name: 'Figures' })
+  await expect(table.getByRole('columnheader', { name: positivity })).toBeVisible()
+  const kampala = table.getByRole('row', { name: /Kampala/ }).getByRole('cell')
+  await expect(kampala).toHaveText('45')
+  await expect(kampala).toHaveAttribute('data-tone', 'bad')
+  await card.getByRole('group', { name: 'Table layout' }).getByRole('button', { name: 'Indicators × periods' }).click()
+  await expect(table.getByRole('columnheader', { name: current ?? '' })).toBeVisible()
+  await expect(legend).toBeVisible()
+  await noViolations(page)
+})

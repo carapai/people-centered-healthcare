@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::disaggregation::{Disaggregation, DisaggregationDefinition, DisaggregationSource};
 use crate::membership::{Reference, references};
+use crate::threshold::{ThresholdBand, ThresholdDefinition, threshold_bands};
 
 /// The FHIRPath expression language, as a FHIR `Expression.language`.
 pub const FHIRPATH: &str = "text/fhirpath";
@@ -446,6 +447,8 @@ pub struct MeasureDefinition {
     pub groups: usize,
     /// What it is broken down by: its first group's stratifiers, in order (#551, #552).
     pub disaggregations: Vec<DisaggregationDefinition>,
+    /// Its threshold bands, as written (#600).
+    pub thresholds: Vec<ThresholdDefinition>,
 }
 
 /// An indicator without problems: what evaluation takes.
@@ -477,6 +480,9 @@ pub struct Indicator {
     pub references: BTreeSet<Reference>,
     /// What it is broken down by, in order (#552).
     pub disaggregations: Vec<Disaggregation>,
+    /// The bands its figures are coloured by, lowest first; none when it has no legend set
+    /// (#600).
+    pub thresholds: Vec<ThresholdBand>,
 }
 
 impl Indicator {
@@ -728,6 +734,10 @@ impl MeasureDefinition {
                 Err(found) => problems.extend(found),
             }
         }
+        let thresholds = threshold_bands(&self.thresholds).unwrap_or_else(|found| {
+            problems.extend(found);
+            Vec::new()
+        });
         let canonical = format!("{url}|{version}");
         if referred.iter().any(|r: &Reference| r.measure == canonical) {
             problems.push(format!(
@@ -748,6 +758,7 @@ impl MeasureDefinition {
                 populations,
                 references: referred,
                 disaggregations,
+                thresholds,
                 value: value.map(|(_, value)| value),
             }),
             _ => Err(problems),
@@ -879,7 +890,44 @@ mod tests {
                 age_band_set: Some("https://health.go.ug/fhir/Library/age-bands-anc|1.0.0".into()),
                 ..DisaggregationDefinition::default()
             }],
+            thresholds: Vec::new(),
         }
+    }
+
+    #[test]
+    fn an_indicator_keeps_its_threshold_bands_and_validation_names_their_problems() {
+        let band = |from: Option<&str>, to: Option<&str>, tone: &str| ThresholdDefinition {
+            from: from.map(Into::into),
+            to: to.map(Into::into),
+            tone: Some(tone.into()),
+        };
+        let measure = MeasureDefinition {
+            thresholds: vec![
+                band(Some("20"), None, "bad"),
+                band(None, Some("20"), "good"),
+            ],
+            ..anc_first_visits()
+        };
+        let indicator = measure.indicator().expect("indicator");
+        assert_eq!(
+            indicator
+                .thresholds
+                .iter()
+                .map(|b| b.tone)
+                .collect::<Vec<_>>(),
+            [crate::Tone::Good, crate::Tone::Bad]
+        );
+        let overlapping = MeasureDefinition {
+            thresholds: vec![
+                band(Some("10"), None, "bad"),
+                band(None, Some("20"), "good"),
+            ],
+            ..anc_first_visits()
+        };
+        assert_eq!(
+            overlapping.problems(),
+            ["threshold bands overlap: below 20 and 10 and above"]
+        );
     }
 
     #[test]

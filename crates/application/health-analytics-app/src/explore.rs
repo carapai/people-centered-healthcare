@@ -157,7 +157,8 @@ pub fn calculation_code(calculation: Calculation) -> &'static str {
     }
 }
 
-/// An indicator as the explorer lists it.
+/// An indicator as the explorer lists it, with its threshold bands lowest first, each bound
+/// exact decimal text (#600).
 pub fn indicator_json(indicator: &Indicator) -> Value {
     let per = match indicator.calculation {
         Calculation::Rate { per } => Some(per),
@@ -172,6 +173,15 @@ pub fn indicator_json(indicator: &Indicator) -> Value {
             indicator.calculation,
             Calculation::Value(aggregate) if !aggregate.rolls_up()
         ),
+        "thresholds": indicator
+            .thresholds
+            .iter()
+            .map(|band| json!({
+                "from": band.from.map(|v| v.normalize().to_string()),
+                "to": band.to.map(|v| v.normalize().to_string()),
+                "tone": band.tone.code(),
+            }))
+            .collect::<Vec<_>>(),
     })
 }
 

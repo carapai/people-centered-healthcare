@@ -42,6 +42,7 @@ fn indicator() -> Indicator {
         populations: BTreeMap::new(),
         references: BTreeSet::new(),
         disaggregations: Vec::new(),
+        thresholds: Vec::new(),
         value: None,
     }
 }
