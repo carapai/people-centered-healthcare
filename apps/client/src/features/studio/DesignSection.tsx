@@ -58,6 +58,8 @@ export function useOpenDesign() {
         return navigate({ to: target.to, params: target.params })
       case '/studio/$id/indicators/$':
         return navigate({ to: target.to, params: target.params })
+      case '/studio/$id/files/$':
+        return navigate({ to: target.to, params: target.params })
     }
   }
 }
@@ -187,7 +189,7 @@ function Listing({ section, designs }: { section: SectionId; designs: StudioDesi
   )
 }
 
-const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language']
+const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language', 'reporting']
 
 /** *New* in a section: which package (a draft the person holds, a published package whose next
  * version they start, or a new package), then a title; a decision table also asks which workflow

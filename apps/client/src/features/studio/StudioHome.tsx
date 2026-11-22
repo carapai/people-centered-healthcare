@@ -38,6 +38,8 @@ function SectionLink({ section, isNew, children }: { section: SectionId; isNew?:
       return <Link to="/studio/age-bands" search={search}>{children}</Link>
     case 'indicators':
       return <Link to="/studio/indicators" search={search}>{children}</Link>
+    case 'reports':
+      return <Link to="/studio/reports" search={search}>{children}</Link>
   }
 }
 
@@ -45,8 +47,8 @@ export { SectionLink }
 
 /**
  * The Studio's home (studio.md § The Studio home; #855): what a person designs, one card per
- * kind with how many there are, *Open* and *New*. Reports and dashboards are shown,
- * marked coming soon, until their editors exist. The packages, for checking, review, approval and
+ * kind with how many there are, *Open* and *New*. Reports (#556) are listed and open in the file
+ * editor until the Report designer (#559) exists; dashboards are shown, marked coming soon. The packages, for checking, review, approval and
  * publication, are one more card.
  */
 export function StudioHome() {
@@ -86,17 +88,10 @@ export function StudioHome() {
               </Card>
             )
           })}
-          {(
-            [
-              [dm.dhReports, dm.dhReportsHint],
-              [dm.dhDashboards, dm.dhDashboardsHint],
-            ] as const
-          ).map(([title, hint]) => (
-            <Card key={title.id} title={intl.formatMessage(title)} hint={intl.formatMessage(hint)} soon>
-              <span className={badge}>{intl.formatMessage(dm.dhSoon)}</span>
-              <p className={muted}>{intl.formatMessage(dm.dhSoonHint)}</p>
-            </Card>
-          ))}
+          <Card title={intl.formatMessage(dm.dhDashboards)} hint={intl.formatMessage(dm.dhDashboardsHint)} soon>
+            <span className={badge}>{intl.formatMessage(dm.dhSoon)}</span>
+            <p className={muted}>{intl.formatMessage(dm.dhSoonHint)}</p>
+          </Card>
           <Card title={intl.formatMessage(dm.dhPackages)} hint={intl.formatMessage(dm.dhPackagesHint)}>
             <p className={count}>{intl.formatMessage(dm.dhPackagesCount, { count: data.packages.length })}</p>
             <div className={actions}>

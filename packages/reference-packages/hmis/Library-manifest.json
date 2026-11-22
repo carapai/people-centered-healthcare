@@ -1,0 +1,11 @@
+{
+  "resourceType": "Library",
+  "id": "manifest",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/ug.moh.hmis-manifest",
+  "version": "1.0.0",
+  "title": "Uganda MoH HMIS reports",
+  "type": {
+    "text": "asset-collection"
+  }
+}

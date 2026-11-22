@@ -279,3 +279,44 @@ async fn a_package_with_only_withdrawn_drafts_is_left_out() {
     assert_eq!(designs.packages, []);
     assert_eq!(designs.designs, []);
 }
+
+/// A Reporting package's Reports (#556), from `configuration/reports/`, each under its title.
+#[tokio::test]
+async fn a_reporting_package_lists_its_reports() {
+    let central = central().await;
+    let publications = &central.publications;
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages/hmis");
+    let mut files = Files::new();
+    for path in [
+        "package.json",
+        "Library-manifest.json",
+        "configuration/reports/hmis-105-anc.json",
+        "configuration/reports/anc-facility-monitoring.json",
+    ] {
+        files.insert(path.into(), std::fs::read(dir.join(path)).expect("read"));
+    }
+    publications.draft(&files, "ann").await.expect("draft");
+    let designs = publications.studio_designs("ann").await.expect("designs");
+    assert_eq!(designs.packages[0].kind, PackageKind::Reporting);
+    let found: Vec<_> = designs
+        .designs
+        .iter()
+        .map(|d| (d.kind, d.title.as_str(), d.path.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (
+                DesignKind::Report,
+                "ANC facility monitoring",
+                "configuration/reports/anc-facility-monitoring.json"
+            ),
+            (
+                DesignKind::Report,
+                "HMIS 105 · 2 Antenatal care",
+                "configuration/reports/hmis-105-anc.json"
+            ),
+        ]
+    );
+}

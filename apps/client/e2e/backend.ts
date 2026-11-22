@@ -225,6 +225,10 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
 // patients, which the indicator editor's Try evaluates (#537).
 const anc = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/anc'), '--by', author], { env, stdio: 'inherit' })
 if (anc.status !== 0) throw new Error('drafting the ANC reference package failed')
+// The HMIS Reporting package (#556; packages/reference-packages/hmis), drafted by the author: the
+// HMIS 105 antenatal care Report and the facility's ANC monitoring, over the ANC indicators.
+const hmis = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/hmis'), '--by', author], { env, stdio: 'inherit' })
+if (hmis.status !== 0) throw new Error('drafting the HMIS reference package failed')
 if (seedPatients > 0) {
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)

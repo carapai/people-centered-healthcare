@@ -1,7 +1,8 @@
 //! What the Studio designs, across packages (#855; studio.md § The Studio home): every form,
-//! workflow, decision table, code system, value set and program, each in the package version a
-//! person would open it in, and each package's published version and open draft. The Studio
-//! starts from these; the package workspace stays behind them.
+//! workflow, decision table, code system, value set, program, Age Band Set, indicator and
+//! Report, each in the package version a person would open it in, and each package's published
+//! version and open draft. The Studio starts from these; the package workspace stays behind
+//! them.
 //!
 //! A package's artefacts are read from its open draft when it has one (Draft to Approval), and
 //! otherwise from its latest published version. A package with neither (only withdrawn drafts)
@@ -18,6 +19,7 @@ use serde_json::Value;
 
 use health_analytics_app::is_age_band_set;
 
+use crate::reports::reports_in;
 use crate::workflows::workflow_definitions;
 use crate::{Error, Publications, failed, lifecycle_id};
 
@@ -41,6 +43,8 @@ pub enum DesignKind {
     AgeBandSet,
     /// An indicator's Measure, in the indicator editor (#537).
     Indicator,
+    /// A Report in a Reporting package, `configuration/reports/<id>.json` (#556).
+    Report,
 }
 
 /// One designed artefact, in the package version it opens in.
@@ -183,6 +187,14 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
             artefact.url.clone(),
             artefact.version.clone(),
         ));
+    }
+    for (path, report) in reports_in(packed) {
+        let title = report
+            .ok()
+            .map(|r| r.title)
+            .filter(|t| !t.trim().is_empty())
+            .unwrap_or_else(|| path.clone());
+        found.push(design(DesignKind::Report, title, &path, None, None, None));
     }
     for (path, definition) in &workflows {
         for table in &definition.decision_tables {

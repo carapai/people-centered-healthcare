@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1",
+  "title": "Report",
+  "description": "A Report in a Reporting package (ADR 0070, ADR 0072): a title, one period type, the levels it runs for, and sections, each a table of indicator rows with its own Disaggregations or a line list. What the schema cannot say (pinned versions, facility-only calculations and line lists) Validation checks.",
+  "type": "object",
+  "required": ["$schema", "id", "title", "periodType"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1" },
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "periodType": { "enum": ["weekly", "monthly", "quarterly", "semiAnnual", "annual", "financialJuly"] },
+    "levels": { "type": "array", "items": { "enum": ["facility", "district", "region", "national"] } },
+    "sections": { "type": "array", "items": { "$ref": "#/$defs/section" } }
+  },
+  "$defs": {
+    "code": {
+      "type": "object",
+      "required": ["system", "code"],
+      "additionalProperties": false,
+      "properties": { "system": { "type": "string" }, "code": { "type": "string" } }
+    },
+    "section": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": { "kind": { "enum": ["table", "lineList"] } },
+      "oneOf": [{ "$ref": "#/$defs/table" }, { "$ref": "#/$defs/lineList" }]
+    },
+    "table": {
+      "type": "object",
+      "required": ["kind", "id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "table" },
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "disaggregations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["axis"],
+            "additionalProperties": false,
+            "properties": {
+              "ageBandSet": { "type": "string" },
+              "code": { "type": "string" },
+              "expression": { "type": "string" },
+              "axis": { "enum": ["rows", "columns"] }
+            }
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "indicator", "label"],
+            "additionalProperties": false,
+            "properties": { "id": { "type": "string" }, "indicator": { "type": "string" }, "label": { "type": "string" } }
+          }
+        },
+        "columnTotals": { "type": "boolean" },
+        "rowTotals": { "type": "boolean" },
+        "change": { "type": "boolean" },
+        "sendToDhis2": { "type": "boolean" }
+      }
+    },
+    "lineList": {
+      "type": "object",
+      "required": ["kind", "id", "title", "rowPer", "program"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "lineList" },
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "rowPer": { "enum": ["enrollment", "visit"] },
+        "program": { "type": "string" },
+        "enrollments": { "enum": ["started", "active"] },
+        "visitTypes": { "type": "array", "items": { "$ref": "#/$defs/code" } },
+        "countedBy": { "type": "string" },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "attribute": { "type": "string" },
+              "concept": { "$ref": "#/$defs/code" },
+              "pick": { "enum": ["latest", "first", "all", "count"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

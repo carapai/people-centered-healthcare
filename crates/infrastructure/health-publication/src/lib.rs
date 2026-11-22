@@ -46,6 +46,11 @@
 //!   `age-band-set`) with a gap or an overlap between its bands, and
 //!   [`Publications::age_band_sets`] lists every published version, which pinned indicators keep.
 //!
+//! - **Reports** (ADR 0070, ADR 0072; #556): a Report (`configuration/reports/<id>.json`, schema
+//!   `report/1`) belongs in a Reporting package; validation refuses one whose indicators or Age
+//!   Band Sets are not pinned and published, or that runs above facility level with a median, a
+//!   distinct count or a line list ([`reports_in`]).
+//!
 //! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
 //!   settings against the latest published version of each base package they name, and
 //!   [`Publications::activate`] refuses a base version that would orphan, or put outside its
@@ -92,12 +97,14 @@ pub mod editing;
 mod extraction;
 mod indicators;
 mod programs;
+mod reports;
 pub mod studio;
 pub mod terminology;
 mod workflows;
 
 pub use age_bands::{PublishedAgeBandSet, age_band_sets_in};
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
+pub use reports::reports_in;
 pub use workflows::{WorkflowSandbox, workflow_definitions};
 
 pub use health_workflow_actions::ActionDescriptor;
@@ -521,6 +528,10 @@ impl Publications {
         problems.extend(programs::problems(packed));
         problems.extend(indicators::problems(packed));
         problems.extend(age_bands::problems(packed));
+        if !reports_in(packed).is_empty() {
+            let catalogue = self.catalogue(tx, packed).await?;
+            problems.extend(reports::problems(packed, &catalogue));
+        }
         if packed.contents.package.kind == PackageKind::Language
             && let Some(translates) = &packed.contents.package.translates
             && translates.major().is_some()

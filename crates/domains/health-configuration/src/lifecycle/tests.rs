@@ -57,7 +57,11 @@ fn clinical_content_needs_two_distinct_approvers_who_did_not_author_it() {
 
 #[test]
 fn configuration_needs_one_approver() {
-    for kind in [PackageKind::CountryConfiguration, PackageKind::Override] {
+    for kind in [
+        PackageKind::CountryConfiguration,
+        PackageKind::Override,
+        PackageKind::Reporting,
+    ] {
         let mut lifecycle = draft(kind);
         assert!(!is_clinical(kind));
         to_approval(&mut lifecycle, "rita");

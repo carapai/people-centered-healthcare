@@ -43,6 +43,7 @@ const designs: StudioDesigns = {
     { name: 'ug.moh.art', title: 'ART', kind: 'program', published: null, draft: { id: 'ug.moh.art@1.0.0', stage: 'draft', holder: 'ann', mine: true }, canonical: null, changed: null },
     { name: 'ug.moh.opd', title: 'OPD', kind: 'program', published: 'ug.moh.opd@1.0.0', draft: { id: 'ug.moh.opd@1.1.0-draft', stage: 'draft', holder: 'bob', mine: false }, canonical: null, changed: null },
     { name: 'ug.moh.tb', title: 'TB', kind: 'program', published: null, draft: { id: 'ug.moh.tb@0.1.0', stage: 'review', holder: 'ann', mine: true }, canonical: null, changed: null },
+    { name: 'ug.moh.hmis', title: 'HMIS', kind: 'reporting', published: null, draft: { id: 'ug.moh.hmis@1.0.0', stage: 'review', holder: 'bob', mine: false }, canonical: null, changed: null },
   ],
   designs: [
     design('form', 'ANC visit', 'ug.moh.anc', 'ug.moh.anc@1.0.0', 'Questionnaire-anc-visit.json'),
@@ -51,6 +52,7 @@ const designs: StudioDesigns = {
     design('form', 'OPD triage', 'ug.moh.opd', 'ug.moh.opd@1.1.0-draft', 'Questionnaire-opd-triage.json'),
     design('code-system', 'Triage category', 'ug.moh.opd', 'ug.moh.opd@1.1.0-draft', 'CodeSystem-triage-category.json'),
     design('value-set', 'TB symptoms', 'ug.moh.tb', 'ug.moh.tb@0.1.0', 'ValueSet-tb-symptoms.json'),
+    design('report', 'HMIS 105 · 2 Antenatal care', 'ug.moh.hmis', 'ug.moh.hmis@1.0.0', 'configuration/reports/hmis-105-anc.json'),
   ],
 }
 const pkg = (name: string) => designs.packages.find((p) => p.name === name)
@@ -61,6 +63,7 @@ describe('sections', () => {
     expect(inSection(designs.designs, 'concepts').map((d) => d.kind)).toEqual(['code-system', 'value-set'])
     expect(inSection(designs.designs, 'decision-tables').map((d) => d.table)).toEqual(['regimen'])
     expect(inSection(designs.designs, 'programs')).toEqual([])
+    expect(inSection(designs.designs, 'reports').map((d) => d.title)).toEqual(['HMIS 105 · 2 Antenatal care'])
   })
 
   test('a design is published, in your draft, in someone else’s, or submitted', () => {
@@ -84,6 +87,9 @@ describe('sections', () => {
     expect(editorOf(designs.designs[2]!, 'x@1')).toEqual({ to: '/studio/$id/workflows/$', params: { id: 'x@1', _splat: 'Library-art-care.json' }, search: { table: 'regimen' } })
     expect(editorOf(designs.designs[1]!, 'x@1')).toMatchObject({ search: {} })
     expect(editorOf(designs.designs[4]!, 'x@1').to).toBe('/studio/$id/terminology/$')
+    // A Report opens in the file editor until the Report designer (#559).
+    expect(editorOf(designs.designs[6]!, 'ug.moh.hmis@1.0.0')).toEqual({ to: '/studio/$id/files/$', params: { id: 'ug.moh.hmis@1.0.0', _splat: 'configuration/reports/hmis-105-anc.json' } })
+    expect(sections.find((s) => s.id === 'reports')?.creates).toBe(false)
   })
 })
 
@@ -143,7 +149,7 @@ test('every section, kind and status is worded, with no ICU error', () => {
   const texts = [
     ...sections.flatMap((s) => [dm.dhSection, dm.dhSectionHint, dm.dhOpen, dm.dhNew, dm.dhEmpty, dm.dhNewHeading].map((m) => intl.formatMessage(m, { section: icu(s.id) }))),
     ...sections.map((s) => intl.formatMessage(dm.dhCount, { section: icu(s.id), count: 2 })),
-    ...(['form', 'workflow', 'decision-table', 'code-system', 'value-set', 'program'] as const).map((k) => intl.formatMessage(dm.dhKind, { kind: icu(k) })),
+    ...(['form', 'workflow', 'decision-table', 'code-system', 'value-set', 'program', 'age-band-set', 'indicator', 'report'] as const).map((k) => intl.formatMessage(dm.dhKind, { kind: icu(k) })),
     ...(['published', 'yours', 'theirs', 'submitted'] as const).map((st) => intl.formatMessage(dm.dhStatus, { status: st, holder: 'bob' })),
   ]
   expect(errors).toEqual([])
@@ -151,4 +157,6 @@ test('every section, kind and status is worded, with no ICU error', () => {
   expect(texts).toContain('2 code systems and value sets')
   expect(texts).toContain('Value set')
   expect(texts).toContain('In bob’s draft')
+  expect(texts).toContain('2 reports')
+  expect(texts).toContain('Report')
 })

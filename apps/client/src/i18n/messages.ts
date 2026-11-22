@@ -2981,8 +2981,6 @@ type DesignValues = {
   dhPackagesHint: {}
   dhPackagesCount: { count: number }
   dhPackagesOpen: {}
-  dhReports: {}
-  dhReportsHint: {}
   dhDashboards: {}
   dhDashboardsHint: {}
   dhHome: {}
@@ -3038,29 +3036,29 @@ export const designMessages = defineMessages<DesignValues>({
   dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
   dhSection: {
     id: 'app.studio.home.section',
-    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} other {{section}}}',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} reports {Reports} other {{section}}}',
     description: 'Studio: a section heading',
   },
   dhSectionHint: {
     id: 'app.studio.home.sectionHint',
     defaultMessage:
-      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} other {}}',
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} reports {HMIS forms and facility reports: indicators laid out for one period type, by section, with the levels they run for.} other {}}',
     description: 'Studio: what a section holds',
   },
   dhCount: {
     id: 'app.studio.home.count',
     defaultMessage:
-      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} other {{count}}}',
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} reports {{count, plural, =0 {No reports} one {# report} other {# reports}}} other {{count}}}',
     description: 'Studio: how many designs a section holds',
   },
   dhOpen: {
     id: 'app.studio.home.open',
-    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} other {Open}}',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} reports {Open reports} other {Open}}',
     description: 'Studio home: open a section',
   },
   dhNew: {
     id: 'app.studio.home.new',
-    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} other {New}}',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} reports {New report} other {New}}',
     description: 'Studio: start a new design',
   },
   dhSoon: { id: 'app.studio.home.soon', defaultMessage: 'Coming soon', description: 'Studio home: a design type whose editor is not built yet' },
@@ -3069,8 +3067,6 @@ export const designMessages = defineMessages<DesignValues>({
   dhPackagesHint: { id: 'app.studio.home.packagesHint', defaultMessage: 'The packages your designs live in: check, submit, review, approve, publish and activate them.', description: 'Studio home: the packages section' },
   dhPackagesCount: { id: 'app.studio.home.packagesCount', defaultMessage: '{count, plural, =0 {No packages} one {# package} other {# packages}}', description: 'Studio home: how many packages' },
   dhPackagesOpen: { id: 'app.studio.home.packagesOpen', defaultMessage: 'Open the packages', description: 'Studio home: open the package list' },
-  dhReports: { id: 'app.studio.home.reports', defaultMessage: 'Reports', description: 'Studio home: reports section' },
-  dhReportsHint: { id: 'app.studio.home.reportsHint', defaultMessage: 'Indicators grouped by period, with their DHIS2 mappings.', description: 'Studio home: reports section' },
   dhDashboards: { id: 'app.studio.home.dashboards', defaultMessage: 'Dashboards', description: 'Studio home: dashboards section' },
   dhDashboardsHint: { id: 'app.studio.home.dashboardsHint', defaultMessage: 'Charts and tables of indicators for each level of care.', description: 'Studio home: dashboards section' },
   dhHome: { id: 'app.studio.home.back', defaultMessage: 'Back to the Studio', description: 'Studio: back to the home' },
@@ -3081,7 +3077,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhColChanged: { id: 'app.studio.design.colChanged', defaultMessage: 'Last change', description: 'Studio section: column' },
   dhKind: {
     id: 'app.studio.design.kind',
-    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} other {{kind}}}',
+    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} indicator {Indicator} report {Report} other {{kind}}}',
     description: 'Studio section: a design’s type',
   },
   dhStatus: {
@@ -3097,7 +3093,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
   dhEmpty: {
     id: 'app.studio.design.empty',
-    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} other {Nothing yet.}}',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} reports {No reports yet.} other {Nothing yet.}}',
     description: 'Studio section: nothing designed yet',
   },
   dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
@@ -3105,7 +3101,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
   dhNewHeading: {
     id: 'app.studio.design.newHeading',
-    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} other {New}}',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} reports {A new report} other {New}}',
     description: 'Studio section: the New panel heading',
   },
   dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },

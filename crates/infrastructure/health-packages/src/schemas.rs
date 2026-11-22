@@ -28,6 +28,13 @@ pub const LANGUAGE_PACK: &str =
 
 const LANGUAGE_PACK_SCHEMA: &str = include_str!("../schemas/language-pack-1.json");
 
+/// The `$schema` of a Report in a Reporting package (ADR 0070, ADR 0072; #556;
+/// `health_analytics::report`).
+pub const REPORT: &str =
+    "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1";
+
+const REPORT_SCHEMA: &str = include_str!("../schemas/report-1.json");
+
 const OVERRIDE_POINTS_SCHEMA: &str = include_str!("../schemas/override-points-1.json");
 
 const OVERRIDES_SCHEMA: &str = include_str!("../schemas/overrides-1.json");
@@ -52,7 +59,8 @@ impl Schemas {
     /// The schemas built into this release, each arriving with the feature that reads its
     /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]), Language Pack entries (#502,
     /// [`LANGUAGE_PACK`]), and override point declarations and settings (#507,
-    /// [`crate::overrides::OVERRIDE_POINTS_SCHEMA`], [`crate::overrides::OVERRIDES_SCHEMA`]).
+    /// [`crate::overrides::OVERRIDE_POINTS_SCHEMA`], [`crate::overrides::OVERRIDES_SCHEMA`]) and
+    /// Reports (#556, [`REPORT`]).
     /// Configuration naming any other schema (deployment settings) is refused until its
     /// feature arrives.
     pub fn platform() -> Self {
@@ -65,6 +73,7 @@ impl Schemas {
                 OVERRIDE_POINTS_SCHEMA,
             ),
             (crate::overrides::OVERRIDES_SCHEMA, OVERRIDES_SCHEMA),
+            (REPORT, REPORT_SCHEMA),
         ] {
             // Built into the release and checked by its tests, so it always compiles.
             if let Ok(schema) = serde_json::from_str::<Value>(text)

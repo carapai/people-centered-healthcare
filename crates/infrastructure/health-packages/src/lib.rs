@@ -45,7 +45,7 @@ use health_time::Timestamp;
 use sha2::Digest as _;
 
 pub use archive::{Files, Limits};
-pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, LANGUAGE_PACK, Schemas};
+pub use schemas::{FORM_LAYOUT, FORMAT_VERSIONS, LANGUAGE_PACK, REPORT, Schemas};
 pub use signature::{
     LocalSigner, PublicationSigner, SEED_TYP, TYP, sign_detached, verify_detached,
 };
