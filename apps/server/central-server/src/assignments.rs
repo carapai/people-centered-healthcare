@@ -12,6 +12,10 @@
 //!   role's locations. The user signs in for the place from their next sign-in.
 //! - `DELETE /users/{username}/{place}`: withdraws every role the user holds there.
 //!
+//! An administrator grants only what their own session holds (#888): a role carrying a permission
+//! the session does not cover is refused with 403, naming the role and the permission, and the
+//! refusal is audited.
+//!
 //! Each change is audited with its snapshot, in one transaction.
 
 use std::sync::Arc;
@@ -29,7 +33,7 @@ use health_identity::AccountId;
 use health_identity::snapshot::{
     ADMINISTER, PermissionSnapshot, RoleAssignment, RolePermissions, SnapshotPolicy,
 };
-use health_persistence::Store as _;
+use health_persistence::{Store as _, Transaction as _};
 use health_registries_app::places::places;
 use health_surrealdb::SurrealStore;
 use health_time::Timestamp;
@@ -229,6 +233,7 @@ fn audit(
     action: &str,
     account: AccountId,
     detail: &str,
+    failure: Option<&str>,
 ) -> Value {
     let who = agent.map_or_else(
         || json!({ "display": format!("account {}", subject.account) }),
@@ -240,7 +245,7 @@ fn audit(
             who
         },
     );
-    json!({
+    let mut event = json!({
         "resourceType": "AuditEvent",
         "category": [{ "coding": [{ "system": "http://dicom.nema.org/resources/ontology/DCM", "code": "110137", "display": "User Security Attributes Changed" }] }],
         "code": { "coding": [{ "system": "urn:health:audit-event", "code": "role-assignment" }] },
@@ -254,7 +259,39 @@ fn audit(
             "what": { "display": format!("account {account}") },
             "detail": [{ "type": { "text": "change" }, "valueString": detail }],
         }],
+    });
+    // A refused change is a minor failure, as health-audit records a refused interaction.
+    if let Some(failure) = failure {
+        event["outcome"]["code"]["code"] = json!("4");
+        event["outcome"]["detail"] = json!([{ "text": failure }]);
+    }
+    event
+}
+
+/// The first role in `roles` carrying a permission `subject`'s session does not cover, with that
+/// permission: what an administrator may not grant (#888).
+fn escalation<'a>(
+    policy: &'a RolePermissions,
+    subject: &Subject,
+    roles: &'a [String],
+) -> Option<(&'a str, &'a str)> {
+    roles.iter().find_map(|role| {
+        policy
+            .0
+            .get(role)?
+            .iter()
+            .find(|p| !subject.permissions.covers(p))
+            .map(|p| (role.as_str(), p.as_str()))
     })
+}
+
+/// Appends the AuditEvent `event` of a refused change on its own.
+async fn refusal(store: &SurrealStore, event: &Value) -> Result<(), String> {
+    let mut tx = store.begin().await.map_err(|e| e.to_string())?;
+    health_audit::append(&mut tx, event)
+        .await
+        .map_err(|e| e.to_string())?;
+    tx.commit().await.map_err(|e| e.to_string())
 }
 
 /// The target of a change: the account and the place, if the administrator may manage it.
@@ -313,6 +350,27 @@ async fn assign(
         Ok(account) => account,
         Err(response) => return *response,
     };
+    if let Some((role, permission)) = escalation(&api.roles, &subject, &roles) {
+        let detail = format!(
+            "you cannot grant {role}: it carries {permission}, which your session does not hold"
+        );
+        let event = audit(
+            agent,
+            &subject,
+            "U",
+            account,
+            &format!("roles at {place}: {}", roles.join(", ")),
+            Some(&detail),
+        );
+        if let Err(error) = refusal(&api.store, &event).await {
+            return unavailable(error);
+        }
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "detail": detail, "role": role, "permission": permission })),
+        )
+            .into_response();
+    }
     // What the user holds there now: its programs and each kept role's locations stay.
     let held = match snapshot(&api, account, &place).await {
         Ok(held) => held,
@@ -343,7 +401,7 @@ async fn assign(
         Err(error) => return unavailable(error),
     };
     let detail = format!("roles at {place}: {}", roles.join(", "));
-    let event = audit(agent, &subject, "U", account, &detail);
+    let event = audit(agent, &subject, "U", account, &detail, None);
     if let Err(error) = api
         .accounts
         .assign(account, &place, Some(&jws), &event)
@@ -391,6 +449,7 @@ async fn withdraw(
         "D",
         account,
         &format!("every role at {place} withdrawn"),
+        None,
     );
     match api.accounts.assign(account, &place, None, &event).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),

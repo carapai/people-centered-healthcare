@@ -70,6 +70,12 @@ describe('role assignment at a place', () => {
     await expect(withdraw(missing, 'okello', 'KAM013')).rejects.toBeInstanceOf(PlacesError)
   })
 
+  test('a role the administrator may not grant names the role and its permission', async () => {
+    const detail = 'you cannot grant access: it carries places.manage, which your session does not hold'
+    const refused = fakeTransport(() => ({ status: 403, body: { detail, role: 'access', permission: 'places.manage' } }))
+    await expect(assign(refused, 'okello', 'KAM013', ['access'])).rejects.toEqual(new PlacesError(403, detail, [], { role: 'access', permission: 'places.manage' }))
+  })
+
   test('a place is named with its level, a facility with its code', () => {
     expect(placeLabel(place('district-kampala', 'district', 'region-central', { name: 'Kampala' }), level)).toBe('Kampala (district)')
     expect(placeLabel(place('KAM013', 'facility', 'district-kampala', { name: 'Kisenyi HC IV' }), level)).toBe('Kisenyi HC IV (KAM013)')
