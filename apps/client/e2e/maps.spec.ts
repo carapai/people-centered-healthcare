@@ -15,7 +15,7 @@ test("a national user's malaria map shades each region by band, and an unsynced 
   await press(page, 'Data explorer', 'link')
   const pickers = page.getByRole('form', { name: 'What to show' })
   const card = page.getByRole('article', { name: 'Visualization' })
-  for (const box of await pickers.getByRole('group', { name: 'Data' }).getByRole('checkbox', { checked: true }).all()) await box.uncheck()
+  await pickers.getByRole('checkbox', { name: 'ANC 1st visit before 12 weeks (sample)' }).uncheck()
   await pickers.getByRole('checkbox', { name: positivity }).check()
   await pickers.getByLabel('Period type').selectOption({ label: 'Quarters' })
   const quarters = await pickers.getByLabel('From').getByRole('option').allTextContents()
