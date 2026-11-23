@@ -18,7 +18,10 @@
 //!
 //! The designer lays the cells out (rows, columns, totals, % change) and greys what a level
 //! cannot show (medians and distinct counts above facility level, line lists), so choosing a
-//! level asks nothing of the server. Rows of a line list are not previewed yet.
+//! level asks nothing of the server. A cell crossing several Disaggregations (#867) is counted
+//! here: each row's figures carry every crossed cell the section lays out, so the crossed cells
+//! across one Disaggregation add up to the band of the others. Rows of a line list are not
+//! previewed yet.
 
 use std::collections::BTreeMap;
 
@@ -28,8 +31,8 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use health_access_policy::Subject;
 use health_analytics::{
-    AgeBandSet, Evaluation, Indicator, NOT_RECORDED, Period, PeriodType, Reason, ReportDefinition,
-    Section, pinned,
+    AgeBandSet, Axis, Evaluation, Indicator, NOT_RECORDED, Period, PeriodType, Reason,
+    ReportDefinition, Section, TableSection, pinned,
 };
 use health_analytics_app::{
     Library, TestPatient, age_band_set, evaluate, is_age_band_set, is_test_patient, measure,
@@ -119,6 +122,37 @@ pub(crate) struct StudioReportFigures {
     pub(crate) denominator: Option<u64>,
     /// The figure per band of each of the indicator's disaggregations.
     pub(crate) disaggregations: Vec<StudioDisaggregation>,
+    /// The figure at each cell crossing several of the section's Disaggregations (#867): its
+    /// row bands crossed, its column bands crossed, and both crossed, for those the indicator
+    /// is broken down by.
+    pub(crate) crossed: Vec<StudioReportCell>,
+}
+
+/// One band of one of a section's Disaggregations, as a crossed cell is at it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportAt {
+    /// The Disaggregation's name: the Age Band Set's `url|version`, or the code.
+    pub(crate) name: String,
+    /// The band's code.
+    pub(crate) code: String,
+}
+
+/// An indicator's figure at one band of each of several Disaggregations: what was counted in
+/// all of them, a percentage's numerator and denominator both within the cell.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportCell {
+    /// The bands it is at, in the section's order.
+    pub(crate) at: Vec<StudioReportAt>,
+    /// The figure, to two decimal places; none when the denominator is zero or no value was
+    /// taken.
+    #[schema(value_type = Option<f64>)]
+    pub(crate) value: Option<serde_json::Number>,
+    /// How many are counted: the numerator of a percentage, rate or ratio.
+    pub(crate) count: u64,
+    /// The denominator of a percentage, rate or ratio.
+    pub(crate) denominator: Option<u64>,
 }
 
 /// A test patient a row counted, and in which bands.
@@ -314,7 +348,97 @@ fn figures(
         count: summary.count,
         denominator: summary.denominator,
         disaggregations: disaggregations(indicator, summary, sets),
+        crossed: Vec::new(),
     }
+}
+
+/// Which of a table section's Disaggregations its cells cross, by name: those on rows, those
+/// on columns, and all of them, each when it is two or more.
+fn crossings(table: &TableSection) -> Vec<Vec<&str>> {
+    let names = |axis: Option<Axis>| -> Vec<&str> {
+        table
+            .disaggregations
+            .iter()
+            .filter(|d| axis.is_none_or(|a| d.axis == a))
+            .filter_map(|d| d.age_band_set.as_deref().or(d.code.as_deref()))
+            .collect()
+    };
+    let mut out: Vec<Vec<&str>> = Vec::new();
+    for names in [
+        names(Some(Axis::Rows)),
+        names(Some(Axis::Columns)),
+        names(None),
+    ] {
+        if names.len() > 1 && !out.contains(&names) {
+            out.push(names);
+        }
+    }
+    out
+}
+
+/// The indicator's figure at every cell crossing each of `crossings`, over the bands the
+/// section lays out; a crossing with a Disaggregation the indicator is not broken down by is
+/// left out (the designer says so).
+fn crossed(
+    indicator: &Indicator,
+    evaluation: &Evaluation,
+    crossings: &[Vec<&str>],
+    bands: &[StudioReportBands],
+) -> Vec<StudioReportCell> {
+    let mut cells = Vec::new();
+    for names in crossings {
+        let Some(sides) = names
+            .iter()
+            .map(|name| {
+                let d = indicator
+                    .disaggregations
+                    .iter()
+                    .position(|d| d.name == *name)?;
+                let codes: Vec<&str> = bands
+                    .iter()
+                    .find(|b| b.name == *name)?
+                    .bands
+                    .iter()
+                    .map(|b| b.code.as_str())
+                    .collect();
+                Some((*name, d, codes))
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        let combos = sides
+            .iter()
+            .fold(vec![Vec::new()], |combos, (_, d, codes)| {
+                combos
+                    .iter()
+                    .flat_map(|combo: &Vec<(usize, &str)>| {
+                        codes.iter().map(move |code| {
+                            let mut next = combo.clone();
+                            next.push((*d, *code));
+                            next
+                        })
+                    })
+                    .collect()
+            });
+        for combo in combos {
+            let summary = evaluation.crossed(indicator, &combo);
+            cells.push(StudioReportCell {
+                at: sides
+                    .iter()
+                    .zip(&combo)
+                    .map(|((name, _, _), (_, code))| StudioReportAt {
+                        name: (*name).to_owned(),
+                        code: (*code).to_owned(),
+                    })
+                    .collect(),
+                value: summary.value.map(exact),
+                count: summary.count,
+                denominator: summary.denominator,
+            });
+        }
+    }
+    cells
 }
 
 fn counted(evaluation: &Evaluation, patients: &[TestPatient]) -> Vec<StudioReportCounted> {
@@ -399,7 +523,7 @@ fn section_bands(
 
 /// Documents and serves the Report designer's preview.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/reports/preview", tag = "studio", operation_id = "previewStudioReport",
-    description = "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole and each band of the indicator's disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
+    description = "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
     params(("id" = String, Path, description = "`name@version`")),
     request_body = StudioReportPreviewInput,
     responses(
@@ -472,6 +596,9 @@ pub(crate) async fn preview(
             continue;
         };
         let mut rows = Vec::with_capacity(table.rows.len());
+        // Each row's evaluations, now and before, to cross its bands once they are known.
+        let mut evaluations: Vec<Option<(&Indicator, Evaluation, Option<Evaluation>)>> =
+            Vec::with_capacity(table.rows.len());
         for row in &table.rows {
             let Some(f) = found.get(&row.indicator) else {
                 rows.push(StudioReportRow {
@@ -482,6 +609,7 @@ pub(crate) async fn preview(
                     counted: Vec::new(),
                     error: Some(format!("no indicator is {}", row.indicator)),
                 });
+                evaluations.push(None);
                 continue;
             };
             let indicator = StudioReportIndicator {
@@ -511,28 +639,33 @@ pub(crate) async fn preview(
                 ),
                 _ => None,
             };
-            rows.push(match now {
-                Ok(now) => StudioReportRow {
-                    row: row.id.clone(),
-                    indicator: Some(indicator),
-                    current: Some(figures(&f.indicator, &now, &sets)),
-                    previous: before
-                        .and_then(Result::ok)
-                        .map(|b| figures(&f.indicator, &b, &sets)),
-                    counted: counted(&now, &patients),
-                    error: None,
-                },
-                Err(why) => StudioReportRow {
-                    row: row.id.clone(),
-                    indicator: Some(indicator),
-                    current: None,
-                    previous: None,
-                    counted: Vec::new(),
-                    error: Some(why),
-                },
-            });
+            let before = before.and_then(Result::ok);
+            match now {
+                Ok(now) => {
+                    rows.push(StudioReportRow {
+                        row: row.id.clone(),
+                        indicator: Some(indicator),
+                        current: Some(figures(&f.indicator, &now, &sets)),
+                        previous: before.as_ref().map(|b| figures(&f.indicator, b, &sets)),
+                        counted: counted(&now, &patients),
+                        error: None,
+                    });
+                    evaluations.push(Some((&f.indicator, now, before)));
+                }
+                Err(why) => {
+                    rows.push(StudioReportRow {
+                        row: row.id.clone(),
+                        indicator: Some(indicator),
+                        current: None,
+                        previous: None,
+                        counted: Vec::new(),
+                        error: Some(why),
+                    });
+                    evaluations.push(None);
+                }
+            }
         }
-        let disaggregations = table
+        let disaggregations: Vec<StudioReportBands> = table
             .disaggregations
             .iter()
             .filter_map(|d| {
@@ -540,6 +673,20 @@ pub(crate) async fn preview(
                 Some(section_bands(name, d.age_band_set.is_some(), &sets, &rows))
             })
             .collect();
+        let crossings = crossings(table);
+        if !crossings.is_empty() {
+            for (row, evaluated) in rows.iter_mut().zip(&evaluations) {
+                let Some((indicator, now, before)) = evaluated else {
+                    continue;
+                };
+                if let Some(current) = &mut row.current {
+                    current.crossed = crossed(indicator, now, &crossings, &disaggregations);
+                }
+                if let (Some(previous), Some(before)) = (&mut row.previous, before) {
+                    previous.crossed = crossed(indicator, before, &crossings, &disaggregations);
+                }
+            }
+        }
         sections.push(StudioReportSection {
             disaggregations,
             rows,

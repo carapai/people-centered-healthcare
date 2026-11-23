@@ -10,6 +10,7 @@ import type { Transport } from '../../../platform/types'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
 import { designsQuery, icu } from '../designs'
+import { codeSystemsQuery, conceptsQuery } from '../terminology/api'
 import { refusalText } from '../wording'
 import { countedAt, layoutTable, sentCells, shownAt, type At, type Cell } from './layout'
 import {
@@ -267,7 +268,7 @@ function Designer({ id, path, draft, file, initial, onReload }: { id: string; pa
                         {section.kind === 'table' ? (
                           <TableEditor section={section} editable={editable} choices={choices} preview={preview.data?.sections[at]} onChange={(next) => change(updateSection(report, at, 'table', () => next))} />
                         ) : (
-                          <LineListEditor section={section} editable={editable} choices={choices} onChange={(next) => change(updateSection(report, at, 'lineList', () => next))} />
+                          <LineListEditor id={id} section={section} editable={editable} choices={choices} onChange={(next) => change(updateSection(report, at, 'lineList', () => next))} />
                         )}
                       </div>
                     ) : null}
@@ -669,7 +670,75 @@ function IndicatorRowEditor({ section, at, editable, choices, preview, onChange 
   )
 }
 
-function LineListEditor({ section, editable, choices, onChange }: { section: LineListSection; editable: boolean; choices: Choices; onChange: (next: LineListSection) => void }) {
+/** A terminology search for a line list's concept column (#867): a code system the package is
+ * authored against, searched on the server by code or name, a page at a time; using a concept
+ * fills the column to add. */
+function ConceptSearch({ id, onUse }: { id: string; onUse: (concept: { system: string; code: string; display: string }) => void }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const ids = { heading: useId(), system: useId(), text: useId() }
+  const systems = useQuery(codeSystemsQuery(platform.transport, id))
+  const [chosen, setChosen] = useState('')
+  const [text, setText] = useState('')
+  const settled = useSettled(text.trim(), 300)
+  const system = systems.data?.find((s) => `${s.url}|${s.version ?? ''}` === chosen) ?? systems.data?.[0]
+  const ask = system === undefined ? null : { system: system.url, version: system.version ?? undefined, text: settled, count: 20 }
+  const concepts = useQuery({ ...conceptsQuery(platform.transport, id, ask ?? { system: '' }), enabled: ask !== null && settled !== '' })
+  return (
+    <fieldset aria-labelledby={ids.heading} className={cx(card, css({ m: '0' }))}>
+      <legend id={ids.heading} className={css({ fontSize: 'sm', fontWeight: 'semibold', px: '1' })}>
+        {intl.formatMessage(m.rdConceptSearch)}
+      </legend>
+      {systems.isError ? (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(m.rdConceptSearchFailed, { reason: failure(intl, systems.error) })}
+        </p>
+      ) : null}
+      <div className={row}>
+        <label className={label} htmlFor={ids.system}>
+          {intl.formatMessage(m.rdConceptSystemToSearch)}
+          <select id={ids.system} className={input} value={system === undefined ? '' : `${system.url}|${system.version ?? ''}`} onChange={(e) => setChosen(e.target.value)}>
+            {(systems.data ?? []).map((s) => (
+              <option key={`${s.url}|${s.version ?? ''}`} value={`${s.url}|${s.version ?? ''}`}>
+                {s.title ?? s.url} ({s.package})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label} htmlFor={ids.text}>
+          {intl.formatMessage(m.rdConceptSearchText)}
+          <input id={ids.text} type="search" className={input} value={text} onChange={(e) => setText(e.target.value)} />
+        </label>
+      </div>
+      {settled === '' || ask === null ? null : concepts.isError ? (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(m.rdConceptSearchFailed, { reason: failure(intl, concepts.error) })}
+        </p>
+      ) : concepts.data === undefined ? (
+        <p role="status">{intl.formatMessage(m.rdConceptSearching)}</p>
+      ) : (
+        <>
+          <p role="status" className={muted}>
+            {concepts.data.total === 0
+              ? intl.formatMessage(m.rdConceptNone)
+              : intl.formatMessage(m.rdConceptFound, { total: concepts.data.total, shown: concepts.data.concepts.length < concepts.data.total ? concepts.data.concepts.length : 0 })}
+          </p>
+          <ul className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+            {concepts.data.concepts.map((c) => (
+              <li key={c.code}>
+                <button type="button" className={small} onClick={() => onUse({ system: system?.url ?? '', code: c.code, display: c.display ?? c.code })}>
+                  {intl.formatMessage(m.rdConceptUse, { code: c.code, display: c.display ?? '' })}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </fieldset>
+  )
+}
+
+function LineListEditor({ id, section, editable, choices, onChange }: { id: string; section: LineListSection; editable: boolean; choices: Choices; onChange: (next: LineListSection) => void }) {
   const intl = useIntl()
   const ids = { rowPer: useId(), program: useId(), programs: useId(), enrollments: useId(), counted: useId(), attribute: useId(), system: useId(), code: useId(), conceptLabel: useId() }
   const attributes = attributesFor(section.rowPer)
@@ -802,6 +871,7 @@ function LineListEditor({ section, editable, choices, onChange }: { section: Lin
                 {intl.formatMessage(m.rdAddAttribute)}
               </button>
             </div>
+            <ConceptSearch id={id} onUse={(found) => setConcept({ system: found.system, code: found.code, label: concept.label.trim() === '' ? found.display : concept.label })} />
             <div className={row}>
               <label className={label} htmlFor={ids.conceptLabel}>
                 {intl.formatMessage(m.rdConceptLabel)}

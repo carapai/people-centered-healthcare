@@ -320,6 +320,9 @@ pub struct Evaluation {
     pub summary: Summary,
     /// Every patient, counted or not, in the order given.
     pub members: Vec<Member>,
+    /// Each counted thing in the denominator (or counted, with none), with its band in each
+    /// disaggregation: what a crossed cell is summarised from ([`Self::crossed`]).
+    counted: Vec<Counted>,
 }
 
 impl Evaluation {
@@ -348,6 +351,21 @@ impl Evaluation {
                     .map(move |why| (r.reference.as_str(), why))
             })
         })
+    }
+
+    /// The summary of the counted things in band `code` of disaggregation `d` for every
+    /// `(d, code)` of `at`, `d` being an index into `indicator`'s disaggregations: a cell
+    /// crossing several disaggregations (a Report's age band by HIV status, #867). A
+    /// percentage's numerator and denominator are both the cell's, so the cells across one
+    /// disaggregation add up to the band of the others. It has no disaggregations of its own.
+    pub fn crossed(&self, indicator: &Indicator, at: &[(usize, &str)]) -> Summary {
+        summarize(
+            indicator,
+            self.counted.iter().filter(|c| {
+                at.iter()
+                    .all(|(d, code)| c.bands.get(*d).is_some_and(|band| band == code))
+            }),
+        )
     }
 }
 
@@ -433,6 +451,7 @@ fn median(mut numbers: Vec<Decimal>) -> Option<Decimal> {
 
 /// One counted thing (a person, an enrollment, a visit or an observation) in the denominator,
 /// or counted when there is none.
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Counted {
     /// Whether it is in the numerator (or counted).
     numerator: bool,
@@ -612,7 +631,11 @@ pub fn calculate(
             }
         })
         .collect();
-    Evaluation { summary, members }
+    Evaluation {
+        summary,
+        members,
+        counted,
+    }
 }
 
 #[cfg(test)]
@@ -1324,5 +1347,67 @@ mod tests {
         )
         .expect("rolled up");
         assert_eq!(alone, evaluated.summary);
+    }
+
+    #[test]
+    fn crossed_bands_add_up_to_each_band_and_keep_the_denominator_within_the_cell() {
+        use PopulationKind::{Denominator, InitialPopulation, Numerator};
+        let mut percentage = indicator(Calculation::Percentage, Counts::People);
+        percentage.disaggregations = vec![
+            by("age", DisaggregationSource::AgeBands("a|1".into())),
+            by("hiv-status", DisaggregationSource::Coded("v".into())),
+        ];
+        let one =
+            |patient: &str, numerator: bool, age: &str, status: Option<&str>| PatientOutcome {
+                patient: format!("Patient/{patient}"),
+                records: vec![in_band(
+                    &format!("Encounter/{patient}"),
+                    "2026-03-10",
+                    &[
+                        (InitialPopulation, Ok(true)),
+                        (Denominator, Ok(true)),
+                        (Numerator, Ok(numerator)),
+                    ],
+                    &[Ok(Some(age)), Ok(status)],
+                )],
+            };
+        let patients = [
+            one("a", true, "15-19", Some("positive")),
+            one("b", false, "15-19", Some("positive")),
+            one("c", true, "15-19", Some("negative")),
+            one("d", true, "25+", Some("negative")),
+            one("e", false, "25+", None),
+        ];
+        let evaluated = calculate(&percentage, &march(), &patients, &[]);
+        let cell = |age: &str, status: &str| {
+            let s = evaluated.crossed(&percentage, &[(0, age), (1, status)]);
+            (s.count, s.denominator, s.value)
+        };
+        let n = |n: i64| Some(Decimal::from(n));
+        assert_eq!(cell("15-19", "positive"), (1, Some(2), n(50)));
+        assert_eq!(cell("15-19", "negative"), (1, Some(1), n(100)));
+        assert_eq!(cell("25+", "negative"), (1, Some(1), n(100)));
+        assert_eq!(cell("25+", NOT_RECORDED), (0, Some(1), n(0)));
+        assert_eq!(cell("15-19", NOT_RECORDED), (0, Some(0), None));
+        // Across the HIV statuses, each age band's crossed cells add up to its band.
+        for band in &evaluated.summary.disaggregations[0].bands {
+            let statuses = &evaluated.summary.disaggregations[1].bands;
+            let (count, denominator) = statuses.iter().fold((0, 0), |(c, d), status| {
+                let s = evaluated.crossed(&percentage, &[(0, &band.code), (1, &status.code)]);
+                (c + s.count, d + s.denominator.unwrap_or(0))
+            });
+            assert_eq!(
+                (Some(count), Some(denominator)),
+                (Some(band.summary.count), band.summary.denominator),
+                "{} adds up",
+                band.code
+            );
+        }
+        // One band alone is that band; none is the whole.
+        let alone = evaluated.crossed(&percentage, &[(1, "negative")]);
+        assert_eq!(alone, evaluated.summary.disaggregations[1].bands[0].summary);
+        let mut whole = evaluated.summary.clone();
+        whole.disaggregations = Vec::new();
+        assert_eq!(evaluated.crossed(&percentage, &[]), whole);
     }
 }

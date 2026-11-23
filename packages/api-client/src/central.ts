@@ -1124,6 +1124,15 @@ export const StudioQuestionnaireImportInput = z.object({
 })
 export type StudioQuestionnaireImportInput = z.infer<typeof StudioQuestionnaireImportInput>
 
+/** One band of one of a section's Disaggregations, as a crossed cell is at it. */
+export const StudioReportAt = z.object({
+  /** The band's code. */
+  "code": z.string(),
+  /** The Disaggregation's name: the Age Band Set's `url|version`, or the code. */
+  "name": z.string(),
+})
+export type StudioReportAt = z.infer<typeof StudioReportAt>
+
 /** A band a section lays out. */
 export const StudioReportBand = z.object({
   /** Its code: an age band's, a coded value, or `not-recorded`. */
@@ -1144,6 +1153,19 @@ export const StudioReportBands = z.object({
 })
 export type StudioReportBands = z.infer<typeof StudioReportBands>
 
+/** An indicator's figure at one band of each of several Disaggregations: what was counted in all of them, a percentage's numerator and denominator both within the cell. */
+export const StudioReportCell = z.object({
+  /** The bands it is at, in the section's order. */
+  "at": z.array(StudioReportAt),
+  /** How many are counted: the numerator of a percentage, rate or ratio. */
+  "count": integer,
+  /** The denominator of a percentage, rate or ratio. */
+  "denominator": integer.nullable().optional(),
+  /** The figure, to two decimal places; none when the denominator is zero or no value was taken. */
+  "value": decimal.nullable().optional(),
+})
+export type StudioReportCell = z.infer<typeof StudioReportCell>
+
 /** A test patient a row counted, and in which bands. */
 export const StudioReportCounted = z.object({
   /** For each counted record, its band in each of the indicator's disaggregations, in order. */
@@ -1157,6 +1179,8 @@ export type StudioReportCounted = z.infer<typeof StudioReportCounted>
 export const StudioReportFigures = z.object({
   /** How many are counted: the numerator of a percentage, rate or ratio. */
   "count": integer,
+  /** The figure at each cell crossing several of the section's Disaggregations (#867): its row bands crossed, its column bands crossed, and both crossed, for those the indicator is broken down by. */
+  "crossed": z.array(StudioReportCell),
   /** The denominator of a percentage, rate or ratio. */
   "denominator": integer.nullable().optional(),
   /** The figure per band of each of the indicator's disaggregations. */

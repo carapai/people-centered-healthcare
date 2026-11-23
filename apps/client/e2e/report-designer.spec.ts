@@ -66,3 +66,38 @@ test('New report creates a Report in the Reporting package and the designer save
   await expect(page.getByText('Saved.')).toBeVisible()
   await noViolations(page)
 })
+
+// #867: a line list's concept column is chosen by a terminology search, run on the server a page
+// at a time. The seeded backend publishes no code system the HMIS draft can search, so the
+// terminology answers here are LOINC's, as central gives them.
+test('a line list concept column is chosen by a terminology search', async ({ page }) => {
+  await page.route('**/terminology/code-systems', (route) =>
+    route.fulfill({ json: { codeSystems: [{ url: 'http://loinc.org', version: '2.80', title: 'LOINC', package: 'hl7.terminology@1.0.0', own: false, external: true, complete: false, concepts: 2 }] } }),
+  )
+  const asked: string[] = []
+  await page.route('**/terminology/concepts?*', (route) => {
+    const url = new URL(route.request().url())
+    asked.push(`${url.searchParams.get('system')}|${url.searchParams.get('version')}:${url.searchParams.get('text')}`)
+    return route.fulfill({ json: { codeSystem: 'http://loinc.org|2.80', concepts: [{ code: '11884-4', display: 'Gestational age Estimated', inactive: false, children: 0 }], total: 1 } })
+  })
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await press(page, 'Open reports', 'link')
+  await page.getByRole('grid', { name: 'Reports' }).getByText('ANC facility monitoring').click()
+  await expect(page.getByRole('heading', { name: 'ANC facility monitoring', level: 1 })).toBeVisible()
+  const outline = page.getByRole('navigation', { name: 'Outline' })
+  await outline.getByRole('button', { name: /^ANC clients this month/ }).click()
+
+  const search = outline.getByRole('group', { name: 'Find a concept' })
+  await expect(search.getByLabel('Code system')).toHaveValue('http://loinc.org|2.80')
+  await search.getByLabel('Search by code or name').fill('gestational')
+  await expect(search.getByRole('status')).toHaveText('1 concept found')
+  await search.getByRole('button', { name: 'Use 11884-4 Gestational age Estimated' }).click()
+  expect(asked).toContain('http://loinc.org|2.80:gestational')
+  await expect(outline.getByLabel('Concept system', { exact: true })).toHaveValue('http://loinc.org')
+  await expect(outline.getByLabel('Concept code', { exact: true })).toHaveValue('11884-4')
+  await expect(outline.getByLabel('Concept column heading')).toHaveValue('Gestational age Estimated')
+  await outline.getByRole('button', { name: '+ concept' }).click()
+  await expect(outline.getByLabel('Concept code of column 7')).toHaveValue('11884-4')
+  await noViolations(page)
+})
