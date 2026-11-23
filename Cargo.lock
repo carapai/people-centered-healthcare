@@ -752,6 +752,7 @@ dependencies = [
  "health-packages",
  "health-persistence",
  "health-pki",
+ "health-programs-app",
  "health-provisioning",
  "health-publication",
  "health-registries-app",

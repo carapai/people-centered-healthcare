@@ -12,7 +12,7 @@ import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioF
 import { designsQuery, icu } from '../designs'
 import { codeSystemsQuery, conceptsQuery } from '../terminology/api'
 import { refusalText } from '../wording'
-import { countedAt, layoutTable, sentCells, shownAt, type At, type Cell } from './layout'
+import { countedAt, layoutTable, listCellText, sentCells, shownAt, type At, type Cell } from './layout'
 import {
   LEVELS,
   PERIOD_EXAMPLES,
@@ -367,21 +367,7 @@ function Designer({ id, path, draft, file, initial, onReload }: { id: string; pa
               {section.kind === 'table' ? (
                 <PreviewTable section={section} at={at} preview={preview.data?.sections[at]} level={shownLevel} selected={selected} onCell={openCell} />
               ) : shownLevel === 'facility' ? (
-                <>
-                  <table className={table}>
-                    <caption className={css({ srOnly: true })}>{section.title}</caption>
-                    <thead>
-                      <tr>
-                        {section.columns.map((c, n) => (
-                          <th key={n} scope="col">
-                            {c.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                  </table>
-                  <p className={muted}>{intl.formatMessage(m.rdListRows)}</p>
-                </>
+                <PreviewList section={section} preview={preview.data?.sections[at]} />
               ) : (
                 <p className={muted}>{intl.formatMessage(m.rdListFacility)}</p>
               )}
@@ -993,6 +979,51 @@ function PreviewTable({ section, at, preview, level, selected, onCell }: { secti
         })}
       </tbody>
     </table>
+  )
+}
+
+/** A line list's rows over the test patients, one per enrollment or visit (#867). */
+function PreviewList({ section, preview }: { section: LineListSection; preview: StudioReportSection | undefined }) {
+  const intl = useIntl()
+  const list = preview?.list
+  return (
+    <>
+      {list?.program === null || list?.program === undefined ? null : (
+        <p className={muted}>
+          {intl.formatMessage(m.rdListProgram, { program: list.program.title, episodeType: list.program.episodeType, package: list.program.package, published: String(list.program.published) })}
+        </p>
+      )}
+      <table className={table}>
+        <caption className={css({ srOnly: true })}>{section.title}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{intl.formatMessage(m.rdListPatient)}</th>
+            {section.columns.map((c, n) => (
+              <th key={n} scope="col">
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {(list?.rows ?? []).map((r) => (
+            <tr key={r.record}>
+              <th scope="row">{r.patient}</th>
+              {section.columns.map((c, n) => (
+                <td key={n}>{listCellText(r.cells[n] ?? [], c.pick === 'all')}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {list === null || list === undefined ? null : list.error !== null && list.error !== undefined ? (
+        <p className={alert}>{intl.formatMessage(m.rdListFailed, { reason: list.error })}</p>
+      ) : list.rows.length === 0 ? (
+        <p className={muted}>{intl.formatMessage(m.rdListEmpty)}</p>
+      ) : (
+        <p className={muted}>{intl.formatMessage(m.rdListCount, { rows: list.rows.length, rowPer: section.rowPer })}</p>
+      )}
+    </>
   )
 }
 

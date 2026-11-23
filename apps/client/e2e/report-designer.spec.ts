@@ -101,3 +101,27 @@ test('a line list concept column is chosen by a terminology search', async ({ pa
   await expect(outline.getByLabel('Concept code of column 7')).toHaveValue('11884-4')
   await noViolations(page)
 })
+
+// #867, part 2: a line list's rows in the preview, over the ANC test patients at facility level.
+// The ANC package's PlanDefinition is the program, so each test patient's ANC EpisodeOfCare is an
+// enrollment in it; the 1st visits list keeps the visits ANC 1st visits counted.
+test('the preview lists a line list’s rows over the test patients', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await press(page, 'Open reports', 'link')
+  await page.getByRole('grid', { name: 'Reports' }).getByText('ANC facility monitoring').click()
+  await expect(page.getByRole('heading', { name: 'ANC facility monitoring', level: 1 })).toBeVisible()
+  const preview = page.getByRole('region', { name: 'Preview' })
+  await preview.getByLabel('Period').fill('2026-03')
+
+  const clients = preview.getByRole('table', { name: 'ANC clients this month' })
+  const nakato = clients.getByRole('row', { name: /^Annet Nakato/ })
+  await expect(nakato.getByRole('cell')).toHaveText(['Annet Nakato', '23', '—', '2026-03-04', '2026-03-28', '14 weeks'])
+  await expect(preview.getByText('7 rows, one per enrollment, over the test patients.', { exact: false })).toBeVisible()
+  await expect(preview.getByText(/Enrollments in Antenatal care \(Antenatal care\), from ug\.moh\.anc@1\.0\.0 \(an open draft\)/)).toHaveCount(2)
+
+  const first = preview.getByRole('table', { name: '1st visits counted' })
+  await expect(first.getByRole('row', { name: /^Annet Nakato/ })).toHaveCount(1)
+  await expect(first.getByRole('row', { name: /Auma/ })).toHaveCount(0)
+  await noViolations(page)
+})

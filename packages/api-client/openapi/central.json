@@ -1458,7 +1458,7 @@
           "studio"
         ],
         "summary": "Documents and serves the Report designer's preview.",
-        "description": "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
+        "description": "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators or a line list's program. Each line list's rows (one per enrollment in its program, matched by the program's episode type, or per visit) are read over the same test patients at facility level, with each column's value.",
         "operationId": "previewStudioReport",
         "parameters": [
           {
@@ -6000,6 +6000,89 @@
           }
         }
       },
+      "StudioReportList": {
+        "type": "object",
+        "description": "A line list's preview: its rows over the test patients, at facility level.",
+        "required": [
+          "rows"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not be read, if it could not."
+          },
+          "program": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioReportProgram",
+                "description": "The program, if it was found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportListRow"
+            },
+            "description": "Its rows, in order."
+          }
+        }
+      },
+      "StudioReportListRow": {
+        "type": "object",
+        "description": "One row of a line list's preview.",
+        "required": [
+          "patient",
+          "record",
+          "cells"
+        ],
+        "properties": {
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/StudioReportListValue"
+              }
+            },
+            "description": "Each column's values, in the section's order: none when it has no value, several for a\nconcept's *all*."
+          },
+          "patient": {
+            "type": "string",
+            "description": "The test patient it is of, as they show."
+          },
+          "record": {
+            "type": "string",
+            "description": "The enrollment (`EpisodeOfCare/…`) or visit (`Encounter/…`) it is."
+          }
+        }
+      },
+      "StudioReportListValue": {
+        "type": "object",
+        "description": "One value of a line list cell.",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was recorded (`YYYY-MM-DD`), for a concept's value."
+          },
+          "value": {
+            "type": "string",
+            "description": "What a person reads."
+          }
+        }
+      },
       "StudioReportPreview": {
         "type": "object",
         "description": "The preview of a draft Report.",
@@ -6103,6 +6186,34 @@
           }
         }
       },
+      "StudioReportProgram": {
+        "type": "object",
+        "description": "The program a line list names, as found.",
+        "required": [
+          "title",
+          "episodeType",
+          "package",
+          "published"
+        ],
+        "properties": {
+          "episodeType": {
+            "type": "string",
+            "description": "What a person reads for its enrollments' type."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package version it was taken from (`name@version`)."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether that version is published (or is the draft itself); otherwise it is another\npackage's open draft."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, else its name."
+          }
+        }
+      },
       "StudioReportRow": {
         "type": "object",
         "description": "One indicator row's preview.",
@@ -6166,7 +6277,7 @@
       },
       "StudioReportSection": {
         "type": "object",
-        "description": "One section's preview; a line list's is empty.",
+        "description": "One section's preview: a table's Disaggregations and rows, or a line list's rows.",
         "required": [
           "disaggregations",
           "rows"
@@ -6178,6 +6289,17 @@
               "$ref": "#/components/schemas/StudioReportBands"
             },
             "description": "The section's Disaggregations, in order, with their bands."
+          },
+          "list": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioReportList",
+                "description": "A line list's rows."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rows": {
             "type": "array",

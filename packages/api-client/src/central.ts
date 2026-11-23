@@ -1203,6 +1203,49 @@ export const StudioReportIndicator = z.object({
 })
 export type StudioReportIndicator = z.infer<typeof StudioReportIndicator>
 
+/** One value of a line list cell. */
+export const StudioReportListValue = z.object({
+  /** When it was recorded (`YYYY-MM-DD`), for a concept's value. */
+  "date": z.string().nullable().optional(),
+  /** What a person reads. */
+  "value": z.string(),
+})
+export type StudioReportListValue = z.infer<typeof StudioReportListValue>
+
+/** One row of a line list's preview. */
+export const StudioReportListRow = z.object({
+  /** Each column's values, in the section's order: none when it has no value, several for a concept's *all*. */
+  "cells": z.array(z.array(StudioReportListValue)),
+  /** The test patient it is of, as they show. */
+  "patient": z.string(),
+  /** The enrollment (`EpisodeOfCare/…`) or visit (`Encounter/…`) it is. */
+  "record": z.string(),
+})
+export type StudioReportListRow = z.infer<typeof StudioReportListRow>
+
+/** The program a line list names, as found. */
+export const StudioReportProgram = z.object({
+  /** What a person reads for its enrollments' type. */
+  "episodeType": z.string(),
+  /** The package version it was taken from (`name@version`). */
+  "package": z.string(),
+  /** Whether that version is published (or is the draft itself); otherwise it is another package's open draft. */
+  "published": z.boolean(),
+  /** Its title, else its name. */
+  "title": z.string(),
+})
+export type StudioReportProgram = z.infer<typeof StudioReportProgram>
+
+/** A line list's preview: its rows over the test patients, at facility level. */
+export const StudioReportList = z.object({
+  /** Why it could not be read, if it could not. */
+  "error": z.string().nullable().optional(),
+  "program": StudioReportProgram.nullable().optional(),
+  /** Its rows, in order. */
+  "rows": z.array(StudioReportListRow),
+})
+export type StudioReportList = z.infer<typeof StudioReportList>
+
 /** One of Validation's problems with the Report. */
 export const StudioReportProblem = z.object({
   /** What is wrong. */
@@ -1226,10 +1269,11 @@ export const StudioReportRow = z.object({
 })
 export type StudioReportRow = z.infer<typeof StudioReportRow>
 
-/** One section's preview; a line list's is empty. */
+/** One section's preview: a table's Disaggregations and rows, or a line list's rows. */
 export const StudioReportSection = z.object({
   /** The section's Disaggregations, in order, with their bands. */
   "disaggregations": z.array(StudioReportBands),
+  "list": StudioReportList.nullable().optional(),
   /** Its rows, in order. */
   "rows": z.array(StudioReportRow),
 })

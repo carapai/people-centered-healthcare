@@ -41,6 +41,7 @@ health-persistence = { workspace = true }
 health-packages = { workspace = true }
 health-terminology = { workspace = true }
 health-pki = { workspace = true }
+health-programs-app = { workspace = true }
 health-provisioning = { workspace = true }
 health-publication = { workspace = true }
 health-registries-app = { workspace = true }

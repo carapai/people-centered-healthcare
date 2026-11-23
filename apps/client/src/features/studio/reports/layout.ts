@@ -211,3 +211,18 @@ export function sentCells(sections: readonly { section: TableSection; index: num
       ),
     )
 }
+
+/** One value of a line list cell, as central reads it (#867). */
+export interface ListValue {
+  value: string
+  date?: string | null | undefined
+}
+
+/**
+ * What a line list cell shows: its values in order, each with its date when the column shows
+ * all of a concept's values; an empty cell is a dash.
+ */
+export function listCellText(values: readonly ListValue[], withDates: boolean): string {
+  if (values.length === 0) return '—'
+  return values.map((v) => (withDates && v.date !== null && v.date !== undefined ? `${v.value} (${v.date})` : v.value)).join('; ')
+}
