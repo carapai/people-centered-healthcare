@@ -793,6 +793,7 @@ type ExplorerValues = {
   dbNoStandard: {}
   dbSaved: {}
   dbNoSaved: {}
+  dbSavedAtCentral: {}
   dbMine: {}
   dbSharedWithYou: {}
   dbUnplaced: {}
@@ -928,6 +929,7 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   dbNoStandard: { id: 'app.dashboards.noStandard', defaultMessage: 'None yet: standard Dashboards come with the Reporting package.', description: 'Dashboards: no standard Dashboards' },
   dbSaved: { id: 'app.dashboards.saved', defaultMessage: 'Saved', description: 'Dashboards: saved Dashboards' },
   dbNoSaved: { id: 'app.dashboards.noSaved', defaultMessage: 'None shared with you yet.', description: 'Dashboards: no saved Dashboards' },
+  dbSavedAtCentral: { id: 'app.dashboards.savedAtCentral', defaultMessage: 'Saved Dashboards are kept at central. The standard ones work here offline, over this facility’s own figures.', description: 'Dashboards: on a Facility Edge Node, saved Dashboards are not here' },
   dbMine: { id: 'app.dashboards.mine', defaultMessage: 'Yours', description: 'Dashboards: a Dashboard the user made' },
   dbSharedWithYou: { id: 'app.dashboards.sharedWithYou', defaultMessage: 'Shared with you', description: 'Dashboards: a Dashboard shared with the user' },
   dbUnplaced: { id: 'app.dashboards.unplaced', defaultMessage: 'Your Visualizations on no Dashboard', description: 'Dashboards: saved Visualizations on no Dashboard' },

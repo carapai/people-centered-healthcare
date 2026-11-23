@@ -21,8 +21,15 @@ use crate::{Error, Publications, failed};
 
 /// The package's standard Dashboards, each with its file, as written or why it cannot be read.
 pub fn dashboards_in(packed: &Packed) -> Vec<(String, Result<StandardDashboard, String>)> {
-    packed
-        .files
+    dashboards_in_files(&packed.files)
+}
+
+/// The standard Dashboards in a package's `files`, as [`dashboards_in`] reads them: what a
+/// Facility Edge Node lists from its active packages (#879).
+pub fn dashboards_in_files(
+    files: &health_packages::Files,
+) -> Vec<(String, Result<StandardDashboard, String>)> {
+    files
         .iter()
         .filter(|(path, _)| path.starts_with("configuration/") && path.ends_with(".json"))
         .filter_map(|(path, bytes)| {

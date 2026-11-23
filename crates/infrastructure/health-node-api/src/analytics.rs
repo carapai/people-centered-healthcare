@@ -13,6 +13,12 @@
 //!   from the facility registry's NHFR coordinates. Boundaries are drawn at central, where
 //!   districts and regions are explored.
 //!
+//! - `GET /api/analytics/dashboards` (#879): the Dashboards tab here, offline: the active
+//!   Reporting packages' standard Dashboards ([`dashboards_here`]), as central lists them, their
+//!   periods the last few up to the facility's today. Their places follow the viewer, which here
+//!   is the facility, and each item is answered by `/explore` over the node's own summaries.
+//!   Saved Dashboards are central's (user content, #602), so none are listed and none are made.
+//!
 //! Each needs [`VIEW_PERMISSION`].
 
 use axum::extract::State;
@@ -22,6 +28,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
 use health_analytics::{Indicator, STANDARD_PERIODS};
+use health_analytics_app::dashboards::standard_json;
 use health_analytics_app::explore::{
     ExplorePlace, OwnSummaries, cells_json, explore, indicator_json, periods_json, read_question,
 };
@@ -138,6 +145,33 @@ pub async fn explore_here(
     }))
 }
 
+/// What the Dashboards tab lists here (#879), from the active packages (`packages`, each by its
+/// id, `name@version`, with its files): every Reporting package's standard Dashboards, by
+/// package and then file, as of `today`. Nothing here is the viewer's own, and nothing may be
+/// authored: saved Dashboards are kept at central.
+pub fn dashboards_here<'a>(
+    packages: impl IntoIterator<Item = (&'a str, &'a health_packages::Files)>,
+    today: jiff::civil::Date,
+) -> Value {
+    let mut dashboards = Vec::new();
+    for (id, files) in packages {
+        let reporting = files
+            .get("package.json")
+            .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
+            .is_some_and(|package| package["kind"] == "reporting");
+        let Some((package, version)) = id.rsplit_once('@').filter(|_| reporting) else {
+            continue;
+        };
+        for (_, read) in health_publication::dashboards_in_files(files) {
+            // Validation refused one that does not read before it was published.
+            if let Ok(dashboard) = read {
+                dashboards.push(standard_json(package, version, &dashboard, today));
+            }
+        }
+    }
+    json!({ "canAuthor": false, "dashboards": dashboards, "visualizations": [] })
+}
+
 #[derive(Clone)]
 struct Explorer {
     store: SurrealStore,
@@ -152,6 +186,7 @@ pub(crate) fn router(store: SurrealStore, blobs: FsBlobStore, facility: String) 
         .route("/explorer", get(explorer_route))
         .route("/explore", post(explore_route))
         .route("/map", get(map_route))
+        .route("/dashboards", get(dashboards_route))
         .with_state(Explorer {
             store,
             blobs,
@@ -163,11 +198,8 @@ fn refused((status, detail): Refusal) -> Response {
     (status, Json(json!({ "detail": detail }))).into_response()
 }
 
-/// The subject allowed to explore, and the active indicators, or the refusal.
-async fn ready(
-    explorer: &Explorer,
-    subject: Option<Extension<Subject>>,
-) -> Result<Vec<Indicator>, Refusal> {
+/// The refusal, unless the subject may explore.
+fn allowed(subject: Option<Extension<Subject>>) -> Result<(), Refusal> {
     let Some(Extension(subject)) = subject else {
         return Err((StatusCode::UNAUTHORIZED, "sign in first".into()));
     };
@@ -177,6 +209,15 @@ async fn ready(
             "exploring indicators needs reporting.view".into(),
         ));
     }
+    Ok(())
+}
+
+/// The subject allowed to explore, and the active indicators, or the refusal.
+async fn ready(
+    explorer: &Explorer,
+    subject: Option<Extension<Subject>>,
+) -> Result<Vec<Indicator>, Refusal> {
+    allowed(subject)?;
     let active = crate::indicators::active(&explorer.store, &explorer.blobs, &explorer.facility)
         .await
         .map_err(unavailable)?;
@@ -196,17 +237,30 @@ async fn explorer_route(
     }
 }
 
+async fn dashboards_route(
+    State(explorer): State<Explorer>,
+    subject: Option<Extension<Subject>>,
+) -> Response {
+    if let Err(refusal) = allowed(subject) {
+        return refused(refusal);
+    }
+    match crate::indicators::active_files(&explorer.store, &explorer.blobs).await {
+        Ok(packages) => Json(dashboards_here(
+            packages.iter().map(|(id, files)| (id.as_str(), files)),
+            jiff::Zoned::now().date(),
+        ))
+        .into_response(),
+        Err(error) => refused(unavailable(error)),
+    }
+}
+
 async fn map_route(
     State(explorer): State<Explorer>,
     subject: Option<Extension<Subject>>,
 ) -> Response {
-    match subject {
-        None => refused((StatusCode::UNAUTHORIZED, "sign in first".into())),
-        Some(Extension(subject)) if !subject.permissions.has(VIEW_PERMISSION) => refused((
-            StatusCode::FORBIDDEN,
-            "exploring indicators needs reporting.view".into(),
-        )),
-        Some(_) => Json(map_here(&explorer.store, &explorer.facility).await).into_response(),
+    match allowed(subject) {
+        Err(refusal) => refused(refusal),
+        Ok(()) => Json(map_here(&explorer.store, &explorer.facility).await).into_response(),
     }
 }
 

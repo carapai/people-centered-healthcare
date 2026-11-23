@@ -474,3 +474,130 @@ async fn a_facility_user_explores_their_facility_s_months_offline() {
     let map = health_node_api::analytics::map_here(&store, FACILITY).await;
     assert_eq!(map, json!({ "areas": [], "facilities": [] }));
 }
+
+/// Every file of reference package `name`, by its path in the package.
+fn package_tree(name: &str) -> health_packages::Files {
+    fn walk(root: &Path, dir: &Path, files: &mut health_packages::Files) {
+        for entry in std::fs::read_dir(dir).expect("dir") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                if path.file_name().is_some_and(|n| n != "tests") {
+                    walk(root, &path, files);
+                }
+            } else if path.extension().is_some_and(|e| e == "json") {
+                let relative = path.strip_prefix(root).expect("relative");
+                files.insert(
+                    relative.to_string_lossy().replace('\\', "/"),
+                    std::fs::read(&path).expect("read"),
+                );
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages")
+        .join(name);
+    let mut files = health_packages::Files::new();
+    walk(&root, &root, &mut files);
+    files
+}
+
+/// #879: a facility user on the edge, offline, opens a standard Dashboard of an active
+/// Reporting package and sees their facility's figures: the Dashboards tab lists the HMIS
+/// package's ANC overview (and nothing from the ANC program package), its periods the last six
+/// months up to today, and its first item, at the facility, is answered from this node's own
+/// summaries.
+#[tokio::test]
+async fn a_facility_user_opens_a_standard_dashboard_offline() {
+    use health_node_api::analytics::{dashboards_here, explore_here};
+    let store = store().await;
+    let dir = std::env::temp_dir().join(format!("edge-dashboards-{}", uuid::Uuid::new_v4()));
+    let blobs = health_files::FsBlobStore::open(&dir).expect("blob store");
+    let mut active = health_configuration::activation::ActiveSet::new();
+    for name in ["anc", "core", "hmis"] {
+        let packed = health_packages::pack(&package_tree(name)).expect("pack");
+        blobs.put(packed.tgz.as_slice()).expect("blob");
+        let mut tx = store.begin().await.expect("begin");
+        tx.put_staged_package(&packed.id, &packed.digest.to_string(), "{}")
+            .await
+            .expect("staged");
+        tx.commit().await.expect("commit");
+        let (package, version) = packed.id.rsplit_once('@').expect("id");
+        active.insert(package.into(), version.parse().expect("version"));
+    }
+    let mut tx = store.begin().await.expect("begin");
+    tx.set_active_packages(&serde_json::to_string(&active).expect("json"))
+        .await
+        .expect("active");
+    tx.commit().await.expect("commit");
+
+    let indicators = indicators();
+    let now = at("2026-04-03");
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("first run");
+    for (name, day) in [
+        ("auma", "2026-02-10"),
+        ("achan", "2026-03-04"),
+        ("atim", "2026-03-20"),
+    ] {
+        write(&store, &woman(name)).await;
+        write(&store, &first_visit(&format!("{name}-1"), name, day)).await;
+    }
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("run");
+
+    let packages = health_node_api::indicators::active_files(&store, &blobs)
+        .await
+        .expect("active files");
+    let listed = dashboards_here(
+        packages.iter().map(|(id, files)| (id.as_str(), files)),
+        now.date(),
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(listed["canAuthor"], false);
+    assert_eq!(listed["visualizations"], json!([]));
+    let dashboards = listed["dashboards"].as_array().expect("dashboards");
+    assert_eq!(dashboards.len(), 1, "{listed}");
+    let overview = &dashboards[0];
+    assert_eq!(overview["id"], "ug.moh.hmis:anc-overview");
+    assert_eq!(overview["kind"], "standard");
+    assert_eq!(overview["mine"], false);
+    assert_eq!(overview["package"], "ug.moh.hmis@1.0.0");
+    let item = &overview["items"][0]["visualization"];
+    assert_eq!(item["follow"], "eachAreaUnder");
+    assert_eq!(item["question"]["from"], "2025-11");
+    assert_eq!(item["question"]["to"], "2026-04");
+    assert_eq!(
+        item["question"]["places"],
+        json!([]),
+        "they follow the viewer"
+    );
+
+    // The client draws it at the facility, the place an edge's viewer follows.
+    let mut question = item["question"].clone();
+    question["places"] = json!([FACILITY]);
+    let at: jiff::Timestamp = "2026-04-03T07:00:00Z".parse().expect("now");
+    let answer = explore_here(&store, indicators.indicators(), FACILITY, &question, at)
+        .await
+        .expect("explored");
+    assert_eq!(answer["where"], "facility");
+    let values: Vec<&Value> = answer["cells"]
+        .as_array()
+        .expect("cells")
+        .iter()
+        .map(|c| &c["value"])
+        .collect();
+    assert_eq!(
+        values,
+        [
+            &json!("0"),
+            &json!("0"),
+            &json!("0"),
+            &json!("1"),
+            &json!("2"),
+            &json!("0")
+        ],
+        "{answer}"
+    );
+}

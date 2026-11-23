@@ -190,11 +190,7 @@ async fn read(
     facility: &str,
     json: Option<&str>,
 ) -> Result<Indicators, String> {
-    let active: ActiveSet = match json {
-        Some(json) => serde_json::from_str(json).map_err(failed)?,
-        None => ActiveSet::new(),
-    };
-    let packages = health_activation::definitions::active_files(store, blobs, &active).await?;
+    let packages = files_of(store, blobs, json).await?;
     let (indicators, problems) = load(
         packages.iter().map(|(id, files)| (id.as_str(), files)),
         facility,
@@ -203,6 +199,33 @@ async fn read(
         tracing::warn!(%problem, "an active Measure is not computed");
     }
     Ok(indicators)
+}
+
+/// The files of every package in the active set written as `json` (none: nothing is active),
+/// each by its id, `name@version`.
+async fn files_of(
+    store: &SurrealStore,
+    blobs: &FsBlobStore,
+    json: Option<&str>,
+) -> Result<Vec<(String, health_packages::Files)>, String> {
+    let active: ActiveSet = match json {
+        Some(json) => serde_json::from_str(json).map_err(failed)?,
+        None => ActiveSet::new(),
+    };
+    health_activation::definitions::active_files(store, blobs, &active).await
+}
+
+/// The files of every active package now (their tarballs in `blobs`), each by its id,
+/// `name@version`: what the Dashboards tab lists its standard Dashboards from (#879).
+pub async fn active_files(
+    store: &SurrealStore,
+    blobs: &FsBlobStore,
+) -> Result<Vec<(String, health_packages::Files)>, String> {
+    let json = {
+        let mut tx = store.begin().await.map_err(failed)?;
+        tx.active_packages().await.map_err(failed)?
+    };
+    files_of(store, blobs, json.as_deref()).await
 }
 
 /// The active packages' indicators now, for `facility` (their tarballs in `blobs`): what the
