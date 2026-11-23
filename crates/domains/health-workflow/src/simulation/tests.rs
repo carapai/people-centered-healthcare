@@ -248,6 +248,7 @@ fn a_run_saved_as_a_scenario_passes_unchanged() {
             ("%never-asked".to_owned(), true),
         ]),
         gates: BTreeMap::new(),
+        tables: BTreeMap::new(),
         moves: moves(r#"[{ "wait": "PT1H" }, { "event": "triaged" }, { "event": "seen" }]"#),
     };
     let played = play(&definition(), &run).expect("plays");
@@ -282,6 +283,7 @@ fn a_gate_answered_in_the_sandbox_is_kept_in_the_scenario() {
     let run = Play {
         guards: BTreeMap::new(),
         gates: BTreeMap::from([(gate.clone(), "block".to_owned())]),
+        tables: BTreeMap::new(),
         moves: moves(r#"[{ "event": "sent" }]"#),
     };
     let played = play(&gated(), &run).expect("plays");
@@ -298,4 +300,90 @@ fn guards_and_gates_list_each_once() {
         gates(&gated().statechart),
         ["https://health.go.ug/fhir/FinancialGate/before-lab"]
     );
+}
+
+/// Triage → emergency when the `triage-priority` table gives `urgent`, else → cashier; the
+/// cashier also skips to done when the table gives `routine`.
+fn prioritised() -> WorkflowDefinition {
+    serde_json::from_str(
+        r#"{
+          "url": "https://health.go.ug/fhir/Library/opd-priority",
+          "version": "1.0.0",
+          "statechart": {
+            "states": [
+              {
+                "id": "triage", "kind": "atomic",
+                "transitions": [
+                  { "events": ["triaged"], "guard": { "table": "triage-priority", "outcome": "urgent" }, "targets": ["emergency"] },
+                  { "events": ["triaged"], "targets": ["cashier"] }
+                ]
+              },
+              {
+                "id": "cashier", "kind": "atomic",
+                "transitions": [
+                  { "events": ["paid"], "guard": { "table": "triage-priority", "outcome": "routine" }, "targets": ["done"] },
+                  { "events": ["paid"], "targets": ["emergency"] }
+                ]
+              },
+              { "id": "emergency", "kind": "final" },
+              { "id": "done", "kind": "final" }
+            ]
+          },
+          "decisionTables": [
+            { "id": "triage-priority", "default": "routine",
+              "rows": [{ "name": "Danger signs", "when": ["%encounter.priority = 'urgent'"], "then": "urgent" }] }
+          ]
+        }"#,
+    )
+    .expect("a definition")
+}
+
+#[test]
+fn a_table_guard_is_stubbed_by_the_table_s_outcome() {
+    let text = |t: &str| Value::Text(t.into());
+    let unanswered = Play {
+        moves: moves(r#"[{ "event": "triaged" }, { "event": "paid" }]"#),
+        ..Play::default()
+    };
+    let played = play(&prioritised(), &unanswered).expect("plays");
+    assert_eq!(played.unanswered, Vec::<String>::new());
+    assert_eq!(played.unanswered_tables, ["triage-priority"]);
+    assert_eq!(played.snapshots.len(), 1, "only the start is shown");
+
+    // One stub answers both guards naming the table, as the real table would.
+    let routine = Play {
+        tables: BTreeMap::from([("triage-priority".to_owned(), text("routine"))]),
+        ..unanswered.clone()
+    };
+    let played = play(&prioritised(), &routine).expect("plays");
+    let configurations: Vec<_> = played
+        .snapshots
+        .iter()
+        .map(|s| s.configuration.clone())
+        .collect();
+    assert_eq!(configurations, [["triage"], ["cashier"], ["done"]]);
+    assert_eq!(
+        played.tables,
+        BTreeMap::from([("triage-priority".to_owned(), text("routine"))])
+    );
+    let scenario = save(&prioritised(), &routine, &played, "Routine patient");
+    assert_eq!(scenario.tables, played.tables);
+    assert_eq!(simulate(&prioritised(), &scenario), Vec::<String>::new());
+
+    let urgent = Play {
+        tables: BTreeMap::from([("triage-priority".to_owned(), text("urgent"))]),
+        ..unanswered
+    };
+    let played = play(&prioritised(), &urgent).expect("plays");
+    assert_eq!(played.snapshots[1].configuration, ["emergency"]);
+
+    // A scenario that does not stub the table fails rather than guessing.
+    let mut unstubbed = scenario;
+    unstubbed.tables.clear();
+    assert!(
+        simulate(&prioritised(), &unstubbed)
+            .contains(&"Routine patient: decision tables not stubbed: triage-priority".to_owned())
+    );
+    assert_eq!(tables(&prioritised().statechart), ["triage-priority"]);
+    assert_eq!(guards(&prioritised().statechart), Vec::<String>::new());
 }

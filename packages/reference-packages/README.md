@@ -8,7 +8,7 @@ Published Definition packages the platform ships as references (configuration.md
 | `core/` (`ug.moh.core`) | MoH's national core: the Age Band Sets HMIS reports disaggregate by (*MoH ANC age bands*, *MoH outpatient age bands*), and the regions and districts places sit in, with their boundaries | #551, #869, #604 |
 | `hmis/` (`ug.moh.hmis`) | A Reporting package: the HMIS 105 antenatal care Report (`configuration/reports/hmis-105-anc.json`, monthly, facility to national: ANC attendance by MoH's ANC age bands with row totals and % change, sent to DHIS2, and the timing of the 1st visit) and the facility's ANC monitoring (facility only: the median gestational age at the 1st visit, a line list of ANC clients with their latest gestational age, and one of the 1st visits counted); and the standard *ANC overview* Dashboard (`configuration/dashboards/anc-overview.json`: ANC 1st visits by area and by age band over the last 6 months, the share before 12 weeks over 12, and this quarter's total, each over the viewer's own area) | #556, #603 |
 | `lab/` (`ug.moh.lab`) | The lab Workflow Definition (`Library/lab-test`) and its workflow scenarios | #109 |
-| `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, and triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures) | #103, #105 |
+| `opd/` (`ug.moh.opd`) | The outpatient visit: the OPD Workflow Definition (`Library/opd-visit`) and its scenarios, triage (the Questionnaire, the triage categories, and the Extraction Mapping that records vital signs, with its fixtures), and the triage route, whose guards name a decision table (`Library/opd-triage-route`) | #103, #105, #846 |
 
 **Sources:** a Workflow Definition, and an Age Band Set's bands, are inline, base64 content in their Library. The readable source is in `sources/`, and the test checks the Library holds exactly that source. Edit the source, then regenerate the Library's `content[0].data` from it.
 
@@ -122,3 +122,18 @@ Scenarios in `tests/`:
 - `opd-visit-emergency-triage` and `opd-visit-emergency-arrival`: the gate is set to block, and the visit never reaches it.
 - `opd-visit-unpaid`: blocked at the cashier until paid.
 - `opd-visit-urgent`: the gate defers, and there are no lab or pharmacy orders.
+
+### `Library/opd-triage-route`: where triage sends a patient (#846; ADR 0093)
+
+Each exit from `triage` (nurse, `opd-triage`, form `opd-triage`) on `opd.triaged` is guarded by the outcome of the decision table `triage-priority`, in document order:
+
+| Rule | When | Outcome |
+|---|---|---|
+| Danger signs | `%triage.danger = true` | `emergency` |
+| Triaged emergency | `%triage.category = 'emergency'` | `emergency` |
+| Triaged urgent | `%triage.category = 'urgent'` | `urgent` |
+| (default) | | `routine` |
+
+`emergency` goes to `emergency` (clinician, `opd-emergency`, stat), `urgent` straight to `consultation`, and anything else to `payment` (the cashier) first. The inputs read the data requirement `triage` (an `Observation`'s `category` and `danger`). A node does not run it until FHIRPath guards are wired; the Studio shows it and plays it in the sandbox.
+
+Tests in `tests/`: `opd-triage-route-emergency`, `-urgent` and `-routine` stub the table's outcome (`tables`), and `triage-priority-danger-signs` (a `decision-table-test`) checks that danger signs outrank an urgent category.

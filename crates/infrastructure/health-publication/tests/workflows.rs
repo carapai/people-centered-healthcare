@@ -501,3 +501,57 @@ async fn a_saved_indicator_test_fails_submission_when_a_later_edit_changes_its_c
         "{failures:?}"
     );
 }
+
+#[tokio::test]
+async fn a_decision_table_guard_must_name_a_table_and_an_outcome_it_gives() {
+    let (publications, _dir) = publications_with(Arc::new(WorkflowSandbox)).await;
+    let guarded = |guard: Value| {
+        let mut definition = routed("%triage.danger = true");
+        definition["statechart"]["states"][0]["transitions"] = json!([
+            { "events": ["triaged"], "guard": guard, "targets": ["done"] },
+            { "events": ["triaged"], "targets": ["consultation"] }
+        ]);
+        definition
+    };
+    // A table of the definition and one of its outcomes, with the scenario stubbing the table.
+    let mut files = package(
+        "1.0.0",
+        &guarded(json!({ "table": "route", "outcome": "bypass" })),
+        "application/vnd.health.workflow+json",
+    );
+    let scenario = json!({
+        "type": "workflow-scenario", "name": "Sick child bypasses",
+        "definition": format!("{URL}|1.0.0"), "tables": { "route": "bypass" },
+        "steps": [{ "event": "triaged", "expect": { "configuration": ["done"] } }]
+    });
+    files.insert(
+        "tests/bypass.json".into(),
+        serde_json::to_vec(&scenario).expect("json"),
+    );
+    let (stage, failures) = simulated(&publications, &files, "ug.moh.opd@1.0.0").await;
+    assert_eq!((stage, failures), (Stage::Review, Vec::new()));
+
+    // An unknown table, or an outcome the table never gives, is refused.
+    for (version, guard, problem) in [
+        (
+            "1.0.1",
+            json!({ "table": "danger", "outcome": "bypass" }),
+            "Library-opd-visit.json: a guard of state triage names decision table danger, which the definition does not have",
+        ),
+        (
+            "1.0.2",
+            json!({ "table": "route", "outcome": "admit" }),
+            "Library-opd-visit.json: a guard of state triage requires outcome \"admit\" of decision table route, which it never gives",
+        ),
+    ] {
+        let definition = guarded(guard);
+        let (stage, problems) = submit(
+            &publications,
+            &package(version, &definition, "application/vnd.health.workflow+json"),
+            &format!("ug.moh.opd@{version}"),
+        )
+        .await;
+        assert_eq!(stage, Stage::Draft);
+        assert_eq!(problems, [problem]);
+    }
+}

@@ -18,11 +18,36 @@ export type Kind = (typeof KINDS)[number]
 
 export type Action = { kind: 'raise'; event: string } | { kind: 'assign'; field: string; value: Value } | { kind: 'execute'; action: string; params?: Record<string, Value> }
 
+/** A decision-table guard (ADR 0093): the table's id in the definition and the outcome the
+ * transition requires. */
+export interface TableGuard {
+  table: string
+  outcome: Value
+}
+
+/** A transition's guard: a FHIRPath expression or a decision table's outcome (ADR 0093). */
+export type Guard = string | TableGuard
+
+export const isTableGuard = (guard: Guard | null | undefined): guard is TableGuard => typeof guard === 'object' && guard !== null
+
+/** A guard in words: the expression, or `table = outcome`; empty when there is none. */
+export function guardText(guard: Guard | null | undefined): string {
+  if (guard === undefined || guard === null) return ''
+  return isTableGuard(guard) ? `${guard.table} = ${String(guard.outcome)}` : guard
+}
+
+/** A guard as the outline, canvas and competitors show it: `[expression]` or
+ * `[table = outcome]`; empty when there is none. */
+export function guardLabel(guard: Guard | null | undefined): string {
+  const text = guardText(guard)
+  return text === '' ? '' : `[${text}]`
+}
+
 export interface Transition {
   /** Event descriptors; none: eventless, taken as soon as its guard holds. */
   events?: string[]
-  /** A FHIRPath guard. */
-  guard?: string | null
+  /** Absent (always), a FHIRPath expression, or a decision table's outcome. */
+  guard?: Guard | null
   targets?: string[]
   internal?: boolean
   actions?: Action[]
@@ -85,6 +110,13 @@ export interface DecisionTable {
   /** Rules: an optional name, FHIRPath conditions (the editor writes one) and the outcome. */
   rows: { name?: string | null; when: string[]; then: Value }[]
   default?: Value | null
+}
+
+/** The outcomes `table` can give: its rows' outcomes, then its default, each once. */
+export function tableOutcomes(table: DecisionTable): Value[] {
+  const out: Value[] = []
+  for (const value of [...table.rows.map((r) => r.then), ...(table.default === undefined || table.default === null ? [] : [table.default])]) if (!out.includes(value)) out.push(value)
+  return out
 }
 
 export interface WorkflowDefinition {
@@ -546,8 +578,13 @@ export type ActionProblem =
   | { code: 'principal-lacks'; at: Selection; permission: string; action: string }
   | { code: 'unneeded-permission'; permission: string }
 
+/** A decision-table guard naming a table the definition does not have, or an outcome its table
+ * never gives (ADR 0093). */
+export type GuardProblem = { code: 'unknown-guard-table'; at: Selection; table: string } | { code: 'impossible-guard-outcome'; at: Selection; table: string; outcome: Value }
+
 export type Problem =
   | ActionProblem
+  | GuardProblem
   | { code: 'duplicate-id' | 'bad-children' | 'bad-initial' | 'unreachable' | 'dead-end' | 'bad-task' | 'bad-gate' | 'no-id'; state: string }
   | { code: 'unknown-target'; source: string; index: number; target: string }
   | { code: 'bad-assignment'; at: Selection; field: string }
@@ -622,11 +659,27 @@ export function problems(definition: WorkflowDefinition, catalogue?: ActionSpec[
     if (tables.has(table.id) || table.rows.length === 0 || table.rows.some((r) => r.when.length === 0 || r.when.some((c) => c.trim() === ''))) out.push({ code: 'bad-table', table: table.id })
     tables.add(table.id)
   }
+  out.push(...guardProblems(definition, all))
 
   if (catalogue !== undefined) {
     out.push(...principalProblems(definition, catalogue))
     for (const permission of definition.principal ?? []) if (!needed.has(permission)) out.push({ code: 'unneeded-permission', permission })
   }
+  return out
+}
+
+/** Decision-table guards checked as `WorkflowDefinition::check_table_guards` does. */
+function guardProblems(definition: WorkflowDefinition, all: Row[]): GuardProblem[] {
+  const out: GuardProblem[] = []
+  for (const { state } of all)
+    (state.transitions ?? []).forEach((t, index) => {
+      const guard = t.guard
+      if (!isTableGuard(guard)) return
+      const at: Selection = { kind: 'transition', source: state.id, index }
+      const table = (definition.decisionTables ?? []).find((d) => d.id === guard.table)
+      if (table === undefined) out.push({ code: 'unknown-guard-table', at, table: guard.table })
+      else if (!tableOutcomes(table).includes(guard.outcome)) out.push({ code: 'impossible-guard-outcome', at, table: guard.table, outcome: guard.outcome })
+    })
   return out
 }
 

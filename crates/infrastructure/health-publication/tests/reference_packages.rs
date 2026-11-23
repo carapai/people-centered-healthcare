@@ -242,3 +242,11 @@ fn the_lab_definition_is_its_source() {
 fn the_opd_definition_is_its_source() {
     holds_its_source("opd/Library-opd-visit.json", "sources/opd-visit.json");
 }
+
+#[test]
+fn the_opd_triage_route_is_its_source() {
+    holds_its_source(
+        "opd/Library-opd-triage-route.json",
+        "sources/opd-triage-route.json",
+    );
+}

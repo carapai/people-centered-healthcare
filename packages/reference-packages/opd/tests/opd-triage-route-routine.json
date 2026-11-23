@@ -1,0 +1,32 @@
+{
+  "type": "workflow-scenario",
+  "name": "a routine patient pays first",
+  "definition": "https://health.go.ug/fhir/Library/opd-triage-route|1.0.0",
+  "tables": {
+    "triage-priority": "routine"
+  },
+  "steps": [
+    {
+      "event": "opd.triaged",
+      "expect": {
+        "configuration": [
+          "payment"
+        ],
+        "tasks": [
+          {
+            "state": "payment",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    {
+      "event": "opd.paid",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    }
+  ]
+}

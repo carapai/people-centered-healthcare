@@ -1109,7 +1109,7 @@ export type StudioSandboxStep = z.infer<typeof StudioSandboxStep>
 export const StudioSandbox = z.object({
   /** Every Financial Gate of the definition. */
   "gates": z.array(z.string()),
-  /** Every guard of the definition, for the author to answer. */
+  /** Every FHIRPath guard of the definition, for the author to answer. */
   "guards": z.array(z.string()),
   /** Why the next move could not be taken, if it could not for another reason. */
   "refused": z.string().nullable().optional(),
@@ -1117,8 +1117,12 @@ export const StudioSandbox = z.object({
   "scenario": z.string(),
   /** The start, then each move taken. */
   "steps": z.array(StudioSandboxStep),
+  /** Every decision table a guard of the definition names, for the author to give an outcome. */
+  "tables": z.array(z.string()),
   /** The guards the next move needs answered: it was not taken. */
   "unanswered": z.array(z.string()),
+  /** The decision tables the next move needs an outcome for: it was not taken. */
+  "unansweredTables": z.array(z.string()),
 })
 export type StudioSandbox = z.infer<typeof StudioSandbox>
 
@@ -1143,6 +1147,8 @@ export const StudioSandboxInput = z.object({
   "moves": z.array(StudioSandboxMove).optional(),
   /** The name the run takes as a scenario. */
   "name": z.string().nullable().optional(),
+  /** The author's outcome for each decision table a guard names, by table id. */
+  "tables": z.object({}).optional(),
 })
 export type StudioSandboxInput = z.infer<typeof StudioSandboxInput>
 

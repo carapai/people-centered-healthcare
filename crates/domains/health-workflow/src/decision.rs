@@ -11,6 +11,9 @@
 //! - **Coverage** ([`coverage`]). Over every combination of sample values per input
 //!   ([`combinations`]): the combinations no rule covers when there is no default, and the rules
 //!   that never fire because a rule above always matches first.
+//! - **Guards** ([`WithTables`]; ADR 0093). A transition's guard may name a table and the
+//!   outcome it requires. The engine decides the table through the guard port: its conditions
+//!   are FHIRPath, evaluated by the port, so central and the edge decide alike.
 //! - **Test cases** ([`TableTest`]). A `tests/` file of type [`TEST_TYPE`] keeps sample inputs
 //!   and the outcome they gave; submission's simulation decides again and fails the package when
 //!   the outcome changed.
@@ -20,7 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::definition::{DataRequirement, DecisionTable};
-use crate::model::Value;
+use crate::interpreter::{Event, Guards};
+use crate::model::{DataModel, Value};
 
 /// The `type` of a decision-table test case in a package's `tests/` folder.
 pub const TEST_TYPE: &str = "decision-table-test";
@@ -76,6 +80,36 @@ impl DecisionTable {
             outcome: self.default.clone(),
             row: None,
         }
+    }
+}
+
+/// A guard port that decides a definition's decision tables (ADR 0093): a table's outcome is
+/// its first row whose conditions all hold, each evaluated by `guards`, else its default, else
+/// none. FHIRPath guards go to `guards` unchanged.
+#[derive(Debug, Clone, Copy)]
+pub struct WithTables<'a, G: ?Sized> {
+    tables: &'a [DecisionTable],
+    guards: &'a G,
+}
+
+impl<'a, G: Guards + ?Sized> WithTables<'a, G> {
+    /// Decides `tables` with `guards`' FHIRPath.
+    pub fn new(tables: &'a [DecisionTable], guards: &'a G) -> Self {
+        Self { tables, guards }
+    }
+}
+
+impl<G: Guards + ?Sized> Guards for WithTables<'_, G> {
+    fn holds(&self, guard: &str, event: Option<&Event>, data: &DataModel) -> bool {
+        self.guards.holds(guard, event, data)
+    }
+
+    fn outcome(&self, table: &str, event: Option<&Event>, data: &DataModel) -> Option<Value> {
+        self.tables
+            .iter()
+            .find(|t| t.id == table)?
+            .decide(|_, condition| self.guards.holds(condition, event, data))
+            .outcome
     }
 }
 

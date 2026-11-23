@@ -2605,6 +2605,8 @@ type WorkflowValues = {
   wsPGate: { id: string }
   wsPAssignment: { field: string }
   wsPTable: { id: string }
+  wsPGuardTable: { table: string }
+  wsPGuardOutcome: { table: string; outcome: string }
   wsStates: {}
   wsAddState: {}
   wsAddInside: { id: string }
@@ -2660,6 +2662,11 @@ type WorkflowValues = {
   wsGuard: {}
   wsGuardName: { guard: string }
   wsExpression: {}
+  wsGuardNoTables: {}
+  wsGuardTable: {}
+  wsGuardOutcome: {}
+  wsGuardTableHint: {}
+  wsGuardOpenTable: { table: string }
   wsMayRead: {}
   wsMayReadNone: {}
   wsCompetitors: {}
@@ -2722,6 +2729,8 @@ export const workflowMessages = defineMessages<WorkflowValues>({
   wsPGate: { id: 'app.studio.workflow.pGate', defaultMessage: 'The gate “{id}” must be atomic, name its gate, have the cashier’s task and move on at gate.pass and gate.defer', description: 'Workflow Studio: problem' },
   wsPAssignment: { id: 'app.studio.workflow.pAssignment', defaultMessage: 'An action sets “{field}”, which the data model does not declare with that kind', description: 'Workflow Studio: problem' },
   wsPTable: { id: 'app.studio.workflow.pTable', defaultMessage: 'The decision table “{id}” is not well formed', description: 'Workflow Studio: problem' },
+  wsPGuardTable: { id: 'app.studio.workflow.pGuardTable', defaultMessage: 'A guard names the decision table “{table}”, which the definition does not have', description: 'Workflow Studio: problem' },
+  wsPGuardOutcome: { id: 'app.studio.workflow.pGuardOutcome', defaultMessage: 'A guard requires the outcome “{outcome}” of the decision table “{table}”, which it never gives', description: 'Workflow Studio: problem' },
   wsStates: { id: 'app.studio.workflow.states', defaultMessage: 'States', description: 'Workflow Studio: outline heading' },
   wsAddState: { id: 'app.studio.workflow.addState', defaultMessage: 'Add a state', description: 'Workflow Studio: add a top-level state' },
   wsAddInside: { id: 'app.studio.workflow.addInside', defaultMessage: 'Add a state inside {id}', description: 'Workflow Studio: add a state inside a group' },
@@ -2775,8 +2784,17 @@ export const workflowMessages = defineMessages<WorkflowValues>({
   wsDuration: { id: 'app.studio.workflow.duration', defaultMessage: 'After (ISO 8601 duration, e.g. PT1H)', description: 'Workflow Studio: field' },
   wsTimerHint: { id: 'app.studio.workflow.timerHint', defaultMessage: 'A timer runs as the workflow principal.', description: 'Workflow Studio: hint' },
   wsGuard: { id: 'app.studio.workflow.guard', defaultMessage: 'Guard', description: 'Workflow Studio: field' },
-  wsGuardName: { id: 'app.studio.workflow.guardName', defaultMessage: '{guard, select, always {Always} fhirpath {A FHIRPath expression} other {{guard}}}', description: 'Workflow Studio: a guard kind' },
+  wsGuardName: { id: 'app.studio.workflow.guardName', defaultMessage: '{guard, select, always {Always} fhirpath {A FHIRPath expression} table {A decision table’s outcome} other {{guard}}}', description: 'Workflow Studio: a guard kind' },
   wsExpression: { id: 'app.studio.workflow.expression', defaultMessage: 'FHIRPath expression', description: 'Workflow Studio: field' },
+  wsGuardNoTables: { id: 'app.studio.workflow.guardNoTables', defaultMessage: 'Add a decision table to guard on its outcome.', description: 'Workflow Studio: no decision table to guard on' },
+  wsGuardTable: { id: 'app.studio.workflow.guardTable', defaultMessage: 'Decision table', description: 'Workflow Studio: field' },
+  wsGuardOutcome: { id: 'app.studio.workflow.guardOutcome', defaultMessage: 'Required outcome', description: 'Workflow Studio: field' },
+  wsGuardTableHint: {
+    id: 'app.studio.workflow.guardTableHint',
+    defaultMessage: 'Taken only when the table gives this outcome: its first rule that holds decides, else its default; with neither, the guard does not hold.',
+    description: 'Workflow Studio: what a decision-table guard means',
+  },
+  wsGuardOpenTable: { id: 'app.studio.workflow.guardOpenTable', defaultMessage: 'Open {table} in the decision-table editor', description: 'Workflow Studio: open the guard’s table' },
   wsMayRead: { id: 'app.studio.workflow.mayRead', defaultMessage: 'It may read', description: 'Workflow Studio: the declared data a guard may read' },
   wsMayReadNone: { id: 'app.studio.workflow.mayReadNone', defaultMessage: 'Nothing is declared yet.', description: 'Workflow Studio: no declared data' },
   wsCompetitors: { id: 'app.studio.workflow.competitors', defaultMessage: 'Other transitions on the same event, in document order: the first whose guard holds is taken', description: 'Workflow Studio: legend' },
@@ -3031,6 +3049,10 @@ type SandboxValues = {
   sbAnswer: { guard: string }
   sbAnswerName: { answer: string }
   sbGates: {}
+  sbUnansweredTables: { tables: string }
+  sbTables: {}
+  sbTablesHint: {}
+  sbTable: { table: string }
   sbGate: { gate: string }
   sbOutcomeName: { outcome: string }
   sbNow: { step: number }
@@ -3076,6 +3098,10 @@ export const sandboxMessages = defineMessages<SandboxValues>({
   sbAnswer: { id: 'app.studio.sandbox.answer', defaultMessage: 'Answer to {guard}', description: 'Workflow sandbox: field' },
   sbAnswerName: { id: 'app.studio.sandbox.answerName', defaultMessage: '{answer, select, true {Holds} false {Does not hold} other {Not answered}}', description: 'Workflow sandbox: a guard answer' },
   sbGates: { id: 'app.studio.sandbox.gates', defaultMessage: 'Payment gates', description: 'Workflow sandbox: heading' },
+  sbUnansweredTables: { id: 'app.studio.sandbox.unansweredTables', defaultMessage: 'The next move was not taken: give the outcome of {tables} first.', description: 'Workflow sandbox: unanswered decision tables' },
+  sbTables: { id: 'app.studio.sandbox.tables', defaultMessage: 'Decision table outcomes', description: 'Workflow sandbox: heading' },
+  sbTablesHint: { id: 'app.studio.sandbox.tablesHint', defaultMessage: 'A guard naming a table holds when the table gives the outcome it requires.', description: 'Workflow sandbox: what a table outcome answers' },
+  sbTable: { id: 'app.studio.sandbox.table', defaultMessage: 'Outcome of {table}', description: 'Workflow sandbox: field' },
   sbGate: { id: 'app.studio.sandbox.gate', defaultMessage: 'Outcome of {gate}', description: 'Workflow sandbox: field' },
   sbOutcomeName: { id: 'app.studio.sandbox.outcomeName', defaultMessage: '{outcome, select, pass {Pass} block {Block} other {Defer}}', description: 'Workflow sandbox: a gate outcome' },
   sbNow: { id: 'app.studio.sandbox.now', defaultMessage: '{step, plural, =0 {At the start} other {After move #}}', description: 'Workflow sandbox: heading of the current step' },

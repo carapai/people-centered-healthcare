@@ -3,11 +3,12 @@
 //! holds it, unsaved edits included, in the engine's simulation (`health_workflow::simulation`)
 //! with every action stubbed: nothing is carried out.
 //!
-//! The run lives in the browser as the author's guard answers, gate outcomes and the moves so far
+//! The run lives in the browser as the author's guard answers, decision-table outcomes (for the
+//! guards that name a table, ADR 0093), gate outcomes and the moves so far
 //! (each an event or a wait). Each request replays it from the start and answers what held after
 //! each move, so every step comes from the server: undo drops the last move, restart sends none.
-//! A move that would evaluate a guard the author has not answered is not taken and the guards are
-//! reported. The answer carries the run as a `workflow-scenario` file, for *Save as scenario*.
+//! A move that would evaluate a guard (or decide a table) the author has not answered is not
+//! taken and the guards (or tables) are reported. The answer carries the run as a `workflow-scenario` file, for *Save as scenario*.
 
 use std::collections::BTreeMap;
 
@@ -49,6 +50,10 @@ pub(crate) struct StudioSandboxInput {
     /// The author's answer to each guard, by its expression.
     #[serde(default)]
     pub(crate) guards: BTreeMap<String, bool>,
+    /// The author's outcome for each decision table a guard names, by table id.
+    #[serde(default)]
+    #[schema(value_type = Object)]
+    pub(crate) tables: BTreeMap<String, health_workflow::Value>,
     /// The outcome of each Financial Gate, by canonical URL: `pass`, `defer` or `block`. An
     /// unanswered gate defers.
     #[serde(default)]
@@ -104,14 +109,18 @@ pub(crate) struct StudioSandboxStep {
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StudioSandbox {
-    /// Every guard of the definition, for the author to answer.
+    /// Every FHIRPath guard of the definition, for the author to answer.
     pub(crate) guards: Vec<String>,
+    /// Every decision table a guard of the definition names, for the author to give an outcome.
+    pub(crate) tables: Vec<String>,
     /// Every Financial Gate of the definition.
     pub(crate) gates: Vec<String>,
     /// The start, then each move taken.
     pub(crate) steps: Vec<StudioSandboxStep>,
     /// The guards the next move needs answered: it was not taken.
     pub(crate) unanswered: Vec<String>,
+    /// The decision tables the next move needs an outcome for: it was not taken.
+    pub(crate) unanswered_tables: Vec<String>,
     /// Why the next move could not be taken, if it could not for another reason.
     pub(crate) refused: Option<String>,
     /// The run as the text of a `workflow-scenario` file of the package's `tests/` folder.
@@ -175,6 +184,7 @@ fn read(input: &StudioSandboxInput) -> Result<Play, String> {
         .collect::<Result<_, String>>()?;
     Ok(Play {
         guards: input.guards.clone(),
+        tables: input.tables.clone(),
         gates: input.gates.clone(),
         moves,
     })
@@ -182,7 +192,7 @@ fn read(input: &StudioSandboxInput) -> Result<Play, String> {
 
 /// Documents and serves the sandbox.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/workflows/sandbox", tag = "studio", operation_id = "playStudioWorkflowSandbox",
-    description = "The Workflow Studio's sandbox: plays the posted (unsaved) draft Workflow Definition in the engine's simulation with every action stubbed, from the start through each move (an event or an ISO 8601 wait), with the author's guard answers and gate outcomes. It answers what held after each move: the configuration, the stubbed actions, the pending timers, the open Tasks and the events the configuration accepts. A move that would evaluate an unanswered guard is not taken and the guards are reported, never guessed. The run comes back as a `workflow-scenario` file for *Save as scenario*.",
+    description = "The Workflow Studio's sandbox: plays the posted (unsaved) draft Workflow Definition in the engine's simulation with every action stubbed, from the start through each move (an event or an ISO 8601 wait), with the author's guard answers, decision-table outcomes (a guard naming a table is answered by the table's outcome) and gate outcomes. It answers what held after each move: the configuration, the stubbed actions, the pending timers, the open Tasks and the events the configuration accepts. A move that would evaluate an unanswered guard or decide an unanswered table is not taken and they are reported, never guessed. The run comes back as a `workflow-scenario` file for *Save as scenario*.",
     params(("id" = String, Path, description = "`name@version`")),
     request_body = StudioSandboxInput,
     responses(
@@ -230,9 +240,11 @@ pub(crate) async fn play(
     };
     Json(StudioSandbox {
         guards: simulation::guards(&definition.statechart),
+        tables: simulation::tables(&definition.statechart),
         gates: simulation::gates(&definition.statechart),
         steps: played.snapshots.iter().map(step).collect(),
         unanswered: played.unanswered,
+        unanswered_tables: played.unanswered_tables,
         refused: played.refused,
         scenario,
     })

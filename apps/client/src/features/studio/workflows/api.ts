@@ -2,7 +2,7 @@ import type { StudioDecisionCheck, StudioDecisionTry, StudioProblem, StudioSampl
 
 import type { Transport } from '../../../platform/types'
 import { StudioError } from '../api'
-import type { WorkflowDefinition } from './model'
+import type { Value, WorkflowDefinition } from './model'
 
 // The release's typed-action catalogue (ADR 0043; #498), read from `/api/studio/workflow-actions`
 // at central: each action's reference, permission, compensation and parameter schema. It is the
@@ -84,13 +84,14 @@ export function checkTable(
 export type { StudioSandbox, StudioSandboxMove, StudioSandboxStep } from '@health/api-client'
 
 /** Plays `run` on draft `definition` from the start: what held after each move taken, the
- * guards the next move needs answered, and the run as a `workflow-scenario` file. */
+ * guards (and decision tables) the next move needs answered, and the run as a `workflow-scenario` file. */
 export async function playSandbox(
   transport: Transport,
   id: string,
   body: {
     definition: WorkflowDefinition
     guards: Record<string, boolean>
+    tables: Record<string, Value>
     gates: Record<string, string>
     moves: StudioSandboxMove[]
     name?: string

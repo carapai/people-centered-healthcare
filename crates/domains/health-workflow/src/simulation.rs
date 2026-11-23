@@ -17,12 +17,15 @@
 //! defers, as an unavailable one does in the engine.
 //! Guards are stubbed by the scenario (`guards`: expression → outcome), because guards are
 //! evaluated against clinical data the sandbox does not have; an unstubbed guard fails the
-//! scenario rather than guessing.
+//! scenario rather than guessing. A decision-table guard (ADR 0093) is stubbed by the table's
+//! outcome (`tables`: table id → outcome), not by the guard's truth: one stub answers every
+//! guard that names the table, as the real table would.
 //!
 //! The Workflow Studio's sandbox (#499; studio.md § The Workflow Studio) plays a draft on the same
-//! run with [`play`]: the author's guard answers and gate outcomes, then the moves so far (an
+//! run with [`play`]: the author's guard answers, table outcomes and gate outcomes, then the moves so far (an
 //! event, or a wait), each answered with a [`Snapshot`] of what holds after it. A move that would
-//! evaluate a guard the author has not answered is not taken: the guards are reported instead.
+//! evaluate a guard (or decide a table) the author has not answered is not taken: they are
+//! reported instead.
 //! [`save`] turns the run into a [`Scenario`] whose every step expects what its snapshot showed,
 //! so it passes in submission's simulation unchanged.
 
@@ -34,7 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::definition::WorkflowDefinition;
 use crate::interpreter::{Effect, Event, Guards, Instance, Machine};
-use crate::model::{DataModel, State, Statechart};
+use crate::model::{DataModel, Guard, State, Statechart, Value};
 use crate::store::{HistoryEntry, InstanceRecord, STARTED};
 use crate::worklists::project;
 
@@ -98,6 +101,9 @@ pub struct Scenario {
     /// The outcome of each guard the definition evaluates.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub guards: BTreeMap<String, bool>,
+    /// The outcome of each decision table a guard names, by table id (ADR 0093).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tables: BTreeMap<String, Value>,
     /// The outcome of each Financial Gate, by canonical URL: `pass`, `defer` or `block`. An
     /// unstubbed gate defers, as an unavailable one does.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -106,20 +112,28 @@ pub struct Scenario {
     pub steps: Vec<Step>,
 }
 
-/// Guards answered by the scenario; an unstubbed one is false and noted.
+/// Guards and decision tables answered by the scenario; an unstubbed one is false (gives no
+/// outcome) and noted.
 struct Stubbed<'a> {
     outcomes: &'a BTreeMap<String, bool>,
+    tables: &'a BTreeMap<String, Value>,
     missing: RefCell<BTreeSet<String>>,
+    missing_tables: RefCell<BTreeSet<String>>,
     /// Every stubbed guard evaluated.
     asked: RefCell<BTreeMap<String, bool>>,
+    /// Every stubbed table decided.
+    tables_asked: RefCell<BTreeMap<String, Value>>,
 }
 
 impl<'a> Stubbed<'a> {
-    fn new(outcomes: &'a BTreeMap<String, bool>) -> Self {
+    fn new(outcomes: &'a BTreeMap<String, bool>, tables: &'a BTreeMap<String, Value>) -> Self {
         Self {
             outcomes,
+            tables,
             missing: RefCell::new(BTreeSet::new()),
+            missing_tables: RefCell::new(BTreeSet::new()),
             asked: RefCell::new(BTreeMap::new()),
+            tables_asked: RefCell::new(BTreeMap::new()),
         }
     }
 }
@@ -134,6 +148,21 @@ impl Guards for Stubbed<'_> {
             None => {
                 self.missing.borrow_mut().insert(guard.to_owned());
                 false
+            }
+        }
+    }
+
+    fn outcome(&self, table: &str, _: Option<&Event>, _: &DataModel) -> Option<Value> {
+        match self.tables.get(table) {
+            Some(outcome) => {
+                self.tables_asked
+                    .borrow_mut()
+                    .insert(table.to_owned(), outcome.clone());
+                Some(outcome.clone())
+            }
+            None => {
+                self.missing_tables.borrow_mut().insert(table.to_owned());
+                None
             }
         }
     }
@@ -419,7 +448,7 @@ pub fn simulate(definition: &WorkflowDefinition, scenario: &Scenario) -> Vec<Str
         Ok(machine) => machine,
         Err(error) => return fail(error.to_string()),
     };
-    let guards = Stubbed::new(&scenario.guards);
+    let guards = Stubbed::new(&scenario.guards, &scenario.tables);
     let (mut run, started) = Run::start(
         &machine,
         definition,
@@ -444,6 +473,13 @@ pub fn simulate(definition: &WorkflowDefinition, scenario: &Scenario) -> Vec<Str
     if !missing.is_empty() {
         failed.push(format!(
             "guards not stubbed: {}",
+            missing.iter().cloned().collect::<Vec<_>>().join(", ")
+        ));
+    }
+    let missing = run.guards.missing_tables.borrow();
+    if !missing.is_empty() {
+        failed.push(format!(
+            "decision tables not stubbed: {}",
             missing.iter().cloned().collect::<Vec<_>>().join(", ")
         ));
     }
@@ -501,6 +537,9 @@ pub struct Play {
     /// The author's answer to each guard.
     #[serde(default)]
     pub guards: BTreeMap<String, bool>,
+    /// The author's outcome for each decision table a guard names, by table id.
+    #[serde(default)]
+    pub tables: BTreeMap<String, Value>,
     /// The outcome of each Financial Gate, by canonical URL; an unanswered gate defers.
     #[serde(default)]
     pub gates: BTreeMap<String, String>,
@@ -518,10 +557,14 @@ pub struct Played {
     /// The guards the next move (the start, if there is no snapshot) would evaluate without an
     /// answer: it was not taken.
     pub unanswered: Vec<String>,
+    /// The decision tables the next move would decide without an outcome: it was not taken.
+    pub unanswered_tables: Vec<String>,
     /// Why the next move could not be taken, if it could not for another reason.
     pub refused: Option<String>,
     /// The answered guards the run evaluated.
     pub guards: BTreeMap<String, bool>,
+    /// The answered decision tables the run decided.
+    pub tables: BTreeMap<String, Value>,
     /// The answered gates the run entered.
     pub gates: BTreeMap<String, String>,
 }
@@ -544,21 +587,37 @@ pub fn accepts(chart: &Statechart, configuration: &[String]) -> Vec<String> {
     found.into_iter().collect()
 }
 
-/// Every guard of `chart`'s transitions, in document order, each once.
-pub fn guards(chart: &Statechart) -> Vec<String> {
-    fn walk(states: &[State], found: &mut Vec<String>) {
+/// Every guard of `chart`'s transitions, in document order, each once: the FHIRPath ones
+/// (`table` false) or the decision tables they name (`table` true).
+fn named_guards(chart: &Statechart, table: bool) -> Vec<String> {
+    fn walk(states: &[State], table: bool, found: &mut Vec<String>) {
         for state in states {
             for guard in state.transitions.iter().filter_map(|t| t.guard.as_ref()) {
-                if !guard.is_empty() && !found.contains(guard) {
-                    found.push(guard.clone());
+                let name = match guard {
+                    Guard::Expression(expression) if !table => expression,
+                    Guard::Table { table: name, .. } if table => name,
+                    _ => continue,
+                };
+                if !name.is_empty() && !found.contains(name) {
+                    found.push(name.clone());
                 }
             }
-            walk(&state.children, found);
+            walk(&state.children, table, found);
         }
     }
     let mut found = Vec::new();
-    walk(&chart.states, &mut found);
+    walk(&chart.states, table, &mut found);
     found
+}
+
+/// Every FHIRPath guard of `chart`'s transitions, in document order, each once.
+pub fn guards(chart: &Statechart) -> Vec<String> {
+    named_guards(chart, false)
+}
+
+/// Every decision table a guard of `chart`'s transitions names, in document order, each once.
+pub fn tables(chart: &Statechart) -> Vec<String> {
+    named_guards(chart, true)
 }
 
 /// Every Financial Gate of `chart`'s states, by canonical URL, in document order, each once.
@@ -581,8 +640,10 @@ pub fn gates(chart: &Statechart) -> Vec<String> {
 /// Whether the run stops at the move just tried: it needed an unanswered guard, or it failed.
 fn halted(run: &Run<'_>, moved: Result<(), String>, played: &mut Played) -> bool {
     let missing = run.guards.missing.borrow();
-    if !missing.is_empty() {
+    let missing_tables = run.guards.missing_tables.borrow();
+    if !missing.is_empty() || !missing_tables.is_empty() {
         played.unanswered = missing.iter().cloned().collect();
+        played.unanswered_tables = missing_tables.iter().cloned().collect();
         return true;
     }
     if let Err(problem) = moved {
@@ -602,7 +663,7 @@ pub fn play(definition: &WorkflowDefinition, play: &Play) -> Result<Played, Stri
     let (mut run, started) = Run::start(
         &machine,
         definition,
-        Stubbed::new(&play.guards),
+        Stubbed::new(&play.guards, &play.tables),
         &canonical,
         &play.gates,
     );
@@ -619,6 +680,7 @@ pub fn play(definition: &WorkflowDefinition, play: &Play) -> Result<Played, Stri
         }
     }
     played.guards = run.guards.asked.borrow().clone();
+    played.tables = run.guards.tables_asked.borrow().clone();
     played.gates = run.gates_asked.clone();
     Ok(played)
 }
@@ -651,6 +713,7 @@ pub fn save(definition: &WorkflowDefinition, play: &Play, played: &Played, name:
         name: name.to_owned(),
         definition: format!("{}|{}", definition.url, definition.version),
         guards: played.guards.clone(),
+        tables: played.tables.clone(),
         gates: played.gates.clone(),
         steps,
     }

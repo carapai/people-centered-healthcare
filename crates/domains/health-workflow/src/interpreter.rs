@@ -4,7 +4,8 @@
 //! **Pure and deterministic.** [`Machine::start`] and [`Machine::step`] take an instance and an
 //! event and return what to do: the effects are typed actions, timers and invocations, which the
 //! workflow application carries out in the same transaction (ADR 0044). Guards are evaluated
-//! through the [`Guards`] port. Nothing here reads a clock or does I/O, so the same instance and
+//! through the [`Guards`] port: a FHIRPath guard holds when the port says so, and a decision-table
+//! guard (ADR 0093) when the port's outcome for the table is the required one. Nothing here reads a clock or does I/O, so the same instance and
 //! event always give the same result.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -12,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use health_time::SignedDuration;
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Action, DataModel, Kind, State, Statechart, Transition, Value};
+use crate::model::{Action, DataModel, Guard, Kind, State, Statechart, Transition, Value};
 
 /// An event: from a user command, a domain event, a timer or an invocation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,10 +36,30 @@ impl Event {
 }
 
 /// Evaluates guards (FHIRPath, outside the domain): whether `guard` holds for `event` over
-/// `data`.
+/// `data`, and what a decision table decides (ADR 0093).
 pub trait Guards {
-    /// Whether `guard` holds.
+    /// Whether the FHIRPath expression `guard` holds.
     fn holds(&self, guard: &str, event: Option<&Event>, data: &DataModel) -> bool;
+
+    /// The outcome of the decision table `table`, if it gives one. A port that knows no tables
+    /// gives none, so every decision-table guard is false;
+    /// [`WithTables`](crate::decision::WithTables) decides the definition's tables with this
+    /// port's FHIRPath.
+    fn outcome(&self, table: &str, event: Option<&Event>, data: &DataModel) -> Option<Value> {
+        let _ = (table, event, data);
+        None
+    }
+
+    /// Whether `guard` holds: a FHIRPath guard by [`Guards::holds`], a decision-table guard
+    /// when the table's [`Guards::outcome`] is the required one.
+    fn guard(&self, guard: &Guard, event: Option<&Event>, data: &DataModel) -> bool {
+        match guard {
+            Guard::Expression(expression) => self.holds(expression, event, data),
+            Guard::Table { table, outcome } => {
+                self.outcome(table, event, data).as_ref() == Some(outcome)
+            }
+        }
+    }
 }
 
 /// What the workflow application must do after a step, in order.
@@ -486,8 +507,8 @@ impl<'a, G: Guards> Run<'a, G> {
                     let enabled_here = event_ok
                         && transition
                             .guard
-                            .as_deref()
-                            .is_none_or(|g| self.guards.holds(g, event, &self.data));
+                            .as_ref()
+                            .is_none_or(|g| self.guards.guard(g, event, &self.data));
                     if enabled_here {
                         let chosen = Chosen {
                             source: node,

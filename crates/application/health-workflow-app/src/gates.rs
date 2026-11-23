@@ -19,10 +19,12 @@ use health_billing_contract::{FinancialGates, GateOutcome, GateQuery, GateUnavai
 use health_persistence::{Store, Transaction};
 use health_time::Timestamp;
 use health_workflow::{
-    Effect, Event, Guards, Instance, InstanceRecord, Machine, State, Value, WorkflowStore,
+    Effect, Event, Guards, Instance, InstanceRecord, State, Value, WorkflowStore,
 };
 
-use crate::{Actions, Definitions, Outcome, PRINCIPAL, WorkflowError, Workflows, event_key};
+use crate::{
+    Actions, Compiled, Definitions, Outcome, PRINCIPAL, WorkflowError, Workflows, event_key,
+};
 
 /// At most this many gates are answered in one step: a definition cannot loop through gates.
 const MOST_GATES: usize = 8;
@@ -110,7 +112,7 @@ where
     /// Answers the gates a step entered, stepping `gate.<outcome>` in, until none is left.
     pub(crate) async fn settle_gates(
         &self,
-        machine: &Machine,
+        compiled: &Compiled,
         context: &str,
         mut state: Instance,
         effects: Vec<Effect>,
@@ -141,7 +143,10 @@ where
                 event
                     .data
                     .insert("reason".into(), Value::Text(outcome.reason().to_owned()));
-                let (stepped, more) = machine.step(state, &event, &self.guards)?;
+                let (stepped, more) =
+                    compiled
+                        .machine
+                        .step(state, &event, &compiled.guards(&self.guards))?;
                 state = stepped;
                 next.extend(more);
             }

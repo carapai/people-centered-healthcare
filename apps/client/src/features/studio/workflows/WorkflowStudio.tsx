@@ -25,6 +25,8 @@ import {
   edgeId,
   entryActions,
   flagged,
+  guardLabel,
+  isTableGuard,
   moveSource,
   moveState,
   moveTransition,
@@ -39,6 +41,7 @@ import {
   renameState,
   rows,
   stateOf,
+  tableOutcomes,
   transitionAt,
   triggerOf,
   undeclarePermission,
@@ -356,6 +359,7 @@ function Studio({ id, path, table: opening, draft, file, published, onReload, li
                   </h2>
                   <SandboxPanel
                     id={id}
+                    definition={definition}
                     run={run}
                     played={sandbox.data}
                     playing={sandbox.isFetching}
@@ -395,6 +399,7 @@ function Studio({ id, path, table: opening, draft, file, published, onReload, li
                   editable={editable}
                   onChange={change}
                   onSelect={setSelected}
+                  onOpenTable={openTable}
                 />
               )}
                 </>
@@ -473,6 +478,10 @@ function problemText(intl: IntlShape, problem: Problem): string {
       return intl.formatMessage(m.wsPPrincipalLacks, { action: problem.action, permission: problem.permission })
     case 'unneeded-permission':
       return intl.formatMessage(m.wsPUnneeded, { permission: problem.permission })
+    case 'unknown-guard-table':
+      return intl.formatMessage(m.wsPGuardTable, { table: problem.table })
+    case 'impossible-guard-outcome':
+      return intl.formatMessage(m.wsPGuardOutcome, { table: problem.table, outcome: String(problem.outcome) })
   }
 }
 
@@ -551,7 +560,7 @@ function onText(intl: IntlShape, state: State, transition: Transition): string {
 }
 
 const targetText = (transition: Transition) => (transition.targets ?? []).join(', ') || '—'
-const guardText = (transition: Transition) => (transition.guard === undefined || transition.guard === null || transition.guard === '' ? '' : `[${transition.guard}]`)
+const guardText = (transition: Transition) => guardLabel(transition.guard)
 
 interface OutlineProps {
   definition: WorkflowDefinition
@@ -846,11 +855,13 @@ interface TransitionInspectorProps {
   editable: boolean
   onChange: (definition: WorkflowDefinition) => void
   onSelect: (selection: Selection | null) => void
+  /** Opens a decision table, by id, in the decision-table editor. */
+  onOpenTable: (table: string) => void
 }
 
-function TransitionInspector({ definition, source, index, catalogue, editable, onChange, onSelect }: TransitionInspectorProps) {
+function TransitionInspector({ definition, source, index, catalogue, editable, onChange, onSelect, onOpenTable }: TransitionInspectorProps) {
   const intl = useIntl()
-  const ids = { trigger: useId(), guard: useId(), expression: useId() }
+  const ids = { trigger: useId(), guard: useId(), expression: useId(), table: useId(), outcome: useId() }
   const state = stateOf(definition, source)
   const transition = transitionAt(definition, source, index)
   const [events, setEvents] = useState(() => (transition?.events ?? []).join(', '))
@@ -859,7 +870,14 @@ function TransitionInspector({ definition, source, index, catalogue, editable, o
   const edit = (f: (t: Transition) => Transition) => onChange(updateTransition(definition, source, index, f))
   const all = rows(definition).map((r) => ({ value: r.state.id, text: r.state.id }))
   const target = transition.targets?.[0] ?? ''
-  const guarded = transition.guard !== undefined && transition.guard !== null
+  const guard = transition.guard
+  const tableGuard = isTableGuard(guard) ? guard : null
+  const guarded = typeof guard === 'string'
+  const tables = definition.decisionTables ?? []
+  const chosen = tableGuard === null ? undefined : tables.find((t) => t.id === tableGuard.table)
+  const outcomes = chosen === undefined ? [] : tableOutcomes(chosen)
+  // An outcome the table does not give stays listed, so the select shows what the definition holds.
+  const outcomeOptions = tableGuard === null || outcomes.includes(tableGuard.outcome) ? outcomes : [tableGuard.outcome, ...outcomes]
   const rivals = competitors(state, index)
   const order = (state.transitions ?? []).map((t, n) => ({ index: n, transition: t, self: n === index })).filter((entry) => entry.self || rivals.some((r) => r.index === entry.index))
   const readable = [...(definition.dataModel ?? []).map((f) => `%${f.name} (${f.kind})`), ...(definition.dataRequirements ?? []).map((d) => `%${d.name}: ${d.resourceType}${(d.paths ?? []).length > 0 ? ` (${(d.paths ?? []).join(', ')})` : ''}`)]
@@ -940,27 +958,79 @@ function TransitionInspector({ definition, source, index, catalogue, editable, o
         <select
           id={ids.guard}
           className={input}
-          value={guarded ? 'fhirpath' : 'always'}
+          value={tableGuard !== null ? 'table' : guarded ? 'fhirpath' : 'always'}
           disabled={!editable}
           onChange={(e) =>
             edit((t) => {
               const { guard: _guard, ...rest } = t
+              const first = tables[0]
+              if (e.target.value === 'table' && first !== undefined) return { ...rest, guard: { table: first.id, outcome: tableOutcomes(first)[0] ?? '' } }
               return e.target.value === 'always' ? rest : { ...rest, guard: '' }
             })
           }
         >
-          {(['always', 'fhirpath'] as const).map((g) => (
-            <option key={g} value={g}>
+          {(['always', 'fhirpath', 'table'] as const).map((g) => (
+            <option key={g} value={g} disabled={g === 'table' && tables.length === 0 && tableGuard === null}>
               {intl.formatMessage(m.wsGuardName, { guard: g })}
             </option>
           ))}
         </select>
       </label>
+      {tables.length === 0 && tableGuard === null ? <p className={muted}>{intl.formatMessage(m.wsGuardNoTables)}</p> : null}
+      {tableGuard === null ? null : (
+        <>
+          <label className={label} htmlFor={ids.table}>
+            {intl.formatMessage(m.wsGuardTable)}
+            <select
+              id={ids.table}
+              className={input}
+              value={tableGuard.table}
+              disabled={!editable}
+              onChange={(e) => {
+                const next = tables.find((t) => t.id === e.target.value)
+                if (next !== undefined) edit((t) => ({ ...t, guard: { table: next.id, outcome: tableOutcomes(next)[0] ?? '' } }))
+              }}
+            >
+              {chosen === undefined ? <option value={tableGuard.table}>{tableGuard.table}</option> : null}
+              {tables.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label} htmlFor={ids.outcome}>
+            {intl.formatMessage(m.wsGuardOutcome)}
+            <select
+              id={ids.outcome}
+              className={input}
+              value={String(tableGuard.outcome)}
+              disabled={!editable}
+              onChange={(e) => {
+                const next = outcomeOptions.find((o) => String(o) === e.target.value)
+                if (next !== undefined) edit((t) => ({ ...t, guard: { table: tableGuard.table, outcome: next } }))
+              }}
+            >
+              {outcomeOptions.map((o) => (
+                <option key={String(o)} value={String(o)}>
+                  {String(o)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className={muted}>{intl.formatMessage(m.wsGuardTableHint)}</p>
+          {chosen === undefined ? null : (
+            <button type="button" className={linkButton} onClick={() => onOpenTable(chosen.id)}>
+              {intl.formatMessage(m.wsGuardOpenTable, { table: chosen.id })}
+            </button>
+          )}
+        </>
+      )}
       {guarded ? (
         <>
           <label className={label} htmlFor={ids.expression}>
             {intl.formatMessage(m.wsExpression)}
-            <textarea id={ids.expression} className={input} rows={2} value={transition.guard ?? ''} disabled={!editable} onChange={(e) => edit((t) => ({ ...t, guard: e.target.value }))} />
+            <textarea id={ids.expression} className={input} rows={2} value={guarded ? guard : ''} disabled={!editable} onChange={(e) => edit((t) => ({ ...t, guard: e.target.value }))} />
           </label>
           <div>
             <p className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.wsMayRead)}</p>

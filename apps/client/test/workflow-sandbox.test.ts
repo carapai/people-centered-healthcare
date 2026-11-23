@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import type { StudioSandbox } from '../src/features/studio/workflows/api'
-import { activeStates, answer, current, emptyRun, restart, scenarioFile, scenarioPath, send, setGate, undo, untaken, wait } from '../src/features/studio/workflows/sandbox'
+import { activeStates, answer, current, emptyRun, restart, scenarioFile, scenarioPath, send, setGate, setTableOutcome, undo, untaken, wait } from '../src/features/studio/workflows/sandbox'
 
 // The Workflow Studio's sandbox (#499): the browser keeps the author's answers and moves; every
 // step, what is active and the scenario file come from the server's answer.
@@ -11,8 +11,10 @@ const step = (configuration: string[]) => ({ configuration, actions: [], timers:
 const played = (steps: string[][], unanswered: string[] = []): StudioSandbox => ({
   guards: ['%urgent'],
   gates: [],
+  tables: [],
   steps: steps.map(step),
   unanswered,
+  unansweredTables: [],
   refused: null,
   scenario: JSON.stringify({ type: 'workflow-scenario', name: 'Sandbox run', definition: 'http://x|1.0.0', guards: { '%urgent': false }, steps: [{ expect: { configuration: ['triage'] } }] }),
 })
@@ -24,10 +26,17 @@ describe('the sandbox run', () => {
     run = wait(run, 'PT1H')
     expect(run.moves).toEqual([{ event: 'triaged' }, { wait: 'PT1H' }])
     expect(undo(run).moves).toEqual([{ event: 'triaged' }])
-    expect(restart(run)).toEqual({ guards: { '%urgent': false }, gates: {}, moves: [] })
+    expect(restart(run)).toEqual({ guards: { '%urgent': false }, tables: {}, gates: {}, moves: [] })
     expect(answer(run, '%urgent', null).guards).toEqual({})
     expect(setGate(run, 'http://gate', 'block').gates).toEqual({ 'http://gate': 'block' })
     expect(setGate(setGate(run, 'http://gate', 'block'), 'http://gate', null).gates).toEqual({})
+  })
+
+  test('a decision table a guard names is answered by its outcome, kept across restarts (ADR 0093)', () => {
+    const run = send(setTableOutcome(emptyRun(), 'triage-priority', 'urgent'), 'opd.triaged')
+    expect(run.tables).toEqual({ 'triage-priority': 'urgent' })
+    expect(restart(run).tables).toEqual({ 'triage-priority': 'urgent' })
+    expect(setTableOutcome(run, 'triage-priority', null).tables).toEqual({})
   })
 
   test('what is active and how far the run got come from the server', () => {

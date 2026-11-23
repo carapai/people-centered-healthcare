@@ -402,3 +402,69 @@ fn a_gate_state_moves_on_at_pass_and_defer_and_has_a_cashier_task() {
         "re-entering on block loops"
     );
 }
+
+#[test]
+fn a_decision_table_guard_names_a_table_of_the_definition_and_an_outcome_it_gives() {
+    let table = DecisionTable {
+        id: "triage-priority".into(),
+        rows: vec![Row {
+            name: Some("Danger signs".into()),
+            when: vec!["%encounter.priority = 'urgent'".into()],
+            then: text("urgent"),
+        }],
+        default: Some(text("routine")),
+    };
+    let guarded = |guard: Guard| {
+        let mut chart = definition(vec![]);
+        chart.principal.clear();
+        chart.decision_tables = vec![table.clone()];
+        chart.statechart.states[0].transitions[0].guard = Some(guard);
+        chart.problems(&catalog())
+    };
+    // A row's outcome and the default are both possible.
+    assert_eq!(
+        guarded(Guard::table("triage-priority", text("urgent"))),
+        vec![]
+    );
+    assert_eq!(
+        guarded(Guard::table("triage-priority", text("routine"))),
+        vec![]
+    );
+    assert_eq!(
+        guarded(Guard::table("danger", text("urgent"))),
+        vec![Problem::UnknownGuardTable {
+            state: "waiting".into(),
+            table: "danger".into()
+        }]
+    );
+    assert_eq!(
+        guarded(Guard::table("triage-priority", text("emergency"))),
+        vec![Problem::ImpossibleGuardOutcome {
+            state: "waiting".into(),
+            table: "triage-priority".into(),
+            outcome: "\"emergency\"".into()
+        }]
+    );
+    // FHIRPath guards are not checked here.
+    assert_eq!(guarded(Guard::expression("%urgent")), vec![]);
+}
+
+#[test]
+fn a_guard_reads_as_fhirpath_or_a_table_and_its_outcome() {
+    let transition: Transition = serde_json::from_str(
+        r#"{ "events": ["triaged"], "guard": { "table": "triage-priority", "outcome": "urgent" } }"#,
+    )
+    .expect("a table guard");
+    assert_eq!(
+        transition.guard,
+        Some(Guard::table("triage-priority", text("urgent")))
+    );
+    let transition: Transition =
+        serde_json::from_str(r#"{ "events": ["triaged"], "guard": "%urgent" }"#)
+            .expect("a FHIRPath guard");
+    assert_eq!(transition.guard, Some(Guard::expression("%urgent")));
+    assert_eq!(
+        serde_json::to_value(Guard::table("t", text("x"))).expect("json"),
+        serde_json::json!({ "table": "t", "outcome": "x" })
+    );
+}

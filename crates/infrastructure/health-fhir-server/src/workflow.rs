@@ -18,7 +18,9 @@
 //!
 //! **Guards and actions.** FHIRPath guards over data requirements and the contexts' typed
 //! actions are not wired yet, so the node's definitions must use neither: guards evaluate as
-//! false and actions fail, and [`WorkflowConfig::new`] refuses definitions that use them.
+//! false and actions fail, and [`WorkflowConfig::new`] refuses definitions that use them. A
+//! decision-table guard (ADR 0093) decides its table with the same FHIRPath port, so it is
+//! refused with them; the definition's tables are compiled in for when the port is wired.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -220,8 +222,8 @@ fn compile(definitions: Vec<WorkflowDefinition>) -> Result<Definitions, Workflow
         if uses_unwired(&definition.statechart.states) {
             return Err(WorkflowConfigError::Unsupported(key));
         }
-        let chart =
-            Compiled::new(definition.statechart).map_err(|e| WorkflowConfigError::Problem {
+        let chart = Compiled::with_tables(definition.statechart, definition.decision_tables)
+            .map_err(|e| WorkflowConfigError::Problem {
                 definition: key.clone(),
                 problem: e.to_string(),
             })?;

@@ -1,0 +1,11 @@
+{
+  "type": "decision-table-test",
+  "name": "Danger signs outrank an urgent category",
+  "definition": "https://health.go.ug/fhir/Library/opd-triage-route|1.0.0",
+  "table": "triage-priority",
+  "inputs": {
+    "%triage.category": "urgent",
+    "%triage.danger": true
+  },
+  "expect": "emergency"
+}

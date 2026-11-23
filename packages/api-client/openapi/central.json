@@ -2273,7 +2273,7 @@
           "studio"
         ],
         "summary": "Documents and serves the sandbox.",
-        "description": "The Workflow Studio's sandbox: plays the posted (unsaved) draft Workflow Definition in the engine's simulation with every action stubbed, from the start through each move (an event or an ISO 8601 wait), with the author's guard answers and gate outcomes. It answers what held after each move: the configuration, the stubbed actions, the pending timers, the open Tasks and the events the configuration accepts. A move that would evaluate an unanswered guard is not taken and the guards are reported, never guessed. The run comes back as a `workflow-scenario` file for *Save as scenario*.",
+        "description": "The Workflow Studio's sandbox: plays the posted (unsaved) draft Workflow Definition in the engine's simulation with every action stubbed, from the start through each move (an event or an ISO 8601 wait), with the author's guard answers, decision-table outcomes (a guard naming a table is answered by the table's outcome) and gate outcomes. It answers what held after each move: the configuration, the stubbed actions, the pending timers, the open Tasks and the events the configuration accepts. A move that would evaluate an unanswered guard or decide an unanswered table is not taken and they are reported, never guessed. The run comes back as a `workflow-scenario` file for *Save as scenario*.",
         "operationId": "playStudioWorkflowSandbox",
         "parameters": [
           {
@@ -5528,9 +5528,11 @@
         "description": "How the run went.",
         "required": [
           "guards",
+          "tables",
           "gates",
           "steps",
           "unanswered",
+          "unansweredTables",
           "scenario"
         ],
         "properties": {
@@ -5546,7 +5548,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Every guard of the definition, for the author to answer."
+            "description": "Every FHIRPath guard of the definition, for the author to answer."
           },
           "refused": {
             "type": [
@@ -5566,12 +5568,26 @@
             },
             "description": "The start, then each move taken."
           },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every decision table a guard of the definition names, for the author to give an outcome."
+          },
           "unanswered": {
             "type": "array",
             "items": {
               "type": "string"
             },
             "description": "The guards the next move needs answered: it was not taken."
+          },
+          "unansweredTables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The decision tables the next move needs an outcome for: it was not taken."
           }
         }
       },
@@ -5619,6 +5635,10 @@
               "null"
             ],
             "description": "The name the run takes as a scenario."
+          },
+          "tables": {
+            "type": "object",
+            "description": "The author's outcome for each decision table a guard names, by table id."
           }
         }
       },
