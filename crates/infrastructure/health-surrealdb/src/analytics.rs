@@ -8,12 +8,15 @@
 //! holds, so a summary computed again with the same figures is not sent again and one forgotten
 //! is removed there. Central keeps each facility's in `facility_indicator_summary` and when its
 //! summaries last synced in `facility_indicator_sync`.
+//!
+//! Saved Visualizations and Dashboards (migration `0064_saved_dashboards`; #602):
+//! `health_analytics::SavedDashboards` over the transaction, at central.
 
 use std::collections::BTreeMap;
 
 use health_analytics::{
     FacilitySummaries, FacilitySummary, IndicatorStore, MemberKey, PatientOutcome, Period,
-    PeriodType, Position, StoredSummary,
+    PeriodType, Position, SavedDashboard, SavedDashboards, SavedVisualization, StoredSummary,
 };
 use health_persistence::{ResourceType, Store as _, StoreError, Transaction as _, WriteError};
 use health_sync_protocol::IndicatorSummary;
@@ -518,6 +521,87 @@ impl FacilitySummaries for SurrealTx {
         .into_iter()
         .map(|row| match <[String; 2]>::try_from(row) {
             Ok([facility, at]) => Ok((facility, timestamp(&at)?)),
+            Err(_) => Err(invalid()),
+        })
+        .collect()
+    }
+}
+
+/// Saved Visualizations and Dashboards at central (migration `0064_saved_dashboards`; #602),
+/// keyed by their ids, their setup, shares and items kept as JSON text.
+impl SavedDashboards for SurrealTx {
+    async fn put_visualization(
+        &mut self,
+        visualization: &SavedVisualization,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT type::record('saved_visualization', $id) CONTENT { owner: $owner, \
+             title: $title, setup: $setup, saved_at: time::now() } RETURN NONE",
+            vec![
+                ("id", visualization.id.clone()),
+                ("owner", visualization.owner.clone()),
+                ("title", visualization.title.clone()),
+                ("setup", visualization.setup.clone()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn visualizations(&mut self) -> Result<Vec<SavedVisualization>, StoreError> {
+        self.rows(
+            "SELECT VALUE [<string>record::id(id), owner, title, setup] FROM saved_visualization \
+             ORDER BY saved_at",
+            vec![],
+        )
+        .await?
+        .into_iter()
+        .map(|row| match <[String; 4]>::try_from(row) {
+            Ok([id, owner, title, setup]) => Ok(SavedVisualization {
+                id,
+                owner,
+                title,
+                setup,
+            }),
+            Err(_) => Err(invalid()),
+        })
+        .collect()
+    }
+
+    async fn put_dashboard(&mut self, dashboard: &SavedDashboard) -> Result<(), WriteError> {
+        let json = |value: Result<String, serde_json::Error>| value.map_err(store_error);
+        self.run(
+            "UPSERT type::record('saved_dashboard', $id) SET owner = $owner, title = $title, \
+             shares = $shares, items = $items, created_at = created_at ?? time::now(), \
+             saved_at = time::now() RETURN NONE",
+            vec![
+                ("id", dashboard.id.clone()),
+                ("owner", dashboard.owner.clone()),
+                ("title", dashboard.title.clone()),
+                ("shares", json(serde_json::to_string(&dashboard.shares))?),
+                ("items", json(serde_json::to_string(&dashboard.items))?),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn dashboards(&mut self) -> Result<Vec<SavedDashboard>, StoreError> {
+        self.rows(
+            "SELECT VALUE [<string>record::id(id), owner, title, shares, items] FROM \
+             saved_dashboard ORDER BY created_at",
+            vec![],
+        )
+        .await?
+        .into_iter()
+        .map(|row| match <[String; 5]>::try_from(row) {
+            Ok([id, owner, title, shares, items]) => Ok(SavedDashboard {
+                id,
+                owner,
+                title,
+                shares: serde_json::from_str(&shares).map_err(|_| invalid())?,
+                items: serde_json::from_str(&items).map_err(|_| invalid())?,
+            }),
             Err(_) => Err(invalid()),
         })
         .collect()

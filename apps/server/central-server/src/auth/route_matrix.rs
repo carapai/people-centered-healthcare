@@ -386,7 +386,13 @@ const INVENTORY: &[Mounted] = &[
         file: "central-server/src/analytics.rs",
         prefix: "/api/analytics",
         gate: Gate::Staff,
-        paths: &["/explorer", "/explore"],
+        paths: &[
+            "/explorer",
+            "/explore",
+            "/dashboards",
+            "/dashboards/{id}",
+            "/visualizations",
+        ],
     },
     Mounted {
         file: "central-server/src/places.rs",

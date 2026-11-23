@@ -1,11 +1,13 @@
 import { css, cx } from '@health/design-system/css'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
 import { explorerMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
-import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, explorerQuery, fitted, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
+import { DASHBOARDS_KEY, DashboardsError, createDashboard, dashboardsQuery, saveVisualization } from '../dashboards/api'
+import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, explorerQuery, fitted, forViewer, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
 
 const layout = css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', md: '18rem 1fr' }, alignItems: 'start' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -62,7 +64,7 @@ function defaultQuestion(explorer: Explorer, kind: PeriodType = 'monthly'): Ques
  * reported, which are missing (never counted as zero), and why a median is absent above
  * facility level.
  */
-export function ExplorerPage() {
+export function ExplorerPage({ initial }: { initial?: Shown | undefined } = {}) {
   const intl = useIntl()
   const { transport } = usePlatform()
   const explorer = useQuery(explorerQuery(transport))
@@ -78,25 +80,21 @@ export function ExplorerPage() {
       </section>
     )
   }
-  return <Explore explorer={explorer.data} />
+  return <Explore explorer={explorer.data} initial={initial} />
 }
 
-function Explore({ explorer }: { explorer: Explorer }) {
+function Explore({ explorer, initial }: { explorer: Explorer; initial: Shown | undefined }) {
   const intl = useIntl()
-  const { transport } = usePlatform()
-  // The chart type and table layout are kept apart from the question: switching them keeps the selection.
-  const [shown, setShownAs] = useState<Shown>(() => ({ type: 'column', question: defaultQuestion(explorer), layout: 'placesByIndicators', series: 'indicator' }))
+  // The chart type and table layout are kept apart from the question: switching them keeps the
+  // selection. A saved Visualization opened here (#602) starts from its setup, its places the
+  // session's own when it follows the viewer.
+  const [shown, setShownAs] = useState<Shown>(() => fitted(explorer, initial === undefined ? { type: 'column', question: defaultQuestion(explorer), layout: 'placesByIndicators', series: 'indicator', ...(explorer.place === null ? {} : { follow: 'myPlace' as const }) } : forViewer(explorer, initial)))
   const setShown = (next: Shown) => setShownAs(fitted(explorer, next))
   const { question } = shown
   const setQuestion = (next: Question) => setShown({ ...shown, question: next })
   const splits = sharedDisaggregations(explorer, question.indicators)
   const children = childAreas(explorer)
   const ready = question.indicators.length > 0 && question.places.length > 0
-  const answer = useQuery({ ...answerQuery(transport, question), enabled: ready, placeholderData: keepPreviousData })
-  // A single number shows its change on the period before the range's last; ask for it when the range does not hold it.
-  const earlier = previousPeriod(question.periodType, question.to)
-  const askBefore = ready && shown.type === 'single' && question.from === question.to
-  const before = useQuery({ ...answerQuery(transport, { ...question, from: earlier, to: earlier }), enabled: askBefore })
   const offered = recentPeriods(question.periodType, new Date(), OFFERED[question.periodType])
   const places = [explorer.place, ...explorer.places].filter((p) => p !== null)
   const periodTypeName = (kind: PeriodType) => intl.formatMessage(m[`exPeriodType_${kind}`])
@@ -152,15 +150,16 @@ function Explore({ explorer }: { explorer: Explorer }) {
             <legend>{intl.formatMessage(m.exPlaces)}</legend>
             {places.map((place) => (
               <label key={place.code} className={css({ display: 'flex', gap: '2', alignItems: 'start', pl: place.code === explorer.place?.code ? '0' : '4' })}>
-                <input type="checkbox" checked={question.places.includes(place.code)} onChange={() => setQuestion({ ...question, places: toggle(question.places, place.code) })} />
+                <input type="checkbox" checked={question.places.includes(place.code)} onChange={() => setShown(picked(shown, toggle(question.places, place.code)))} />
                 <span>{place.name}</span>
               </label>
             ))}
             {explorer.place !== null && children.length > 0 ? (
-              <button type="button" className={pressable} aria-pressed={question.places.length === children.length && children.every((c) => question.places.includes(c))} onClick={() => setQuestion({ ...question, places: children })}>
+              <button type="button" className={pressable} aria-pressed={question.places.length === children.length && children.every((c) => question.places.includes(c))} onClick={() => setShown({ ...shown, question: { ...question, places: children }, follow: 'eachAreaUnder' })}>
                 {intl.formatMessage(m.exChildAreas, { place: explorer.place.name })}
               </button>
             ) : null}
+            {shown.follow === undefined ? null : <p className={muted}>{intl.formatMessage(shown.follow === 'myPlace' ? m.exFollowsPlace : m.exFollowsAreas)}</p>}
           </fieldset>
           <label className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontWeight: 'semibold' })}>
               {intl.formatMessage(m.exDisaggregation)}
@@ -209,22 +208,145 @@ function Explore({ explorer }: { explorer: Explorer }) {
               ))}
             </div>
           ) : null}
-          {!ready ? (
-            <p className={muted}>{intl.formatMessage(m.exPickSomething)}</p>
-          ) : answer.data === undefined ? (
-            answer.isPending ? (
-              <p role="status">{intl.formatMessage(m.exLoading)}</p>
-            ) : (
-              <p role="alert" className={css({ color: 'danger.text' })}>
-                {answer.error instanceof ExplorerError && answer.error.detail !== undefined ? answer.error.detail : intl.formatMessage(m.exFailed)}
-              </p>
-            )
-          ) : (
-            <Visualization explorer={explorer} shown={shown} answer={answer.data} before={askBefore ? before.data : undefined} />
-          )}
+          <LiveVisualization explorer={explorer} shown={shown} />
         </article>
       </div>
+      <SaveVisualization shown={shown} ready={ready} />
     </section>
+  )
+}
+
+/**
+ * `shown` asked and drawn (#599–#601): its figures, or why there are none. The explorer and every
+ * Dashboard item (#602) show a Visualization this way.
+ */
+export function LiveVisualization({ explorer, shown }: { explorer: Explorer; shown: Shown }) {
+  const intl = useIntl()
+  const { transport } = usePlatform()
+  const { question } = shown
+  const ready = question.indicators.length > 0 && question.places.length > 0
+  const answer = useQuery({ ...answerQuery(transport, question), enabled: ready, placeholderData: keepPreviousData })
+  // A single number shows its change on the period before the range's last; ask for it when the range does not hold it.
+  const earlier = previousPeriod(question.periodType, question.to)
+  const askBefore = ready && shown.type === 'single' && question.from === question.to
+  const before = useQuery({ ...answerQuery(transport, { ...question, from: earlier, to: earlier }), enabled: askBefore })
+  if (!ready) return <p className={muted}>{intl.formatMessage(m.exPickSomething)}</p>
+  if (answer.data === undefined)
+    return answer.isPending ? (
+      <p role="status">{intl.formatMessage(m.exLoading)}</p>
+    ) : (
+      <p role="alert" className={css({ color: 'danger.text' })}>
+        {answer.error instanceof ExplorerError && answer.error.detail !== undefined ? answer.error.detail : intl.formatMessage(m.exFailed)}
+      </p>
+    )
+  return <Visualization explorer={explorer} shown={shown} answer={answer.data} before={askBefore ? before.data : undefined} />
+}
+
+/** `shown` with `places` picked by hand: they no longer follow the viewer. */
+function picked(shown: Shown, places: string[]): Shown {
+  const { follow: _dropped, ...rest } = shown
+  return { ...rest, question: { ...shown.question, places } }
+}
+
+const NEW_DASHBOARD = '\u0000new'
+
+/**
+ * *Save Visualization* (#602): a title and, optionally, one of the session's own Dashboards or a
+ * new one. Offered at central to those holding `analytics.author`.
+ */
+function SaveVisualization({ shown, ready }: { shown: Shown; ready: boolean }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const { transport } = platform
+  const queryClient = useQueryClient()
+  const titleId = useId()
+  const dashboards = useQuery({ ...dashboardsQuery(transport), enabled: platform.capabilities.studio })
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [onto, setOnto] = useState('')
+  const [newTitle, setNewTitle] = useState('')
+  const save = useMutation({
+    mutationFn: async () => {
+      let dashboard = onto === '' ? undefined : onto
+      let dashboardTitle = dashboards.data?.dashboards.find((d) => d.id === onto)?.title
+      if (onto === NEW_DASHBOARD) {
+        const made = await createDashboard(transport, { title: newTitle.trim(), shares: [] })
+        dashboard = made.id
+        dashboardTitle = made.title
+      }
+      await saveVisualization(transport, { title: title.trim(), visualization: shown, ...(dashboard === undefined ? {} : { dashboard }) })
+      return dashboardTitle
+    },
+    onSuccess: async () => {
+      setOpen(false)
+      await queryClient.invalidateQueries({ queryKey: DASHBOARDS_KEY })
+    },
+  })
+  if (dashboards.data?.canAuthor !== true) return null
+  const own = dashboards.data.dashboards.filter((d) => d.mine && d.kind === 'saved')
+  if (!open)
+    return (
+      <div className={css({ display: 'flex', gap: '3', alignItems: 'center', flexWrap: 'wrap' })}>
+        <button type="button" className={pressable} disabled={!ready} onClick={() => (save.reset(), setOpen(true))}>
+          {intl.formatMessage(m.exSave)}
+        </button>
+        {save.isSuccess ? (
+          <p role="status">
+            {save.data === undefined ? intl.formatMessage(m.exSaved) : intl.formatMessage(m.exSavedOnto, { dashboard: save.data })} <Link to="/dashboards">{intl.formatMessage(m.dbTitle)}</Link>
+          </p>
+        ) : null}
+      </div>
+    )
+  const canSave = title.trim() !== '' && (onto !== NEW_DASHBOARD || newTitle.trim() !== '') && !save.isPending
+  return (
+    <form
+      className={panel}
+      aria-labelledby={titleId}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (canSave) save.mutate()
+      }}
+    >
+      <h2 id={titleId} className={css({ fontWeight: 'semibold' })}>
+        {intl.formatMessage(m.exSave)}
+      </h2>
+      <label className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+        {intl.formatMessage(m.exSaveTitle)}
+        <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
+      </label>
+      <label className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+        {intl.formatMessage(m.exSaveOnto)}
+        <select className={field} value={onto} onChange={(e) => setOnto(e.target.value)}>
+          <option value="">{intl.formatMessage(m.exSaveOntoNone)}</option>
+          {own.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title}
+            </option>
+          ))}
+          <option value={NEW_DASHBOARD}>{intl.formatMessage(m.exSaveOntoNew)}</option>
+        </select>
+      </label>
+      {onto === NEW_DASHBOARD ? (
+        <label className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>
+          {intl.formatMessage(m.exNewDashboardTitle)}
+          <input className={field} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} maxLength={120} required />
+        </label>
+      ) : null}
+      {shown.follow === undefined ? null : <p className={muted}>{intl.formatMessage(shown.follow === 'myPlace' ? m.exFollowsPlace : m.exFollowsAreas)}</p>}
+      {save.isError ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {save.error instanceof DashboardsError && save.error.detail !== undefined ? save.error.detail : intl.formatMessage(m.exSaveFailed)}
+        </p>
+      ) : null}
+      <div className={css({ display: 'flex', gap: '2' })}>
+        <button type="submit" className={pressable} disabled={!canSave}>
+          {intl.formatMessage(m.exSaveConfirm)}
+        </button>
+        <button type="button" className={pressable} onClick={() => setOpen(false)}>
+          {intl.formatMessage(m.exSaveCancel)}
+        </button>
+      </div>
+    </form>
   )
 }
 

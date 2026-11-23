@@ -10,24 +10,48 @@
 //!   figure and says why. A place outside the session's area is refused (403).
 //!
 //! Both read summaries only, never patient-level records, and need [`VIEW_PERMISSION`].
+//!
+//! Saved Visualizations and Dashboards (#602; ADR 0075), user content kept here at central:
+//!
+//! - `GET /dashboards` lists the Dashboards the session may open (its own, and those shared with
+//!   it as a person, by a role it holds, or by its place's level), each with its Visualizations,
+//!   the session's own Visualizations on none of them, and whether it may author.
+//! - `POST /dashboards` makes one (a title and shares) and `PUT /dashboards/{id}` changes its
+//!   title and shares, its owner only.
+//! - `POST /visualizations` saves the explorer's setup with a title, optionally onto one of the
+//!   session's own Dashboards. Its places must be in the session's area; one that follows the
+//!   viewer shows each viewer their own place, or each area under it.
+//!
+//! Each needs [`VIEW_PERMISSION`], and every change [`AUTHOR_PERMISSION`] too. Sharing never
+//! widens what a viewer reads: the explorer still answers only for their own area.
 
 use std::collections::BTreeMap;
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
-use health_analytics::{Indicator, STANDARD_PERIODS};
+use health_analytics::{
+    Indicator, STANDARD_PERIODS, SavedDashboard, SavedDashboards as _, SavedVisualization, Share,
+    Viewer,
+};
+use health_analytics_app::dashboards::{
+    AUTHOR_PERMISSION, MOST_ITEMS, dashboard_json, read_setup, read_shares, read_title,
+    unplaced_json,
+};
 use health_analytics_app::explore::{
     ExplorePlace, cells_json, explore, indicator_json, periods_json, read_question,
 };
+use health_auth::SessionRoles;
 use health_facility_registry::{Place, PlaceLevel, Places};
-use health_persistence::Store as _;
+use health_persistence::{Store as _, Transaction as _};
 use health_publication::Publications;
 use health_registries_app::places::places;
 use health_surrealdb::SurrealStore;
+
+use crate::studio::Accounts;
 use serde_json::{Value, json};
 
 /// The use-case permission that reads Indicator Reports (ADR 0070): Reports and dashboards.
@@ -37,15 +61,23 @@ pub(crate) const VIEW_PERMISSION: &str = "reporting.view";
 struct AnalyticsApi {
     store: SurrealStore,
     catalogue: Catalogue,
+    accounts: Accounts,
 }
 
-/// The routes over `store`, offering `catalogue`'s indicators. They expect the subject layer's
-/// `Subject`.
-pub(crate) fn router(store: SurrealStore, catalogue: Catalogue) -> Router {
+/// The routes over `store`, offering `catalogue`'s indicators, sharing with the people
+/// `accounts` finds by username. They expect the subject layer's `Subject` and `SessionRoles`.
+pub(crate) fn router(store: SurrealStore, catalogue: Catalogue, accounts: Accounts) -> Router {
     Router::new()
         .route("/explorer", get(explorer))
         .route("/explore", post(explore_route))
-        .with_state(AnalyticsApi { store, catalogue })
+        .route("/dashboards", get(dashboards).post(new_dashboard))
+        .route("/dashboards/{id}", put(change_dashboard))
+        .route("/visualizations", post(save_visualization))
+        .with_state(AnalyticsApi {
+            store,
+            catalogue,
+            accounts,
+        })
 }
 
 fn problem(status: StatusCode, detail: impl Into<String>) -> Response {
@@ -194,6 +226,296 @@ async fn explore_route(
     .into_response()
 }
 
+/// The place levels a Dashboard may be shared with.
+const LEVELS: [PlaceLevel; 4] = [
+    PlaceLevel::Facility,
+    PlaceLevel::District,
+    PlaceLevel::Region,
+    PlaceLevel::National,
+];
+
+/// Who is looking, at their place's level.
+fn viewer_of(subject: &Subject, roles: Option<Extension<SessionRoles>>, area: &[Place]) -> Viewer {
+    Viewer {
+        account: subject.account.clone(),
+        roles: roles.map(|Extension(r)| r.0).unwrap_or_default(),
+        level: area
+            .first()
+            .map_or(PlaceLevel::Facility, |p| p.level)
+            .code()
+            .to_owned(),
+    }
+}
+
+/// The session's area and who it is, or the refusal.
+async fn looking(
+    api: &AnalyticsApi,
+    subject: Option<Extension<Subject>>,
+    roles: Option<Extension<SessionRoles>>,
+    author: bool,
+) -> Result<(Subject, Vec<Place>, Viewer), Box<Response>> {
+    let subject = viewer(subject)?;
+    if author && !subject.permissions.has(AUTHOR_PERMISSION) {
+        return Err(Box::new(problem(
+            StatusCode::FORBIDDEN,
+            "saving Visualizations and Dashboards needs analytics.author",
+        )));
+    }
+    let registry = registry(&api.store).await?;
+    let area = area(&registry, &subject);
+    let viewer = viewer_of(&subject, roles, &area);
+    Ok((subject, area, viewer))
+}
+
+/// Every saved Dashboard and Visualization.
+async fn saved(
+    store: &SurrealStore,
+) -> Result<(Vec<SavedDashboard>, Vec<SavedVisualization>), Box<Response>> {
+    let refused = |e: health_persistence::StoreError| Box::new(unavailable(e));
+    let mut tx = store.begin().await.map_err(refused)?;
+    let dashboards = tx.dashboards().await.map_err(refused)?;
+    let visualizations = tx.visualizations().await.map_err(refused)?;
+    Ok((dashboards, visualizations))
+}
+
+/// `GET /dashboards`.
+async fn dashboards(
+    State(api): State<AnalyticsApi>,
+    subject: Option<Extension<Subject>>,
+    roles: Option<Extension<SessionRoles>>,
+) -> Response {
+    let (subject, _, viewer) = match looking(&api, subject, roles, false).await {
+        Ok(looking) => looking,
+        Err(response) => return *response,
+    };
+    let (dashboards, visualizations) = match saved(&api.store).await {
+        Ok(saved) => saved,
+        Err(response) => return *response,
+    };
+    Json(json!({
+        "where": "central",
+        "canAuthor": subject.permissions.has(AUTHOR_PERMISSION),
+        "dashboards": dashboards
+            .iter()
+            .filter(|d| d.visible_to(&viewer))
+            .map(|d| dashboard_json(d, &visualizations, &viewer))
+            .collect::<Vec<_>>(),
+        "visualizations": unplaced_json(&dashboards, &visualizations, &viewer),
+    }))
+    .into_response()
+}
+
+/// The shares `body` asks for, the people named found by username.
+async fn shares_of(api: &AnalyticsApi, body: &Value) -> Result<Vec<Share>, Box<Response>> {
+    let levels = LEVELS.map(PlaceLevel::code);
+    let asked = read_shares(body, "shares", &levels)
+        .map_err(|why| Box::new(problem(StatusCode::UNPROCESSABLE_ENTITY, why)))?;
+    let mut shares = asked.shares;
+    for username in asked.people {
+        match (api.accounts)(username.clone()).await {
+            Ok(Some(account)) => shares.push(Share::Person { account, username }),
+            Ok(None) => {
+                return Err(Box::new(problem(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("nobody is signed up as {username}"),
+                )));
+            }
+            Err(error) => return Err(Box::new(unavailable(error))),
+        }
+    }
+    Ok(shares)
+}
+
+async fn put_dashboard(
+    store: &SurrealStore,
+    dashboard: &SavedDashboard,
+) -> Result<(), Box<Response>> {
+    let refused = |e: health_persistence::WriteError| Box::new(unavailable(e));
+    let mut tx = store.begin().await.map_err(|e| Box::new(unavailable(e)))?;
+    tx.put_dashboard(dashboard).await.map_err(refused)?;
+    tx.commit().await.map_err(refused)
+}
+
+/// `POST /dashboards`: `{title, shares}`.
+async fn new_dashboard(
+    State(api): State<AnalyticsApi>,
+    subject: Option<Extension<Subject>>,
+    roles: Option<Extension<SessionRoles>>,
+    Json(body): Json<Value>,
+) -> Response {
+    let (_, _, viewer) = match looking(&api, subject, roles, true).await {
+        Ok(looking) => looking,
+        Err(response) => return *response,
+    };
+    let title = match read_title(&body, "title") {
+        Ok(title) => title,
+        Err(why) => return problem(StatusCode::UNPROCESSABLE_ENTITY, why),
+    };
+    let shares = match shares_of(&api, &body).await {
+        Ok(shares) => shares,
+        Err(response) => return *response,
+    };
+    let dashboard = SavedDashboard {
+        id: uuid::Uuid::now_v7().to_string(),
+        owner: viewer.account.clone(),
+        title,
+        shares,
+        items: Vec::new(),
+    };
+    if let Err(response) = put_dashboard(&api.store, &dashboard).await {
+        return *response;
+    }
+    (
+        StatusCode::CREATED,
+        Json(dashboard_json(&dashboard, &[], &viewer)),
+    )
+        .into_response()
+}
+
+/// The session's own Dashboard `id`, or the refusal: 404 when it may not see it, 403 when it
+/// may but is not its owner.
+fn own<'a>(
+    dashboards: &'a [SavedDashboard],
+    id: &str,
+    viewer: &Viewer,
+) -> Result<&'a SavedDashboard, Box<Response>> {
+    match dashboards
+        .iter()
+        .find(|d| d.id == id && d.visible_to(viewer))
+    {
+        None => Err(Box::new(problem(
+            StatusCode::NOT_FOUND,
+            "no such Dashboard",
+        ))),
+        Some(d) if d.owner != viewer.account => Err(Box::new(problem(
+            StatusCode::FORBIDDEN,
+            "only its owner changes a Dashboard",
+        ))),
+        Some(d) => Ok(d),
+    }
+}
+
+/// `PUT /dashboards/{id}`: `{title, shares}`, its owner only.
+async fn change_dashboard(
+    State(api): State<AnalyticsApi>,
+    subject: Option<Extension<Subject>>,
+    roles: Option<Extension<SessionRoles>>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Response {
+    let (_, _, viewer) = match looking(&api, subject, roles, true).await {
+        Ok(looking) => looking,
+        Err(response) => return *response,
+    };
+    let title = match read_title(&body, "title") {
+        Ok(title) => title,
+        Err(why) => return problem(StatusCode::UNPROCESSABLE_ENTITY, why),
+    };
+    let shares = match shares_of(&api, &body).await {
+        Ok(shares) => shares,
+        Err(response) => return *response,
+    };
+    let (dashboards, visualizations) = match saved(&api.store).await {
+        Ok(saved) => saved,
+        Err(response) => return *response,
+    };
+    let mut dashboard = match own(&dashboards, &id, &viewer) {
+        Ok(dashboard) => dashboard.clone(),
+        Err(response) => return *response,
+    };
+    dashboard.title = title;
+    dashboard.shares = shares;
+    if let Err(response) = put_dashboard(&api.store, &dashboard).await {
+        return *response;
+    }
+    Json(dashboard_json(&dashboard, &visualizations, &viewer)).into_response()
+}
+
+/// `POST /visualizations`: `{title, visualization, dashboard?}`.
+async fn save_visualization(
+    State(api): State<AnalyticsApi>,
+    subject: Option<Extension<Subject>>,
+    roles: Option<Extension<SessionRoles>>,
+    Json(body): Json<Value>,
+) -> Response {
+    let (_, area, viewer) = match looking(&api, subject, roles, true).await {
+        Ok(looking) => looking,
+        Err(response) => return *response,
+    };
+    let title = match read_title(&body, "title") {
+        Ok(title) => title,
+        Err(why) => return problem(StatusCode::UNPROCESSABLE_ENTITY, why),
+    };
+    let offered = match api.catalogue.indicators().await {
+        Ok(indicators) => indicators,
+        Err(error) => return unavailable(error),
+    };
+    let setup = match read_setup(&body["visualization"], &offered) {
+        Ok(setup) => setup,
+        Err(why) => return problem(StatusCode::UNPROCESSABLE_ENTITY, why),
+    };
+    if let Some(code) = setup
+        .places
+        .iter()
+        .find(|code| !area.iter().any(|p| p.code == **code))
+    {
+        return problem(StatusCode::FORBIDDEN, format!("{code} is not in your area"));
+    }
+    let visualization = SavedVisualization {
+        id: uuid::Uuid::now_v7().to_string(),
+        owner: viewer.account.clone(),
+        title,
+        setup: setup.json.to_string(),
+    };
+    let mut tx = match api.store.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return unavailable(error),
+    };
+    let onto = match &body["dashboard"] {
+        Value::Null => None,
+        Value::String(id) => {
+            let dashboards = match tx.dashboards().await {
+                Ok(dashboards) => dashboards,
+                Err(error) => return unavailable(error),
+            };
+            let mut dashboard = match own(&dashboards, id, &viewer) {
+                Ok(dashboard) => dashboard.clone(),
+                Err(response) => return *response,
+            };
+            if dashboard.items.len() >= MOST_ITEMS {
+                return problem(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("a Dashboard holds at most {MOST_ITEMS} Visualizations"),
+                );
+            }
+            dashboard.items.push(visualization.id.clone());
+            Some(dashboard)
+        }
+        _ => return problem(StatusCode::UNPROCESSABLE_ENTITY, "`dashboard` is not an id"),
+    };
+    if let Err(error) = tx.put_visualization(&visualization).await {
+        return unavailable(error);
+    }
+    if let Some(dashboard) = &onto
+        && let Err(error) = tx.put_dashboard(dashboard).await
+    {
+        return unavailable(error);
+    }
+    if let Err(error) = tx.commit().await {
+        return unavailable(error);
+    }
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "id": visualization.id,
+            "title": visualization.title,
+            "visualization": setup.json,
+            "dashboard": onto.map(|d| d.id),
+        })),
+    )
+        .into_response()
+}
+
 // After the routes: the route inventory reads this file up to its first test-only item.
 /// Where the indicators offered come from.
 #[derive(Clone)]
@@ -234,7 +556,6 @@ mod tests {
     use health_facility_registry::{
         AdministrativeAreas, Area, District, parse_nhfr_csv, plan_import,
     };
-    use health_persistence::Transaction as _;
     use health_surrealdb::{Connection, MIGRATIONS, Settings, Target, migrate};
     use health_sync_protocol::IndicatorSummary;
     use health_time::SystemClock;
@@ -395,8 +716,31 @@ mod tests {
         path: &str,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
-        let app = router(store.clone(), Catalogue::Fixed(vec![visits(), weeks()]))
-            .layer(Extension(subject));
+        ask_as(store, subject, &[], method, path, body).await
+    }
+
+    /// Asks as `subject` holding `roles`; each username is its own account id, and `nobody`
+    /// has none.
+    async fn ask_as(
+        store: &SurrealStore,
+        subject: Subject,
+        roles: &[&str],
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
+        let accounts: Accounts = Arc::new(|username: String| {
+            Box::pin(async move { Ok((username != "nobody").then_some(username)) })
+        });
+        let app = router(
+            store.clone(),
+            Catalogue::Fixed(vec![visits(), weeks()]),
+            accounts,
+        )
+        .layer(Extension(subject))
+        .layer(Extension(SessionRoles(
+            roles.iter().map(|r| (*r).to_owned()).collect(),
+        )));
         let request = Request::builder()
             .method(method)
             .uri(path)
@@ -521,5 +865,235 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(explorer["place"]["code"], "KAM020");
         assert_eq!(explorer["places"], json!([]));
+    }
+
+    fn author(place: &str, account: &str) -> Subject {
+        Subject {
+            account: account.into(),
+            ..subject(place, true, [VIEW_PERMISSION, AUTHOR_PERMISSION])
+        }
+    }
+
+    fn saved_setup(places: &[&str], follow: Option<&str>) -> Value {
+        let mut setup = json!({
+            "type": "column",
+            "layout": "placesByIndicators",
+            "series": "place",
+            "question": question(places),
+        });
+        if let Some(follow) = follow {
+            setup["follow"] = json!(follow);
+        }
+        setup
+    }
+
+    #[tokio::test]
+    async fn a_district_user_shares_a_dashboard_with_every_district() {
+        let store = central().await;
+        let kampala = author("district-kampala", "okot");
+        let (status, made) = ask(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "ANC", "shares": [{ "with": "level", "level": "district" }] })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{made}");
+        let id = made["id"].as_str().expect("id").to_owned();
+        let (status, saved) = ask(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/visualizations",
+            Some(json!({
+                "title": "ANC 1st visits by area",
+                "dashboard": id,
+                "visualization": saved_setup(&["KAM013", "KAM020", "KAM031"], Some("eachAreaUnder")),
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{saved}");
+        assert_eq!(saved["dashboard"], id.as_str());
+
+        // Another district's user, who may not author, opens it: the setup follows them.
+        let wakiso = Subject {
+            account: "nakato".into(),
+            ..subject("district-wakiso", true, [VIEW_PERMISSION])
+        };
+        let (status, listed) = ask(&store, wakiso.clone(), "GET", "/dashboards", None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        assert_eq!(listed["canAuthor"], false);
+        let dashboard = &listed["dashboards"][0];
+        assert_eq!(dashboard["title"], "ANC");
+        assert_eq!(dashboard["mine"], false);
+        assert_eq!(
+            dashboard["shares"],
+            Value::Null,
+            "only its owner reads its shares"
+        );
+        let item = &dashboard["items"][0];
+        assert_eq!(item["title"], "ANC 1st visits by area");
+        assert_eq!(item["visualization"]["follow"], "eachAreaUnder");
+        // Their own area's figures: Wakiso HC IV's, never Kampala's.
+        let mut asked = item["visualization"]["question"].clone();
+        asked["places"] = json!(["WAK001"]);
+        let (status, answer) = ask(&store, wakiso.clone(), "POST", "/explore", Some(asked)).await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert_eq!(answer["cells"][0]["value"], "50");
+
+        // A facility session is not a district, so it is not shared with it.
+        let facility = Subject {
+            account: "akello".into(),
+            ..subject("KAM013", false, [VIEW_PERMISSION])
+        };
+        let (_, listed) = ask(&store, facility, "GET", "/dashboards", None).await;
+        assert_eq!(listed["dashboards"], json!([]));
+
+        // Its owner reads its shares and may change them; nobody else may.
+        let (_, own) = ask(&store, kampala.clone(), "GET", "/dashboards", None).await;
+        assert_eq!(own["canAuthor"], true);
+        assert_eq!(own["dashboards"][0]["shares"][0]["level"], "district");
+        let change = json!({ "title": "ANC, shared", "shares": [{ "with": "person", "username": "nakato" }] });
+        let other_author = author("district-wakiso", "nakato");
+        let (status, _) = ask(
+            &store,
+            other_author,
+            "PUT",
+            &format!("/dashboards/{id}"),
+            Some(change.clone()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, changed) = ask(
+            &store,
+            kampala,
+            "PUT",
+            &format!("/dashboards/{id}"),
+            Some(change),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+        assert_eq!(
+            changed["shares"],
+            json!([{ "with": "person", "account": "nakato", "username": "nakato" }])
+        );
+        let (_, listed) = ask(&store, wakiso, "GET", "/dashboards", None).await;
+        assert_eq!(listed["dashboards"][0]["title"], "ANC, shared");
+    }
+
+    #[tokio::test]
+    async fn a_dashboard_shared_with_a_role_reaches_whoever_holds_it() {
+        let store = central().await;
+        let (_, made) = ask(
+            &store,
+            author("district-kampala", "okot"),
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "HMIS", "shares": [{ "with": "role", "role": "in-charge" }] })),
+        )
+        .await;
+        let viewer = Subject {
+            account: "akello".into(),
+            ..subject("KAM013", false, [VIEW_PERMISSION])
+        };
+        let (_, listed) = ask_as(
+            &store,
+            viewer.clone(),
+            &["in-charge"],
+            "GET",
+            "/dashboards",
+            None,
+        )
+        .await;
+        assert_eq!(listed["dashboards"][0]["id"], made["id"]);
+        let (_, listed) = ask_as(&store, viewer, &["clerk"], "GET", "/dashboards", None).await;
+        assert_eq!(listed["dashboards"], json!([]));
+    }
+
+    #[tokio::test]
+    async fn saving_needs_analytics_author_and_places_in_the_area() {
+        let store = central().await;
+        let viewer = subject("district-kampala", true, [VIEW_PERMISSION]);
+        let save = json!({
+            "title": "ANC",
+            "visualization": saved_setup(&["district-kampala"], Some("myPlace")),
+        });
+        let (status, _) = ask(
+            &store,
+            viewer.clone(),
+            "POST",
+            "/visualizations",
+            Some(save.clone()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let (status, _) = ask(
+            &store,
+            viewer,
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "ANC" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        let kampala = author("district-kampala", "okot");
+        let (status, saved) = ask(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/visualizations",
+            Some(save),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{saved}");
+        // Saved onto no Dashboard, it is listed as the author's own.
+        let (_, listed) = ask(&store, kampala.clone(), "GET", "/dashboards", None).await;
+        assert_eq!(listed["visualizations"][0]["id"], saved["id"]);
+
+        let outside = json!({ "title": "Wakiso", "visualization": saved_setup(&["WAK001"], None) });
+        let (status, _) = ask(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/visualizations",
+            Some(outside),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        for wrong in [
+            json!({ "title": "", "visualization": saved_setup(&["KAM013"], None) }),
+            json!({ "title": "x", "visualization": { "type": "pie" } }),
+            json!({ "title": "x", "visualization": saved_setup(&["KAM013"], None), "dashboard": 3 }),
+        ] {
+            let (status, _) = ask(
+                &store,
+                kampala.clone(),
+                "POST",
+                "/visualizations",
+                Some(wrong),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        let (status, _) = ask(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/visualizations",
+            Some(json!({ "title": "x", "visualization": saved_setup(&["KAM013"], None), "dashboard": "none" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (status, _) = ask(
+            &store,
+            kampala,
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "x", "shares": [{ "with": "person", "username": "nobody" }] })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     }
 }

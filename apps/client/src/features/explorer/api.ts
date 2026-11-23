@@ -246,6 +246,12 @@ export type TableLayout = 'placesByIndicators' | 'indicatorsByPeriods'
 export type SeriesBy = 'indicator' | 'place' | 'band'
 
 /**
+ * Whose places a Visualization shows when they follow the viewer (#602): the viewer's own place,
+ * or each area directly under it. A saved one shared with another district shows that district's.
+ */
+export type Follow = 'myPlace' | 'eachAreaUnder'
+
+/**
  * What a Visualization shows: the question asked and how its answer is drawn. Switching the type
  * keeps the question; a saved Visualization (#602) is this with a title.
  */
@@ -254,6 +260,18 @@ export interface Visualization {
   question: Question
   layout: TableLayout
   series: SeriesBy
+  /** Set when the places follow the viewer rather than name places; picking places clears it. */
+  follow?: Follow
+}
+
+/**
+ * `shown` as `explorer`'s session sees it (#602): when it follows the viewer, its places are the
+ * session's own place or each area under it, whoever saved it; otherwise as saved.
+ */
+export function forViewer(explorer: Explorer, shown: Visualization): Visualization {
+  if (shown.follow === undefined) return shown
+  const places = shown.follow === 'myPlace' ? (explorer.place === null ? [] : [explorer.place.code]) : childAreas(explorer)
+  return { ...shown, question: { ...shown.question, places } }
 }
 
 /** One series of a chart: an indicator at a place, or one band of it. */

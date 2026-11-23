@@ -165,6 +165,18 @@ impl<S: AuthStore> Subjects<S> {
         method: &str,
         uri: &str,
     ) -> Result<(Subject, Agent, uuid::Uuid), Refused> {
+        self.resolve_with_roles(headers, method, uri)
+            .await
+            .map(|(subject, agent, session, _)| (subject, agent, session))
+    }
+
+    /// [`Self::resolve`], with the role codes the user holds at the session's place.
+    async fn resolve_with_roles(
+        &self,
+        headers: &HeaderMap,
+        method: &str,
+        uri: &str,
+    ) -> Result<(Subject, Agent, uuid::Uuid, SessionRoles), Refused> {
         let principal = self.verifier.verify(headers, method, uri).await?;
         let declared = match headers.get(PURPOSE_HEADER) {
             Some(value) => Some(
@@ -184,6 +196,7 @@ impl<S: AuthStore> Subjects<S> {
             .current_snapshot(principal.account, facility)
             .await?;
         let mut subject = subject_of(&snapshot, &self.roles, purpose.clone());
+        let roles = SessionRoles(snapshot.roles.iter().map(|r| r.role.clone()).collect());
         // A session at a district, region or the national place reads no patient-level records
         // (ADR 0094); the level is the token's, which central signed at sign-in.
         subject.area = principal.place_level.is_area();
@@ -207,7 +220,7 @@ impl<S: AuthStore> Subjects<S> {
             // Every access under an active grant is audited with BTG.
             break_glass: subject.break_glass.is_some(),
         };
-        Ok((subject, agent, principal.session))
+        Ok((subject, agent, principal.session, roles))
     }
 
     /// The absolute URL of a request path, on the issuer's origin (for the DPoP `htu`).
@@ -216,7 +229,13 @@ impl<S: AuthStore> Subjects<S> {
     }
 }
 
-/// Middleware: inserts the request's `Subject` and `Agent`, or refuses it (401, or 400 for an
+/// The role codes the session's user holds at its place, from the same snapshot as its
+/// `Subject`: what a Dashboard shared with a role is matched against (#602). `subject_layer`
+/// inserts it beside the `Subject`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SessionRoles(pub std::collections::BTreeSet<String>);
+
+/// Middleware: inserts the request's `Subject`, `SessionRoles` and `Agent`, or refuses it (401, or 400 for an
 /// unknown purpose of use). A request with no credentials at all passes without a subject, so
 /// the routes decide: the FHIR server answers 401 except for `/metadata`. Use with
 /// `axum::middleware::from_fn_with_state`.
@@ -231,12 +250,13 @@ pub async fn subject_layer<S: AuthStore + 'static>(
         .map_or_else(|| request.uri().path().to_owned(), |o| o.path().to_owned());
     let uri = subjects.absolute(&path);
     match subjects
-        .resolve(request.headers(), request.method().as_str(), &uri)
+        .resolve_with_roles(request.headers(), request.method().as_str(), &uri)
         .await
     {
-        Ok((subject, agent, _)) => {
+        Ok((subject, agent, _, roles)) => {
             request.extensions_mut().insert(subject);
             request.extensions_mut().insert(agent);
+            request.extensions_mut().insert(roles);
             next.run(request).await
         }
         Err(Refused::Access(AccessError::Missing)) => next.run(request).await,

@@ -49,6 +49,8 @@
 //!   and rolls them up over a set of facilities from their summed parts.
 //! - **The data explorer** ([`explore`], #599): indicators × places × a range of standard
 //!   periods, at central over synced summaries and on an edge over its own.
+//! - **Saved Dashboards** ([`dashboards`], #602): what a saved Visualization's setup and a
+//!   Dashboard's shares may hold, and how a Dashboard reads to a viewer.
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -68,6 +70,7 @@ use health_analytics::{
 };
 use health_fhir_validation::{FhirPathEngine, FhirPathItem};
 
+pub mod dashboards;
 pub mod explore;
 pub mod incremental;
 pub mod report;

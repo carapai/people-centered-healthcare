@@ -164,6 +164,9 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("indicator_summary_upstream", "analytics"),
     ("facility_indicator_summary", "analytics"),
     ("facility_indicator_sync", "analytics"),
+    // Saved Visualizations and Dashboards, user content at central (#602).
+    ("saved_visualization", "analytics"),
+    ("saved_dashboard", "analytics"),
     // Stock (health-inventory).
     ("stock_balance", "inventory"),
     ("stock_movement", "inventory"),
