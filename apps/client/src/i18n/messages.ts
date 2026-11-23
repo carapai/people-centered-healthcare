@@ -737,6 +737,13 @@ type ExplorerValues = {
   exType_line: {}
   exType_table: {}
   exType_single: {}
+  exType_map: {}
+  exMapLabel: { indicator: string; period: string }
+  exMapNoGeometry: {}
+  exMapPlace: { name: string; figure: string }
+  exMapNoFigure: {}
+  exMapHollow: {}
+  exMapLoading: {}
   exLayout: {}
   exLayout_placesByIndicators: {}
   exLayout_indicatorsByPeriods: {}
@@ -865,6 +872,13 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   exType_line: { id: 'app.explorer.type.line', defaultMessage: 'Line', description: 'Data explorer: Visualization type' },
   exType_table: { id: 'app.explorer.type.table', defaultMessage: 'Table', description: 'Data explorer: Visualization type' },
   exType_single: { id: 'app.explorer.type.single', defaultMessage: 'Single number', description: 'Data explorer: Visualization type' },
+  exType_map: { id: 'app.explorer.type.map', defaultMessage: 'Map', description: 'Data explorer: Visualization type' },
+  exMapLabel: { id: 'app.explorer.mapLabel', defaultMessage: 'Map of {indicator}, {period}', description: 'Data explorer: a map’s accessible name' },
+  exMapNoGeometry: { id: 'app.explorer.mapNoGeometry', defaultMessage: 'None of these places has a boundary or coordinates to draw.', description: 'Data explorer: nothing to draw on a map' },
+  exMapPlace: { id: 'app.explorer.mapPlace', defaultMessage: '{name}: {figure}', description: 'Data explorer: a place on a map, with its figure' },
+  exMapNoFigure: { id: 'app.explorer.mapNoFigure', defaultMessage: 'no figure', description: 'Data explorer: a place on a map without a figure' },
+  exMapHollow: { id: 'app.explorer.mapHollow', defaultMessage: 'A hollow point is a facility that has not synced this period.', description: 'Data explorer: the key to hollow facility points on a map' },
+  exMapLoading: { id: 'app.explorer.mapLoading', defaultMessage: 'Loading the map…', description: 'Data explorer: the map’s places are loading' },
   exLayout: { id: 'app.explorer.layout', defaultMessage: 'Table layout', description: 'Data explorer: how the table lays out its figures' },
   exLayout_placesByIndicators: { id: 'app.explorer.layout.placesByIndicators', defaultMessage: 'Places × indicators', description: 'Data explorer: places down the side, indicators across' },
   exLayout_indicatorsByPeriods: { id: 'app.explorer.layout.indicatorsByPeriods', defaultMessage: 'Indicators × periods', description: 'Data explorer: indicators down the side, periods across' },

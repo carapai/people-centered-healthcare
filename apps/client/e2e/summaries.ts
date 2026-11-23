@@ -2,7 +2,9 @@
 // (HEALTH_DEV_INDICATOR_SUMMARIES) as if the facilities' edges had synced them, since a local
 // backend has no edges computing indicators. They are summary MeasureReports of the sample
 // indicators (e2e/fixtures/indicators; malaria test positivity's for #600; ANC 1st visits by age band for #601), written as health-analytics-app's `report` writes them,
-// for KAM013, KAM020 and WAK001; KAM031 never syncs, so it shows as missing in Kampala.
+// for KAM013, KAM020 and WAK001, and Jinja's and Gulu's referral hospitals (JIN001, GUL001) so a
+// national map shades the Eastern and Northern regions too (#604); KAM031 never syncs, so it
+// shows as missing in Kampala.
 
 const MEASURES = 'https://health.go.ug/fhir/Measure/'
 export const FIRST_VISITS = `${MEASURES}sample-anc-first-visits|1.0.0`
@@ -94,15 +96,19 @@ function report(measure: string, period: Period, facility: string, group: object
   }
 }
 
+/** This quarter's malaria positives out of 20 outside the Central region (#604): Jinja 25% (*warning*), Gulu 10% (*good*). */
+const ELSEWHERE_THIS_QUARTER: Record<string, number> = { JIN001: 5, GUL001: 2 }
+
 /**
  * Malaria test positivity's share positive in `period`, out of 20: in quarters, 9 (45%, in the
- * *bad* band) this quarter and 6 (30%, a *warning*) the quarter before, at every facility, so
- * Kampala's rolled-up figure is the same (#600); elsewhere a steady 3 to 9.
+ * *bad* band) this quarter and 6 (30%, a *warning*) the quarter before, at every facility of the
+ * Central region, so Kampala's rolled-up figure is the same (#600), and the Eastern and Northern
+ * regions' this quarter from `ELSEWHERE_THIS_QUARTER`; elsewhere a steady 3 to 9.
  */
 function positiveOutOf20(facility: string, period: Period, today: Date): number {
   if (period.kind === 'quarterly') {
     const current = periodOf('quarterly', today)
-    if (period.id === current.id) return 9
+    if (period.id === current.id) return ELSEWHERE_THIS_QUARTER[facility] ?? 9
     if (period.id === periodOf('quarterly', new Date(current.start.getTime() - 86_400_000)).id) return 6
   }
   return 3 + (figure(facility, period, 0) % 7)
@@ -128,6 +134,8 @@ export function sampleSummaries(today: Date): object[] {
     ['KAM013', 14],
     ['KAM020', 9],
     ['WAK001', 20],
+    ['JIN001', 25],
+    ['GUL001', 12],
   ] as const) {
     for (const period of periods) {
       const computed = new Date(Math.min(today.getTime(), period.end.getTime() + 86_400_000 + 6 * 3_600_000))

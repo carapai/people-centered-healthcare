@@ -9,7 +9,10 @@
 //!   last sync, never counted as zero; a median or a distinct count above facility level has no
 //!   figure and says why. A place outside the session's area is refused (403).
 //!
-//! Both read summaries only, never patient-level records, and need [`VIEW_PERMISSION`].
+//! - `GET /map` (#604) answers what a map of the area draws: each district's and region's
+//!   boundary from the national core package, and each open facility's NHFR coordinates.
+//!
+//! They read summaries only, never patient-level records, and need [`VIEW_PERMISSION`].
 //!
 //! Saved Visualizations and Dashboards (#602; ADR 0075), user content kept here at central:
 //!
@@ -52,7 +55,7 @@ use health_analytics_app::explore::{
     ExplorePlace, cells_json, explore, indicator_json, periods_json, read_question,
 };
 use health_auth::SessionRoles;
-use health_facility_registry::{Place, PlaceLevel, Places};
+use health_facility_registry::{AdministrativeBoundaries, Place, PlaceLevel, Places};
 use health_persistence::{Store as _, Transaction as _};
 use health_publication::{Publications, PublishedDashboard};
 use health_registries_app::places::places;
@@ -87,6 +90,7 @@ pub(crate) fn router(
     Router::new()
         .route("/explorer", get(explorer))
         .route("/explore", post(explore_route))
+        .route("/map", get(map))
         .route("/dashboards", get(dashboards).post(new_dashboard))
         .route("/dashboards/{id}", put(change_dashboard))
         .route("/visualizations", post(save_visualization))
@@ -242,6 +246,58 @@ async fn explore_route(
         "cells": cells_json(&cells, &names, question.disaggregation.as_deref()),
     }))
     .into_response()
+}
+
+/// `GET /map` (#604): what a map of the session's area draws, from the facility registry and the
+/// national core package: the boundary of each district and region in the area that has one, and
+/// each open facility in it with its NHFR coordinates. The figures come from `POST /explore`.
+async fn map(State(api): State<AnalyticsApi>, subject: Option<Extension<Subject>>) -> Response {
+    let subject = match viewer(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    let boundaries = match api.catalogue.boundaries().await {
+        Ok(boundaries) => boundaries.unwrap_or_default(),
+        Err(error) => return unavailable(error),
+    };
+    Json(map_json(&area(&registry, &subject), &boundaries)).into_response()
+}
+
+/// The map of `area`: its regions' and districts' `boundaries`, and its open facilities' points.
+pub(crate) fn map_json(area: &[Place], boundaries: &AdministrativeBoundaries) -> Value {
+    // Regions first, so a district is drawn over its region.
+    let areas: Vec<Value> = [PlaceLevel::Region, PlaceLevel::District]
+        .iter()
+        .flat_map(|level| area.iter().filter(move |p| p.level == *level))
+        .filter_map(|p| {
+            let boundary = boundaries.of(&p.code)?;
+            Some(json!({
+                "code": p.code,
+                "name": p.name,
+                "level": p.level.code(),
+                "geometry": boundary.geometry,
+            }))
+        })
+        .collect();
+    let facilities: Vec<Value> = area
+        .iter()
+        .filter(|p| p.level == PlaceLevel::Facility && p.active)
+        .filter_map(|p| {
+            let at = p.coordinates.as_ref()?;
+            Some(json!({
+                "code": p.code,
+                "name": p.name,
+                "parent": p.parent,
+                "latitude": at.latitude,
+                "longitude": at.longitude,
+            }))
+        })
+        .collect();
+    json!({ "areas": areas, "facilities": facilities })
 }
 
 /// The place levels a Dashboard may be shared with.
@@ -660,9 +716,13 @@ pub(crate) enum Catalogue {
     /// Every published package version's indicators, and the newest published version's
     /// standard Dashboards of each package.
     Published(Option<Publications>),
-    /// Fixed lists, for tests.
+    /// Fixed lists, and boundaries, for tests.
     #[cfg(test)]
-    Fixed(Vec<Indicator>, Vec<PublishedDashboard>),
+    Fixed(
+        Vec<Indicator>,
+        Vec<PublishedDashboard>,
+        Option<AdministrativeBoundaries>,
+    ),
 }
 
 impl Catalogue {
@@ -674,7 +734,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(indicators, _) => Ok(indicators.clone()),
+            Self::Fixed(indicators, _, _) => Ok(indicators.clone()),
         }
     }
 
@@ -686,7 +746,20 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, dashboards) => Ok(dashboards.clone()),
+            Self::Fixed(_, dashboards, _) => Ok(dashboards.clone()),
+        }
+    }
+
+    /// The region and district boundaries of the newest published package holding any (#604).
+    async fn boundaries(&self) -> Result<Option<AdministrativeBoundaries>, String> {
+        match self {
+            Self::Published(None) => Ok(None),
+            Self::Published(Some(publications)) => publications
+                .administrative_boundaries()
+                .await
+                .map_err(|e| e.to_string()),
+            #[cfg(test)]
+            Self::Fixed(_, _, boundaries) => Ok(boundaries.clone()),
         }
     }
 }
@@ -791,11 +864,11 @@ mod tests {
                 .to_vec(),
         };
         let rows = parse_nhfr_csv(
-            "nhfr_id,name,district,status\n\
-             KAM013,Kisenyi HC IV,district-kampala,open\n\
-             KAM020,Kawempe HC III,district-kampala,open\n\
-             KAM031,Kitebi HC III,district-kampala,open\n\
-             WAK001,Wakiso HC IV,district-wakiso,open\n",
+            "nhfr_id,name,district,status,latitude,longitude\n\
+             KAM013,Kisenyi HC IV,district-kampala,open,0.3136,32.5664\n\
+             KAM020,Kawempe HC III,district-kampala,open,,\n\
+             KAM031,Kitebi HC III,district-kampala,open,0.2870,32.5590\n\
+             WAK001,Wakiso HC IV,district-wakiso,open,0.4044,32.4594\n",
         )
         .expect("rows");
         let plan = plan_import(&Places::default(), &areas, &rows).expect("plan");
@@ -879,7 +952,7 @@ mod tests {
         path: &str,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
-        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new());
+        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new(), None);
         ask_in(store, catalogue, subject, roles, method, path, body).await
     }
 
@@ -999,6 +1072,94 @@ mod tests {
         dates["from"] = json!("2026-03-05");
         let (status, _) = ask(&store, district, "POST", "/explore", Some(dates)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    /// The national core's boundaries of Central region and Kampala (none for Wakiso).
+    fn boundaries() -> AdministrativeBoundaries {
+        let square = |x: f64, y: f64, size: f64| {
+            health_facility_registry::Geometry::Polygon(vec![vec![
+                [x, y],
+                [x + size, y],
+                [x + size, y + size],
+                [x, y + size],
+                [x, y],
+            ]])
+        };
+        AdministrativeBoundaries {
+            features: [
+                ("region-central", square(31.0, -1.0, 2.5)),
+                ("district-kampala", square(32.5, 0.25, 0.15)),
+            ]
+            .map(|(code, geometry)| health_facility_registry::Boundary {
+                properties: health_facility_registry::BoundaryProperties {
+                    code: code.into(),
+                    name: None,
+                },
+                geometry,
+            })
+            .to_vec(),
+        }
+    }
+
+    async fn map_for(store: &SurrealStore, subject: Subject) -> (StatusCode, Value) {
+        let catalogue = Catalogue::Fixed(vec![visits()], Vec::new(), Some(boundaries()));
+        ask_in(store, catalogue, subject, &[], "GET", "/map", None).await
+    }
+
+    #[tokio::test]
+    async fn a_map_draws_the_area_s_boundaries_and_facility_points_only() {
+        let store = central().await;
+        // A national user: every region and district in the area that has a boundary, and every
+        // facility with NHFR coordinates; a region's figure comes from /explore like any place.
+        let (status, map) = map_for(&store, subject("central", true, [VIEW_PERMISSION])).await;
+        assert_eq!(status, StatusCode::OK);
+        let codes = |key: &str| -> Vec<String> {
+            map[key]
+                .as_array()
+                .expect(key)
+                .iter()
+                .map(|p| p["code"].as_str().unwrap_or_default().to_owned())
+                .collect()
+        };
+        assert_eq!(codes("areas"), ["region-central", "district-kampala"]);
+        assert_eq!(map["areas"][0]["level"], "region");
+        assert_eq!(map["areas"][0]["geometry"]["type"], "Polygon");
+        assert_eq!(codes("facilities"), ["KAM013", "KAM031", "WAK001"]);
+        assert_eq!(map["facilities"][0]["latitude"], "0.3136");
+        assert_eq!(map["facilities"][0]["parent"], "district-kampala");
+        let (status, answer) = ask(
+            &store,
+            subject("central", true, [VIEW_PERMISSION]),
+            "POST",
+            "/explore",
+            Some(json!({
+                "indicators": [visits().canonical()],
+                "periodType": "monthly",
+                "from": "2026-03",
+                "to": "2026-03",
+                "places": ["region-central"],
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(answer["cells"][0]["place"], "region-central");
+        assert_eq!(answer["cells"][0]["value"], "60");
+
+        // A district user: their district only, never the region around it or a neighbour.
+        let (_, map) = map_for(&store, subject("district-kampala", true, [VIEW_PERMISSION])).await;
+        assert_eq!(codes_of(&map["areas"]), ["district-kampala"]);
+        assert_eq!(codes_of(&map["facilities"]), ["KAM013", "KAM031"]);
+
+        let (status, _) = map_for(&store, subject("central", true, ["Organization.rs"])).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
+    fn codes_of(list: &Value) -> Vec<&str> {
+        list.as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p["code"].as_str())
+            .collect()
     }
 
     #[tokio::test]
@@ -1287,6 +1448,7 @@ mod tests {
                 version: "1.0.0".into(),
                 dashboard,
             }],
+            None,
         )
     }
 

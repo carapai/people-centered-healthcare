@@ -236,8 +236,8 @@ export function previousPeriod(kind: PeriodType, id: string): string {
   }
 }
 
-/** The kinds of Visualization the explorer shows (ADR 0075); a map comes later. */
-export type VisualizationType = 'column' | 'line' | 'table' | 'single'
+/** The kinds of Visualization the explorer shows (ADR 0075): a map (#604) shades boundaries and facility points by band. */
+export type VisualizationType = 'column' | 'line' | 'table' | 'single' | 'map'
 
 /** How a table lays out its figures. */
 export type TableLayout = 'placesByIndicators' | 'indicatorsByPeriods'

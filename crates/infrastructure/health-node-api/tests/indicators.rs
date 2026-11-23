@@ -468,4 +468,9 @@ async fn a_facility_user_explores_their_facility_s_months_offline() {
         .await
         .expect_err("refused");
     assert_eq!(status.as_u16(), 403);
+
+    // A map here draws no boundaries (#604): only the facility's own point, which this node's
+    // registry does not hold yet.
+    let map = health_node_api::analytics::map_here(&store, FACILITY).await;
+    assert_eq!(map, json!({ "areas": [], "facilities": [] }));
 }

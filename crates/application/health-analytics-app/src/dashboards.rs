@@ -344,6 +344,14 @@ mod tests {
     }
 
     #[test]
+    fn a_map_is_saved_like_any_other_type() {
+        let mut body = setup();
+        body["type"] = json!("map");
+        let read = read_setup(&body, &[visits()]).expect("a map");
+        assert_eq!(read.json["type"], "map");
+    }
+
+    #[test]
     fn a_setup_the_explorer_cannot_draw_is_refused() {
         for (path, value) in [
             ("type", json!("pie")),

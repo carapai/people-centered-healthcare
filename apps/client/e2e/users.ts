@@ -33,6 +33,9 @@ export const USERS = {
   // Another district's user, at Wakiso, who may explore but not author: opens what Kampala shares
   // with every district and sees Wakiso's figures (#602).
   wakiso: { username: 'e2e-wakiso', password: 'harrier canyon velvet fourteen', roles: 'district', place: 'district-wakiso' },
+  // A role held at the national place (`central`, ADR 0094): explores every region, and maps them
+  // shaded by band over the national core's boundaries (#604).
+  national: { username: 'e2e-national', password: 'osprey granary violet fifteen', roles: 'district', place: 'central' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
 } as const

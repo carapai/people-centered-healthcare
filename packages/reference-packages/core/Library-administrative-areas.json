@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "name": "AdministrativeAreas",
   "title": "Uganda's regions and districts",
-  "description": "The regions and districts the facility registry places facilities in (ADR 0094): the NHFR import links each facility to its district by code. A sample of the country's districts; boundaries are not shipped yet.",
+  "description": "The regions and districts the facility registry places facilities in (ADR 0094): the NHFR import links each facility to its district by code. A sample of the country's districts; their boundaries are Library/administrative-boundaries.",
   "type": {
     "coding": [
       {

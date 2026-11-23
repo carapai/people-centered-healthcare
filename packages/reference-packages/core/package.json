@@ -2,7 +2,7 @@
   "name": "ug.moh.core",
   "version": "1.0.0",
   "title": "Uganda MoH national core",
-  "description": "MoH's national core configuration: the Age Band Sets HMIS reports disaggregate by (ADR 0071), and the regions and districts the facility registry places facilities in (ADR 0094).",
+  "description": "MoH's national core configuration: the Age Band Sets HMIS reports disaggregate by (ADR 0071), and the regions and districts the facility registry places facilities in (ADR 0094), with their boundaries for maps (ADR 0075).",
   "fhirVersions": [
     "5.0.0"
   ],

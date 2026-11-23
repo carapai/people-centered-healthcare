@@ -8,10 +8,13 @@ The data explorer (ADR 0075; analytics.md § Dashboards; #599).
 - **Threshold colours** (#600): an indicator's bands (`thresholds`, from its Measure's `indicator-threshold` extensions) colour bars, line points, table cells and single numbers, with a legend per banded indicator (`toneOf`).
 - **Disaggregation and series** (#601): the Disaggregation picker offers what every picked indicator is broken down by (`sharedDisaggregations`); the answer then carries each figure's `bands`. *Series* is by indicator, place or band (`chartSeries`, also the rows of the table under a chart), and *Each area under* the user's place picks the places directly below it (`childAreas`). Picking an indicator without the disaggregation drops it (`fitted`).
 - **Saving** (#602): *Save Visualization* (shown at central to those holding `analytics.author`) saves the setup with a title, optionally onto one of the user's Dashboards or a new one (`features/dashboards`). The default places and *Each area under* follow the viewer (`follow`; `forViewer`), so a shared Visualization shows each viewer their own area; picking places by hand names them. `/explore?v=` opens a saved setup (*Open in explorer*). `LiveVisualization` asks for and draws a setup, here and on each Dashboard item.
+- **Maps** (#604): the *Map* type draws, per indicator, the range's last period over the national core's district and region boundaries and the NHFR's facility coordinates (`GET /api/analytics/map`, `map.ts`'s `drawnMap`): the places asked shaded by band over the viewer's own place, the facilities in them as points, hollow with their last sync on hover when they have not synced. The figures table stays under it.
 - The chart is drawn as SVG here, as the dashboards prototype did; no charting library is used.
 
 ## Tests
 
 - `test/explorer.test.ts`: standard period ids, the range pickers, the API, the chart's series, threshold tones, the period before, single numbers, table layouts, and band and place series.
+- `test/map.test.ts`: a national map shading regions by band, hollow unsynced facilities, a district over its region, and the map API.
+- `e2e/maps.spec.ts`: `e2e-national` maps the regions' malaria positivity, and `e2e-district` maps Kampala only.
 - `test/dashboards.test.ts`: places that follow the viewer, *Open in explorer*'s search, and the dashboards API.
 - `e2e/explorer.spec.ts`: `e2e-district` explores Kampala on the local backend, and switches chart types over the sample malaria positivity (45%, bad), and splits the sample ANC 1st visits by age band and compares Kampala's facilities.

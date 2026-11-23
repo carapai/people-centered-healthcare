@@ -36,8 +36,9 @@ pub const EACH_AREA_UNDER: &str = "eachAreaUnder";
 /// Whose places a Visualization may follow.
 pub const FOLLOW: [&str; 2] = [MY_PLACE, EACH_AREA_UNDER];
 
-/// The kinds of Visualization the explorer draws.
-pub const TYPES: [&str; 4] = ["column", "line", "table", "single"];
+/// The kinds of Visualization the explorer draws (a map, #604: boundaries and facility points
+/// shaded by threshold band).
+pub const TYPES: [&str; 5] = ["column", "line", "table", "single", "map"];
 
 /// How a table lays out its figures.
 pub const LAYOUTS: [&str; 2] = ["placesByIndicators", "indicatorsByPeriods"];
@@ -346,7 +347,7 @@ mod tests {
         assert_eq!(
             named.problems(&catalogue()),
             [
-                "Visualization 1 (ANC 1st visits by area)'s type pie is not one of column, line, table, single",
+                "Visualization 1 (ANC 1st visits by area)'s type pie is not one of column, line, table, single, map",
                 "Visualization 1 (ANC 1st visits by area) follows KAM013: a standard Dashboard shows each viewer their own area, so follow myPlace or eachAreaUnder",
                 "Visualization 1 (ANC 1st visits by area) has series by band but no disaggregation",
                 "Visualization 1 (ANC 1st visits by area) shows the last 0 periods: show 1 to 106",
