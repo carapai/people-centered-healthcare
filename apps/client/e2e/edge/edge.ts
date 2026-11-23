@@ -14,6 +14,9 @@ const fixture = process.env['EDGE_FIXTURE_BIN'] ?? resolve(import.meta.dirname, 
 /** The member of staff central provisions to an edge started with `signIn`. */
 export const staff = { username: 'nakato', password: 'tumbling otter quarry 7919' }
 
+/** How many first ANC visits an edge started with `dashboards` holds, all today. */
+export const firstVisits = 3
+
 export interface Edge {
   readonly origin: string
   /** Central's provisioning bundle for `staff`, when the edge serves sign-in. */
@@ -36,7 +39,7 @@ function freePort(): Promise<number> {
  * Starts an edge. With `signIn`, it also serves staff sign-in: the keys `provision request` would
  * seal, central's snapshot keys, and a bundle for `staff` come from `edge-fixture`.
  */
-export async function startEdge(options: { signIn?: boolean; opd?: boolean } = {}): Promise<Edge> {
+export async function startEdge(options: { signIn?: boolean; opd?: boolean; dashboards?: boolean } = {}): Promise<Edge> {
   // An unprovisioned edge serves only its console, the plain-HTTP loopback listener for its own
   // screen; the LAN port stays closed until it has a certificate. Devices' DPoP proofs name the
   // console's origin, so it is one the edge accepts.
@@ -49,7 +52,19 @@ export async function startEdge(options: { signIn?: boolean; opd?: boolean } = {
     // With `opd`, the OPD package's definitions (the triage form and its mapping) are in the
     // edge's store, as central's sync would bring them (#106).
     const opd = options.opd === true ? [resolve(import.meta.dirname, '../../../../packages/reference-packages/opd')] : []
-    const made = spawnSync(fixture, [dir, 'ug-kla-0001', 'KLA001', staff.username, staff.password, ...opd], { stdio: 'inherit' })
+    // With `dashboards` (#879), the sample indicators, MoH's Age Band Sets and the sample Reporting
+    // package with the ANC overview Dashboard are active, as central's activation would leave the
+    // node, and `firstVisits` women each had a first ANC visit here today.
+    const e2e = resolve(import.meta.dirname, '..')
+    const dashboards =
+      options.dashboards === true
+        ? [
+            ...['fixtures/indicators', '../../../packages/reference-packages/core', 'fixtures/dashboards'].flatMap((p) => ['--activate', resolve(e2e, p)]),
+            '--first-visits',
+            String(firstVisits),
+          ]
+        : []
+    const made = spawnSync(fixture, [dir, 'ug-kla-0001', 'KLA001', staff.username, staff.password, ...opd, ...dashboards], { stdio: 'inherit' })
     if (made.status !== 0) throw new Error('edge-fixture failed: run `cargo build -p facility-edge --example edge-fixture`')
     auth = {
       HEALTH_NODE_ID: 'ug-kla-0001',

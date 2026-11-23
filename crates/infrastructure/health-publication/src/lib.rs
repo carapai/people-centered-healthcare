@@ -117,7 +117,9 @@ pub mod terminology;
 mod workflows;
 
 pub use age_bands::{PublishedAgeBandSet, age_band_sets_in};
-pub use dashboards::{PublishedDashboard, dashboards_in, located_problems as dashboard_problems};
+pub use dashboards::{
+    PublishedDashboard, dashboards_in, dashboards_in_files, located_problems as dashboard_problems,
+};
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
 pub use reports::{ReportSources, SourcePackage, reports_in};
 pub use workflows::{WorkflowSandbox, workflow_definitions};

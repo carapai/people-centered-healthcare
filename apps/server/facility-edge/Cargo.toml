@@ -38,7 +38,9 @@ windows-service = { workspace = true }
 [dev-dependencies]
 health-activation = { workspace = true }
 health-fhir-server = { workspace = true }
+health-files = { workspace = true }
 health-identifiers = { workspace = true }
+health-node-api = { workspace = true }
 health-packages = { workspace = true }
 health-persistence = { workspace = true }
 axum = { workspace = true }
@@ -46,5 +48,6 @@ base64 = { workspace = true }
 health-auth = { workspace = true }
 rcgen = { workspace = true }
 surrealdb = { workspace = true, features = ["kv-mem"] }
+jiff = { workspace = true }
 tempfile = { workspace = true }
 tokio-rustls = { workspace = true }

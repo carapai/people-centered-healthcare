@@ -40,6 +40,13 @@ describe('dashboards', () => {
     expect(forViewer(wakiso, named)).toBe(named)
   })
 
+  test('on an edge, a Visualization that follows the viewer shows the facility itself (#879)', () => {
+    // An edge explores its own facility only: each area under it is the facility.
+    const edge: Explorer = { where: 'facility', place: { code: 'KLA001', name: 'Kisenyi HC IV', level: 'facility', parent: null }, places: [], indicators: [], periodTypes: ['monthly'] }
+    expect(forViewer(edge, saved).question.places).toEqual(['KLA001'])
+    expect(forViewer(edge, { ...saved, follow: 'myPlace' }).question.places).toEqual(['KLA001'])
+  })
+
   test('Open in explorer carries the setup, and only a setup the explorer can draw opens', () => {
     const { v } = explorerSearch(saved)
     expect(readExplorerSearch(v)).toEqual(saved)

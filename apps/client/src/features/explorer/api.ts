@@ -270,7 +270,9 @@ export interface Visualization {
  */
 export function forViewer(explorer: Explorer, shown: Visualization): Visualization {
   if (shown.follow === undefined) return shown
-  const places = shown.follow === 'myPlace' ? (explorer.place === null ? [] : [explorer.place.code]) : childAreas(explorer)
+  const mine = explorer.place === null ? [] : [explorer.place.code]
+  // At a facility there is no area under it: each area under it is the facility itself, as on an edge (#879).
+  const places = shown.follow === 'myPlace' || explorer.place?.level === 'facility' ? mine : childAreas(explorer)
   return { ...shown, question: { ...shown.question, places } }
 }
 

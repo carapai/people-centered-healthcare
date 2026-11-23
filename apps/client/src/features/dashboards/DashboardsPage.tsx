@@ -34,7 +34,9 @@ const UNPLACED = '\u0000unplaced'
 /**
  * The Dashboards tab (ADR 0075; analytics.md § Dashboards; #602): standard and saved Dashboards
  * on the left, the picked one's Visualizations on the right, each drawn for the viewer's own area
- * and with *Open in explorer*. Its owner shares it with people, roles and place levels.
+ * and with *Open in explorer*. Its owner shares it with people, roles and place levels. On a
+ * Facility Edge Node (#879) it lists the active Reporting packages' standard Dashboards, offline,
+ * over the facility's own figures.
  */
 export function DashboardsPage() {
   const intl = useIntl()
@@ -81,7 +83,8 @@ function Board({ explorer, dashboards, unplaced, canAuthor }: { explorer: Explor
           <h2 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.dbStandard)}</h2>
           {standard.length === 0 ? <p className={muted}>{intl.formatMessage(m.dbNoStandard)}</p> : <ul className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>{standard.map(item)}</ul>}
           <h2 className={css({ fontWeight: 'semibold' })}>{intl.formatMessage(m.dbSaved)}</h2>
-          {saved.length === 0 ? <p className={muted}>{intl.formatMessage(m.dbNoSaved)}</p> : <ul className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>{saved.map(item)}</ul>}
+          {/* On an edge (#879) only the standard Dashboards are here: saved ones are user content kept at central (#602). */}
+          {explorer.where === 'facility' ? <p className={muted}>{intl.formatMessage(m.dbSavedAtCentral)}</p> : saved.length === 0 ? <p className={muted}>{intl.formatMessage(m.dbNoSaved)}</p> : <ul className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>{saved.map(item)}</ul>}
           {unplaced.length > 0 ? (
             <button type="button" className={pressable} aria-pressed={picked === UNPLACED} onClick={() => setPicked(UNPLACED)}>
               {intl.formatMessage(m.dbUnplaced)}
