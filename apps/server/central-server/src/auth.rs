@@ -409,6 +409,33 @@ pub(crate) fn routes(
                 subject_layer,
             )),
         );
+        // Role assignment at a place (#873; ADR 0094), within the administrator's area.
+        if let Some(key) = settings.snapshot_keys.first() {
+            let signer = SnapshotSigner::from_secret(key)
+                .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?;
+            let keys = settings
+                .snapshot_keys
+                .iter()
+                .map(|k| SnapshotSigner::from_secret(k).map(|s| s.public()))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?;
+            api = api.nest(
+                "/assignments",
+                crate::assignments::router(
+                    studio_people.clone(),
+                    fhir_store.clone(),
+                    signer,
+                    SnapshotVerifier::new(&keys)
+                        .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?,
+                    policy.roles.clone(),
+                )
+                .layer(axum::middleware::from_fn(signed_in))
+                .layer(axum::middleware::from_fn_with_state(
+                    subjects.clone(),
+                    subject_layer,
+                )),
+            );
+        }
         // The data explorer (#599): figures from the facilities' synced summaries, over the
         // session's area; and saved Visualizations and Dashboards (#602).
         api = api.nest(
@@ -1073,6 +1100,7 @@ pub(crate) fn gate(ready: Arc<OnceCell<Router>>) -> Router {
         .route_service("/api/laboratory/{*rest}", service.clone())
         .route_service("/api/studio/{*rest}", service.clone())
         .route_service("/api/places/{*rest}", service.clone())
+        .route_service("/api/assignments/{*rest}", service.clone())
         .route_service("/api/analytics/{*rest}", service.clone())
         .route_service("/api/inbox", service.clone())
         .route_service("/api/inbox/{*rest}", service.clone())
@@ -1649,11 +1677,9 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     }
 
-    /// ADR 0094 (#869): a user with a role at a district signs in for it, their token says so,
-    /// their area lists the district's facilities, and they read no patient-level records even
-    /// though their role maps to `Patient.rs`; a facility session is as before.
-    #[tokio::test]
-    async fn a_district_session_has_an_area_and_reads_no_patients() {
+    /// Central's database, with the sample places imported (the district test's NHFR file):
+    /// region-central, district-kampala (KAM013, KAM020) and district-wakiso (WAK001).
+    async fn sample_places() -> Connection {
         use health_facility_registry::{
             AdministrativeAreas, Area, District, parse_nhfr_csv, plan_import,
         };
@@ -1720,6 +1746,15 @@ mod tests {
         health_registries_app::places::apply_import(&store, &NoAudit, "test", &plan)
             .await
             .expect("import");
+        connection
+    }
+
+    /// ADR 0094 (#869): a user with a role at a district signs in for it, their token says so,
+    /// their area lists the district's facilities, and they read no patient-level records even
+    /// though their role maps to `Patient.rs`; a facility session is as before.
+    #[tokio::test]
+    async fn a_district_session_has_an_area_and_reads_no_patients() {
+        let connection = sample_places().await;
 
         let key = [6u8; 32];
         let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
@@ -1821,6 +1856,279 @@ mod tests {
         let area: serde_json::Value = serde_json::from_str(&body).expect("json");
         assert_eq!(area["level"], "facility");
         assert_eq!(area["facilities"], serde_json::json!(["KAM013"]));
+    }
+
+    /// Role assignment at a place (#873; ADR 0094): a national administrator assigns a role at a
+    /// district to a user who holds none, and that user signs in for the district; the
+    /// assignment is listed, refused outside the administrator's area, for an undefined role or
+    /// an unknown user, and to someone without `access.administer`; withdrawing it removes it.
+    #[tokio::test]
+    async fn an_administrator_assigns_a_role_at_a_district_and_its_user_signs_in_for_it() {
+        let connection = sample_places().await;
+        let key = [6u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": {
+                "access": ["access.administer", "places.manage"],
+                "district": ["Organization.rs"],
+                "clinician": ["Patient.crs"],
+            },
+            "labels": [],
+        }))
+        .expect("policy");
+        provision_at(&connection, &key, &policy, "amina", &["access"], "central").await;
+        provision_at(
+            &connection,
+            &key,
+            &policy,
+            "kato",
+            &["access"],
+            "district-wakiso",
+        )
+        .await;
+        provision(&connection, &key, &policy, "nakato", &["clinician"]).await;
+        // A user with an account and no role anywhere yet.
+        {
+            use health_identity::{AccountId, AccountStatus, Lockout, LoginAccount};
+            let store = SurrealAuthStore::new(
+                SurrealStore::new(connection.clone(), Arc::new(SystemClock)),
+                SessionPolicy::default().hard_cap,
+            );
+            let account = AccountId(uuid::Uuid::now_v7());
+            store
+                .put_account(&LoginAccount {
+                    id: account,
+                    username: "okello".into(),
+                    credential: Credentials::new(Vec::new())
+                        .expect("credentials")
+                        .credential(account, "correct horse battery")
+                        .expect("hash"),
+                    status: AccountStatus::Active,
+                    lockout: Lockout::default(),
+                })
+                .await
+                .expect("account");
+        }
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+        let json = |body: &str| -> serde_json::Value { serde_json::from_str(body).expect("json") };
+
+        let admin = sign_in(&app, "amina").await;
+        // The roles and the administrator's area.
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/options", &admin, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let options = json(&body);
+        assert_eq!(
+            options["roles"],
+            serde_json::json!(["access", "clinician", "district"])
+        );
+        let codes: Vec<&str> = options["places"]
+            .as_array()
+            .expect("places")
+            .iter()
+            .filter_map(|p| p["code"].as_str())
+            .collect();
+        assert_eq!(codes.first(), Some(&"central"), "{codes:?}");
+        assert!(codes.contains(&"district-kampala") && codes.contains(&"KAM013"));
+
+        let assign = |bearer: &str, user: &str, place: &str, roles: serde_json::Value| {
+            authorized(
+                "PUT",
+                &format!("/api/assignments/users/{user}/{place}"),
+                bearer,
+                Some(serde_json::json!({ "roles": roles })),
+            )
+        };
+        let (status, body, _) = send(
+            &app,
+            assign(
+                &admin,
+                "okello",
+                "district-kampala",
+                serde_json::json!(["district"]),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/users/okello", &admin, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let held = json(&body);
+        assert_eq!(held["assignments"][0]["place"]["code"], "district-kampala");
+        assert_eq!(held["assignments"][0]["place"]["level"], "district");
+        assert_eq!(
+            held["assignments"][0]["roles"],
+            serde_json::json!(["district"])
+        );
+        assert_eq!(held["assignments"][0]["manageable"], true);
+
+        // The user signs in for the district, an area session.
+        let okello = sign_in(&app, "okello").await;
+        let (status, body, _) =
+            send(&app, authorized("GET", "/api/places/area", &okello, None)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let area = json(&body);
+        assert_eq!(area["code"], "district-kampala");
+        assert_eq!(area["level"], "district");
+        assert_eq!(area["facilities"], serde_json::json!(["KAM013", "KAM020"]));
+
+        // Refusals: an undefined role, an unknown user, a place the registry does not hold.
+        let (status, body, _) = send(
+            &app,
+            assign(
+                &admin,
+                "okello",
+                "district-kampala",
+                serde_json::json!(["chief"]),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let (status, body, _) = send(
+            &app,
+            assign(
+                &admin,
+                "nobody",
+                "district-kampala",
+                serde_json::json!(["district"]),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+        let (status, body, _) = send(
+            &app,
+            assign(
+                &admin,
+                "okello",
+                "district-nowhere",
+                serde_json::json!(["district"]),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        // A district's administrator assigns only within their district.
+        let wakiso = sign_in(&app, "kato").await;
+        for place in ["district-kampala", "KAM013", "central"] {
+            let (status, body, _) = send(
+                &app,
+                assign(&wakiso, "okello", place, serde_json::json!(["district"])),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{place}: {body}");
+        }
+        let (status, body, _) = send(
+            &app,
+            assign(
+                &wakiso,
+                "okello",
+                "WAK001",
+                serde_json::json!(["clinician"]),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/users/okello", &wakiso, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let manageable: Vec<(String, bool)> = json(&body)["assignments"]
+            .as_array()
+            .expect("assignments")
+            .iter()
+            .map(|a| {
+                (
+                    a["place"]["code"].as_str().unwrap_or_default().to_owned(),
+                    a["manageable"].as_bool().unwrap_or_default(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            manageable,
+            vec![
+                ("WAK001".to_owned(), true),
+                ("district-kampala".to_owned(), false)
+            ]
+        );
+        // Someone without access.administer is refused.
+        let clinician = sign_in(&app, "nakato").await;
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/options", &clinician, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+
+        // Withdrawing the district leaves the facility role.
+        for (place, expected) in [
+            ("district-kampala", StatusCode::NO_CONTENT),
+            ("district-kampala", StatusCode::NOT_FOUND),
+        ] {
+            let (status, body, _) = send(
+                &app,
+                authorized(
+                    "DELETE",
+                    &format!("/api/assignments/users/okello/{place}"),
+                    &admin,
+                    None,
+                ),
+            )
+            .await;
+            assert_eq!(status, expected, "{body}");
+        }
+        let (_, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/users/okello", &admin, None),
+        )
+        .await;
+        let left = json(&body);
+        assert_eq!(
+            left["assignments"].as_array().map(Vec::len),
+            Some(1),
+            "{body}"
+        );
+        assert_eq!(left["assignments"][0]["place"]["code"], "WAK001");
+
+        // The NHFR import takes the CSV in JSON from the client too.
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/places/nhfr/preview",
+                &admin,
+                Some(serde_json::json!({ "file": "nhfr_id" })),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(body.contains("the body names no csv"), "{body}");
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/places/nhfr/preview",
+                &admin,
+                Some(serde_json::json!({
+                    "csv": "nhfr_id,name,district,status\nKAM013,Kisenyi HC IV,district-kampala,open\n"
+                })),
+            ),
+        )
+        .await;
+        // Read: this central keeps no packages, so the districts cannot be checked.
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(body.contains("central keeps no packages"), "{body}");
     }
 
     /// Provisions `username` at KAM013 with `roles`, as the workforce registry will.

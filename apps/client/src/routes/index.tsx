@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useIntl } from 'react-intl'
 
-import { accessMessages, areaMessages, explorerMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, receptionMessages, studioMessages, triageMessages, worklistMessages } from '../i18n/messages'
+import { accessMessages, areaMessages, explorerMessages, conflictMessages, consultationMessages, edgeStatusMessages, enrollmentMessages, formMessages, inboxMessages, labMessages, messages, pharmacyMessages, placesMessages, receptionMessages, studioMessages, triageMessages, worklistMessages } from '../i18n/messages'
 import { SetPin } from '../features/lock/LockGuard'
 import { usePlatform } from '../platform'
 
@@ -108,6 +108,17 @@ function Home() {
               {platform.capabilities.studio ? (
                 <li>
                   <Link to="/area">{intl.formatMessage(areaMessages.arTitle)}</Link>
+                </li>
+              ) : null}
+              {/* Administering places (#873): roles at a place, and the NHFR import. Each answers 403 to someone whose role does not include it. */}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/places/roles">{intl.formatMessage(placesMessages.plRolesTitle)}</Link>
+                </li>
+              ) : null}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/places/import">{intl.formatMessage(placesMessages.plImportTitle)}</Link>
                 </li>
               ) : null}
               {/* The Studio is central's only (studio.md § Scope). */}

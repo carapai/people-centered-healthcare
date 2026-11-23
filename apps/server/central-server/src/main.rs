@@ -13,6 +13,7 @@
 
 mod activation;
 mod analytics;
+mod assignments;
 mod auth;
 mod backup;
 mod boundaries;

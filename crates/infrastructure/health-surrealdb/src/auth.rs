@@ -418,6 +418,23 @@ impl SurrealTx {
         Ok(())
     }
 
+    /// Removes `account`'s permission snapshot at `facility`: its roles there are withdrawn.
+    pub async fn delete_auth_snapshot(
+        &mut self,
+        account: AccountId,
+        facility: &str,
+    ) -> Result<(), WriteError> {
+        self.run(
+            "DELETE type::record('auth_snapshot', [$account, $facility])",
+            vec![
+                ("account", account.to_string()),
+                ("facility", facility.to_owned()),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
     /// Every snapshot at `facility`, as (account, JWS): what a provisioning bundle carries.
     pub async fn auth_snapshots_at(
         &mut self,
