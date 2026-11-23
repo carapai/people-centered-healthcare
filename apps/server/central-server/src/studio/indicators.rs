@@ -11,9 +11,11 @@
 //! (`%indicators`), which is evaluated over the same period and test patients first (#550).
 //! The figure is also given per band of each of the indicator's disaggregations (#552): an Age
 //! Band Set pinned to `url|version`, looked up among every published version and the draft's own
-//! sets, or a coded value, each with a *not recorded* band; each record says its band.
+//! sets, or a coded value, each with a *not recorded* band; each record says its band. The editor
+//! may also post each condition of the numerator's and denominator's trees, and each record then
+//! says whether each held (#864).
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
@@ -23,8 +25,8 @@ use health_analytics::{
     PeriodType, Reason, Summary, pinned,
 };
 use health_analytics_app::{
-    Library, PatientRecords, age_band_set, evaluate, is_age_band_set, is_test_patient, measure,
-    test_patient,
+    Library, PatientRecords, age_band_set, evaluate, explain, is_age_band_set, is_test_patient,
+    measure, test_patient,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -88,6 +90,23 @@ pub(crate) struct StudioIndicatorTryInput {
     pub(crate) period_type: StudioPeriodType,
     /// The period, written as its type writes it (`2026-03`, `2026W10`, `2026Q1`, …).
     pub(crate) period: String,
+    /// Conditions of the criteria to explain (#864): FHIRPath, each one condition of the
+    /// numerator's or denominator's tree as the editor writes it. Each record answers whether
+    /// each held, in this order.
+    #[serde(default)]
+    pub(crate) conditions: Vec<String>,
+}
+
+/// Whether one of the asked conditions held on a record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum StudioHeld {
+    /// It gave true.
+    Held,
+    /// It gave false or nothing.
+    NotHeld,
+    /// It could not be evaluated, or gave something other than true or false.
+    Error,
 }
 
 /// The period evaluated.
@@ -145,6 +164,8 @@ pub(crate) struct StudioIndicatorRecord {
     /// Its band in each of the indicator's disaggregations, in order: a band's code, or
     /// `not-recorded` (#552).
     pub(crate) bands: Vec<String>,
+    /// Whether each asked condition held on it, in the order asked (#864).
+    pub(crate) conditions: Vec<StudioHeld>,
 }
 
 /// One test patient, counted or not.
@@ -336,7 +357,7 @@ fn shown(reason: &Reason) -> (StudioRecordReason, Option<String>) {
 
 /// Documents and serves *Try*.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/indicators/try", tag = "studio", operation_id = "tryStudioIndicator",
-    description = "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
+    description = "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why; given `conditions` (each one condition of the criteria, as FHIRPath), each record also says whether each held.",
     params(("id" = String, Path, description = "`name@version`")),
     request_body = StudioIndicatorTryInput,
     responses(
@@ -423,6 +444,19 @@ pub(crate) async fn try_indicator(
         Ok(count) => count,
         Err(why) => return unprocessable(why),
     };
+    let held = match explain(
+        studio.engine.as_ref(),
+        &library,
+        &indicator,
+        &period,
+        &records,
+        &input.conditions,
+    )
+    .await
+    {
+        Ok(held) => held,
+        Err(why) => return unprocessable(why),
+    };
     errors.extend(
         count
             .errors()
@@ -431,7 +465,8 @@ pub(crate) async fn try_indicator(
     let patients = tested
         .iter()
         .zip(&count.members)
-        .map(|((path, tested), member)| StudioIndicatorPatient {
+        .zip(&held)
+        .map(|(((path, tested), member), held)| StudioIndicatorPatient {
             path: path.clone(),
             name: tested.name.clone(),
             patient: member.patient.clone(),
@@ -442,7 +477,8 @@ pub(crate) async fn try_indicator(
             records: member
                 .records
                 .iter()
-                .map(|record| {
+                .zip(held)
+                .map(|(record, held)| {
                     let (reason, error) = shown(&record.reason);
                     StudioIndicatorRecord {
                         reference: record.reference.clone(),
@@ -457,6 +493,14 @@ pub(crate) async fn try_indicator(
                             .map(|s| match s {
                                 Ok(Some(code)) => code.clone(),
                                 _ => NOT_RECORDED.to_owned(),
+                            })
+                            .collect(),
+                        conditions: held
+                            .iter()
+                            .map(|h| match h {
+                                Ok(true) => StudioHeld::Held,
+                                Ok(false) => StudioHeld::NotHeld,
+                                Err(_) => StudioHeld::Error,
                             })
                             .collect(),
                     }
@@ -486,4 +530,73 @@ pub(crate) async fn try_indicator(
         errors,
     })
     .into_response()
+}
+
+/// Where a Report lays out an indicator: one row of a table section (#864).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioIndicatorMapping {
+    /// The package version the Report is in, `name@version`.
+    pub(crate) package_id: String,
+    /// Whether that version is published; otherwise it is the package's open draft.
+    pub(crate) published: bool,
+    /// The Report's id: its file is `configuration/reports/<id>.json`.
+    pub(crate) report: String,
+    /// The Report's title (e.g. *HMIS 105 · 2 Antenatal care*).
+    pub(crate) title: String,
+    /// The section's title.
+    pub(crate) section: String,
+    /// The row's label (e.g. *ANC 1st visit for women*).
+    pub(crate) label: String,
+    /// The version of the indicator the row pins, `url|version`.
+    pub(crate) indicator: String,
+    /// Whether the section's cells are sent to DHIS2.
+    pub(crate) sent_to_dhis2: bool,
+}
+
+/// Documents and serves an indicator's HMIS mapping.
+#[utoipa::path(get, path = "/api/studio/indicator-mappings", tag = "studio", operation_id = "listStudioIndicatorMappings",
+    description = "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row. Mappings are edited in the Reporting package's Report designer.",
+    params(("url" = String, Query, description = "The indicator's canonical URL, without a version")),
+    responses(
+        (status = 200, description = "Where it is laid out", body = [StudioIndicatorMapping]),
+        (status = 400, description = "No `url`", body = StudioProblem),
+        (status = 401, description = "Not signed in", body = StudioProblem),
+        (status = 403, description = "No Studio permission", body = StudioProblem),
+        (status = 500, description = "The package store failed", body = StudioProblem),
+    ))]
+pub(crate) async fn mappings(
+    State(studio): State<Studio>,
+    subject: Option<Extension<Subject>>,
+    RawQuery(query): RawQuery,
+) -> Response {
+    if let Err(response) = author(subject) {
+        return *response;
+    }
+    let url = form_urlencoded::parse(query.as_deref().unwrap_or("").as_bytes())
+        .find(|(name, _)| name == "url")
+        .map(|(_, value)| value.into_owned())
+        .filter(|url| !url.trim().is_empty());
+    let Some(url) = url else {
+        return problem(StatusCode::BAD_REQUEST, "name the indicator's url", None);
+    };
+    match studio.publications.indicator_mappings(&url).await {
+        Ok(found) => Json(
+            found
+                .into_iter()
+                .map(|m| StudioIndicatorMapping {
+                    package_id: m.package,
+                    published: m.published,
+                    report: m.report,
+                    title: m.title,
+                    section: m.section,
+                    label: m.label,
+                    indicator: m.indicator,
+                    sent_to_dhis2: m.sent_to_dhis2,
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
+        Err(error) => failure(&error),
+    }
 }

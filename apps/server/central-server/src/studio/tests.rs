@@ -2166,6 +2166,64 @@ async fn an_indicator_built_in_the_editor_counts_as_the_reference_one() {
     assert!(counts[0].2.as_u64().is_some_and(|d| d > 0), "{counts:?}");
 }
 
+/// *Try* marks each posted condition held or not on each record (#864): on ANC 1st visit before
+/// 12 weeks, the gestational age under 12 holds on every record in the numerator and on none
+/// only in the denominator, and a condition that is not true or false is an error.
+#[tokio::test]
+async fn try_marks_each_condition_held_or_not_on_each_record() {
+    let (publications, _dir) = publications().await;
+    let files = anc_package();
+    publications.draft(&files, "ann").await.expect("draft");
+    let measure: Value =
+        serde_json::from_slice(&files["Measure-anc-first-visit-before-12-weeks.json"])
+            .expect("measure");
+    let ga = "%records.entry.resource.ofType(Observation).where(encounter.reference = 'Encounter/' + %resource.id and code.coding.where(system = 'http://loinc.org' and code = '18185-9').exists()).value.value";
+    let input = json!({
+        "measure": measure,
+        "periodType": "quarterly",
+        "period": "2026Q1",
+        "conditions": [format!("{ga} < 12"), "%patient.gender = 'female'", "Encounter.id"],
+    });
+    let (status, body) = call(
+        &publications,
+        subject("ann", &["metadata.author"]),
+        "POST",
+        &format!("/packages/{ID}/indicators/try"),
+        Some(input),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let mut seen = std::collections::BTreeSet::new();
+    for patient in body["patients"].as_array().expect("patients") {
+        for record in patient["records"].as_array().expect("records") {
+            let marks = record["conditions"].as_array().expect("conditions");
+            assert_eq!(marks.len(), 3, "{record}");
+            assert_eq!(marks[2], "error", "{record}");
+            match record["reason"].as_str() {
+                Some("meets") => assert_eq!(marks[0], "held", "{record}"),
+                Some("denominator-only") => assert_eq!(marks[0], "not-held", "{record}"),
+                _ => {}
+            }
+            seen.insert(record["reason"].as_str().unwrap_or_default().to_owned());
+        }
+    }
+    assert!(
+        seen.contains("meets") && seen.contains("denominator-only"),
+        "{seen:?}"
+    );
+    // Without conditions, records carry none.
+    let input = json!({ "measure": measure, "periodType": "quarterly", "period": "2026Q1" });
+    let (_, body) = call(
+        &publications,
+        subject("ann", &["metadata.author"]),
+        "POST",
+        &format!("/packages/{ID}/indicators/try"),
+        Some(input),
+    )
+    .await;
+    assert_eq!(body["patients"][0]["records"][0]["conditions"], json!([]));
+}
+
 #[tokio::test]
 async fn try_gives_the_figure_per_band_and_each_records_band() {
     let (publications, _dir) = publications().await;
@@ -2350,8 +2408,8 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
     assert_eq!(
         nakato["records"],
         json!([
-            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null, "value": null, "picked": false, "bands": ["20-24"] },
-            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null, "value": null, "picked": false, "bands": ["20-24"] }
+            { "reference": "Encounter/nakato-visit-1", "date": "2026-03-04", "reason": "meets", "error": null, "value": null, "picked": false, "bands": ["20-24"], "conditions": [] },
+            { "reference": "Encounter/nakato-visit-2", "date": "2026-03-28", "reason": "does-not-meet", "error": null, "value": null, "picked": false, "bands": ["20-24"], "conditions": [] }
         ])
     );
     let auma = patients
@@ -2668,4 +2726,63 @@ async fn the_dashboard_preview_answers_each_visualization_over_test_patients_wit
     let input = json!({ "dashboard": dashboard, "path": path, "asOf": "April" });
     let (status, _) = call(&publications, author(), "POST", preview_path, Some(input)).await;
     assert_eq!(status, 422);
+}
+
+/// The indicator editor's HMIS mapping (#864): the Report rows laying the indicator out, from
+/// the HMIS package's draft, and nothing for an indicator no Report lays out.
+#[tokio::test]
+async fn an_indicators_mapping_lists_the_report_rows_laying_it_out() {
+    let (publications, _dir) = publications().await;
+    publications
+        .draft(&hmis_package(), "ann")
+        .await
+        .expect("draft hmis");
+    let author = || subject("ann", &["metadata.author"]);
+    let url = "https://health.go.ug/fhir/Measure/anc-first-visit-before-12-weeks";
+    let (status, body) = call(
+        &publications,
+        author(),
+        "GET",
+        &format!("/indicator-mappings?url={}", urlencoding(url)),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body,
+        json!([{
+            "packageId": "ug.moh.hmis@1.0.0",
+            "published": false,
+            "report": "hmis-105-anc",
+            "title": "HMIS 105 · 2 Antenatal care",
+            "section": "2.2 Timing of the 1st visit",
+            "label": "ANC 1st visit before 12 weeks (%)",
+            "indicator": format!("{url}|1.0.0"),
+            "sentToDhis2": false,
+        }])
+    );
+    let (status, body) = call(
+        &publications,
+        author(),
+        "GET",
+        "/indicator-mappings?url=https%3A%2F%2Fexample.org%2FMeasure%2Fnone",
+        None,
+    )
+    .await;
+    assert_eq!((status, body), (200, json!([])));
+    let (status, _) = call(&publications, author(), "GET", "/indicator-mappings", None).await;
+    assert_eq!(status, 400);
+    let (status, _) = call(
+        &publications,
+        subject("nurse", &["patient.read"]),
+        "GET",
+        "/indicator-mappings?url=x",
+        None,
+    )
+    .await;
+    assert_eq!(status, 403);
+}
+
+fn urlencoding(text: &str) -> String {
+    form_urlencoded::byte_serialize(text.as_bytes()).collect()
 }

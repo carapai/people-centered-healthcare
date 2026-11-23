@@ -801,6 +801,10 @@ export const StudioFileInput = z.object({
 })
 export type StudioFileInput = z.infer<typeof StudioFileInput>
 
+/** Whether one of the asked conditions held on a record. */
+export const StudioHeld = z.enum(["held", "not-held", "error"])
+export type StudioHeld = z.infer<typeof StudioHeld>
+
 /** What happened in one history entry. */
 export const StudioHistoryStep = z.enum(["created", "revised", "submitted", "validated", "validation-failed", "simulated", "simulation-failed", "reviewed", "changes-requested", "approved", "published", "checked", "version-changed", "handover-offered", "handover-declined", "handed-over", "reassigned", "withdrawn", "commented"])
 export type StudioHistoryStep = z.infer<typeof StudioHistoryStep>
@@ -834,6 +838,27 @@ export type StudioHistoryEntry = z.infer<typeof StudioHistoryEntry>
 export const StudioImportRefusal = z.enum(["not-json", "not-questionnaire", "looks-r4"])
 export type StudioImportRefusal = z.infer<typeof StudioImportRefusal>
 
+/** Where a Report lays out an indicator: one row of a table section (#864). */
+export const StudioIndicatorMapping = z.object({
+  /** The version of the indicator the row pins, `url|version`. */
+  "indicator": z.string(),
+  /** The row's label (e.g. *ANC 1st visit for women*). */
+  "label": z.string(),
+  /** The package version the Report is in, `name@version`. */
+  "packageId": z.string(),
+  /** Whether that version is published; otherwise it is the package's open draft. */
+  "published": z.boolean(),
+  /** The Report's id: its file is `configuration/reports/<id>.json`. */
+  "report": z.string(),
+  /** The section's title. */
+  "section": z.string(),
+  /** Whether the section's cells are sent to DHIS2. */
+  "sentToDhis2": z.boolean(),
+  /** The Report's title (e.g. *HMIS 105 · 2 Antenatal care*). */
+  "title": z.string(),
+})
+export type StudioIndicatorMapping = z.infer<typeof StudioIndicatorMapping>
+
 /** Why a record counts or not. */
 export const StudioRecordReason = z.enum(["meets", "denominator-only", "does-not-meet", "no-enrollment", "outside-period", "no-period-date", "error"])
 export type StudioRecordReason = z.infer<typeof StudioRecordReason>
@@ -842,6 +867,8 @@ export type StudioRecordReason = z.infer<typeof StudioRecordReason>
 export const StudioIndicatorRecord = z.object({
   /** Its band in each of the indicator's disaggregations, in order: a band's code, or `not-recorded` (#552). */
   "bands": z.array(z.string()),
+  /** Whether each asked condition held on it, in the order asked (#864). */
+  "conditions": z.array(StudioHeld),
   /** Its period date, if it has one. */
   "date": z.string().nullable().optional(),
   /** Why it could not be evaluated, if it could not. */
@@ -921,6 +948,8 @@ export type StudioIndicatorTry = z.infer<typeof StudioIndicatorTry>
 
 /** *Try* on a draft indicator. */
 export const StudioIndicatorTryInput = z.object({
+  /** Conditions of the criteria to explain (#864): FHIRPath, each one condition of the numerator's or denominator's tree as the editor writes it. Each record answers whether each held, in this order. */
+  "conditions": z.array(z.string()).optional(),
   /** The draft Measure, as the Studio holds it. */
   "measure": z.object({}),
   /** The period, written as its type writes it (`2026-03`, `2026W10`, `2026Q1`, …). */
@@ -1362,6 +1391,17 @@ export const operations = {
       404: StudioProblem,
       409: StudioProblem,
       422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  listStudioIndicatorMappings: {
+    method: 'GET',
+    path: '/api/studio/indicator-mappings',
+    responses: {
+      200: z.array(StudioIndicatorMapping),
+      400: StudioProblem,
+      401: StudioProblem,
+      403: StudioProblem,
       500: StudioProblem,
     },
   },

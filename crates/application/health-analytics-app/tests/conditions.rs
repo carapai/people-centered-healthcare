@@ -468,3 +468,79 @@ async fn a_missing_indicator_a_circle_or_a_count_s_denominator_is_an_error() {
     .expect_err("a count has no denominator");
     assert!(error.ends_with("which has none"), "{error}");
 }
+
+/// *Try*'s per-condition marks (#864): each condition of *ANC 1st visit before 12 weeks*, as the
+/// editor's tree writes it, held on exactly the records the whole criteria say: the gestational
+/// age under 12 on each record in the numerator and on none only in the denominator, and *is in
+/// ANC 1st visits' numerator* on the patients that indicator counts.
+#[tokio::test]
+async fn each_condition_holds_where_the_criteria_say() {
+    let library = library();
+    let patients = patients();
+    // As the editor builds it: the denominator *is in ANC 1st visits' numerator*.
+    let member =
+        "'https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0' in %indicators.numerator";
+    let mut resource = anc_measure("anc-first-visit-before-12-weeks");
+    resource["group"][0]["population"][1]["criteria"]["expression"] = json!(member);
+    let indicator = measure(&resource).indicator().expect("indicator");
+    let period = Period::parse(PeriodType::Quarterly, "2026Q1").expect("period");
+    let ga = "%records.entry.resource.ofType(Observation).where(encounter.reference = 'Encounter/' + %resource.id and code.coding.where(system = 'http://loinc.org' and code = '18185-9').exists()).value.value";
+    let conditions = [
+        member.to_owned(),
+        format!("{ga} < 12"),
+        "Encounter.id".to_owned(),
+    ];
+    let engine = OctofhirEngine::new();
+    let held = health_analytics_app::explain(
+        &engine,
+        &library,
+        &indicator,
+        &period,
+        &patients,
+        &conditions,
+    )
+    .await
+    .expect("explained");
+    let evaluation = evaluate(&engine, &library, &indicator, &period, &patients)
+        .await
+        .expect("evaluated");
+    let first_visits = evaluated(
+        &anc_measure("anc-first-visits"),
+        &library,
+        PeriodType::Quarterly,
+        "2026Q1",
+        &patients,
+    )
+    .await
+    .expect("first visits");
+    let in_first_visits = people(&first_visits);
+    assert_eq!(held.len(), patients.len());
+    let (mut meets, mut denominator_only) = (0, 0);
+    for (member, records) in evaluation.members.iter().zip(&held) {
+        assert_eq!(records.len(), member.records.len(), "{}", member.patient);
+        for (record, held) in member.records.iter().zip(records) {
+            assert_eq!(
+                held[0],
+                Ok(in_first_visits.contains(&member.patient)),
+                "{}",
+                record.reference
+            );
+            match record.reason {
+                health_analytics::Reason::Meets => {
+                    meets += 1;
+                    assert_eq!(held[1], Ok(true), "{}", record.reference);
+                }
+                health_analytics::Reason::DenominatorOnly => {
+                    denominator_only += 1;
+                    assert_eq!(held[1], Ok(false), "{}", record.reference);
+                }
+                _ => {}
+            }
+            assert!(held[2].is_err(), "a text is not true or false: {held:?}");
+        }
+    }
+    assert!(
+        meets > 0 && denominator_only > 0,
+        "{meets} {denominator_only}"
+    );
+}

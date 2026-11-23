@@ -47,7 +47,9 @@
 //! `health-fhir-mapping`, at `/packages/{id}/questionnaires/import` ([`forms`], #853).
 //!
 //! The indicator editor's *Try* evaluates a draft Measure over the package's test patients for a
-//! period at `/packages/{id}/indicators/try` ([`indicators`], #548).
+//! period at `/packages/{id}/indicators/try` ([`indicators`], #548), each posted condition of its
+//! criteria marked held or not on each record (#864), and lists where Reports lay an indicator out
+//! (its HMIS mapping) at `GET /indicator-mappings?url=` (#864).
 //!
 //! The Report designer's preview computes a draft Report's table rows over test patients, with
 //! Validation's problems, at `/packages/{id}/reports/preview` ([`reports`], #559).
@@ -166,6 +168,7 @@ pub(crate) fn router(
             "/packages/{id}/indicators/try",
             post(indicators::try_indicator),
         )
+        .route("/indicator-mappings", get(indicators::mappings))
         .route("/packages/{id}/reports/preview", post(reports::preview))
         .route(
             "/packages/{id}/dashboards/preview",

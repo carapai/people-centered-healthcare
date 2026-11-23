@@ -11,6 +11,8 @@
 //! - standard Dashboards (#603): the reference *ANC overview* passes Validation, one whose
 //!   Visualization references an unknown indicator fails, and once the package is published
 //!   its newest version's Dashboards are listed.
+//! - an indicator's HMIS mapping (#864): the rows of Reports laying it out, in the newest
+//!   published version and the open draft.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -381,5 +383,87 @@ async fn a_published_reporting_package_lists_its_newest_versions_dashboards() {
             .map(|d| (d.version.as_str(), d.dashboard.title.as_str()))
             .collect::<Vec<_>>(),
         [("1.1.0", "Antenatal care overview")]
+    );
+}
+
+#[tokio::test]
+async fn an_indicators_mapping_lists_the_report_rows_laying_it_out() {
+    let central = with_indicators().await;
+    let first_visits = "https://health.go.ug/fhir/Measure/anc-first-visits";
+    let rows = |found: &[health_publication::IndicatorMapping]| {
+        found
+            .iter()
+            .map(|m| {
+                (
+                    m.package.clone(),
+                    m.published,
+                    m.title.clone(),
+                    m.section.clone(),
+                    m.label.clone(),
+                    m.indicator.clone(),
+                    m.sent_to_dhis2,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        central
+            .publications
+            .indicator_mappings(first_visits)
+            .await
+            .expect("none yet"),
+        []
+    );
+    publish(&central, &package("hmis")).await;
+    let row = |package: &str, published: bool, label: &str| {
+        (
+            package.to_owned(),
+            published,
+            "HMIS 105 · 2 Antenatal care".to_owned(),
+            "2.1 ANC attendance".to_owned(),
+            label.to_owned(),
+            format!("{first_visits}|1.0.0"),
+            true,
+        )
+    };
+    let found = central
+        .publications
+        .indicator_mappings(first_visits)
+        .await
+        .expect("mapped");
+    assert_eq!(
+        rows(&found),
+        [row("ug.moh.hmis@1.0.0", true, "ANC 1st visit for women")]
+    );
+    // An open draft that relabels the row is listed beside the published version.
+    let mut relabelled = versioned(package("hmis"), "1.1.0");
+    let mut report = json_of(&relabelled, HMIS_105);
+    report["sections"][0]["rows"][0]["label"] = json!("ANC 1st visits");
+    put(&mut relabelled, HMIS_105, &report);
+    central
+        .publications
+        .draft(&relabelled, "ann")
+        .await
+        .expect("draft");
+    let found = central
+        .publications
+        .indicator_mappings(first_visits)
+        .await
+        .expect("mapped");
+    assert_eq!(
+        rows(&found),
+        [
+            row("ug.moh.hmis@1.0.0", true, "ANC 1st visit for women"),
+            row("ug.moh.hmis@1.1.0", false, "ANC 1st visits"),
+        ]
+    );
+    // An indicator no Report lays out has no mapping.
+    assert_eq!(
+        central
+            .publications
+            .indicator_mappings("https://health.go.ug/fhir/Measure/anc-median-gestational-age")
+            .await
+            .expect("none"),
+        []
     );
 }

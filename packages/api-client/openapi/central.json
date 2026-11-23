@@ -203,6 +203,82 @@
         }
       }
     },
+    "/api/studio/indicator-mappings": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves an indicator's HMIS mapping.",
+        "description": "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row. Mappings are edited in the Reporting package's Report designer.",
+        "operationId": "listStudioIndicatorMappings",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "The indicator's canonical URL, without a version",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where it is laid out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudioIndicatorMapping"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No `url`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages": {
       "get": {
         "tags": [
@@ -1086,7 +1162,7 @@
           "studio"
         ],
         "summary": "Documents and serves *Try*.",
-        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why.",
+        "description": "*Try* on a draft indicator: the server evaluates the posted (unsaved) Measure over the package version's test patients (`tests/` files of type `test-patient`) for a period type and period as a Report would choose them, on the FHIRPath engine every node runs. Each record of the Measure's basis is placed in the period by its period date (up to its end, cumulative), and the criteria decide whether it counts; people and enrollments count once each, visits and observations each one. A percentage, rate or ratio's numerator is within its denominator; a sum, average, median, minimum, maximum or distinct count takes each counted thing's first or last value. Criteria may compare dates with `%periodStart` and `%periodEnd` (`YYYY-MM-DD`) and `%previousPeriods.start` (the starts of the periods before, the nearest first), and may require a patient to be in another indicator of the package's numerator or denominator (`'<url>|<version>' in %indicators.numerator`), which is evaluated first. It answers the figure with what roll-up needs and every test patient with each record's part, so the editor shows who is counted and why; given `conditions` (each one condition of the criteria, as FHIRPath), each record also says whether each held.",
         "operationId": "tryStudioIndicator",
         "parameters": [
           {
@@ -4641,6 +4717,15 @@
           }
         }
       },
+      "StudioHeld": {
+        "type": "string",
+        "description": "Whether one of the asked conditions held on a record.",
+        "enum": [
+          "held",
+          "not-held",
+          "error"
+        ]
+      },
       "StudioHistoryEntry": {
         "type": "object",
         "description": "One entry of the discussion: a lifecycle record, or a comment (#496).",
@@ -4746,6 +4831,54 @@
           "looks-r4"
         ]
       },
+      "StudioIndicatorMapping": {
+        "type": "object",
+        "description": "Where a Report lays out an indicator: one row of a table section (#864).",
+        "required": [
+          "packageId",
+          "published",
+          "report",
+          "title",
+          "section",
+          "label",
+          "indicator",
+          "sentToDhis2"
+        ],
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "description": "The version of the indicator the row pins, `url|version`."
+          },
+          "label": {
+            "type": "string",
+            "description": "The row's label (e.g. *ANC 1st visit for women*)."
+          },
+          "packageId": {
+            "type": "string",
+            "description": "The package version the Report is in, `name@version`."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether that version is published; otherwise it is the package's open draft."
+          },
+          "report": {
+            "type": "string",
+            "description": "The Report's id: its file is `configuration/reports/<id>.json`."
+          },
+          "section": {
+            "type": "string",
+            "description": "The section's title."
+          },
+          "sentToDhis2": {
+            "type": "boolean",
+            "description": "Whether the section's cells are sent to DHIS2."
+          },
+          "title": {
+            "type": "string",
+            "description": "The Report's title (e.g. *HMIS 105 · 2 Antenatal care*)."
+          }
+        }
+      },
       "StudioIndicatorPatient": {
         "type": "object",
         "description": "One test patient, counted or not.",
@@ -4812,7 +4945,8 @@
           "reference",
           "reason",
           "picked",
-          "bands"
+          "bands",
+          "conditions"
         ],
         "properties": {
           "bands": {
@@ -4821,6 +4955,13 @@
               "type": "string"
             },
             "description": "Its band in each of the indicator's disaggregations, in order: a band's code, or\n`not-recorded` (#552)."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioHeld"
+            },
+            "description": "Whether each asked condition held on it, in the order asked (#864)."
           },
           "date": {
             "type": [
@@ -4952,6 +5093,13 @@
           "period"
         ],
         "properties": {
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Conditions of the criteria to explain (#864): FHIRPath, each one condition of the\nnumerator's or denominator's tree as the editor writes it. Each record answers whether\neach held, in this order."
+          },
           "measure": {
             "type": "object",
             "description": "The draft Measure, as the Studio holds it."

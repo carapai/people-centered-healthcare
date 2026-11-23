@@ -30,6 +30,8 @@
 //!   (`numerator`, `denominator`), each `url|version`: a criterion reads it as
 //!   `'<url>|<version>' in %indicators.numerator`. Those indicators come from a [`Library`] and
 //!   are evaluated over the same period and patients first; a circle is refused (#550).
+//! - [`explain`] says, for *Try*, whether each condition of the criteria held on each record
+//!   (#864), each evaluated as the criteria are.
 //! - [`age_band_set`] reads a `Library` of type [`AGE_BAND_SET_TYPE`] as an Age Band Set (#551):
 //!   its `url`, `version` and `title`, and its inline content ([`AGE_BAND_SET_CONTENT`]),
 //!   `{"unit": "years", "ageAt": "period-end", "bands": [{"from": 10, "to": 14}, {"from": 25}]}`.
@@ -601,11 +603,7 @@ async fn outcomes_within(
     within: Vec<String>,
 ) -> Result<Vec<PatientOutcome>, String> {
     let memberships = memberships(engine, library, indicator, period, patients, within).await?;
-    let previous: Vec<String> = period
-        .previous_starts(PREVIOUS_PERIODS)
-        .iter()
-        .map(ToString::to_string)
-        .collect();
+    let previous = previous_starts(period);
     let kinds: Vec<_> = indicator.populations.keys().copied().collect();
     let mut expressions = vec![indicator.period_date.clone()];
     expressions.extend(indicator.populations.values().cloned());
@@ -636,24 +634,9 @@ async fn outcomes_within(
     let distinct = indicator.calculation == Calculation::Value(Aggregate::DistinctCount);
     let mut outcomes = Vec::with_capacity(patients.len());
     for (patient, membership) in patients.iter().zip(&memberships) {
-        let sides = |side: Side| membership.get(&side).cloned().unwrap_or_default();
-        let variables = BTreeMap::from([
-            ("patient".to_owned(), patient.patient.clone()),
-            ("records".to_owned(), patient.bundle()),
-            ("periodStart".to_owned(), json!(period.start.to_string())),
-            ("periodEnd".to_owned(), json!(period.end.to_string())),
-            ("previousPeriods".to_owned(), json!({ "start": previous })),
-            (
-                MEMBERSHIP_VARIABLE.to_owned(),
-                json!({
-                    "numerator": sides(Side::Numerator),
-                    "denominator": sides(Side::Denominator),
-                }),
-            ),
-        ]);
+        let variables = variables(patient, period, &previous, membership);
         let mut records = Vec::new();
-        let candidates = std::iter::once(&patient.patient).chain(&patient.records);
-        for record in candidates.filter(|r| r["resourceType"] == indicator.basis.as_str()) {
+        for record in basis_records(indicator, patient) {
             let mut results: Vec<Result<Vec<FhirPathItem>, String>> = engine
                 .evaluate_with(record, &expressions, &variables)
                 .await
@@ -707,6 +690,100 @@ async fn outcomes_within(
         });
     }
     Ok(outcomes)
+}
+
+/// The first days of the periods before `period`, the nearest first: `%previousPeriods.start`.
+fn previous_starts(period: &Period) -> Vec<String> {
+    period
+        .previous_starts(PREVIOUS_PERIODS)
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+/// The variables every expression is evaluated with for `patient`.
+fn variables(
+    patient: &PatientRecords,
+    period: &Period,
+    previous: &[String],
+    membership: &BTreeMap<Side, Vec<String>>,
+) -> BTreeMap<String, Value> {
+    let sides = |side: Side| membership.get(&side).cloned().unwrap_or_default();
+    BTreeMap::from([
+        ("patient".to_owned(), patient.patient.clone()),
+        ("records".to_owned(), patient.bundle()),
+        ("periodStart".to_owned(), json!(period.start.to_string())),
+        ("periodEnd".to_owned(), json!(period.end.to_string())),
+        ("previousPeriods".to_owned(), json!({ "start": previous })),
+        (
+            MEMBERSHIP_VARIABLE.to_owned(),
+            json!({
+                "numerator": sides(Side::Numerator),
+                "denominator": sides(Side::Denominator),
+            }),
+        ),
+    ])
+}
+
+/// The patient's records of the indicator's basis, in the order evaluation takes them.
+fn basis_records<'a>(
+    indicator: &'a Indicator,
+    patient: &'a PatientRecords,
+) -> impl Iterator<Item = &'a Value> {
+    std::iter::once(&patient.patient)
+        .chain(&patient.records)
+        .filter(|r| r["resourceType"] == indicator.basis.as_str())
+}
+
+/// Whether each condition held on one record, in the order asked: `Err` when it could not be
+/// evaluated or gave something other than true or false.
+pub type Held = Vec<Result<bool, String>>;
+
+/// Whether each of `conditions` (FHIRPath, each one condition of the indicator's criteria as the
+/// editor's tree writes it) held on each record of `indicator`'s basis, per patient and in the
+/// order [`evaluate`] gives the records (#864): what *Try* shows as a check or a cross beside each
+/// condition. Each is evaluated exactly as the criteria are, with the same variables, and the
+/// indicators the criteria refer to are evaluated first, so *is in another indicator* holds as it
+/// does in the criteria. Nothing gives a condition no value: an empty result is not held.
+pub async fn explain(
+    engine: &dyn FhirPathEngine,
+    library: &Library,
+    indicator: &Indicator,
+    period: &Period,
+    patients: &[PatientRecords],
+    conditions: &[String],
+) -> Result<Vec<Vec<Held>>, String> {
+    let memberships = memberships(
+        engine,
+        library,
+        indicator,
+        period,
+        patients,
+        vec![indicator.canonical()],
+    )
+    .await?;
+    let previous = previous_starts(period);
+    let mut out = Vec::with_capacity(patients.len());
+    for (patient, membership) in patients.iter().zip(&memberships) {
+        let variables = variables(patient, period, &previous, membership);
+        let mut records = Vec::new();
+        for record in basis_records(indicator, patient) {
+            let mut held: Held = if conditions.is_empty() {
+                Vec::new()
+            } else {
+                engine
+                    .evaluate_with(record, conditions, &variables)
+                    .await
+                    .into_iter()
+                    .map(|r| meets(r.map_err(|failure| failure.0)))
+                    .collect()
+            };
+            held.resize(conditions.len(), Ok(false));
+            records.push(held);
+        }
+        out.push(records);
+    }
+    Ok(out)
 }
 
 /// How a record's band in one disaggregation is found.
