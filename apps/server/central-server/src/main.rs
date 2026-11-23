@@ -255,7 +255,8 @@ async fn session() {}
         studio::sandbox::play,
         studio::forms::import_questionnaire,
         studio::indicators::try_indicator,
-        studio::reports::preview
+        studio::reports::preview,
+        studio::dashboards::preview
     ),
     components(schemas(SessionInfo))
 )]

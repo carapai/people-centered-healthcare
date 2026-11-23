@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use health_analytics::{Catalogue, DASHBOARDS_FOLDER, StandardDashboard};
+use health_analytics::{Catalogue, DASHBOARDS_FOLDER, DashboardProblem, StandardDashboard};
 use health_configuration::lifecycle::{Lifecycle, Stage};
 use health_configuration::package::{PackageKind, Version};
 use health_packages::{DASHBOARD, Packed};
@@ -58,20 +58,33 @@ pub(crate) fn problems(packed: &Packed, catalogue: &Catalogue) -> Vec<String> {
                 continue;
             }
         };
-        let expected = format!("{DASHBOARDS_FOLDER}{}.json", dashboard.id);
-        if !dashboard.id.trim().is_empty() && path != expected {
-            problems.push(format!(
-                "{path}: the Dashboard {} belongs at {expected}",
-                dashboard.id
-            ));
-        }
         problems.extend(
-            dashboard
-                .problems(catalogue)
+            located_problems(&path, &dashboard, catalogue)
                 .into_iter()
-                .map(|problem| format!("{path}: {problem}")),
+                .map(|problem| format!("{path}: {}", problem.message)),
         );
     }
+    problems
+}
+
+/// Every problem publication finds with the Dashboard at `path`, beyond its schema, each with
+/// the Visualization it is in: the file it belongs at and [`StandardDashboard::located_problems`].
+/// The Studio's Dashboard designer shows these as the author edits (#879), so it refuses what
+/// publication refuses.
+pub fn located_problems(
+    path: &str,
+    dashboard: &StandardDashboard,
+    catalogue: &Catalogue,
+) -> Vec<DashboardProblem> {
+    let mut problems = Vec::new();
+    let expected = format!("{DASHBOARDS_FOLDER}{}.json", dashboard.id);
+    if !dashboard.id.trim().is_empty() && path != expected {
+        problems.push(DashboardProblem {
+            item: None,
+            message: format!("the Dashboard {} belongs at {expected}", dashboard.id),
+        });
+    }
+    problems.extend(dashboard.located_problems(catalogue));
     problems
 }
 

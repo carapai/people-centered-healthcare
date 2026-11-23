@@ -351,7 +351,13 @@ function SaveVisualization({ shown, ready }: { shown: Shown; ready: boolean }) {
   )
 }
 
-function Visualization({ explorer, shown, answer, before }: { explorer: Explorer; shown: Shown; answer: Answer; before: Answer | undefined }) {
+/**
+ * `answer` drawn as `shown` asks: a column or line chart, a map, single numbers or a table, with
+ * the threshold legend and, unless `footer` is false, where the figures were computed and how
+ * complete they are. The Studio's Dashboard designer (#879) draws its preview over sample data
+ * with this, without the footer.
+ */
+export function Visualization({ explorer, shown, answer, before, footer = true }: { explorer: Explorer; shown: Shown; answer: Answer; before: Answer | undefined; footer?: boolean }) {
   const intl = useIntl()
   const { question } = shown
   const bandName = (code: string) => (code === NOT_RECORDED ? intl.formatMessage(m.exNotRecorded) : code)
@@ -414,7 +420,7 @@ function Visualization({ explorer, shown, answer, before }: { explorer: Explorer
           ))}
         </div>
       ) : null}
-      <div className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' })}>
+      {footer ? <div className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontSize: 'sm' })}>
         <p className={muted}>
           {intl.formatMessage(answer.where === 'central' ? m.exWhereCentral : m.exWhereFacility)}{' '}
           {newest === null ? intl.formatMessage(m.exNeverComputed) : intl.formatMessage(m.exAsOf, { at: intl.formatDate(newest, { dateStyle: 'medium', timeStyle: 'short' }) })}
@@ -447,7 +453,7 @@ function Visualization({ explorer, shown, answer, before }: { explorer: Explorer
             {intl.formatMessage(m.exFacilityOnly, { indicator: title(measure) })}
           </p>
         ))}
-      </div>
+      </div> : null}
     </>
   )
 }

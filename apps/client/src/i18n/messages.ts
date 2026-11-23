@@ -3305,14 +3305,10 @@ type DesignValues = {
   dhCount: { section: string; count: number }
   dhOpen: { section: string }
   dhNew: { section: string }
-  dhSoon: {}
-  dhSoonHint: {}
   dhPackages: {}
   dhPackagesHint: {}
   dhPackagesCount: { count: number }
   dhPackagesOpen: {}
-  dhDashboards: {}
-  dhDashboardsHint: {}
   dhHome: {}
   dhColTitle: {}
   dhColType: {}
@@ -3366,39 +3362,35 @@ export const designMessages = defineMessages<DesignValues>({
   dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
   dhSection: {
     id: 'app.studio.home.section',
-    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} reports {Reports} other {{section}}}',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} reports {Reports} dashboards {Dashboards} other {{section}}}',
     description: 'Studio: a section heading',
   },
   dhSectionHint: {
     id: 'app.studio.home.sectionHint',
     defaultMessage:
-      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} reports {HMIS forms and facility reports: indicators laid out for one period type, by section, with the levels they run for.} other {}}',
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} reports {HMIS forms and facility reports: indicators laid out for one period type, by section, with the levels they run for.} dashboards {Standard dashboards: charts, tables and single numbers of indicators over the last few periods, shown to every user over their own area.} other {}}',
     description: 'Studio: what a section holds',
   },
   dhCount: {
     id: 'app.studio.home.count',
     defaultMessage:
-      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} reports {{count, plural, =0 {No reports} one {# report} other {# reports}}} other {{count}}}',
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} reports {{count, plural, =0 {No reports} one {# report} other {# reports}}} dashboards {{count, plural, =0 {No dashboards} one {# dashboard} other {# dashboards}}} other {{count}}}',
     description: 'Studio: how many designs a section holds',
   },
   dhOpen: {
     id: 'app.studio.home.open',
-    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} reports {Open reports} other {Open}}',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} reports {Open reports} dashboards {Open dashboards} other {Open}}',
     description: 'Studio home: open a section',
   },
   dhNew: {
     id: 'app.studio.home.new',
-    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} reports {New report} other {New}}',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} reports {New report} dashboards {New dashboard} other {New}}',
     description: 'Studio: start a new design',
   },
-  dhSoon: { id: 'app.studio.home.soon', defaultMessage: 'Coming soon', description: 'Studio home: a design type whose editor is not built yet' },
-  dhSoonHint: { id: 'app.studio.home.soonHint', defaultMessage: 'Its editor is not built yet.', description: 'Studio home: why a section cannot be opened' },
   dhPackages: { id: 'app.studio.home.packages', defaultMessage: 'Packages', description: 'Studio: the packages section heading' },
   dhPackagesHint: { id: 'app.studio.home.packagesHint', defaultMessage: 'The packages your designs live in: check, submit, review, approve, publish and activate them.', description: 'Studio home: the packages section' },
   dhPackagesCount: { id: 'app.studio.home.packagesCount', defaultMessage: '{count, plural, =0 {No packages} one {# package} other {# packages}}', description: 'Studio home: how many packages' },
   dhPackagesOpen: { id: 'app.studio.home.packagesOpen', defaultMessage: 'Open the packages', description: 'Studio home: open the package list' },
-  dhDashboards: { id: 'app.studio.home.dashboards', defaultMessage: 'Dashboards', description: 'Studio home: dashboards section' },
-  dhDashboardsHint: { id: 'app.studio.home.dashboardsHint', defaultMessage: 'Charts and tables of indicators for each level of care.', description: 'Studio home: dashboards section' },
   dhHome: { id: 'app.studio.home.back', defaultMessage: 'Back to the Studio', description: 'Studio: back to the home' },
   dhColTitle: { id: 'app.studio.design.colTitle', defaultMessage: 'Title', description: 'Studio section: column' },
   dhColType: { id: 'app.studio.design.colType', defaultMessage: 'Type', description: 'Studio section: column' },
@@ -3407,7 +3399,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhColChanged: { id: 'app.studio.design.colChanged', defaultMessage: 'Last change', description: 'Studio section: column' },
   dhKind: {
     id: 'app.studio.design.kind',
-    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} indicator {Indicator} report {Report} other {{kind}}}',
+    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} indicator {Indicator} report {Report} dashboard {Dashboard} other {{kind}}}',
     description: 'Studio section: a design’s type',
   },
   dhStatus: {
@@ -3423,7 +3415,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
   dhEmpty: {
     id: 'app.studio.design.empty',
-    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} reports {No reports yet.} other {Nothing yet.}}',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} reports {No reports yet.} dashboards {No dashboards yet.} other {Nothing yet.}}',
     description: 'Studio section: nothing designed yet',
   },
   dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
@@ -3431,7 +3423,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
   dhNewHeading: {
     id: 'app.studio.design.newHeading',
-    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} reports {A new report} other {New}}',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} reports {A new report} dashboards {A new dashboard} other {New}}',
     description: 'Studio section: the New panel heading',
   },
   dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },
@@ -4082,4 +4074,118 @@ export const reportMessages = defineMessages<ReportValues>({
   rdDhis2Combo: { id: 'app.studio.report.dhis2Combo', defaultMessage: 'Category option combo', description: 'Report designer' },
   rdSentIfMapped: { id: 'app.studio.report.sentIfMapped', defaultMessage: '(sent only if mapped)', description: 'Report designer' },
   rdNotMapped: { id: 'app.studio.report.notMapped', defaultMessage: 'Not mapped yet', description: 'Report designer' },
+})
+
+// The Dashboard designer (#879; studio.md § Dashboards): a standard Dashboard in a Reporting
+// package, its Visualizations built like the explorer's, previewed over test patients.
+type DashboardDesignerValues = {
+  bdLoading: {}
+  bdUnreadable: { reason: string }
+  bdReadOnly: {}
+  bdOpen: { path: string }
+  bdOpenShort: {}
+  bdOutline: {}
+  bdTitle: {}
+  bdDescription: {}
+  bdId: { id: string; path: string }
+  bdItems: {}
+  bdNoItems: {}
+  bdUntitled: {}
+  bdSummary: { type: string; indicators: number; periods: string }
+  bdProblemCount: { count: number }
+  bdAddItem: {}
+  bdNewItem: {}
+  bdItemTitle: {}
+  bdItemId: {}
+  bdMoveUp: { title: string }
+  bdMoveDown: { title: string }
+  bdRemove: { title: string }
+  bdIndicators: {}
+  bdNoChoices: {}
+  bdPeriods: {}
+  bdLast: {}
+  bdLastCount: {}
+  bdRange: {}
+  bdFrom: {}
+  bdTo: {}
+  bdRangeHint: {}
+  bdFollow: {}
+  bdFollow_myPlace: {}
+  bdFollow_eachAreaUnder: {}
+  bdValidation: {}
+  bdChecking: {}
+  bdNoProblems: {}
+  bdCheckFailed: { reason: string }
+  bdDashboardProblem: {}
+  bdSave: {}
+  bdSaved: {}
+  bdStale: {}
+  bdReload: {}
+  bdFailed: { reason: string }
+  bdPreview: {}
+  bdAsOf: {}
+  bdAsOfHint: {}
+  bdComputing: {}
+  bdPreviewFailed: { reason: string }
+  bdPreviewHint: { patients: number; sources: string }
+  bdSample: {}
+  bdPeriodsShown: { from: string; to: string }
+  bdMapAsTable: {}
+  bdItemFailed: { reason: string }
+}
+
+export const dashboardDesignerMessages = defineMessages<DashboardDesignerValues>({
+  bdLoading: { id: 'app.studio.dashboard.loading', defaultMessage: 'Loading the Dashboard…', description: 'Dashboard designer' },
+  bdUnreadable: { id: 'app.studio.dashboard.unreadable', defaultMessage: 'This file is not a Dashboard the designer can edit ({reason}). Open it in the file editor instead.', description: 'Dashboard designer' },
+  bdReadOnly: { id: 'app.studio.dashboard.readOnly', defaultMessage: 'Read only. Press Edit to change it in your draft.', description: 'Dashboard designer' },
+  bdOpen: { id: 'app.studio.dashboard.open', defaultMessage: 'Open in the Dashboard designer: {path}', description: 'Dashboard designer' },
+  bdOpenShort: { id: 'app.studio.dashboard.openShort', defaultMessage: 'Open in the Dashboard designer', description: 'Dashboard designer' },
+  bdOutline: { id: 'app.studio.dashboard.outline', defaultMessage: 'Outline', description: 'Dashboard designer' },
+  bdTitle: { id: 'app.studio.dashboard.title', defaultMessage: 'Dashboard title', description: 'Dashboard designer' },
+  bdDescription: { id: 'app.studio.dashboard.description', defaultMessage: 'What it is for', description: 'Dashboard designer' },
+  bdId: { id: 'app.studio.dashboard.id', defaultMessage: 'Id {id}, saved at {path}', description: 'Dashboard designer' },
+  bdItems: { id: 'app.studio.dashboard.items', defaultMessage: 'Visualizations', description: 'Dashboard designer' },
+  bdNoItems: { id: 'app.studio.dashboard.noItems', defaultMessage: 'No Visualizations yet: add a chart.', description: 'Dashboard designer' },
+  bdUntitled: { id: 'app.studio.dashboard.untitled', defaultMessage: 'Untitled Visualization', description: 'Dashboard designer' },
+  bdSummary: { id: 'app.studio.dashboard.summary', defaultMessage: '{type, select, column {Column chart} line {Line chart} table {Table} single {Single number} map {Map} other {{type}}} · {indicators, plural, =0 {no indicators} one {# indicator} other {# indicators}} · {periods}', description: 'Dashboard designer' },
+  bdProblemCount: { id: 'app.studio.dashboard.problemCount', defaultMessage: '{count, plural, one {# problem} other {# problems}}', description: 'Dashboard designer' },
+  bdAddItem: { id: 'app.studio.dashboard.addItem', defaultMessage: '+ visualization', description: 'Dashboard designer' },
+  bdNewItem: { id: 'app.studio.dashboard.newItem', defaultMessage: 'New chart', description: 'Dashboard designer' },
+  bdItemTitle: { id: 'app.studio.dashboard.itemTitle', defaultMessage: 'Visualization title', description: 'Dashboard designer' },
+  bdItemId: { id: 'app.studio.dashboard.itemId', defaultMessage: 'Visualization id', description: 'Dashboard designer' },
+  bdMoveUp: { id: 'app.studio.dashboard.moveUp', defaultMessage: 'Move {title} up', description: 'Dashboard designer' },
+  bdMoveDown: { id: 'app.studio.dashboard.moveDown', defaultMessage: 'Move {title} down', description: 'Dashboard designer' },
+  bdRemove: { id: 'app.studio.dashboard.remove', defaultMessage: 'Remove {title}', description: 'Dashboard designer' },
+  bdIndicators: { id: 'app.studio.dashboard.indicators', defaultMessage: 'Indicators', description: 'Dashboard designer' },
+  bdNoChoices: { id: 'app.studio.dashboard.noChoices', defaultMessage: 'No indicators in the Studio yet.', description: 'Dashboard designer' },
+  bdPeriods: { id: 'app.studio.dashboard.periods', defaultMessage: 'Periods', description: 'Dashboard designer' },
+  bdLast: { id: 'app.studio.dashboard.last', defaultMessage: 'The last', description: 'Dashboard designer' },
+  bdLastCount: { id: 'app.studio.dashboard.lastCount', defaultMessage: 'How many periods', description: 'Dashboard designer' },
+  bdRange: { id: 'app.studio.dashboard.range', defaultMessage: 'A fixed range', description: 'Dashboard designer' },
+  bdFrom: { id: 'app.studio.dashboard.from', defaultMessage: 'From', description: 'Dashboard designer' },
+  bdTo: { id: 'app.studio.dashboard.to', defaultMessage: 'To', description: 'Dashboard designer' },
+  bdRangeHint: { id: 'app.studio.dashboard.rangeHint', defaultMessage: 'A standard Dashboard usually shows the last few periods, so it stays current.', description: 'Dashboard designer' },
+  bdFollow: { id: 'app.studio.dashboard.follow', defaultMessage: 'Places', description: 'Dashboard designer' },
+  bdFollow_myPlace: { id: 'app.studio.dashboard.follow_myPlace', defaultMessage: 'The viewer’s own place', description: 'Dashboard designer' },
+  bdFollow_eachAreaUnder: { id: 'app.studio.dashboard.follow_eachAreaUnder', defaultMessage: 'Each area under the viewer’s place', description: 'Dashboard designer' },
+  bdValidation: { id: 'app.studio.dashboard.validation', defaultMessage: 'Validation', description: 'Dashboard designer' },
+  bdChecking: { id: 'app.studio.dashboard.checking', defaultMessage: 'Checking…', description: 'Dashboard designer' },
+  bdNoProblems: { id: 'app.studio.dashboard.noProblems', defaultMessage: 'No problems: publication would accept this Dashboard.', description: 'Dashboard designer' },
+  bdCheckFailed: { id: 'app.studio.dashboard.checkFailed', defaultMessage: 'Could not check: {reason}', description: 'Dashboard designer' },
+  bdDashboardProblem: { id: 'app.studio.dashboard.dashboardProblem', defaultMessage: 'Dashboard', description: 'Dashboard designer' },
+  bdSave: { id: 'app.studio.dashboard.save', defaultMessage: 'Save', description: 'Dashboard designer' },
+  bdSaved: { id: 'app.studio.dashboard.saved', defaultMessage: 'Saved.', description: 'Dashboard designer' },
+  bdStale: { id: 'app.studio.dashboard.stale', defaultMessage: 'Someone saved this draft since you opened it. Nothing was kept: reload to see their changes.', description: 'Dashboard designer' },
+  bdReload: { id: 'app.studio.dashboard.reload', defaultMessage: 'Reload', description: 'Dashboard designer' },
+  bdFailed: { id: 'app.studio.dashboard.failed', defaultMessage: 'Saving failed: {reason}', description: 'Dashboard designer' },
+  bdPreview: { id: 'app.studio.dashboard.preview', defaultMessage: 'Preview', description: 'Dashboard designer' },
+  bdAsOf: { id: 'app.studio.dashboard.asOf', defaultMessage: 'As of', description: 'Dashboard designer' },
+  bdAsOfHint: { id: 'app.studio.dashboard.asOfHint', defaultMessage: 'The day the last periods run up to. The sample data is dated, so pick a day near it.', description: 'Dashboard designer' },
+  bdComputing: { id: 'app.studio.dashboard.computing', defaultMessage: 'Computing the preview…', description: 'Dashboard designer' },
+  bdPreviewFailed: { id: 'app.studio.dashboard.previewFailed', defaultMessage: 'The preview failed: {reason}', description: 'Dashboard designer' },
+  bdPreviewHint: { id: 'app.studio.dashboard.previewHint', defaultMessage: 'Computed over {patients, plural, one {# test patient} other {# test patients}} ({sources}), standing for one place, whatever each Visualization follows.', description: 'Dashboard designer' },
+  bdSample: { id: 'app.studio.dashboard.sample', defaultMessage: 'Test patients', description: 'Dashboard designer' },
+  bdPeriodsShown: { id: 'app.studio.dashboard.periodsShown', defaultMessage: '{from} to {to}', description: 'Dashboard designer' },
+  bdMapAsTable: { id: 'app.studio.dashboard.mapAsTable', defaultMessage: 'A map is previewed as a table: the test patients have no place on the map.', description: 'Dashboard designer' },
+  bdItemFailed: { id: 'app.studio.dashboard.itemFailed', defaultMessage: 'Not computed: {reason}', description: 'Dashboard designer' },
 })

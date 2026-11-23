@@ -152,9 +152,28 @@ fn one_of(problems: &mut Vec<String>, name: &str, what: &str, value: &str, allow
     }
 }
 
+/// One of Validation's problems with a standard Dashboard, and the Visualization it is in, if
+/// any: the Studio's Dashboard designer shows each beside its item (#879).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DashboardProblem {
+    /// The Visualization's index in the Dashboard's items, or none for the Dashboard itself.
+    pub item: Option<usize>,
+    /// What is wrong.
+    pub message: String,
+}
+
 impl StandardDashboard {
     /// Every problem with it, given the indicators it can pin.
     pub fn problems(&self, catalogue: &Catalogue) -> Vec<String> {
+        self.located_problems(catalogue)
+            .into_iter()
+            .map(|problem| problem.message)
+            .collect()
+    }
+
+    /// Every problem with it, as [`Self::problems`] words them, each with the Visualization it
+    /// is in.
+    pub fn located_problems(&self, catalogue: &Catalogue) -> Vec<DashboardProblem> {
         let mut problems = Vec::new();
         if blank(&self.id) {
             problems.push("the Dashboard has no id".to_owned());
@@ -171,8 +190,16 @@ impl StandardDashboard {
                 self.items.len()
             ));
         }
+        let mut located: Vec<DashboardProblem> = problems
+            .into_iter()
+            .map(|message| DashboardProblem {
+                item: None,
+                message,
+            })
+            .collect();
         let mut ids = BTreeSet::new();
         for (n, item) in self.items.iter().enumerate() {
+            let mut problems = Vec::new();
             let name = if blank(&item.title) {
                 format!("Visualization {}", n + 1)
             } else {
@@ -194,8 +221,12 @@ impl StandardDashboard {
                 &name,
                 catalogue,
             ));
+            located.extend(problems.into_iter().map(|message| DashboardProblem {
+                item: Some(n),
+                message,
+            }));
         }
-        problems
+        located
     }
 }
 
@@ -387,6 +418,31 @@ mod tests {
             [
                 "Visualization 2 (ANC 1st visits by area) has the id first-visits, which another Visualization has",
                 "Visualization 2 (ANC 1st visits by area)'s periods: 2026-03 is after 2026-01",
+            ]
+        );
+    }
+
+    #[test]
+    fn each_problem_names_the_visualization_it_is_in() {
+        let located = dashboard(|d| {
+            d["title"] = json!("");
+            let mut second = d["items"][0].clone();
+            second["id"] = json!("second");
+            second["visualization"]["question"]["indicators"] = json!(["https://x/Measure/m"]);
+            d["items"].as_array_mut().expect("items").push(second);
+        })
+        .located_problems(&catalogue());
+        assert_eq!(
+            located,
+            [
+                DashboardProblem {
+                    item: None,
+                    message: "the Dashboard has no title".to_owned()
+                },
+                DashboardProblem {
+                    item: Some(1),
+                    message: "Visualization 2 (ANC 1st visits by area): the indicator https://x/Measure/m is not pinned to a version (url|version)".to_owned()
+                },
             ]
         );
     }

@@ -447,6 +447,99 @@
         }
       }
     },
+    "/api/studio/packages/{id}/dashboards/preview": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Documents and serves the Dashboard designer's preview.",
+        "description": "The Dashboard designer's preview of a draft standard Dashboard (unsaved edits included) as of a day: Validation's problems as publication words them, each with the Visualization it is in, and each Visualization's figures as the explorer answers them (indicators × its periods, split by its disaggregation), computed over the package's test patients as *Try* computes an indicator, the sample standing for one place. Indicators are taken from the draft, else a published package version, else another package's open draft.",
+        "operationId": "previewStudioDashboard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "`name@version`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioDashboardPreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioDashboardPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No Studio permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The posted Dashboard cannot be read, or the day is not a date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The package store failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/packages/{id}/decision-tables/check": {
       "post": {
         "tags": [
@@ -3517,6 +3610,381 @@
           "unconverted"
         ]
       },
+      "StudioDashboardAnswer": {
+        "type": "object",
+        "description": "Figures as the explorer answers them.",
+        "required": [
+          "periods",
+          "cells"
+        ],
+        "properties": {
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardCell"
+            },
+            "description": "Indicator by indicator, then period."
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardPeriod"
+            },
+            "description": "The periods, first to last."
+          }
+        }
+      },
+      "StudioDashboardBand": {
+        "type": "object",
+        "description": "One band's figure.",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Its code."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal text; none when the band's denominator is zero."
+          }
+        }
+      },
+      "StudioDashboardCell": {
+        "type": "object",
+        "description": "One indicator's figure for one period, at the sample place.",
+        "required": [
+          "indicator",
+          "period",
+          "place"
+        ],
+        "properties": {
+          "bands": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardBand"
+            },
+            "description": "Split by the Visualization's disaggregation: each band's figure."
+          },
+          "indicator": {
+            "type": "string",
+            "description": "`url|version`."
+          },
+          "period": {
+            "type": "string",
+            "description": "The period's id."
+          },
+          "place": {
+            "type": "string",
+            "description": "Always [`SAMPLE`]."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal text; none when the denominator is zero or no value was taken."
+          }
+        }
+      },
+      "StudioDashboardDisaggregation": {
+        "type": "object",
+        "description": "A disaggregation an indicator offers.",
+        "required": [
+          "name",
+          "by"
+        ],
+        "properties": {
+          "by": {
+            "type": "string",
+            "description": "`age` or `code`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name: an Age Band Set's `url|version`, or the code."
+          }
+        }
+      },
+      "StudioDashboardIndicator": {
+        "type": "object",
+        "description": "An indicator, as the explorer lists it.",
+        "required": [
+          "measure",
+          "title",
+          "calculation",
+          "rollsUp",
+          "thresholds",
+          "disaggregations",
+          "package",
+          "published"
+        ],
+        "properties": {
+          "calculation": {
+            "type": "string",
+            "description": "What it calculates: `count`, `percentage`, `rate`, `ratio`, or a value's aggregate."
+          },
+          "disaggregations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardDisaggregation"
+            },
+            "description": "What it is broken down by."
+          },
+          "measure": {
+            "type": "string",
+            "description": "`url|version`."
+          },
+          "package": {
+            "type": "string",
+            "description": "The package version it was taken from (`name@version`)."
+          },
+          "per": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "A rate's factor."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether that version is published (or is this draft); otherwise it is an open draft."
+          },
+          "rollsUp": {
+            "type": "boolean",
+            "description": "False for a median or a distinct count."
+          },
+          "thresholds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardThreshold"
+            },
+            "description": "Its threshold bands, lowest first."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title."
+          }
+        }
+      },
+      "StudioDashboardItem": {
+        "type": "object",
+        "description": "One Visualization's preview.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioDashboardAnswer",
+                "description": "Its figures."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudioDashboardAnswer",
+                "description": "A single number's period before its last."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it could not be computed, if it could not."
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first period shown, when its periods can be read."
+          },
+          "id": {
+            "type": "string",
+            "description": "The item's id."
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last period shown."
+          }
+        }
+      },
+      "StudioDashboardPeriod": {
+        "type": "object",
+        "description": "A period of an answer.",
+        "required": [
+          "id",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string",
+            "description": "Its last day."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its id (`2026-03`)."
+          },
+          "start": {
+            "type": "string",
+            "description": "Its first day."
+          }
+        }
+      },
+      "StudioDashboardPreview": {
+        "type": "object",
+        "description": "The preview of a draft standard Dashboard.",
+        "required": [
+          "asOf",
+          "problems",
+          "indicators",
+          "items",
+          "sources",
+          "patients",
+          "errors"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "description": "The day the periods run up to."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Test patients that could not be read."
+          },
+          "indicators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardIndicator"
+            },
+            "description": "Each indicator a Visualization shows that was found, as the explorer lists it."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardItem"
+            },
+            "description": "Each Visualization, in order."
+          },
+          "patients": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many test patients were read.",
+            "minimum": 0
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioDashboardProblem"
+            },
+            "description": "Validation's problems, as they stand."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The package versions whose test patients were read."
+          }
+        }
+      },
+      "StudioDashboardPreviewInput": {
+        "type": "object",
+        "description": "The preview of a draft standard Dashboard.",
+        "required": [
+          "dashboard",
+          "path",
+          "asOf"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "description": "The day the \"last *n*\" periods run up to (`2026-04-30`)."
+          },
+          "dashboard": {
+            "type": "object",
+            "description": "The draft Dashboard, as the designer holds it (`dashboard/1`)."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its file in the package (`configuration/dashboards/<id>.json`)."
+          }
+        }
+      },
+      "StudioDashboardProblem": {
+        "type": "object",
+        "description": "One of Validation's problems with the Dashboard.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "item": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The Visualization it is in (its index), or none for the Dashboard itself.",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong."
+          }
+        }
+      },
+      "StudioDashboardThreshold": {
+        "type": "object",
+        "description": "One of an indicator's threshold bands.",
+        "required": [
+          "tone"
+        ],
+        "properties": {
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its lower bound (inclusive), exact decimal text, none below every figure."
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its upper bound (exclusive), none above every figure."
+          },
+          "tone": {
+            "type": "string",
+            "description": "`good`, `warning` or `bad`."
+          }
+        }
+      },
       "StudioDecisionCheck": {
         "type": "object",
         "description": "What the checks found.",
@@ -3844,7 +4312,8 @@
           "program",
           "age-band-set",
           "indicator",
-          "report"
+          "report",
+          "dashboard"
         ]
       },
       "StudioDesignPackage": {

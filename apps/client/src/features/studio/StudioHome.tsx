@@ -14,11 +14,9 @@ export const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
 export const muted = css({ color: 'fg.muted' })
 const grid = css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', md: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }, listStyle: 'none', p: '0', m: '0' })
 const card = css({ display: 'flex', flexDirection: 'column', gap: '2', p: '4', borderRadius: 'lg', border: '1px solid', borderColor: 'border', bg: 'bg.surface', height: '100%' })
-const soon = css({ borderStyle: 'dashed', bg: 'transparent' })
 const cardTitle = css({ fontSize: 'lg', fontWeight: 'semibold' })
 const count = css({ fontSize: 'sm', fontWeight: 'medium' })
 const actions = css({ display: 'flex', flexWrap: 'wrap', gap: '3', mt: 'auto', pt: '2' })
-const badge = css({ alignSelf: 'flex-start', fontSize: 'xs', fontWeight: 'semibold', px: '2', py: '0.5', borderRadius: 'full', border: '1px solid', borderColor: 'border', color: 'fg.muted' })
 
 /** A link to `/studio/<section>`; New opens its panel. */
 function SectionLink({ section, isNew, children }: { section: SectionId; isNew?: boolean; children: ReactNode }) {
@@ -40,6 +38,8 @@ function SectionLink({ section, isNew, children }: { section: SectionId; isNew?:
       return <Link to="/studio/indicators" search={search}>{children}</Link>
     case 'reports':
       return <Link to="/studio/reports" search={search}>{children}</Link>
+    case 'dashboards':
+      return <Link to="/studio/dashboards" search={search}>{children}</Link>
   }
 }
 
@@ -48,7 +48,7 @@ export { SectionLink }
 /**
  * The Studio's home (studio.md § The Studio home; #855): what a person designs, one card per
  * kind with how many there are, *Open* and *New*. Reports (#556) open in the Report designer
- * (#559); dashboards are shown, marked coming soon. The packages, for checking, review, approval and
+ * (#559), standard Dashboards in the Dashboard designer (#879). The packages, for checking, review, approval and
  * publication, are one more card.
  */
 export function StudioHome() {
@@ -88,10 +88,6 @@ export function StudioHome() {
               </Card>
             )
           })}
-          <Card title={intl.formatMessage(dm.dhDashboards)} hint={intl.formatMessage(dm.dhDashboardsHint)} soon>
-            <span className={badge}>{intl.formatMessage(dm.dhSoon)}</span>
-            <p className={muted}>{intl.formatMessage(dm.dhSoonHint)}</p>
-          </Card>
           <Card title={intl.formatMessage(dm.dhPackages)} hint={intl.formatMessage(dm.dhPackagesHint)}>
             <p className={count}>{intl.formatMessage(dm.dhPackagesCount, { count: data.packages.length })}</p>
             <div className={actions}>
@@ -104,11 +100,11 @@ export function StudioHome() {
   )
 }
 
-function Card({ title, hint, soon: isSoon, children }: { title: string; hint: string; soon?: boolean; children: ReactNode }) {
+function Card({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   const id = useId()
   return (
     <li>
-      <article aria-labelledby={id} className={isSoon === true ? `${card} ${soon}` : card}>
+      <article aria-labelledby={id} className={card}>
         <h2 id={id} className={cardTitle}>
           {title}
         </h2>

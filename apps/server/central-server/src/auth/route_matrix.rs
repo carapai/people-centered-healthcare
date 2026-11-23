@@ -378,6 +378,7 @@ const INVENTORY: &[Mounted] = &[
             "/packages/{id}/questionnaires/import",
             "/packages/{id}/indicators/try",
             "/packages/{id}/reports/preview",
+            "/packages/{id}/dashboards/preview",
             "/drafts",
             "/workflow-actions",
         ],

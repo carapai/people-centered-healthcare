@@ -4,11 +4,12 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useId, useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { indicatorMessages as im, programMessages as pm, reportMessages as rm, studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
+import { dashboardDesignerMessages as bm, indicatorMessages as im, programMessages as pm, reportMessages as rm, studioMessages as m, terminologyMessages as tm, workflowMessages as wm } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { button, control, field } from '../reception/styles'
 import { StudioError, actionInput, addComment, needs, packageQuery, setNote, setVersion, startDraft, studioKey, takeAction, type StudioActionName, type StudioPackagePage } from './api'
 import { actionLabel, checkLabel, refusalText, stageLabel } from './wording'
+import { DASHBOARDS_FOLDER } from './dashboards/dashboard'
 import { REPORTS_FOLDER } from './reports/report'
 import { useWorkflowFiles } from './workflowFiles'
 
@@ -255,7 +256,9 @@ function ArtefactLink({ id, draft, workflows, path }: { id: string; draft: Studi
               ? ('/studio/$id/indicators/$' as const)
               : path.startsWith(REPORTS_FOLDER)
                 ? ('/studio/$id/reports/$' as const)
-                : ('/studio/$id/files/$' as const)
+                : path.startsWith(DASHBOARDS_FOLDER)
+                  ? ('/studio/$id/dashboards/$' as const)
+                  : ('/studio/$id/files/$' as const)
   return (
     <>
       <Link to={to} params={{ id, _splat: path }}>
@@ -522,6 +525,14 @@ function Files({ id, draft, workflows }: { id: string; draft: StudioPackagePage;
                 {' · '}
                 <Link to="/studio/$id/reports/$" params={{ id, _splat: file.path }} aria-label={intl.formatMessage(rm.rdOpen, { path: file.path })}>
                   {intl.formatMessage(rm.rdOpenShort)}
+                </Link>
+              </>
+            ) : null}
+            {file.path.startsWith(DASHBOARDS_FOLDER) && file.path.endsWith('.json') ? (
+              <>
+                {' · '}
+                <Link to="/studio/$id/dashboards/$" params={{ id, _splat: file.path }} aria-label={intl.formatMessage(bm.bdOpen, { path: file.path })}>
+                  {intl.formatMessage(bm.bdOpenShort)}
                 </Link>
               </>
             ) : null}

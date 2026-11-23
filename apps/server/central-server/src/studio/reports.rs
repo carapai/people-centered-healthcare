@@ -35,7 +35,7 @@ use health_analytics_app::{
     Library, TestPatient, age_band_set, evaluate, is_age_band_set, is_test_patient, measure,
     test_patient,
 };
-use health_publication::Files;
+use health_publication::{Files, ReportSources};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -193,10 +193,13 @@ fn studio_period(kind: PeriodType, period: &Period) -> StudioPeriod {
 }
 
 /// An indicator found, and where.
-struct Found {
-    indicator: Indicator,
-    package: String,
-    published: bool,
+pub(super) struct Found {
+    /// The indicator.
+    pub(super) indicator: Indicator,
+    /// The package version it was taken from.
+    pub(super) package: String,
+    /// Whether that version is published (or is the draft itself).
+    pub(super) published: bool,
 }
 
 /// What a package version holds that the preview uses.
@@ -226,6 +229,78 @@ fn held(files: &Files) -> Held {
         }
     }
     out
+}
+
+/// The indicators and Age Band Sets a preview computes with, and the test patients it may read.
+pub(super) struct Gathered {
+    /// Each package version, the draft first, then published versions, then other open
+    /// drafts, with whether it is published and what it holds.
+    holders: Vec<(String, bool, Held)>,
+    /// Each indicator by `url|version`, from the first holder holding it.
+    pub(super) found: BTreeMap<String, Found>,
+    /// Every published Age Band Set, and those the holders add.
+    pub(super) sets: Vec<AgeBandSet>,
+}
+
+/// What draft `id` can compute with, from `sources` and the published Age Band Sets `sets`:
+/// an indicator is taken from the draft, else a published version, else another package's
+/// open draft.
+pub(super) fn gather(id: &str, sources: &ReportSources, mut sets: Vec<AgeBandSet>) -> Gathered {
+    let mut holders = vec![(id.to_owned(), false, held(&sources.draft))];
+    holders.extend(
+        sources
+            .packages
+            .iter()
+            .map(|p| (p.id.clone(), p.published, held(&p.files))),
+    );
+    let mut found: BTreeMap<String, Found> = BTreeMap::new();
+    for (package, published, holding) in &holders {
+        for indicator in &holding.indicators {
+            found.entry(indicator.canonical()).or_insert_with(|| Found {
+                indicator: indicator.clone(),
+                package: package.clone(),
+                published: *published || package == id,
+            });
+        }
+        for set in &holding.sets {
+            if !sets.iter().any(|s| s.canonical() == set.canonical()) {
+                sets.push(set.clone());
+            }
+        }
+    }
+    Gathered {
+        holders,
+        found,
+        sets,
+    }
+}
+
+impl Gathered {
+    /// The test patients to read for indicators `used`: the draft's, and those of each package
+    /// version holding one of them; with the versions read and the patients that cannot be.
+    pub(super) fn test_patients(
+        &self,
+        id: &str,
+        used: &[&str],
+    ) -> (Vec<String>, Vec<TestPatient>, Vec<String>) {
+        let mut read = vec![id.to_owned()];
+        for reference in used {
+            if let Some(f) = self.found.get(*reference)
+                && !read.contains(&f.package)
+            {
+                read.push(f.package.clone());
+            }
+        }
+        let mut patients: Vec<TestPatient> = Vec::new();
+        let mut errors = Vec::new();
+        for (package, _, holding) in &self.holders {
+            if read.contains(package) {
+                patients.extend(holding.patients.iter().cloned());
+                errors.extend(holding.errors.iter().map(|e| format!("{package}: {e}")));
+            }
+        }
+        (read, patients, errors)
+    }
 }
 
 fn figures(
@@ -356,7 +431,7 @@ pub(crate) async fn preview(
         Ok(sources) => sources,
         Err(error) => return failure(&error),
     };
-    let mut sets: Vec<AgeBandSet> = match studio.publications.age_band_sets().await {
+    let sets: Vec<AgeBandSet> = match studio.publications.age_band_sets().await {
         Ok(published) => published.into_iter().map(|p| p.set).collect(),
         Err(error) => return failure(&error),
     };
@@ -369,30 +444,9 @@ pub(crate) async fn preview(
         })
         .collect();
 
-    // The draft first, then published versions, then other open drafts: the first holding an
-    // indicator is where it is taken from.
-    let mut holders = vec![(id.clone(), false, held(&sources.draft))];
-    holders.extend(
-        sources
-            .packages
-            .iter()
-            .map(|p| (p.id.clone(), p.published, held(&p.files))),
-    );
-    let mut found: BTreeMap<String, Found> = BTreeMap::new();
-    for (package, published, holding) in &holders {
-        for indicator in &holding.indicators {
-            found.entry(indicator.canonical()).or_insert_with(|| Found {
-                indicator: indicator.clone(),
-                package: package.clone(),
-                published: *published || *package == id,
-            });
-        }
-        for set in &holding.sets {
-            if !sets.iter().any(|s| s.canonical() == set.canonical()) {
-                sets.push(set.clone());
-            }
-        }
-    }
+    let gathered = gather(&id, &sources, sets);
+    let sets = gathered.sets.clone();
+    let found = &gathered.found;
     // The test patients: the draft's, and those of each package holding a used indicator.
     let used: Vec<&str> = report
         .sections
@@ -402,22 +456,7 @@ pub(crate) async fn preview(
             Section::LineList(list) => list.counted_by.as_deref().into_iter().collect::<Vec<_>>(),
         })
         .collect();
-    let mut read = vec![id.clone()];
-    for reference in &used {
-        if let Some(f) = found.get(*reference)
-            && !read.contains(&f.package)
-        {
-            read.push(f.package.clone());
-        }
-    }
-    let mut patients: Vec<TestPatient> = Vec::new();
-    let mut errors = Vec::new();
-    for (package, _, holding) in &holders {
-        if read.contains(package) {
-            patients.extend(holding.patients.iter().cloned());
-            errors.extend(holding.errors.iter().map(|e| format!("{package}: {e}")));
-        }
-    }
+    let (read, patients, errors) = gathered.test_patients(&id, &used);
     let records: Vec<_> = patients.iter().map(|p| p.records.clone()).collect();
     let library =
         Library::new(found.values().map(|f| f.indicator.clone())).with_age_band_sets(sets.clone());

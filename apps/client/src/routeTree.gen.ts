@@ -44,6 +44,7 @@ import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioIdRouteImport } from './routes/studio.$id'
 import { Route as StudioAgeBandsRouteImport } from './routes/studio.age-bands'
 import { Route as StudioConceptsRouteImport } from './routes/studio.concepts'
+import { Route as StudioDashboardsRouteImport } from './routes/studio.dashboards'
 import { Route as StudioDecisionTablesRouteImport } from './routes/studio.decision-tables'
 import { Route as StudioFormsRouteImport } from './routes/studio.forms'
 import { Route as StudioIndicatorsRouteImport } from './routes/studio.indicators'
@@ -56,6 +57,7 @@ import { Route as TillIndexRouteImport } from './routes/till.index'
 import { Route as TillSuperviseRouteImport } from './routes/till.supervise'
 import { Route as RecordsTypeIdRouteImport } from './routes/records.$type.$id'
 import { Route as StudioIdAgeBandsSplatRouteImport } from './routes/studio.$id_.age-bands.$'
+import { Route as StudioIdDashboardsSplatRouteImport } from './routes/studio.$id_.dashboards.$'
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
 import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
 import { Route as StudioIdIndicatorsSplatRouteImport } from './routes/studio.$id_.indicators.$'
@@ -239,6 +241,11 @@ const StudioConceptsRoute = StudioConceptsRouteImport.update({
   path: '/studio/concepts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioDashboardsRoute = StudioDashboardsRouteImport.update({
+  id: '/studio/dashboards',
+  path: '/studio/dashboards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioDecisionTablesRoute = StudioDecisionTablesRouteImport.update({
   id: '/studio/decision-tables',
   path: '/studio/decision-tables',
@@ -297,6 +304,11 @@ const RecordsTypeIdRoute = RecordsTypeIdRouteImport.update({
 const StudioIdAgeBandsSplatRoute = StudioIdAgeBandsSplatRouteImport.update({
   id: '/studio/$id_/age-bands/$',
   path: '/studio/$id/age-bands/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioIdDashboardsSplatRoute = StudioIdDashboardsSplatRouteImport.update({
+  id: '/studio/$id_/dashboards/$',
+  path: '/studio/$id/dashboards/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioIdFilesSplatRoute = StudioIdFilesSplatRouteImport.update({
@@ -368,6 +380,7 @@ export interface FileRoutesByFullPath {
   '/studio/$id': typeof StudioIdRoute
   '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/dashboards': typeof StudioDashboardsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
@@ -384,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/age-bands/$': typeof StudioIdAgeBandsSplatRoute
+  '/studio/$id/dashboards/$': typeof StudioIdDashboardsSplatRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/indicators/$': typeof StudioIdIndicatorsSplatRoute
@@ -424,6 +438,7 @@ export interface FileRoutesByTo {
   '/studio/$id': typeof StudioIdRoute
   '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/dashboards': typeof StudioDashboardsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
@@ -440,6 +455,7 @@ export interface FileRoutesByTo {
   '/till': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id/age-bands/$': typeof StudioIdAgeBandsSplatRoute
+  '/studio/$id/dashboards/$': typeof StudioIdDashboardsSplatRoute
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/indicators/$': typeof StudioIdIndicatorsSplatRoute
@@ -481,6 +497,7 @@ export interface FileRoutesById {
   '/studio/$id': typeof StudioIdRoute
   '/studio/age-bands': typeof StudioAgeBandsRoute
   '/studio/concepts': typeof StudioConceptsRoute
+  '/studio/dashboards': typeof StudioDashboardsRoute
   '/studio/decision-tables': typeof StudioDecisionTablesRoute
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
@@ -497,6 +514,7 @@ export interface FileRoutesById {
   '/till/': typeof TillIndexRoute
   '/records/$type/$id': typeof RecordsTypeIdRoute
   '/studio/$id_/age-bands/$': typeof StudioIdAgeBandsSplatRoute
+  '/studio/$id_/dashboards/$': typeof StudioIdDashboardsSplatRoute
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id_/indicators/$': typeof StudioIdIndicatorsSplatRoute
@@ -539,6 +557,7 @@ export interface FileRouteTypes {
     | '/studio/$id'
     | '/studio/age-bands'
     | '/studio/concepts'
+    | '/studio/dashboards'
     | '/studio/decision-tables'
     | '/studio/forms'
     | '/studio/indicators'
@@ -555,6 +574,7 @@ export interface FileRouteTypes {
     | '/till/'
     | '/records/$type/$id'
     | '/studio/$id/age-bands/$'
+    | '/studio/$id/dashboards/$'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/indicators/$'
@@ -595,6 +615,7 @@ export interface FileRouteTypes {
     | '/studio/$id'
     | '/studio/age-bands'
     | '/studio/concepts'
+    | '/studio/dashboards'
     | '/studio/decision-tables'
     | '/studio/forms'
     | '/studio/indicators'
@@ -611,6 +632,7 @@ export interface FileRouteTypes {
     | '/till'
     | '/records/$type/$id'
     | '/studio/$id/age-bands/$'
+    | '/studio/$id/dashboards/$'
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/indicators/$'
@@ -651,6 +673,7 @@ export interface FileRouteTypes {
     | '/studio/$id'
     | '/studio/age-bands'
     | '/studio/concepts'
+    | '/studio/dashboards'
     | '/studio/decision-tables'
     | '/studio/forms'
     | '/studio/indicators'
@@ -667,6 +690,7 @@ export interface FileRouteTypes {
     | '/till/'
     | '/records/$type/$id'
     | '/studio/$id_/age-bands/$'
+    | '/studio/$id_/dashboards/$'
     | '/studio/$id_/files/$'
     | '/studio/$id_/forms/$'
     | '/studio/$id_/indicators/$'
@@ -708,6 +732,7 @@ export interface RootRouteChildren {
   StudioIdRoute: typeof StudioIdRoute
   StudioAgeBandsRoute: typeof StudioAgeBandsRoute
   StudioConceptsRoute: typeof StudioConceptsRoute
+  StudioDashboardsRoute: typeof StudioDashboardsRoute
   StudioDecisionTablesRoute: typeof StudioDecisionTablesRoute
   StudioFormsRoute: typeof StudioFormsRoute
   StudioIndicatorsRoute: typeof StudioIndicatorsRoute
@@ -724,6 +749,7 @@ export interface RootRouteChildren {
   TillIndexRoute: typeof TillIndexRoute
   RecordsTypeIdRoute: typeof RecordsTypeIdRoute
   StudioIdAgeBandsSplatRoute: typeof StudioIdAgeBandsSplatRoute
+  StudioIdDashboardsSplatRoute: typeof StudioIdDashboardsSplatRoute
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
   StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
   StudioIdIndicatorsSplatRoute: typeof StudioIdIndicatorsSplatRoute
@@ -980,6 +1006,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioConceptsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/dashboards': {
+      id: '/studio/dashboards'
+      path: '/studio/dashboards'
+      fullPath: '/studio/dashboards'
+      preLoaderRoute: typeof StudioDashboardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/decision-tables': {
       id: '/studio/decision-tables'
       path: '/studio/decision-tables'
@@ -1062,6 +1095,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/$id/age-bands/$'
       fullPath: '/studio/$id/age-bands/$'
       preLoaderRoute: typeof StudioIdAgeBandsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/$id_/dashboards/$': {
+      id: '/studio/$id_/dashboards/$'
+      path: '/studio/$id/dashboards/$'
+      fullPath: '/studio/$id/dashboards/$'
+      preLoaderRoute: typeof StudioIdDashboardsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/$id_/files/$': {
@@ -1148,6 +1188,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioIdRoute: StudioIdRoute,
   StudioAgeBandsRoute: StudioAgeBandsRoute,
   StudioConceptsRoute: StudioConceptsRoute,
+  StudioDashboardsRoute: StudioDashboardsRoute,
   StudioDecisionTablesRoute: StudioDecisionTablesRoute,
   StudioFormsRoute: StudioFormsRoute,
   StudioIndicatorsRoute: StudioIndicatorsRoute,
@@ -1164,6 +1205,7 @@ const rootRouteChildren: RootRouteChildren = {
   TillIndexRoute: TillIndexRoute,
   RecordsTypeIdRoute: RecordsTypeIdRoute,
   StudioIdAgeBandsSplatRoute: StudioIdAgeBandsSplatRoute,
+  StudioIdDashboardsSplatRoute: StudioIdDashboardsSplatRoute,
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
   StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
   StudioIdIndicatorsSplatRoute: StudioIdIndicatorsSplatRoute,
