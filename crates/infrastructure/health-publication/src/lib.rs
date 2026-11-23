@@ -55,6 +55,11 @@
 //!   `report/1`) belongs in a Reporting package; validation refuses one whose indicators or Age
 //!   Band Sets are not pinned and published, or that runs above facility level with a median, a
 //!   distinct count or a line list ([`reports_in`]).
+//! - **Standard Dashboards** (ADR 0075; #603): a Dashboard (`configuration/dashboards/<id>.json`,
+//!   schema `dashboard/1`) belongs in a Reporting package too; validation refuses one whose
+//!   indicators are not pinned and published ([`dashboards_in`]). Once published, the newest
+//!   version of each package gives every user's Dashboards tab its standard Dashboards
+//!   ([`Publications::published_dashboards`]).
 //!
 //! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
 //!   settings against the latest published version of each base package they name, and
@@ -96,6 +101,7 @@ use uuid::Uuid;
 
 mod age_bands;
 mod areas;
+mod dashboards;
 pub mod decisions;
 pub mod designs;
 pub mod discussion;
@@ -109,6 +115,7 @@ pub mod terminology;
 mod workflows;
 
 pub use age_bands::{PublishedAgeBandSet, age_band_sets_in};
+pub use dashboards::{PublishedDashboard, dashboards_in};
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
 pub use reports::{ReportSources, SourcePackage, reports_in};
 pub use workflows::{WorkflowSandbox, workflow_definitions};
@@ -535,9 +542,10 @@ impl Publications {
         problems.extend(indicators::problems(packed));
         problems.extend(age_bands::problems(packed));
         problems.extend(areas::problems(packed));
-        if !reports_in(packed).is_empty() {
+        if !reports_in(packed).is_empty() || !dashboards_in(packed).is_empty() {
             let catalogue = self.catalogue(tx, packed).await?;
             problems.extend(reports::problems(packed, &catalogue));
+            problems.extend(dashboards::problems(packed, &catalogue));
         }
         if packed.contents.package.kind == PackageKind::Language
             && let Some(translates) = &packed.contents.package.translates

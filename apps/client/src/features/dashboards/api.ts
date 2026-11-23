@@ -16,8 +16,11 @@ export interface Dashboard {
   id: string
   title: string
   kind: 'saved' | 'standard'
-  /** Whether the session made it: only then may it change it, and read its shares. */
+  /** Whether the session made it: only then may it change it, and read its shares. Never a standard one. */
   mine: boolean
+  /** A standard Dashboard's Reporting package version, `name@version`. */
+  package?: string
+  description?: string
   shares?: Share[]
   items: SavedVisualization[]
 }
@@ -73,8 +76,8 @@ export function saveVisualization(transport: Transport, save: { title: string; v
   return send<SavedVisualization & { dashboard: string | null }>(transport, 'POST', '/analytics/visualizations', save, 201)
 }
 
-/** Makes a Dashboard with `title`, shared with `shares`. */
-export function createDashboard(transport: Transport, dashboard: { title: string; shares: Share[] }) {
+/** Makes a Dashboard with `title`, shared with `shares`; with `copyOf`, a copy of that standard Dashboard's Visualizations (*Save as*). */
+export function createDashboard(transport: Transport, dashboard: { title: string; shares: Share[]; copyOf?: string }) {
   return send<Dashboard>(transport, 'POST', '/analytics/dashboards', dashboard, 201)
 }
 

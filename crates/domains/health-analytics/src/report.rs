@@ -320,6 +320,9 @@ pub struct Catalogue {
     pub indicators: BTreeMap<String, Calculation>,
     /// Every Age Band Set, by `url|version`.
     pub age_band_sets: BTreeSet<String>,
+    /// The names of each indicator's disaggregations, by `url|version`: what a standard
+    /// Dashboard's Visualization may split it by (#603).
+    pub disaggregations: BTreeMap<String, BTreeSet<String>>,
 }
 
 /// Why a calculation cannot run above facility level, if it cannot.

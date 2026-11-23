@@ -24,8 +24,15 @@
 //!
 //! Each needs [`VIEW_PERMISSION`], and every change [`AUTHOR_PERMISSION`] too. Sharing never
 //! widens what a viewer reads: the explorer still answers only for their own area.
+//!
+//! Standard Dashboards (#603; ADR 0075) ship in Reporting packages: `GET /dashboards` lists, to
+//! every session, those of the newest published version of each package, first, their periods
+//! as of today and their places following the viewer. They are never changed here (a new
+//! package version changes them); `POST /dashboards` with `copyOf` *saves as* the session's own
+//! Dashboard, its Visualizations copied as the session sees them.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -38,8 +45,8 @@ use health_analytics::{
     Viewer,
 };
 use health_analytics_app::dashboards::{
-    AUTHOR_PERMISSION, MOST_ITEMS, dashboard_json, read_setup, read_shares, read_title,
-    unplaced_json,
+    AUTHOR_PERMISSION, EACH_AREA_UNDER, MOST_ITEMS, copied_setup, dashboard_json, read_setup,
+    read_shares, read_title, standard_id, standard_json, unplaced_json,
 };
 use health_analytics_app::explore::{
     ExplorePlace, cells_json, explore, indicator_json, periods_json, read_question,
@@ -47,9 +54,12 @@ use health_analytics_app::explore::{
 use health_auth::SessionRoles;
 use health_facility_registry::{Place, PlaceLevel, Places};
 use health_persistence::{Store as _, Transaction as _};
-use health_publication::Publications;
+use health_publication::{Publications, PublishedDashboard};
 use health_registries_app::places::places;
 use health_surrealdb::SurrealStore;
+use health_time::Clock;
+use jiff::civil::Date;
+use jiff::tz::TimeZone;
 
 use crate::studio::Accounts;
 use serde_json::{Value, json};
@@ -62,11 +72,18 @@ struct AnalyticsApi {
     store: SurrealStore,
     catalogue: Catalogue,
     accounts: Accounts,
+    clock: Arc<dyn Clock>,
 }
 
-/// The routes over `store`, offering `catalogue`'s indicators, sharing with the people
-/// `accounts` finds by username. They expect the subject layer's `Subject` and `SessionRoles`.
-pub(crate) fn router(store: SurrealStore, catalogue: Catalogue, accounts: Accounts) -> Router {
+/// The routes over `store`, offering `catalogue`'s indicators and standard Dashboards (their
+/// periods as of `clock`'s today), sharing with the people `accounts` finds by username. They
+/// expect the subject layer's `Subject` and `SessionRoles`.
+pub(crate) fn router(
+    store: SurrealStore,
+    catalogue: Catalogue,
+    accounts: Accounts,
+    clock: Arc<dyn Clock>,
+) -> Router {
     Router::new()
         .route("/explorer", get(explorer))
         .route("/explore", post(explore_route))
@@ -77,6 +94,7 @@ pub(crate) fn router(store: SurrealStore, catalogue: Catalogue, accounts: Accoun
             store,
             catalogue,
             accounts,
+            clock,
         })
 }
 
@@ -292,17 +310,59 @@ async fn dashboards(
         Ok(saved) => saved,
         Err(response) => return *response,
     };
+    let standard = match standard(&api).await {
+        Ok(standard) => standard,
+        Err(response) => return *response,
+    };
+    let saved = dashboards
+        .iter()
+        .filter(|d| d.visible_to(&viewer))
+        .map(|d| dashboard_json(d, &visualizations, &viewer));
     Json(json!({
         "where": "central",
         "canAuthor": subject.permissions.has(AUTHOR_PERMISSION),
-        "dashboards": dashboards
-            .iter()
-            .filter(|d| d.visible_to(&viewer))
-            .map(|d| dashboard_json(d, &visualizations, &viewer))
-            .collect::<Vec<_>>(),
+        "dashboards": standard.into_iter().chain(saved).collect::<Vec<_>>(),
         "visualizations": unplaced_json(&dashboards, &visualizations, &viewer),
     }))
     .into_response()
+}
+
+/// Today, which standard Dashboards' periods run up to.
+fn today(clock: &dyn Clock) -> Date {
+    clock.now().to_zoned(TimeZone::UTC).date()
+}
+
+/// The standard Dashboards every session reads, as of today.
+async fn standard(api: &AnalyticsApi) -> Result<Vec<Value>, Box<Response>> {
+    let published = api
+        .catalogue
+        .dashboards()
+        .await
+        .map_err(|e| Box::new(unavailable(e)))?;
+    let today = today(api.clock.as_ref());
+    Ok(published
+        .iter()
+        .map(|p| standard_json(&p.package, &p.version, &p.dashboard, today))
+        .collect())
+}
+
+/// The refusal to change standard Dashboard `id`, if it is one.
+async fn not_standard(api: &AnalyticsApi, id: &str) -> Result<(), Box<Response>> {
+    let published = api
+        .catalogue
+        .dashboards()
+        .await
+        .map_err(|e| Box::new(unavailable(e)))?;
+    if published
+        .iter()
+        .any(|p| standard_id(&p.package, &p.dashboard.id) == id)
+    {
+        return Err(Box::new(problem(
+            StatusCode::FORBIDDEN,
+            "a standard Dashboard changes only in a new version of its Reporting package: Save as makes your own copy",
+        )));
+    }
+    Ok(())
 }
 
 /// The shares `body` asks for, the people named found by username.
@@ -336,14 +396,15 @@ async fn put_dashboard(
     tx.commit().await.map_err(refused)
 }
 
-/// `POST /dashboards`: `{title, shares}`.
+/// `POST /dashboards`: `{title, shares, copyOf?}`; `copyOf` names a standard Dashboard whose
+/// Visualizations it copies (*Save as*).
 async fn new_dashboard(
     State(api): State<AnalyticsApi>,
     subject: Option<Extension<Subject>>,
     roles: Option<Extension<SessionRoles>>,
     Json(body): Json<Value>,
 ) -> Response {
-    let (_, _, viewer) = match looking(&api, subject, roles, true).await {
+    let (_, area, viewer) = match looking(&api, subject, roles, true).await {
         Ok(looking) => looking,
         Err(response) => return *response,
     };
@@ -355,21 +416,91 @@ async fn new_dashboard(
         Ok(shares) => shares,
         Err(response) => return *response,
     };
+    let copies = match &body["copyOf"] {
+        Value::Null => Vec::new(),
+        Value::String(id) => match copies_of(&api, id, &area, &viewer).await {
+            Ok(copies) => copies,
+            Err(response) => return *response,
+        },
+        _ => return problem(StatusCode::UNPROCESSABLE_ENTITY, "`copyOf` is not an id"),
+    };
     let dashboard = SavedDashboard {
         id: uuid::Uuid::now_v7().to_string(),
         owner: viewer.account.clone(),
         title,
         shares,
-        items: Vec::new(),
+        items: copies.iter().map(|v| v.id.clone()).collect(),
     };
-    if let Err(response) = put_dashboard(&api.store, &dashboard).await {
-        return *response;
+    let refused = |e: health_persistence::WriteError| unavailable(e);
+    let mut tx = match api.store.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return unavailable(error),
+    };
+    for copy in &copies {
+        if let Err(error) = tx.put_visualization(copy).await {
+            return refused(error);
+        }
+    }
+    if let Err(error) = tx.put_dashboard(&dashboard).await {
+        return refused(error);
+    }
+    if let Err(error) = tx.commit().await {
+        return refused(error);
     }
     (
         StatusCode::CREATED,
-        Json(dashboard_json(&dashboard, &[], &viewer)),
+        Json(dashboard_json(&dashboard, &copies, &viewer)),
     )
         .into_response()
+}
+
+/// The places a copied Visualization that follows its viewer starts at, as `area`'s session
+/// sees it: their own place, or each area directly under it (their own place when none is).
+fn own_places(follow: Option<&str>, area: &[Place]) -> Vec<String> {
+    let Some(own) = area.first() else {
+        return Vec::new();
+    };
+    let under: Vec<String> = area
+        .iter()
+        .filter(|p| p.parent.as_deref() == Some(own.code.as_str()))
+        .map(|p| p.code.clone())
+        .collect();
+    if follow == Some(EACH_AREA_UNDER) && !under.is_empty() {
+        under
+    } else {
+        vec![own.code.clone()]
+    }
+}
+
+/// Standard Dashboard `id`'s Visualizations, copied as the session's own (*Save as*).
+async fn copies_of(
+    api: &AnalyticsApi,
+    id: &str,
+    area: &[Place],
+    viewer: &Viewer,
+) -> Result<Vec<SavedVisualization>, Box<Response>> {
+    let unavailable_now = |e: String| Box::new(unavailable(e));
+    let standard = standard(api).await?;
+    let Some(dashboard) = standard.iter().find(|d| d["id"] == id) else {
+        return Err(Box::new(problem(
+            StatusCode::NOT_FOUND,
+            "no such standard Dashboard",
+        )));
+    };
+    let offered = api.catalogue.indicators().await.map_err(unavailable_now)?;
+    let mut copies = Vec::new();
+    for item in dashboard["items"].as_array().into_iter().flatten() {
+        let follow = item["visualization"]["follow"].as_str();
+        let setup = read_setup(&copied_setup(item, &own_places(follow, area)), &offered)
+            .map_err(|why| Box::new(problem(StatusCode::UNPROCESSABLE_ENTITY, why)))?;
+        copies.push(SavedVisualization {
+            id: uuid::Uuid::now_v7().to_string(),
+            owner: viewer.account.clone(),
+            title: item["title"].as_str().unwrap_or_default().to_owned(),
+            setup: setup.json.to_string(),
+        });
+    }
+    Ok(copies)
 }
 
 /// The session's own Dashboard `id`, or the refusal: 404 when it may not see it, 403 when it
@@ -407,6 +538,9 @@ async fn change_dashboard(
         Ok(looking) => looking,
         Err(response) => return *response,
     };
+    if let Err(response) = not_standard(&api, &id).await {
+        return *response;
+    }
     let title = match read_title(&body, "title") {
         Ok(title) => title,
         Err(why) => return problem(StatusCode::UNPROCESSABLE_ENTITY, why),
@@ -474,6 +608,9 @@ async fn save_visualization(
     let onto = match &body["dashboard"] {
         Value::Null => None,
         Value::String(id) => {
+            if let Err(response) = not_standard(&api, id).await {
+                return *response;
+            }
             let dashboards = match tx.dashboards().await {
                 Ok(dashboards) => dashboards,
                 Err(error) => return unavailable(error),
@@ -517,14 +654,15 @@ async fn save_visualization(
 }
 
 // After the routes: the route inventory reads this file up to its first test-only item.
-/// Where the indicators offered come from.
+/// Where the indicators offered, and the standard Dashboards, come from.
 #[derive(Clone)]
 pub(crate) enum Catalogue {
-    /// Every published package version's.
+    /// Every published package version's indicators, and the newest published version's
+    /// standard Dashboards of each package.
     Published(Option<Publications>),
-    /// A fixed list, for tests.
+    /// Fixed lists, for tests.
     #[cfg(test)]
-    Fixed(Vec<Indicator>),
+    Fixed(Vec<Indicator>, Vec<PublishedDashboard>),
 }
 
 impl Catalogue {
@@ -536,7 +674,19 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(indicators) => Ok(indicators.clone()),
+            Self::Fixed(indicators, _) => Ok(indicators.clone()),
+        }
+    }
+
+    async fn dashboards(&self) -> Result<Vec<PublishedDashboard>, String> {
+        match self {
+            Self::Published(None) => Ok(Vec::new()),
+            Self::Published(Some(publications)) => publications
+                .published_dashboards()
+                .await
+                .map_err(|e| e.to_string()),
+            #[cfg(test)]
+            Self::Fixed(_, dashboards) => Ok(dashboards.clone()),
         }
     }
 }
@@ -729,18 +879,28 @@ mod tests {
         path: &str,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
+        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new());
+        ask_in(store, catalogue, subject, roles, method, path, body).await
+    }
+
+    /// Asks as `ask_as` does, offering `catalogue`.
+    async fn ask_in(
+        store: &SurrealStore,
+        catalogue: Catalogue,
+        subject: Subject,
+        roles: &[&str],
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
         let accounts: Accounts = Arc::new(|username: String| {
             Box::pin(async move { Ok((username != "nobody").then_some(username)) })
         });
-        let app = router(
-            store.clone(),
-            Catalogue::Fixed(vec![visits(), weeks()]),
-            accounts,
-        )
-        .layer(Extension(subject))
-        .layer(Extension(SessionRoles(
-            roles.iter().map(|r| (*r).to_owned()).collect(),
-        )));
+        let app = router(store.clone(), catalogue, accounts, Arc::new(SystemClock))
+            .layer(Extension(subject))
+            .layer(Extension(SessionRoles(
+                roles.iter().map(|r| (*r).to_owned()).collect(),
+            )));
         let request = Request::builder()
             .method(method)
             .uri(path)
@@ -1095,5 +1255,180 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    /// A published Reporting package's *ANC overview*: ANC 1st visits in each area under the
+    /// viewer's place, over the last three months.
+    fn with_standard() -> Catalogue {
+        let dashboard = serde_json::from_value(json!({
+            "id": "anc-overview",
+            "title": "ANC overview",
+            "items": [{
+                "id": "first-visits",
+                "title": "ANC 1st visits by area",
+                "visualization": {
+                    "type": "column",
+                    "question": {
+                        "indicators": [visits().canonical()],
+                        "periodType": "monthly",
+                        "last": 3
+                    },
+                    "layout": "placesByIndicators",
+                    "series": "place",
+                    "follow": "eachAreaUnder"
+                }
+            }]
+        }))
+        .expect("a standard Dashboard");
+        Catalogue::Fixed(
+            vec![visits(), weeks()],
+            vec![PublishedDashboard {
+                package: "ug.moh.hmis".into(),
+                version: "1.0.0".into(),
+                dashboard,
+            }],
+        )
+    }
+
+    async fn ask_standard(
+        store: &SurrealStore,
+        subject: Subject,
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
+        ask_in(store, with_standard(), subject, &[], method, path, body).await
+    }
+
+    #[tokio::test]
+    async fn a_published_reporting_package_adds_its_dashboard_for_every_user() {
+        let store = central().await;
+        let today = super::today(&SystemClock);
+        let last = Period::of(PeriodType::Monthly, today);
+        let first = last
+            .previous()
+            .and_then(|p| p.previous())
+            .expect("two months back");
+        for (viewer, place) in [
+            ("nakato", "district-wakiso"),
+            ("okot", "district-kampala"),
+            ("akello", "KAM013"),
+        ] {
+            let subject = Subject {
+                account: viewer.into(),
+                ..subject(place, place.starts_with("district"), [VIEW_PERMISSION])
+            };
+            let (status, listed) = ask_standard(&store, subject, "GET", "/dashboards", None).await;
+            assert_eq!(status, StatusCode::OK, "{listed}");
+            let standard = &listed["dashboards"][0];
+            assert_eq!(standard["id"], "ug.moh.hmis:anc-overview", "{viewer}");
+            assert_eq!(standard["title"], "ANC overview");
+            assert_eq!(
+                (standard["kind"].clone(), standard["mine"].clone()),
+                (json!("standard"), json!(false))
+            );
+            assert_eq!(standard["package"], "ug.moh.hmis@1.0.0");
+            let shown = &standard["items"][0]["visualization"];
+            assert_eq!(shown["follow"], "eachAreaUnder");
+            assert_eq!(
+                (
+                    shown["question"]["from"].clone(),
+                    shown["question"]["to"].clone()
+                ),
+                (json!(first.id), json!(last.id))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_standard_dashboard_is_not_edited_in_place_and_save_as_copies_it() {
+        let store = central().await;
+        let kampala = author("district-kampala", "okot");
+        let id = "ug.moh.hmis:anc-overview";
+        let change = json!({ "title": "Mine now", "shares": [] });
+        let (status, refused) = ask_standard(
+            &store,
+            kampala.clone(),
+            "PUT",
+            &format!("/dashboards/{id}"),
+            Some(change),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            refused["detail"],
+            "a standard Dashboard changes only in a new version of its Reporting package: Save as makes your own copy"
+        );
+        let (status, _) = ask_standard(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/visualizations",
+            Some(json!({
+                "title": "More",
+                "dashboard": id,
+                "visualization": saved_setup(&["KAM013"], None),
+            })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+
+        let (status, copy) = ask_standard(
+            &store,
+            kampala.clone(),
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "ANC overview (mine)", "shares": [], "copyOf": id })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{copy}");
+        assert_eq!(
+            (copy["kind"].clone(), copy["mine"].clone()),
+            (json!("saved"), json!(true))
+        );
+        let item = &copy["items"][0];
+        assert_eq!(item["title"], "ANC 1st visits by area");
+        assert_eq!(item["visualization"]["follow"], "eachAreaUnder");
+        assert_eq!(
+            item["visualization"]["question"]["places"],
+            json!(["KAM013", "KAM020", "KAM031"])
+        );
+        let (_, listed) = ask_standard(&store, kampala.clone(), "GET", "/dashboards", None).await;
+        let titles: Vec<&str> = listed["dashboards"]
+            .as_array()
+            .expect("dashboards")
+            .iter()
+            .filter_map(|d| d["title"].as_str())
+            .collect();
+        assert_eq!(titles, ["ANC overview", "ANC overview (mine)"]);
+        // The standard one is unchanged.
+        assert_eq!(listed["dashboards"][0]["kind"], "standard");
+
+        let (status, _) = ask_standard(
+            &store,
+            kampala,
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "Nothing", "copyOf": "ug.moh.hmis:gone" })),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let viewer = Subject {
+            account: "nakato".into(),
+            ..subject("district-wakiso", true, [VIEW_PERMISSION])
+        };
+        let (status, _) = ask_standard(
+            &store,
+            viewer,
+            "POST",
+            "/dashboards",
+            Some(json!({ "title": "Copy", "copyOf": id })),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::FORBIDDEN,
+            "Save as needs analytics.author"
+        );
     }
 }

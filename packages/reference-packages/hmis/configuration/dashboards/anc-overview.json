@@ -1,0 +1,77 @@
+{
+  "$schema": "https://carapai.github.io/people-centered-healthcare/fhir/schema/dashboard/1",
+  "id": "anc-overview",
+  "title": "ANC overview",
+  "description": "Antenatal care at a glance for the viewer's own area: first visits by area and by age band, and how many come before 12 weeks.",
+  "items": [
+    {
+      "id": "first-visits-by-area",
+      "title": "ANC 1st visits by area",
+      "visualization": {
+        "type": "column",
+        "question": {
+          "indicators": [
+            "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"
+          ],
+          "periodType": "monthly",
+          "last": 6
+        },
+        "layout": "placesByIndicators",
+        "series": "place",
+        "follow": "eachAreaUnder"
+      }
+    },
+    {
+      "id": "first-visits-by-age",
+      "title": "ANC 1st visits by age band",
+      "visualization": {
+        "type": "column",
+        "question": {
+          "indicators": [
+            "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"
+          ],
+          "periodType": "monthly",
+          "last": 6,
+          "disaggregation": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"
+        },
+        "layout": "placesByIndicators",
+        "series": "band",
+        "follow": "myPlace"
+      }
+    },
+    {
+      "id": "before-12-weeks",
+      "title": "ANC 1st visit before 12 weeks",
+      "visualization": {
+        "type": "line",
+        "question": {
+          "indicators": [
+            "https://health.go.ug/fhir/Measure/anc-first-visit-before-12-weeks|1.0.0"
+          ],
+          "periodType": "monthly",
+          "last": 12
+        },
+        "layout": "indicatorsByPeriods",
+        "series": "indicator",
+        "follow": "myPlace"
+      }
+    },
+    {
+      "id": "first-visits-this-quarter",
+      "title": "ANC 1st visits this quarter",
+      "visualization": {
+        "type": "single",
+        "question": {
+          "indicators": [
+            "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"
+          ],
+          "periodType": "quarterly",
+          "last": 1
+        },
+        "layout": "placesByIndicators",
+        "series": "indicator",
+        "follow": "myPlace"
+      }
+    }
+  ]
+}

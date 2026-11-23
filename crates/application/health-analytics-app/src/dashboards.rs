@@ -10,10 +10,16 @@
 //!   the caller turns usernames into accounts.
 //! - **A Dashboard as a viewer reads it** ([`dashboard_json`]): its Visualizations in order, with
 //!   whether it is the viewer's own. Its shares are listed only to its owner.
+//! - **A standard Dashboard** (#603; [`standard_json`]) reads the same, from the Reporting
+//!   package that ships it: never the viewer's own, its periods as of today, its places the
+//!   viewer's. *Save as* copies its Visualizations as the author sees them ([`copied_setup`]).
 
 use std::collections::BTreeSet;
 
-use health_analytics::{Indicator, SavedDashboard, SavedVisualization, Share, Viewer};
+use health_analytics::{
+    Indicator, SavedDashboard, SavedVisualization, Share, StandardDashboard, StandardItem, Viewer,
+};
+use jiff::civil::Date;
 use serde_json::{Value, json};
 
 use crate::explore::read_question;
@@ -21,29 +27,15 @@ use crate::explore::read_question;
 /// The use-case permission that saves Visualizations and Dashboards (ADR 0075).
 pub const AUTHOR_PERMISSION: &str = "analytics.author";
 
-/// A Visualization whose place is the viewer's own.
-pub const MY_PLACE: &str = "myPlace";
-
-/// A Visualization whose places are each area directly under the viewer's place.
-pub const EACH_AREA_UNDER: &str = "eachAreaUnder";
-
-/// The kinds of Visualization the explorer draws.
-pub const TYPES: [&str; 4] = ["column", "line", "table", "single"];
-
-/// How a table lays out its figures.
-pub const LAYOUTS: [&str; 2] = ["placesByIndicators", "indicatorsByPeriods"];
-
-/// What a chart's series are.
-pub const SERIES: [&str; 3] = ["indicator", "place", "band"];
+pub use health_analytics::standard::{
+    EACH_AREA_UNDER, LAYOUTS, MOST_ITEMS, MY_PLACE, SERIES, TYPES,
+};
 
 /// The longest title kept.
 pub const MOST_TITLE: usize = 120;
 
 /// The most shares a Dashboard holds.
 pub const MOST_SHARES: usize = 50;
-
-/// The most Visualizations a Dashboard holds.
-pub const MOST_ITEMS: usize = 40;
 
 /// `body[name]` as a title: trimmed, not empty, at most [`MOST_TITLE`] characters.
 pub fn read_title(body: &Value, name: &str) -> Result<String, String> {
@@ -226,6 +218,75 @@ pub fn unplaced_json(
         .collect()
 }
 
+/// A standard Dashboard's id as viewers read it: its package's name and its own id, so one
+/// from another package never clashes with it, and a new version keeps it.
+pub fn standard_id(package: &str, dashboard: &str) -> String {
+    format!("{package}:{dashboard}")
+}
+
+/// `item` as the explorer draws it on `today`: its periods resolved to a range, and no places,
+/// since they follow the viewer. None when its periods do not read.
+fn standard_item_json(item: &StandardItem, today: Date) -> Option<Value> {
+    let shown = &item.visualization;
+    let (from, to) = shown.question.range(today)?;
+    let mut question = json!({
+        "indicators": shown.question.indicators,
+        "periodType": shown.question.period_type,
+        "from": from,
+        "to": to,
+        "places": [],
+    });
+    if let Some(by) = &shown.question.disaggregation {
+        question["disaggregation"] = json!(by);
+    }
+    Some(json!({
+        "id": item.id,
+        "title": item.title,
+        "visualization": {
+            "type": shown.kind,
+            "question": question,
+            "layout": shown.layout,
+            "series": shown.series,
+            "follow": shown.follow,
+        },
+    }))
+}
+
+/// `dashboard`, from version `version` of package `package`, as every viewer reads it on
+/// `today`: kind `standard`, never anyone's own, and the package version it came from.
+pub fn standard_json(
+    package: &str,
+    version: &str,
+    dashboard: &StandardDashboard,
+    today: Date,
+) -> Value {
+    let items: Vec<Value> = dashboard
+        .items
+        .iter()
+        .filter_map(|item| standard_item_json(item, today))
+        .collect();
+    let mut out = json!({
+        "id": standard_id(package, &dashboard.id),
+        "title": dashboard.title,
+        "kind": "standard",
+        "mine": false,
+        "package": format!("{package}@{version}"),
+        "items": items,
+    });
+    if let Some(description) = &dashboard.description {
+        out["description"] = json!(description);
+    }
+    out
+}
+
+/// The setup *Save as* keeps for a standard Dashboard's `item` (from [`standard_json`]), for
+/// [`read_setup`] to check: as the author sees it, at `places`, still following its viewer.
+pub fn copied_setup(item: &Value, places: &[String]) -> Value {
+    let mut setup = item["visualization"].clone();
+    setup["question"]["places"] = json!(places);
+    setup
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
@@ -380,5 +441,63 @@ mod tests {
         let unplaced = unplaced_json(&[dashboard], &visualizations, &viewer("okot"));
         assert_eq!(unplaced[0]["id"], "v3");
         assert_eq!(unplaced.as_array().map(Vec::len), Some(1));
+    }
+
+    fn standard() -> StandardDashboard {
+        serde_json::from_value(json!({
+            "id": "anc-overview",
+            "title": "ANC overview",
+            "description": "Antenatal care at a glance",
+            "items": [{
+                "id": "first-visits",
+                "title": "ANC 1st visits by area",
+                "visualization": {
+                    "type": "column",
+                    "question": {
+                        "indicators": ["https://x/Measure/anc1|1.0.0"],
+                        "periodType": "monthly",
+                        "last": 3
+                    },
+                    "layout": "placesByIndicators",
+                    "series": "place",
+                    "follow": EACH_AREA_UNDER
+                }
+            }]
+        }))
+        .expect("a standard Dashboard")
+    }
+
+    #[test]
+    fn a_standard_dashboard_reads_as_of_today_and_is_nobodys_own() {
+        let read = standard_json(
+            "ug.moh.hmis",
+            "1.0.0",
+            &standard(),
+            Date::constant(2026, 11, 23),
+        );
+        assert_eq!(read["id"], "ug.moh.hmis:anc-overview");
+        assert_eq!(
+            (read["kind"].clone(), read["mine"].clone()),
+            (json!("standard"), json!(false))
+        );
+        assert_eq!(read["package"], "ug.moh.hmis@1.0.0");
+        let shown = &read["items"][0]["visualization"];
+        assert_eq!(
+            shown["question"],
+            json!({
+                "indicators": ["https://x/Measure/anc1|1.0.0"],
+                "periodType": "monthly",
+                "from": "2026-09",
+                "to": "2026-11",
+                "places": [],
+            })
+        );
+        assert_eq!(shown["follow"], EACH_AREA_UNDER);
+        // Save as keeps what the explorer saves, at the author's places.
+        let copied = copied_setup(&read["items"][0], &["KAM013".to_owned()]);
+        let setup = read_setup(&copied, &[visits()]).expect("a saved setup");
+        assert_eq!(setup.places, ["KAM013"]);
+        assert_eq!(setup.follow.as_deref(), Some(EACH_AREA_UNDER));
+        assert_eq!(setup.json["question"]["from"], "2026-09");
     }
 }

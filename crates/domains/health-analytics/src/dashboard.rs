@@ -7,7 +7,7 @@
 //! - **A Dashboard** is a named arrangement of Visualizations. A *saved* Dashboard is user
 //!   content: made by someone holding `analytics.author`, who alone changes it, and shared with
 //!   a person, a role or a place level ([`Share`]). *Standard* Dashboards ship in the Reporting
-//!   package (#603) and are not kept here.
+//!   package ([`crate::standard`], #603) and are not kept here.
 //! - **Who sees one** ([`SavedDashboard::visible_to`]): its owner, and whoever a share names.
 //!   Sharing never widens what a viewer reads: each still sees only their own area.
 

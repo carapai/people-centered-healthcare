@@ -502,6 +502,39 @@ fn the_release_reads_reports() {
     }
 }
 
+#[test]
+fn the_release_reads_standard_dashboards() {
+    let schemas = schemas();
+    assert!(schemas.uris().any(|uri| uri == health_packages::DASHBOARD));
+    let pki = pki();
+    let dashboard = |value: serde_json::Value| {
+        let mut files = files();
+        files.insert(
+            "configuration/dashboards/anc-overview.json".into(),
+            value.to_string().into_bytes(),
+        );
+        publish(&files, &schemas, &pki.signer, at(SIGNED))
+    };
+    let visualization = |follow: &str, period: serde_json::Value| {
+        serde_json::json!({
+            "$schema": health_packages::DASHBOARD,
+            "id": "anc-overview", "title": "ANC overview",
+            "items": [{ "id": "v", "title": "V", "visualization": {
+                "type": "column", "layout": "placesByIndicators", "series": "place", "follow": follow,
+                "question": { "indicators": ["https://x/Measure/m|1.0.0"], "periodType": period }
+            } }]
+        })
+    };
+    assert!(dashboard(visualization("eachAreaUnder", serde_json::json!("monthly"))).is_ok());
+    for wrong in [
+        visualization("KAM013", serde_json::json!("monthly")),
+        visualization("myPlace", serde_json::json!("annual")),
+        serde_json::json!({ "$schema": health_packages::DASHBOARD, "id": "d", "title": "D" }),
+    ] {
+        assert!(matches!(dashboard(wrong), Err(Error::Configuration { .. })));
+    }
+}
+
 /// `files()` with the `ug-address` profile, its snapshot edited by `edit`.
 fn with_profile(edit: impl FnOnce(&mut serde_json::Value)) -> Files {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(

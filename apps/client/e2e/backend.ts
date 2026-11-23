@@ -213,6 +213,9 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
     // Sample indicators (e2e/fixtures/indicators), published so the data explorer offers them
     // over the sample summaries (#599); after the core, whose ANC age bands they pin.
     [resolve(import.meta.dirname, 'fixtures/indicators'), 'ug.moh.sample-indicators@1.0.0'],
+    // A sample Reporting package (e2e/fixtures/dashboards) with the standard ANC overview Dashboard
+    // over those indicators (#603), so every user's Dashboards tab lists it.
+    [resolve(import.meta.dirname, 'fixtures/dashboards'), 'ug.moh.sample-dashboards@1.0.0'],
   ] as const) {
     for (const step of [
       ['draft', source, '--by', author],

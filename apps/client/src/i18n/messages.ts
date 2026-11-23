@@ -810,6 +810,12 @@ type ExplorerValues = {
   dbChangeFailed: {}
   dbSharedWith: { shares: string }
   dbNotShared: {}
+  dbStandardFrom: { package: string }
+  dbStandardNote: {}
+  dbSaveAs: {}
+  dbSaveAsTitle: {}
+  dbSaveAsCopy: { title: string }
+  dbSaveAsButton: {}
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -932,6 +938,12 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   dbChangeFailed: { id: 'app.dashboards.changeFailed', defaultMessage: 'The Dashboard could not be saved. Please try again.', description: 'Dashboards: a change failed' },
   dbSharedWith: { id: 'app.dashboards.sharedWith', defaultMessage: 'Shared with {shares}.', description: 'Dashboards: who the Dashboard is shared with' },
   dbNotShared: { id: 'app.dashboards.notShared', defaultMessage: 'Not shared: only you see it.', description: 'Dashboards: shared with nobody' },
+  dbStandardFrom: { id: 'app.dashboards.standardFrom', defaultMessage: 'From {package}', description: 'Dashboards: the Reporting package version a standard Dashboard comes from' },
+  dbStandardNote: { id: 'app.dashboards.standardNote', defaultMessage: 'A standard Dashboard: everyone sees it over their own area, and it changes only in a new version of its Reporting package.', description: 'Dashboards: a standard Dashboard cannot be edited in place' },
+  dbSaveAs: { id: 'app.dashboards.saveAs', defaultMessage: 'Save as', description: 'Dashboards: save a standard Dashboard as your own copy' },
+  dbSaveAsTitle: { id: 'app.dashboards.saveAsTitle', defaultMessage: 'Your copy’s title', description: 'Dashboards: the title of the copy Save as makes' },
+  dbSaveAsCopy: { id: 'app.dashboards.saveAsCopy', defaultMessage: '{title} (copy)', description: 'Dashboards: the title Save as suggests' },
+  dbSaveAsButton: { id: 'app.dashboards.saveAsButton', defaultMessage: 'Save as my Dashboard', description: 'Dashboards: make the copy' },
 })
 
 type AccessValues = {
