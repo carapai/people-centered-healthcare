@@ -389,6 +389,7 @@ const INVENTORY: &[Mounted] = &[
         paths: &[
             "/explorer",
             "/explore",
+            "/map",
             "/dashboards",
             "/dashboards/{id}",
             "/visualizations",

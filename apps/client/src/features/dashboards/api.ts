@@ -96,7 +96,7 @@ export function explorerSearch(visualization: Visualization): { v: string } {
   return { v: JSON.stringify(visualization) }
 }
 
-const TYPES = ['column', 'line', 'table', 'single']
+const TYPES = ['column', 'line', 'table', 'single', 'map']
 const LAYOUTS = ['placesByIndicators', 'indicatorsByPeriods']
 const SERIES = ['indicator', 'place', 'band']
 const PERIOD_TYPES = ['weekly', 'monthly', 'quarterly', 'financialJuly']

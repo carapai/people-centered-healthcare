@@ -8,6 +8,7 @@ import { explorerMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { DASHBOARDS_KEY, DashboardsError, createDashboard, dashboardsQuery, saveVisualization } from '../dashboards/api'
 import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, explorerQuery, fitted, forViewer, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
+import { type DrawnMap, drawnMap, mapQuery } from './map'
 
 const layout = css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', md: '18rem 1fr' }, alignItems: 'start' })
 const heading = css({ fontSize: '2xl', fontWeight: 'semibold' })
@@ -23,7 +24,7 @@ const TONE_CELL: Record<Tone, { background: string; color: string }> = {
   warning: { background: '#fef3c7', color: '#78350f' },
   bad: { background: '#fee2e2', color: '#7f1d1d' },
 }
-const TYPES: VisualizationType[] = ['column', 'line', 'table', 'single']
+const TYPES: VisualizationType[] = ['column', 'line', 'table', 'single', 'map']
 const LAYOUTS: TableLayout[] = ['placesByIndicators', 'indicatorsByPeriods']
 const SERIES: SeriesBy[] = ['indicator', 'place', 'band']
 const pressable = css({
@@ -373,6 +374,7 @@ function Visualization({ explorer, shown, answer, before }: { explorer: Explorer
     <>
       {shown.type === 'column' ? <ColumnChart series={series} periods={periods} label={intl.formatMessage(m.exChartLabel, chartLabel)} /> : null}
       {shown.type === 'line' ? <LineChart series={series} periods={periods} label={intl.formatMessage(m.exLineChartLabel, chartLabel)} /> : null}
+      {shown.type === 'map' ? <Maps explorer={explorer} question={question} answer={answer} show={show} /> : null}
       {shown.type === 'single' ? (
         <ul aria-label={intl.formatMessage(m.exSingleNumbers)} className={css({ display: 'grid', gap: '3', gridTemplateColumns: 'repeat(auto-fill, minmax(14rem, 1fr))' })}>
           {singleNumbers(answer, before, explorer, question).map((n) => (
@@ -447,6 +449,59 @@ function Visualization({ explorer, shown, answer, before }: { explorer: Explorer
         ))}
       </div>
     </>
+  )
+}
+
+/**
+ * A map per indicator (#604) for the range's last period: the districts and regions asked shaded
+ * by their figure's band, and the facilities in them at their NHFR coordinates, hollow when they
+ * have not synced. Drawn as SVG from the national core package's boundaries: no tiles, so it
+ * works offline.
+ */
+function Maps({ explorer, question, answer, show }: { explorer: Explorer; question: Question; answer: Answer; show: (measure: string, value: number) => string }) {
+  const intl = useIntl()
+  const { transport } = usePlatform()
+  const places = useQuery(mapQuery(transport))
+  if (places.data === undefined)
+    return places.isPending ? (
+      <p role="status">{intl.formatMessage(m.exMapLoading)}</p>
+    ) : (
+      <p role="alert" className={css({ color: 'danger.text' })}>
+        {intl.formatMessage(m.exFailed)}
+      </p>
+    )
+  const maps = question.indicators.map((indicator) => drawnMap(answer, explorer, question, places.data, indicator)).filter((d): d is DrawnMap => d !== null)
+  if (maps.length === 0) return <p className={muted}>{intl.formatMessage(m.exMapNoGeometry)}</p>
+  const title = (measure: string) => explorer.indicators.find((i) => i.measure === measure)?.title ?? measure
+  const figure = (measure: string, value: number | null) => (value === null ? intl.formatMessage(m.exMapNoFigure) : show(measure, value))
+  return (
+    <div className={css({ display: 'grid', gap: '3', gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))' })}>
+      {maps.map((map) => (
+        <figure key={map.indicator} className={css({ display: 'flex', flexDirection: 'column', gap: '2', m: '0' })}>
+          <svg viewBox={`0 0 ${map.width} ${map.height}`} role="img" aria-label={intl.formatMessage(m.exMapLabel, { indicator: title(map.indicator), period: map.period })} className={css({ width: '100%', height: 'auto', maxHeight: '32rem' })}>
+            {map.areas.map((area) => (
+              <path key={area.code} d={area.path} fillRule="evenodd" data-place={area.code} data-tone={area.tone ?? undefined} fill={area.tone !== null ? TONE_CELL[area.tone].background : area.picked ? '#f9fafb' : '#f3f4f6'} stroke={area.tone !== null ? TONE_MARK[area.tone] : '#9ca3af'} strokeWidth={area.picked ? 1.5 : 0.75} strokeDasharray={area.picked ? undefined : '3 2'}>
+                <title>{area.picked ? intl.formatMessage(m.exMapPlace, { name: area.name, figure: figure(map.indicator, area.value) }) : area.name}</title>
+              </path>
+            ))}
+            {map.points.map((point) => (
+              <circle key={point.code} cx={point.x} cy={point.y} r="5" data-place={point.code} data-tone={point.tone ?? undefined} data-hollow={point.missing === null ? undefined : 'true'} fill={point.missing !== null ? '#ffffff' : point.tone !== null ? TONE_MARK[point.tone] : '#374151'} stroke={point.tone !== null ? TONE_MARK[point.tone] : '#374151'} strokeWidth={point.missing === null ? 1 : 2}>
+                <title>
+                  {point.missing !== null
+                    ? point.missing.lastSync === null
+                      ? intl.formatMessage(m.exNeverSynced, { name: point.name })
+                      : intl.formatMessage(m.exLastSynced, { name: point.name, at: intl.formatDate(point.missing.lastSync, { dateStyle: 'medium' }) })
+                    : point.picked
+                      ? intl.formatMessage(m.exMapPlace, { name: point.name, figure: figure(map.indicator, point.value) })
+                      : point.name}
+                </title>
+              </circle>
+            ))}
+          </svg>
+          {map.points.some((p) => p.missing !== null) ? <figcaption className={muted}>{intl.formatMessage(m.exMapHollow)}</figcaption> : null}
+        </figure>
+      ))}
+    </div>
   )
 }
 

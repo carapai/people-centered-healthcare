@@ -15,6 +15,7 @@ mod activation;
 mod analytics;
 mod auth;
 mod backup;
+mod boundaries;
 mod config;
 mod node;
 mod package;
@@ -400,6 +401,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         json.push('\n');
         std::io::Write::write_all(&mut std::io::stdout(), json.as_bytes())?;
         return Ok(());
+    }
+    if std::env::args().nth(1).as_deref() == Some("boundaries") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return boundaries::run(&args);
     }
     let config = Config::from_lookup(|name| std::env::var(name).ok())?;
     if std::env::args().nth(1).as_deref() == Some("backup") {

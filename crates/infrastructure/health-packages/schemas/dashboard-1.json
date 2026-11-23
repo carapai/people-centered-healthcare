@@ -29,7 +29,7 @@
       "required": ["type", "question", "layout", "series", "follow"],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["column", "line", "table", "single"] },
+        "type": { "enum": ["column", "line", "table", "single", "map"] },
         "question": { "$ref": "#/$defs/question" },
         "layout": { "enum": ["placesByIndicators", "indicatorsByPeriods"] },
         "series": { "enum": ["indicator", "place", "band"] },

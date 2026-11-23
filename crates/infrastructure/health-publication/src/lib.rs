@@ -49,7 +49,9 @@
 //! - **Administrative areas** (ADR 0094; #869): validation refuses a package's regions and
 //!   districts (a `Library` of type `administrative-areas`) with a code used twice or a district
 //!   in no listed region, and [`Publications::administrative_areas`] reads the newest published
-//!   ones for the facility registry's NHFR import.
+//!   ones for the facility registry's NHFR import. Their boundaries (`administrative-boundaries`,
+//!   GeoJSON; #604) must sit in the same package and fit its areas, and
+//!   [`Publications::administrative_boundaries`] reads the newest published ones for maps.
 //!
 //! - **Reports** (ADR 0070, ADR 0072; #556): a Report (`configuration/reports/<id>.json`, schema
 //!   `report/1`) belongs in a Reporting package; validation refuses one whose indicators or Age

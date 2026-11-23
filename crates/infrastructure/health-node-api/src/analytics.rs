@@ -9,7 +9,11 @@
 //!   summary counted nothing here; a median shows, since the facility is facility level. Any
 //!   other place is refused (403): districts are explored at central.
 //!
-//! Both need [`VIEW_PERMISSION`].
+//! - `GET /api/analytics/map` (#604): what a map draws here, offline: the facility's own point
+//!   from the facility registry's NHFR coordinates. Boundaries are drawn at central, where
+//!   districts and regions are explored.
+//!
+//! Each needs [`VIEW_PERMISSION`].
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -73,6 +77,32 @@ pub async fn explorer_here(
     })
 }
 
+/// What a map of `facility` draws here (#604): its point, when the facility registry holds its
+/// coordinates, and no boundaries.
+pub async fn map_here(store: &SurrealStore, facility: &str) -> Value {
+    let place = match store.begin().await {
+        Ok(mut tx) => places(&mut tx)
+            .await
+            .ok()
+            .and_then(|p| p.get(facility).cloned()),
+        Err(_) => None,
+    };
+    let facilities: Vec<Value> = place
+        .and_then(|p| {
+            let at = p.coordinates?;
+            Some(json!({
+                "code": p.code,
+                "name": p.name,
+                "parent": null,
+                "latitude": at.latitude,
+                "longitude": at.longitude,
+            }))
+        })
+        .into_iter()
+        .collect();
+    json!({ "areas": [], "facilities": facilities })
+}
+
 /// The answer to the question `body` over `facility`'s own summaries in `store`, offering
 /// `indicators`, as of `now`.
 pub async fn explore_here(
@@ -121,6 +151,7 @@ pub(crate) fn router(store: SurrealStore, blobs: FsBlobStore, facility: String) 
     Router::new()
         .route("/explorer", get(explorer_route))
         .route("/explore", post(explore_route))
+        .route("/map", get(map_route))
         .with_state(Explorer {
             store,
             blobs,
@@ -162,6 +193,20 @@ async fn explorer_route(
                 .into_response()
         }
         Err(refusal) => refused(refusal),
+    }
+}
+
+async fn map_route(
+    State(explorer): State<Explorer>,
+    subject: Option<Extension<Subject>>,
+) -> Response {
+    match subject {
+        None => refused((StatusCode::UNAUTHORIZED, "sign in first".into())),
+        Some(Extension(subject)) if !subject.permissions.has(VIEW_PERMISSION) => refused((
+            StatusCode::FORBIDDEN,
+            "exploring indicators needs reporting.view".into(),
+        )),
+        Some(_) => Json(map_here(&explorer.store, &explorer.facility).await).into_response(),
     }
 }
 

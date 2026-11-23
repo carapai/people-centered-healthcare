@@ -11,8 +11,9 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use health_facility_registry::{
-    AREAS_CONTENT, AREAS_TYPE, AdministrativeAreas, ImportPlan, Place, PlaceLevel, PlaceStore,
-    Places, location_id, place_id,
+    AREAS_CONTENT, AREAS_TYPE, AdministrativeAreas, AdministrativeBoundaries, BOUNDARIES_CONTENT,
+    BOUNDARIES_TYPE, BoundaryFeature, Geometry, ImportPlan, Place, PlaceLevel, PlaceStore, Places,
+    location_id, place_id,
 };
 use health_identifiers::{OpId, ResourceId};
 use health_persistence::{
@@ -38,12 +39,7 @@ pub const OWNERSHIP_SYSTEM: &str =
 
 /// Whether `resource` is a package's administrative areas: a `Library` of type [`AREAS_TYPE`].
 pub fn is_administrative_areas(resource: &Value) -> bool {
-    resource["resourceType"] == "Library"
-        && resource["type"]["coding"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .any(|c| c["code"] == AREAS_TYPE)
+    is_library_of(resource, AREAS_TYPE)
 }
 
 /// The regions and districts of an administrative-areas `Library`: its first attachment,
@@ -60,6 +56,117 @@ pub fn administrative_areas(resource: &Value) -> Result<AdministrativeAreas, Str
         .decode(data)
         .map_err(|e| format!("the areas' content is not base64: {e}"))?;
     serde_json::from_slice(&bytes).map_err(|e| format!("the areas' content is not valid: {e}"))
+}
+
+/// Whether `resource` is a `Library` of type `kind`.
+fn is_library_of(resource: &Value, kind: &str) -> bool {
+    resource["resourceType"] == "Library"
+        && resource["type"]["coding"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|c| c["code"] == kind)
+}
+
+/// Whether `resource` is a package's area boundaries: a `Library` of type [`BOUNDARIES_TYPE`]
+/// (#604).
+pub fn is_administrative_boundaries(resource: &Value) -> bool {
+    is_library_of(resource, BOUNDARIES_TYPE)
+}
+
+/// The boundaries of an administrative-boundaries `Library`: its first attachment, GeoJSON
+/// ([`BOUNDARIES_CONTENT`]) inline as base64.
+pub fn administrative_boundaries(resource: &Value) -> Result<AdministrativeBoundaries, String> {
+    let content = &resource["content"][0];
+    if content["contentType"] != BOUNDARIES_CONTENT {
+        return Err(format!(
+            "the boundaries' content is not {BOUNDARIES_CONTENT}"
+        ));
+    }
+    let data = content["data"]
+        .as_str()
+        .ok_or("the boundaries' content is not inline")?;
+    let bytes = STANDARD
+        .decode(data)
+        .map_err(|e| format!("the boundaries' content is not base64: {e}"))?;
+    serde_json::from_slice(&bytes)
+        .map_err(|e| format!("the boundaries' content is not a GeoJSON FeatureCollection: {e}"))
+}
+
+/// The features of a boundary file (a GeoJSON `FeatureCollection`, as UBOS or MoH export it),
+/// each naming its area by the `code` property or, failing that, by `name_property` (`name` when
+/// none is given). A feature without a Polygon or MultiPolygon is refused.
+pub fn boundary_file(
+    file: &Value,
+    name_property: Option<&str>,
+) -> Result<Vec<BoundaryFeature>, Vec<String>> {
+    if file["type"] != "FeatureCollection" {
+        return Err(vec![
+            "the boundary file is not a GeoJSON FeatureCollection".into(),
+        ]);
+    }
+    let text = |value: &Value| match value {
+        Value::String(s) if !s.trim().is_empty() => Some(s.trim().to_owned()),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    };
+    let mut features = Vec::new();
+    let mut problems = Vec::new();
+    for (index, feature) in file["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        let properties = &feature["properties"];
+        match serde_json::from_value::<Geometry>(feature["geometry"].clone()) {
+            Ok(geometry) => features.push(BoundaryFeature {
+                code: text(&properties["code"]),
+                name: text(&properties[name_property.unwrap_or("name")]),
+                geometry,
+            }),
+            Err(_) => problems.push(format!(
+                "feature {} has no Polygon or MultiPolygon geometry",
+                index + 1
+            )),
+        }
+    }
+    if problems.is_empty() {
+        Ok(features)
+    } else {
+        Err(problems)
+    }
+}
+
+/// The administrative-boundaries `Library` holding `boundaries`, beside the areas `Library`
+/// `areas` (whose canonical base and version it takes), its GeoJSON inline as base64.
+pub fn boundaries_library(areas: &Value, boundaries: &AdministrativeBoundaries) -> Value {
+    let url = areas["url"].as_str().unwrap_or("").to_owned();
+    let base = url
+        .strip_suffix("administrative-areas")
+        .map_or_else(|| url.clone(), str::to_owned);
+    let mut geojson = serde_json::to_vec(boundaries).unwrap_or_default();
+    geojson.push(b'\n');
+    json!({
+        "resourceType": "Library",
+        "id": "administrative-boundaries",
+        "status": "active",
+        "url": format!("{base}administrative-boundaries"),
+        "version": areas["version"],
+        "name": "AdministrativeBoundaries",
+        "title": "Region and district boundaries",
+        "description": "The boundaries of the regions and districts in Library/administrative-areas, which maps shade by an indicator's threshold bands (ADR 0075; #604).",
+        "type": {
+            "coding": [{
+                "system": "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/platform",
+                "code": BOUNDARIES_TYPE,
+            }]
+        },
+        "content": [{
+            "contentType": BOUNDARIES_CONTENT,
+            "data": STANDARD.encode(geojson),
+        }]
+    })
 }
 
 fn coding(system: &str, code: &str) -> Value {
