@@ -61,6 +61,44 @@ pub enum Action {
     },
 }
 
+/// A transition's guard (ADR 0093): a FHIRPath expression, or a decision table of the
+/// definition and the outcome it requires.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Guard {
+    /// A FHIRPath expression, evaluated by the [`Guards`](crate::Guards) port.
+    Expression(String),
+    /// A decision table and the outcome it requires, e.g.
+    /// `{ "table": "triage-priority", "outcome": "urgent" }`.
+    Table {
+        /// The table's id in the same definition.
+        table: String,
+        /// The outcome the transition requires.
+        outcome: Value,
+    },
+}
+
+impl Guard {
+    /// A FHIRPath guard.
+    pub fn expression(expression: &str) -> Self {
+        Self::Expression(expression.to_owned())
+    }
+
+    /// A decision-table guard: `table` must give `outcome`.
+    pub fn table(table: &str, outcome: Value) -> Self {
+        Self::Table {
+            table: table.to_owned(),
+            outcome,
+        }
+    }
+}
+
+impl From<&str> for Guard {
+    fn from(expression: &str) -> Self {
+        Self::expression(expression)
+    }
+}
+
 /// A transition.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transition {
@@ -68,9 +106,10 @@ pub struct Transition {
     /// event). Empty: an eventless transition, taken as soon as its guard holds.
     #[serde(default)]
     pub events: Vec<String>,
-    /// A FHIRPath guard, evaluated by the [`Guards`](crate::Guards) port.
+    /// Its guard: absent (always), FHIRPath, or a decision table's outcome (ADR 0093), each
+    /// evaluated through the [`Guards`](crate::Guards) port.
     #[serde(default)]
-    pub guard: Option<String>,
+    pub guard: Option<Guard>,
     /// The target states. Empty: a targetless transition, which exits and enters nothing.
     #[serde(default)]
     pub targets: Vec<String>,

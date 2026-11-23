@@ -1580,6 +1580,53 @@ async fn the_sandbox_plays_a_draft_step_by_step_and_reports_an_unanswered_guard(
     assert_eq!(status, 403);
 }
 
+#[tokio::test]
+async fn the_sandbox_answers_a_decision_table_guard_by_the_table_s_outcome() {
+    let (publications, _dir) = publications().await;
+    publications.draft(&package(), "ann").await.expect("draft");
+    let author = || subject("ann", &["metadata.author"]);
+    let path = format!("/packages/{ID}/workflows/sandbox");
+    let mut prioritised = visit();
+    prioritised["statechart"]["states"][0]["transitions"][0]["guard"] =
+        json!({ "table": "triage-priority", "outcome": "urgent" });
+    prioritised["decisionTables"] = json!([{ "id": "triage-priority", "default": "routine",
+        "rows": [{ "name": "Danger signs", "when": ["%encounter.priority = 'urgent'"], "then": "urgent" }] }]);
+
+    // The table is listed for an outcome, and a move needing it waits for one.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({ "definition": prioritised, "moves": [{ "event": "triaged" }] })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["guards"], json!([]));
+    assert_eq!(body["tables"], json!(["triage-priority"]));
+    assert_eq!(body["unansweredTables"], json!(["triage-priority"]));
+    assert_eq!(body["steps"].as_array().expect("steps").len(), 1);
+
+    // Given `urgent`, the guarded transition fires, and the scenario keeps the stub.
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        &path,
+        Some(json!({
+            "definition": prioritised, "tables": { "triage-priority": "urgent" },
+            "moves": [{ "event": "triaged" }]
+        })),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["unansweredTables"], json!([]));
+    assert_eq!(body["steps"][1]["configuration"], json!(["done"]));
+    let scenario: Value =
+        serde_json::from_str(body["scenario"].as_str().expect("the file")).expect("json");
+    assert_eq!(scenario["tables"], json!({ "triage-priority": "urgent" }));
+}
+
 // Editing a local CodeSystem's concepts (#524).
 
 #[tokio::test]

@@ -1,0 +1,54 @@
+{
+  "type": "workflow-scenario",
+  "name": "an emergency goes to emergency care, not the cashier",
+  "definition": "https://health.go.ug/fhir/Library/opd-triage-route|1.0.0",
+  "tables": {
+    "triage-priority": "emergency"
+  },
+  "steps": [
+    {
+      "expect": {
+        "configuration": [
+          "triage"
+        ],
+        "tasks": [
+          {
+            "state": "triage",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    {
+      "event": "opd.triaged",
+      "expect": {
+        "configuration": [
+          "emergency"
+        ],
+        "tasks": [
+          {
+            "state": "emergency",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    {
+      "event": "opd.stabilised",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    },
+    {
+      "event": "opd.seen",
+      "expect": {
+        "configuration": [
+          "done"
+        ],
+        "running": false
+      }
+    }
+  ]
+}

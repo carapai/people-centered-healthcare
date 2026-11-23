@@ -1,0 +1,149 @@
+{
+  "url": "https://health.go.ug/fhir/Library/opd-triage-route",
+  "version": "1.0.0",
+  "statechart": {
+    "states": [
+      {
+        "id": "triage",
+        "kind": "atomic",
+        "task": {
+          "role": "nurse",
+          "worklist": "opd-triage",
+          "form": "https://health.go.ug/fhir/Questionnaire/opd-triage|1.0.0"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.triaged"
+            ],
+            "guard": {
+              "table": "triage-priority",
+              "outcome": "emergency"
+            },
+            "targets": [
+              "emergency"
+            ]
+          },
+          {
+            "events": [
+              "opd.triaged"
+            ],
+            "guard": {
+              "table": "triage-priority",
+              "outcome": "urgent"
+            },
+            "targets": [
+              "consultation"
+            ]
+          },
+          {
+            "events": [
+              "opd.triaged"
+            ],
+            "targets": [
+              "payment"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "payment",
+        "kind": "atomic",
+        "task": {
+          "role": "cashier",
+          "worklist": "cashier"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.paid"
+            ],
+            "targets": [
+              "consultation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "emergency",
+        "kind": "atomic",
+        "task": {
+          "role": "clinician",
+          "worklist": "opd-emergency",
+          "priority": "stat"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.stabilised"
+            ],
+            "targets": [
+              "consultation"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "consultation",
+        "kind": "atomic",
+        "task": {
+          "role": "clinician",
+          "worklist": "opd-consult"
+        },
+        "transitions": [
+          {
+            "events": [
+              "opd.seen"
+            ],
+            "targets": [
+              "done"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "done",
+        "kind": "final"
+      }
+    ]
+  },
+  "dataRequirements": [
+    {
+      "name": "triage",
+      "resourceType": "Observation",
+      "paths": [
+        "Observation.category",
+        "Observation.danger"
+      ]
+    }
+  ],
+  "decisionTables": [
+    {
+      "id": "triage-priority",
+      "rows": [
+        {
+          "name": "Danger signs",
+          "when": [
+            "%triage.danger = true"
+          ],
+          "then": "emergency"
+        },
+        {
+          "name": "Triaged emergency",
+          "when": [
+            "%triage.category = 'emergency'"
+          ],
+          "then": "emergency"
+        },
+        {
+          "name": "Triaged urgent",
+          "when": [
+            "%triage.category = 'urgent'"
+          ],
+          "then": "urgent"
+        }
+      ],
+      "default": "routine"
+    }
+  ]
+}

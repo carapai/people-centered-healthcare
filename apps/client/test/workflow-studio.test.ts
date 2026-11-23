@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import libraryJson from '../../../packages/reference-packages/opd/Library-opd-visit.json'
+import routeJson from '../../../packages/reference-packages/opd/Library-opd-triage-route.json'
 import { arrange, GROUP_HEADER, type Box } from '../src/features/studio/workflows/layout'
 import {
   activityOf,
@@ -9,6 +10,7 @@ import {
   competitors,
   edgeId,
   flagged,
+  guardLabel,
   moveSource,
   moveState,
   moveTransition,
@@ -20,6 +22,7 @@ import {
   renameState,
   rows,
   stateOf,
+  tableOutcomes,
   transitionAt,
   triggerOf,
   updateState,
@@ -171,5 +174,28 @@ describe('the Workflow Studio', () => {
     expect(problems(empty)).toEqual([{ code: 'bad-children', state: 'a' }])
     const bad = updateState(opd, 'lab', (s) => ({ ...s, initial: ['pharmacy-awaiting'] }))
     expect(problems(bad)).toContainEqual({ code: 'bad-initial', state: 'lab' })
+  })
+
+  test('a guard may name a decision table and the outcome it requires, checked as publication does (ADR 0093)', () => {
+    const route = readDefinition(JSON.stringify(routeJson))
+    if (!('definition' in route)) throw new Error('the triage route does not read')
+    const definition = route.definition
+    const [table] = definition.decisionTables ?? []
+    if (table === undefined) throw new Error('no table')
+    expect(tableOutcomes(table)).toEqual(['emergency', 'urgent', 'routine'])
+    expect(guardLabel(transitionAt(definition, 'triage', 0)?.guard)).toBe('[triage-priority = emergency]')
+    expect(guardLabel('%urgent')).toBe('[%urgent]')
+    expect(guardLabel(null)).toBe('')
+    expect(problems(definition)).toEqual([])
+    const guarded = (guard: { table: string; outcome: string }) => updateTransition(definition, 'triage', 0, (t) => ({ ...t, guard }))
+    const at = { kind: 'transition', source: 'triage', index: 0 }
+    expect(problems(guarded({ table: 'danger', outcome: 'emergency' }))).toEqual([{ code: 'unknown-guard-table', at, table: 'danger' }])
+    expect(problems(guarded({ table: 'triage-priority', outcome: 'admit' }))).toEqual([{ code: 'impossible-guard-outcome', at, table: 'triage-priority', outcome: 'admit' }])
+    // The default is an outcome the table gives.
+    expect(problems(guarded({ table: 'triage-priority', outcome: 'routine' }))).toEqual([])
+    expect(flagged(problems(guarded({ table: 'danger', outcome: 'x' })))).toEqual(new Set([edgeId('triage', 0)]))
+    // It writes back to its Library unchanged.
+    const again = readDefinition(JSON.stringify(writeDefinition(route.library, definition)))
+    expect('definition' in again && again.definition).toEqual(definition)
   })
 })

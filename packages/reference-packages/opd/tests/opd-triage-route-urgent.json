@@ -1,0 +1,18 @@
+{
+  "type": "workflow-scenario",
+  "name": "an urgent patient goes straight to consultation",
+  "definition": "https://health.go.ug/fhir/Library/opd-triage-route|1.0.0",
+  "tables": {
+    "triage-priority": "urgent"
+  },
+  "steps": [
+    {
+      "event": "opd.triaged",
+      "expect": {
+        "configuration": [
+          "consultation"
+        ]
+      }
+    }
+  ]
+}

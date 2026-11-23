@@ -16,7 +16,8 @@
 //! [`WorkflowDefinition::problems`] is the publication gate's check, against the actions the
 //! release knows ([`ActionDescriptor`]): every action reference and its parameters valid, every
 //! assignment typed, no unreachable states, no non-final state without an exit, decision tables
-//! well formed, human tasks only on atomic states with a role, a worklist and a `url|version`
+//! well formed, every decision-table guard naming a table of the definition and an outcome it can
+//! give (ADR 0093), human tasks only on atomic states with a role, a worklist and a `url|version`
 //! form, and no principal permission that no action needs. There is no scripting: guards
 //! and conditions are FHIRPath, evaluated through a port. Type-checking guards against the data
 //! requirements comes with workflow simulation (#101).
@@ -27,7 +28,7 @@ use health_workflow_actions::{ActionDescriptor, ParamKind};
 use serde::{Deserialize, Serialize};
 
 use crate::interpreter::{DefinitionError, Machine};
-use crate::model::{Action, Kind, State, Statechart, Value};
+use crate::model::{Action, Guard, Kind, State, Statechart, Value};
 
 /// The kind of a data-model field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,6 +160,29 @@ pub enum Problem {
     /// A decision table with no rows, an empty condition, or an id used twice.
     #[error("decision table {0} is not well formed")]
     BadDecisionTable(String),
+    /// A decision-table guard naming a table the definition does not have (ADR 0093).
+    #[error(
+        "a guard of state {state} names decision table {table}, which the definition does not have"
+    )]
+    UnknownGuardTable {
+        /// The state the transition leaves.
+        state: String,
+        /// The table named.
+        table: String,
+    },
+    /// A decision-table guard requiring an outcome that is neither one of the table's row
+    /// outcomes nor its default (ADR 0093).
+    #[error(
+        "a guard of state {state} requires outcome {outcome} of decision table {table}, which it never gives"
+    )]
+    ImpossibleGuardOutcome {
+        /// The state the transition leaves.
+        state: String,
+        /// The table.
+        table: String,
+        /// The outcome required, as written (text quoted).
+        outcome: String,
+    },
     /// A human task on a state that is not atomic, with no role or worklist, a form that is not
     /// `url|version`, or a claim timeout that is not positive.
     #[error("the human task of state {0} is not well formed")]
@@ -291,6 +315,8 @@ impl WorkflowDefinition {
             }
         }
 
+        self.check_table_guards(&all, &mut problems);
+
         for permission in &self.principal {
             if !needed.contains(permission.as_str()) {
                 problems.push(Problem::UnneededPermission(permission.clone()));
@@ -340,6 +366,37 @@ impl WorkflowDefinition {
                     });
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// Decision-table guards naming an unknown table, or an outcome their table never gives.
+    fn check_table_guards(&self, all: &[(&State, Vec<&State>)], problems: &mut Vec<Problem>) {
+        for (state, _) in all {
+            for guard in state.transitions.iter().filter_map(|t| t.guard.as_ref()) {
+                let Guard::Table { table, outcome } = guard else {
+                    continue;
+                };
+                let Some(found) = self.decision_tables.iter().find(|t| &t.id == table) else {
+                    problems.push(Problem::UnknownGuardTable {
+                        state: state.id.clone(),
+                        table: table.clone(),
+                    });
+                    continue;
+                };
+                let possible = found.rows.iter().any(|row| &row.then == outcome)
+                    || found.default.as_ref() == Some(outcome);
+                if !possible {
+                    problems.push(Problem::ImpossibleGuardOutcome {
+                        state: state.id.clone(),
+                        table: table.clone(),
+                        outcome: match outcome {
+                            Value::Bool(b) => b.to_string(),
+                            Value::Int(n) => n.to_string(),
+                            Value::Text(text) => format!("{text:?}"),
+                        },
+                    });
+                }
             }
         }
     }

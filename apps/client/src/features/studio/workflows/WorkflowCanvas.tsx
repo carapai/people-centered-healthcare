@@ -6,7 +6,7 @@ import { useIntl } from 'react-intl'
 
 import { sandboxMessages as bm, workflowMessages as m } from '../../../i18n/messages'
 import { arrange, LEAF_WIDTH } from './layout'
-import { activityOf, edgeId, edges, rows, triggerOf, type Selection, type State, type WorkflowDefinition } from './model'
+import { activityOf, edgeId, edges, guardLabel, rows, triggerOf, type Selection, type State, type WorkflowDefinition } from './model'
 
 // The canvas (studio.md § The Workflow Studio): the statechart on @xyflow/react, laid out left
 // to right by `layout.ts`. Compound and parallel states are group nodes holding their children;
@@ -103,7 +103,8 @@ export function WorkflowCanvas({ definition, selected, flagged, active, onSelect
     if (state === undefined) return []
     const trigger = triggerOf(state, transition)
     const on = trigger.kind === 'eventless' ? intl.formatMessage(m.wsEventless) : trigger.kind === 'timer' ? intl.formatMessage(m.wsAfter, { after: trigger.after }) : trigger.events.join(', ')
-    const label = transition.guard === undefined || transition.guard === null || transition.guard === '' ? on : `${on} [${transition.guard}]`
+    const guard = guardLabel(transition.guard)
+    const label = guard === '' ? on : `${on} ${guard}`
     const id = edgeId(source, index)
     return (transition.targets ?? []).map((target, n) => ({
       id: n === 0 ? id : `${id}·${n}`,

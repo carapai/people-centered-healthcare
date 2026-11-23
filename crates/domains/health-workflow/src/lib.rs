@@ -1,7 +1,7 @@
 //! The workflow engine's statechart interpreter (workflow-engine.md § Statechart model; ADR 0042).
 //!
 //! A Workflow Definition is a [`Statechart`] of atomic, compound, parallel and final states, with
-//! transitions (event descriptors, a FHIRPath guard, typed actions, targets), entry and exit
+//! transitions (event descriptors, a guard (FHIRPath or a decision table's outcome, ADR 0093), typed actions, targets), entry and exit
 //! handlers, timers and invocations. [`Machine`] runs it with SCXML-style semantics:
 //! run-to-completion, one event queue per instance, transitions chosen by document order, and
 //! deterministic. The behaviour is pinned by a curated subset of the W3C SCXML conformance
@@ -21,8 +21,8 @@ pub mod worklists;
 
 pub use interpreter::{DefinitionError, Effect, Event, Guards, Instance, Machine, matches};
 pub use model::{
-    Action, CLAIM_TIMEOUT, DataModel, HumanTask, Invoke, Kind, Priority, State, Statechart, Timer,
-    Transition, Value,
+    Action, CLAIM_TIMEOUT, DataModel, Guard, HumanTask, Invoke, Kind, Priority, State, Statechart,
+    Timer, Transition, Value,
 };
 pub use store::{
     CANCELLED, HistoryEntry, InstanceRecord, STARTED, TimerRecord, TimerStatus, WorkflowStore,

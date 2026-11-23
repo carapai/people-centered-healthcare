@@ -159,3 +159,80 @@ fn a_test_case_reads_from_its_file() {
     assert_eq!(test.inputs["%triage.danger"], Value::Bool(true));
     assert_eq!(test.expect, text("bypass"));
 }
+
+/// FHIRPath for the guard tests: a condition holds when it names the data model's `category`.
+struct Category;
+
+impl crate::Guards for Category {
+    fn holds(&self, guard: &str, _: Option<&crate::Event>, data: &DataModel) -> bool {
+        data.get("category") == Some(&text(guard))
+    }
+}
+
+/// triage --triaged [triage-route = bypass]--> emergency; --triaged--> cashier.
+fn routed() -> crate::Machine {
+    use crate::{Guard, Kind, State, Statechart, Transition};
+    let mut triage = State::new("triage", Kind::Atomic);
+    let to = |target: &str, guard: Option<Guard>| Transition {
+        events: vec!["triaged".into()],
+        guard,
+        targets: vec![target.into()],
+        internal: false,
+        actions: vec![],
+    };
+    triage.transitions.push(to(
+        "emergency",
+        Some(Guard::table("triage-route", text("bypass"))),
+    ));
+    triage.transitions.push(to("cashier", None));
+    let chart = Statechart {
+        states: vec![
+            triage,
+            State::new("emergency", Kind::Final),
+            State::new("cashier", Kind::Final),
+        ],
+        initial: vec![],
+    };
+    crate::Machine::new(&chart).expect("a statechart")
+}
+
+#[test]
+fn a_table_guard_holds_only_when_the_table_gives_its_outcome() {
+    let tables = [table(None)];
+    let guards = WithTables::new(&tables, &Category);
+    let machine = routed();
+    let after = |category: Option<&str>| {
+        let (mut instance, _) = machine.start(&guards);
+        if let Some(category) = category {
+            instance.data.insert("category".into(), text(category));
+        }
+        let (instance, _) = machine
+            .step(instance, &crate::Event::named("triaged"), &guards)
+            .expect("a step");
+        instance.configuration
+    };
+    // The first row that holds gives `bypass`: the guard holds.
+    assert_eq!(after(Some("emergency")), ["emergency"]);
+    // Another outcome, or none (no row holds and no default): the guard is false.
+    assert_eq!(after(Some("routine")), ["cashier"]);
+    assert_eq!(after(None), ["cashier"]);
+    // The default counts as the table's outcome.
+    let bypassing = [table(Some(text("bypass")))];
+    let (instance, _) = machine.start(&WithTables::new(&bypassing, &Category));
+    let (instance, _) = machine
+        .step(
+            instance,
+            &crate::Event::named("triaged"),
+            &WithTables::new(&bypassing, &Category),
+        )
+        .expect("a step");
+    assert_eq!(instance.configuration, ["emergency"]);
+    // A port that knows no tables answers none: the guard is false.
+    let (instance, _) = machine.start(&Category);
+    let mut instance = instance;
+    instance.data.insert("category".into(), text("emergency"));
+    let (instance, _) = machine
+        .step(instance, &crate::Event::named("triaged"), &Category)
+        .expect("a step");
+    assert_eq!(instance.configuration, ["cashier"]);
+}

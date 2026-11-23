@@ -9,8 +9,9 @@ use health_surrealdb::{
     Connection, MIGRATIONS, Settings, SurrealStore, SurrealTx, Target, migrate,
 };
 use health_time::{Clock, FixedClock, Timestamp};
+use health_workflow::definition::{DecisionTable, Row};
 use health_workflow::{
-    DataModel, Event, Guards, InstanceRecord, Kind, State, Statechart, Transition,
+    DataModel, Event, Guard, Guards, InstanceRecord, Kind, State, Statechart, Transition, Value,
 };
 use health_workflow_app::{
     ActionCall, ActionFailed, Actions, Candidate, Compiled, Judged, Outcome, Workflows,
@@ -18,6 +19,7 @@ use health_workflow_app::{
 
 const OPD: &str = "urn:opd|1.0.0";
 const BOTH: &str = "urn:both|1.0.0";
+const PRIORITY: &str = "urn:priority|1.0.0";
 
 fn on(event: &str, target: &str) -> Transition {
     Transition {
@@ -48,6 +50,37 @@ fn opd() -> Statechart {
         ],
         initial: vec![],
     }
+}
+
+/// Triage → emergency when the `triage-priority` table decides `urgent` (ADR 0093), else →
+/// consultation.
+fn priority() -> Compiled {
+    let mut urgent = on("triage.completed", "emergency");
+    urgent.guard = Some(Guard::table(
+        "triage-priority",
+        Value::Text("urgent".into()),
+    ));
+    let chart = Statechart {
+        states: vec![
+            atomic(
+                "triage",
+                vec![urgent, on("triage.completed", "consultation")],
+            ),
+            atomic("emergency", vec![]),
+            atomic("consultation", vec![]),
+        ],
+        initial: vec![],
+    };
+    let table = DecisionTable {
+        id: "triage-priority".into(),
+        rows: vec![Row {
+            name: Some("Danger signs".into()),
+            when: vec!["%encounter.priority = 'urgent'".into()],
+            then: Value::Text("urgent".into()),
+        }],
+        default: Some(Value::Text("routine".into())),
+    };
+    Compiled::with_tables(chart, vec![table]).expect("priority")
 }
 
 /// The visit and its bill, side by side.
@@ -114,6 +147,7 @@ async fn app<G: Guards + Send + Sync>(node: &str, guards: G) -> App<G> {
             BOTH.to_owned(),
             Arc::new(Compiled::new(both()).expect("both")),
         ),
+        (PRIORITY.to_owned(), Arc::new(priority())),
     ]);
     Workflows::new(
         SurrealStore::new(connection, clock.clone()),
@@ -241,4 +275,43 @@ async fn the_authority_re_evaluates_the_guards() {
         matches!(&judged, Judged::Conflict(why) if why.contains("not enabled at the authority")),
         "{judged:?}"
     );
+}
+
+#[tokio::test]
+async fn a_decision_table_guard_fires_only_when_the_table_gives_its_outcome() {
+    // The danger-sign row holds: the table decides `urgent`, the guarded transition fires.
+    let (edge, desktop, record) = started(PRIORITY, Always).await;
+    let candidate = offline(&desktop, &record, "triage.completed", "op-1").await;
+    assert_eq!(candidate.left, ["triage"]);
+    let Judged::Applied(next) = edge.apply_candidate(&candidate).await.expect("judge") else {
+        panic!("not applied");
+    };
+    assert_eq!(next.state.configuration, ["emergency"]);
+
+    // No row holds: the default `routine` is not `urgent`, so the next transition is taken.
+    let (edge, _, record) = started(PRIORITY, Never).await;
+    let next = applied(
+        edge.command(
+            &record.id,
+            &Event::named("triage.completed"),
+            "nurse",
+            "op-2",
+        )
+        .await
+        .expect("command"),
+    );
+    assert_eq!(next.state.configuration, ["consultation"]);
+}
+
+#[tokio::test]
+async fn the_authority_re_decides_a_decision_table_guard() {
+    // Offline, the table decided `urgent` (emergency); at the edge it decides `routine`. The
+    // candidate is judged by the authority's own decision, as a FHIRPath guard is: the move
+    // goes to consultation there.
+    let (edge, desktop, record) = started(PRIORITY, Never).await;
+    let candidate = offline(&desktop, &record, "triage.completed", "op-1").await;
+    let Judged::Applied(next) = edge.apply_candidate(&candidate).await.expect("judge") else {
+        panic!("not applied");
+    };
+    assert_eq!(next.state.configuration, ["consultation"]);
 }

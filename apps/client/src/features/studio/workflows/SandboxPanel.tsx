@@ -9,7 +9,8 @@ import { button, control } from '../../reception/styles'
 import { StudioError, saveFile, type StudioPackagePage } from '../api'
 import { refusalText } from '../wording'
 import type { StudioSandbox } from './api'
-import { OUTCOMES, answer, current, moveText, restart, scenarioFile, scenarioPath, send, setGate, undo, untaken, wait, type Outcome, type Run } from './sandbox'
+import { tableOutcomes, type Value, type WorkflowDefinition } from './model'
+import { OUTCOMES, answer, current, moveText, restart, scenarioFile, scenarioPath, send, setGate, setTableOutcome, undo, untaken, wait, type Outcome, type Run } from './sandbox'
 
 const subheading = css({ fontSize: 'md', fontWeight: 'semibold' })
 const muted = css({ color: 'fg.muted', fontSize: 'sm' })
@@ -40,6 +41,8 @@ const failure = (intl: IntlShape, error: unknown) =>
 export interface SandboxPanelProps {
   /** The package version, `name@version`. */
   id: string
+  /** The draft definition, for the outcomes each decision table can give. */
+  definition: WorkflowDefinition
   run: Run
   /** The server's answer for `run`; absent until it comes. */
   played: StudioSandbox | undefined
@@ -58,12 +61,12 @@ export interface SandboxPanelProps {
 /**
  * The Workflow Studio's Sandbox mode (studio.md § The Workflow Studio; #499). Every step comes
  * from central, which plays the draft with every action stubbed: the panel shows the guard
- * answers, the gates' outcomes, what holds after the last step (configuration, stubbed actions,
+ * answers, the outcome of each decision table a guard names, the gates' outcomes, what holds after the last step (configuration, stubbed actions,
  * open tasks, pending timers), the events it accepts and the history, and sends the author's
  * moves. *Save as scenario* writes the run the server returned into `tests/` through the
  * `If-Match` path.
  */
-export function SandboxPanel({ id, run, played, playing, error, editable, revision, files, onRun, onSaved }: SandboxPanelProps) {
+export function SandboxPanel({ id, definition, run, played, playing, error, editable, revision, files, onRun, onSaved }: SandboxPanelProps) {
   const intl = useIntl()
   const platform = usePlatform()
   const ids = { wait: useId(), name: useId() }
@@ -86,6 +89,7 @@ export function SandboxPanel({ id, run, played, playing, error, editable, revisi
     },
   })
   const unanswered = new Set(played?.unanswered ?? [])
+  const unansweredTables = new Set(played?.unansweredTables ?? [])
   const joined = (items: readonly string[]) => (items.length === 0 ? intl.formatMessage(m.sbNone) : items.join(', '))
 
   return (
@@ -102,6 +106,11 @@ export function SandboxPanel({ id, run, played, playing, error, editable, revisi
           {intl.formatMessage(m.sbUnanswered, { guards: played.unanswered.join(', ') })}
         </p>
       ) : null}
+      {played !== undefined && played.unansweredTables.length > 0 ? (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(m.sbUnansweredTables, { tables: played.unansweredTables.join(', ') })}
+        </p>
+      ) : null}
       {played?.refused === null || played?.refused === undefined ? null : (
         <p role="alert" className={alert}>
           {intl.formatMessage(m.sbRefused, { reason: played.refused })}
@@ -114,6 +123,22 @@ export function SandboxPanel({ id, run, played, playing, error, editable, revisi
           {played.guards.length === 0 ? <p className={muted}>{intl.formatMessage(m.sbGuardsNone)}</p> : null}
           {played.guards.map((guard) => (
             <GuardAnswer key={guard} guard={guard} value={run.guards[guard]} flagged={unanswered.has(guard)} onChange={(holds) => onRun(answer(run, guard, holds))} />
+          ))}
+        </fieldset>
+      )}
+      {played === undefined || played.tables.length === 0 ? null : (
+        <fieldset className={group}>
+          <legend className={legend}>{intl.formatMessage(m.sbTables)}</legend>
+          <p className={muted}>{intl.formatMessage(m.sbTablesHint)}</p>
+          {played.tables.map((table) => (
+            <TableOutcome
+              key={table}
+              table={table}
+              outcomes={(definition.decisionTables ?? []).filter((t) => t.id === table).flatMap(tableOutcomes)}
+              value={run.tables[table]}
+              flagged={unansweredTables.has(table)}
+              onChange={(outcome) => onRun(setTableOutcome(run, table, outcome))}
+            />
           ))}
         </fieldset>
       )}
@@ -221,6 +246,30 @@ function GuardAnswer({ guard, value, flagged, onChange }: { guard: string; value
         {(['', 'true', 'false'] as const).map((v) => (
           <option key={v} value={v}>
             {intl.formatMessage(m.sbAnswerName, { answer: v === '' ? 'none' : v })}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function TableOutcome({ table, outcomes, value, flagged, onChange }: { table: string; outcomes: Value[]; value: Value | undefined; flagged: boolean; onChange: (outcome: Value | null) => void }) {
+  const intl = useIntl()
+  const field = useId()
+  return (
+    <label className={label} htmlFor={field}>
+      <span className={cx(css({ overflowWrap: 'anywhere', fontSize: 'sm' }), flagged ? alert : undefined)}>{intl.formatMessage(m.sbTable, { table })}</span>
+      <select
+        id={field}
+        className={input}
+        aria-invalid={flagged ? true : undefined}
+        value={value === undefined ? '' : String(value)}
+        onChange={(e) => onChange(outcomes.find((o) => String(o) === e.target.value) ?? null)}
+      >
+        <option value="">{intl.formatMessage(m.sbAnswerName, { answer: 'none' })}</option>
+        {outcomes.map((o) => (
+          <option key={String(o)} value={String(o)}>
+            {String(o)}
           </option>
         ))}
       </select>

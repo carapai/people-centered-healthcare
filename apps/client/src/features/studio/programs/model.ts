@@ -13,7 +13,7 @@
 import type { StudioArtefactChange, StudioPackageFile } from '@health/api-client'
 
 import { newIndicator } from '../indicators/indicator'
-import { isWorkflowLibrary, WORKFLOW_CONTENT_TYPE, type Action, type State, type Timer, type Value, type WorkflowDefinition } from '../workflows/model'
+import { guardText, isWorkflowLibrary, WORKFLOW_CONTENT_TYPE, type Action, type State, type Timer, type Value, type WorkflowDefinition } from '../workflows/model'
 
 /** A PlanDefinition as JSON. */
 export type Plan = Record<string, unknown> & { resourceType: 'PlanDefinition' }
@@ -280,6 +280,7 @@ export interface Exit {
   events: string[]
   /** The timer it waits for, ISO 8601, when its event is a timer's. */
   after: string | null
+  /** Its guard in words: a FHIRPath expression, or `table = outcome` (ADR 0093). */
   guard: string | null
 }
 
@@ -357,7 +358,7 @@ export function board(program: Program, definition: WorkflowDefinition, held: Ho
       leaves: (state.transitions ?? []).map((t) => {
         const events = t.events ?? []
         const timer = events.length === 1 ? (timers.get(events[0] ?? '') ?? null) : null
-        return { targets: t.targets ?? [], events: timer === null ? events : [], after: timer, guard: t.guard ?? null }
+        return { targets: t.targets ?? [], events: timer === null ? events : [], after: timer, guard: t.guard === undefined || t.guard === null ? null : guardText(t.guard) }
       }),
     }
   })

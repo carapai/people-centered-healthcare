@@ -19,6 +19,10 @@
 //! - **Timers** ([`Workflows::fire_due`]) fire at the instance's authority only, each once, in its
 //!   own transaction, using the node clock checked against the clock floor (see [`timers`]).
 //!
+//! - **Guards** are evaluated through the [`Guards`] port, with the definition's decision tables
+//!   decided on it ([`Compiled::guards`]; ADR 0093), so central and the edge judge a
+//!   decision-table guard alike.
+//!
 //! Sub-workflow invocations are refused until the engine supports them, so a definition that
 //! uses one fails closed.
 
@@ -28,6 +32,8 @@ use std::sync::Arc;
 
 use health_persistence::{Store, StoreError, Transaction, WriteError};
 use health_time::{Clock, Timestamp};
+use health_workflow::decision::WithTables;
+use health_workflow::definition::DecisionTable;
 use health_workflow::worklists::{
     claimed_field, human_tasks, is_task_field, owner_field, priority_field, project,
 };
@@ -64,13 +70,32 @@ pub struct Compiled {
     pub chart: Statechart,
     /// The compiled machine.
     pub machine: Machine,
+    /// The definition's decision tables, which its guards may name (ADR 0093).
+    pub tables: Vec<DecisionTable>,
 }
 
 impl Compiled {
-    /// Compiles `chart`.
+    /// Compiles `chart`, with no decision tables.
     pub fn new(chart: Statechart) -> Result<Self, DefinitionError> {
+        Self::with_tables(chart, Vec::new())
+    }
+
+    /// Compiles `chart` with the definition's decision `tables`.
+    pub fn with_tables(
+        chart: Statechart,
+        tables: Vec<DecisionTable>,
+    ) -> Result<Self, DefinitionError> {
         let machine = Machine::new(&chart)?;
-        Ok(Self { chart, machine })
+        Ok(Self {
+            chart,
+            machine,
+            tables,
+        })
+    }
+
+    /// `guards`, deciding this definition's tables with its FHIRPath.
+    pub fn guards<'a, G: Guards + ?Sized>(&'a self, guards: &'a G) -> WithTables<'a, G> {
+        WithTables::new(&self.tables, guards)
     }
 }
 
@@ -300,9 +325,9 @@ where
         if !tx.claim_event(&command_key(op_id), now).await? {
             return Ok(Outcome::Replayed);
         }
-        let (state, effects) = compiled.machine.start(&self.guards);
+        let (state, effects) = compiled.machine.start(&compiled.guards(&self.guards));
         let (state, effects) = self
-            .settle_gates(&compiled.machine, context, state, effects)
+            .settle_gates(&compiled, context, state, effects)
             .await?;
         let record = InstanceRecord {
             id: instance_id(op_id),
@@ -524,11 +549,12 @@ where
         now: Timestamp,
     ) -> Result<Option<InstanceRecord>, WorkflowError> {
         let compiled = self.compiled(&record.definition)?;
-        let (state, effects) = compiled
-            .machine
-            .step(record.state.clone(), event, &self.guards)?;
+        let (state, effects) =
+            compiled
+                .machine
+                .step(record.state.clone(), event, &compiled.guards(&self.guards))?;
         let (state, effects) = self
-            .settle_gates(&compiled.machine, &record.context, state, effects)
+            .settle_gates(&compiled, &record.context, state, effects)
             .await?;
         if state == record.state && effects.is_empty() {
             return Ok(None);

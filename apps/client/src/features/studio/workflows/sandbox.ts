@@ -1,7 +1,9 @@
 import type { StudioSandbox, StudioSandboxMove, StudioSandboxStep } from './api'
+import type { Value } from './model'
 
 // The Workflow Studio's sandbox (studio.md § The Workflow Studio; #499). The browser holds the
-// run as the author's guard answers, gate outcomes and the moves so far, and posts it whole on
+// run as the author's guard answers, decision-table outcomes (ADR 0093), gate outcomes and the
+// moves so far, and posts it whole on
 // every change: central replays it from the start in the engine's simulation and answers every
 // step. Nothing here reads the statechart, so the browser never decides a transition: undo drops
 // the last move, restart drops them all, and what is active comes from the server's last step.
@@ -10,6 +12,9 @@ import type { StudioSandbox, StudioSandboxMove, StudioSandboxStep } from './api'
 export interface Run {
   /** The author's answer to each guard, by its expression. */
   guards: Record<string, boolean>
+  /** The outcome of each decision table a guard names, by table id: one answers every guard
+   * that names the table, as the real table would. */
+  tables: Record<string, Value>
   /** The outcome of each Financial Gate, by canonical URL; an unanswered gate defers. */
   gates: Record<string, string>
   /** The moves so far, in order. */
@@ -20,7 +25,7 @@ export type Outcome = 'pass' | 'defer' | 'block'
 
 export const OUTCOMES: readonly Outcome[] = ['pass', 'defer', 'block']
 
-export const emptyRun = (): Run => ({ guards: {}, gates: {}, moves: [] })
+export const emptyRun = (): Run => ({ guards: {}, tables: {}, gates: {}, moves: [] })
 
 /** Sends `event` next. */
 export const send = (run: Run, event: string): Run => ({ ...run, moves: [...run.moves, { event }] })
@@ -40,6 +45,14 @@ export function answer(run: Run, guard: string, holds: boolean | null): Run {
   if (holds === null) delete guards[guard]
   else guards[guard] = holds
   return { ...run, guards }
+}
+
+/** Sets the outcome decision table `table` gives (`null` takes it back). */
+export function setTableOutcome(run: Run, table: string, outcome: Value | null): Run {
+  const tables = { ...run.tables }
+  if (outcome === null) delete tables[table]
+  else tables[table] = outcome
+  return { ...run, tables }
 }
 
 /** Sets the outcome of `gate` (`null` takes it back: it defers). */
