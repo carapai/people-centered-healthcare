@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest'
 import monitoring from '../../../packages/reference-packages/hmis/configuration/reports/anc-facility-monitoring.json'
 import hmis105 from '../../../packages/reference-packages/hmis/configuration/reports/hmis-105-anc.json'
 import { newDesign } from '../src/features/studio/designs'
-import { countedAt, layoutTable, percentChange, sentCells } from '../src/features/studio/reports/layout'
+import { countedAt, layoutTable, listCellText, percentChange, sentCells } from '../src/features/studio/reports/layout'
 import {
   addAgeBands,
   addAttribute,
@@ -234,5 +234,17 @@ describe('laying a table section out from the preview', () => {
     const sheet = sentCells([{ section: attendance, index: 0, preview }])
     expect(sheet).toHaveLength(8)
     expect(sheet.filter((c) => c.total || c.notRecorded)).toHaveLength(4)
+  })
+
+  // #867, part 2: a line list's cells, as central reads them over the test patients.
+  test('a line list cell shows its values, with their dates when it shows all of them', () => {
+    expect(listCellText([], false)).toBe('—')
+    expect(listCellText([{ value: 'Annet Nakato', date: null }], false)).toBe('Annet Nakato')
+    expect(listCellText([{ value: '14 weeks', date: '2026-03-28' }], false)).toBe('14 weeks')
+    const all = [
+      { value: '10 weeks', date: '2026-03-04' },
+      { value: '14 weeks', date: '2026-03-28' },
+    ]
+    expect(listCellText(all, true)).toBe('10 weeks (2026-03-04); 14 weeks (2026-03-28)')
   })
 })

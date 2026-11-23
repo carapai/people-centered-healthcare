@@ -2703,6 +2703,149 @@ async fn the_report_preview_counts_cells_crossing_two_disaggregations() {
     assert_eq!(previous.as_array().map(Vec::len), Some(crossed.len()));
 }
 
+/// A line list's rows in the Report designer's preview (#867): the HMIS package's *ANC facility
+/// monitoring* over the ANC package's test patients. The program is the ANC package's draft
+/// PlanDefinition, whose episode type makes a test patient's EpisodeOfCare an enrollment in it;
+/// the 1st visits list keeps only the visits *ANC 1st visits* counted.
+#[tokio::test]
+async fn the_report_preview_lists_a_line_lists_rows_over_test_patients() {
+    let (publications, _dir) = publications().await;
+    let anc = anc_package();
+    publications.draft(&anc, "ann").await.expect("draft anc");
+    let hmis = hmis_package();
+    publications.draft(&hmis, "ann").await.expect("draft hmis");
+    let author = || subject("ann", &["metadata.author"]);
+    let mut report: Value =
+        serde_json::from_slice(&hmis["configuration/reports/anc-facility-monitoring.json"])
+            .expect("report");
+    let preview_path = "/packages/ug.moh.hmis@1.0.0/reports/preview";
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (status, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["sources"], json!(["ug.moh.hmis@1.0.0", ID]));
+    assert!(body["sections"][0]["list"].is_null());
+
+    // ANC clients this month: each enrollment active during March, one row each.
+    let clients = &body["sections"][1]["list"];
+    assert_eq!(clients["error"], Value::Null, "{clients}");
+    assert_eq!(clients["program"]["title"], "Antenatal care");
+    assert_eq!(clients["program"]["package"], ID);
+    assert_eq!(clients["program"]["published"], false);
+    let rows = clients["rows"].as_array().expect("rows");
+    let records: Vec<&str> = rows.iter().filter_map(|r| r["record"].as_str()).collect();
+    assert_eq!(
+        records,
+        [
+            "EpisodeOfCare/achan-anc-1",
+            "EpisodeOfCare/akello-anc",
+            "EpisodeOfCare/atim-anc",
+            "EpisodeOfCare/auma-anc",
+            "EpisodeOfCare/nakato-anc",
+            "EpisodeOfCare/namubiru-anc",
+            "EpisodeOfCare/nansubuga-anc"
+        ]
+    );
+    // Nakato: name, age at the end of March, no phone, enrolled on 4 March, last visit on
+    // 28 March, and her latest gestational age.
+    let nakato = &rows[4];
+    assert_eq!(nakato["patient"], "Annet Nakato");
+    assert_eq!(
+        nakato["cells"],
+        json!([
+            [{ "value": "Annet Nakato", "date": null }],
+            [{ "value": "23", "date": null }],
+            [],
+            [{ "value": "2026-03-04", "date": null }],
+            [{ "value": "2026-03-28", "date": null }],
+            [{ "value": "14 weeks", "date": "2026-03-28" }]
+        ])
+    );
+
+    // 1st visits counted: only the first visits in March that ANC 1st visits counted.
+    let first = &body["sections"][2]["list"];
+    assert_eq!(first["error"], Value::Null, "{first}");
+    let records: Vec<&str> = first["rows"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .filter_map(|r| r["record"].as_str())
+        .collect();
+    for visit in [
+        "Encounter/akello-visit-1",
+        "Encounter/nakato-visit-1",
+        "Encounter/namubiru-visit-1",
+        "Encounter/nansubuga-visit-1",
+    ] {
+        assert!(records.contains(&visit), "{records:?}");
+    }
+    assert!(
+        records
+            .iter()
+            .all(|r| !r.contains("auma") && !r.contains("opio")),
+        "{records:?}"
+    );
+
+    // Started in March instead: Atim (February), Auma (January) and Achan (November) go.
+    report["sections"][1]["enrollments"] = json!("started");
+    // A program no package holds is said so.
+    report["sections"][2]["program"] = json!("https://health.go.ug/fhir/PlanDefinition/nowhere");
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (_, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    let started: Vec<&str> = body["sections"][1]["list"]["rows"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .filter_map(|r| r["record"].as_str())
+        .collect();
+    assert_eq!(
+        started,
+        [
+            "EpisodeOfCare/akello-anc",
+            "EpisodeOfCare/nakato-anc",
+            "EpisodeOfCare/namubiru-anc",
+            "EpisodeOfCare/nansubuga-anc"
+        ]
+    );
+    assert_eq!(
+        body["sections"][2]["list"]["error"],
+        "no program is https://health.go.ug/fhir/PlanDefinition/nowhere"
+    );
+}
+
+/// The program's test patients are read even when no indicator the Report uses is in its
+/// package: a Report of one line list over the ANC program reads the ANC package's.
+#[tokio::test]
+async fn the_report_preview_reads_the_test_patients_of_the_package_holding_a_line_lists_program() {
+    let (publications, _dir) = publications().await;
+    publications
+        .draft(&anc_package(), "ann")
+        .await
+        .expect("draft anc");
+    let hmis = hmis_package();
+    publications.draft(&hmis, "ann").await.expect("draft hmis");
+    let mut report: Value =
+        serde_json::from_slice(&hmis["configuration/reports/anc-facility-monitoring.json"])
+            .expect("report");
+    let clients = report["sections"][1].clone();
+    report["sections"] = json!([clients]);
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (status, body) = call(
+        &publications,
+        subject("ann", &["metadata.author"]),
+        "POST",
+        "/packages/ug.moh.hmis@1.0.0/reports/preview",
+        Some(input),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["sources"], json!(["ug.moh.hmis@1.0.0", ID]));
+    assert_eq!(body["patients"], 11);
+    assert_eq!(
+        body["sections"][0]["list"]["rows"].as_array().map(Vec::len),
+        Some(7)
+    );
+}
+
 /// The Dashboard designer's preview (#879): the HMIS package's *ANC overview* over the ANC
 /// package's test patients, while the ANC indicators are still a draft. Validation's problems
 /// are publication's, each with the Visualization it is in; each Visualization's figures are the

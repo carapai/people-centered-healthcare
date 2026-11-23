@@ -20,8 +20,14 @@
 //! cannot show (medians and distinct counts above facility level, line lists), so choosing a
 //! level asks nothing of the server. A cell crossing several Disaggregations (#867) is counted
 //! here: each row's figures carry every crossed cell the section lays out, so the crossed cells
-//! across one Disaggregation add up to the band of the others. Rows of a line list are not
-//! previewed yet.
+//! across one Disaggregation add up to the band of the others.
+//!
+//! **A line list's rows** (#867) are read over the same test patients, at facility level, as
+//! `health-analytics-app`'s `line_list` reads them. The program is its PlanDefinition (a
+//! ProgramPlanDefinition), taken from the draft, else a published version, else another
+//! package's open draft, and its episode type is what makes a test patient's EpisodeOfCare an
+//! enrollment in it; the test patients of the package holding it are read too. *Only those
+//! counted by* evaluates the indicator over the period first.
 
 use std::collections::BTreeMap;
 
@@ -31,12 +37,13 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use health_access_policy::Subject;
 use health_analytics::{
-    AgeBandSet, Axis, Evaluation, Indicator, NOT_RECORDED, Period, PeriodType, Reason,
-    ReportDefinition, Section, TableSection, pinned,
+    AgeBandSet, Axis, Evaluation, Indicator, LineListSection, NOT_RECORDED, Period, PeriodType,
+    Reason, ReportDefinition, Section, TableSection, pinned,
 };
+use health_analytics_app::line_list::{self, CellValue, ProgramType};
 use health_analytics_app::{
-    Library, TestPatient, age_band_set, evaluate, is_age_band_set, is_test_patient, measure,
-    test_patient,
+    Library, PatientRecords, TestPatient, age_band_set, evaluate, is_age_band_set, is_test_patient,
+    measure, test_patient,
 };
 use health_publication::{Files, ReportSources};
 use serde::{Deserialize, Serialize};
@@ -183,7 +190,57 @@ pub(crate) struct StudioReportRow {
     pub(crate) error: Option<String>,
 }
 
-/// One section's preview; a line list's is empty.
+/// The program a line list names, as found.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportProgram {
+    /// Its title, else its name.
+    pub(crate) title: String,
+    /// What a person reads for its enrollments' type.
+    pub(crate) episode_type: String,
+    /// The package version it was taken from (`name@version`).
+    pub(crate) package: String,
+    /// Whether that version is published (or is the draft itself); otherwise it is another
+    /// package's open draft.
+    pub(crate) published: bool,
+}
+
+/// One value of a line list cell.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportListValue {
+    /// What a person reads.
+    pub(crate) value: String,
+    /// When it was recorded (`YYYY-MM-DD`), for a concept's value.
+    pub(crate) date: Option<String>,
+}
+
+/// One row of a line list's preview.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportListRow {
+    /// The test patient it is of, as they show.
+    pub(crate) patient: String,
+    /// The enrollment (`EpisodeOfCare/…`) or visit (`Encounter/…`) it is.
+    pub(crate) record: String,
+    /// Each column's values, in the section's order: none when it has no value, several for a
+    /// concept's *all*.
+    pub(crate) cells: Vec<Vec<StudioReportListValue>>,
+}
+
+/// A line list's preview: its rows over the test patients, at facility level.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioReportList {
+    /// The program, if it was found.
+    pub(crate) program: Option<StudioReportProgram>,
+    /// Its rows, in order.
+    pub(crate) rows: Vec<StudioReportListRow>,
+    /// Why it could not be read, if it could not.
+    pub(crate) error: Option<String>,
+}
+
+/// One section's preview: a table's Disaggregations and rows, or a line list's rows.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StudioReportSection {
@@ -191,6 +248,8 @@ pub(crate) struct StudioReportSection {
     pub(crate) disaggregations: Vec<StudioReportBands>,
     /// Its rows, in order.
     pub(crate) rows: Vec<StudioReportRow>,
+    /// A line list's rows.
+    pub(crate) list: Option<StudioReportList>,
 }
 
 /// The preview of a draft Report.
@@ -241,6 +300,8 @@ pub(super) struct Found {
 struct Held {
     indicators: Vec<Indicator>,
     sets: Vec<AgeBandSet>,
+    /// Its PlanDefinitions.
+    plans: Vec<Value>,
     patients: Vec<TestPatient>,
     errors: Vec<String>,
 }
@@ -255,6 +316,8 @@ fn held(files: &Files) -> Held {
             out.sets.extend(age_band_set(&file).age_band_set().ok());
         } else if file["resourceType"] == "Measure" && !path.contains('/') {
             out.indicators.extend(measure(&file).indicator().ok());
+        } else if file["resourceType"] == "PlanDefinition" && !path.contains('/') {
+            out.plans.push(file);
         } else if path.starts_with("tests/") && path.ends_with(".json") && is_test_patient(&file) {
             match test_patient(&file) {
                 Ok(patient) => out.patients.push(patient),
@@ -317,7 +380,23 @@ impl Gathered {
         id: &str,
         used: &[&str],
     ) -> (Vec<String>, Vec<TestPatient>, Vec<String>) {
+        self.test_patients_with(id, used, &[])
+    }
+
+    /// [`Self::test_patients`], and those of the package versions `also` (each holding a line
+    /// list's program).
+    fn test_patients_with(
+        &self,
+        id: &str,
+        used: &[&str],
+        also: &[&str],
+    ) -> (Vec<String>, Vec<TestPatient>, Vec<String>) {
         let mut read = vec![id.to_owned()];
+        for package in also {
+            if !read.iter().any(|r| r == package) {
+                read.push((*package).to_owned());
+            }
+        }
         for reference in used {
             if let Some(f) = self.found.get(*reference)
                 && !read.contains(&f.package)
@@ -334,6 +413,57 @@ impl Gathered {
             }
         }
         (read, patients, errors)
+    }
+
+    /// The program `canonical` names (`url`, or `url|version`): its PlanDefinition, from the
+    /// first holder holding it, with the package version and whether it is published.
+    fn program(&self, id: &str, canonical: &str) -> Option<(&Value, &str, bool)> {
+        let (url, version) = match canonical.split_once('|') {
+            Some((url, version)) => (url, Some(version)),
+            None => (canonical, None),
+        };
+        self.holders
+            .iter()
+            .find_map(|(package, published, holding)| {
+                holding
+                    .plans
+                    .iter()
+                    .find(|p| p["url"] == url && version.is_none_or(|v| p["version"] == v))
+                    .map(|plan| (plan, package.as_str(), *published || package == id))
+            })
+    }
+}
+
+/// A line list's program, as the preview shows it and as its enrollments are matched.
+fn list_program(
+    plan: &Value,
+    package: &str,
+    published: bool,
+) -> Result<(StudioReportProgram, ProgramType), String> {
+    let program = health_programs_app::program(plan).map_err(|e| e.to_string())?;
+    let shown = StudioReportProgram {
+        title: plan["title"]
+            .as_str()
+            .or_else(|| plan["name"].as_str())
+            .unwrap_or(program.url.as_str())
+            .to_owned(),
+        episode_type: program.episode_type.text.clone(),
+        package: package.to_owned(),
+        published,
+    };
+    let kind = ProgramType {
+        url: program.url,
+        system: program.episode_type.system,
+        code: program.episode_type.code,
+        text: program.episode_type.text,
+    };
+    Ok((shown, kind))
+}
+
+fn list_value(value: CellValue) -> StudioReportListValue {
+    StudioReportListValue {
+        value: value.value,
+        date: value.date.map(|d| d.to_string()),
     }
 }
 
@@ -523,7 +653,7 @@ fn section_bands(
 
 /// Documents and serves the Report designer's preview.
 #[utoipa::path(post, path = "/api/studio/packages/{id}/reports/preview", tag = "studio", operation_id = "previewStudioReport",
-    description = "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
+    description = "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators or a line list's program. Each line list's rows (one per enrollment in its program, matched by the program's episode type, or per visit) are read over the same test patients at facility level, with each column's value.",
     params(("id" = String, Path, description = "`name@version`")),
     request_body = StudioReportPreviewInput,
     responses(
@@ -580,7 +710,16 @@ pub(crate) async fn preview(
             Section::LineList(list) => list.counted_by.as_deref().into_iter().collect::<Vec<_>>(),
         })
         .collect();
-    let (read, patients, errors) = gathered.test_patients(&id, &used);
+    // And those of each package holding a line list's program.
+    let programs: Vec<&str> = report
+        .sections
+        .iter()
+        .filter_map(|section| match section {
+            Section::LineList(list) => gathered.program(&id, &list.program).map(|(_, p, _)| p),
+            Section::Table(_) => None,
+        })
+        .collect();
+    let (read, patients, errors) = gathered.test_patients_with(&id, &used, &programs);
     let records: Vec<_> = patients.iter().map(|p| p.records.clone()).collect();
     let library =
         Library::new(found.values().map(|f| f.indicator.clone())).with_age_band_sets(sets.clone());
@@ -588,12 +727,18 @@ pub(crate) async fn preview(
 
     let mut sections = Vec::with_capacity(report.sections.len());
     for section in &report.sections {
-        let Section::Table(table) = section else {
-            sections.push(StudioReportSection {
-                disaggregations: Vec::new(),
-                rows: Vec::new(),
-            });
-            continue;
+        let table = match section {
+            Section::Table(table) => table,
+            Section::LineList(list) => {
+                let list =
+                    list_preview(&studio, &id, &gathered, &library, list, &period, &patients).await;
+                sections.push(StudioReportSection {
+                    disaggregations: Vec::new(),
+                    rows: Vec::new(),
+                    list: Some(list),
+                });
+                continue;
+            }
         };
         let mut rows = Vec::with_capacity(table.rows.len());
         // Each row's evaluations, now and before, to cross its bands once they are known.
@@ -690,6 +835,7 @@ pub(crate) async fn preview(
         sections.push(StudioReportSection {
             disaggregations,
             rows,
+            list: None,
         });
     }
     Json(StudioReportPreview {
@@ -704,4 +850,77 @@ pub(crate) async fn preview(
         errors,
     })
     .into_response()
+}
+
+/// A line list's rows over the test patients, for `period`.
+async fn list_preview(
+    studio: &Studio,
+    id: &str,
+    gathered: &Gathered,
+    library: &Library,
+    list: &LineListSection,
+    period: &Period,
+    patients: &[TestPatient],
+) -> StudioReportList {
+    let records: Vec<PatientRecords> = patients.iter().map(|p| p.records.clone()).collect();
+    let failed = |program: Option<StudioReportProgram>, why: String| StudioReportList {
+        program,
+        rows: Vec::new(),
+        error: Some(why),
+    };
+    let Some((plan, package, published)) = gathered.program(id, &list.program) else {
+        return failed(None, format!("no program is {}", list.program));
+    };
+    let (shown, kind) = match list_program(plan, package, published) {
+        Ok(found) => found,
+        Err(why) => {
+            return failed(
+                None,
+                format!("{} is not a usable program: {why}", list.program),
+            );
+        }
+    };
+    let counted = match &list.counted_by {
+        None => None,
+        Some(reference) => {
+            let Some(f) = gathered.found.get(reference) else {
+                return failed(Some(shown), format!("no indicator is {reference}"));
+            };
+            match evaluate(
+                studio.engine.as_ref(),
+                library,
+                &f.indicator,
+                period,
+                &records,
+            )
+            .await
+            {
+                Ok(evaluation) => Some(line_list::counted(&evaluation)),
+                Err(why) => return failed(Some(shown), why),
+            }
+        }
+    };
+    let rows = line_list::rows(list, &kind, &records, period, counted.as_ref())
+        .into_iter()
+        .map(|row| StudioReportListRow {
+            patient: patients
+                .iter()
+                .find(|p| p.records.reference() == row.patient)
+                .map_or_else(
+                    || row.patient.clone(),
+                    |p| p.records.name().unwrap_or_else(|| p.name.clone()),
+                ),
+            record: row.record,
+            cells: row
+                .cells
+                .into_iter()
+                .map(|cell| cell.into_iter().map(list_value).collect())
+                .collect(),
+        })
+        .collect();
+    StudioReportList {
+        program: Some(shown),
+        rows,
+        error: None,
+    }
 }

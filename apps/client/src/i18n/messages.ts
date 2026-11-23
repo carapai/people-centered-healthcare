@@ -3876,7 +3876,11 @@ type ReportValues = {
   rdPreviewFailed: { reason: string }
   rdComputing: {}
   rdPreviewHint: { patients: number; sources: string; start: string; end: string }
-  rdListRows: {}
+  rdListProgram: { program: string; episodeType: string; package: string; published: string }
+  rdListPatient: {}
+  rdListFailed: { reason: string }
+  rdListEmpty: {}
+  rdListCount: { rows: number; rowPer: string }
   rdListFacility: {}
   rdTitle: {}
   rdId: {id: string; path: string}
@@ -4009,7 +4013,11 @@ export const reportMessages = defineMessages<ReportValues>({
   rdPreviewFailed: { id: 'app.studio.report.previewFailed', defaultMessage: 'The preview failed: {reason}', description: 'Report designer' },
   rdComputing: { id: 'app.studio.report.computing', defaultMessage: 'Computing…', description: 'Report designer' },
   rdPreviewHint: { id: 'app.studio.report.previewHint', defaultMessage: '{start} to {end}, over {patients, plural, one {# test patient} other {# test patients}} of {sources}. Click a cell to open its section.', description: 'Report designer' },
-  rdListRows: { id: 'app.studio.report.listRows', defaultMessage: 'Its rows are patient-level and run on the facility’s edge; they are not previewed yet.', description: 'Report designer' },
+  rdListProgram: { id: 'app.studio.report.listProgram', defaultMessage: 'Enrollments in {program} ({episodeType}), from {package}{published, select, true {} other { (an open draft)}}.', description: 'Report designer' },
+  rdListPatient: { id: 'app.studio.report.listPatient', defaultMessage: 'Test patient', description: 'Report designer' },
+  rdListFailed: { id: 'app.studio.report.listFailed', defaultMessage: 'Its rows cannot be read: {reason}', description: 'Report designer' },
+  rdListEmpty: { id: 'app.studio.report.listEmpty', defaultMessage: 'No test patient has a row in this period.', description: 'Report designer' },
+  rdListCount: { id: 'app.studio.report.listCount', defaultMessage: '{rows, plural, one {# row} other {# rows}}, one per {rowPer, select, visit {visit} other {enrollment}}, over the test patients. On the facility’s edge it runs over its own patients.', description: 'Report designer' },
   rdListFacility: { id: 'app.studio.report.listFacility', defaultMessage: 'Line lists run at facility level only: choose Facility to see it.', description: 'Report designer' },
   rdTitle: { id: 'app.studio.report.title', defaultMessage: 'Title', description: 'Report designer' },
   rdId: { id: 'app.studio.report.id', defaultMessage: 'Id {id}, kept at {path}', description: 'Report designer' },
