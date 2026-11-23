@@ -8,7 +8,9 @@
 //! The indicators and sets are looked up in every published package version, so a Report keeps
 //! the version it pinned whatever is published after it.
 
-use health_analytics::{Catalogue, REPORTS_FOLDER, ReportDefinition};
+use std::collections::BTreeMap;
+
+use health_analytics::{Catalogue, REPORTS_FOLDER, ReportDefinition, Section};
 use health_analytics_app::measure;
 use health_configuration::lifecycle::{Lifecycle, Stage};
 use health_configuration::package::{INDEX, PackageKind};
@@ -188,5 +190,85 @@ impl Publications {
             catalogue,
             packages,
         })
+    }
+}
+
+/// Where a Report lays out an indicator (#864; studio.md § Indicators, *HMIS mapping*): one row
+/// of one of its table sections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndicatorMapping {
+    /// The package version the Report is in, `name@version`.
+    pub package: String,
+    /// Whether that version is published; otherwise it is the package's open draft.
+    pub published: bool,
+    /// The Report's id.
+    pub report: String,
+    /// The Report's title (e.g. *HMIS 105 · 2 Antenatal care*).
+    pub title: String,
+    /// The section's title.
+    pub section: String,
+    /// The row's label (e.g. *ANC 1st visit for women*).
+    pub label: String,
+    /// The version of the indicator the row pins, `url|version`.
+    pub indicator: String,
+    /// Whether the section's cells are sent to DHIS2.
+    pub sent_to_dhis2: bool,
+}
+
+impl Publications {
+    /// Every row of a Report that lays out the indicator `url`, whichever version it pins, in
+    /// each package's newest published version and its open draft (#864): what the indicator
+    /// editor shows, read-only, as the indicator's HMIS mapping. By package version, then the
+    /// Reports' files, sections and rows in order.
+    pub async fn indicator_mappings(&self, url: &str) -> Result<Vec<IndicatorMapping>, Error> {
+        let mut tx = self.begin().await?;
+        let mut by_package: BTreeMap<String, Vec<Lifecycle>> = BTreeMap::new();
+        for json in tx.package_lifecycles().await.map_err(failed)? {
+            let lifecycle: Lifecycle = serde_json::from_str(&json).map_err(failed)?;
+            by_package
+                .entry(lifecycle.package.clone())
+                .or_default()
+                .push(lifecycle);
+        }
+        drop(tx);
+        let mut found = Vec::new();
+        for lifecycles in by_package.values() {
+            let newest = |wanted: &dyn Fn(Stage) -> bool| {
+                lifecycles
+                    .iter()
+                    .filter(|l| wanted(l.stage))
+                    .max_by(|a, b| a.version.cmp(&b.version))
+            };
+            let published = newest(&|stage| stage == Stage::Published);
+            let draft = newest(&|stage| !matches!(stage, Stage::Published | Stage::Withdrawn));
+            for lifecycle in published.into_iter().chain(draft) {
+                let packed = self.packed(&lifecycle.content).await?;
+                for (_, read) in reports_in(&packed) {
+                    let Ok(report) = read else { continue };
+                    for section in &report.sections {
+                        let Section::Table(table) = section else {
+                            continue;
+                        };
+                        for row in &table.rows {
+                            let pinned = row.indicator.split('|').next().unwrap_or_default();
+                            if pinned != url {
+                                continue;
+                            }
+                            found.push(IndicatorMapping {
+                                package: lifecycle_id(lifecycle),
+                                published: lifecycle.stage == Stage::Published,
+                                report: report.id.clone(),
+                                title: report.title.clone(),
+                                section: table.title.clone(),
+                                label: row.label.clone(),
+                                indicator: row.indicator.clone(),
+                                sent_to_dhis2: table.send_to_dhis2,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        Ok(found)
     }
 }

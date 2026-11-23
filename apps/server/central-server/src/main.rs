@@ -255,6 +255,7 @@ async fn session() {}
         studio::sandbox::play,
         studio::forms::import_questionnaire,
         studio::indicators::try_indicator,
+        studio::indicators::mappings,
         studio::reports::preview,
         studio::dashboards::preview
     ),

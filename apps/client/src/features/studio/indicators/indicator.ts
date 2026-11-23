@@ -22,7 +22,7 @@
 // read (other extensions, descriptions, populations' ids). Validation remains the authority; the
 // problems here mirror what it refuses so the editor can say so before saving.
 
-import { compileCriteria, parseCriteria, referencesOf, type Criteria } from './conditions'
+import { compileCriteria, parseCriteria, referencesOf, type Criteria, type CriteriaNode } from './conditions'
 
 export const EXTENSION = 'https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition'
 export const PERIOD_DATE = `${EXTENSION}/indicator-period-date`
@@ -474,4 +474,30 @@ export function indicatorTest(measure: string, title: string, periodType: Period
   if (tried.denominator !== null && tried.denominator !== undefined) expect['denominator'] = tried.denominator
   if (tried.value !== null && tried.value !== undefined) expect['value'] = tried.value.toString()
   return { path, test: { type: INDICATOR_TEST_TYPE, name: `${title}, ${period}`, measure, periodType, period, expect } }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Try's explanation (#864)
+
+/** One condition of the numerator's or denominator's tree that *Try* marks held or not on each
+ * record: every node under each side's root, depth first, a group as well as its conditions. */
+export interface Explained {
+  side: 'numerator' | 'denominator'
+  /** 1 for a child of the side's root. */
+  depth: number
+  node: CriteriaNode
+  /** The node as FHIRPath, as the side's criteria write it: what *Try* evaluates. */
+  expression: string
+}
+
+/** The conditions *Try* explains, the numerator's first, then the denominator's. */
+export function explainedConditions(indicator: Indicator): Explained[] {
+  const out: Explained[] = []
+  const walk = (side: Explained['side'], node: CriteriaNode, depth: number) => {
+    out.push({ side, depth, node, expression: compileCriteria(node) })
+    if ((node as { kind: string }).kind === 'group') for (const child of (node as Criteria).children) walk(side, child, depth + 1)
+  }
+  for (const child of indicator.numerator.children) walk('numerator', child, 1)
+  for (const child of indicator.denominator?.children ?? []) walk('denominator', child, 1)
+  return out
 }

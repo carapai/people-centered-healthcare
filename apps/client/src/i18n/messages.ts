@@ -3690,6 +3690,13 @@ type IndicatorValues = {
   inPatientLine: { name: string; counted: string; count: number; denominator: string }
   inReason: { reason: string }
   inRecordValue: { value: string; picked: string }
+  inExplainSide: { side: string }
+  inHeld: { held: string }
+  inMapping: {}
+  inMappingHint: {}
+  inMappingNone: {}
+  inMappingRow: { title: string; section: string; label: string }
+  inMappingWhere: { package: string; published: string; pinned: string; sent: string }
 }
 
 export const indicatorMessages = defineMessages<IndicatorValues>({
@@ -3826,6 +3833,17 @@ export const indicatorMessages = defineMessages<IndicatorValues>({
   inPatientLine: { id: 'app.studio.indicator.patientLine', defaultMessage: '{name}: {counted, select, true {counted {count}} other {not counted}}{denominator, select, none {} other { · denominator {denominator}}}', description: 'Indicator editor' },
   inReason: { id: 'app.studio.indicator.reason', defaultMessage: '{reason, select, meets {counted} denominatorOnly {in the denominator only} doesNotMeet {does not meet the conditions} noEnrollment {belongs to no enrollment} outsidePeriod {outside the period} noPeriodDate {has no period date} error {could not be evaluated} other {{reason}}}', description: 'Indicator editor' },
   inRecordValue: { id: 'app.studio.indicator.recordValue', defaultMessage: 'value {value}{picked, select, true { (taken)} other {}}', description: 'Indicator editor' },
+  inExplainSide: { id: 'app.studio.indicator.explainSide', defaultMessage: '{side, select, numerator {Numerator} denominator {Denominator} other {Conditions}}', description: 'Indicator editor: Try, the conditions of one side marked held or not on a record' },
+  inHeld: { id: 'app.studio.indicator.held', defaultMessage: '{held, select, held {held:} notHeld {not held:} other {could not be evaluated:}}', description: 'Indicator editor: Try, whether a condition held on a record (read by screen readers)' },
+  inMapping: { id: 'app.studio.indicator.mapping', defaultMessage: 'HMIS mapping', description: 'Indicator editor: where Reports lay the indicator out' },
+  inMappingHint: { id: 'app.studio.indicator.mappingHint', defaultMessage: "Read-only: the rows of Reports that lay this indicator out. Mappings are edited in the Reporting package's Report designer.", description: 'Indicator editor' },
+  inMappingNone: { id: 'app.studio.indicator.mappingNone', defaultMessage: 'No Report lays this indicator out yet.', description: 'Indicator editor' },
+  inMappingRow: { id: 'app.studio.indicator.mappingRow', defaultMessage: '{title}, {section}: {label}', description: 'Indicator editor: a Report row laying the indicator out' },
+  inMappingWhere: {
+    id: 'app.studio.indicator.mappingWhere',
+    defaultMessage: '{package}{published, select, true {} other { (draft)}} · version {pinned}{sent, select, true { · sent to DHIS2} other {}}',
+    description: 'Indicator editor: the package version a Report row is in, the indicator version it pins, and whether it is sent to DHIS2',
+  },
 })
 
 type ReportValues = {

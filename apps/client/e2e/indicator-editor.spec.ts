@@ -6,6 +6,49 @@ import { USERS } from './users'
 // #537: the indicator editor. The ANC reference package (ug.moh.anc) is the author's draft, with
 // its indicators and test patients. Try evaluates the unsaved definition on central over them.
 
+// #864: Try marks each condition of the numerator and denominator held or not on every test
+// patient's records, and the editor shows, read-only, where Reports lay the indicator out (the
+// local backend drafts the HMIS Reporting package, ug.moh.hmis).
+test("Try marks each condition held or not, and the indicator's HMIS mapping is shown", async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await press(page, 'Open indicators', 'link')
+  await page.getByRole('grid', { name: 'Indicators' }).getByText('ANC 1st visit before 12 weeks', { exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'ANC 1st visit before 12 weeks', level: 1 })).toBeVisible()
+  const tryPanel = page.getByRole('complementary', { name: 'Try' })
+  await tryPanel.getByLabel('Period', { exact: true }).fill('2026-03')
+  await expect(tryPanel.getByText('Numerator 3 of denominator 4')).toBeVisible()
+  const patients = tryPanel.getByRole('region', { name: /Test patients/ })
+
+  // A counted patient: the gestational age under 12 held, and so did the denominator's conditions.
+  const counted = patients.getByRole('listitem').filter({ has: page.locator('summary', { hasText: /: counted 1/ }) }).first()
+  await counted.locator('summary').click()
+  // Its counted visit.
+  const visit = counted.getByRole('listitem').filter({ hasText: /— counted/ }).first()
+  await expect(visit.getByText('Numerator')).toBeVisible()
+  await expect(visit.getByText('Denominator')).toBeVisible()
+  const ga = visit.getByRole('listitem').filter({ hasText: '< 12' })
+  await expect(ga).toContainText('held:')
+  await expect(ga).not.toContainText('not held')
+  await expect(visit.getByRole('listitem').filter({ hasText: "%patient.gender = 'female'" })).not.toContainText('not held')
+
+  // A patient in the denominator only: the gestational age condition did not hold.
+  const notCounted = patients.getByRole('listitem').filter({ has: page.locator('summary', { hasText: /not counted · denominator 1/ }) }).first()
+  await notCounted.locator('summary').click()
+  const inDenominator = notCounted.getByRole('listitem').filter({ hasText: /— in the denominator only/ }).first()
+  await expect(inDenominator.getByRole('listitem').filter({ hasText: '< 12' })).toContainText('not held:')
+  await noViolations(page)
+
+  // The HMIS mapping: the HMIS 105 row laying it out, in the HMIS package's draft.
+  const mapping = page.getByRole('region', { name: 'HMIS mapping' })
+  const row = mapping.getByRole('link', { name: 'HMIS 105 · 2 Antenatal care, 2.2 Timing of the 1st visit: ANC 1st visit before 12 weeks (%)' })
+  await expect(row).toBeVisible()
+  await expect(mapping.getByText(/ug\.moh\.hmis@[\d.]+(-draft)? \(draft\) · version 1\.0\.0/)).toBeVisible()
+  await row.click()
+  await expect(page).toHaveURL(/\/studio\/ug\.moh\.hmis(@|%40)[^/]+\/reports\/configuration\/reports\/hmis-105-anc\.json/)
+})
+
+// Runs after the test above: it saves the indicator as a count.
 test('an indicator is tried over the test patients, its denominator removed and saved as a count', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
@@ -14,7 +57,7 @@ test('an indicator is tried over the test patients, its denominator removed and 
   await expect(page.getByRole('heading', { name: 'Indicators', level: 1 })).toBeVisible()
   const grid = page.getByRole('grid', { name: 'Indicators' })
   await expect(grid.getByRole('row').filter({ hasText: 'ANC 1st visit before 12 weeks' }).getByText('In your draft')).toBeVisible()
-  await grid.getByText('ANC 1st visit before 12 weeks').click()
+  await grid.getByText('ANC 1st visit before 12 weeks', { exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'ANC 1st visit before 12 weeks', level: 1 })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'No problems found while editing.' })).toBeVisible()
@@ -39,7 +82,7 @@ test('an indicator is tried over the test patients, its denominator removed and 
   // Reopened, it is saved as a count.
   await press(page, 'Back to the Studio', 'link')
   await press(page, 'Open indicators', 'link')
-  await grid.getByText('ANC 1st visit before 12 weeks').click()
+  await grid.getByText('ANC 1st visit before 12 weeks', { exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Calculation', exact: true })).toHaveValue('count')
 })
 

@@ -5,7 +5,7 @@ import firstVisits from '../../../packages/reference-packages/anc/Measure-anc-fi
 import gestationalAge from '../../../packages/reference-packages/anc/Measure-anc-gestational-age-at-first-visit.json'
 import { editorOf, newDesign, sections } from '../src/features/studio/designs'
 import type { Criteria } from '../src/features/studio/indicators/conditions'
-import { addDenominator, indicatorProblems, indicatorTest, newIndicator, periodOf, readIndicator, removeDenominator, withCalculation, writeIndicator, type Indicator } from '../src/features/studio/indicators/indicator'
+import { addDenominator, explainedConditions, indicatorProblems, indicatorTest, newIndicator, periodOf, readIndicator, removeDenominator, withCalculation, writeIndicator, type Indicator } from '../src/features/studio/indicators/indicator'
 
 // The indicator editor (#537): a Measure read as what the editor edits and written back, the
 // denominator added and removed, the problems Validation would refuse, and Try's periods.
@@ -57,6 +57,20 @@ describe('ANC 1st visit before 12 weeks, built in the editor', () => {
     expect(read(measure).indicator).toEqual(built)
     // And it has what Validation needs.
     expect(indicatorProblems(read(measure).indicator, SELF, [{ canonical: ANC_FIRST_VISITS, title: 'ANC 1st visits', refers: [] }])).toEqual([])
+  })
+
+  test("Try explains each of the numerator's and denominator's conditions, as each side writes it (#864)", () => {
+    const explained = explainedConditions(built)
+    expect(explained.map((e) => [e.side, e.depth, e.expression])).toEqual([
+      ['numerator', 1, `${GA} < 12`],
+      ['denominator', 1, `'${ANC_FIRST_VISITS}' in %indicators.numerator`],
+      ['denominator', 1, '((%patient.birthDate.toDate() >= %periodEnd.toDate() - 120 months and %patient.birthDate.toDate() < %periodEnd.toDate())).not()'],
+      ['denominator', 2, '(%patient.birthDate.toDate() >= %periodEnd.toDate() - 120 months and %patient.birthDate.toDate() < %periodEnd.toDate())'],
+    ])
+    // Each side's whole criteria are its conditions joined, so a mark agrees with the criteria.
+    expect(BUILT_DENOMINATOR).toBe(`${explained[1]?.expression} and ${explained[2]?.expression}`)
+    // A count without conditions explains none.
+    expect(explainedConditions(start.indicator)).toEqual([])
   })
 
   test('a reference indicator saved unchanged keeps its meaning', () => {

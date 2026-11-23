@@ -1,6 +1,7 @@
-import type { StudioIndicatorPatient, StudioIndicatorTry, StudioProblem } from '@health/api-client'
+import type { StudioHeld, StudioIndicatorMapping, StudioIndicatorPatient, StudioIndicatorTry, StudioProblem } from '@health/api-client'
 import { css, cx } from '@health/design-system/css'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { useIntl, type IntlShape } from 'react-intl'
 
@@ -9,7 +10,7 @@ import { usePlatform } from '../../../platform'
 import type { Transport } from '../../../platform/types'
 import { button, control } from '../../reception/styles'
 import { StudioError, fileQuery, packageQuery, saveFile, studioKey, type StudioFile, type StudioPackagePage } from '../api'
-import { designsQuery, icu } from '../designs'
+import { designsQuery, editorOf, icu } from '../designs'
 import { refusalText } from '../wording'
 import { JOINS, type Group, type Join, type LiteralKind, type Operator, blank, kindOf, literal, operatorsFor, shown } from '../workflows/decisions'
 import { DATE_UNITS, SIDES, compileCriteria, type Anchor, type Atom, type Criteria, type CriteriaNode, type DateCondition, type DateOp, type DateUnit, type Side } from './conditions'
@@ -23,6 +24,7 @@ import {
   RATE_FACTORS,
   addDenominator,
   declaredDates,
+  explainedConditions,
   hasDenominator,
   indicatorProblems,
   indicatorTest,
@@ -36,6 +38,7 @@ import {
   type BetweenUnit,
   type Calculation,
   type Counted,
+  type Explained,
   type Indicator,
   type IndicatorProblem,
   type Other,
@@ -85,11 +88,22 @@ const failure = (intl: IntlShape, error: unknown) =>
   error instanceof StudioError ? (error.refusal === null || error.refusal === undefined ? error.detail || String(error.status) : refusalText(intl, error.refusal)) : error instanceof Error ? error.message : String(error)
 
 /** *Try*: the server evaluates the posted Measure over the package's test patients. */
-async function tryIndicator(transport: Transport, id: string, body: { measure: unknown; periodType: PeriodType; period: string }, signal?: AbortSignal): Promise<StudioIndicatorTry> {
+async function tryIndicator(transport: Transport, id: string, body: { measure: unknown; periodType: PeriodType; period: string; conditions: string[] }, signal?: AbortSignal): Promise<StudioIndicatorTry> {
   const response = await transport.request({ method: 'POST', path: `/studio/packages/${encodeURIComponent(id)}/indicators/try`, body, ...(signal === undefined ? {} : { signal }) })
   const { parseResponse } = await import('@health/api-client')
   const value = parseResponse('tryStudioIndicator', response.status, response.body)
   if (response.status === 200) return value as StudioIndicatorTry
+  const problem = value as StudioProblem | null
+  throw new StudioError(response.status, problem?.detail ?? '', problem?.refusal ?? null)
+}
+
+/** Where Reports lay out the indicator `url` (its HMIS mapping, #864), in each package's newest
+ * published version and its open draft. */
+async function indicatorMappings(transport: Transport, url: string, signal?: AbortSignal): Promise<StudioIndicatorMapping[]> {
+  const response = await transport.request({ method: 'GET', path: `/studio/indicator-mappings?url=${encodeURIComponent(url)}`, ...(signal === undefined ? {} : { signal }) })
+  const { parseResponse } = await import('@health/api-client')
+  const value = parseResponse('listStudioIndicatorMappings', response.status, response.body)
+  if (response.status === 200) return value as StudioIndicatorMapping[]
   const problem = value as StudioProblem | null
   throw new StudioError(response.status, problem?.detail ?? '', problem?.refusal ?? null)
 }
@@ -264,6 +278,7 @@ function Editor({ id, path, draft, file, measure, initial, onReload }: EditorPro
             </SideEditor>
           )}
           <Disaggregations indicator={indicator} editable={editable} sets={ageBandSets} onChange={change} />
+          <HmisMapping url={typeof measure['url'] === 'string' ? measure['url'] : ''} />
           {editable ? (
             <div className={row}>
               <button type="button" className={button} disabled={save.isPending || stale} onClick={() => save.mutate()}>
@@ -288,6 +303,7 @@ function Editor({ id, path, draft, file, measure, initial, onReload }: EditorPro
         <TryPanel
           id={id}
           measure={written}
+          explained={explainedConditions(indicator)}
           calculation={indicator.calculation}
           test={{
             allowed: editable && !dirty && !stale,
@@ -911,13 +927,13 @@ interface TestSaving {
   onSave: (tried: { periodType: PeriodType; period: string; result: StudioIndicatorTry }) => void
 }
 
-function TryPanel({ id, measure, calculation, test }: { id: string; measure: Record<string, unknown>; calculation: Calculation; test: TestSaving }) {
+function TryPanel({ id, measure, explained, calculation, test }: { id: string; measure: Record<string, unknown>; explained: Explained[]; calculation: Calculation; test: TestSaving }) {
   const intl = useIntl()
   const platform = usePlatform()
   const ids = { heading: useId(), type: useId(), period: useId() }
   const [periodType, setPeriodType] = useState<PeriodType>('monthly')
   const [period, setPeriod] = useState(() => periodOf('monthly', today()))
-  const settled = useSettled({ measure, periodType, period })
+  const settled = useSettled({ measure, periodType, period, conditions: explained.map((e) => e.expression) })
   const result = useQuery({
     queryKey: ['studio', 'indicators', 'try', id, settled] as const,
     queryFn: ({ signal }) => tryIndicator(platform.transport, id, settled, signal),
@@ -989,7 +1005,7 @@ function TryPanel({ id, measure, calculation, test }: { id: string; measure: Rec
               </span>
             )}
           </div>
-          <TryResult data={data} calculation={calculation} />
+          <TryResult data={data} calculation={calculation} explained={explained} />
         </>
       )}
     </aside>
@@ -999,7 +1015,7 @@ function TryPanel({ id, measure, calculation, test }: { id: string; measure: Rec
 /** A figure as the server sent it (a decimal arrives exact), or a dash. */
 const number = (value: { toString: () => string } | null | undefined) => (value === null || value === undefined ? '—' : value.toString())
 
-function TryResult({ data, calculation }: { data: StudioIndicatorTry; calculation: Calculation }) {
+function TryResult({ data, calculation, explained }: { data: StudioIndicatorTry; calculation: Calculation; explained: Explained[] }) {
   const intl = useIntl()
   const ratio = data.denominator !== null && data.denominator !== undefined
   return (
@@ -1043,7 +1059,7 @@ function TryResult({ data, calculation }: { data: StudioIndicatorTry; calculatio
           ))}
         </ul>
       )}
-      <Patients patients={data.patients} ratio={ratio} names={data.disaggregations.map((d) => d.title)} />
+      <Patients patients={data.patients} ratio={ratio} names={data.disaggregations.map((d) => d.title)} explained={explained} />
     </div>
   )
 }
@@ -1053,7 +1069,7 @@ function takesValueText(intl: IntlShape, data: StudioIndicatorTry, calculation: 
   return intl.formatMessage(m.inValuesShown, { count: data.values.count, sum: number(data.values.sum), minimum: number(data.values.minimum), maximum: number(data.values.maximum) })
 }
 
-function Patients({ patients, ratio, names }: { patients: StudioIndicatorPatient[]; ratio: boolean; names: string[] }) {
+function Patients({ patients, ratio, names, explained }: { patients: StudioIndicatorPatient[]; ratio: boolean; names: string[]; explained: Explained[] }) {
   const intl = useIntl()
   const heading = useId()
   const counted = patients.filter((p) => p.counted).length
@@ -1085,6 +1101,8 @@ function Patients({ patients, ratio, names }: { patients: StudioIndicatorPatient
                     {r.error === null || r.error === undefined ? '' : `: ${r.error}`}
                     {r.value === null || r.value === undefined ? '' : ` · ${intl.formatMessage(m.inRecordValue, { value: r.value, picked: String(r.picked) })}`}
                     {r.bands.length === 0 ? '' : ` · ${r.bands.map((b, n) => `${names[n] ?? ''}: ${b}`).join(', ')}`}
+                    {/* The marks answer the conditions asked; a stale answer (asked before an edit) is not shown. */}
+                    {r.conditions.length === explained.length && explained.length > 0 ? <ConditionMarks explained={explained} held={r.conditions} ratio={ratio} /> : null}
                   </li>
                 ))}
               </ul>
@@ -1092,6 +1110,85 @@ function Patients({ patients, ratio, names }: { patients: StudioIndicatorPatient
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+const MARKS: Record<StudioHeld, string> = { held: '✓', 'not-held': '✗', error: '!' }
+
+/** Whether each condition of the numerator and denominator held on one record (#864), each side's
+ * conditions as its tree nests them. */
+function ConditionMarks({ explained, held, ratio }: { explained: Explained[]; held: StudioHeld[]; ratio: boolean }) {
+  const intl = useIntl()
+  const sides = (['numerator', 'denominator'] as const).filter((side) => explained.some((e) => e.side === side))
+  return (
+    <div className={css({ display: 'flex', flexDirection: 'column', gap: '1', pl: '2', py: '1' })}>
+      {sides.map((side) => (
+        <div key={side}>
+          <span className={muted}>{intl.formatMessage(m.inExplainSide, { side: ratio ? side : 'counted' })}</span>
+          <ul className={css({ listStyle: 'none', p: '0', m: '0' })}>
+            {explained.map((e, n) =>
+              e.side !== side ? null : (
+                <li key={n} className={css({ display: 'flex', gap: '1', alignItems: 'baseline' })} style={{ paddingLeft: `${(e.depth - 1) * 1}rem` }}>
+                  <span className={held[n] === 'held' ? good : held[n] === 'error' ? alert : muted} aria-hidden>
+                    {MARKS[held[n] ?? 'error']}
+                  </span>
+                  <span className={css({ srOnly: true })}>{intl.formatMessage(m.inHeld, { held: icu(held[n] ?? 'error') })}</span>
+                  <ConditionLabel node={e} />
+                </li>
+              ),
+            )}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ConditionLabel({ node }: { node: Explained }) {
+  const intl = useIntl()
+  const kind = (node.node as { kind: string }).kind
+  if (kind === 'group') return <span>{intl.formatMessage(m.inJoinName, { join: (node.node as Criteria).join })}</span>
+  return <code className={css({ fontSize: 'xs', overflowWrap: 'anywhere' })}>{node.expression}</code>
+}
+
+/** Where Reports lay the indicator out (studio.md § Indicators, *HMIS mapping*; #864), read-only:
+ * mappings are edited in the Reporting package's Report designer. */
+function HmisMapping({ url }: { url: string }) {
+  const intl = useIntl()
+  const platform = usePlatform()
+  const heading = useId()
+  const mappings = useQuery({
+    queryKey: ['studio', 'indicators', 'mappings', url] as const,
+    queryFn: ({ signal }) => indicatorMappings(platform.transport, url, signal),
+    enabled: url !== '',
+    retry: false,
+  })
+  const found = mappings.data ?? []
+  return (
+    <div role="region" aria-labelledby={heading} className={panel}>
+      <h3 id={heading} className={css({ fontWeight: 'semibold' })}>
+        {intl.formatMessage(m.inMapping)}
+      </h3>
+      <p className={muted}>{intl.formatMessage(m.inMappingHint)}</p>
+      {mappings.isError ? (
+        <p role="alert" className={alert}>
+          {intl.formatMessage(m.inFailed, { reason: failure(intl, mappings.error) })}
+        </p>
+      ) : mappings.isSuccess && found.length === 0 ? (
+        <p>{intl.formatMessage(m.inMappingNone)}</p>
+      ) : (
+        <ul className={css({ pl: '5', listStyle: 'disc', display: 'flex', flexDirection: 'column', gap: '1' })}>
+          {found.map((f) => (
+            <li key={`${f.packageId} ${f.report} ${f.section} ${f.label}`}>
+              <Link {...editorOf({ kind: 'report', path: `configuration/reports/${f.report}.json`, table: null }, f.packageId)}>{intl.formatMessage(m.inMappingRow, { title: f.title, section: f.section, label: f.label })}</Link>{' '}
+              <span className={muted}>
+                {intl.formatMessage(m.inMappingWhere, { package: f.packageId, published: String(f.published), pinned: f.indicator.split('|')[1] ?? '', sent: String(f.sentToDhis2) })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
