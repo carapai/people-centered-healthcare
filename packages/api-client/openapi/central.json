@@ -3683,7 +3683,7 @@
           },
           "place": {
             "type": "string",
-            "description": "Always [`SAMPLE`]."
+            "description": "Always `sample`: the test patients stand for one place."
           },
           "value": {
             "type": [

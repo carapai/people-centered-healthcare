@@ -441,7 +441,7 @@ export const StudioDashboardCell = z.object({
   "indicator": z.string(),
   /** The period's id. */
   "period": z.string(),
-  /** Always [`SAMPLE`]. */
+  /** Always `sample`: the test patients stand for one place. */
   "place": z.string(),
   /** Exact decimal text; none when the denominator is zero or no value was taken. */
   "value": z.string().nullable().optional(),
