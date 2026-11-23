@@ -1,8 +1,8 @@
 //! What the Studio designs, across packages (#855; studio.md § The Studio home), at
-//! `GET /api/studio/designs`: every form, workflow, decision table, code system, value set and
-//! program, each in the package version it opens in, and each package's published version and
-//! open draft, so the client can say where a design stands, start or reuse a draft for *Edit*,
-//! and offer a package for *New*. `?kind=` keeps the designs of one kind.
+//! `GET /api/studio/designs`: every form, workflow, decision table, code system, value set,
+//! program, Age Band Set, indicator, Report and standard Dashboard, each in the package version
+//! it opens in, and each package's published version and open draft, so the client can say
+//! where a design stands, start or reuse a draft for *Edit*, and offer a package for *New*. `?kind=` keeps the designs of one kind.
 
 use axum::extract::{RawQuery, State};
 use axum::http::StatusCode;
@@ -28,6 +28,7 @@ pub(crate) enum StudioDesignKind {
     AgeBandSet,
     Indicator,
     Report,
+    Dashboard,
 }
 
 impl From<DesignKind> for StudioDesignKind {
@@ -42,6 +43,7 @@ impl From<DesignKind> for StudioDesignKind {
             DesignKind::AgeBandSet => Self::AgeBandSet,
             DesignKind::Indicator => Self::Indicator,
             DesignKind::Report => Self::Report,
+            DesignKind::Dashboard => Self::Dashboard,
         }
     }
 }

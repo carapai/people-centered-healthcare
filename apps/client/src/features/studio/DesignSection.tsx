@@ -60,6 +60,8 @@ export function useOpenDesign() {
         return navigate({ to: target.to, params: target.params })
       case '/studio/$id/reports/$':
         return navigate({ to: target.to, params: target.params })
+      case '/studio/$id/dashboards/$':
+        return navigate({ to: target.to, params: target.params })
     }
   }
 }
@@ -202,12 +204,12 @@ function NewDesign({ section, designs, onCancel }: { section: SectionId; designs
   const ids = { title: useId(), name: useId(), packageTitle: useId(), kind: useId(), canonical: useId(), what: useId(), workflow: useId(), heading: useId() }
   const tables = section === 'decision-tables'
   const workflows = designs.designs.filter((d) => d.kind === 'workflow')
-  const reports = section === 'reports'
-  // A Report belongs in a Reporting package (ADR 0070).
+  const reports = section === 'reports' || section === 'dashboards'
+  // A Report or a standard Dashboard belongs in a Reporting package (ADR 0070, ADR 0075).
   const choices = packageChoices(designs).filter((c) => (!tables || workflows.some((w) => w.package === c.name)) && (!reports || packageOf(designs, c.name)?.kind === 'reporting'))
   const [chosen, setChosen] = useState<string>(choices[0]?.name ?? (tables ? '' : '*new'))
   const [title, setTitle] = useState('')
-  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : section === 'indicators' ? 'indicator' : reports ? 'report' : 'form')
+  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : section === 'indicators' ? 'indicator' : section === 'dashboards' ? 'dashboard' : reports ? 'report' : 'form')
   const [blank, setBlank] = useState({ name: '', title: '', kind: (reports ? 'reporting' : 'program') as StudioPackageKind, canonical: '' })
   const inPackage = useMemo(() => workflows.filter((w) => w.package === chosen), [workflows, chosen])
   const [workflow, setWorkflow] = useState('')

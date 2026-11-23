@@ -52,10 +52,15 @@
 //! The Report designer's preview computes a draft Report's table rows over test patients, with
 //! Validation's problems, at `/packages/{id}/reports/preview` ([`reports`], #559).
 //!
+//! The Dashboard designer's preview computes a draft standard Dashboard's Visualizations over
+//! test patients, with Validation's problems, at `/packages/{id}/dashboards/preview`
+//! ([`dashboards`], #879).
+//!
 //! The list of allowed actions is advisory. Each step is checked again: the permission here, and
 //! the stage and the separation of duties by the lifecycle itself (ADR 0025).
 
 pub(crate) mod actions;
+pub(crate) mod dashboards;
 pub(crate) mod decisions;
 pub(crate) mod designs;
 mod dto;
@@ -162,6 +167,10 @@ pub(crate) fn router(
             post(indicators::try_indicator),
         )
         .route("/packages/{id}/reports/preview", post(reports::preview))
+        .route(
+            "/packages/{id}/dashboards/preview",
+            post(dashboards::preview),
+        )
         .route("/drafts", post(start))
         .route("/workflow-actions", get(actions::list))
         .with_state(Studio {

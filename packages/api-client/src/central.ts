@@ -424,6 +424,147 @@ export const StudioConversionFinding = z.object({
 })
 export type StudioConversionFinding = z.infer<typeof StudioConversionFinding>
 
+/** One band's figure. */
+export const StudioDashboardBand = z.object({
+  /** Its code. */
+  "code": z.string(),
+  /** Exact decimal text; none when the band's denominator is zero. */
+  "value": z.string().nullable().optional(),
+})
+export type StudioDashboardBand = z.infer<typeof StudioDashboardBand>
+
+/** One indicator's figure for one period, at the sample place. */
+export const StudioDashboardCell = z.object({
+  /** Split by the Visualization's disaggregation: each band's figure. */
+  "bands": z.array(StudioDashboardBand).nullable().optional(),
+  /** `url|version`. */
+  "indicator": z.string(),
+  /** The period's id. */
+  "period": z.string(),
+  /** Always `sample`: the test patients stand for one place. */
+  "place": z.string(),
+  /** Exact decimal text; none when the denominator is zero or no value was taken. */
+  "value": z.string().nullable().optional(),
+})
+export type StudioDashboardCell = z.infer<typeof StudioDashboardCell>
+
+/** A period of an answer. */
+export const StudioDashboardPeriod = z.object({
+  /** Its last day. */
+  "end": z.string(),
+  /** Its id (`2026-03`). */
+  "id": z.string(),
+  /** Its first day. */
+  "start": z.string(),
+})
+export type StudioDashboardPeriod = z.infer<typeof StudioDashboardPeriod>
+
+/** Figures as the explorer answers them. */
+export const StudioDashboardAnswer = z.object({
+  /** Indicator by indicator, then period. */
+  "cells": z.array(StudioDashboardCell),
+  /** The periods, first to last. */
+  "periods": z.array(StudioDashboardPeriod),
+})
+export type StudioDashboardAnswer = z.infer<typeof StudioDashboardAnswer>
+
+/** A disaggregation an indicator offers. */
+export const StudioDashboardDisaggregation = z.object({
+  /** `age` or `code`. */
+  "by": z.string(),
+  /** Its name: an Age Band Set's `url|version`, or the code. */
+  "name": z.string(),
+})
+export type StudioDashboardDisaggregation = z.infer<typeof StudioDashboardDisaggregation>
+
+/** One of an indicator's threshold bands. */
+export const StudioDashboardThreshold = z.object({
+  /** Its lower bound (inclusive), exact decimal text, none below every figure. */
+  "from": z.string().nullable().optional(),
+  /** Its upper bound (exclusive), none above every figure. */
+  "to": z.string().nullable().optional(),
+  /** `good`, `warning` or `bad`. */
+  "tone": z.string(),
+})
+export type StudioDashboardThreshold = z.infer<typeof StudioDashboardThreshold>
+
+/** An indicator, as the explorer lists it. */
+export const StudioDashboardIndicator = z.object({
+  /** What it calculates: `count`, `percentage`, `rate`, `ratio`, or a value's aggregate. */
+  "calculation": z.string(),
+  /** What it is broken down by. */
+  "disaggregations": z.array(StudioDashboardDisaggregation),
+  /** `url|version`. */
+  "measure": z.string(),
+  /** The package version it was taken from (`name@version`). */
+  "package": z.string(),
+  /** A rate's factor. */
+  "per": decimal.nullable().optional(),
+  /** Whether that version is published (or is this draft); otherwise it is an open draft. */
+  "published": z.boolean(),
+  /** False for a median or a distinct count. */
+  "rollsUp": z.boolean(),
+  /** Its threshold bands, lowest first. */
+  "thresholds": z.array(StudioDashboardThreshold),
+  /** Its title. */
+  "title": z.string(),
+})
+export type StudioDashboardIndicator = z.infer<typeof StudioDashboardIndicator>
+
+/** One Visualization's preview. */
+export const StudioDashboardItem = z.object({
+  "answer": StudioDashboardAnswer.nullable().optional(),
+  "before": StudioDashboardAnswer.nullable().optional(),
+  /** Why it could not be computed, if it could not. */
+  "error": z.string().nullable().optional(),
+  /** The first period shown, when its periods can be read. */
+  "from": z.string().nullable().optional(),
+  /** The item's id. */
+  "id": z.string(),
+  /** The last period shown. */
+  "to": z.string().nullable().optional(),
+})
+export type StudioDashboardItem = z.infer<typeof StudioDashboardItem>
+
+/** One of Validation's problems with the Dashboard. */
+export const StudioDashboardProblem = z.object({
+  /** The Visualization it is in (its index), or none for the Dashboard itself. */
+  "item": integer.nullable().optional(),
+  /** What is wrong. */
+  "message": z.string(),
+})
+export type StudioDashboardProblem = z.infer<typeof StudioDashboardProblem>
+
+/** The preview of a draft standard Dashboard. */
+export const StudioDashboardPreview = z.object({
+  /** The day the periods run up to. */
+  "asOf": z.string(),
+  /** Test patients that could not be read. */
+  "errors": z.array(z.string()),
+  /** Each indicator a Visualization shows that was found, as the explorer lists it. */
+  "indicators": z.array(StudioDashboardIndicator),
+  /** Each Visualization, in order. */
+  "items": z.array(StudioDashboardItem),
+  /** How many test patients were read. */
+  "patients": integer,
+  /** Validation's problems, as they stand. */
+  "problems": z.array(StudioDashboardProblem),
+  /** The package versions whose test patients were read. */
+  "sources": z.array(z.string()),
+})
+export type StudioDashboardPreview = z.infer<typeof StudioDashboardPreview>
+
+/** The preview of a draft standard Dashboard. */
+export const StudioDashboardPreviewInput = z.object({
+  /** The day the "last *n*" periods run up to (`2026-04-30`). */
+  "asOf": z.string(),
+  /** The draft Dashboard, as the designer holds it (`dashboard/1`). */
+  "dashboard": z.object({}),
+  /** Its file in the package (`configuration/dashboards/<id>.json`). */
+  "path": z.string(),
+})
+export type StudioDashboardPreviewInput = z.infer<typeof StudioDashboardPreviewInput>
+
 /** A sample value: a flag, a whole number or a code. */
 export const StudioSample = z.union([z.boolean(), integer, z.string()])
 export type StudioSample = z.infer<typeof StudioSample>
@@ -513,7 +654,7 @@ export const StudioDecisionTryInput = z.object({
 export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
 
 /** What kind of design an artefact is: the Studio's sections. */
-export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set", "indicator", "report"])
+export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set", "indicator", "report", "dashboard"])
 export type StudioDesignKind = z.infer<typeof StudioDesignKind>
 
 /** One designed artefact, in the package version it opens in. */
@@ -1268,6 +1409,18 @@ export const operations = {
       403: StudioProblem,
       404: StudioProblem,
       409: StudioProblem,
+      422: StudioProblem,
+      500: StudioProblem,
+    },
+  },
+  previewStudioDashboard: {
+    method: 'POST',
+    path: '/api/studio/packages/{id}/dashboards/preview',
+    responses: {
+      200: StudioDashboardPreview,
+      401: StudioProblem,
+      403: StudioProblem,
+      404: StudioProblem,
       422: StudioProblem,
       500: StudioProblem,
     },

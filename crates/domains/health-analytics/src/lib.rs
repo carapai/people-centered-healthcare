@@ -103,7 +103,8 @@ pub use rollup::{
     FacilitySummaries, FacilitySummary, Missing, Reported, RolledUp, roll_up_facilities,
 };
 pub use standard::{
-    DASHBOARDS_FOLDER, StandardDashboard, StandardItem, StandardQuestion, StandardVisualization,
+    DASHBOARDS_FOLDER, DashboardProblem, StandardDashboard, StandardItem, StandardQuestion,
+    StandardVisualization,
 };
 pub use store::{IndicatorStore, MemberKey, Position, StoredSummary, periods_with_care};
 pub use threshold::{ThresholdBand, ThresholdDefinition, Tone, threshold_bands, tone_of};

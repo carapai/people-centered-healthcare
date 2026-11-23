@@ -280,9 +280,10 @@ async fn a_package_with_only_withdrawn_drafts_is_left_out() {
     assert_eq!(designs.designs, []);
 }
 
-/// A Reporting package's Reports (#556), from `configuration/reports/`, each under its title.
+/// A Reporting package's Reports (#556), from `configuration/reports/`, and its standard
+/// Dashboards (#879), from `configuration/dashboards/`, each under its title.
 #[tokio::test]
-async fn a_reporting_package_lists_its_reports() {
+async fn a_reporting_package_lists_its_reports_and_dashboards() {
     let central = central().await;
     let publications = &central.publications;
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -293,6 +294,7 @@ async fn a_reporting_package_lists_its_reports() {
         "Library-manifest.json",
         "configuration/reports/hmis-105-anc.json",
         "configuration/reports/anc-facility-monitoring.json",
+        "configuration/dashboards/anc-overview.json",
     ] {
         files.insert(path.into(), std::fs::read(dir.join(path)).expect("read"));
     }
@@ -307,6 +309,11 @@ async fn a_reporting_package_lists_its_reports() {
     assert_eq!(
         found,
         [
+            (
+                DesignKind::Dashboard,
+                "ANC overview",
+                "configuration/dashboards/anc-overview.json"
+            ),
             (
                 DesignKind::Report,
                 "ANC facility monitoring",

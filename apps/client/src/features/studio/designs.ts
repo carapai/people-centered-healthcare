@@ -4,6 +4,7 @@ import type { Transport } from '../../platform/types'
 import { StudioError, studioKey } from './api'
 import { newAgeBandSet } from './indicators/ageBands'
 import { newIndicator } from './indicators/indicator'
+import { DASHBOARDS_FOLDER, dashboardPath, newDashboard, writeDashboard } from './dashboards/dashboard'
 import { REPORTS_FOLDER, newReport, reportPath, unique, writeReport } from './reports/report'
 import { newArtefact } from './programs/model'
 import { addTable } from './workflows/decisions'
@@ -39,7 +40,7 @@ export function designsQuery(transport: Transport) {
 export const icu = (id: string) => id.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())
 
 /** The Studio's sections: what a person designs. */
-export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands' | 'indicators' | 'reports'
+export type SectionId = 'forms' | 'workflows' | 'concepts' | 'decision-tables' | 'programs' | 'age-bands' | 'indicators' | 'reports' | 'dashboards'
 
 /** Each section and the kinds of design it lists, in the order the home shows them. */
 export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKind[]; creates: boolean }[] = [
@@ -52,6 +53,8 @@ export const sections: readonly { id: SectionId; kinds: readonly StudioDesignKin
   { id: 'indicators', kinds: ['indicator'], creates: true },
   // Reporting packages' Reports (#556), in the Report designer (#559).
   { id: 'reports', kinds: ['report'], creates: true },
+  // Reporting packages' standard Dashboards (#603), in the Dashboard designer (#879).
+  { id: 'dashboards', kinds: ['dashboard'], creates: true },
 ]
 
 export const sectionOf = (id: SectionId) => sections.find((s) => s.id === id) ?? sections[0]!
@@ -114,6 +117,8 @@ export function editorOf(design: Pick<StudioDesign, 'kind' | 'path' | 'table'>, 
       return { to: '/studio/$id/indicators/$', params: { id, _splat: design.path } } as const
     case 'report':
       return { to: '/studio/$id/reports/$', params: { id, _splat: design.path } } as const
+    case 'dashboard':
+      return { to: '/studio/$id/dashboards/$', params: { id, _splat: design.path } } as const
   }
 }
 
@@ -161,9 +166,9 @@ export function slug(title: string): string {
 }
 
 /** What *New* creates, for a section: a form, a workflow, a code system, a value set, an Age
- * Band Set, an indicator or a Report. A decision table goes into a workflow instead
+ * Band Set, an indicator, a Report or a standard Dashboard. A decision table goes into a workflow instead
  * ([`withNewTable`]). */
-export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set' | 'indicator' | 'report'
+export type NewKind = 'form' | 'workflow' | 'code-system' | 'value-set' | 'age-band-set' | 'indicator' | 'report' | 'dashboard'
 
 /** A new, empty design of `kind` titled `title`, at a top-level path the package does not use
  * yet, its url under the package's canonical base and its version the package's. */
@@ -176,6 +181,14 @@ export function newDesign(kind: NewKind, title: string, canonical: string, packa
       taken.filter((p) => p.startsWith(REPORTS_FOLDER) && p.endsWith('.json')).map((p) => p.slice(REPORTS_FOLDER.length, -'.json'.length)),
     )
     return { path: reportPath(reportId), resource: writeReport(newReport(reportId, title.trim())) }
+  }
+  if (kind === 'dashboard') {
+    // A standard Dashboard lives at configuration/dashboards/<id>.json, its id its file's name (#879).
+    const dashboardId = unique(
+      id,
+      taken.filter((p) => p.startsWith(DASHBOARDS_FOLDER) && p.endsWith('.json')).map((p) => p.slice(DASHBOARDS_FOLDER.length, -'.json'.length)),
+    )
+    return { path: dashboardPath(dashboardId), resource: writeDashboard(newDashboard(dashboardId, title.trim())) }
   }
   const type = { form: 'Questionnaire', workflow: 'Library', 'code-system': 'CodeSystem', 'value-set': 'ValueSet', 'age-band-set': 'Library', indicator: 'Measure' }[kind]
   const url = `${canonical.replace(/\/+$/, '')}/${type}/${id}`

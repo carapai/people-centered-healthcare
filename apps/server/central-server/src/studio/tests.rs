@@ -2437,12 +2437,12 @@ async fn try_counts_a_draft_indicator_over_the_test_patients_and_says_why() {
 }
 
 /// The HMIS Reporting package's files (#556; `packages/reference-packages/hmis`), its Reports
-/// under `configuration/reports/`.
+/// under `configuration/reports/` and its standard Dashboards under `configuration/dashboards/`.
 fn hmis_package() -> Files {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../packages/reference-packages/hmis");
     let mut files = Files::new();
-    for sub in ["", "configuration/reports"] {
+    for sub in ["", "configuration/reports", "configuration/dashboards"] {
         for entry in std::fs::read_dir(dir.join(sub)).expect("dir") {
             let path = entry.expect("entry").path();
             if path.is_file() {
@@ -2547,6 +2547,125 @@ async fn the_report_preview_computes_each_row_over_test_patients_with_validation
 
     // A period not of the Report's type is refused.
     let input = json!({ "report": report, "period": "2026Q1" });
+    let (status, _) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert_eq!(status, 422);
+}
+
+/// The Dashboard designer's preview (#879): the HMIS package's *ANC overview* over the ANC
+/// package's test patients, while the ANC indicators are still a draft. Validation's problems
+/// are publication's, each with the Visualization it is in; each Visualization's figures are the
+/// indicator's own over its last *n* periods as of the day asked, as the explorer answers them.
+#[tokio::test]
+async fn the_dashboard_preview_answers_each_visualization_over_test_patients_with_publications_problems()
+ {
+    let (publications, _dir) = publications().await;
+    let anc = anc_package();
+    publications.draft(&anc, "ann").await.expect("draft anc");
+    let hmis = hmis_package();
+    publications.draft(&hmis, "ann").await.expect("draft hmis");
+    let author = || subject("ann", &["metadata.author"]);
+    let path = "configuration/dashboards/anc-overview.json";
+    let dashboard: Value = serde_json::from_slice(&hmis[path]).expect("dashboard");
+    let preview_path = "/packages/ug.moh.hmis@1.0.0/dashboards/preview";
+    let input = json!({ "dashboard": dashboard, "path": path, "asOf": "2026-04-30" });
+    let (status, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["asOf"], "2026-04-30");
+    assert_eq!(body["sources"], json!(["ug.moh.hmis@1.0.0", ID]));
+    // The ANC indicators are only drafted: Validation asks for them published, in the
+    // Visualization that shows them.
+    let problems = body["problems"].as_array().expect("problems");
+    assert!(
+        problems.iter().any(|p| p["item"] == 0
+            && p["message"]
+                == "Visualization 1 (ANC 1st visits by area): no published indicator is https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0"),
+        "{problems:?}"
+    );
+    assert!(
+        problems.iter().all(|p| p["item"].is_number()),
+        "{problems:?}"
+    );
+    let first = "https://health.go.ug/fhir/Measure/anc-first-visits|1.0.0";
+    assert_eq!(body["indicators"][0]["measure"], first);
+    assert_eq!(body["indicators"][0]["package"], ID);
+    assert_eq!(body["indicators"][0]["published"], false);
+
+    // The last six months up to April 2026, each figure the indicator's own, as Try gives it.
+    let by_area = &body["items"][0];
+    assert_eq!(by_area["from"], "2025-11");
+    assert_eq!(by_area["to"], "2026-04");
+    let cells = by_area["answer"]["cells"].as_array().expect("cells");
+    assert_eq!(cells.len(), 6);
+    assert!(cells.iter().all(|c| c["place"] == "sample"));
+    let measure: Value =
+        serde_json::from_slice(&anc["Measure-anc-first-visits.json"]).expect("measure");
+    let tried = json!({ "measure": measure, "periodType": "monthly", "period": "2026-03" });
+    let (_, tried) = call(
+        &publications,
+        author(),
+        "POST",
+        &format!("/packages/{ID}/indicators/try"),
+        Some(tried),
+    )
+    .await;
+    let march = cells
+        .iter()
+        .find(|c| c["period"] == "2026-03")
+        .expect("march");
+    assert_eq!(march["value"], tried["count"].to_string());
+    assert!(march.get("bands").is_none());
+    // Split by age band, each figure carries its bands.
+    let by_age = &body["items"][1]["answer"]["cells"];
+    let march = by_age
+        .as_array()
+        .expect("cells")
+        .iter()
+        .find(|c| c["period"] == "2026-03")
+        .expect("march");
+    assert_eq!(
+        march["bands"]
+            .as_array()
+            .expect("bands")
+            .last()
+            .expect("band")["code"],
+        "not-recorded"
+    );
+    // A single number has the period before its last.
+    let single = &body["items"][3];
+    assert_eq!(single["from"], "2026Q2");
+    assert_eq!(single["before"]["periods"][0]["id"], "2026Q1");
+
+    // An unknown or unpinned indicator, and a file not named after the Dashboard, are refused
+    // as publication refuses them.
+    let mut changed = dashboard.clone();
+    changed["items"][2]["visualization"]["question"]["indicators"] = json!([
+        "https://health.go.ug/fhir/Measure/anc-unknown|1.0.0",
+        "https://x/Measure/m"
+    ]);
+    let input = json!({ "dashboard": changed, "path": "configuration/dashboards/other.json", "asOf": "2026-04-30" });
+    let (_, body) = call(&publications, author(), "POST", preview_path, Some(input)).await;
+    let messages: Vec<(Value, &str)> = body["problems"]
+        .as_array()
+        .expect("problems")
+        .iter()
+        .map(|p| (p["item"].clone(), p["message"].as_str().unwrap_or_default()))
+        .collect();
+    assert!(
+        messages.contains(&(
+            Value::Null,
+            "the Dashboard anc-overview belongs at configuration/dashboards/anc-overview.json"
+        )),
+        "{messages:?}"
+    );
+    assert!(messages.contains(&(json!(2), "Visualization 3 (ANC 1st visit before 12 weeks): no published indicator is https://health.go.ug/fhir/Measure/anc-unknown|1.0.0")), "{messages:?}");
+    assert!(messages.contains(&(json!(2), "Visualization 3 (ANC 1st visit before 12 weeks): the indicator https://x/Measure/m is not pinned to a version (url|version)")), "{messages:?}");
+    assert_eq!(
+        body["items"][2]["error"],
+        "no indicator is https://health.go.ug/fhir/Measure/anc-unknown|1.0.0"
+    );
+
+    // A day that is not a date is refused.
+    let input = json!({ "dashboard": dashboard, "path": path, "asOf": "April" });
     let (status, _) = call(&publications, author(), "POST", preview_path, Some(input)).await;
     assert_eq!(status, 422);
 }
