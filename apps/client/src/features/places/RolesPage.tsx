@@ -96,6 +96,12 @@ function reasonOf(error: unknown): string {
   return String(error)
 }
 
+/** Why an assignment was refused: the role the administrator may not grant and its permission, or central's explanation. */
+function refusalOf(intl: ReturnType<typeof useIntl>, error: unknown): string {
+  if (error instanceof PlacesError && error.ungranted !== null) return intl.formatMessage(m.plCannotGrant, error.ungranted)
+  return intl.formatMessage(m.plFailed, { reason: reasonOf(error) })
+}
+
 /** One user's places and roles, and the forms that change them. */
 function UserRoles({ username, options }: { username: string; options: AssignmentOptions }) {
   const intl = useIntl()
@@ -203,7 +209,7 @@ function UserRoles({ username, options }: { username: string; options: Assignmen
           {intl.formatMessage(m.plSave)}
         </button>
         {assigning.isSuccess ? <p role="status">{intl.formatMessage(m.plAssigned, { username, roles: roles.join(', '), place: nameOf(place) })}</p> : null}
-        {assigning.isError ? <p role="alert">{intl.formatMessage(m.plFailed, { reason: reasonOf(assigning.error) })}</p> : null}
+        {assigning.isError ? <p role="alert">{refusalOf(intl, assigning.error)}</p> : null}
       </form>
     </>
   )

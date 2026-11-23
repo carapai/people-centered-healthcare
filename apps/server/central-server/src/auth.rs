@@ -1875,13 +1875,22 @@ mod tests {
             "labels": [],
         }))
         .expect("policy");
-        provision_at(&connection, &key, &policy, "amina", &["access"], "central").await;
+        // Each administrator also holds the roles they grant (#888).
+        provision_at(
+            &connection,
+            &key,
+            &policy,
+            "amina",
+            &["access", "district"],
+            "central",
+        )
+        .await;
         provision_at(
             &connection,
             &key,
             &policy,
             "kato",
-            &["access"],
+            &["access", "clinician"],
             "district-wakiso",
         )
         .await;
@@ -2129,6 +2138,121 @@ mod tests {
         // Read: this central keeps no packages, so the districts cannot be checked.
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert!(body.contains("central keeps no packages"), "{body}");
+    }
+
+    #[tokio::test]
+    async fn an_administrator_grants_only_permissions_they_hold() {
+        let connection = sample_places().await;
+        let key = [7u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": {
+                "access": ["access.administer", "places.manage"],
+                "registrar": ["access.administer", "Patient.r"],
+                "reader": ["Patient.r"],
+                "district": ["Organization.rs"],
+            },
+            "labels": [],
+        }))
+        .expect("policy");
+        // An administrator without places.manage.
+        provision_at(
+            &connection,
+            &key,
+            &policy,
+            "amina",
+            &["registrar"],
+            "central",
+        )
+        .await;
+        provision(&connection, &key, &policy, "nakato", &["reader"]).await;
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection.clone(), &settings).expect("routes"));
+        let admin = sign_in(&app, "amina").await;
+        let assign = |roles: serde_json::Value| {
+            authorized(
+                "PUT",
+                "/api/assignments/users/nakato/KAM013",
+                &admin,
+                Some(serde_json::json!({ "roles": roles })),
+            )
+        };
+
+        // A role carrying places.manage is refused, naming the permission and the role.
+        let (status, body, _) = send(&app, assign(serde_json::json!(["reader", "access"]))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        let refusal: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(refusal["permission"], "places.manage", "{body}");
+        assert_eq!(refusal["role"], "access", "{body}");
+        assert!(
+            refusal["detail"]
+                .as_str()
+                .is_some_and(|d| d.contains("places.manage")),
+            "{body}"
+        );
+        // So is one carrying more of a resource than the administrator holds.
+        let (status, body, _) = send(&app, assign(serde_json::json!(["district"]))).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert!(body.contains("Organization.rs"), "{body}");
+        // Nothing changed: nakato still holds reader alone.
+        let (_, body, _) = send(
+            &app,
+            authorized("GET", "/api/assignments/users/nakato", &admin, None),
+        )
+        .await;
+        let held: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(
+            held["assignments"][0]["roles"],
+            serde_json::json!(["reader"])
+        );
+
+        // Roles whose permissions the administrator all holds are granted.
+        let (status, body, _) =
+            send(&app, assign(serde_json::json!(["reader", "registrar"]))).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+
+        // The refusals are audited, as failures naming the permission.
+        let fhir = FhirServer::new(
+            SurrealStore::new(connection, Arc::new(SystemClock)),
+            "https://central.test/fhir",
+            Arc::new(Unrestricted),
+        )
+        .router();
+        let request = Request::get("/AuditEvent?_count=100")
+            .body(Body::empty())
+            .expect("request");
+        let (_, body, _) = send(&fhir, request).await;
+        let bundle: serde_json::Value = serde_json::from_str(&body).expect("json");
+        let assignments: Vec<&serde_json::Value> = bundle["entry"]
+            .as_array()
+            .map(|e| e.iter().map(|e| &e["resource"]).collect::<Vec<_>>())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|e| e["code"]["coding"][0]["code"] == "role-assignment")
+            .collect();
+        let refused: Vec<&&serde_json::Value> = assignments
+            .iter()
+            .filter(|e| e["outcome"]["code"]["code"] == "4")
+            .collect();
+        assert_eq!(refused.len(), 2, "{body}");
+        assert!(
+            refused
+                .iter()
+                .any(|e| e["outcome"]["detail"].to_string().contains("places.manage")),
+            "{body}"
+        );
+        assert_eq!(
+            assignments
+                .iter()
+                .filter(|e| e["outcome"]["code"]["code"] == "0")
+                .count(),
+            1,
+            "{body}"
+        );
     }
 
     /// Provisions `username` at KAM013 with `roles`, as the workforce registry will.

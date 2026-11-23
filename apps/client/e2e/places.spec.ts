@@ -40,6 +40,12 @@ test('the national administrator assigns a role at a district, and its user sign
 
   const form = page.getByRole('form', { name: 'Assign roles at a place' })
   await form.getByLabel('Place').selectOption({ label: 'Kampala (district)' })
+  // #888: the administrator grants only permissions they hold; analyst carries analytics.author.
+  await form.getByRole('checkbox', { name: 'analyst', exact: true }).check()
+  await press(page, 'Assign')
+  await expect(form.getByRole('alert')).toHaveText('You cannot grant analyst: it carries analytics.author, which your own roles do not give you.')
+  await expect(held.getByRole('listitem')).toHaveCount(1)
+  await form.getByRole('checkbox', { name: 'analyst', exact: true }).uncheck()
   await form.getByRole('checkbox', { name: 'district', exact: true }).check()
   await noViolations(page)
   await press(page, 'Assign')

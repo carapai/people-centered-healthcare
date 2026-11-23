@@ -3,12 +3,19 @@ import type { Place, PlaceLevel } from '../area/api'
 
 export type { Place, PlaceLevel }
 
-/** A request central refused: the status, its explanation, and an NHFR file's problems. */
+/** A role an administrator may not grant: it carries a permission their own session lacks (#888). */
+export interface Ungranted {
+  role: string
+  permission: string
+}
+
+/** A request central refused: the status, its explanation, an NHFR file's problems, and the role an administrator may not grant. */
 export class PlacesError extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
     readonly problems: string[] = [],
+    readonly ungranted: Ungranted | null = null,
   ) {
     super(`the places request failed: ${status} ${detail}`)
     this.name = 'PlacesError'
@@ -18,7 +25,8 @@ export class PlacesError extends Error {
 function refused(status: number, body: unknown): PlacesError {
   const fields = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
   const problems = Array.isArray(fields['problems']) ? fields['problems'].filter((p): p is string => typeof p === 'string') : []
-  return new PlacesError(status, typeof fields['detail'] === 'string' ? fields['detail'] : '', problems)
+  const ungranted = typeof fields['role'] === 'string' && typeof fields['permission'] === 'string' ? { role: fields['role'], permission: fields['permission'] } : null
+  return new PlacesError(status, typeof fields['detail'] === 'string' ? fields['detail'] : '', problems, ungranted)
 }
 
 function isObject(body: unknown): body is Record<string, unknown> {

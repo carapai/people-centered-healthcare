@@ -744,6 +744,7 @@ type PlacesValues = {
   plReplaceNote: {}
   plSave: {}
   plAssigned: { username: string; roles: string; place: string }
+  plCannotGrant: { role: string; permission: string }
   plWithdrawn: { place: string }
 }
 
@@ -792,6 +793,7 @@ export const placesMessages = defineMessages<PlacesValues>({
   plRoles: { id: 'app.places.roles.roles', defaultMessage: 'Roles', description: 'Role assignment page: the roles to hold at the place' },
   plReplaceNote: { id: 'app.places.roles.replace', defaultMessage: 'The roles chosen replace those the user holds at that place.', description: 'Role assignment page: assigning replaces the roles at the place' },
   plSave: { id: 'app.places.roles.save', defaultMessage: 'Assign', description: 'Role assignment page: save button' },
+  plCannotGrant: { id: 'app.places.roles.cannotGrant', defaultMessage: 'You cannot grant {role}: it carries {permission}, which your own roles do not give you.', description: 'Role assignment page: the administrator tried to grant a permission they do not hold' },
   plAssigned: { id: 'app.places.roles.assigned', defaultMessage: '{username} now holds {roles} at {place}. They sign in for it from their next sign-in.', description: 'Role assignment page: the roles were assigned' },
   plWithdrawn: { id: 'app.places.roles.withdrawn', defaultMessage: 'Every role at {place} was withdrawn.', description: 'Role assignment page: the roles at a place were withdrawn' },
 })
