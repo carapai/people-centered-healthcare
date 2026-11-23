@@ -65,6 +65,18 @@ describe('dashboards', () => {
     await expect(saveVisualization(refused, { title: 'Visits', visualization: saved })).rejects.toEqual(new DashboardsError(403, 'saving Visualizations and Dashboards needs analytics.author'))
   })
 
+  test('a standard Dashboard’s Visualization names no places: each viewer sees their own, and Save as copies it', async () => {
+    // As GET /analytics/dashboards gives it (#603): the package's periods as of today, no places.
+    const standard: Visualization = { ...saved, question: { ...saved.question, places: [] } }
+    expect(forViewer(kampala, standard).question.places).toEqual(['KAM013', 'KAM020'])
+    expect(forViewer(wakiso, { ...standard, follow: 'myPlace' }).question.places).toEqual(['district-wakiso'])
+    expect(readExplorerSearch(explorerSearch(standard).v)).toEqual(standard)
+
+    const transport = fakeTransport(() => ({ status: 201, body: { id: 'copy', title: 'ANC overview (copy)', kind: 'saved', mine: true, items: [] } }))
+    await createDashboard(transport, { title: 'ANC overview (copy)', shares: [], copyOf: 'ug.moh.hmis:anc-overview' })
+    expect(transport.sent[0]?.body).toEqual({ title: 'ANC overview (copy)', shares: [], copyOf: 'ug.moh.hmis:anc-overview' })
+  })
+
   test('roles and people are a comma-separated list, each once', () => {
     expect(splitList(' district, in-charge,,district ')).toEqual(['district', 'in-charge'])
     expect(splitList('')).toEqual([])

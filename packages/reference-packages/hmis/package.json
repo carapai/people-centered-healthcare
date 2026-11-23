@@ -2,7 +2,7 @@
   "name": "ug.moh.hmis",
   "version": "1.0.0",
   "title": "Uganda MoH HMIS reports",
-  "description": "MoH's HMIS Reports (ADR 0070, ADR 0072): the HMIS 105 antenatal care section, and the facility's own ANC monitoring.",
+  "description": "MoH's HMIS Reports (ADR 0070, ADR 0072): the HMIS 105 antenatal care section, the facility's own ANC monitoring, and the standard ANC overview Dashboard.",
   "fhirVersions": [
     "5.0.0"
   ],

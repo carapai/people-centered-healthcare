@@ -52,6 +52,9 @@
 //! - **Saved Dashboards** ([`dashboard`], #602): Visualizations and Dashboards users holding
 //!   `analytics.author` save at central, shared with a person, a role or a place level
 //!   ([`SavedDashboard::visible_to`]).
+//! - **Standard Dashboards** ([`standard`], #603): Dashboards in a Reporting package, shown to
+//!   every user over their own area; [`StandardDashboard::problems`] refuses indicators not
+//!   pinned or not published.
 //!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
@@ -65,6 +68,7 @@ pub mod membership;
 pub mod period;
 pub mod report;
 pub mod rollup;
+pub mod standard;
 pub mod store;
 pub mod threshold;
 
@@ -97,6 +101,9 @@ pub use report::{
 };
 pub use rollup::{
     FacilitySummaries, FacilitySummary, Missing, Reported, RolledUp, roll_up_facilities,
+};
+pub use standard::{
+    DASHBOARDS_FOLDER, StandardDashboard, StandardItem, StandardQuestion, StandardVisualization,
 };
 pub use store::{IndicatorStore, MemberKey, Position, StoredSummary, periods_with_care};
 pub use threshold::{ThresholdBand, ThresholdDefinition, Tone, threshold_bands, tone_of};

@@ -7,7 +7,10 @@
 //! - a Report with a line list that runs at national level fails;
 //! - a Report pins its indicators and Age Band Sets to `url|version`, and keeps version 1 of a
 //!   set after version 2 is published;
-//! - a Report belongs in a Reporting package.
+//! - a Report belongs in a Reporting package;
+//! - standard Dashboards (#603): the reference *ANC overview* passes Validation, one whose
+//!   Visualization references an unknown indicator fails, and once the package is published
+//!   its newest version's Dashboards are listed.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -24,6 +27,7 @@ use serde_json::{Value, json};
 const HMIS_105: &str = "configuration/reports/hmis-105-anc.json";
 const MONITORING: &str = "configuration/reports/anc-facility-monitoring.json";
 const BANDS: &str = "https://health.go.ug/fhir/Library/age-bands-anc";
+const OVERVIEW: &str = "configuration/dashboards/anc-overview.json";
 
 struct Central {
     publications: Publications,
@@ -259,6 +263,8 @@ async fn a_report_pins_indicator_and_age_band_set_versions() {
 async fn a_report_belongs_in_a_reporting_package() {
     let central = with_indicators().await;
     let mut files = package("hmis");
+    // The standard Dashboard's own case is below.
+    files.remove(OVERVIEW);
     let mut manifest = json_of(&files, "package.json");
     manifest["kind"] = json!("program");
     put(&mut files, "package.json", &manifest);
@@ -284,5 +290,96 @@ async fn a_report_lives_at_its_id() {
         [format!(
             "{HMIS_105}: the Report hmis-105 belongs at configuration/reports/hmis-105.json"
         )]
+    );
+}
+
+#[tokio::test]
+async fn a_visualization_referencing_an_unknown_indicator_fails_validation() {
+    let central = with_indicators().await;
+    let mut files = package("hmis");
+    let mut overview = json_of(&files, OVERVIEW);
+    overview["items"][0]["visualization"]["question"]["indicators"] =
+        json!(["https://health.go.ug/fhir/Measure/anc-fourth-visits|1.0.0"]);
+    put(&mut files, OVERVIEW, &overview);
+    let (_, stage, problems) = submit(&central, &files).await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        problems,
+        [format!(
+            "{OVERVIEW}: Visualization 1 (ANC 1st visits by area): no published indicator is https://health.go.ug/fhir/Measure/anc-fourth-visits|1.0.0"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_standard_dashboard_belongs_in_a_reporting_package_at_its_id() {
+    let central = with_indicators().await;
+    let mut files = package("hmis");
+    files.remove(HMIS_105);
+    files.remove(MONITORING);
+    let mut overview = json_of(&files, OVERVIEW);
+    overview["id"] = json!("anc");
+    put(&mut files, OVERVIEW, &overview);
+    let mut manifest = json_of(&files, "package.json");
+    manifest["kind"] = json!("program");
+    put(&mut files, "package.json", &manifest);
+    let (_, stage, problems) = submit(&central, &files).await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        problems,
+        [
+            format!(
+                "{OVERVIEW}: a standard Dashboard belongs in a Reporting package, not a program package"
+            ),
+            format!("{OVERVIEW}: the Dashboard anc belongs at configuration/dashboards/anc.json"),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_published_reporting_package_lists_its_newest_versions_dashboards() {
+    let central = with_indicators().await;
+    assert_eq!(
+        central
+            .publications
+            .published_dashboards()
+            .await
+            .expect("none yet"),
+        []
+    );
+    publish(&central, &package("hmis")).await;
+    let mut renamed = versioned(package("hmis"), "1.1.0");
+    let mut overview = json_of(&renamed, OVERVIEW);
+    overview["title"] = json!("Antenatal care overview");
+    put(&mut renamed, OVERVIEW, &overview);
+    let listed = central
+        .publications
+        .published_dashboards()
+        .await
+        .expect("published");
+    assert_eq!(
+        listed
+            .iter()
+            .map(|d| (
+                d.package.as_str(),
+                d.version.as_str(),
+                d.dashboard.title.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        [("ug.moh.hmis", "1.0.0", "ANC overview")]
+    );
+    assert_eq!(listed[0].dashboard.items.len(), 4);
+    publish(&central, &renamed).await;
+    let listed = central
+        .publications
+        .published_dashboards()
+        .await
+        .expect("published");
+    assert_eq!(
+        listed
+            .iter()
+            .map(|d| (d.version.as_str(), d.dashboard.title.as_str()))
+            .collect::<Vec<_>>(),
+        [("1.1.0", "Antenatal care overview")]
     );
 }

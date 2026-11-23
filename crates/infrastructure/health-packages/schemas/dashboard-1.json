@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/dashboard/1",
+  "title": "Dashboard",
+  "description": "A standard Dashboard in a Reporting package (ADR 0075; #603): a title and its Visualizations in order, each the data explorer's setup over the viewer's own area. What the schema cannot say (pinned, published indicators and their disaggregations) Validation checks.",
+  "type": "object",
+  "required": ["$schema", "id", "title", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://carapai.github.io/people-centered-healthcare/fhir/schema/dashboard/1" },
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "items": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["id", "title", "visualization"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "visualization": { "$ref": "#/$defs/visualization" }
+      }
+    },
+    "visualization": {
+      "type": "object",
+      "required": ["type", "question", "layout", "series", "follow"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["column", "line", "table", "single"] },
+        "question": { "$ref": "#/$defs/question" },
+        "layout": { "enum": ["placesByIndicators", "indicatorsByPeriods"] },
+        "series": { "enum": ["indicator", "place", "band"] },
+        "follow": { "enum": ["myPlace", "eachAreaUnder"] }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": ["indicators", "periodType"],
+      "additionalProperties": false,
+      "properties": {
+        "indicators": { "type": "array", "items": { "type": "string" } },
+        "periodType": { "enum": ["weekly", "monthly", "quarterly", "financialJuly"] },
+        "last": { "type": "integer", "minimum": 1 },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "disaggregation": { "type": "string" }
+      }
+    }
+  }
+}

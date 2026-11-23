@@ -36,7 +36,8 @@ pub fn reports_in(packed: &Packed) -> Vec<(String, Result<ReportDefinition, Stri
         .collect()
 }
 
-/// Adds the indicators and Age Band Sets `packed` holds to `catalogue`.
+/// Adds the indicators (with their disaggregations) and Age Band Sets `packed` holds to
+/// `catalogue`.
 fn add(catalogue: &mut Catalogue, packed: &Packed) {
     for (path, bytes) in &packed.files {
         if path.contains('/') {
@@ -48,6 +49,14 @@ fn add(catalogue: &mut Catalogue, packed: &Packed) {
         if value["resourceType"] == "Measure"
             && let Ok(indicator) = measure(&value).indicator()
         {
+            catalogue.disaggregations.insert(
+                indicator.canonical(),
+                indicator
+                    .disaggregations
+                    .iter()
+                    .map(|d| d.name.clone())
+                    .collect(),
+            );
             catalogue
                 .indicators
                 .insert(indicator.canonical(), indicator.calculation);
@@ -98,8 +107,8 @@ pub(crate) fn problems(packed: &Packed, catalogue: &Catalogue) -> Vec<String> {
 }
 
 impl Publications {
-    /// What the Reports in `packed` can pin: the indicators and Age Band Sets of every published
-    /// package version, and of `packed` itself.
+    /// What the Reports and standard Dashboards in `packed` can pin: the indicators and Age Band
+    /// Sets of every published package version, and of `packed` itself.
     pub(crate) async fn catalogue(
         &self,
         tx: &mut SurrealTx,

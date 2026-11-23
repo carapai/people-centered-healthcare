@@ -20,6 +20,7 @@ fn catalogue() -> Catalogue {
         ]
         .into(),
         age_band_sets: [BANDS.to_owned()].into(),
+        ..Catalogue::default()
     }
 }
 

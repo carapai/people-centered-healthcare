@@ -422,6 +422,7 @@ pub(crate) fn routes(
                         .map(|blobs| publications(fhir_store.clone(), blobs.clone())),
                 ),
                 studio_accounts(studio_people.clone()),
+                Arc::new(SystemClock),
             )
             .layer(axum::middleware::from_fn(signed_in))
             .layer(axum::middleware::from_fn_with_state(

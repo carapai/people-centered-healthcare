@@ -67,7 +67,9 @@ function Board({ explorer, dashboards, unplaced, canAuthor }: { explorer: Explor
     <li key={d.id}>
       <button type="button" className={pressable} aria-pressed={picked === d.id} onClick={() => setPicked(d.id)}>
         {d.title}
-        <span className={css({ display: 'block', fontSize: 'xs', fontWeight: 'normal' })}>{intl.formatMessage(d.mine ? m.dbMine : m.dbSharedWithYou)}</span>
+        <span className={css({ display: 'block', fontSize: 'xs', fontWeight: 'normal' })}>
+          {d.kind === 'standard' ? intl.formatMessage(m.dbStandardFrom, { package: d.package ?? '' }) : intl.formatMessage(d.mine ? m.dbMine : m.dbSharedWithYou)}
+        </span>
       </button>
     </li>
   )
@@ -89,7 +91,7 @@ function Board({ explorer, dashboards, unplaced, canAuthor }: { explorer: Explor
         </nav>
         <div className={css({ display: 'flex', flexDirection: 'column', gap: '4' })}>
           {open !== undefined ? (
-            <OpenDashboard key={open.id} explorer={explorer} dashboard={open} canAuthor={canAuthor} />
+            <OpenDashboard key={open.id} explorer={explorer} dashboard={open} canAuthor={canAuthor} onCopied={setPicked} />
           ) : picked === UNPLACED ? (
             <Items explorer={explorer} items={unplaced} label={intl.formatMessage(m.dbUnplaced)} />
           ) : (
@@ -139,12 +141,62 @@ function NewDashboard({ onMade }: { onMade: (id: string) => void }) {
   )
 }
 
-function OpenDashboard({ explorer, dashboard, canAuthor }: { explorer: Explorer; dashboard: Dashboard; canAuthor: boolean }) {
+function OpenDashboard({ explorer, dashboard, canAuthor, onCopied }: { explorer: Explorer; dashboard: Dashboard; canAuthor: boolean; onCopied: (id: string) => void }) {
   return (
     <>
+      {dashboard.kind === 'standard' ? <Standard dashboard={dashboard} canAuthor={canAuthor} onCopied={onCopied} /> : null}
       {dashboard.mine && canAuthor ? <Sharing dashboard={dashboard} /> : null}
       <Items explorer={explorer} items={dashboard.items} label={dashboard.title} />
     </>
+  )
+}
+
+/**
+ * A standard Dashboard (#603): where it comes from, that it changes only in a new version of its
+ * Reporting package, and, for a user holding `analytics.author`, *Save as* their own copy.
+ */
+function Standard({ dashboard, canAuthor, onCopied }: { dashboard: Dashboard; canAuthor: boolean; onCopied: (id: string) => void }) {
+  const intl = useIntl()
+  const { transport } = usePlatform()
+  const queryClient = useQueryClient()
+  const [title, setTitle] = useState(intl.formatMessage(m.dbSaveAsCopy, { title: dashboard.title }))
+  const copy = useMutation({
+    mutationFn: () => createDashboard(transport, { title: title.trim(), shares: [], copyOf: dashboard.id }),
+    onSuccess: async (made) => {
+      await queryClient.invalidateQueries({ queryKey: DASHBOARDS_KEY })
+      onCopied(made.id)
+    },
+  })
+  return (
+    <div className={panel}>
+      <p className={muted}>
+        {dashboard.description === undefined ? null : `${dashboard.description} `}
+        {intl.formatMessage(m.dbStandardNote)} {intl.formatMessage(m.dbStandardFrom, { package: dashboard.package ?? '' })}.
+      </p>
+      {canAuthor ? (
+        <form
+          className={css({ display: 'flex', gap: '2', alignItems: 'end', flexWrap: 'wrap' })}
+          aria-label={intl.formatMessage(m.dbSaveAs)}
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (title.trim() !== '') copy.mutate()
+          }}
+        >
+          <label className={css({ display: 'flex', flexDirection: 'column', gap: '1', fontWeight: 'semibold' })}>
+            {intl.formatMessage(m.dbSaveAsTitle)}
+            <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          </label>
+          <button type="submit" className={pressable} disabled={title.trim() === '' || copy.isPending}>
+            {intl.formatMessage(m.dbSaveAsButton)}
+          </button>
+          {copy.isError ? (
+            <p role="alert" className={css({ color: 'danger.text' })}>
+              {copy.error instanceof DashboardsError && copy.error.detail !== undefined ? copy.error.detail : intl.formatMessage(m.dbChangeFailed)}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+    </div>
   )
 }
 
