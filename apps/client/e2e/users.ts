@@ -27,8 +27,12 @@ export const USERS = {
   publisher: { username: 'e2e-publisher', password: 'cinder otter gazebo sixty', roles: 'publisher' },
   // A role held at a district, not a facility (ADR 0094; #869): signs in for Kampala district,
   // whose area lists its facilities from the NHFR sample, and reads no patient-level records;
-  // it explores the area's indicator summaries (#599).
-  district: { username: 'e2e-district', password: 'kestrel lagoon pillar thirteen', roles: 'district', place: 'district-kampala' },
+  // it explores the area's indicator summaries (#599), and saves and shares Dashboards
+  // (analytics.author, #602).
+  district: { username: 'e2e-district', password: 'kestrel lagoon pillar thirteen', roles: 'district,analyst', place: 'district-kampala' },
+  // Another district's user, at Wakiso, who may explore but not author: opens what Kampala shares
+  // with every district and sees Wakiso's figures (#602).
+  wakiso: { username: 'e2e-wakiso', password: 'harrier canyon velvet fourteen', roles: 'district', place: 'district-wakiso' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
 } as const
@@ -40,6 +44,7 @@ export const ADMIN_PERMISSIONS = [
   'break-glass',
   'break-glass.alerts',
   'break-glass.review',
+  'analytics.author',
   'appointments.book',
   'caregiver.manage',
   'careplans.manage',

@@ -764,6 +764,52 @@ type ExplorerValues = {
   exNotRecorded: {}
   exChildAreas: { place: string }
   exBandHeader: {}
+  exFollowsPlace: {}
+  exFollowsAreas: {}
+  exSave: {}
+  exSaveTitle: {}
+  exSaveOnto: {}
+  exSaveOntoNone: {}
+  exSaveOntoNew: {}
+  exNewDashboardTitle: {}
+  exSaveConfirm: {}
+  exSaveCancel: {}
+  exSaveFailed: {}
+  exSaved: {}
+  exSavedOnto: { dashboard: string }
+  dbTitle: {}
+  dbLoading: {}
+  dbFailed: {}
+  dbForbidden: {}
+  dbList: {}
+  dbStandard: {}
+  dbNoStandard: {}
+  dbSaved: {}
+  dbNoSaved: {}
+  dbMine: {}
+  dbSharedWithYou: {}
+  dbUnplaced: {}
+  dbPick: {}
+  dbEmpty: {}
+  dbOpenInExplorer: {}
+  dbNew: {}
+  dbNewTitle: {}
+  dbCreate: {}
+  dbSharing: {}
+  dbSharingIntro: {}
+  dbLevels: {}
+  dbLevel_facility: {}
+  dbLevel_district: {}
+  dbLevel_region: {}
+  dbLevel_national: {}
+  dbRoles: {}
+  dbPeople: {}
+  dbListHint: {}
+  dbSaveSharing: {}
+  dbSharingSaved: {}
+  dbChangeFailed: {}
+  dbSharedWith: { shares: string }
+  dbNotShared: {}
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -840,6 +886,52 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   exNotRecorded: { id: 'app.explorer.notRecorded', defaultMessage: 'Not recorded', description: 'Data explorer: the band of everything with no value for the disaggregation' },
   exChildAreas: { id: 'app.explorer.childAreas', defaultMessage: 'Each area under {place}', description: 'Data explorer: pick every place directly under the user’s place' },
   exBandHeader: { id: 'app.explorer.bandHeader', defaultMessage: 'Band', description: 'Data explorer: the table row header when the rows are disaggregation bands' },
+  exFollowsPlace: { id: 'app.explorer.followsPlace', defaultMessage: 'Follows whoever views it: their own place.', description: 'Data explorer: the places follow the viewer' },
+  exFollowsAreas: { id: 'app.explorer.followsAreas', defaultMessage: 'Follows whoever views it: each area under their place.', description: 'Data explorer: the places follow the viewer' },
+  exSave: { id: 'app.explorer.save', defaultMessage: 'Save Visualization', description: 'Data explorer: save the Visualization shown' },
+  exSaveTitle: { id: 'app.explorer.saveTitle', defaultMessage: 'Title', description: 'Data explorer: the saved Visualization’s title' },
+  exSaveOnto: { id: 'app.explorer.saveOnto', defaultMessage: 'Dashboard', description: 'Data explorer: the Dashboard to save onto' },
+  exSaveOntoNone: { id: 'app.explorer.saveOntoNone', defaultMessage: 'None', description: 'Data explorer: save onto no Dashboard' },
+  exSaveOntoNew: { id: 'app.explorer.saveOntoNew', defaultMessage: 'New Dashboard…', description: 'Data explorer: save onto a new Dashboard' },
+  exNewDashboardTitle: { id: 'app.explorer.newDashboardTitle', defaultMessage: 'New Dashboard’s title', description: 'Data explorer: the new Dashboard’s title' },
+  exSaveConfirm: { id: 'app.explorer.saveConfirm', defaultMessage: 'Save', description: 'Data explorer: confirm saving' },
+  exSaveCancel: { id: 'app.explorer.saveCancel', defaultMessage: 'Cancel', description: 'Data explorer: cancel saving' },
+  exSaveFailed: { id: 'app.explorer.saveFailed', defaultMessage: 'The Visualization could not be saved. Please try again.', description: 'Data explorer: saving failed' },
+  exSaved: { id: 'app.explorer.saved', defaultMessage: 'Visualization saved.', description: 'Data explorer: saved onto no Dashboard' },
+  exSavedOnto: { id: 'app.explorer.savedOnto', defaultMessage: 'Visualization saved on {dashboard}.', description: 'Data explorer: saved onto a Dashboard' },
+  dbTitle: { id: 'app.dashboards.title', defaultMessage: 'Dashboards', description: 'Dashboards heading and links' },
+  dbLoading: { id: 'app.dashboards.loading', defaultMessage: 'Loading…', description: 'Dashboards: loading' },
+  dbFailed: { id: 'app.dashboards.failed', defaultMessage: 'The Dashboards could not be loaded. Please try again.', description: 'Dashboards: loading failed' },
+  dbForbidden: { id: 'app.dashboards.forbidden', defaultMessage: 'Dashboards need the reporting.view permission.', description: 'Dashboards: the user may not view them' },
+  dbList: { id: 'app.dashboards.list', defaultMessage: 'Dashboards', description: 'Dashboards: the list on the left' },
+  dbStandard: { id: 'app.dashboards.standard', defaultMessage: 'Standard', description: 'Dashboards: standard Dashboards' },
+  dbNoStandard: { id: 'app.dashboards.noStandard', defaultMessage: 'None yet: standard Dashboards come with the Reporting package.', description: 'Dashboards: no standard Dashboards' },
+  dbSaved: { id: 'app.dashboards.saved', defaultMessage: 'Saved', description: 'Dashboards: saved Dashboards' },
+  dbNoSaved: { id: 'app.dashboards.noSaved', defaultMessage: 'None shared with you yet.', description: 'Dashboards: no saved Dashboards' },
+  dbMine: { id: 'app.dashboards.mine', defaultMessage: 'Yours', description: 'Dashboards: a Dashboard the user made' },
+  dbSharedWithYou: { id: 'app.dashboards.sharedWithYou', defaultMessage: 'Shared with you', description: 'Dashboards: a Dashboard shared with the user' },
+  dbUnplaced: { id: 'app.dashboards.unplaced', defaultMessage: 'Your Visualizations on no Dashboard', description: 'Dashboards: saved Visualizations on no Dashboard' },
+  dbPick: { id: 'app.dashboards.pick', defaultMessage: 'Pick a Dashboard on the left.', description: 'Dashboards: nothing picked' },
+  dbEmpty: { id: 'app.dashboards.empty', defaultMessage: 'No Visualizations yet: save one from the Data explorer.', description: 'Dashboards: an empty Dashboard' },
+  dbOpenInExplorer: { id: 'app.dashboards.openInExplorer', defaultMessage: 'Open in explorer', description: 'Dashboards: open an item in the data explorer' },
+  dbNew: { id: 'app.dashboards.new', defaultMessage: 'New Dashboard', description: 'Dashboards: make a Dashboard' },
+  dbNewTitle: { id: 'app.dashboards.newTitle', defaultMessage: 'Title', description: 'Dashboards: a new Dashboard’s title' },
+  dbCreate: { id: 'app.dashboards.create', defaultMessage: 'Create', description: 'Dashboards: create the Dashboard' },
+  dbSharing: { id: 'app.dashboards.sharing', defaultMessage: 'Sharing', description: 'Dashboards: who a Dashboard is shared with' },
+  dbSharingIntro: { id: 'app.dashboards.sharingIntro', defaultMessage: 'Each viewer still sees only their own area.', description: 'Dashboards: sharing never widens what a viewer reads' },
+  dbLevels: { id: 'app.dashboards.levels', defaultMessage: 'Every place of a level', description: 'Dashboards: share with a place level' },
+  dbLevel_facility: { id: 'app.dashboards.level.facility', defaultMessage: 'Every facility', description: 'Dashboards: share with every facility' },
+  dbLevel_district: { id: 'app.dashboards.level.district', defaultMessage: 'Every district', description: 'Dashboards: share with every district' },
+  dbLevel_region: { id: 'app.dashboards.level.region', defaultMessage: 'Every region', description: 'Dashboards: share with every region' },
+  dbLevel_national: { id: 'app.dashboards.level.national', defaultMessage: 'National', description: 'Dashboards: share with the national place' },
+  dbRoles: { id: 'app.dashboards.roles', defaultMessage: 'Roles', description: 'Dashboards: share with roles' },
+  dbPeople: { id: 'app.dashboards.people', defaultMessage: 'People (usernames)', description: 'Dashboards: share with people' },
+  dbListHint: { id: 'app.dashboards.listHint', defaultMessage: 'Separate several with commas.', description: 'Dashboards: roles and people are comma-separated' },
+  dbSaveSharing: { id: 'app.dashboards.saveSharing', defaultMessage: 'Save sharing', description: 'Dashboards: save who it is shared with' },
+  dbSharingSaved: { id: 'app.dashboards.sharingSaved', defaultMessage: 'Sharing saved.', description: 'Dashboards: sharing saved' },
+  dbChangeFailed: { id: 'app.dashboards.changeFailed', defaultMessage: 'The Dashboard could not be saved. Please try again.', description: 'Dashboards: a change failed' },
+  dbSharedWith: { id: 'app.dashboards.sharedWith', defaultMessage: 'Shared with {shares}.', description: 'Dashboards: who the Dashboard is shared with' },
+  dbNotShared: { id: 'app.dashboards.notShared', defaultMessage: 'Not shared: only you see it.', description: 'Dashboards: shared with nobody' },
 })
 
 type AccessValues = {

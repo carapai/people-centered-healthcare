@@ -100,6 +100,12 @@ function Home() {
               <li>
                 <Link to="/explore">{intl.formatMessage(explorerMessages.exTitle)}</Link>
               </li>
+              {/* Saved Dashboards are kept at central (#602; ADR 0075). */}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/dashboards">{intl.formatMessage(explorerMessages.dbTitle)}</Link>
+                </li>
+              ) : null}
               {/* Places and areas are central's (ADR 0094): the session's place and its facilities. */}
               {platform.capabilities.studio ? (
                 <li>

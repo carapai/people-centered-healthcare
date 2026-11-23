@@ -1554,6 +1554,18 @@ DEFINE TABLE risk_assessment_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON risk_assessment_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON risk_assessment_history TYPE int PERMISSIONS FULL
   DEFINE INDEX risk_assessment_history_last_updated ON risk_assessment_history FIELDS last_updated, version_seq
+DEFINE TABLE saved_dashboard TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD created_at ON saved_dashboard TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD items ON saved_dashboard TYPE string PERMISSIONS FULL
+  DEFINE FIELD owner ON saved_dashboard TYPE string PERMISSIONS FULL
+  DEFINE FIELD saved_at ON saved_dashboard TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD shares ON saved_dashboard TYPE string PERMISSIONS FULL
+  DEFINE FIELD title ON saved_dashboard TYPE string PERMISSIONS FULL
+DEFINE TABLE saved_visualization TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD owner ON saved_visualization TYPE string PERMISSIONS FULL
+  DEFINE FIELD saved_at ON saved_visualization TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD setup ON saved_visualization TYPE string PERMISSIONS FULL
+  DEFINE FIELD title ON saved_visualization TYPE string PERMISSIONS FULL
 DEFINE TABLE schedule TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON schedule TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON schedule TYPE array<record> DEFAULT [] PERMISSIONS FULL

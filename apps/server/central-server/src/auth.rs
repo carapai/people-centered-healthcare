@@ -410,7 +410,7 @@ pub(crate) fn routes(
             )),
         );
         // The data explorer (#599): figures from the facilities' synced summaries, over the
-        // session's area.
+        // session's area; and saved Visualizations and Dashboards (#602).
         api = api.nest(
             "/analytics",
             crate::analytics::router(
@@ -421,6 +421,7 @@ pub(crate) fn routes(
                         .as_ref()
                         .map(|blobs| publications(fhir_store.clone(), blobs.clone())),
                 ),
+                studio_accounts(studio_people.clone()),
             )
             .layer(axum::middleware::from_fn(signed_in))
             .layer(axum::middleware::from_fn_with_state(
@@ -511,7 +512,8 @@ fn publications(
     .with_actions(crate::studio::actions::catalogue())
 }
 
-/// The account id of each username, for the Studio's handover and reassignment (#493).
+/// The account id of each username, for the Studio's handover and reassignment (#493) and for
+/// sharing a Dashboard with a person (#602).
 fn studio_accounts(store: SurrealAuthStore) -> crate::studio::Accounts {
     Arc::new(move |username: String| {
         let store = store.clone();

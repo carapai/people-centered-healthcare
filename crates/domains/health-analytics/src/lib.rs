@@ -49,12 +49,16 @@
 //! - **Threshold bands** ([`threshold`], #600): an indicator may carry a legend set, ranges of
 //!   its figure read as good, warning or bad, which every Visualization colours figures by.
 //!   Bands never overlap ([`threshold_bands`]).
+//! - **Saved Dashboards** ([`dashboard`], #602): Visualizations and Dashboards users holding
+//!   `analytics.author` save at central, shared with a person, a role or a place level
+//!   ([`SavedDashboard::visible_to`]).
 //!
 //! Evaluating the FHIRPath is the application layer's (`health-analytics-app`): this crate takes
 //! each record's period date and whether it met the criteria.
 
 pub mod age_bands;
 pub mod calculate;
+pub mod dashboard;
 pub mod disaggregation;
 pub mod indicator;
 pub mod membership;
@@ -72,6 +76,7 @@ pub use calculate::{
     Band, Disaggregated, Evaluation, Member, Observed, PatientOutcome, Reason, RecordOutcome,
     RecordPart, RollUpError, Summary, Values, calculate,
 };
+pub use dashboard::{SavedDashboard, SavedDashboards, SavedVisualization, Share, Viewer};
 pub use disaggregation::{
     Disaggregation, DisaggregationDefinition, DisaggregationSource, NOT_RECORDED,
 };
