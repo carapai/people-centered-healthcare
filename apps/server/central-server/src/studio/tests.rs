@@ -2609,6 +2609,100 @@ async fn the_report_preview_computes_each_row_over_test_patients_with_validation
     assert_eq!(status, 422);
 }
 
+/// A table section crossing two Disaggregations (#867): age band on columns by when the woman
+/// booked on rows. Each row's figures carry every crossed cell, and across the booking bands
+/// they add up to each age band.
+#[tokio::test]
+async fn the_report_preview_counts_cells_crossing_two_disaggregations() {
+    let (publications, _dir) = publications().await;
+    let mut anc = anc_package();
+    let path = "Measure-anc-first-visits.json";
+    let mut measure: Value = serde_json::from_slice(&anc[path]).expect("measure");
+    let booked = "iif(%records.entry.resource.ofType(Observation).where(code.coding.code = '18185-9' and value.value < 12).exists(), 'early', 'late')";
+    measure["group"][0]["stratifier"]
+        .as_array_mut()
+        .expect("stratifiers")
+        .push(json!({
+            "code": { "coding": [{ "code": "booked" }], "text": "Booked" },
+            "criteria": { "language": "text/fhirpath", "expression": booked }
+        }));
+    anc.insert(path.into(), serde_json::to_vec(&measure).expect("json"));
+    publications.draft(&anc, "ann").await.expect("draft anc");
+    let hmis = hmis_package();
+    publications.draft(&hmis, "ann").await.expect("draft hmis");
+    let author = || subject("ann", &["metadata.author"]);
+    let mut report: Value =
+        serde_json::from_slice(&hmis["configuration/reports/hmis-105-anc.json"]).expect("report");
+    let ages = "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0";
+    report["sections"][0]["disaggregations"] = json!([
+        { "ageBandSet": ages, "axis": "columns" },
+        { "code": "booked", "expression": booked, "axis": "rows" }
+    ]);
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (status, body) = call(
+        &publications,
+        author(),
+        "POST",
+        "/packages/ug.moh.hmis@1.0.0/reports/preview",
+        Some(input),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let section = &body["sections"][0];
+    let first = &section["rows"][0]["current"];
+    assert!(first["count"].as_u64().expect("count") > 0, "{first}");
+    let crossed = first["crossed"].as_array().expect("crossed");
+    let codes = |n: usize| -> Vec<String> {
+        section["disaggregations"][n]["bands"]
+            .as_array()
+            .expect("bands")
+            .iter()
+            .map(|b| b["code"].as_str().expect("code").to_owned())
+            .collect()
+    };
+    let (age_bands, booked_bands) = (codes(0), codes(1));
+    assert!(
+        booked_bands.contains(&"early".to_owned()),
+        "{booked_bands:?}"
+    );
+    // Every age band by every booking band, each at the age band then the booking band.
+    assert_eq!(crossed.len(), age_bands.len() * booked_bands.len());
+    assert!(
+        crossed
+            .iter()
+            .all(|c| c["at"][0]["name"] == ages && c["at"][1]["name"] == "booked")
+    );
+    let mut total = 0;
+    for band in first["disaggregations"][0]["bands"]
+        .as_array()
+        .expect("bands")
+    {
+        let sum: u64 = crossed
+            .iter()
+            .filter(|c| c["at"][0]["code"] == band["code"])
+            .map(|c| c["count"].as_u64().expect("count"))
+            .sum();
+        assert_eq!(sum, band["count"].as_u64().expect("count"), "{band}");
+        total += sum;
+    }
+    assert_eq!(total, first["count"].as_u64().expect("count"));
+    // A row whose indicator is not broken down by when she booked has no crossed cells.
+    assert_eq!(section["rows"][1]["current"]["crossed"], json!([]));
+    // Crossed cells are counted for the period before too, for % change.
+    report["sections"][0]["change"] = json!(true);
+    let input = json!({ "report": report, "period": "2026-03" });
+    let (_, body) = call(
+        &publications,
+        author(),
+        "POST",
+        "/packages/ug.moh.hmis@1.0.0/reports/preview",
+        Some(input),
+    )
+    .await;
+    let previous = &body["sections"][0]["rows"][0]["previous"]["crossed"];
+    assert_eq!(previous.as_array().map(Vec::len), Some(crossed.len()));
+}
+
 /// The Dashboard designer's preview (#879): the HMIS package's *ANC overview* over the ANC
 /// package's test patients, while the ANC indicators are still a draft. Validation's problems
 /// are publication's, each with the Visualization it is in; each Visualization's figures are the

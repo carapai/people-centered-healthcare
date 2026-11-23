@@ -10,11 +10,14 @@ import { disaggregationName, type IndicatorRow, type Level, type TableSection } 
 // the indicator's own figure for that band, which central computed with what roll-up needs; a
 // Total is the figure over every band of its side, so it is never an addition of percentages.
 //
+// A cell crossing several Disaggregations (#867) is read from the row's crossed figures, which
+// central counts for every crossing the section lays out (its row bands, its column bands, and
+// both), so the crossed cells across one Disaggregation add up to the band of the others.
+//
 // What a cell cannot show it says, with the reason: an indicator not broken down by one of the
-// section's Disaggregations (a note, not an error), a cell crossing two Disaggregations (each
-// indicator's figures are per Disaggregation, so crossed cells are computed when Reports run,
-// #557), and a median or distinct count above facility level (they cannot be rebuilt from facility
-// summaries, ADR 0070).
+// section's Disaggregations (a note, not an error), a crossing the preview has not counted, and a
+// median or distinct count above facility level (they cannot be rebuilt from facility summaries,
+// ADR 0070).
 
 /** One band of one of the section's Disaggregations. */
 export interface At {
@@ -108,7 +111,14 @@ export function figureAt(figures: StudioReportFigures | null | undefined, at: re
   if (at.length === 0) return { figure: asFigure(figures) }
   const missing = at.find((a) => !figures.disaggregations.some((d) => d.name === a.name))
   if (missing !== undefined) return { notShown: 'not-broken-down', missing: missing.name }
-  if (at.length > 1) return { notShown: 'crossed' }
+  if (at.length > 1) {
+    const names = at.map((a) => a.name)
+    const crossing = (figures.crossed ?? []).filter((c) => c.at.length === at.length && c.at.every((b) => names.includes(b.name)))
+    if (crossing.length === 0) return { notShown: 'crossed' }
+    const cell = crossing.find((c) => at.every((a) => c.at.some((b) => b.name === a.name && b.code === a.code)))
+    // A band nobody had: nothing was counted in that cell.
+    return { figure: cell === undefined ? { value: null, count: 0, denominator: null } : asFigure(cell) }
+  }
   const [only] = at as [At]
   const band = figures.disaggregations.find((d) => d.name === only.name)?.bands.find((b) => b.code === only.code)
   // A coded value nobody had: nothing was counted in that band.

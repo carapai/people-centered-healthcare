@@ -3941,6 +3941,14 @@ type ReportValues = {
   rdConceptSystem: {}
   rdConceptCode: {}
   rdAddConcept: {}
+  rdConceptSearch: {}
+  rdConceptSystemToSearch: {}
+  rdConceptSearchText: {}
+  rdConceptSearching: {}
+  rdConceptNone: {}
+  rdConceptFound: { total: number; shown: number }
+  rdConceptUse: { code: string; display: string }
+  rdConceptSearchFailed: { reason: string }
   rdValidation: {}
   rdChecking: {}
   rdNoProblems: {}
@@ -4066,11 +4074,19 @@ export const reportMessages = defineMessages<ReportValues>({
   rdConceptSystem: { id: 'app.studio.report.conceptSystem', defaultMessage: 'Concept system', description: 'Report designer' },
   rdConceptCode: { id: 'app.studio.report.conceptCode', defaultMessage: 'Concept code', description: 'Report designer' },
   rdAddConcept: { id: 'app.studio.report.addConcept', defaultMessage: '+ concept', description: 'Report designer' },
+  rdConceptSearch: { id: 'app.studio.report.conceptSearch', defaultMessage: 'Find a concept', description: 'Report designer: the terminology search for a line list concept column' },
+  rdConceptSystemToSearch: { id: 'app.studio.report.conceptSystemToSearch', defaultMessage: 'Code system', description: 'Report designer' },
+  rdConceptSearchText: { id: 'app.studio.report.conceptSearchText', defaultMessage: 'Search by code or name', description: 'Report designer' },
+  rdConceptSearching: { id: 'app.studio.report.conceptSearching', defaultMessage: 'Searching…', description: 'Report designer' },
+  rdConceptNone: { id: 'app.studio.report.conceptNone', defaultMessage: 'No concept matches.', description: 'Report designer' },
+  rdConceptFound: { id: 'app.studio.report.conceptFound', defaultMessage: '{total, plural, one {# concept} other {# concepts}} found{shown, select, 0 {} other {, showing the first {shown}}}', description: 'Report designer' },
+  rdConceptUse: { id: 'app.studio.report.conceptUse', defaultMessage: 'Use {code} {display}', description: 'Report designer: fills the concept column to add with a found concept' },
+  rdConceptSearchFailed: { id: 'app.studio.report.conceptSearchFailed', defaultMessage: 'The terminology could not be searched: {reason}', description: 'Report designer' },
   rdValidation: { id: 'app.studio.report.validation', defaultMessage: 'Validation', description: 'Report designer' },
   rdChecking: { id: 'app.studio.report.checking', defaultMessage: 'Checking…', description: 'Report designer' },
   rdNoProblems: { id: 'app.studio.report.noProblems', defaultMessage: 'No problems found.', description: 'Report designer' },
   rdAuthority: { id: 'app.studio.report.authority', defaultMessage: 'As Validation would refuse it, checked on central as you edit. Check now on the draft page remains the authority.', description: 'Report designer' },
-  rdNotShown: { id: 'app.studio.report.notShown', defaultMessage: '{reason, select, notBrokenDown {The indicator is not broken down by {name}.} crossed {Crossed bands are computed when the Report runs.} facilityOnly {A median or distinct count cannot be rebuilt from facility summaries, so it shows at facility level only.} noIndicator {No indicator is pinned here.} other {Not computed yet.}}', description: 'Report designer' },
+  rdNotShown: { id: 'app.studio.report.notShown', defaultMessage: '{reason, select, notBrokenDown {The indicator is not broken down by {name}.} crossed {This crossing of bands was not counted in the preview.} facilityOnly {A median or distinct count cannot be rebuilt from facility summaries, so it shows at facility level only.} noIndicator {No indicator is pinned here.} other {Not computed yet.}}', description: 'Report designer' },
   rdNa: { id: 'app.studio.report.na', defaultMessage: 'n/a', description: 'Report designer' },
   rdValueShown: { id: 'app.studio.report.valueShown', defaultMessage: '{calculation, select, percentage {{value}%} other {{value}}}', description: 'Report designer' },
   rdIndicatorColumn: { id: 'app.studio.report.indicatorColumn', defaultMessage: 'Indicator', description: 'Report designer' },

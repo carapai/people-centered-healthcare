@@ -1458,7 +1458,7 @@
           "studio"
         ],
         "summary": "Documents and serves the Report designer's preview.",
-        "description": "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole and each band of the indicator's disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
+        "description": "The Report designer's preview of a draft Report (unsaved edits included) for a period of its type: Validation's problems, each with the section it is in, and each table row's figures (the whole, each band of the indicator's disaggregations, and each cell crossing several of the section's Disaggregations, for the period and, with % change, the period before) with who was counted, computed over test patients as *Try* computes an indicator. Indicators are taken from the draft, else a published package version, else another package's open draft; the test patients are the Reporting package's and those of each package version holding one of its indicators. Line list rows are not previewed.",
         "operationId": "previewStudioReport",
         "parameters": [
           {
@@ -5798,6 +5798,24 @@
           "other"
         ]
       },
+      "StudioReportAt": {
+        "type": "object",
+        "description": "One band of one of a section's Disaggregations, as a crossed cell is at it.",
+        "required": [
+          "name",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The band's code."
+          },
+          "name": {
+            "type": "string",
+            "description": "The Disaggregation's name: the Age Band Set's `url|version`, or the code."
+          }
+        }
+      },
       "StudioReportBand": {
         "type": "object",
         "description": "A band a section lays out.",
@@ -5842,6 +5860,46 @@
           }
         }
       },
+      "StudioReportCell": {
+        "type": "object",
+        "description": "An indicator's figure at one band of each of several Disaggregations: what was counted in\nall of them, a percentage's numerator and denominator both within the cell.",
+        "required": [
+          "at",
+          "count"
+        ],
+        "properties": {
+          "at": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportAt"
+            },
+            "description": "The bands it is at, in the section's order."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many are counted: the numerator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The denominator of a percentage, rate or ratio.",
+            "minimum": 0
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The figure, to two decimal places; none when the denominator is zero or no value was\ntaken."
+          }
+        }
+      },
       "StudioReportCounted": {
         "type": "object",
         "description": "A test patient a row counted, and in which bands.",
@@ -5871,7 +5929,8 @@
         "description": "An indicator's figure over one period: the whole, and each band of its disaggregations.",
         "required": [
           "count",
-          "disaggregations"
+          "disaggregations",
+          "crossed"
         ],
         "properties": {
           "count": {
@@ -5879,6 +5938,13 @@
             "format": "int64",
             "description": "How many are counted: the numerator of a percentage, rate or ratio.",
             "minimum": 0
+          },
+          "crossed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioReportCell"
+            },
+            "description": "The figure at each cell crossing several of the section's Disaggregations (#867): its\nrow bands crossed, its column bands crossed, and both crossed, for those the indicator\nis broken down by."
           },
           "denominator": {
             "type": [

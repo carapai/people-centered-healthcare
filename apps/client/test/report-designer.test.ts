@@ -174,7 +174,7 @@ describe('laying a table section out from the preview', () => {
     expect(layout.rows[0]?.cells[3]?.figure?.value).toBe('4')
   })
 
-  test('bands on rows give a row per band and, with column totals, a Total row; crossed cells wait for the run', () => {
+  test('bands on rows give a row per band and, with column totals, a Total row', () => {
     const onRows: TableSection = { ...attendance, disaggregations: [{ ageBandSet: BANDS, axis: 'rows' }], rowTotals: false, columnTotals: true }
     const layout = layoutTable(onRows, preview, 'facility')
     expect(layout.rows.filter((r) => r.row.id === 'first-visits').map((r) => [r.total, r.bands.map((b) => b.code).join(), r.cells[0]?.figure?.value])).toEqual([
@@ -188,6 +188,43 @@ describe('laying a table section out from the preview', () => {
     expect(layoutTable(crossed, hiv, 'facility').rows[0]?.cells[0]?.notShown).toBe('not-broken-down')
     const both = { ...hiv, rows: [{ ...previewRows[0]!, current: { ...previewRows[0]!.current!, disaggregations: [...previewRows[0]!.current!.disaggregations, { name: 'hiv', title: 'hiv', bands: [] }] } }] } as StudioReportSection
     expect(layoutTable(crossed, both, 'facility').rows[0]?.cells[0]?.notShown).toBe('crossed')
+  })
+
+  test('a cell crossing two Disaggregations shows its crossed figure, and the Total row still adds up', () => {
+    // Age bands on rows by HIV status on columns, with column and row totals.
+    const crossed: TableSection = { ...attendance, disaggregations: [{ ageBandSet: BANDS, axis: 'rows' }, { code: 'hiv', expression: 'x', axis: 'columns' }], columnTotals: true, rowTotals: true, change: false }
+    const at = (age: string, hiv: string) => [
+      { name: BANDS, code: age },
+      { name: 'hiv', code: hiv },
+    ]
+    const cell = (age: string, hiv: string, count: number) => ({ at: at(age, hiv), count, value: { toString: () => String(count) } })
+    const hivBands = [band('positive', 'Positive', 1), band('negative', 'Negative', 3), band('not-recorded', 'Not recorded', 0)]
+    const current = {
+      ...figures(4, [band('15-19', '15–19 years', 1), band('20-24', '20–24 years', 3), band('not-recorded', 'Not recorded', 0)]),
+      // Every age band by every HIV status, as central counts them.
+      crossed: ['15-19', '20-24', 'not-recorded'].flatMap((age) => ['positive', 'negative', 'not-recorded'].map((hiv) => cell(age, hiv, age === '15-19' && hiv === 'positive' ? 1 : age === '20-24' && hiv === 'negative' ? 3 : 0))),
+    }
+    current.disaggregations = [...current.disaggregations, { name: 'hiv', title: 'hiv', bands: hivBands }]
+    const section = {
+      disaggregations: [...preview.disaggregations, { name: 'hiv', title: 'hiv', bands: hivBands.map(({ code, label }) => ({ code, label })) }],
+      rows: [{ ...previewRows[0]!, current, previous: null }],
+    } as unknown as StudioReportSection
+    const layout = layoutTable(crossed, section, 'facility')
+    const lines = layout.rows.filter((r) => r.row.id === 'first-visits')
+    const values = lines.map((r) => r.cells.map((c) => c.figure?.value ?? c.notShown))
+    expect(values).toEqual([
+      // positive, negative, not recorded, Total
+      ['1', '0', '0', '1'],
+      ['0', '3', '0', '3'],
+      ['0', '0', '0', '0'],
+      ['1', '3', '0', '4'],
+    ])
+    // Down each column the crossed cells add up to its Total.
+    const body = values.slice(0, -1)
+    expect([0, 1, 2].map((n) => body.reduce((sum, line) => sum + Number(line[n]), 0))).toEqual([1, 3, 0])
+    // Who a crossed cell counted: those with a counted record in both bands.
+    const counted = { ...section.rows[0]!, counted: [{ name: 'Akello', bands: [['15-19', 'positive']] }, { name: 'Nansubuga', bands: [['20-24', 'negative']] }] } as StudioReportRow
+    expect(countedAt(counted, lines[1]!.cells[1]!.at)).toEqual(['Nansubuga'])
   })
 
   test('a cell names who it counted, and the DHIS2 sheet lists every cell of a sent section', () => {
