@@ -9,13 +9,14 @@
 //!   and the facilities new, changed, closed, unchanged and absent. Nothing is written.
 //! - `POST /nhfr/apply` does it, in one transaction, each place's write audited. Both need
 //!   [`MANAGE_PERMISSION`], and both refuse (422) a file with a district the national core
-//!   package does not hold.
+//!   package does not hold. Both take the CSV as the body, or, from the client's JSON transport,
+//!   as `{"csv": "…"}` with `Content-Type: application/json` (#873).
 
 use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
@@ -121,10 +122,29 @@ async fn area(State(api): State<PlacesApi>, subject: Option<Extension<Subject>>)
     .into_response()
 }
 
+/// The CSV text of a request: the body itself, or its JSON's `csv` field.
+fn csv_of(headers: &HeaderMap, body: &Bytes) -> Result<String, &'static str> {
+    let json = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("application/json"));
+    if json {
+        let value: Value = serde_json::from_slice(body).map_err(|_| "the body is not JSON")?;
+        return value["csv"]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or("the body names no csv");
+    }
+    std::str::from_utf8(body)
+        .map(str::to_owned)
+        .map_err(|_| "the file is not UTF-8 text")
+}
+
 /// The plan of importing the body's NHFR export, or the refusal.
 async fn plan(
     api: &PlacesApi,
     subject: &Subject,
+    headers: &HeaderMap,
     body: &Bytes,
 ) -> Result<ImportPlan, Box<Response>> {
     if !subject.permissions.has(MANAGE_PERMISSION) {
@@ -133,9 +153,8 @@ async fn plan(
             "importing the NHFR needs places.manage",
         )));
     }
-    let text = std::str::from_utf8(body)
-        .map_err(|_| Box::new(refused(vec!["the file is not UTF-8 text".into()])))?;
-    let rows = parse_nhfr_csv(text).map_err(|p| Box::new(refused(p)))?;
+    let text = csv_of(headers, body).map_err(|p| Box::new(refused(vec![p.into()])))?;
+    let rows = parse_nhfr_csv(&text).map_err(|p| Box::new(refused(p)))?;
     let Some(publications) = &api.publications else {
         return Err(Box::new(refused(vec!["central keeps no packages".into()])));
     };
@@ -156,13 +175,14 @@ async fn plan(
 async fn preview(
     State(api): State<PlacesApi>,
     subject: Option<Extension<Subject>>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let subject = match signed_in(subject) {
         Ok(subject) => subject,
         Err(response) => return *response,
     };
-    match plan(&api, &subject, &body).await {
+    match plan(&api, &subject, &headers, &body).await {
         Ok(plan) => Json(plan).into_response(),
         Err(response) => *response,
     }
@@ -173,13 +193,14 @@ async fn apply(
     State(api): State<PlacesApi>,
     subject: Option<Extension<Subject>>,
     agent: Option<Extension<Agent>>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let subject = match signed_in(subject) {
         Ok(subject) => subject,
         Err(response) => return *response,
     };
-    let plan = match plan(&api, &subject, &body).await {
+    let plan = match plan(&api, &subject, &headers, &body).await {
         Ok(plan) => plan,
         Err(response) => return *response,
     };

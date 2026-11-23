@@ -398,6 +398,12 @@ const INVENTORY: &[Mounted] = &[
         ],
     },
     Mounted {
+        file: "central-server/src/assignments.rs",
+        prefix: "/api/assignments",
+        gate: Gate::Staff,
+        paths: &["/options", "/users/{username}", "/users/{username}/{place}"],
+    },
+    Mounted {
         file: "central-server/src/places.rs",
         prefix: "/api/places",
         gate: Gate::Staff,
@@ -521,6 +527,8 @@ fn concrete(prefix: &str, path: &str) -> String {
         .replace("{service_point}", "triage")
         .replace("{entry}", "018f0000-0000-7000-8000-000000000001")
         .replace("{key}", "triage")
+        .replace("{username}", "nakato")
+        .replace("{place}", "district-kampala")
         .replace("{*path}", "Questionnaire-anc-visit.json")
         .replace("{id}", "018f0000-0000-7000-8000-000000000000");
     match path.as_str() {

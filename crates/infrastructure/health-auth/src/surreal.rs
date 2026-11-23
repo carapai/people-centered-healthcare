@@ -181,6 +181,26 @@ impl SurrealAuthStore {
         }
     }
 
+    /// Assigns `account`'s roles at `place` (ADR 0094): stores the signed snapshot `jws`, or with
+    /// `None` removes the one there, and appends its AuditEvent `audit` in the same transaction.
+    pub async fn assign(
+        &self,
+        account: AccountId,
+        place: &str,
+        jws: Option<&str>,
+        audit: &Value,
+    ) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        match jws {
+            Some(jws) => tx.put_auth_snapshot(account, place, jws).await,
+            None => tx.delete_auth_snapshot(account, place).await,
+        }
+        .map_err(failed)?;
+        // The assignment and its AuditEvent commit together, or neither does.
+        health_audit::append(&mut tx, audit).await.map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
     /// Deletes expired codes, jtis and sessions (a background job); returns how many rows went.
     pub async fn purge(&self, now: Timestamp) -> Result<usize, StoreError> {
         {

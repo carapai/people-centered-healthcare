@@ -30,6 +30,8 @@ import { Route as BreakGlassAlertsRouteImport } from './routes/break-glass.alert
 import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.reviews'
 import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
+import { Route as PlacesImportRouteImport } from './routes/places.import'
+import { Route as PlacesRolesRouteImport } from './routes/places.roles'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
 import { Route as ReceptionIndexRouteImport } from './routes/reception.index'
@@ -169,6 +171,16 @@ const EdgeStatusRoute = EdgeStatusRouteImport.update({
 const PatientsIdRoute = PatientsIdRouteImport.update({
   id: '/patients/$id',
   path: '/patients/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlacesImportRoute = PlacesImportRouteImport.update({
+  id: '/places/import',
+  path: '/places/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlacesRolesRoute = PlacesRolesRouteImport.update({
+  id: '/places/roles',
+  path: '/places/roles',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortalIndexRoute = PortalIndexRouteImport.update({
@@ -370,6 +382,8 @@ export interface FileRoutesByFullPath {
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/places/import': typeof PlacesImportRoute
+  '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -428,6 +442,8 @@ export interface FileRoutesByTo {
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/places/import': typeof PlacesImportRoute
+  '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -487,6 +503,8 @@ export interface FileRoutesById {
   '/break-glass/reviews': typeof BreakGlassReviewsRoute
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
+  '/places/import': typeof PlacesImportRoute
+  '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
   '/registry/reviews': typeof RegistryReviewsRoute
@@ -547,6 +565,8 @@ export interface FileRouteTypes {
     | '/break-glass/reviews'
     | '/edge/status'
     | '/patients/$id'
+    | '/places/import'
+    | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
@@ -605,6 +625,8 @@ export interface FileRouteTypes {
     | '/break-glass/reviews'
     | '/edge/status'
     | '/patients/$id'
+    | '/places/import'
+    | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
@@ -663,6 +685,8 @@ export interface FileRouteTypes {
     | '/break-glass/reviews'
     | '/edge/status'
     | '/patients/$id'
+    | '/places/import'
+    | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
     | '/registry/reviews'
@@ -722,6 +746,8 @@ export interface RootRouteChildren {
   BreakGlassReviewsRoute: typeof BreakGlassReviewsRoute
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
+  PlacesImportRoute: typeof PlacesImportRoute
+  PlacesRolesRoute: typeof PlacesRolesRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
   RegistryReviewsRoute: typeof RegistryReviewsRoute
@@ -906,6 +932,20 @@ declare module '@tanstack/react-router' {
       path: '/patients/$id'
       fullPath: '/patients/$id'
       preLoaderRoute: typeof PatientsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/places/import': {
+      id: '/places/import'
+      path: '/places/import'
+      fullPath: '/places/import'
+      preLoaderRoute: typeof PlacesImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/places/roles': {
+      id: '/places/roles'
+      path: '/places/roles'
+      fullPath: '/places/roles'
+      preLoaderRoute: typeof PlacesRolesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portal/': {
@@ -1178,6 +1218,8 @@ const rootRouteChildren: RootRouteChildren = {
   BreakGlassReviewsRoute: BreakGlassReviewsRoute,
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
+  PlacesImportRoute: PlacesImportRoute,
+  PlacesRolesRoute: PlacesRolesRoute,
   PortalCallbackRoute: PortalCallbackRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
   RegistryReviewsRoute: RegistryReviewsRoute,

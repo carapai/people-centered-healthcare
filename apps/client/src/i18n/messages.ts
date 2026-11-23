@@ -699,6 +699,103 @@ export const areaMessages = defineMessages<AreaValues>({
   arLevel_national: { id: 'app.area.level.national', defaultMessage: 'national', description: 'Area page: place level' },
 })
 
+type PlacesValues = {
+  plImportTitle: {}
+  plImportIntro: {}
+  plFile: {}
+  plPreview: {}
+  plApply: {}
+  plApplied: { count: number }
+  plNothing: {}
+  plHierarchy: { count: number }
+  plNew: { count: number }
+  plChanged: { count: number }
+  plClosed: { count: number }
+  plClosedNote: {}
+  plAbsent: { count: number }
+  plAbsentNote: {}
+  plUnchanged: { count: number }
+  plChange: { name: string; code: string; fields: string }
+  plField_name: {}
+  plField_parent: {}
+  plField_active: {}
+  plField_care_level: {}
+  plField_ownership: {}
+  plField_coordinates: {}
+  plRefused: {}
+  plImportForbidden: {}
+  plFailed: { reason: string }
+  plRolesTitle: {}
+  plRolesIntro: {}
+  plRolesForbidden: {}
+  plLoading: {}
+  plUsername: {}
+  plFind: {}
+  plNoSuchUser: {}
+  plHeld: { username: string }
+  plNone: {}
+  plHeldLine: { place: string; roles: string; until: string }
+  plWithdraw: {}
+  plWithdrawConfirm: { place: string }
+  plAssignHeading: {}
+  plPlace: {}
+  plChoosePlace: {}
+  plRoles: {}
+  plReplaceNote: {}
+  plSave: {}
+  plAssigned: { username: string; roles: string; place: string }
+  plWithdrawn: { place: string }
+}
+
+// The facility registry's administration pages (features/places; ADR 0094; #873).
+export const placesMessages = defineMessages<PlacesValues>({
+  plImportTitle: { id: 'app.places.import.title', defaultMessage: 'Import facilities from the NHFR', description: 'NHFR import page heading and home link' },
+  plImportIntro: { id: 'app.places.import.intro', defaultMessage: 'Choose the NHFR facility export (CSV). You review what it would add, change and close before anything is imported.', description: 'NHFR import page: what it does' },
+  plFile: { id: 'app.places.import.file', defaultMessage: 'NHFR export (CSV)', description: 'NHFR import page: the file picker' },
+  plPreview: { id: 'app.places.import.preview', defaultMessage: 'Review the import', description: 'NHFR import page: preview button' },
+  plApply: { id: 'app.places.import.apply', defaultMessage: 'Import', description: 'NHFR import page: apply button' },
+  plApplied: { id: 'app.places.import.applied', defaultMessage: 'Imported: {count, plural, one {# place} other {# places}} written.', description: 'NHFR import page: the import was applied' },
+  plNothing: { id: 'app.places.import.nothing', defaultMessage: 'The registry already matches this file. There is nothing to import.', description: 'NHFR import page: the file changes nothing' },
+  plHierarchy: { id: 'app.places.import.hierarchy', defaultMessage: 'Regions and districts to add ({count})', description: 'NHFR import page: section of regions and districts added' },
+  plNew: { id: 'app.places.import.new', defaultMessage: 'New facilities ({count})', description: 'NHFR import page: section of new facilities' },
+  plChanged: { id: 'app.places.import.changed', defaultMessage: 'Changed facilities ({count})', description: 'NHFR import page: section of changed facilities' },
+  plClosed: { id: 'app.places.import.closed', defaultMessage: 'Closed facilities ({count})', description: 'NHFR import page: section of facilities the NHFR closed' },
+  plClosedNote: { id: 'app.places.import.closedNote', defaultMessage: 'A closed facility is kept, marked closed, because its records still refer to it.', description: 'NHFR import page: closed facilities are not deleted' },
+  plAbsent: { id: 'app.places.import.absent', defaultMessage: 'Not in this file ({count})', description: 'NHFR import page: section of facilities the file does not list' },
+  plAbsentNote: { id: 'app.places.import.absentNote', defaultMessage: 'These facilities are left as they are: a partial export does not close them.', description: 'NHFR import page: absent facilities are left alone' },
+  plUnchanged: { id: 'app.places.import.unchanged', defaultMessage: '{count, plural, one {# facility is} other {# facilities are}} unchanged.', description: 'NHFR import page: how many facilities are unchanged' },
+  plChange: { id: 'app.places.import.change', defaultMessage: '{name} ({code}): {fields}', description: 'NHFR import page: a changed facility and the fields that change' },
+  plField_name: { id: 'app.places.import.field.name', defaultMessage: 'name', description: 'NHFR import page: changed field' },
+  plField_parent: { id: 'app.places.import.field.parent', defaultMessage: 'district', description: 'NHFR import page: changed field' },
+  plField_active: { id: 'app.places.import.field.active', defaultMessage: 'status', description: 'NHFR import page: changed field' },
+  plField_care_level: { id: 'app.places.import.field.careLevel', defaultMessage: 'level of care', description: 'NHFR import page: changed field' },
+  plField_ownership: { id: 'app.places.import.field.ownership', defaultMessage: 'ownership', description: 'NHFR import page: changed field' },
+  plField_coordinates: { id: 'app.places.import.field.coordinates', defaultMessage: 'coordinates', description: 'NHFR import page: changed field' },
+  plRefused: { id: 'app.places.import.refused', defaultMessage: 'The file cannot be imported:', description: 'NHFR import page: the file was refused, followed by its problems' },
+  plImportForbidden: { id: 'app.places.import.forbidden', defaultMessage: 'Your role does not include importing the NHFR.', description: 'NHFR import page: the user lacks places.manage' },
+  plFailed: { id: 'app.places.failed', defaultMessage: 'The request failed: {reason}', description: 'Places pages: a request failed' },
+  plRolesTitle: { id: 'app.places.roles.title', defaultMessage: 'Roles at places', description: 'Role assignment page heading and home link' },
+  plRolesIntro: { id: 'app.places.roles.intro', defaultMessage: 'A role is held at a place: a facility, a district, a region or the national place. At a district, region or the national place it gives its permissions over every place below, never over patient records. You assign roles within your own area.', description: 'Role assignment page: what it does' },
+  plRolesForbidden: { id: 'app.places.roles.forbidden', defaultMessage: 'Your role does not include assigning roles.', description: 'Role assignment page: the user lacks access.administer' },
+  plLoading: { id: 'app.places.loading', defaultMessage: 'Loading…', description: 'Places pages: loading' },
+  plUsername: { id: 'app.places.roles.username', defaultMessage: 'Username', description: 'Role assignment page: whose roles' },
+  plFind: { id: 'app.places.roles.find', defaultMessage: 'Show roles', description: 'Role assignment page: look the user up' },
+  plNoSuchUser: { id: 'app.places.roles.noSuchUser', defaultMessage: 'There is no user with that username.', description: 'Role assignment page: unknown username' },
+  plHeld: { id: 'app.places.roles.held', defaultMessage: 'Roles {username} holds', description: "Role assignment page: the user's current roles" },
+  plNone: { id: 'app.places.roles.none', defaultMessage: 'No roles at any place.', description: 'Role assignment page: the user holds no roles' },
+  plHeldLine: { id: 'app.places.roles.heldLine', defaultMessage: '{place}: {roles}, until {until}', description: 'Role assignment page: roles held at a place and when they expire' },
+  plWithdraw: { id: 'app.places.roles.withdraw', defaultMessage: 'Withdraw', description: 'Role assignment page: withdraw every role at the place' },
+  plWithdrawConfirm: { id: 'app.places.roles.withdrawConfirm', defaultMessage: 'Confirm: withdraw every role at {place}', description: 'Role assignment page: confirm a withdrawal' },
+  plAssignHeading: { id: 'app.places.roles.assign', defaultMessage: 'Assign roles at a place', description: 'Role assignment page: the assignment form' },
+  plPlace: { id: 'app.places.roles.place', defaultMessage: 'Place', description: 'Role assignment page: the place picker' },
+  plChoosePlace: { id: 'app.places.roles.choosePlace', defaultMessage: 'Choose a place', description: 'Role assignment page: no place chosen' },
+  plRoles: { id: 'app.places.roles.roles', defaultMessage: 'Roles', description: 'Role assignment page: the roles to hold at the place' },
+  plReplaceNote: { id: 'app.places.roles.replace', defaultMessage: 'The roles chosen replace those the user holds at that place.', description: 'Role assignment page: assigning replaces the roles at the place' },
+  plSave: { id: 'app.places.roles.save', defaultMessage: 'Assign', description: 'Role assignment page: save button' },
+  plAssigned: { id: 'app.places.roles.assigned', defaultMessage: '{username} now holds {roles} at {place}. They sign in for it from their next sign-in.', description: 'Role assignment page: the roles were assigned' },
+  plWithdrawn: { id: 'app.places.roles.withdrawn', defaultMessage: 'Every role at {place} was withdrawn.', description: 'Role assignment page: the roles at a place were withdrawn' },
+})
+
 type ExplorerValues = {
   exTitle: {}
   exLoading: {}

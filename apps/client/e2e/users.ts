@@ -34,8 +34,9 @@ export const USERS = {
   // with every district and sees Wakiso's figures (#602).
   wakiso: { username: 'e2e-wakiso', password: 'harrier canyon velvet fourteen', roles: 'district', place: 'district-wakiso' },
   // A role held at the national place (`central`, ADR 0094): explores every region, and maps them
-  // shaded by band over the national core's boundaries (#604).
-  national: { username: 'e2e-national', password: 'osprey granary violet fifteen', roles: 'district', place: 'central' },
+  // shaded by band over the national core's boundaries (#604). Its `access` role administers
+  // places (#873): it imports the NHFR and assigns roles at any place.
+  national: { username: 'e2e-national', password: 'osprey granary violet fifteen', roles: 'district,access', place: 'central' },
   // Every right, for exploring a local backend by hand; no test signs in as it.
   admin: { username: 'admin', password: 'harbour lantern meadow quartz', roles: 'admin' },
 } as const
@@ -44,6 +45,7 @@ export const USERS = {
  * permission the platform checks. A permission added to the code belongs here too. */
 export const ADMIN_PERMISSIONS = [
   '*.cruds',
+  'access.administer',
   'break-glass',
   'break-glass.alerts',
   'break-glass.review',

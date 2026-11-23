@@ -16,9 +16,14 @@ use crate::AccountId;
 /// The permission to administer access on an edge offline.
 pub const ADMINISTER_LOCAL: &str = "access.administer-local";
 
+/// The permission to assign roles at places at central (ADR 0094), over the administrator's own
+/// area. Central-only (ADR 0011): never granted offline.
+pub const ADMINISTER: &str = "access.administer";
+
 /// Permissions a role may not carry to be granted offline: administration, and break-glass
 /// eligibility, its alerts and the privacy officer's review.
 pub const NEVER_OFFLINE: &[&str] = &[
+    ADMINISTER,
     ADMINISTER_LOCAL,
     "break-glass",
     "break-glass.alerts",
