@@ -686,6 +686,10 @@ DEFINE TABLE facility_indicator_summary TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
 DEFINE TABLE facility_indicator_sync TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD node ON facility_indicator_sync TYPE string PERMISSIONS FULL
   DEFINE FIELD synced_at ON facility_indicator_sync TYPE datetime PERMISSIONS FULL
+DEFINE TABLE facility_reporting TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD set_at ON facility_reporting TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD set_by ON facility_reporting TYPE string PERMISSIONS FULL
+  DEFINE FIELD setting ON facility_reporting TYPE string PERMISSIONS FULL
 DEFINE TABLE family_member_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON family_member_history TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON family_member_history TYPE array<record> DEFAULT [] PERMISSIONS FULL

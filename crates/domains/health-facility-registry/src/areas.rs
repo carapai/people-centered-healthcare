@@ -95,6 +95,7 @@ impl AdministrativeAreas {
             care_level: None,
             ownership: None,
             coordinates: None,
+            org_unit: None,
         };
         let mut places = vec![Place::national(
             self.national.as_deref().unwrap_or("National"),

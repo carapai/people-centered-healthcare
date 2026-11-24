@@ -115,6 +115,7 @@ fn place_of(registry: &Places, code: &str) -> Place {
         care_level: None,
         ownership: None,
         coordinates: None,
+        org_unit: None,
     })
 }
 

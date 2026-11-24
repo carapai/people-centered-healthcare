@@ -1,4 +1,5 @@
 use crate::place::Coordinates;
+use crate::reporting::is_dhis2_uid;
 
 /// One facility as the NHFR's facility list gives it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +18,8 @@ pub struct NhfrFacility {
     pub active: bool,
     /// Where it is, if given.
     pub coordinates: Option<Coordinates>,
+    /// Its DHIS2 org unit ID, if given (#560).
+    pub org_unit: Option<String>,
 }
 
 /// The columns an NHFR export must have.
@@ -59,7 +62,8 @@ fn records(text: &str) -> Vec<Vec<String>> {
 
 /// Reads an NHFR facility export (CSV, a header row first): the columns `nhfr_id`, `name`,
 /// `district` and `status` (`open`, `functional` or `active`; `closed`, `non-functional` or
-/// `inactive`), and optionally `level`, `ownership`, `latitude` and `longitude`, in any order.
+/// `inactive`), and optionally `level`, `ownership`, `latitude`, `longitude` and `dhis2_uid`
+/// (the facility's DHIS2 org unit ID, #560), in any order.
 /// Every problem is returned, each naming its line.
 pub fn parse_nhfr_csv(text: &str) -> Result<Vec<NhfrFacility>, Vec<String>> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
@@ -127,6 +131,13 @@ pub fn parse_nhfr_csv(text: &str) -> Result<Vec<NhfrFacility>, Vec<String>> {
                 continue;
             }
         };
+        let org_unit = get("dhis2_uid");
+        if let Some(uid) = org_unit.as_deref().filter(|uid| !is_dhis2_uid(uid)) {
+            problems.push(format!(
+                "line {line}: {code}'s dhis2_uid {uid:?} is not a DHIS2 ID (11 letters and digits, a letter first)"
+            ));
+            continue;
+        }
         facilities.push(NhfrFacility {
             code,
             name,
@@ -135,6 +146,7 @@ pub fn parse_nhfr_csv(text: &str) -> Result<Vec<NhfrFacility>, Vec<String>> {
             ownership: get("ownership"),
             active,
             coordinates,
+            org_unit,
         });
     }
     if problems.is_empty() {
@@ -150,9 +162,9 @@ mod tests {
 
     #[test]
     fn an_export_is_read_by_its_header() {
-        let text = "\u{feff}status,nhfr_id,name,district,level,latitude,longitude\r\n\
-            open,KAM013,\"Kisenyi HC IV, Kampala\",district-kampala,HC IV,0.3136,32.5664\r\n\
-            Closed,KAM020,\"The \"\"Old\"\" Clinic\",district-kampala,,,\r\n\
+        let text = "\u{feff}status,nhfr_id,name,district,level,latitude,longitude,dhis2_uid\r\n\
+            open,KAM013,\"Kisenyi HC IV, Kampala\",district-kampala,HC IV,0.3136,32.5664,KisenyiH4a1\r\n\
+            Closed,KAM020,\"The \"\"Old\"\" Clinic\",district-kampala,,,,\r\n\
             \r\n";
         let facilities = parse_nhfr_csv(text).expect("facilities");
         assert_eq!(facilities.len(), 2);
@@ -166,6 +178,8 @@ mod tests {
             Some("0.3136")
         );
         assert!(facilities[0].active);
+        assert_eq!(facilities[0].org_unit.as_deref(), Some("KisenyiH4a1"));
+        assert_eq!(facilities[1].org_unit, None);
         assert_eq!(facilities[1].name, "The \"Old\" Clinic");
         assert!(!facilities[1].active);
         assert_eq!(facilities[1].coordinates, None);
@@ -192,5 +206,9 @@ mod tests {
         assert!(problems[0].starts_with("line 2"));
         assert!(problems[3].starts_with("line 5"));
         assert!(parse_nhfr_csv("").is_err());
+        let problems =
+            parse_nhfr_csv("nhfr_id,name,district,status,dhis2_uid\nE,e,d,open,not-a-uid\n")
+                .expect_err("problems");
+        assert!(problems[0].contains("not a DHIS2 ID"), "{problems:?}");
     }
 }

@@ -83,10 +83,10 @@ fn areas() -> AdministrativeAreas {
     }
 }
 
-const FIRST: &str = "nhfr_id,name,district,level,ownership,status,latitude,longitude\n\
-    KAM013,Kisenyi HC IV,district-kampala,HC IV,Government,open,0.3136,32.5664\n\
-    KAM020,Kawempe HC III,district-kampala,HC III,Government,open,,\n\
-    WAK001,Wakiso HC IV,district-wakiso,HC IV,PNFP,open,0.4044,32.4594\n";
+const FIRST: &str = "nhfr_id,name,district,level,ownership,status,latitude,longitude,dhis2_uid\n\
+    KAM013,Kisenyi HC IV,district-kampala,HC IV,Government,open,0.3136,32.5664,KisenyiH4a1\n\
+    KAM020,Kawempe HC III,district-kampala,HC III,Government,open,,,\n\
+    WAK001,Wakiso HC IV,district-wakiso,HC IV,PNFP,open,0.4044,32.4594,\n";
 
 #[tokio::test]
 async fn an_nhfr_import_creates_the_hierarchy_and_closes_facilities_on_reimport() {
@@ -124,6 +124,12 @@ async fn an_nhfr_import_creates_the_hierarchy_and_closes_facilities_on_reimport(
     assert_eq!(
         kisenyi.coordinates.as_ref().map(|c| c.longitude.as_str()),
         Some("32.5664")
+    );
+    // The NHFR's DHIS2 org unit ID is kept with the facility (#560).
+    assert_eq!(kisenyi.org_unit.as_deref(), Some("KisenyiH4a1"));
+    assert_eq!(
+        registry.get("KAM020").and_then(|p| p.org_unit.clone()),
+        None
     );
     // Read back, the registry equals what was imported: the same file again changes nothing.
     let again = plan_import(&registry, &areas(), &rows).expect("preview");

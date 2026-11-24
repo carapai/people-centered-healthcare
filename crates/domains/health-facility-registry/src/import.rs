@@ -110,6 +110,7 @@ pub fn plan_import(
             care_level: facility.care_level.clone(),
             ownership: facility.ownership.clone(),
             coordinates: facility.coordinates.clone(),
+            org_unit: facility.org_unit.clone(),
         };
         match current.get(&facility.code) {
             None => plan.new.push(after),

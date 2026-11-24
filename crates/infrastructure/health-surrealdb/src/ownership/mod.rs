@@ -125,6 +125,8 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("node_activation_report", "configuration"),
     // The DHIS2 instance's metadata Report mappings are checked against (#560).
     ("dhis2_metadata", "configuration"),
+    // Each facility's HMIS org unit ID and forms reported through the platform (#560).
+    ("facility_reporting", "configuration"),
     // Staged software roll-out (#136).
     ("platform_release", "configuration"),
     ("release_rollout", "configuration"),

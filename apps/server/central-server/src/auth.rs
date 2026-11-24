@@ -1718,7 +1718,8 @@ mod tests {
     }
 
     /// Central's database, with the sample places imported (the district test's NHFR file):
-    /// region-central, district-kampala (KAM013, KAM020) and district-wakiso (WAK001).
+    /// region-central, district-kampala (KAM013, KAM020, each with the NHFR's DHIS2 org unit ID)
+    /// and district-wakiso (WAK001, with none).
     async fn sample_places() -> Connection {
         use health_facility_registry::{
             AdministrativeAreas, Area, District, parse_nhfr_csv, plan_import,
@@ -1775,10 +1776,10 @@ mod tests {
             ],
         };
         let rows = parse_nhfr_csv(
-            "nhfr_id,name,district,status\n\
-             KAM013,Kisenyi HC IV,district-kampala,open\n\
-             KAM020,Kawempe HC III,district-kampala,open\n\
-             WAK001,Wakiso HC IV,district-wakiso,open\n",
+            "nhfr_id,name,district,status,dhis2_uid\n\
+             KAM013,Kisenyi HC IV,district-kampala,open,KisenyiH4a1\n\
+             KAM020,Kawempe HC III,district-kampala,open,KawempeH3b2\n\
+             WAK001,Wakiso HC IV,district-wakiso,open,\n",
         )
         .expect("rows");
         let plan =
@@ -1896,6 +1897,154 @@ mod tests {
         let area: serde_json::Value = serde_json::from_str(&body).expect("json");
         assert_eq!(area["level"], "facility");
         assert_eq!(area["facilities"], serde_json::json!(["KAM013"]));
+    }
+
+    /// HMIS reporting settings (#560; ADR 0069): the national HMIS lead sets a facility's org
+    /// unit ID and the forms reported through the platform; an ID unknown to the NHFR is kept
+    /// and flagged; a bad ID, a data set the instance lacks or a form without an org unit ID is
+    /// refused; a district user sees its own facilities' settings and changes none.
+    #[tokio::test]
+    async fn a_facility_with_an_org_unit_id_unknown_to_the_nhfr_is_flagged() {
+        use health_persistence::{Store as _, Transaction as _};
+        let connection = sample_places().await;
+        {
+            let store = SurrealStore::new(connection.clone(), Arc::new(SystemClock));
+            let mut tx = store.begin().await.expect("tx");
+            tx.put_dhis2_metadata(
+                include_str!("../../../../packages/reference-packages/dhis2/ehmis-metadata.json"),
+                "test",
+            )
+            .await
+            .expect("metadata");
+            tx.commit().await.expect("commit");
+        }
+        let key = [6u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": { "hmis": ["places.manage", "reporting.view"], "district": ["reporting.view"] },
+            "labels": [],
+        }))
+        .expect("policy");
+        provision_at(&connection, &key, &policy, "lead", &["hmis"], "central").await;
+        provision_at(
+            &connection,
+            &key,
+            &policy,
+            "okot",
+            &["district"],
+            "district-kampala",
+        )
+        .await;
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+        let json = |body: &str| -> serde_json::Value { serde_json::from_str(body).expect("json") };
+        let lead = sign_in(&app, "lead").await;
+
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/places/reporting", &lead, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let listed = json(&body);
+        assert_eq!(listed["manage"], true);
+        assert_eq!(listed["forms"][0]["id"], "Hmis105Smpl");
+        let codes: Vec<&str> = listed["facilities"]
+            .as_array()
+            .expect("facilities")
+            .iter()
+            .filter_map(|f| f["code"].as_str())
+            .collect();
+        assert_eq!(codes, ["KAM013", "KAM020", "WAK001"]);
+        assert_eq!(listed["facilities"][0]["nhfrOrgUnit"], "KisenyiH4a1");
+        assert_eq!(listed["facilities"][0]["orgUnit"], serde_json::Value::Null);
+
+        // The NHFR's ID, with HMIS 105 reported through the platform: nothing flagged.
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "PUT",
+                "/api/places/reporting/KAM013",
+                &lead,
+                Some(serde_json::json!({ "orgUnit": "KisenyiH4a1", "forms": ["Hmis105Smpl"] })),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(json(&body)["forms"], serde_json::json!(["Hmis105Smpl"]));
+        assert_eq!(json(&body)["flags"], serde_json::json!([]));
+
+        // An ID the NHFR does not list is kept, and flagged.
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "PUT",
+                "/api/places/reporting/WAK001",
+                &lead,
+                Some(serde_json::json!({ "orgUnit": "Unknown0001", "forms": [] })),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            json(&body)["flags"],
+            serde_json::json!([{ "kind": "unknownToNhfr", "orgUnit": "Unknown0001" }])
+        );
+
+        // Refused: not a DHIS2 ID, a data set the instance lacks, a form with no org unit ID.
+        for (setting, expected) in [
+            (
+                serde_json::json!({ "orgUnit": "bad id", "forms": [] }),
+                "not a DHIS2 ID",
+            ),
+            (
+                serde_json::json!({ "orgUnit": "KawempeH3b2", "forms": ["Hmis999Smpl"] }),
+                "not a data set",
+            ),
+            (
+                serde_json::json!({ "orgUnit": null, "forms": ["Hmis105Smpl"] }),
+                "only once the facility has an org unit ID",
+            ),
+        ] {
+            let (status, body, _) = send(
+                &app,
+                authorized("PUT", "/api/places/reporting/KAM020", &lead, Some(setting)),
+            )
+            .await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+            assert!(body.contains(expected), "{expected}: {body}");
+        }
+
+        // A district user sees its own facilities' settings, and changes none.
+        let district = sign_in(&app, "okot").await;
+        let (status, body, _) = send(
+            &app,
+            authorized("GET", "/api/places/reporting", &district, None),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let listed = json(&body);
+        assert_eq!(listed["manage"], false);
+        assert_eq!(listed["facilities"].as_array().map(Vec::len), Some(2));
+        assert_eq!(
+            listed["facilities"][0]["forms"],
+            serde_json::json!(["Hmis105Smpl"])
+        );
+        let (status, _, _) = send(
+            &app,
+            authorized(
+                "PUT",
+                "/api/places/reporting/KAM020",
+                &district,
+                Some(serde_json::json!({ "orgUnit": "KawempeH3b2", "forms": [] })),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
     }
 
     /// Population Estimates (#553; ADR 0071): the HMIS lead's CSV is checked against the

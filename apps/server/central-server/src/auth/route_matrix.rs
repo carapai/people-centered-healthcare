@@ -415,6 +415,8 @@ const INVENTORY: &[Mounted] = &[
             "/nhfr/preview",
             "/nhfr/apply",
             "/population/preview",
+            "/reporting",
+            "/reporting/{facility}",
         ],
     },
     Mounted {

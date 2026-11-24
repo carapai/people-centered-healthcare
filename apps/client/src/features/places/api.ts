@@ -87,12 +87,78 @@ function where(place: Place): string {
 }
 
 /** The fields of a facility that an import changes, by name: what the review shows. */
-export function changedFields(change: PlaceChange): ('name' | 'parent' | 'active' | 'care_level' | 'ownership' | 'coordinates')[] {
+export function changedFields(change: PlaceChange): ('name' | 'parent' | 'active' | 'care_level' | 'ownership' | 'org_unit' | 'coordinates')[] {
   const { before, after } = change
-  const fields = ['name', 'parent', 'active', 'care_level', 'ownership'] as const
-  const changed: ('name' | 'parent' | 'active' | 'care_level' | 'ownership' | 'coordinates')[] = fields.filter((f) => (before[f] ?? null) !== (after[f] ?? null))
+  const fields = ['name', 'parent', 'active', 'care_level', 'ownership', 'org_unit'] as const
+  const changed: ('name' | 'parent' | 'active' | 'care_level' | 'ownership' | 'org_unit' | 'coordinates')[] = fields.filter((f) => (before[f] ?? null) !== (after[f] ?? null))
   if (where(before) !== where(after)) changed.push('coordinates')
   return changed
+}
+
+// --- HMIS reporting settings (`/api/places/reporting`; #560, ADR 0069) ---
+
+/** What is wrong with a facility's HMIS org unit ID, against the NHFR (`health_facility_registry::OrgUnitFlag`). */
+export type OrgUnitFlag =
+  | { kind: 'unknownToNhfr'; orgUnit: string }
+  | { kind: 'nhfrListsElsewhere'; orgUnit: string; facility: string }
+  | { kind: 'nhfrListsAnother'; orgUnit: string; nhfr: string }
+  | { kind: 'sharedWith'; orgUnit: string; facility: string }
+
+/** A form that may be reported through the platform: a DHIS2 data set of central's recorded copy of the instance's metadata. */
+export interface ReportingForm {
+  id: string
+  name: string
+  periodType: string
+}
+
+/** A facility's HMIS reporting settings, with the NHFR's org unit ID and what is wrong with the one set. */
+export interface FacilityReporting {
+  code: string
+  name: string
+  district: string | null
+  active: boolean
+  nhfrOrgUnit: string | null
+  orgUnit: string | null
+  /** The IDs of the data sets reported through the platform for it. */
+  forms: string[]
+  flags: OrgUnitFlag[]
+}
+
+/** The facilities of the session's area with their settings, and the forms there are. */
+export interface ReportingSettings {
+  /** Whether the session may change them (places.manage). */
+  manage: boolean
+  /** Whether central holds a copy of the DHIS2 instance's metadata. */
+  metadataRecorded: boolean
+  forms: ReportingForm[]
+  facilities: FacilityReporting[]
+}
+
+/** The query key of the reporting settings. */
+export const REPORTING = ['places', 'reporting']
+
+/** Each facility's HMIS reporting settings in the session's area. */
+export function reportingQuery(transport: Transport) {
+  return {
+    queryKey: REPORTING,
+    queryFn: async ({ signal }: { signal?: AbortSignal }): Promise<ReportingSettings> => {
+      const response = await transport.request({ method: 'GET', path: '/places/reporting', ...(signal === undefined ? {} : { signal }) })
+      if (response.status !== 200 || !isObject(response.body)) throw refused(response.status, response.body)
+      return response.body as unknown as ReportingSettings
+    },
+  }
+}
+
+/** Sets `facility`'s HMIS org unit ID (none when blank) and the forms reported through the platform. */
+export async function setReporting(transport: Transport, facility: string, orgUnit: string, forms: string[]): Promise<FacilityReporting> {
+  const trimmed = orgUnit.trim()
+  const response = await transport.request({
+    method: 'PUT',
+    path: `/places/reporting/${encodeURIComponent(facility)}`,
+    body: { orgUnit: trimmed === '' ? null : trimmed, forms },
+  })
+  if (response.status !== 200 || !isObject(response.body)) throw refused(response.status, response.body)
+  return response.body as unknown as FacilityReporting
 }
 
 // --- Role assignment at a place (`/api/assignments`, access.administer) ---

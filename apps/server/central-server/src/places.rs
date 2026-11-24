@@ -18,20 +18,35 @@
 //!   It answers the estimates with the file's figures, for the Studio to save to the draft, and
 //!   each district's annual totals, given and derived, to read before approval. Nothing is
 //!   written. It needs the Studio's `metadata.author`.
+//! - `GET /reporting` (#560; ADR 0069) answers each facility in the session's area with its HMIS
+//!   reporting settings: its HMIS org unit ID, the NHFR's, what is wrong with it against the
+//!   NHFR (`health_facility_registry::org_unit_flags`), and the forms (DHIS2 data sets, from
+//!   central's recorded copy of the instance's metadata) reported through the platform. It
+//!   needs `reporting.view`, so the district sees which forms it no longer keys, or
+//!   [`MANAGE_PERMISSION`].
+//! - `PUT /reporting/{facility}` sets them (`{"orgUnit": "…" | null, "forms": ["…"]}`), for a
+//!   facility in the session's area, audited. It needs [`MANAGE_PERMISSION`]; settings that are
+//!   not a DHIS2 ID, name a data set the recorded copy lacks, or report a form without an org
+//!   unit ID are refused (422). An ID the NHFR does not know is kept, and flagged.
 
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
-use health_analytics::{Estimates, EstimatesDefinition, parse_estimates_csv};
+use health_analytics::{
+    DataSetsExport, Dhis2Metadata, Estimates, EstimatesDefinition, parse_estimates_csv,
+};
 use health_audit::{Agent, Auditor, Entity, Interaction};
-use health_facility_registry::{ImportPlan, PlaceLevel, Places, parse_nhfr_csv, plan_import};
-use health_persistence::{RawJson, Store as _, WriteError};
+use health_facility_registry::{
+    FacilityReporting, FacilityReportingStore as _, ImportPlan, Place, PlaceLevel, Places,
+    org_unit_flags, parse_nhfr_csv, plan_import,
+};
+use health_persistence::{RawJson, Store as _, Transaction as _, WriteError};
 use health_publication::Publications;
 use health_registries_app::AuditTrail;
 use health_registries_app::places::{apply_import, places};
@@ -39,8 +54,11 @@ use health_surrealdb::{SurrealStore, SurrealTx};
 use health_time::Timestamp;
 use serde_json::{Value, json};
 
-/// The use-case permission that imports the NHFR's facility list.
+/// The use-case permission that imports the NHFR's facility list, and sets each facility's HMIS
+/// reporting settings.
 pub(crate) const MANAGE_PERMISSION: &str = "places.manage";
+/// The use-case permission that reads Reports, and so each facility's HMIS reporting settings.
+const REPORTING_VIEW: &str = "reporting.view";
 
 #[derive(Clone)]
 struct PlacesApi {
@@ -62,6 +80,8 @@ pub(crate) fn router(
         .route("/nhfr/preview", post(preview))
         .route("/nhfr/apply", post(apply))
         .route("/population/preview", post(population_preview))
+        .route("/reporting", get(reporting))
+        .route("/reporting/{facility}", put(set_reporting))
         .with_state(PlacesApi {
             store,
             publications,
@@ -333,6 +353,221 @@ fn district_totals(registry: &Places, estimates: &Estimates) -> Vec<Value> {
             })
         })
         .collect()
+}
+
+/// Central's recorded copy of the DHIS2 instance's metadata, if one is recorded (#560).
+async fn dhis2_metadata(tx: &mut SurrealTx) -> Result<Option<Dhis2Metadata>, Box<Response>> {
+    let export = tx
+        .dhis2_metadata()
+        .await
+        .map_err(|e| Box::new(unavailable(e)))?;
+    Ok(export.and_then(|text| {
+        serde_json::from_str::<DataSetsExport>(&text)
+            .ok()
+            .map(|e| e.metadata())
+    }))
+}
+
+/// A facility's row of the HMIS reporting settings: the place, its settings and their flags.
+fn reporting_row(place: &Place, all: &[FacilityReporting], registry: &Places) -> Value {
+    let setting = all
+        .iter()
+        .find(|s| s.facility == place.code)
+        .cloned()
+        .unwrap_or_else(|| FacilityReporting {
+            facility: place.code.clone(),
+            ..FacilityReporting::default()
+        });
+    json!({
+        "code": place.code,
+        "name": place.name,
+        "district": place.parent,
+        "active": place.active,
+        "nhfrOrgUnit": place.org_unit,
+        "orgUnit": setting.org_unit,
+        "forms": setting.forms,
+        "flags": org_unit_flags(registry, all, &setting),
+    })
+}
+
+/// `GET /reporting`.
+async fn reporting(State(api): State<PlacesApi>, subject: Option<Extension<Subject>>) -> Response {
+    let subject = match signed_in(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let manage = subject.permissions.has(MANAGE_PERMISSION);
+    if !manage && !subject.permissions.has(REPORTING_VIEW) {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "the facilities' HMIS reporting settings need reporting.view or places.manage",
+        );
+    }
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    let mut tx = match api.store.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return unavailable(e),
+    };
+    let all = match tx.facility_reporting().await {
+        Ok(all) => all,
+        Err(e) => return unavailable(e),
+    };
+    let metadata = match dhis2_metadata(&mut tx).await {
+        Ok(metadata) => metadata,
+        Err(response) => return *response,
+    };
+    let forms: Vec<Value> = metadata
+        .iter()
+        .flat_map(|m| &m.data_sets)
+        .map(|(id, set)| json!({ "id": id, "name": set.name, "periodType": set.period_type }))
+        .collect();
+    let facilities: Vec<Value> = registry
+        .area(subject.facility.as_str())
+        .into_iter()
+        .filter(|p| p.level == PlaceLevel::Facility)
+        .map(|place| reporting_row(place, &all, &registry))
+        .collect();
+    Json(json!({
+        "manage": manage,
+        "metadataRecorded": metadata.is_some(),
+        "forms": forms,
+        "facilities": facilities,
+    }))
+    .into_response()
+}
+
+/// The body of `PUT /reporting/{facility}`.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SetReporting {
+    #[serde(default)]
+    org_unit: Option<String>,
+    #[serde(default)]
+    forms: std::collections::BTreeSet<String>,
+}
+
+/// `PUT /reporting/{facility}`.
+async fn set_reporting(
+    State(api): State<PlacesApi>,
+    subject: Option<Extension<Subject>>,
+    agent: Option<Extension<Agent>>,
+    Path(facility): Path<String>,
+    body: Bytes,
+) -> Response {
+    let subject = match signed_in(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    if !subject.permissions.has(MANAGE_PERMISSION) {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "setting a facility's HMIS reporting needs places.manage",
+        );
+    }
+    let Ok(body) = serde_json::from_slice::<SetReporting>(&body) else {
+        return problem(
+            StatusCode::BAD_REQUEST,
+            "the body is not {\"orgUnit\": …, \"forms\": […]}",
+        );
+    };
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    if !registry.within(&facility, subject.facility.as_str()) {
+        return problem(
+            StatusCode::FORBIDDEN,
+            format!("{facility} is not in your area"),
+        );
+    }
+    let setting = FacilityReporting {
+        facility: facility.clone(),
+        org_unit: body
+            .org_unit
+            .map(|o| o.trim().to_owned())
+            .filter(|o| !o.is_empty()),
+        forms: body.forms,
+    };
+    let mut tx = match api.store.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return unavailable(e),
+    };
+    let metadata = match dhis2_metadata(&mut tx).await {
+        Ok(metadata) => metadata,
+        Err(response) => return *response,
+    };
+    let data_sets = metadata
+        .map(|m| m.data_sets.into_keys().collect())
+        .unwrap_or_default();
+    let problems = setting.problems(&registry, &data_sets);
+    if !problems.is_empty() {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "detail": "the HMIS reporting settings cannot be kept",
+                "problems": problems,
+            })),
+        )
+            .into_response();
+    }
+    if let Err(e) = tx.put_facility_reporting(&setting, &subject.account).await {
+        return unavailable(e);
+    }
+    let event = reporting_audit(agent, &subject, &setting);
+    if let Err(e) = health_audit::append(&mut tx, &event).await {
+        return unavailable(e);
+    }
+    let all = match tx.facility_reporting().await {
+        Ok(all) => all,
+        Err(e) => return unavailable(e),
+    };
+    if let Err(e) = tx.commit().await {
+        return unavailable(e);
+    }
+    match registry.get(&facility) {
+        Some(place) => Json(reporting_row(place, &all, &registry)).into_response(),
+        None => unavailable("a facility in the area is missing"),
+    }
+}
+
+/// The AuditEvent of setting `setting`, by the signed-in account.
+fn reporting_audit(
+    agent: Option<Extension<Agent>>,
+    subject: &Subject,
+    setting: &FacilityReporting,
+) -> Value {
+    let who = agent.map_or_else(
+        || json!({ "display": format!("account {}", subject.account) }),
+        |Extension(agent)| {
+            let mut who = json!({ "display": agent.display });
+            if let Some(reference) = agent.who {
+                who["reference"] = json!(reference);
+            }
+            who
+        },
+    );
+    let forms: Vec<&str> = setting.forms.iter().map(String::as_str).collect();
+    json!({
+        "resourceType": "AuditEvent",
+        "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/audit-event-type", "code": "rest", "display": "Restful Operation" }] }],
+        "code": { "coding": [{ "system": "urn:health:audit-event", "code": "facility-reporting" }] },
+        "action": "U",
+        "severity": "notice",
+        "recorded": Timestamp::now().to_string(),
+        "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
+        "agent": [{ "who": who, "requestor": true }],
+        "source": { "observer": { "display": "central" } },
+        "entity": [{
+            "what": { "display": format!("facility {}", setting.facility) },
+            "detail": [
+                { "type": { "text": "org unit" }, "valueString": setting.org_unit.as_deref().unwrap_or("none") },
+                { "type": { "text": "forms reported through the platform" }, "valueString": if forms.is_empty() { "none".to_owned() } else { forms.join(", ") } },
+            ],
+        }],
+    })
 }
 
 /// Audits each place an import writes, as the signed-in account.

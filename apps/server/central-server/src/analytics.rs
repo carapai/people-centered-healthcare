@@ -162,6 +162,7 @@ fn area(registry: &Places, subject: &Subject) -> Vec<Place> {
             care_level: None,
             ownership: None,
             coordinates: None,
+            org_unit: None,
         }];
     }
     area
