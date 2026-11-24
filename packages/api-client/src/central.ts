@@ -657,8 +657,19 @@ export type StudioDecisionTryInput = z.infer<typeof StudioDecisionTryInput>
 export const StudioDesignKind = z.enum(["form", "workflow", "decision-table", "code-system", "value-set", "program", "age-band-set", "indicator", "report", "dashboard", "population"])
 export type StudioDesignKind = z.infer<typeof StudioDesignKind>
 
+/** An estimate type a Population package declares. */
+export const StudioEstimateType = z.object({
+  /** Its code, what a denominator names (`expected-pregnancies`). */
+  "code": z.string(),
+  /** What a person reads. */
+  "title": z.string(),
+})
+export type StudioEstimateType = z.infer<typeof StudioEstimateType>
+
 /** One designed artefact, in the package version it opens in. */
 export const StudioDesign = z.object({
+  /** A year's Population Estimates' types, given and derived, in order: what an indicator's denominator may name (#553, #864). Empty for other designs. */
+  "estimateTypes": z.array(StudioEstimateType),
   /** Its kind. */
   "kind": StudioDesignKind,
   /** The package name. */

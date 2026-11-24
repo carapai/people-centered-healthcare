@@ -5,7 +5,7 @@ import firstVisits from '../../../packages/reference-packages/anc/Measure-anc-fi
 import gestationalAge from '../../../packages/reference-packages/anc/Measure-anc-gestational-age-at-first-visit.json'
 import { editorOf, newDesign, sections } from '../src/features/studio/designs'
 import type { Criteria } from '../src/features/studio/indicators/conditions'
-import { addDenominator, explainedConditions, indicatorProblems, indicatorTest, newIndicator, periodOf, readIndicator, removeDenominator, withCalculation, writeIndicator, type Indicator } from '../src/features/studio/indicators/indicator'
+import { DENOMINATOR_ESTIMATE, addDenominator, estimateTypesOf, explainedConditions, indicatorProblems, indicatorTest, newIndicator, periodOf, readIndicator, removeDenominator, withCalculation, withDenominatorEstimate, writeIndicator, type Indicator } from '../src/features/studio/indicators/indicator'
 
 // The indicator editor (#537): a Measure read as what the editor edits and written back, the
 // denominator added and removed, the problems Validation would refuse, and Try's periods.
@@ -101,6 +101,47 @@ test('removing the denominator turns the indicator into a count, saved as cohort
   // A rate keeps its factor; a value calculation has no denominator.
   expect(writeIndicator(measure, { ...withCalculation(indicator, 'rate'), ratePer: 10000 })['extension']).toContainEqual({ url: 'https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-rate-per', valueInteger: 10000 })
   expect(withCalculation(indicator, 'sum').denominator).toBeNull()
+})
+
+// #864: ANC 1st visit coverage, its denominator the place's expected pregnancies (#553).
+describe('a denominator from a Population Estimate', () => {
+  const { measure, indicator } = read(firstVisits)
+  const coverage = withDenominatorEstimate(addDenominator(indicator), 'expected-pregnancies')
+
+  test('saves as the estimate extension with no denominator population, and reads back', () => {
+    expect(coverage).toMatchObject({ calculation: 'percentage', denominatorEstimate: 'expected-pregnancies' })
+    const written = writeIndicator(measure, coverage)
+    expect(written['extension']).toContainEqual({ url: DENOMINATOR_ESTIMATE, valueCode: 'expected-pregnancies' })
+    expect(populationsOf(written).map(([code]) => code)).toEqual(['initial-population', 'numerator'])
+    expect(read(written).indicator.denominatorEstimate).toBe('expected-pregnancies')
+    // Try has no denominator conditions to explain.
+    expect(explainedConditions(coverage).every((e) => e.side === 'numerator')).toBe(true)
+  })
+
+  test('counting it from records again, or dropping the denominator, removes the estimate', () => {
+    const counted = withDenominatorEstimate(coverage, null)
+    const written = writeIndicator(measure, counted)
+    expect(written['extension']).not.toContainEqual(expect.objectContaining({ url: DENOMINATOR_ESTIMATE }))
+    expect(populationsOf(written).map(([code]) => code)).toEqual(['initial-population', 'denominator', 'numerator'])
+    expect(removeDenominator(coverage).denominatorEstimate).toBeNull()
+    expect(writeIndicator(measure, removeDenominator(coverage))['extension']).not.toContainEqual(expect.objectContaining({ url: DENOMINATOR_ESTIMATE }))
+    // A count cannot take one.
+    expect(withDenominatorEstimate(indicator, 'expected-pregnancies').denominatorEstimate).toBeNull()
+  })
+
+  test('the picker offers each Population package type once', () => {
+    const types = [
+      { code: 'total-population', title: 'Total population' },
+      { code: 'expected-pregnancies', title: 'Expected pregnancies' },
+    ]
+    expect(
+      estimateTypesOf([
+        { kind: 'population', estimateTypes: types },
+        { kind: 'population', estimateTypes: [{ code: 'expected-pregnancies', title: 'Expected pregnancies' }, { code: 'under-1', title: '' }] },
+        { kind: 'indicator', estimateTypes: [] },
+      ]),
+    ).toEqual([...types, { code: 'under-1', title: 'under-1' }])
+  })
 })
 
 const member = (measure: string): Criteria => ({ kind: 'group', join: 'all', children: [{ kind: 'member', measure, side: 'numerator' }] })

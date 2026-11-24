@@ -93,7 +93,7 @@ pub use disaggregation::{
 };
 pub use estimates::{
     ESTIMATES_FILE, EstimateTypeDefinition, Estimates, EstimatesDefinition, Figure, PLACE_COLUMN,
-    over_estimate, parse_estimates_csv, pro_rata,
+    PopulationEstimates, over_estimate, parse_estimates_csv, pro_rata,
 };
 pub use indicator::{
     Aggregate, BetweenDefinition, Calculation, Counts, Expression, FHIRPATH, Indicator,

@@ -113,3 +113,31 @@ test('ANC 1st visits by age band show a series per band, and series by place com
   await expect(table.getByRole('rowheader')).toHaveText(['Kisenyi HC IV', 'Kawempe HC III', 'Kitebi HC III'])
   await noViolations(page)
 })
+
+// #553: coverage against Population Estimates. The sample ANC 1st visit coverage divides each
+// place's first visits by its expected pregnancies for the month (5% of the total population,
+// over 12) from the sample Population package the backend publishes for this year: Kampala's
+// district figure and Kisenyi HC IV's own catchment; Kawempe HC III has none, so no figure.
+test('coverage is over each place’s expected pregnancies, and a facility without an estimate has no figure', async ({ page }) => {
+  await signIn(page, USERS.district)
+  await press(page, 'Data explorer', 'link')
+  const pickers = page.getByRole('form', { name: 'What to show' })
+  const card = page.getByRole('article', { name: 'Visualization' })
+  const coverage = 'ANC 1st visit coverage (sample)'
+  await pickers.getByRole('checkbox', { name: 'ANC 1st visit before 12 weeks (sample)' }).uncheck()
+  await pickers.getByRole('checkbox', { name: coverage }).check()
+  await pickers.getByLabel('Period type').selectOption({ label: 'Months' })
+  const months = await pickers.getByLabel('From').getByRole('option').allTextContents()
+  await pickers.getByLabel('From').selectOption(months.at(-1) ?? '')
+  await pickers.getByRole('checkbox', { name: 'Kisenyi HC IV' }).check()
+  await pickers.getByRole('checkbox', { name: 'Kawempe HC III' }).check()
+  await card.getByRole('group', { name: 'Chart type' }).getByRole('button', { name: 'Table' }).click()
+
+  const table = card.getByRole('table', { name: 'Figures' })
+  await expect(table.getByRole('row', { name: /Kampala/ }).getByRole('cell')).toHaveText(/^\d/)
+  await expect(table.getByRole('row', { name: /Kisenyi HC IV/ }).getByRole('cell')).toHaveText(/^\d/)
+  await expect(table.getByRole('row', { name: /Kawempe HC III/ }).getByRole('cell')).toHaveText('—')
+  await expect(card.getByText(`${coverage} is over each place’s Expected pregnancies for the period, from the year’s Population estimates.`)).toBeVisible()
+  await expect(card.getByText('No estimate of Expected pregnancies for Kawempe HC III: no figure is shown rather than a guessed share.')).toBeVisible()
+  await noViolations(page)
+})

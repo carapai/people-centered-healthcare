@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use health_analytics::{
     Aggregate, Band, Calculation, Counts, Disaggregated, Disaggregation, DisaggregationSource,
-    Indicator, IndicatorStore as _, NOT_RECORDED, Period, PeriodType, StoredSummary, Summary,
-    Values,
+    Indicator, IndicatorStore as _, NOT_RECORDED, Period, PeriodType, PopulationEstimates,
+    StoredSummary, Summary, Values,
 };
 use health_analytics_app::explore::{
     ExplorePlace, Figure, OwnSummaries, cells_json, explore, indicator_json,
@@ -151,6 +151,7 @@ async fn a_district_s_months_count_its_reported_facilities_and_list_the_missing_
         &[visits(), weeks()],
         std::slice::from_ref(&march),
         &[district, place("KAM013", &["KAM013"])],
+        &PopulationEstimates::default(),
     )
     .await
     .expect("explored");
@@ -193,6 +194,7 @@ async fn a_facility_s_median_shows_at_facility_level() {
         &[weeks()],
         &[march],
         &[place("KAM013", &["KAM013"])],
+        &PopulationEstimates::default(),
     )
     .await
     .expect("explored");
@@ -221,6 +223,7 @@ async fn an_edge_explores_its_own_months_offline() {
         &[visits()],
         &[march, april],
         &[place("KAM013", &["KAM013"])],
+        &PopulationEstimates::default(),
     )
     .await
     .expect("explored");
@@ -457,6 +460,7 @@ async fn anc_first_visits_by_age_band_give_one_figure_per_band() {
         &[anc],
         &[march],
         &[place("district-kampala", &["KAM013", "KAM020"])],
+        &PopulationEstimates::default(),
     )
     .await
     .expect("explored");
@@ -515,6 +519,7 @@ async fn a_band_s_percentage_rolls_up_from_summed_parts_never_averaged() {
         &[positivity],
         &[march],
         &[place("district-kampala", &["KAM013", "KAM020"])],
+        &PopulationEstimates::default(),
     )
     .await
     .expect("explored");
@@ -560,5 +565,106 @@ fn a_question_splits_by_a_disaggregation_every_indicator_has() {
     assert_eq!(
         indicator_json(&visits_by_age())["disaggregations"],
         json!([{ "name": AGE, "by": "age" }])
+    );
+}
+
+/// ANC 1st visit coverage (#553): a place's first visits over its expected pregnancies for the
+/// period, pro rata, from the year's Population package; a facility below the figures has *no
+/// estimate*, never a guessed share.
+#[tokio::test]
+async fn coverage_is_each_place_s_count_over_its_estimate_for_the_period() {
+    use health_analytics::{EstimateTypeDefinition, EstimatesDefinition, Figure as Given};
+    let central = store().await;
+    let march = month("2026-03");
+    let coverage = Indicator {
+        estimate: Some("expected-pregnancies".into()),
+        ..indicator("anc1-coverage", Calculation::Percentage)
+    };
+    let first_visits = |count| Summary {
+        value: None,
+        denominator: None,
+        ..summary(&coverage, count)
+    };
+    for (facility, count) in [("KAM013", 420), ("KAM020", 330)] {
+        let report = measure_report(
+            &coverage.canonical(),
+            &march,
+            facility,
+            &first_visits(count),
+            "2026-04-01T06:00:00Z",
+        );
+        synced(
+            &central,
+            facility,
+            &[StoredSummary {
+                measure: coverage.canonical(),
+                period: march.clone(),
+                facility: facility.into(),
+                report: report.to_string(),
+            }],
+        )
+        .await;
+    }
+    let parents = BTreeMap::from([
+        ("KAM013", "district-kampala"),
+        ("KAM020", "district-kampala"),
+    ]);
+    let estimates = PopulationEstimates::new(
+        [EstimatesDefinition {
+            year: 2026,
+            types: vec![
+                EstimateTypeDefinition {
+                    code: "total-population".into(),
+                    title: "Total population".into(),
+                    derived_from: None,
+                    percent: None,
+                },
+                EstimateTypeDefinition {
+                    code: "expected-pregnancies".into(),
+                    title: "Expected pregnancies".into(),
+                    derived_from: Some("total-population".into()),
+                    percent: Some("5".into()),
+                },
+            ],
+            figures: vec![Given {
+                place: "district-kampala".into(),
+                kind: "total-population".into(),
+                value: 1_797_722,
+            }],
+        }],
+        |code| parents.get(code).map(|p| (*p).to_owned()),
+    );
+    let mut tx = central.begin().await.expect("begin");
+    let cells = explore(
+        &mut tx,
+        std::slice::from_ref(&coverage),
+        std::slice::from_ref(&march),
+        &[
+            place("district-kampala", &["KAM013", "KAM020"]),
+            place("KAM013", &["KAM013"]),
+        ],
+        &estimates,
+    )
+    .await
+    .expect("explored");
+    drop(tx);
+    let json = cells_json(&cells, &BTreeMap::new(), None);
+    // 750 over 89,886.1 / 12 = 7,490.51 expected pregnancies in March: 10.01%.
+    assert_eq!(json[0]["value"], "10.01", "{json}");
+    assert_eq!(json[0]["count"], 750);
+    assert_eq!(json[0]["estimate"]["type"], "expected-pregnancies");
+    assert_eq!(json[0]["estimate"]["title"], "Expected pregnancies");
+    assert_eq!(json[0]["estimate"]["value"], "7490.51");
+    // The facility has no estimate of its own: no figure.
+    assert_eq!(json[1]["value"], serde_json::Value::Null);
+    assert_eq!(json[1]["count"], 420);
+    assert_eq!(json[1]["estimate"]["value"], serde_json::Value::Null);
+    assert_eq!(
+        indicator_json(&coverage)["denominatorEstimate"],
+        "expected-pregnancies"
+    );
+    assert_eq!(
+        indicator_json(&visits())["denominatorEstimate"],
+        serde_json::Value::Null
     );
 }

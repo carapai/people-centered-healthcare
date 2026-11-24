@@ -17,6 +17,7 @@ use health_time::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use health_analytics::EstimateTypeDefinition;
 use health_analytics_app::is_age_band_set;
 
 use crate::dashboards::dashboards_in;
@@ -74,6 +75,10 @@ pub struct Design {
     pub package: String,
     /// The package version it is read from (`name@version`).
     pub package_id: String,
+    /// A year's Population Estimates' types, given and derived, in order: what an indicator's
+    /// denominator may name (#553, #864). None for other designs.
+    #[serde(default)]
+    pub estimate_types: Vec<EstimateTypeDefinition>,
 }
 
 /// A package's open draft.
@@ -161,6 +166,7 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
         version,
         package: package.to_owned(),
         package_id: id.to_owned(),
+        estimate_types: Vec::new(),
     };
     let (workflows, _) = workflow_definitions(&packed.files);
     let mut found = Vec::new();
@@ -205,18 +211,15 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
         found.push(design(DesignKind::Report, title, &path, None, None, None));
     }
     for (path, estimates) in estimates_in(&packed.files) {
+        let estimates = estimates.ok();
         let title = estimates
-            .ok()
+            .as_ref()
             .map(|e| format!("Population estimates {}", e.year))
             .unwrap_or_else(|| path.clone());
-        found.push(design(
-            DesignKind::Population,
-            title,
-            &path,
-            None,
-            None,
-            None,
-        ));
+        found.push(Design {
+            estimate_types: estimates.map(|e| e.types).unwrap_or_default(),
+            ..design(DesignKind::Population, title, &path, None, None, None)
+        });
     }
     for (path, dashboard) in dashboards_in(packed) {
         let title = dashboard

@@ -19,6 +19,11 @@
 //!   is the facility, and each item is answered by `/explore` over the node's own summaries.
 //!   Saved Dashboards are central's (user content, #602), so none are listed and none are made.
 //!
+//! A percentage or rate over a Population Estimate type (#553; ADR 0071) is the facility's count
+//! over its own estimate for the period: the node keeps only its own place's figures of the
+//! active Population packages ([`estimates_here`]), so a facility without a catchment figure
+//! shows *no estimate*.
+//!
 //! Each needs [`VIEW_PERMISSION`].
 
 use axum::extract::State;
@@ -27,7 +32,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
-use health_analytics::{Indicator, STANDARD_PERIODS};
+use health_analytics::{Indicator, PopulationEstimates, STANDARD_PERIODS};
 use health_analytics_app::dashboards::standard_json;
 use health_analytics_app::explore::{
     ExplorePlace, OwnSummaries, cells_json, explore, indicator_json, periods_json, read_question,
@@ -110,11 +115,38 @@ pub async fn map_here(store: &SurrealStore, facility: &str) -> Value {
     json!({ "areas": [], "facilities": facilities })
 }
 
+/// The Population Estimates of the active packages (`packages`, each by its id with its files)
+/// that this node keeps: every year's estimate types, and only `facility`'s own figures. Each
+/// edge has its own places' figures (ADR 0071); a district's are central's.
+pub fn estimates_here<'a>(
+    packages: impl IntoIterator<Item = (&'a str, &'a health_packages::Files)>,
+    facility: &str,
+) -> PopulationEstimates {
+    let mut years = Vec::new();
+    for (_, files) in packages {
+        let population = files
+            .get("package.json")
+            .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
+            .is_some_and(|package| package["kind"] == "population");
+        if !population {
+            continue;
+        }
+        for (_, read) in health_publication::estimates_in(files) {
+            // Validation refused estimates that do not read before they were published.
+            if let Ok(definition) = read {
+                years.push(definition.for_places(|place| place == facility));
+            }
+        }
+    }
+    PopulationEstimates::new(years, |_| None)
+}
+
 /// The answer to the question `body` over `facility`'s own summaries in `store`, offering
-/// `indicators`, as of `now`.
+/// `indicators`, with the facility's own Population Estimates, as of `now`.
 pub async fn explore_here(
     store: &SurrealStore,
     indicators: &[Indicator],
+    estimates: &PopulationEstimates,
     facility: &str,
     body: &Value,
     now: jiff::Timestamp,
@@ -133,9 +165,15 @@ pub async fn explore_here(
         code: facility.to_owned(),
         facilities: vec![facility.to_owned()],
     };
-    let cells = explore(&mut own, &question.indicators, &question.periods, &[place])
-        .await
-        .map_err(unavailable)?;
+    let cells = explore(
+        &mut own,
+        &question.indicators,
+        &question.periods,
+        &[place],
+        estimates,
+    )
+    .await
+    .map_err(unavailable)?;
     drop(tx);
     let names = [(facility.to_owned(), name_of(store, facility).await)].into();
     Ok(json!({
@@ -273,9 +311,17 @@ async fn explore_route(
         Ok(indicators) => indicators,
         Err(refusal) => return refused(refusal),
     };
+    let estimates = match crate::indicators::active_files(&explorer.store, &explorer.blobs).await {
+        Ok(packages) => estimates_here(
+            packages.iter().map(|(id, files)| (id.as_str(), files)),
+            &explorer.facility,
+        ),
+        Err(error) => return refused(unavailable(error)),
+    };
     match explore_here(
         &explorer.store,
         &indicators,
+        &estimates,
         &explorer.facility,
         &body,
         jiff::Timestamp::now(),

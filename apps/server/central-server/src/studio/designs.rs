@@ -71,6 +71,19 @@ pub(crate) struct StudioDesign {
     /// The package version it opens in (`name@version`): the open draft, else the latest
     /// published version.
     pub(crate) package_id: String,
+    /// A year's Population Estimates' types, given and derived, in order: what an indicator's
+    /// denominator may name (#553, #864). Empty for other designs.
+    pub(crate) estimate_types: Vec<StudioEstimateType>,
+}
+
+/// An estimate type a Population package declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioEstimateType {
+    /// Its code, what a denominator names (`expected-pregnancies`).
+    pub(crate) code: String,
+    /// What a person reads.
+    pub(crate) title: String,
 }
 
 impl From<&Design> for StudioDesign {
@@ -84,6 +97,14 @@ impl From<&Design> for StudioDesign {
             version: design.version.clone(),
             package: design.package.clone(),
             package_id: design.package_id.clone(),
+            estimate_types: design
+                .estimate_types
+                .iter()
+                .map(|t| StudioEstimateType {
+                    code: t.code.clone(),
+                    title: t.title.clone(),
+                })
+                .collect(),
         }
     }
 }

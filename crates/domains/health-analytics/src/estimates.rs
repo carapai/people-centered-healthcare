@@ -98,6 +98,22 @@ impl EstimatesDefinition {
         self.types.iter().find(|t| t.code == code)
     }
 
+    /// These estimates with only the figures of the places `keep` holds, every type still
+    /// declared: what a Facility Edge Node keeps of a Population package, its own places'
+    /// figures (ADR 0071).
+    pub fn for_places(&self, keep: impl Fn(&str) -> bool) -> Self {
+        Self {
+            year: self.year,
+            types: self.types.clone(),
+            figures: self
+                .figures
+                .iter()
+                .filter(|f| keep(&f.place))
+                .cloned()
+                .collect(),
+        }
+    }
+
     /// Every reason these estimates cannot be published.
     pub fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
@@ -404,6 +420,73 @@ impl Estimates {
             count,
             self.for_period(place, kind, period),
         )
+    }
+}
+
+/// Every year's estimates a node holds, one Population package per year (ADR 0071): a period
+/// takes those of the year it starts in, so a financial year from July 2025 takes 2025's.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PopulationEstimates {
+    years: BTreeMap<i32, Estimates>,
+}
+
+impl PopulationEstimates {
+    /// The estimates of each of `definitions`, summed upward with `parent` naming the place
+    /// directly above a code. A year given twice keeps the last given.
+    pub fn new(
+        definitions: impl IntoIterator<Item = EstimatesDefinition>,
+        parent: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let years = definitions
+            .into_iter()
+            .map(|definition| (definition.year, Estimates::new(definition, &parent)))
+            .collect();
+        Self { years }
+    }
+
+    /// Whether no year has estimates.
+    pub fn is_empty(&self) -> bool {
+        self.years.is_empty()
+    }
+
+    /// The estimates `period` takes: those of the year it starts in.
+    pub fn of(&self, period: &Period) -> Option<&Estimates> {
+        self.years.get(&i32::from(period.start.year()))
+    }
+
+    /// The estimate `indicator`'s denominator is at `place` over `period`, pro rata; none when
+    /// its denominator is not an estimate, no Population package covers the period, or the
+    /// place has *no estimate*.
+    pub fn estimate(&self, indicator: &Indicator, place: &str, period: &Period) -> Option<Decimal> {
+        let kind = indicator.estimate.as_deref()?;
+        self.of(period)?.for_period(place, kind, period)
+    }
+
+    /// `indicator`'s figure at `place` over `period` from the `count` its facilities' summaries
+    /// add up to, over the place's estimate ([`over_estimate`]); none as for [`Self::estimate`].
+    pub fn figure(
+        &self,
+        indicator: &Indicator,
+        count: u64,
+        place: &str,
+        period: &Period,
+    ) -> Option<Decimal> {
+        over_estimate(
+            indicator.calculation,
+            count,
+            self.estimate(indicator, place, period),
+        )
+    }
+
+    /// What a person reads for estimate type `kind` in the year `period` takes: its title, else
+    /// its code.
+    pub fn title(&self, kind: &str, period: &Period) -> String {
+        self.of(period)
+            .and_then(|e| e.definition().estimate_type(kind))
+            .map(|t| t.title.trim())
+            .filter(|t| !t.is_empty())
+            .unwrap_or(kind)
+            .to_owned()
     }
 }
 

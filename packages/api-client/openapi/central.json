@@ -4302,9 +4302,17 @@
           "title",
           "path",
           "package",
-          "packageId"
+          "packageId",
+          "estimateTypes"
         ],
         "properties": {
+          "estimateTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioEstimateType"
+            },
+            "description": "A year's Population Estimates' types, given and derived, in order: what an indicator's\ndenominator may name (#553, #864). Empty for other designs."
+          },
           "kind": {
             "$ref": "#/components/schemas/StudioDesignKind",
             "description": "Its kind."
@@ -4525,6 +4533,24 @@
           "summary": {
             "type": "string",
             "description": "One plain line, e.g. \"Item bp: text reworded\"."
+          }
+        }
+      },
+      "StudioEstimateType": {
+        "type": "object",
+        "description": "An estimate type a Population package declares.",
+        "required": [
+          "code",
+          "title"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Its code, what a denominator names (`expected-pregnancies`)."
+          },
+          "title": {
+            "type": "string",
+            "description": "What a person reads."
           }
         }
       },

@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-24.
 
-Population packages (#553, part 1; ADR 0071) are in: a `population` package kind holds a year's estimate types and figures, summed upward and taken pro rata to a period, a Measure may name an estimate type as its denominator (`indicator-denominator-estimate`), and the Studio imports the HMIS lead's CSV after central checks its place codes against the facility registry and shows each district's totals. Syncing each edge its own places' figures and using estimates in the explorer, Reports, Dashboards and the indicator editor (#864) remain.
+Population packages (#553; ADR 0071) are in: a `population` package kind holds a year's estimate types and figures, summed upward and taken pro rata to a period, the Studio imports the HMIS lead's CSV after central checks its place codes against the facility registry, and a Measure may name an estimate type as its denominator, picked in the indicator editor (#864). Central's explorer and Dashboards divide such an indicator's count by each place's estimate from the published Population packages (a place without one shows no figure), and each edge keeps only its own facility's figures. Running Reports over stored summaries (#557) is still to come and will take the same path.
 
 ## Phase
 

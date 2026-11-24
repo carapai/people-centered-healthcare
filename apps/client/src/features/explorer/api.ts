@@ -28,6 +28,8 @@ export interface ExplorerIndicator {
   thresholds: ThresholdBand[]
   /** What it is broken down by (#601): by an Age Band Set's bands or by a coded value's. */
   disaggregations: ExplorerDisaggregation[]
+  /** The Population Estimate type its denominator is (#553), if it is not counted from records. */
+  denominatorEstimate?: string | null
 }
 
 /** A disaggregation an indicator offers, by its name. */
@@ -108,6 +110,31 @@ export interface Cell {
   computedAt?: string | null
   /** Split by the question's disaggregation: each band's figure, in the summary's order (#601). */
   bands?: BandFigure[]
+  /** For an indicator over a Population Estimate type (#553): what its facilities counted. */
+  count?: number | null
+  /** For an indicator over a Population Estimate type (#553): the place's estimate for the period. */
+  estimate?: CellEstimate
+}
+
+/** The Population Estimate a figure's denominator is (#553; ADR 0071). */
+export interface CellEstimate {
+  /** The estimate type's code (`expected-pregnancies`). */
+  type: string
+  title: string
+  /** The place's estimate for the period, pro rata, as exact decimal text; null when it has none. */
+  value: string | null
+}
+
+/** Each indicator over a Population Estimate type in `answer` (#553), with the places that have no estimate for some period asked. */
+export function estimateNotes(answer: Answer): { indicator: string; estimate: string; without: string[] }[] {
+  const notes = new Map<string, { indicator: string; estimate: string; without: string[] }>()
+  for (const cell of answer.cells) {
+    if (cell.estimate === undefined) continue
+    const note = notes.get(cell.indicator) ?? { indicator: cell.indicator, estimate: cell.estimate.title, without: [] }
+    if (cell.estimate.value === null && !note.without.includes(cell.place)) note.without.push(cell.place)
+    notes.set(cell.indicator, note)
+  }
+  return [...notes.values()]
 }
 
 /** One band's figure: recomputed at central from the band's own summed parts, never an average. */
@@ -164,7 +191,7 @@ export function answerQuery(transport: Transport, question: Question) {
       if (response.status !== 200 || typeof response.body !== 'object' || response.body === null) throw new ExplorerError(response.status, detailOf(response.body))
       const answer = response.body as Answer
       // Counts arrive as exact JSON numbers (lossless-json): plain numbers here.
-      return { ...answer, cells: answer.cells.map((c) => ({ ...c, ...(c.reported === undefined ? {} : { reported: plainCount(c.reported) ?? 0 }), ...(c.expected === undefined ? {} : { expected: plainCount(c.expected) ?? 0 }) })) }
+      return { ...answer, cells: answer.cells.map((c) => ({ ...c, ...(c.reported === undefined ? {} : { reported: plainCount(c.reported) ?? 0 }), ...(c.expected === undefined ? {} : { expected: plainCount(c.expected) ?? 0 }), ...(c.count === undefined ? {} : { count: plainCount(c.count) ?? null }) })) }
     },
   }
 }

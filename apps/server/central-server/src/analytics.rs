@@ -9,6 +9,11 @@
 //!   last sync, never counted as zero; a median or a distinct count above facility level has no
 //!   figure and says why. A place outside the session's area is refused (403).
 //!
+//!   An indicator whose denominator is a Population Estimate type (#553; ADR 0071) is each
+//!   place's summed count over the place's estimate for the period, pro rata, from the newest
+//!   published version of the year's Population package, the figures summed upward through the
+//!   facility registry's hierarchy; a place below the figures given has *no estimate*.
+//!
 //! - `GET /map` (#604) answers what a map of the area draws: each district's and region's
 //!   boundary from the national core package, and each open facility's NHFR coordinates.
 //!
@@ -44,8 +49,8 @@ use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
 use health_analytics::{
-    Indicator, STANDARD_PERIODS, SavedDashboard, SavedDashboards as _, SavedVisualization, Share,
-    Viewer,
+    EstimatesDefinition, Indicator, PopulationEstimates, STANDARD_PERIODS, SavedDashboard,
+    SavedDashboards as _, SavedVisualization, Share, Viewer,
 };
 use health_analytics_app::dashboards::{
     AUTHOR_PERMISSION, EACH_AREA_UNDER, MOST_ITEMS, copied_setup, dashboard_json, read_setup,
@@ -228,11 +233,27 @@ async fn explore_route(
             facilities,
         });
     }
+    let estimates = if question.indicators.iter().any(|i| i.estimate.is_some()) {
+        match api.catalogue.estimates().await {
+            Ok(years) => estimates_over(years, &registry),
+            Err(error) => return unavailable(error),
+        }
+    } else {
+        PopulationEstimates::default()
+    };
     let mut tx = match api.store.begin().await {
         Ok(tx) => tx,
         Err(error) => return unavailable(error),
     };
-    let cells = match explore(&mut tx, &question.indicators, &question.periods, &picked).await {
+    let cells = match explore(
+        &mut tx,
+        &question.indicators,
+        &question.periods,
+        &picked,
+        &estimates,
+    )
+    .await
+    {
         Ok(cells) => cells,
         Err(error) => return unavailable(error),
     };
@@ -246,6 +267,16 @@ async fn explore_route(
         "cells": cells_json(&cells, &names, question.disaggregation.as_deref()),
     }))
     .into_response()
+}
+
+/// `years` of Population Estimates over the facility registry's hierarchy: each figure summed
+/// up through the places above it.
+fn estimates_over(years: Vec<EstimatesDefinition>, registry: &Places) -> PopulationEstimates {
+    let parents: BTreeMap<String, String> = registry
+        .iter()
+        .filter_map(|p| p.parent.clone().map(|parent| (p.code.clone(), parent)))
+        .collect();
+    PopulationEstimates::new(years, |code| parents.get(code).cloned())
 }
 
 /// `GET /map` (#604): what a map of the session's area draws, from the facility registry and the
@@ -722,6 +753,7 @@ pub(crate) enum Catalogue {
         Vec<Indicator>,
         Vec<PublishedDashboard>,
         Option<AdministrativeBoundaries>,
+        Vec<EstimatesDefinition>,
     ),
 }
 
@@ -734,7 +766,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(indicators, _, _) => Ok(indicators.clone()),
+            Self::Fixed(indicators, _, _, _) => Ok(indicators.clone()),
         }
     }
 
@@ -746,7 +778,21 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, dashboards, _) => Ok(dashboards.clone()),
+            Self::Fixed(_, dashboards, _, _) => Ok(dashboards.clone()),
+        }
+    }
+
+    /// The Population Estimates of the newest published version of each Population package
+    /// (#553).
+    async fn estimates(&self) -> Result<Vec<EstimatesDefinition>, String> {
+        match self {
+            Self::Published(None) => Ok(Vec::new()),
+            Self::Published(Some(publications)) => publications
+                .published_estimates()
+                .await
+                .map_err(|e| e.to_string()),
+            #[cfg(test)]
+            Self::Fixed(_, _, _, estimates) => Ok(estimates.clone()),
         }
     }
 
@@ -759,7 +805,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, _, boundaries) => Ok(boundaries.clone()),
+            Self::Fixed(_, _, boundaries, _) => Ok(boundaries.clone()),
         }
     }
 }
@@ -838,6 +884,14 @@ mod tests {
         indicator("gestational-age", Calculation::Value(Aggregate::Median))
     }
 
+    /// ANC 1st visit coverage (#553): first visits over the place's expected pregnancies.
+    fn coverage() -> Indicator {
+        Indicator {
+            estimate: Some("expected-pregnancies".into()),
+            ..indicator("anc1-coverage", Calculation::Percentage)
+        }
+    }
+
     /// Kampala (KAM013, KAM020, KAM031) and Wakiso (WAK001), with KAM013's and KAM020's March
     /// synced and KAM031 never synced.
     async fn central() -> SurrealStore {
@@ -879,7 +933,7 @@ mod tests {
         let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
         for (facility, count) in [("KAM013", 4), ("KAM020", 6), ("WAK001", 50)] {
             let mut tx = store.begin().await.expect("begin");
-            for indicator in [visits(), weeks()] {
+            for indicator in [visits(), weeks(), coverage()] {
                 let summary = Summary {
                     calculation: indicator.calculation,
                     value: Some(Decimal::from(count)),
@@ -953,7 +1007,7 @@ mod tests {
         path: &str,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
-        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new(), None);
+        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new(), None, Vec::new());
         ask_in(store, catalogue, subject, roles, method, path, body).await
     }
 
@@ -1003,6 +1057,70 @@ mod tests {
             "to": "2026-03",
             "places": places,
         })
+    }
+
+    /// #553: ANC 1st visit coverage at district level uses the district's expected pregnancies
+    /// from the published Population package, summed up the facility registry's hierarchy; a
+    /// facility without a figure of its own, and a district without one, show *no estimate*.
+    #[tokio::test]
+    async fn coverage_at_district_level_uses_the_district_s_expected_pregnancies() {
+        use health_analytics::{EstimateTypeDefinition, Figure};
+        let store = central().await;
+        let estimates = EstimatesDefinition {
+            year: 2026,
+            types: vec![
+                EstimateTypeDefinition {
+                    code: "total-population".into(),
+                    title: "Total population".into(),
+                    derived_from: None,
+                    percent: None,
+                },
+                EstimateTypeDefinition {
+                    code: "expected-pregnancies".into(),
+                    title: "Expected pregnancies".into(),
+                    derived_from: Some("total-population".into()),
+                    percent: Some("5".into()),
+                },
+            ],
+            // Kampala's figures are its sub-counties'; nothing above them is given.
+            figures: vec![Figure {
+                place: "district-kampala".into(),
+                kind: "total-population".into(),
+                value: 24_000,
+            }],
+        };
+        let catalogue = Catalogue::Fixed(vec![coverage()], Vec::new(), None, vec![estimates]);
+        let national = subject("central", true, [VIEW_PERMISSION]);
+        let question = json!({
+            "indicators": [coverage().canonical()],
+            "periodType": "monthly",
+            "from": "2026-03",
+            "to": "2026-03",
+            "places": ["district-kampala", "KAM013", "district-wakiso", "region-central"],
+        });
+        let (status, explored) = ask_in(
+            &store,
+            catalogue,
+            national,
+            &[],
+            "POST",
+            "/explore",
+            Some(question),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{explored}");
+        let cells = explored["cells"].as_array().expect("cells");
+        // 4 + 6 first visits over 5% of 24,000 / 12 = 100 expected pregnancies in March.
+        assert_eq!(cells[0]["value"], "10", "{explored}");
+        assert_eq!(cells[0]["estimate"]["value"], "100");
+        assert_eq!(cells[0]["estimate"]["title"], "Expected pregnancies");
+        assert_eq!(cells[0]["count"], 10);
+        for at in [1, 2] {
+            assert_eq!(cells[at]["value"], Value::Null, "{}", cells[at]);
+            assert_eq!(cells[at]["estimate"]["value"], Value::Null);
+        }
+        // The region sums Kampala's figure: Wakiso's 50 and Kampala's 10 over 100.
+        assert_eq!(cells[3]["value"], "60");
     }
 
     #[tokio::test]
@@ -1103,7 +1221,8 @@ mod tests {
     }
 
     async fn map_for(store: &SurrealStore, subject: Subject) -> (StatusCode, Value) {
-        let catalogue = Catalogue::Fixed(vec![visits()], Vec::new(), Some(boundaries()));
+        let catalogue =
+            Catalogue::Fixed(vec![visits()], Vec::new(), Some(boundaries()), Vec::new());
         ask_in(store, catalogue, subject, &[], "GET", "/map", None).await
     }
 
@@ -1450,6 +1569,7 @@ mod tests {
                 dashboard,
             }],
             None,
+            Vec::new(),
         )
     }
 

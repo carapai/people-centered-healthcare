@@ -24,6 +24,7 @@ import {
   RATE_FACTORS,
   addDenominator,
   declaredDates,
+  estimateTypesOf,
   explainedConditions,
   hasDenominator,
   indicatorProblems,
@@ -34,10 +35,12 @@ import {
   removeDenominator,
   takesValue,
   withCalculation,
+  withDenominatorEstimate,
   writeIndicator,
   type BetweenUnit,
   type Calculation,
   type Counted,
+  type EstimateType,
   type Explained,
   type Indicator,
   type IndicatorProblem,
@@ -195,6 +198,7 @@ function Editor({ id, path, draft, file, measure, initial, onReload }: EditorPro
   const others = useOthers(id, draft, path)
   const designs = useQuery(designsQuery(platform.transport))
   const ageBandSets = (designs.data?.designs ?? []).filter((d) => d.kind === 'age-band-set' && typeof d.url === 'string').map((d) => ({ canonical: `${d.url ?? ''}|${d.version ?? ''}`, title: d.title }))
+  const estimateTypes = estimateTypesOf(designs.data?.designs ?? [])
   const self = `${typeof measure['url'] === 'string' ? measure['url'] : ''}|${typeof measure['version'] === 'string' ? measure['version'] : ''}`
   const problems = indicatorProblems(indicator, self, others)
   const written = writeIndicator(measure, indicator)
@@ -268,14 +272,12 @@ function Editor({ id, path, draft, file, measure, initial, onReload }: EditorPro
               </button>
             ) : null}
           </SideEditor>
-          {indicator.denominator === null ? null : (
+          {indicator.denominator === null ? null : indicator.denominatorEstimate === null ? (
             <SideEditor title={intl.formatMessage(m.inDenominator)} hint={intl.formatMessage(m.inDenominatorHint)} tree={indicator.denominator} context={context} onChange={(denominator) => change({ denominator })}>
-              {editable ? (
-                <button type="button" className={small} onClick={() => setIndicator(removeDenominator)}>
-                  {intl.formatMessage(m.inRemoveDenominator)}
-                </button>
-              ) : null}
+              <DenominatorFrom indicator={indicator} editable={editable} types={estimateTypes} onChange={setIndicator} />
             </SideEditor>
+          ) : (
+            <EstimateDenominator indicator={indicator} editable={editable} types={estimateTypes} onChange={setIndicator} />
           )}
           <Disaggregations indicator={indicator} editable={editable} sets={ageBandSets} onChange={change} />
           <HmisMapping url={typeof measure['url'] === 'string' ? measure['url'] : ''} />
@@ -493,6 +495,49 @@ function Calculates({ indicator, editable, onChange }: { indicator: Indicator; e
           )}
         </fieldset>
       ) : null}
+    </div>
+  )
+}
+
+/** Where a percentage's, rate's or ratio's denominator comes from (#864): its records, or a Population Estimate type the Population packages declare; and *Remove denominator*. */
+function DenominatorFrom({ indicator, editable, types, onChange }: { indicator: Indicator; editable: boolean; types: readonly EstimateType[]; onChange: (next: (i: Indicator) => Indicator) => void }) {
+  const intl = useIntl()
+  const current = indicator.denominatorEstimate
+  const offered = current === null || types.some((t) => t.code === current) ? types : [...types, { code: current, title: current }]
+  return (
+    <div className={row}>
+      <label className={css({ display: 'flex', gap: '2', alignItems: 'center' })}>
+        {intl.formatMessage(m.inDenominatorFrom)}
+        <select className={control} value={current ?? ''} disabled={!editable} onChange={(e) => onChange((i) => withDenominatorEstimate(i, e.target.value === '' ? null : e.target.value))}>
+          <option value="">{intl.formatMessage(m.inFromRecords)}</option>
+          {offered.map((t) => (
+            <option key={t.code} value={t.code}>
+              {intl.formatMessage(m.inFromEstimate, { title: t.title })}
+            </option>
+          ))}
+        </select>
+      </label>
+      {offered.length === 0 ? <span className={muted}>{intl.formatMessage(m.inNoEstimateTypes)}</span> : null}
+      {editable ? (
+        <button type="button" className={small} onClick={() => onChange(removeDenominator)}>
+          {intl.formatMessage(m.inRemoveDenominator)}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+/** A denominator that is a Population Estimate type (#553, #864): each place's estimate for the period, not counted from records. */
+function EstimateDenominator({ indicator, editable, types, onChange }: { indicator: Indicator; editable: boolean; types: readonly EstimateType[]; onChange: (next: (i: Indicator) => Indicator) => void }) {
+  const intl = useIntl()
+  const heading = useId()
+  return (
+    <div className={panel} role="group" aria-labelledby={heading}>
+      <h3 id={heading} className={subheading}>
+        {intl.formatMessage(m.inDenominator)}
+      </h3>
+      <DenominatorFrom indicator={indicator} editable={editable} types={types} onChange={onChange} />
+      <p className={muted}>{intl.formatMessage(m.inEstimateHint)}</p>
     </div>
   )
 }
