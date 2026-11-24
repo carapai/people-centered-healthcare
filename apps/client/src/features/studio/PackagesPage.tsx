@@ -84,7 +84,7 @@ export function PackagesPage() {
   )
 }
 
-const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language', 'reporting']
+const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language', 'reporting', 'population']
 
 /** A blank draft of a new package (#494). The next version of a published package starts from
  * its page instead. */

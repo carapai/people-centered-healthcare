@@ -1,0 +1,14 @@
+{
+  "$schema": "https://carapai.github.io/people-centered-healthcare/fhir/schema/population/1",
+  "year": 2026,
+  "types": [
+    { "code": "total-population", "title": "Total population" },
+    { "code": "expected-pregnancies", "title": "Expected pregnancies", "derivedFrom": "total-population", "percent": "5" }
+  ],
+  "figures": [
+    { "place": "district-kampala", "type": "total-population", "value": 1800000 },
+    { "place": "district-wakiso", "type": "total-population", "value": 3400000 },
+    { "place": "district-jinja", "type": "total-population", "value": 540000 },
+    { "place": "district-gulu", "type": "total-population", "value": 330000 }
+  ]
+}

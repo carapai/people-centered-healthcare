@@ -3463,29 +3463,29 @@ export const designMessages = defineMessages<DesignValues>({
   dhLoading: { id: 'app.studio.home.loading', defaultMessage: 'Loading your designs…', description: 'Studio home: loading' },
   dhSection: {
     id: 'app.studio.home.section',
-    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} reports {Reports} dashboards {Dashboards} other {{section}}}',
+    defaultMessage: '{section, select, forms {Forms} workflows {Workflows} concepts {Concepts & value sets} decisionTables {Decision tables} programs {Programs} ageBands {Age band sets} indicators {Indicators} reports {Reports} dashboards {Dashboards} population {Population estimates} other {{section}}}',
     description: 'Studio: a section heading',
   },
   dhSectionHint: {
     id: 'app.studio.home.sectionHint',
     defaultMessage:
-      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} reports {HMIS forms and facility reports: indicators laid out for one period type, by section, with the levels they run for.} dashboards {Standard dashboards: charts, tables and single numbers of indicators over the last few periods, shown to every user over their own area.} other {}}',
+      '{section, select, forms {Questionnaires health workers fill in, designed with a live preview.} workflows {Care pathways as statecharts: states, transitions, timers and tasks, with a sandbox to play them.} concepts {Local code systems and the value sets forms bind to.} decisionTables {Rules that choose an outcome for a patient, used by a workflow’s guards.} programs {Care programs assembled from their workflow, forms and regimens.} ageBands {Named age ranges indicators and reports split their figures by, such as MoH’s ANC age bands.} indicators {Counts, percentages and rates over care, tried on the package’s test patients.} reports {HMIS forms and facility reports: indicators laid out for one period type, by section, with the levels they run for.} dashboards {Standard dashboards: charts, tables and single numbers of indicators over the last few periods, shown to every user over their own area.} population {A year’s population figures by place, imported from the HMIS lead’s CSV: the denominators of coverage indicators.} other {}}',
     description: 'Studio: what a section holds',
   },
   dhCount: {
     id: 'app.studio.home.count',
     defaultMessage:
-      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} reports {{count, plural, =0 {No reports} one {# report} other {# reports}}} dashboards {{count, plural, =0 {No dashboards} one {# dashboard} other {# dashboards}}} other {{count}}}',
+      '{section, select, forms {{count, plural, =0 {No forms} one {# form} other {# forms}}} workflows {{count, plural, =0 {No workflows} one {# workflow} other {# workflows}}} concepts {{count, plural, =0 {No code systems or value sets} one {# code system or value set} other {# code systems and value sets}}} decisionTables {{count, plural, =0 {No decision tables} one {# decision table} other {# decision tables}}} programs {{count, plural, =0 {No programs} one {# program} other {# programs}}} ageBands {{count, plural, =0 {No age band sets} one {# age band set} other {# age band sets}}} indicators {{count, plural, =0 {No indicators} one {# indicator} other {# indicators}}} reports {{count, plural, =0 {No reports} one {# report} other {# reports}}} dashboards {{count, plural, =0 {No dashboards} one {# dashboard} other {# dashboards}}} population {{count, plural, =0 {No population estimates} one {# year of population estimates} other {# years of population estimates}}} other {{count}}}',
     description: 'Studio: how many designs a section holds',
   },
   dhOpen: {
     id: 'app.studio.home.open',
-    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} reports {Open reports} dashboards {Open dashboards} other {Open}}',
+    defaultMessage: '{section, select, forms {Open forms} workflows {Open workflows} concepts {Open concepts & value sets} decisionTables {Open decision tables} programs {Open programs} ageBands {Open age band sets} indicators {Open indicators} reports {Open reports} dashboards {Open dashboards} population {Open population estimates} other {Open}}',
     description: 'Studio home: open a section',
   },
   dhNew: {
     id: 'app.studio.home.new',
-    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} reports {New report} dashboards {New dashboard} other {New}}',
+    defaultMessage: '{section, select, forms {New form} workflows {New workflow} concepts {New code system or value set} decisionTables {New decision table} programs {New program} ageBands {New age band set} indicators {New indicator} reports {New report} dashboards {New dashboard} population {New year of estimates} other {New}}',
     description: 'Studio: start a new design',
   },
   dhPackages: { id: 'app.studio.home.packages', defaultMessage: 'Packages', description: 'Studio: the packages section heading' },
@@ -3500,7 +3500,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhColChanged: { id: 'app.studio.design.colChanged', defaultMessage: 'Last change', description: 'Studio section: column' },
   dhKind: {
     id: 'app.studio.design.kind',
-    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} indicator {Indicator} report {Report} dashboard {Dashboard} other {{kind}}}',
+    defaultMessage: '{kind, select, form {Form} workflow {Workflow} decisionTable {Decision table} codeSystem {Code system} valueSet {Value set} program {Program} ageBandSet {Age band set} indicator {Indicator} report {Report} dashboard {Dashboard} population {Population estimates} other {{kind}}}',
     description: 'Studio section: a design’s type',
   },
   dhStatus: {
@@ -3516,7 +3516,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhFilterStatus: { id: 'app.studio.design.filterStatus', defaultMessage: 'Status', description: 'Studio section: status filter' },
   dhEmpty: {
     id: 'app.studio.design.empty',
-    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} reports {No reports yet.} dashboards {No dashboards yet.} other {Nothing yet.}}',
+    defaultMessage: '{section, select, forms {No forms yet.} workflows {No workflows yet.} concepts {No code systems or value sets yet.} decisionTables {No decision tables yet.} programs {No programs yet.} ageBands {No age band sets yet.} indicators {No indicators yet.} reports {No reports yet.} dashboards {No dashboards yet.} population {No population estimates yet.} other {Nothing yet.}}',
     description: 'Studio section: nothing designed yet',
   },
   dhNoMatch: { id: 'app.studio.design.noMatch', defaultMessage: 'Nothing matches the search and filters.', description: 'Studio section: filters hide everything' },
@@ -3524,7 +3524,7 @@ export const designMessages = defineMessages<DesignValues>({
   dhNever: { id: 'app.studio.design.never', defaultMessage: '—', description: 'Studio section: no last change known' },
   dhNewHeading: {
     id: 'app.studio.design.newHeading',
-    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} reports {A new report} dashboards {A new dashboard} other {New}}',
+    defaultMessage: '{section, select, forms {A new form} workflows {A new workflow} concepts {A new code system or value set} decisionTables {A new decision table} programs {A new program} ageBands {A new age band set} indicators {A new indicator} reports {A new report} dashboards {A new dashboard} population {A new year of population estimates} other {New}}',
     description: 'Studio section: the New panel heading',
   },
   dhNewPackage: { id: 'app.studio.design.newPackage', defaultMessage: 'Which package', description: 'Studio New: the package choice' },
@@ -4331,4 +4331,70 @@ export const dashboardDesignerMessages = defineMessages<DashboardDesignerValues>
   bdPeriodsShown: { id: 'app.studio.dashboard.periodsShown', defaultMessage: '{from} to {to}', description: 'Dashboard designer' },
   bdMapAsTable: { id: 'app.studio.dashboard.mapAsTable', defaultMessage: 'A map is previewed as a table: the test patients have no place on the map.', description: 'Dashboard designer' },
   bdItemFailed: { id: 'app.studio.dashboard.itemFailed', defaultMessage: 'Not computed: {reason}', description: 'Dashboard designer' },
+})
+
+// The Population Estimates editor (#553; ADR 0071): a year's estimate types, and the HMIS lead's
+// CSV checked against the facility registry, with each district's totals before saving.
+type PopulationValues = {
+  peLoading: {}
+  peUnreadable: { reason: string }
+  peReadOnly: {}
+  peHeading: { year: number }
+  peTypes: {}
+  peType: {}
+  peCode: {}
+  peHow: {}
+  peGiven: {}
+  peDerived: { percent: string; from: string }
+  peFigures: { count: number; places: number }
+  peTemplate: {}
+  peTemplateHint: {}
+  peImport: {}
+  peFile: {}
+  peCsv: {}
+  peCheck: {}
+  peChecking: {}
+  peRefused: { count: number }
+  peCheckFailed: { reason: string }
+  peDistricts: { count: number }
+  peDistrict: {}
+  peNoEstimate: {}
+  peProblems: { count: number }
+  peSave: {}
+  peSaved: {}
+  peStale: {}
+  peReload: {}
+  peFailed: { reason: string }
+}
+
+export const populationMessages = defineMessages<PopulationValues>({
+  peLoading: { id: 'app.studio.population.loading', defaultMessage: 'Loading the population estimates…', description: 'Population estimates editor' },
+  peUnreadable: { id: 'app.studio.population.unreadable', defaultMessage: 'This file is not population estimates the Studio can read ({reason}). Open it in the file editor instead.', description: 'Population estimates editor' },
+  peReadOnly: { id: 'app.studio.population.readOnly', defaultMessage: 'Read only. Press Edit to import figures into your draft.', description: 'Population estimates editor' },
+  peHeading: { id: 'app.studio.population.heading', defaultMessage: 'Population estimates {year}', description: 'Population estimates editor: the heading' },
+  peTypes: { id: 'app.studio.population.types', defaultMessage: 'Estimate types', description: 'Population estimates editor: the types table' },
+  peType: { id: 'app.studio.population.type', defaultMessage: 'Type', description: 'Population estimates editor: column' },
+  peCode: { id: 'app.studio.population.code', defaultMessage: 'Code', description: 'Population estimates editor: column' },
+  peHow: { id: 'app.studio.population.how', defaultMessage: 'How it is given', description: 'Population estimates editor: column' },
+  peGiven: { id: 'app.studio.population.given', defaultMessage: 'Given per place, in the CSV', description: 'Population estimates editor: a given type' },
+  peDerived: { id: 'app.studio.population.derived', defaultMessage: '{percent}% of {from}', description: 'Population estimates editor: a derived type' },
+  peFigures: { id: 'app.studio.population.figures', defaultMessage: '{count, plural, =0 {No figures yet.} one {# figure} other {# figures}}{places, plural, =0 {} one { for # place} other { for # places}}', description: 'Population estimates editor: how many figures the draft holds' },
+  peTemplate: { id: 'app.studio.population.template', defaultMessage: 'Download the CSV template', description: 'Population estimates editor: the template link' },
+  peTemplateHint: { id: 'app.studio.population.templateHint', defaultMessage: 'One row per place, its code from the facility registry in the place column, and a column per given type. Leave a cell empty where a place has no figure. Figures are summed upward, never split down.', description: 'Population estimates editor: how to fill the template' },
+  peImport: { id: 'app.studio.population.import', defaultMessage: 'Import figures', description: 'Population estimates editor: the import section' },
+  peFile: { id: 'app.studio.population.file', defaultMessage: 'CSV file', description: 'Population estimates editor: the file picker' },
+  peCsv: { id: 'app.studio.population.csv', defaultMessage: 'Or paste the CSV', description: 'Population estimates editor: the text area' },
+  peCheck: { id: 'app.studio.population.check', defaultMessage: 'Check against the registry', description: 'Population estimates editor: the check button' },
+  peChecking: { id: 'app.studio.population.checking', defaultMessage: 'Checking…', description: 'Population estimates editor' },
+  peRefused: { id: 'app.studio.population.refused', defaultMessage: 'The file cannot be imported: {count, plural, one {# problem} other {# problems}}', description: 'Population estimates editor: the file was refused' },
+  peCheckFailed: { id: 'app.studio.population.checkFailed', defaultMessage: 'Could not check: {reason}', description: 'Population estimates editor' },
+  peDistricts: { id: 'app.studio.population.districts', defaultMessage: 'District totals ({count, plural, one {# district} other {# districts}})', description: 'Population estimates editor: the totals table' },
+  peDistrict: { id: 'app.studio.population.district', defaultMessage: 'District', description: 'Population estimates editor: column' },
+  peNoEstimate: { id: 'app.studio.population.noEstimate', defaultMessage: 'no estimate', description: 'Population estimates editor: a district without a figure' },
+  peProblems: { id: 'app.studio.population.problems', defaultMessage: '{count, plural, one {# problem} other {# problems}} publication would refuse', description: 'Population estimates editor' },
+  peSave: { id: 'app.studio.population.save', defaultMessage: 'Save these figures to the draft', description: 'Population estimates editor: save' },
+  peSaved: { id: 'app.studio.population.saved', defaultMessage: 'Saved.', description: 'Population estimates editor' },
+  peStale: { id: 'app.studio.population.stale', defaultMessage: 'Someone saved this draft since you opened it. Nothing was kept: reload to see their changes.', description: 'Population estimates editor' },
+  peReload: { id: 'app.studio.population.reload', defaultMessage: 'Reload', description: 'Population estimates editor' },
+  peFailed: { id: 'app.studio.population.failed', defaultMessage: 'Saving failed: {reason}', description: 'Population estimates editor' },
 })

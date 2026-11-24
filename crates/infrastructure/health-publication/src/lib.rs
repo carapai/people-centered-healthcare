@@ -63,6 +63,12 @@
 //!   version of each package gives every user's Dashboards tab its standard Dashboards
 //!   ([`Publications::published_dashboards`]).
 //!
+//! - **Population Estimates** (ADR 0071; #553): a year's estimates
+//!   (`configuration/population.json`, schema `population/1`) belong in a Population package
+//!   named for their year; validation refuses a derived type without a declared type and a
+//!   percentage, types derived in a circle, and figures of a derived or undeclared type or
+//!   given twice ([`estimates_in`]).
+//!
 //! - **Override points** (ADR 0026, ADR 0067; #507): validation checks an override package's
 //!   settings against the latest published version of each base package they name, and
 //!   [`Publications::activate`] refuses a base version that would orphan, or put outside its
@@ -110,6 +116,7 @@ pub mod discussion;
 pub mod editing;
 mod extraction;
 mod indicators;
+mod population;
 mod programs;
 mod reports;
 pub mod studio;
@@ -121,6 +128,7 @@ pub use dashboards::{
     PublishedDashboard, dashboards_in, dashboards_in_files, located_problems as dashboard_problems,
 };
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
+pub use population::estimates_in;
 pub use reports::{IndicatorMapping, ReportSources, SourcePackage, reports_in};
 pub use workflows::{WorkflowSandbox, workflow_definitions};
 
@@ -546,6 +554,7 @@ impl Publications {
         problems.extend(indicators::problems(packed));
         problems.extend(age_bands::problems(packed));
         problems.extend(areas::problems(packed));
+        problems.extend(population::problems(packed));
         if !reports_in(packed).is_empty() || !dashboards_in(packed).is_empty() {
             let catalogue = self.catalogue(tx, packed).await?;
             problems.extend(reports::problems(packed, &catalogue));

@@ -449,6 +449,9 @@ pub struct MeasureDefinition {
     pub disaggregations: Vec<DisaggregationDefinition>,
     /// Its threshold bands, as written (#600).
     pub thresholds: Vec<ThresholdDefinition>,
+    /// The Population Estimate type its denominator is, instead of a denominator population
+    /// (#553; ADR 0071): `expected-pregnancies`, …
+    pub denominator_estimate: Option<String>,
 }
 
 /// An indicator without problems: what evaluation takes.
@@ -483,6 +486,10 @@ pub struct Indicator {
     /// The bands its figures are coloured by, lowest first; none when it has no legend set
     /// (#600).
     pub thresholds: Vec<ThresholdBand>,
+    /// The Population Estimate type its denominator is, if it is not counted from records
+    /// (#553; ADR 0071). The place's estimate for the period is the denominator
+    /// ([`crate::over_estimate`]).
+    pub estimate: Option<String>,
 }
 
 impl Indicator {
@@ -500,6 +507,12 @@ impl Indicator {
                 DisaggregationSource::Coded(_) => None,
             })
             .collect()
+    }
+
+    /// Whether its denominator is counted from records: a percentage, rate or ratio whose
+    /// denominator is not a Population Estimate.
+    pub fn counts_its_denominator(&self) -> bool {
+        self.calculation.has_denominator() && self.estimate.is_none()
     }
 
     /// The criteria of `population`.
@@ -629,8 +642,32 @@ impl MeasureDefinition {
                 Err(why) => problems.push(format!("the indicator's {code} criteria {why}")),
             }
         }
+        let estimate = match self.denominator_estimate.as_deref().map(str::trim) {
+            None => None,
+            Some("") => {
+                problems
+                    .push("the indicator's denominator names no Population Estimate type".into());
+                None
+            }
+            Some(code) => {
+                if !matches!(scoring, Some(Scoring::Proportion | Scoring::Ratio)) {
+                    problems.push(format!(
+                        "the indicator's denominator is the estimate {code}, but only a percentage, rate or ratio has a denominator"
+                    ));
+                }
+                if populations.contains_key(&PopulationKind::Denominator) {
+                    problems.push(format!(
+                        "the indicator's denominator is the estimate {code}, so it has no denominator population"
+                    ));
+                }
+                Some(code.to_owned())
+            }
+        };
         if let Some(scoring) = scoring {
             for wanted in scoring.populations() {
+                if *wanted == PopulationKind::Denominator && estimate.is_some() {
+                    continue;
+                }
                 if !populations.contains_key(wanted)
                     && !self
                         .populations
@@ -645,7 +682,9 @@ impl MeasureDefinition {
                 }
             }
             for kind in populations.keys() {
-                if !scoring.populations().contains(kind) {
+                if !scoring.populations().contains(kind)
+                    && !(*kind == PopulationKind::Denominator && estimate.is_some())
+                {
                     problems.push(format!(
                         "the indicator's scoring {} has no {} population",
                         scoring.code(),
@@ -760,6 +799,7 @@ impl MeasureDefinition {
                 disaggregations,
                 thresholds,
                 value: value.map(|(_, value)| value),
+                estimate,
             }),
             _ => Err(problems),
         }
@@ -891,6 +931,7 @@ mod tests {
                 ..DisaggregationDefinition::default()
             }],
             thresholds: Vec::new(),
+            denominator_estimate: None,
         }
     }
 
@@ -1465,5 +1506,50 @@ mod tests {
             Ok(18)
         );
         assert_eq!(TimeUnit::Days.between(visit, lmp), Ok(-70));
+    }
+
+    #[test]
+    fn a_percentage_may_take_its_denominator_from_a_population_estimate() {
+        // ANC 1st visit coverage: first visits over the place's expected pregnancies (#553).
+        let mut coverage = anc_first_visits();
+        coverage.scoring = Some("proportion".into());
+        coverage.populations.push(population("numerator", "true"));
+        coverage.denominator_estimate = Some("expected-pregnancies".into());
+        let indicator = coverage.indicator().expect("an indicator");
+        assert_eq!(indicator.calculation, Calculation::Percentage);
+        assert_eq!(indicator.estimate.as_deref(), Some("expected-pregnancies"));
+        assert!(!indicator.counts_its_denominator());
+
+        let mut both = coverage.clone();
+        both.populations.push(population("denominator", "true"));
+        assert_eq!(
+            both.problems(),
+            vec![
+                "the indicator's denominator is the estimate expected-pregnancies, so it has no denominator population"
+            ]
+        );
+        let mut count = anc_first_visits();
+        count.denominator_estimate = Some("expected-pregnancies".into());
+        assert_eq!(
+            count.problems(),
+            vec![
+                "the indicator's denominator is the estimate expected-pregnancies, but only a percentage, rate or ratio has a denominator"
+            ]
+        );
+        let mut blank = coverage;
+        blank.denominator_estimate = Some(" ".into());
+        assert!(
+            blank
+                .problems()
+                .contains(&"the indicator's denominator names no Population Estimate type".into())
+        );
+        // Without an estimate a proportion still needs its denominator population.
+        let mut counted = anc_first_visits();
+        counted.scoring = Some("proportion".into());
+        counted.populations.push(population("numerator", "true"));
+        assert_eq!(
+            counted.problems(),
+            vec!["the indicator's scoring proportion needs a denominator population"]
+        );
     }
 }

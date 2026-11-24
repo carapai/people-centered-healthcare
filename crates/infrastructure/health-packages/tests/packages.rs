@@ -503,6 +503,46 @@ fn the_release_reads_reports() {
 }
 
 #[test]
+fn the_release_reads_population_estimates() {
+    let schemas = schemas();
+    assert!(schemas.uris().any(|uri| uri == health_packages::POPULATION));
+    let pki = pki();
+    let estimates = |value: serde_json::Value| {
+        let mut files = files();
+        files.insert(
+            "configuration/population.json".into(),
+            value.to_string().into_bytes(),
+        );
+        publish(&files, &schemas, &pki.signer, at(SIGNED))
+    };
+    assert!(
+        estimates(serde_json::json!({
+            "$schema": health_packages::POPULATION,
+            "year": 2026,
+            "types": [
+                { "code": "total-population", "title": "Total population" },
+                { "code": "expected-pregnancies", "title": "Expected pregnancies",
+                  "derivedFrom": "total-population", "percent": "5" }
+            ],
+            "figures": [{ "place": "district-kampala", "type": "total-population", "value": 1797722 }]
+        }))
+        .is_ok()
+    );
+    for wrong in [
+        serde_json::json!({ "$schema": health_packages::POPULATION, "year": 2026, "types": [] }),
+        serde_json::json!({ "$schema": health_packages::POPULATION, "year": 2026,
+            "types": [{ "code": "e", "derivedFrom": "t" }] }),
+        serde_json::json!({ "$schema": health_packages::POPULATION, "year": 2026,
+            "types": [{ "code": "e", "derivedFrom": "t", "percent": 5 }] }),
+        serde_json::json!({ "$schema": health_packages::POPULATION, "year": 2026,
+            "types": [{ "code": "t" }],
+            "figures": [{ "place": "KAM013", "type": "t", "value": 12.5 }] }),
+    ] {
+        assert!(matches!(estimates(wrong), Err(Error::Configuration { .. })));
+    }
+}
+
+#[test]
 fn the_release_reads_standard_dashboards() {
     let schemas = schemas();
     assert!(schemas.uris().any(|uri| uri == health_packages::DASHBOARD));

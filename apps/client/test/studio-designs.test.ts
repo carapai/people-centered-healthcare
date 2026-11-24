@@ -95,6 +95,12 @@ describe('sections', () => {
     // A standard Dashboard opens in the Dashboard designer (#879).
     expect(editorOf(designs.designs[7]!, 'ug.moh.hmis@1.0.0')).toEqual({ to: '/studio/$id/dashboards/$', params: { id: 'ug.moh.hmis@1.0.0', _splat: 'configuration/dashboards/anc-overview.json' } })
     expect(sections.find((s) => s.id === 'dashboards')?.creates).toBe(true)
+    // A year's Population Estimates open in the estimates editor (#553).
+    expect(editorOf(design('population', 'Population estimates 2026', 'ug.population.2026', 'ug.population.2026@1.0.0', 'configuration/population.json'), 'ug.population.2026@1.0.0')).toEqual({
+      to: '/studio/$id/population/$',
+      params: { id: 'ug.population.2026@1.0.0', _splat: 'configuration/population.json' },
+    })
+    expect(sections.find((s) => s.id === 'population')).toEqual({ id: 'population', kinds: ['population'], creates: true })
   })
 })
 
@@ -154,7 +160,7 @@ test('every section, kind and status is worded, with no ICU error', () => {
   const texts = [
     ...sections.flatMap((s) => [dm.dhSection, dm.dhSectionHint, dm.dhOpen, dm.dhNew, dm.dhEmpty, dm.dhNewHeading].map((m) => intl.formatMessage(m, { section: icu(s.id) }))),
     ...sections.map((s) => intl.formatMessage(dm.dhCount, { section: icu(s.id), count: 2 })),
-    ...(['form', 'workflow', 'decision-table', 'code-system', 'value-set', 'program', 'age-band-set', 'indicator', 'report', 'dashboard'] as const).map((k) => intl.formatMessage(dm.dhKind, { kind: icu(k) })),
+    ...(['form', 'workflow', 'decision-table', 'code-system', 'value-set', 'program', 'age-band-set', 'indicator', 'report', 'dashboard', 'population'] as const).map((k) => intl.formatMessage(dm.dhKind, { kind: icu(k) })),
     ...(['published', 'yours', 'theirs', 'submitted'] as const).map((st) => intl.formatMessage(dm.dhStatus, { status: st, holder: 'bob' })),
   ]
   expect(errors).toEqual([])
@@ -166,4 +172,6 @@ test('every section, kind and status is worded, with no ICU error', () => {
   expect(texts).toContain('Report')
   expect(texts).toContain('2 dashboards')
   expect(texts).toContain('Dashboard')
+  expect(texts).toContain('Population estimates')
+  expect(texts).toContain('2 years of population estimates')
 })

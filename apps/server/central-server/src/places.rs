@@ -11,6 +11,13 @@
 //!   [`MANAGE_PERMISSION`], and both refuse (422) a file with a district the national core
 //!   package does not hold. Both take the CSV as the body, or, from the client's JSON transport,
 //!   as `{"csv": "…"}` with `Content-Type: application/json` (#873).
+//! - `POST /population/preview` (#553; ADR 0071) reads the HMIS lead's Population Estimates CSV
+//!   against a Population package draft's estimates (`{"csv": "…", "estimates": {…}}`, the
+//!   draft's `configuration/population.json`): each place code must be one the registry holds
+//!   (the national core's areas and the NHFR's facilities), and a refused file names each row.
+//!   It answers the estimates with the file's figures, for the Studio to save to the draft, and
+//!   each district's annual totals, given and derived, to read before approval. Nothing is
+//!   written. It needs the Studio's `metadata.author`.
 
 use std::sync::Arc;
 
@@ -21,8 +28,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
+use health_analytics::{Estimates, EstimatesDefinition, parse_estimates_csv};
 use health_audit::{Agent, Auditor, Entity, Interaction};
-use health_facility_registry::{ImportPlan, Places, parse_nhfr_csv, plan_import};
+use health_facility_registry::{ImportPlan, PlaceLevel, Places, parse_nhfr_csv, plan_import};
 use health_persistence::{RawJson, Store as _, WriteError};
 use health_publication::Publications;
 use health_registries_app::AuditTrail;
@@ -53,6 +61,7 @@ pub(crate) fn router(
         .route("/area", get(area))
         .route("/nhfr/preview", post(preview))
         .route("/nhfr/apply", post(apply))
+        .route("/population/preview", post(population_preview))
         .with_state(PlacesApi {
             store,
             publications,
@@ -226,6 +235,104 @@ async fn apply(
         ),
         Err(error) => unavailable(error),
     }
+}
+
+/// `POST /population/preview`.
+async fn population_preview(
+    State(api): State<PlacesApi>,
+    subject: Option<Extension<Subject>>,
+    Json(body): Json<Value>,
+) -> Response {
+    let subject = match signed_in(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    if !subject
+        .permissions
+        .has(health_publication::studio::AUTHOR_PERMISSION)
+    {
+        return problem(
+            StatusCode::FORBIDDEN,
+            "importing Population Estimates needs metadata.author",
+        );
+    }
+    let not_estimates = |problems: Vec<String>| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "detail": "the Population Estimates cannot be imported",
+                "problems": problems,
+            })),
+        )
+            .into_response()
+    };
+    let Some(csv) = body["csv"].as_str() else {
+        return not_estimates(vec!["the body names no csv".into()]);
+    };
+    let mut written = body["estimates"].clone();
+    let definition: EstimatesDefinition = match serde_json::from_value(written.clone()) {
+        Ok(definition) => definition,
+        Err(e) => {
+            return not_estimates(vec![format!("the draft's estimates cannot be read: {e}")]);
+        }
+    };
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    let figures = match parse_estimates_csv(csv, &definition, |code| registry.get(code).is_some()) {
+        Ok(figures) => figures,
+        Err(problems) => return not_estimates(problems),
+    };
+    let imported = EstimatesDefinition {
+        figures,
+        ..definition
+    };
+    written["figures"] = serde_json::to_value(&imported.figures).unwrap_or(Value::Null);
+    let problems = imported.problems();
+    let estimates = Estimates::new(imported, |code| {
+        registry.get(code).and_then(|p| p.parent.clone())
+    });
+    Json(json!({
+        "estimates": written,
+        "figures": estimates.definition().figures.len(),
+        "districts": district_totals(&registry, &estimates),
+        "problems": problems,
+    }))
+    .into_response()
+}
+
+/// Each district with an estimate, by code: its name, its region and its annual figure for each
+/// estimate type, given or derived, or none (*no estimate*).
+fn district_totals(registry: &Places, estimates: &Estimates) -> Vec<Value> {
+    registry
+        .iter()
+        .filter(|place| place.level == PlaceLevel::District)
+        .filter_map(|district| {
+            let totals: Vec<Value> = estimates
+                .definition()
+                .types
+                .iter()
+                .map(|kind| {
+                    json!({
+                        "type": kind.code,
+                        "title": kind.title,
+                        "annual": estimates
+                            .annual(&district.code, &kind.code)
+                            .map(|a| a.round_dp(0).normalize().to_string()),
+                    })
+                })
+                .collect();
+            totals.iter().any(|t| !t["annual"].is_null()).then(|| {
+                json!({
+                    "code": district.code,
+                    "name": district.name,
+                    "region": district.parent,
+                    "totals": totals,
+                })
+            })
+        })
+        .collect()
 }
 
 /// Audits each place an import writes, as the signed-in account.

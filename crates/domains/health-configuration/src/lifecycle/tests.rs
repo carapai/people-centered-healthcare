@@ -61,6 +61,7 @@ fn configuration_needs_one_approver() {
         PackageKind::CountryConfiguration,
         PackageKind::Override,
         PackageKind::Reporting,
+        PackageKind::Population,
     ] {
         let mut lifecycle = draft(kind);
         assert!(!is_clinical(kind));

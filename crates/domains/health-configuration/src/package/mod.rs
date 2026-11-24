@@ -61,6 +61,9 @@ pub enum PackageKind {
     /// Reports: indicators laid out for one period type and the levels they run for (ADR 0070,
     /// ADR 0072).
     Reporting,
+    /// A year's Population Estimates, the denominators of coverage indicators, approved by the
+    /// HMIS lead (ADR 0071): one package per year, `ug.population.2026`.
+    Population,
 }
 
 /// What software a package needs (configuration.md § Distribution and activation on nodes).
