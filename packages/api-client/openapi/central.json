@@ -209,7 +209,7 @@
           "studio"
         ],
         "summary": "Documents and serves an indicator's HMIS mapping.",
-        "description": "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row. Mappings are edited in the Reporting package's Report designer.",
+        "description": "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row, each with its cells' DHIS2 data set, data element and category option combo and the dates each is in effect. Mappings are edited in the Reporting package's Report designer.",
         "operationId": "listStudioIndicatorMappings",
         "parameters": [
           {
@@ -3171,6 +3171,52 @@
           }
         }
       },
+      "StudioCellMapping": {
+        "type": "object",
+        "description": "One DHIS2 mapping of one cell of a Report row (#560).",
+        "required": [
+          "bands",
+          "dataSet",
+          "dataElement",
+          "categoryOptionCombo",
+          "from"
+        ],
+        "properties": {
+          "bands": {
+            "type": "object",
+            "description": "The cell's band of each Disaggregation, by the Disaggregation's name (an Age Band Set's\n`url|version`, or a code); none is the row's whole.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "categoryOptionCombo": {
+            "type": "string",
+            "description": "The DHIS2 category option combo's ID."
+          },
+          "dataElement": {
+            "type": "string",
+            "description": "The DHIS2 data element's ID."
+          },
+          "dataSet": {
+            "type": "string",
+            "description": "The DHIS2 data set's ID."
+          },
+          "from": {
+            "type": "string",
+            "description": "The first day it is in effect, `YYYY-MM-DD`."
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last day it is in effect, `YYYY-MM-DD`; none is until further notice."
+          }
+        }
+      },
       "StudioCheck": {
         "type": "string",
         "description": "Which automated check.",
@@ -4869,7 +4915,8 @@
           "section",
           "label",
           "indicator",
-          "sentToDhis2"
+          "sentToDhis2",
+          "mappings"
         ],
         "properties": {
           "indicator": {
@@ -4879,6 +4926,13 @@
           "label": {
             "type": "string",
             "description": "The row's label (e.g. *ANC 1st visit for women*)."
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudioCellMapping"
+            },
+            "description": "The row's cells' DHIS2 mappings (#560), in the section's order."
           },
           "packageId": {
             "type": "string",

@@ -19,7 +19,17 @@
       "columnTotals": false,
       "rowTotals": true,
       "change": true,
-      "sendToDhis2": true
+      "sendToDhis2": true,
+      "mappings": [
+        { "row": "first-visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "10-14" }, "dataSet": "Hmis105Smpl", "dataElement": "An01aSample", "categoryOptionCombo": "Age1014Smpl", "from": "2024-07-01" },
+        { "row": "first-visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "15-19" }, "dataSet": "Hmis105Smpl", "dataElement": "An01aSample", "categoryOptionCombo": "Age1519Smpl", "from": "2024-07-01" },
+        { "row": "first-visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "20-24" }, "dataSet": "Hmis105Smpl", "dataElement": "An01aSample", "categoryOptionCombo": "Age2024Smpl", "from": "2024-07-01" },
+        { "row": "first-visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "25+" }, "dataSet": "Hmis105Smpl", "dataElement": "An01aSample", "categoryOptionCombo": "Age25upSmpl", "from": "2024-07-01" },
+        { "row": "visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "10-14" }, "dataSet": "Hmis105Smpl", "dataElement": "An02xSample", "categoryOptionCombo": "Age1014Smpl", "from": "2024-07-01" },
+        { "row": "visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "15-19" }, "dataSet": "Hmis105Smpl", "dataElement": "An02xSample", "categoryOptionCombo": "Age1519Smpl", "from": "2024-07-01" },
+        { "row": "visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "20-24" }, "dataSet": "Hmis105Smpl", "dataElement": "An02xSample", "categoryOptionCombo": "Age2024Smpl", "from": "2024-07-01" },
+        { "row": "visits", "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "25+" }, "dataSet": "Hmis105Smpl", "dataElement": "An02xSample", "categoryOptionCombo": "Age25upSmpl", "from": "2024-07-01" }
+      ]
     },
     {
       "kind": "table",

@@ -295,6 +295,10 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
 // patients, which the indicator editor's Try evaluates (#537).
 const anc = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/anc'), '--by', author], { env, stdio: 'inherit' })
 if (anc.status !== 0) throw new Error('drafting the ANC reference package failed')
+// The DHIS2 instance's metadata (#560; packages/reference-packages/dhis2, illustrative IDs), recorded
+// at central, which Validation checks the HMIS 105 Report's DHIS2 mappings against.
+const dhis2 = spawnSync(centralBin, ['package', 'dhis2-metadata', resolve(import.meta.dirname, '../../../packages/reference-packages/dhis2/ehmis-metadata.json'), '--by', 'e2e-hmis-lead-cli'], { env, stdio: 'inherit' })
+if (dhis2.status !== 0) throw new Error('recording the DHIS2 metadata failed')
 // The HMIS Reporting package (#556; packages/reference-packages/hmis), drafted by the author: the
 // HMIS 105 antenatal care Report and the facility's ANC monitoring, over the ANC indicators.
 const hmis = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/hmis'), '--by', author], { env, stdio: 'inherit' })

@@ -194,6 +194,23 @@ export const StudioBinding = z.object({
 })
 export type StudioBinding = z.infer<typeof StudioBinding>
 
+/** One DHIS2 mapping of one cell of a Report row (#560). */
+export const StudioCellMapping = z.object({
+  /** The cell's band of each Disaggregation, by the Disaggregation's name (an Age Band Set's `url|version`, or a code); none is the row's whole. */
+  "bands": z.record(z.string(), z.string()),
+  /** The DHIS2 category option combo's ID. */
+  "categoryOptionCombo": z.string(),
+  /** The DHIS2 data element's ID. */
+  "dataElement": z.string(),
+  /** The DHIS2 data set's ID. */
+  "dataSet": z.string(),
+  /** The first day it is in effect, `YYYY-MM-DD`. */
+  "from": z.string(),
+  /** The last day it is in effect, `YYYY-MM-DD`; none is until further notice. */
+  "to": z.string().nullable().optional(),
+})
+export type StudioCellMapping = z.infer<typeof StudioCellMapping>
+
 /** Which automated check. */
 export const StudioCheck = z.enum(["validation", "simulation"])
 export type StudioCheck = z.infer<typeof StudioCheck>
@@ -855,6 +872,8 @@ export const StudioIndicatorMapping = z.object({
   "indicator": z.string(),
   /** The row's label (e.g. *ANC 1st visit for women*). */
   "label": z.string(),
+  /** The row's cells' DHIS2 mappings (#560), in the section's order. */
+  "mappings": z.array(StudioCellMapping),
   /** The package version the Report is in, `name@version`. */
   "packageId": z.string(),
   /** Whether that version is published; otherwise it is the package's open draft. */

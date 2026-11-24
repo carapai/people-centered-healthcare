@@ -123,6 +123,8 @@ pub const MODULE_TABLES: &[(&str, &str)] = &[
     ("package_state", "configuration"),
     ("package_activation_report", "configuration"),
     ("node_activation_report", "configuration"),
+    // The DHIS2 instance's metadata Report mappings are checked against (#560).
+    ("dhis2_metadata", "configuration"),
     // Staged software roll-out (#136).
     ("platform_release", "configuration"),
     ("release_rollout", "configuration"),

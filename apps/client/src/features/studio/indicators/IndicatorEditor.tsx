@@ -1230,6 +1230,22 @@ function HmisMapping({ url }: { url: string }) {
               <span className={muted}>
                 {intl.formatMessage(m.inMappingWhere, { package: f.packageId, published: String(f.published), pinned: f.indicator.split('|')[1] ?? '', sent: String(f.sentToDhis2) })}
               </span>
+              {f.mappings.length === 0 ? null : (
+                <ul className={cx(muted, css({ pl: '5', listStyle: 'circle' }))}>
+                  {f.mappings.map((c, n) => (
+                    <li key={n}>
+                      {intl.formatMessage(m.inMappingCell, {
+                        bands: Object.values(c.bands).join(' × ') || intl.formatMessage(m.inMappingWhole),
+                        element: c.dataElement,
+                        combo: c.categoryOptionCombo,
+                        dataSet: c.dataSet,
+                        from: c.from,
+                        to: c.to ?? 'none',
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

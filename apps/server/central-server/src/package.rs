@@ -23,6 +23,11 @@
 //! - `package activations` prints every activation issued, oldest first; `package reports` the
 //!   latest activation reports nodes sent, newest first, with why a failed one failed.
 //!
+//! - `package dhis2-metadata <file> --by <person>` records `<file>`, the DHIS2 instance's
+//!   `dataSets` export (its data sets, their data elements and each one's category option
+//!   combos), as central's copy of its metadata, which Validation checks Report mappings
+//!   against (#560), and prints its data sets.
+//!
 //! Tarballs are kept in central's blob store, `HEALTH_FILES_DIR`, from which nodes fetch the
 //! packages activated for them (`HEALTH_BLOB_DIR` is read when it is not set).
 
@@ -40,7 +45,7 @@ use health_time::SystemClock;
 
 use crate::config::Config;
 
-const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir> | activate <id> --scope <scope> --by <operator> [--effective <time>] [--reason <why>] | activations | reports), where <id> is name@version and <scope> is national, district:<code>, facility:<code> or program:<facility>:<program>";
+const USAGE: &str = "usage: central-server package (draft <dir> --by <author> | submit <id> --by <author> | review <id> --by <reviewer> | approve <id> --by <approver> | request-changes <id> --by <person> --reason <why> | publish <id> --by <operator> | status <id> | list | export <id> --out <dir> | activate <id> --scope <scope> --by <operator> [--effective <time>] [--reason <why>] | activations | reports | dhis2-metadata <file> --by <person>), where <id> is name@version and <scope> is national, district:<code>, facility:<code> or program:<facility>:<program>";
 
 type Failure = Box<dyn std::error::Error>;
 
@@ -364,6 +369,19 @@ pub(crate) async fn run(config: &Config, args: &[String]) -> Result<(), Failure>
                 "{}@{} activated for {} from {} ({}). Nodes receive it in the packages lane.",
                 a.package, a.version, a.scope, a.effective_at, a.id
             )?;
+        }
+        [cmd, file, rest @ ..] if cmd == "dhis2-metadata" => {
+            let found = flags(rest, &["--by"])?;
+            let export =
+                std::fs::read_to_string(file).map_err(|e| format!("cannot read {file}: {e}"))?;
+            let recorded = open()
+                .await?
+                .record_dhis2_metadata(&export, flag(&found, "--by")?)
+                .await
+                .map_err(said)?;
+            for (id, name, elements) in recorded.data_sets {
+                writeln!(out, "{id}\t{name}\t{elements} data elements")?;
+            }
         }
         [cmd] if cmd == "activations" => {
             for record in open().await?.activations().await.map_err(said)? {

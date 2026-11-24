@@ -552,11 +552,32 @@ pub(crate) struct StudioIndicatorMapping {
     pub(crate) indicator: String,
     /// Whether the section's cells are sent to DHIS2.
     pub(crate) sent_to_dhis2: bool,
+    /// The row's cells' DHIS2 mappings (#560), in the section's order.
+    pub(crate) mappings: Vec<StudioCellMapping>,
+}
+
+/// One DHIS2 mapping of one cell of a Report row (#560).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StudioCellMapping {
+    /// The cell's band of each Disaggregation, by the Disaggregation's name (an Age Band Set's
+    /// `url|version`, or a code); none is the row's whole.
+    pub(crate) bands: std::collections::BTreeMap<String, String>,
+    /// The DHIS2 data set's ID.
+    pub(crate) data_set: String,
+    /// The DHIS2 data element's ID.
+    pub(crate) data_element: String,
+    /// The DHIS2 category option combo's ID.
+    pub(crate) category_option_combo: String,
+    /// The first day it is in effect, `YYYY-MM-DD`.
+    pub(crate) from: String,
+    /// The last day it is in effect, `YYYY-MM-DD`; none is until further notice.
+    pub(crate) to: Option<String>,
 }
 
 /// Documents and serves an indicator's HMIS mapping.
 #[utoipa::path(get, path = "/api/studio/indicator-mappings", tag = "studio", operation_id = "listStudioIndicatorMappings",
-    description = "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row. Mappings are edited in the Reporting package's Report designer.",
+    description = "An indicator's HMIS mapping, read-only (studio.md § Indicators): every row of a Report table section that lays out the indicator `url`, whichever version it pins, in each package's newest published version and its open draft, by package version, then Report, section and row, each with its cells' DHIS2 data set, data element and category option combo and the dates each is in effect. Mappings are edited in the Reporting package's Report designer.",
     params(("url" = String, Query, description = "The indicator's canonical URL, without a version")),
     responses(
         (status = 200, description = "Where it is laid out", body = [StudioIndicatorMapping]),
@@ -593,6 +614,18 @@ pub(crate) async fn mappings(
                     label: m.label,
                     indicator: m.indicator,
                     sent_to_dhis2: m.sent_to_dhis2,
+                    mappings: m
+                        .mappings
+                        .into_iter()
+                        .map(|c| StudioCellMapping {
+                            bands: c.bands,
+                            data_set: c.data_set,
+                            data_element: c.data_element,
+                            category_option_combo: c.category_option_combo,
+                            from: c.from,
+                            to: c.to,
+                        })
+                        .collect(),
                 })
                 .collect::<Vec<_>>(),
         )

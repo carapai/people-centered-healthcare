@@ -44,7 +44,7 @@ fn table(rows: Value) -> Value {
         "rows": rows,
         "rowTotals": true,
         "change": true,
-        "sendToDhis2": true,
+        "sendToDhis2": false,
     })
 }
 
@@ -84,7 +84,7 @@ fn a_report_reads_as_written_and_back() {
                 "columnTotals": true,
                 "rowTotals": true,
                 "change": false,
-                "sendToDhis2": true,
+                "sendToDhis2": false,
             },
         ],
     });
@@ -95,7 +95,7 @@ fn a_report_reads_as_written_and_back() {
         panic!("a table section")
     };
     assert_eq!(section.disaggregations[1].axis, Axis::Columns);
-    assert!(section.send_to_dhis2);
+    assert!(!section.send_to_dhis2);
     assert_eq!(serde_json::to_value(&read).expect("json"), written);
     assert_eq!(read.problems(&catalogue()), Vec::<String>::new());
 }

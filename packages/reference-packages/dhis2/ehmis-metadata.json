@@ -1,0 +1,39 @@
+{
+  "dataSets": [
+    {
+      "id": "Hmis105Smpl",
+      "name": "HMIS 105: Health unit outpatient monthly report (illustrative IDs)",
+      "periodType": "Monthly",
+      "dataSetElements": [
+        {
+          "dataElement": {
+            "id": "An01aSample",
+            "name": "105-AN01a. ANC 1st visit for women",
+            "categoryCombo": {
+              "categoryOptionCombos": [
+                { "id": "Age1014Smpl", "name": "10-14 Years" },
+                { "id": "Age1519Smpl", "name": "15-19 Years" },
+                { "id": "Age2024Smpl", "name": "20-24 Years" },
+                { "id": "Age25upSmpl", "name": "25 Years and above" }
+              ]
+            }
+          }
+        },
+        {
+          "dataElement": {
+            "id": "An02xSample",
+            "name": "105-AN02. ANC visits (all)",
+            "categoryCombo": {
+              "categoryOptionCombos": [
+                { "id": "Age1014Smpl", "name": "10-14 Years" },
+                { "id": "Age1519Smpl", "name": "15-19 Years" },
+                { "id": "Age2024Smpl", "name": "20-24 Years" },
+                { "id": "Age25upSmpl", "name": "25 Years and above" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

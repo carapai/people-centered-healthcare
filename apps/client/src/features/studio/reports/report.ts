@@ -37,6 +37,26 @@ export interface TableSection {
   rowTotals: boolean
   change: boolean
   sendToDhis2: boolean
+  /** Its cells' DHIS2 mappings, when it is sent (#560). */
+  mappings: CellMapping[]
+}
+
+/**
+ * One mapping of a cell of a section sent to DHIS2 (#560): the row, its band of each
+ * Disaggregation by the Disaggregation's name (a side left out is that side's Total), the DHIS2
+ * data set, data element and category option combo, and the dates it is in effect.
+ */
+export interface CellMapping {
+  row: string
+  bands: Record<string, string>
+  dataSet: string
+  dataElement: string
+  categoryOptionCombo: string
+  /** `YYYY-MM-DD`. */
+  from: string
+  /** `YYYY-MM-DD`; none (or empty) is until further notice. */
+  to?: string
+  zeroIsSignificant?: boolean
 }
 
 export interface Code {
@@ -159,6 +179,7 @@ export function readReport(text: string): { report: Report } | { refusal: string
           rowTotals: s['rowTotals'] === true,
           change: s['change'] === true,
           sendToDhis2: s['sendToDhis2'] === true,
+          mappings: (Array.isArray(s['mappings']) ? (s['mappings'] as unknown[]) : []).filter(isObject).map(readMapping),
         }
       const list: LineListSection = {
         kind: 'lineList',
@@ -183,6 +204,28 @@ export function readReport(text: string): { report: Report } | { refusal: string
   return { report }
 }
 
+function readMapping(m: Record<string, unknown>): CellMapping {
+  const bands = isObject(m['bands']) ? Object.fromEntries(Object.entries(m['bands']).filter((e): e is [string, string] => typeof e[1] === 'string')) : {}
+  const mapping: CellMapping = { row: str(m['row']), bands, dataSet: str(m['dataSet']), dataElement: str(m['dataElement']), categoryOptionCombo: str(m['categoryOptionCombo']), from: str(m['from']) }
+  if (typeof m['to'] === 'string') mapping.to = m['to']
+  if (m['zeroIsSignificant'] === true) mapping.zeroIsSignificant = true
+  return mapping
+}
+
+/** A mapping in the schema's key order, leaving out what is empty. */
+function writeMapping(m: CellMapping): Record<string, unknown> {
+  return {
+    row: m.row,
+    ...(Object.keys(m.bands).length === 0 ? {} : { bands: m.bands }),
+    dataSet: m.dataSet,
+    dataElement: m.dataElement,
+    categoryOptionCombo: m.categoryOptionCombo,
+    from: m.from,
+    ...(m.to === undefined || m.to === '' ? {} : { to: m.to }),
+    ...(m.zeroIsSignificant === true ? { zeroIsSignificant: true } : {}),
+  }
+}
+
 /** The file for `report`, in the schema's key order. */
 export function writeReport(report: Report): Record<string, unknown> {
   return {
@@ -203,6 +246,7 @@ export function writeReport(report: Report): Record<string, unknown> {
           rowTotals: s.rowTotals,
           change: s.change,
           sendToDhis2: s.sendToDhis2,
+          ...(s.mappings.length === 0 ? {} : { mappings: s.mappings.map(writeMapping) }),
         }
       return {
         kind: 'lineList',
@@ -250,7 +294,7 @@ export function toggleLevel(report: Report, level: Level, on: boolean): Report {
 /** Adds an empty table section titled `title`; its id comes from the title. */
 export function addTable(report: Report, title: string): Report {
   const id = unique(slug(title), report.sections.map((s) => s.id))
-  const section: TableSection = { kind: 'table', id, title, disaggregations: [], rows: [], columnTotals: false, rowTotals: false, change: false, sendToDhis2: false }
+  const section: TableSection = { kind: 'table', id, title, disaggregations: [], rows: [], columnTotals: false, rowTotals: false, change: false, sendToDhis2: false, mappings: [] }
   return { ...report, sections: [...report.sections, section] }
 }
 
@@ -296,7 +340,32 @@ export function addRow(s: TableSection, indicator: string, label: string, id?: s
 }
 
 export const withRow = (s: TableSection, at: number, next: Partial<IndicatorRow>): TableSection => ({ ...s, rows: s.rows.map((r, n) => (n === at ? { ...r, ...next } : r)) })
-export const removeRow = (s: TableSection, at: number): TableSection => ({ ...s, rows: s.rows.filter((_, n) => n !== at) })
+export const removeRow = (s: TableSection, at: number): TableSection => ({ ...s, rows: s.rows.filter((_, n) => n !== at), mappings: s.mappings.filter((m) => m.row !== s.rows[at]?.id) })
+
+// DHIS2 mappings (#560).
+
+/** Whether `mapping` is of the cell of row `row` at `bands` (each Disaggregation's band by name). */
+export const isOfCell = (mapping: CellMapping, row: string, bands: Record<string, string>): boolean =>
+  mapping.row === row && Object.keys(mapping.bands).length === Object.keys(bands).length && Object.entries(bands).every(([name, code]) => mapping.bands[name] === code)
+
+/** Adds a mapping of the cell of row `row` at `bands`: the cell's last mapping's IDs, from
+ * the day after it ends (a revision of the form), or empty IDs from `from`. */
+export function addMapping(s: TableSection, row: string, bands: Record<string, string>, from: string): TableSection {
+  const last = s.mappings.filter((m) => isOfCell(m, row, bands)).at(-1)
+  const mapping: CellMapping = last === undefined ? { row, bands, dataSet: '', dataElement: '', categoryOptionCombo: '', from } : { row, bands, dataSet: last.dataSet, dataElement: last.dataElement, categoryOptionCombo: last.categoryOptionCombo, from: last.to === undefined || last.to === '' ? from : nextDay(last.to) }
+  return { ...s, mappings: [...s.mappings, mapping] }
+}
+
+export const withMapping = (s: TableSection, at: number, next: Partial<CellMapping>): TableSection => ({ ...s, mappings: s.mappings.map((m, n) => (n === at ? { ...m, ...next } : m)) })
+export const removeMapping = (s: TableSection, at: number): TableSection => ({ ...s, mappings: s.mappings.filter((_, n) => n !== at) })
+
+/** The day after `date` (`YYYY-MM-DD`), or `date` if it is not one. */
+function nextDay(date: string): string {
+  const day = new Date(`${date}T00:00:00Z`)
+  if (Number.isNaN(day.getTime())) return date
+  day.setUTCDate(day.getUTCDate() + 1)
+  return day.toISOString().slice(0, 10)
+}
 export const moveRow = (s: TableSection, at: number, by: -1 | 1): TableSection => ({ ...s, rows: move(s.rows, at, by) })
 
 // Line list sections.

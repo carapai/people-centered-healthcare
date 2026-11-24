@@ -23,17 +23,20 @@ import {
   addCoded,
   addConcept,
   addLineList,
+  addMapping,
   addRow,
   addTable,
   addVisitType,
   attributesFor,
   disaggregationName,
+  isOfCell,
   moveColumn,
   moveRow,
   moveSection,
   readReport,
   removeColumn,
   removeDisaggregation,
+  removeMapping,
   removeRow,
   removeSection,
   removeVisitType,
@@ -43,6 +46,7 @@ import {
   withColumn,
   withDisaggregation,
   withList,
+  withMapping,
   withOptions,
   withRow,
   withRowPer,
@@ -378,7 +382,7 @@ function Designer({ id, path, draft, file, initial, onReload }: { id: string; pa
           ))}
         </section>
       </div>
-      <Dhis2Sheet id={ids.dhis2} report={report} preview={preview.data} />
+      <Dhis2Sheet id={ids.dhis2} report={report} preview={preview.data} editable={editable} onChange={change} />
     </section>
   )
 }
@@ -1054,14 +1058,35 @@ function CellDetail({ section, selected, preview, level, previous }: { section: 
           )}
         </>
       )}
-      {section.sendToDhis2 ? <p className={muted}>{intl.formatMessage(m.rdCellMapping)}</p> : null}
+      {section.sendToDhis2 ? <CellMappings section={section} rowId={r.id} at={selected.at} /> : null}
     </div>
   )
 }
 
-function Dhis2Sheet({ id, report, preview }: { id: string; report: Report; preview: StudioReportPreview | undefined }) {
+/** The selected cell's DHIS2 mappings, or that it has none. */
+function CellMappings({ section, rowId, at }: { section: TableSection; rowId: string; at: readonly At[] }) {
+  const intl = useIntl()
+  const mappings = section.mappings.filter((mapping) => isOfCell(mapping, rowId, bandsOf(at)))
+  if (mappings.length === 0) return <p className={muted}>{intl.formatMessage(m.rdCellMapping)}</p>
+  return (
+    <ul className={muted}>
+      {mappings.map((mapping, n) => (
+        <li key={n}>{intl.formatMessage(m.rdCellMapped, { element: mapping.dataElement, combo: mapping.categoryOptionCombo, from: mapping.from, to: mapping.to === undefined || mapping.to === '' ? 'none' : mapping.to })}</li>
+      ))}
+    </ul>
+  )
+}
+
+/** A cell's band of each Disaggregation, by the Disaggregation's name, as a mapping names it. */
+const bandsOf = (at: readonly At[]): Record<string, string> => Object.fromEntries(at.map((a) => [a.name, a.code]))
+
+/** Today, `YYYY-MM-DD`: where a new mapping starts. */
+const today = () => new Date().toISOString().slice(0, 10)
+
+function Dhis2Sheet({ id, report, preview, editable, onChange }: { id: string; report: Report; preview: StudioReportPreview | undefined; editable: boolean; onChange: (next: Report) => void }) {
   const intl = useIntl()
   const cells = sentCells(report.sections.flatMap((section, index) => (section.kind === 'table' ? [{ section, index, preview: preview?.sections[index] }] : [])))
+  const edit = (section: number, change: (s: TableSection) => TableSection) => onChange(updateSection(report, section, 'table', change))
   return (
     <section aria-labelledby={id} className={panel}>
       <h2 id={id} className={subheading}>
@@ -1079,23 +1104,74 @@ function Dhis2Sheet({ id, report, preview }: { id: string; report: Report; previ
                 <th scope="col">{intl.formatMessage(m.rdDhis2Section)}</th>
                 <th scope="col">{intl.formatMessage(m.rdDhis2Row)}</th>
                 <th scope="col">{intl.formatMessage(m.rdDhis2Bands)}</th>
+                <th scope="col">{intl.formatMessage(m.rdDhis2DataSet)}</th>
                 <th scope="col">{intl.formatMessage(m.rdDhis2Element)}</th>
                 <th scope="col">{intl.formatMessage(m.rdDhis2Combo)}</th>
+                <th scope="col">{intl.formatMessage(m.rdDhis2Effect)}</th>
               </tr>
             </thead>
             <tbody>
-              {cells.map((c, n) => (
-                <tr key={n}>
-                  <td>{c.sectionTitle}</td>
-                  <td>{c.row.label}</td>
-                  <td>
-                    {c.total ? intl.formatMessage(m.rdTotal) : c.at.length === 0 ? '—' : bandsText(c.at)}
-                    {c.total || c.notRecorded ? <span className={muted}> {intl.formatMessage(m.rdSentIfMapped)}</span> : null}
-                  </td>
-                  <td className={muted}>{intl.formatMessage(m.rdNotMapped)}</td>
-                  <td className={muted}>{intl.formatMessage(m.rdNotMapped)}</td>
-                </tr>
-              ))}
+              {cells.map((c, n) => {
+                const section = report.sections[c.section]
+                if (section?.kind !== 'table') return null
+                const bands = bandsOf(c.at)
+                const name = c.total ? `${c.row.label} · ${intl.formatMessage(m.rdTotal)}` : c.at.length === 0 ? c.row.label : `${c.row.label} · ${bandsText(c.at)}`
+                const mine = section.mappings.flatMap((mapping, at) => (isOfCell(mapping, c.row.id, bands) ? [{ mapping, at }] : []))
+                const field = (fieldName: string, value: string, k: number, onValue: (value: string) => void, type = 'text') => (
+                  <input
+                    key={k}
+                    type={type}
+                    className={input}
+                    value={value}
+                    readOnly={!editable}
+                    aria-label={intl.formatMessage(m.rdDhis2Field, { field: fieldName, cell: name, n: k + 1 })}
+                    onChange={(e) => onValue(e.target.value)}
+                  />
+                )
+                const column = (fieldName: string, key: 'dataSet' | 'dataElement' | 'categoryOptionCombo') =>
+                  mine.length === 0 ? (
+                    <span className={muted}>{intl.formatMessage(m.rdNotMapped)}</span>
+                  ) : (
+                    <div className={css({ display: 'flex', flexDirection: 'column', gap: '1' })}>{mine.map(({ mapping, at }, k) => field(fieldName, mapping[key], k, (value) => edit(c.section, (s) => withMapping(s, at, { [key]: value }))))}</div>
+                  )
+                return (
+                  <tr key={n}>
+                    <td>{c.sectionTitle}</td>
+                    <td>{c.row.label}</td>
+                    <td>
+                      {c.total ? intl.formatMessage(m.rdTotal) : c.at.length === 0 ? '—' : bandsText(c.at)}
+                      {c.total || c.notRecorded ? <span className={muted}> {intl.formatMessage(m.rdSentIfMapped)}</span> : null}
+                    </td>
+                    <td>{column(intl.formatMessage(m.rdDhis2DataSet), 'dataSet')}</td>
+                    <td>{column(intl.formatMessage(m.rdDhis2Element), 'dataElement')}</td>
+                    <td>{column(intl.formatMessage(m.rdDhis2Combo), 'categoryOptionCombo')}</td>
+                    <td>
+                      <div className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
+                        {mine.map(({ mapping, at }, k) => (
+                          <div key={k} className={row}>
+                            {field(intl.formatMessage(m.rdDhis2From), mapping.from, k, (value) => edit(c.section, (s) => withMapping(s, at, { from: value })), 'date')}
+                            {field(intl.formatMessage(m.rdDhis2To), mapping.to ?? '', k, (value) => edit(c.section, (s) => withMapping(s, at, { to: value })), 'date')}
+                            <label className={row}>
+                              <input type="checkbox" checked={mapping.zeroIsSignificant === true} disabled={!editable} onChange={(e) => edit(c.section, (s) => withMapping(s, at, { zeroIsSignificant: e.target.checked }))} />
+                              <span className={css({ fontSize: 'sm' })}>{intl.formatMessage(m.rdDhis2Zero)}</span>
+                            </label>
+                            {editable ? (
+                              <button type="button" className={small} aria-label={intl.formatMessage(m.rdDhis2Field, { field: intl.formatMessage(m.rdDhis2Remove), cell: name, n: k + 1 })} onClick={() => edit(c.section, (s) => removeMapping(s, at))}>
+                                {intl.formatMessage(m.rdDhis2Remove)}
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                        {editable ? (
+                          <button type="button" className={small} aria-label={`${intl.formatMessage(m.rdDhis2Add)}, ${name}`} onClick={() => edit(c.section, (s) => addMapping(s, c.row.id, bands, today()))}>
+                            {intl.formatMessage(m.rdDhis2Add)}
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

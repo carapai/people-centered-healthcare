@@ -48,6 +48,35 @@ test('one section is open at a time, a preview cell opens its section, and probl
   await noViolations(page)
 })
 
+// #560: the DHIS2 mapping sheet edits each cell's mappings, which Validation checks against the
+// DHIS2 instance's metadata recorded at central (the local backend records the illustrative copy
+// in packages/reference-packages/dhis2).
+test('the DHIS2 mapping sheet edits a cell\'s mapping and Validation checks it against the instance\'s metadata', async ({ page }) => {
+  await signIn(page, USERS.author)
+  await press(page, 'Studio', 'link')
+  await press(page, 'Open reports', 'link')
+  await page.getByRole('grid', { name: 'Reports' }).getByText('HMIS 105 · 2 Antenatal care').click()
+  await expect(page.getByRole('heading', { name: 'HMIS 105 · 2 Antenatal care', level: 1 })).toBeVisible()
+  const sheet = page.getByRole('region', { name: 'DHIS2 mapping' })
+  const element = sheet.getByLabel('Data element, ANC 1st visit for women · 15–19 years, mapping 1')
+  await expect(element).toHaveValue('An01aSample')
+  await expect(sheet.getByLabel('Category option combo, ANC 1st visit for women · 15–19 years, mapping 1')).toHaveValue('Age1519Smpl')
+
+  const validation = page.getByRole('region', { name: 'Validation' })
+  await element.fill('An01bSample')
+  await expect(validation.getByText(/DHIS2 mapping 2 \(row 1 \(ANC 1st visit for women\) at 15-19\): the data element An01bSample is not in the DHIS2 instance's metadata/)).toBeVisible()
+  await element.fill('An01aSample')
+  await expect(validation.getByText(/An01bSample/)).toHaveCount(0)
+
+  // A second mapping of the cell, from today, overlaps the first, which runs until further notice.
+  await sheet.getByRole('button', { name: '+ mapping, ANC 1st visit for women · 15–19 years' }).click()
+  await expect(sheet.getByLabel('Data element, ANC 1st visit for women · 15–19 years, mapping 2')).toHaveValue('An01aSample')
+  await expect(validation.getByText(/two DHIS2 mappings of row 1 \(ANC 1st visit for women\) at 15-19 are in effect on the same dates/)).toBeVisible()
+  await sheet.getByRole('button', { name: 'Remove mapping, ANC 1st visit for women · 15–19 years, mapping 2' }).click()
+  await expect(validation.getByText(/two DHIS2 mappings/)).toHaveCount(0)
+  await noViolations(page)
+})
+
 test('New report creates a Report in the Reporting package and the designer saves it', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')

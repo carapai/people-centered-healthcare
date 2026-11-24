@@ -10,13 +10,17 @@
 
 use std::collections::BTreeMap;
 
-use health_analytics::{Catalogue, REPORTS_FOLDER, ReportDefinition, Section};
+use health_analytics::{
+    Catalogue, CellMapping, DataSetsExport, Dhis2Metadata, REPORTS_FOLDER, ReportDefinition,
+    Section,
+};
 use health_analytics_app::measure;
 use health_configuration::lifecycle::{Lifecycle, Stage};
 use health_configuration::package::{INDEX, PackageKind};
 use health_packages::{Files, Packed, REPORT};
+use health_persistence::Transaction as _;
 use health_surrealdb::SurrealTx;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::age_bands::age_band_sets_in;
 use crate::{Error, Publications, failed, lifecycle_id};
@@ -101,9 +105,90 @@ fn add(catalogue: &mut Catalogue, packed: &Packed) {
                 .insert(indicator.canonical(), indicator.calculation);
         }
     }
-    catalogue
-        .age_band_sets
-        .extend(age_band_sets_in(packed).iter().map(|set| set.canonical()));
+    for set in age_band_sets_in(packed) {
+        catalogue.age_band_sets.insert(set.canonical());
+        catalogue.age_band_codes.insert(
+            set.canonical(),
+            set.bands.iter().map(|band| band.code()).collect(),
+        );
+    }
+}
+
+/// Central's recorded copy of the DHIS2 instance's metadata, if one is recorded (#560).
+async fn recorded_dhis2(tx: &mut SurrealTx) -> Result<Option<Dhis2Metadata>, Error> {
+    tx.dhis2_metadata()
+        .await
+        .map_err(failed)?
+        .map(|export| {
+            serde_json::from_str::<DataSetsExport>(&export)
+                .map(|e| e.metadata())
+                .map_err(failed)
+        })
+        .transpose()
+}
+
+/// What a recorded copy of the DHIS2 instance's metadata holds: its data sets, each with how
+/// many data elements.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedDhis2 {
+    /// Each data set's ID, name and number of data elements.
+    pub data_sets: Vec<(String, String, usize)>,
+}
+
+impl Publications {
+    /// Records `export`, the DHIS2 instance's `dataSets` export (#560; analytics.md § Reporting
+    /// to DHIS2), as central's copy of its metadata, by `by`, audited: what Validation checks
+    /// Report mappings against from now on. A file that is not such an export is refused.
+    pub async fn record_dhis2_metadata(
+        &self,
+        export: &str,
+        by: &str,
+    ) -> Result<RecordedDhis2, Error> {
+        let read: DataSetsExport = serde_json::from_str(export).map_err(|e| {
+            Error::Conflict(format!("the file is not a DHIS2 dataSets export: {e}"))
+        })?;
+        if read.data_sets.is_empty() {
+            return Err(Error::Conflict(
+                "the file holds no data sets: export them with their data elements and category option combos".to_owned(),
+            ));
+        }
+        let metadata = read.metadata();
+        let now = self.clock.now();
+        let mut tx = self.begin().await?;
+        tx.put_dhis2_metadata(export, by).await.map_err(failed)?;
+        let mut agents = vec![json!({ "who": { "display": by }, "requestor": true })];
+        if self.cli {
+            agents.push(json!({ "who": { "display": crate::CLI_AGENT }, "requestor": false }));
+        }
+        let audit = json!({
+            "resourceType": "AuditEvent",
+            "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/audit-event-type", "code": "rest", "display": "Restful Operation" }] }],
+            "code": { "coding": [{ "system": "urn:health:audit-event", "code": "dhis2-metadata" }] },
+            "action": "U",
+            "severity": "notice",
+            "recorded": now.to_string(),
+            "outcome": { "code": { "system": "http://terminology.hl7.org/CodeSystem/audit-event-outcome", "code": "0" } },
+            "agent": agents,
+            "source": { "observer": { "display": self.observer } },
+            "entity": [{
+                "what": { "display": "DHIS2 instance metadata" },
+                "detail": [
+                    { "type": { "text": "data sets" }, "valueString": metadata.data_sets.keys().cloned().collect::<Vec<_>>().join(", ") },
+                ],
+            }],
+        });
+        health_audit::append(&mut tx, &audit)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)?;
+        Ok(RecordedDhis2 {
+            data_sets: metadata
+                .data_sets
+                .iter()
+                .map(|(id, set)| (id.clone(), set.name.clone(), set.data_elements.len()))
+                .collect(),
+        })
+    }
 }
 
 /// Every problem with the package's Reports, each prefixed with its file, given what they can
@@ -153,7 +238,10 @@ impl Publications {
         tx: &mut SurrealTx,
         packed: &Packed,
     ) -> Result<Catalogue, Error> {
-        let mut catalogue = Catalogue::default();
+        let mut catalogue = Catalogue {
+            dhis2: recorded_dhis2(tx).await?,
+            ..Catalogue::default()
+        };
         add(&mut catalogue, packed);
         for json in tx.package_lifecycles().await.map_err(failed)? {
             let lifecycle: Lifecycle = serde_json::from_str(&json).map_err(failed)?;
@@ -197,7 +285,10 @@ impl Publications {
         let mut tx = self.begin().await?;
         let (lifecycle, _) = self.load(&mut tx, id).await?;
         let packed = self.packed(&lifecycle.content).await?;
-        let mut catalogue = Catalogue::default();
+        let mut catalogue = Catalogue {
+            dhis2: recorded_dhis2(&mut tx).await?,
+            ..Catalogue::default()
+        };
         add(&mut catalogue, &packed);
         let lifecycles = tx.package_lifecycles().await.map_err(failed)?;
         drop(tx);
@@ -250,6 +341,8 @@ pub struct IndicatorMapping {
     pub indicator: String,
     /// Whether the section's cells are sent to DHIS2.
     pub sent_to_dhis2: bool,
+    /// The row's cells' DHIS2 mappings, in the section's order (#560).
+    pub mappings: Vec<CellMapping>,
 }
 
 impl Publications {
@@ -300,6 +393,12 @@ impl Publications {
                                 label: row.label.clone(),
                                 indicator: row.indicator.clone(),
                                 sent_to_dhis2: table.send_to_dhis2,
+                                mappings: table
+                                    .mappings
+                                    .iter()
+                                    .filter(|m| m.row == row.id)
+                                    .cloned()
+                                    .collect(),
                             });
                         }
                     }
