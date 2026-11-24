@@ -1,0 +1,24 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "sample-complaint",
+  "url": "https://health.go.ug/fhir/Questionnaire/sample-complaint",
+  "version": "1.0.0",
+  "name": "SampleComplaint",
+  "title": "Presenting complaint",
+  "status": "active",
+  "item": [
+    {
+      "linkId": "complaint",
+      "text": "Main complaint",
+      "type": "coding",
+      "required": true,
+      "answerValueSet": "https://health.go.ug/fhir/ValueSet/sample-complaint|1.0.0"
+    },
+    {
+      "linkId": "district",
+      "text": "Home district",
+      "type": "coding",
+      "answerValueSet": "https://health.go.ug/fhir/ValueSet/sample-district|1.0.0"
+    }
+  ]
+}

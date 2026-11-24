@@ -1341,6 +1341,7 @@ type FormValues = {
   fmSubmitted: {}
   fmSaveFailed: {}
   fmConflict: {}
+  fmCodesFailed: {}
 }
 
 // The Questionnaire renderer's strings (features/forms).
@@ -1372,6 +1373,11 @@ export const formMessages = defineMessages<FormValues>({
   fmSubmitted: { id: 'app.forms.submitted', defaultMessage: 'Submitted.', description: 'Forms: the response was submitted' },
   fmSaveFailed: { id: 'app.forms.saveFailed', defaultMessage: 'The response was not saved. The server checked it and refused it.', description: 'Forms: save or submit refused' },
   fmConflict: { id: 'app.forms.conflict', defaultMessage: 'Someone saved this response elsewhere. Open the latest draft to continue.', description: 'Forms: the draft changed on another device' },
+  fmCodesFailed: {
+    id: 'app.forms.codesFailed',
+    defaultMessage: 'The answers of a question could not be loaded from the terminology here. It offers no answers until they can.',
+    description: 'Forms: a question bound to a ValueSet whose codes the node could not give',
+  },
 })
 
 type ReceptionValues = {

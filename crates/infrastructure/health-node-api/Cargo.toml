@@ -33,6 +33,7 @@ health-programs-app = { workspace = true }
 health-publication = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }
+health-terminology = { workspace = true }
 health-time = { workspace = true }
 health-workflow-app = { workspace = true }
 jiff = { workspace = true }
@@ -42,6 +43,7 @@ tower = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+http-body-util = { workspace = true }
 health-surrealdb = { workspace = true, features = ["memory"] }
 tokio = { workspace = true }
 uuid = { workspace = true }

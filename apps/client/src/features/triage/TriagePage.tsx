@@ -4,10 +4,11 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useState } from 'react'
 import { useIntl } from 'react-intl'
 
-import { triageMessages as m } from '../../i18n/messages'
+import { formMessages, triageMessages as m } from '../../i18n/messages'
 import { newResourceId, searchQuery, usePlatform } from '../../platform'
 import { dispose } from '../consultation/api'
 import { resources } from '../forms/api'
+import { useBoundAnswers } from '../forms/answers'
 import { initialResponse } from '../forms/model'
 import { QuestionnaireRenderer } from '../forms/QuestionnaireRenderer'
 import { patientName, queueKey, queueQuery, step, type QueueEntry } from '../reception/api'
@@ -120,6 +121,8 @@ function Form({ open, onClose }: { open: Open; onClose: (triaged: boolean) => vo
   const queryClient = useQueryClient()
   const forms = useQuery(searchQuery(platform.fhir, 'Questionnaire', { url: TRIAGE_FORM, status: 'active' }))
   const questionnaire = forms.data === undefined ? undefined : newest(resources<Questionnaire>(forms.data))
+  // The codes of its questions bound to a ValueSet, from this node's terminology (#843).
+  const bound = useBoundAnswers(questionnaire)
   const [initial] = useState(() => newResourceId())
   const save = useMutation({
     mutationFn: async (response: QuestionnaireResponse) => {
@@ -145,11 +148,17 @@ function Form({ open, onClose }: { open: Open; onClose: (triaged: boolean) => vo
           {intl.formatMessage(m.trFailed, { reason: save.error instanceof Error ? save.error.message : '' })}
         </p>
       ) : null}
+      {bound.failed ? (
+        <p role="alert" className={css({ color: 'danger.text' })}>
+          {intl.formatMessage(formMessages.fmCodesFailed)}
+        </p>
+      ) : null}
       {questionnaire === undefined ? (
         <p role="status">{intl.formatMessage(forms.isPending ? m.trLoading : m.trNoForm)}</p>
       ) : (
         <QuestionnaireRenderer
           questionnaire={questionnaire}
+          answers={bound.answers}
           initial={{
             ...initialResponse(questionnaire),
             id: initial,

@@ -1,0 +1,34 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "sample-complaint",
+  "url": "https://health.go.ug/fhir/CodeSystem/sample-complaint",
+  "version": "1.0.0",
+  "name": "SampleComplaint",
+  "title": "Sample presenting complaints",
+  "status": "active",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "fever",
+      "display": "Fever"
+    },
+    {
+      "code": "cough",
+      "display": "Cough"
+    },
+    {
+      "code": "diarrhoea",
+      "display": "Diarrhoea"
+    },
+    {
+      "code": "malaise",
+      "display": "Malaise",
+      "property": [
+        {
+          "code": "status",
+          "valueCode": "retired"
+        }
+      ]
+    }
+  ]
+}
