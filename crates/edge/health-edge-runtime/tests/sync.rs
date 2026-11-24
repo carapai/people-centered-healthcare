@@ -738,6 +738,83 @@ async fn an_edge_whose_central_sends_no_accounts_keeps_its_staff() {
     );
 }
 
+/// The node's import, noting each round that took no bundle (#895).
+struct Noting {
+    import: CentralAccounts,
+    unsynced: std::sync::Mutex<Vec<String>>,
+}
+
+impl health_sync_client::Accounts for Noting {
+    fn replace<'a>(&'a self, jws: &'a str) -> health_sync_client::Replaced<'a> {
+        health_sync_client::Accounts::replace(&self.import, jws)
+    }
+
+    fn unsynced(&self, error: &str) {
+        self.unsynced
+            .lock()
+            .expect("unsynced")
+            .push(error.to_owned());
+    }
+}
+
+/// A bundle the node refuses (here, signed by a key it does not trust) leaves its staff as they
+/// were, does not fail the round, and is told to the node's import, for its alert (#895).
+#[tokio::test]
+async fn a_refused_bundle_leaves_the_staff_as_they_were_and_is_raised() {
+    const PASSWORD: &str = "correct horse battery";
+    let central = central().await;
+    let edge = store("edge").await;
+    let edge_auth = SurrealAuthStore::new(edge.clone(), SessionPolicy::default().hard_cap);
+    let edge_credentials = Credentials::new([9; 32].to_vec()).expect("credentials");
+    let nakato = central.account("nakato", PASSWORD).await;
+    central.assign(nakato, &["clinician"]).await;
+    central
+        .sync(&edge, &central.origin)
+        .with_accounts(Arc::new(
+            central.edge_accounts(&edge_auth, &edge_credentials),
+        ))
+        .round()
+        .await
+        .expect("round");
+    let held = edge_auth.snapshot(nakato, FACILITY).await.expect("read");
+    assert!(held.is_some());
+
+    // Withdrawn at central, but the next bundle is refused: nothing is removed.
+    central
+        .accounts
+        .remove_snapshot(nakato, FACILITY)
+        .await
+        .expect("withdraw");
+    let key = p256::SecretKey::from_bytes(&central.key.to_bytes()).expect("key");
+    let distrusting = Arc::new(Noting {
+        import: CentralAccounts(Provisioning::new(
+            edge_auth.clone(),
+            edge_credentials.clone(),
+            SnapshotVerifier::new(&[SnapshotSigner::generate().public()]).expect("verifier"),
+            central.node.to_string(),
+            FACILITY,
+            Arc::new(move || Ok(key.clone())),
+        )),
+        unsynced: std::sync::Mutex::new(Vec::new()),
+    });
+    let round = central
+        .sync(&edge, &central.origin)
+        .with_accounts(distrusting.clone())
+        .round()
+        .await
+        .expect("the round goes on");
+    assert_eq!(round.accounts, None);
+    assert_eq!(
+        edge_auth.snapshot(nakato, FACILITY).await.expect("read"),
+        held
+    );
+    assert_eq!(
+        distrusting.unsynced.lock().expect("unsynced").len(),
+        1,
+        "raised once"
+    );
+}
+
 /// A summary `MeasureReport` of ANC 1st visits at this facility, as the edge computes it.
 fn anc_summary(count: u64) -> health_analytics::StoredSummary {
     let march = health_analytics::Period::parse(health_analytics::PeriodType::Monthly, "2026-03")

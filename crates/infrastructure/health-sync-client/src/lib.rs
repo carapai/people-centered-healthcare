@@ -11,7 +11,7 @@
 //!    and their permission snapshots from `/sync/v1/accounts` as central signed them, before it
 //!    uploads anything (ADR 0011: revocations and snapshots first). A role central withdrew is
 //!    refused here from this round on (#889). A central that sends no accounts, or a bundle the
-//!    node refuses, does not fail the round.
+//!    node refuses, does not fail the round; the node's [`Accounts`] is told of a refusal.
 //! 3. **Push.** The outbox goes up in batches of whole transactions (at most 500 items or 4 MiB).
 //!    Each answered group is acknowledged, and a conflict or rejection is kept as an unaccepted
 //!    candidate. A quarantined node still pushes; central holds its items for review.
@@ -85,11 +85,19 @@ const BATCH: usize = 500;
 const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
 
 /// What a node does with the provisioning bundle of its facility's staff that central sends each
-/// round (#889): on an edge, verify it and take it as the whole of its staff
-/// (`health_auth::Provisioning::replace`).
+/// round (#889): on an edge or a standalone desktop (#895), verify it and take it as the whole of
+/// its staff (`health_auth::Provisioning::replace`).
 pub trait Accounts: std::marker::Sync + Send + 'static {
     /// Takes the bundle `jws`: the snapshots stored, and those removed as withdrawn.
     fn replace<'a>(&'a self, jws: &'a str) -> Replaced<'a>;
+
+    /// Told when a round took no bundle although central was asked for one: the answer carried
+    /// none, or the bundle was refused. The node keeps the staff it had; `error` says why. The
+    /// round has already logged the `accounts-unsynced` alert; a node whose own log is elsewhere
+    /// (the desktop's) raises it there too.
+    fn unsynced(&self, error: &str) {
+        let _ = error;
+    }
 }
 
 /// What [`Accounts::replace`] answers: the snapshots stored, and those removed as withdrawn.
@@ -675,11 +683,16 @@ impl Sync {
         if welcome.verdict == Verdict::Compatible {
             match self.take_accounts().await {
                 Ok(taken) => round.accounts = taken,
-                Err(error) => tracing::warn!(
-                    alert = "accounts-unsynced",
-                    %error,
-                    "this node's staff and their roles are not as central holds them"
-                ),
+                Err(error) => {
+                    tracing::warn!(
+                        alert = "accounts-unsynced",
+                        %error,
+                        "this node's staff and their roles are not as central holds them"
+                    );
+                    if let Some(accounts) = &self.accounts {
+                        accounts.unsynced(&error);
+                    }
+                }
             }
         }
         // Central was restored: queue again what it no longer holds (ADR 0065).

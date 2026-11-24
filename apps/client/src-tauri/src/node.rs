@@ -1,8 +1,9 @@
 //! The standalone desktop as a node (#134; desktop-client.md, mode B): once provisioned, it syncs
 //! with central as an edge does (`health-sync-client`). It pushes what it wrote, pulls its
 //! facility's records, re-seeds from central's snapshot when told to, and activates the packages
-//! its activation records name. `health-desktop seed import <file>` seeds it from removable media
-//! instead, for a first install the link cannot carry.
+//! its activation records name. Once its accounts are imported, each round also takes the
+//! facility's staff from central as the whole of them (#895). `health-desktop seed import <file>`
+//! seeds it from removable media instead, for a first install the link cannot carry.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -71,7 +72,12 @@ pub(crate) fn sync(
         .ok()
         .and_then(|pem| p256::ecdsa::SigningKey::from_pkcs8_pem(pem).ok())
         .ok_or("the node key in the keystore is not a P-256 PKCS#8 key")?;
-    let mut sync = Sync::new(store(connection), upstream, key)?;
+    let mut sync = Sync::new(store(connection.clone()), upstream, key)?;
+    // The facility's staff and their roles, as central holds them, with every round (#895).
+    match crate::auth::central_accounts(&connection, data_dir, keys) {
+        Ok(accounts) => sync = sync.with_accounts(Arc::new(accounts)),
+        Err(why) => eprintln!("health-desktop: staff are not taken through sync: {why}"),
+    }
     // Attachments beside the store, where backups take them from.
     match health_files::FsBlobStore::open(data_dir.join("files")) {
         Ok(blobs) => sync = sync.with_blobs(blobs),
