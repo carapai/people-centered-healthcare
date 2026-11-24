@@ -3528,6 +3528,7 @@ dependencies = [
  "health-identifiers",
  "health-packages",
  "health-persistence",
+ "health-programs-app",
  "health-publication",
  "health-registries-app",
  "health-surrealdb",

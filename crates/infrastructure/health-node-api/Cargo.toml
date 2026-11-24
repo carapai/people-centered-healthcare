@@ -29,6 +29,7 @@ health-files = { workspace = true }
 health-identifiers = { workspace = true }
 health-packages = { workspace = true }
 health-persistence = { workspace = true }
+health-programs-app = { workspace = true }
 health-publication = { workspace = true }
 health-registries-app = { workspace = true }
 health-surrealdb = { workspace = true }

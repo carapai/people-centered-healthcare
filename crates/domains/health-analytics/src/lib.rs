@@ -84,8 +84,8 @@ pub use age_bands::{
     AgeUnit, BandDefinition, PinError, is_pinned, pinned,
 };
 pub use calculate::{
-    Band, Disaggregated, Evaluation, Member, Observed, PatientOutcome, Reason, RecordOutcome,
-    RecordPart, RollUpError, Summary, Values, calculate,
+    Band, CrossedCell, Crossing, Disaggregated, Evaluation, Member, Observed, PatientOutcome,
+    Reason, RecordOutcome, RecordPart, RollUpError, Summary, Values, calculate,
 };
 pub use dashboard::{SavedDashboard, SavedDashboards, SavedVisualization, Share, Viewer};
 pub use disaggregation::{

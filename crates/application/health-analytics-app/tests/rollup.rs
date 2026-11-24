@@ -62,6 +62,7 @@ fn sent(facility: &str, count: u64, denominator: u64) -> IndicatorSummary {
         denominator: Some(denominator),
         values: None,
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     };
     let report = measure_report(
         &indicator().canonical(),
@@ -147,6 +148,7 @@ fn first_visits(facility: &str, count: u64) -> IndicatorSummary {
         denominator: None,
         values: None,
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     };
     let report = measure_report(
         &coverage().canonical(),

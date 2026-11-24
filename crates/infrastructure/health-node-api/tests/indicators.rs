@@ -851,6 +851,49 @@ async fn the_hmis_105_anc_report_at_a_facility_matches_the_indicators_summaries(
         "{bands}"
     );
 
+    // #557 part 2: the facility's ANC monitoring runs its line lists here, over its own
+    // patients: the 1st visits counted are exactly those its summary counted, each named.
+    let monitoring = json!({
+        "report": "ug.moh.hmis:anc-facility-monitoring", "place": FACILITY, "period": "2026-03",
+    });
+    let watched = run_here(&store, &active, FACILITY, &monitoring, at)
+        .await
+        .expect("monitoring");
+    let first_visits = &run["sections"][0]["rows"][0]["current"]["count"];
+    let counted = &watched["sections"][2]["list"];
+    assert_eq!(counted["error"], Value::Null, "{counted}");
+    assert_eq!(counted["program"]["title"], "Antenatal care", "{counted}");
+    let rows = counted["rows"].as_array().expect("rows");
+    // The indicator counts women: one with two 1st visits counted has two rows.
+    let women: std::collections::BTreeSet<&str> =
+        rows.iter().filter_map(|r| r["patient"].as_str()).collect();
+    assert_eq!(json!(women.len()), *first_visits, "{counted}");
+    assert!(!rows.is_empty());
+    for row in rows {
+        assert!(
+            row["record"]
+                .as_str()
+                .is_some_and(|r| r.starts_with("Encounter/"))
+        );
+        // The name column reads the Patient; the row is named as the Patient is.
+        assert_eq!(row["cells"][0][0]["value"], row["patient"], "{row}");
+        assert!(
+            row["cells"][1][0]["value"]
+                .as_str()
+                .is_some_and(|d| d.starts_with("2026-03"))
+        );
+    }
+    // Every ANC enrollment active in March, one row each.
+    let clients = &watched["sections"][1]["list"];
+    assert_eq!(clients["error"], Value::Null, "{clients}");
+    let enrolled = clients["rows"].as_array().expect("rows");
+    assert!(enrolled.len() >= rows.len(), "{clients}");
+    assert!(enrolled.iter().all(|r| {
+        r["record"]
+            .as_str()
+            .is_some_and(|r| r.starts_with("EpisodeOfCare/"))
+    }));
+
     // A district is run at central.
     let mut elsewhere = asked.clone();
     elsewhere["place"] = json!("district-kampala");

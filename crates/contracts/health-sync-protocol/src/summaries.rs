@@ -31,7 +31,9 @@ pub struct IndicatorSummary {
 }
 
 /// The JSON names a summary `MeasureReport` may hold, at any depth: what its figures, period,
-/// facility and computed-at time need, and nothing that could name a patient.
+/// facility and computed-at time need, and nothing that could name a patient. A crossing of
+/// Disaggregations (#557) is a stratifier naming them in `valueString` extensions, its strata's
+/// bands as `component`s.
 pub const SUMMARY_ELEMENTS: &[&str] = &[
     "resourceType",
     "meta",
@@ -43,6 +45,7 @@ pub const SUMMARY_ELEMENTS: &[&str] = &[
     "extension",
     "url",
     "valueCode",
+    "valueString",
     "valueDecimal",
     "valueInteger64",
     "status",
@@ -61,6 +64,7 @@ pub const SUMMARY_ELEMENTS: &[&str] = &[
     "measureScoreQuantity",
     "stratifier",
     "stratum",
+    "component",
 ];
 
 /// The facility tag and reporter identifier system (ADR 0057).
@@ -149,6 +153,28 @@ mod tests {
             ..summary(report())
         };
         assert_eq!(summary_problem(&removal), None);
+        // A crossing of Disaggregations (#557).
+        let mut crossed = report();
+        crossed["group"][0]["stratifier"] = json!([{
+            "extension": [
+                { "url": "https://x/indicator-crossed", "valueString": "age" },
+                { "url": "https://x/indicator-crossed", "valueString": "hiv-status" }
+            ],
+            "code": { "text": "age × hiv-status" },
+            "stratum": [{
+                "component": [
+                    { "code": { "text": "age" }, "value": { "text": "15-19" } },
+                    { "code": { "text": "hiv-status" }, "value": { "text": "positive" } }
+                ],
+                "population": [{ "code": { "coding": [{ "code": "numerator" }] }, "count": 1 }]
+            }]
+        }]);
+        assert_eq!(summary_problem(&summary(crossed.clone())), None);
+        crossed["group"][0]["stratifier"][0]["extension"][0]["valueString"] = json!("Patient/p-1");
+        assert_eq!(
+            summary_problem(&summary(crossed)).as_deref(),
+            Some("its `valueString` names a patient")
+        );
         let wire = serde_json::to_value(&removal).expect("json");
         assert!(wire.get("report").is_none(), "{wire}");
     }

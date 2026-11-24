@@ -11,11 +11,16 @@
 //!   maximum, so central recomputes the figure from summed parts.
 //! - Each disaggregation is a stratifier (its name as `code.text`), each band a stratum (its code
 //!   as `value.text`) with the same parts.
+//! - Each crossing of two or more disaggregations (#557) is a stratifier naming them, in order,
+//!   in its [`CROSSED`] extensions, each combination of bands something was counted in a stratum
+//!   whose `component`s give its band of each (`code.text` the disaggregation, `value.text` the
+//!   band), with the same parts. A crossing with no strata counted nothing.
 //!
 //! Decimals are written exactly, as JSON numbers.
 
 use health_analytics::{
-    Band, Calculation, Disaggregated, Period, PeriodType, PopulationKind, Summary, Values,
+    Band, Calculation, CrossedCell, Crossing, Disaggregated, Period, PeriodType, PopulationKind,
+    Summary, Values,
 };
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
@@ -28,6 +33,9 @@ pub const PERIOD_TYPE: &str = "https://carapai.github.io/people-centered-healthc
 pub const VALUES: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-values";
 /// The tag system naming a record's facility (ADR 0057).
 pub const FACILITY_TAG: &str = "urn:health:facility";
+
+/// On a stratifier: one of the disaggregations it crosses (`valueString`, its name), in order.
+pub const CROSSED: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-crossed";
 
 const POPULATION: &str = "http://terminology.hl7.org/CodeSystem/measure-population";
 
@@ -97,6 +105,77 @@ fn parts(summary: &Summary) -> serde_json::Map<String, Value> {
     out
 }
 
+/// A crossing as a stratifier.
+fn crossing_stratifier(crossing: &Crossing) -> Value {
+    let strata: Vec<Value> = crossing
+        .cells
+        .iter()
+        .map(|cell| {
+            let mut stratum = parts(&cell.summary);
+            stratum.insert(
+                "component".into(),
+                crossing
+                    .names
+                    .iter()
+                    .zip(&cell.codes)
+                    .map(|(name, code)| json!({ "code": { "text": name }, "value": { "text": code } }))
+                    .collect(),
+            );
+            Value::Object(stratum)
+        })
+        .collect();
+    json!({
+        "extension": crossing
+            .names
+            .iter()
+            .map(|name| json!({ "url": CROSSED, "valueString": name }))
+            .collect::<Vec<_>>(),
+        "code": { "text": crossing.names.join(" × ") },
+        "stratum": strata,
+    })
+}
+
+/// The crossing a stratifier written by [`crossing_stratifier`] holds, if it is one.
+fn read_crossing(stratifier: &Value, calculation: Calculation) -> Result<Option<Crossing>, String> {
+    let names: Vec<String> = stratifier["extension"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|e| e["url"] == CROSSED)
+        .map(|e| {
+            e["valueString"]
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| "a crossing names no disaggregation".to_owned())
+        })
+        .collect::<Result<_, _>>()?;
+    if names.is_empty() {
+        return Ok(None);
+    }
+    let mut cells = Vec::new();
+    for stratum in stratifier["stratum"].as_array().into_iter().flatten() {
+        let components = stratum["component"]
+            .as_array()
+            .map_or(&[][..], Vec::as_slice);
+        let codes: Vec<String> = names
+            .iter()
+            .map(|name| {
+                components
+                    .iter()
+                    .find(|c| c["code"]["text"] == name.as_str())
+                    .and_then(|c| c["value"]["text"].as_str())
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("a crossed stratum has no band of {name}"))
+            })
+            .collect::<Result<_, _>>()?;
+        cells.push(CrossedCell {
+            codes,
+            summary: summary_part(stratum, calculation)?,
+        });
+    }
+    Ok(Some(Crossing { names, cells }))
+}
+
 /// `summary` of the indicator `measure` (`url|version`) for `period` at `facility`, computed at
 /// `date` (an RFC 3339 instant), as a summary `MeasureReport`.
 pub fn measure_report(
@@ -123,6 +202,7 @@ pub fn measure_report(
                     .collect();
                 json!({ "code": { "text": by.name }, "stratum": strata })
             })
+            .chain(summary.crossed.iter().map(crossing_stratifier))
             .collect();
         group.insert("stratifier".into(), Value::Array(stratifiers));
     }
@@ -216,6 +296,7 @@ fn summary_part(part: &Value, calculation: Calculation) -> Result<Summary, Strin
         denominator,
         values,
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     })
 }
 
@@ -225,6 +306,10 @@ pub fn report_summary(report: &Value, calculation: Calculation) -> Result<Summar
     let group = &report["group"][0];
     let mut summary = summary_part(group, calculation)?;
     for stratifier in group["stratifier"].as_array().into_iter().flatten() {
+        if let Some(crossing) = read_crossing(stratifier, calculation)? {
+            summary.crossed.push(crossing);
+            continue;
+        }
         let mut bands = Vec::new();
         for stratum in stratifier["stratum"].as_array().into_iter().flatten() {
             bands.push(Band {
@@ -260,6 +345,7 @@ mod tests {
             denominator,
             values: None,
             disaggregations: Vec::new(),
+            crossed: Vec::new(),
         }
     }
 
@@ -283,6 +369,20 @@ mod tests {
                 },
             ],
         }];
+        percentage.crossed = vec![
+            Crossing {
+                names: vec!["age".into(), "hiv-status".into()],
+                cells: vec![CrossedCell {
+                    codes: vec!["15-19".into(), "positive".into()],
+                    summary: summary(Calculation::Percentage, 1, Some(2)),
+                }],
+            },
+            // Nothing counted in any combination.
+            Crossing {
+                names: vec!["age".into(), "visit-type".into()],
+                cells: Vec::new(),
+            },
+        ];
         let average = Summary {
             values: Some(Values {
                 count: 4,
@@ -304,6 +404,16 @@ mod tests {
             assert_eq!(report["period"]["start"], "2026-03-01");
             assert_eq!(report["meta"]["tag"][0]["code"], "KAM013");
             assert_eq!(report_period(&report), Ok(march.clone()));
+            // Central takes it as written, crossings included (#557).
+            let sent = health_sync_protocol::IndicatorSummary {
+                measure: "https://x/Measure/a|1.0.0".into(),
+                period_type: "monthly".into(),
+                period: "2026-03".into(),
+                facility: "KAM013".into(),
+                hash: "h".into(),
+                report: Some(report.clone()),
+            };
+            assert_eq!(health_sync_protocol::summary_problem(&sent), None);
             assert_eq!(
                 report_summary(&report, written.calculation).as_ref(),
                 Ok(&written),

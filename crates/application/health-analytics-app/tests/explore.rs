@@ -78,6 +78,7 @@ fn summary(indicator: &Indicator, count: u64) -> Summary {
             maximum: None,
         }),
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     }
 }
 
@@ -371,6 +372,7 @@ fn by_age(indicator: &Indicator, bands: &[(&str, u64, Option<u64>)]) -> Summary 
                 denominator,
                 values: None,
                 disaggregations: Vec::new(),
+                crossed: Vec::new(),
             }],
         )
         .expect("a part");

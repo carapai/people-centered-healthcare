@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use health_analytics::{
-    Band, Calculation, Counts, Disaggregated, Disaggregation, DisaggregationSource,
-    FacilitySummary, IndicatorRow, PeriodType, Summary,
+    Band, Calculation, Counts, CrossedCell, Crossing, Disaggregated, Disaggregation,
+    DisaggregationSource, FacilitySummary, IndicatorRow, PeriodType, Summary,
 };
 use health_persistence::StoreError;
 use rust_decimal::Decimal;
@@ -72,6 +72,7 @@ fn part(count: u64, denominator: u64) -> Summary {
         denominator: Some(denominator),
         values: None,
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     }
 }
 
@@ -262,6 +263,142 @@ async fn what_a_report_cannot_show_says_why() {
         "no indicator is https://x/Measure/gone|1.0.0"
     );
     assert_eq!(run["sections"][1]["kind"], "lineList");
+    assert_eq!(run["sections"][1]["list"], Value::Null);
     assert_eq!(run["completeness"]["expected"], 2);
     assert_eq!(run["completeness"]["reported"], 0);
+}
+
+/// #557 part 2: a cell crossing a section's Disaggregations is run from the facilities' crossed
+/// parts, summed, like a band: a district's HIV status by visit type is the sum of its
+/// facilities' cells, a combination nobody had is empty, and a facility whose summary predates
+/// crossings leaves the crossed cells out rather than summed in part.
+#[tokio::test]
+async fn a_crossed_cell_comes_from_the_facilities_summed_crossed_parts() {
+    const VISIT: &str = "visit-type";
+    let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
+    let mut crossed_indicator = tested();
+    crossed_indicator.disaggregations.push(Disaggregation {
+        name: VISIT.into(),
+        source: DisaggregationSource::Coded("%record.type".into()),
+    });
+    let facility = |cells: &[(&str, &str, u64, u64)]| {
+        let mut summary = percentage(&cells.iter().map(|c| (c.0, c.2, c.3)).collect::<Vec<_>>());
+        let mut visits: Vec<Band> = Vec::new();
+        for (_, visit, n, d) in cells {
+            visits.push(Band {
+                code: (*visit).into(),
+                summary: part(*n, *d),
+            });
+        }
+        summary.disaggregations.push(Disaggregated {
+            name: VISIT.into(),
+            bands: visits,
+        });
+        summary.crossed = vec![Crossing {
+            names: vec![HIV.into(), VISIT.into()],
+            cells: cells
+                .iter()
+                .map(|(hiv, visit, n, d)| CrossedCell {
+                    codes: vec![(*hiv).into(), (*visit).into()],
+                    summary: part(*n, *d),
+                })
+                .collect(),
+        }];
+        summary
+    };
+    // A: positive first visits 1 of 2; B: positive first visits 3 of 4, negative later 1 of 5.
+    let a = facility(&[("positive", "first", 1, 2)]);
+    let b = facility(&[("positive", "first", 3, 4), ("negative", "later", 1, 5)]);
+    let synced = "2026-04-02T00:00:00Z".parse().expect("time");
+    let measure = crossed_indicator.canonical();
+    let keep = |facility: &str, summary: &Summary| {
+        let (_, period, kept) = kept(facility, &march, summary);
+        let report = measure_report(&measure, &period, facility, summary, "2026-04-01T06:00:00Z");
+        (
+            measure.clone(),
+            period,
+            FacilitySummary {
+                report: report.to_string(),
+                ..kept
+            },
+        )
+    };
+    let mut store = Kept {
+        summaries: vec![keep("A", &a), keep("B", &b)],
+        synced: [("A".into(), synced), ("B".into(), synced)].into(),
+    };
+    let mut definition = report();
+    let Section::Table(table) = &mut definition.sections[0] else {
+        unreachable!()
+    };
+    table.rows[0].indicator = measure.clone();
+    table.change = false;
+    table.disaggregations.push(SectionDisaggregation {
+        age_band_set: None,
+        code: Some(VISIT.into()),
+        expression: Some("%record.type".into()),
+        axis: health_analytics::Axis::Columns,
+    });
+    let place = RunPlace {
+        place: ExplorePlace {
+            code: "district-kampala".into(),
+            facilities: vec!["A".into(), "B".into()],
+        },
+        name: "Kampala".into(),
+        level: Level::District,
+    };
+    let with = RunWith {
+        indicators: std::slice::from_ref(&crossed_indicator),
+        sets: &[],
+        estimates: &PopulationEstimates::default(),
+        names: &BTreeMap::new(),
+    };
+    let run = run_report(&mut store, &definition, &place, &march, &with, "central")
+        .await
+        .expect("run");
+    let crossed = run["sections"][0]["rows"][0]["current"]["crossed"]
+        .as_array()
+        .expect("crossed")
+        .clone();
+    let cell = |hiv: &str, visit: &str| {
+        crossed
+            .iter()
+            .find(|c| c["at"][0]["code"] == hiv && c["at"][1]["code"] == visit)
+            .map(|c| {
+                (
+                    c["count"].clone(),
+                    c["denominator"].clone(),
+                    c["value"].clone(),
+                )
+            })
+    };
+    // Every combination of the section's bands (each side's found, then not recorded).
+    assert_eq!(crossed.len(), 9, "{run}");
+    assert_eq!(crossed[0]["at"][0]["name"], HIV);
+    assert_eq!(crossed[0]["at"][1]["name"], VISIT);
+    assert_eq!(
+        cell("positive", "first"),
+        Some((json!(4), json!(6), json!("66.67")))
+    );
+    assert_eq!(
+        cell("negative", "later"),
+        Some((json!(1), json!(5), json!("20")))
+    );
+    assert_eq!(
+        cell("negative", "first"),
+        Some((json!(0), json!(0), Value::Null))
+    );
+
+    // B's summary from before crossings were kept: the crossed cells are left out.
+    let mut older = b.clone();
+    older.crossed = Vec::new();
+    store.summaries[1] = keep("B", &older);
+    let run = run_report(&mut store, &definition, &place, &march, &with, "central")
+        .await
+        .expect("run");
+    assert_eq!(
+        run["sections"][0]["rows"][0]["current"]["crossed"],
+        json!([]),
+        "{run}"
+    );
 }

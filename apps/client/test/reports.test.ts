@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
+import monitoring from '../../../packages/reference-packages/hmis/configuration/reports/anc-facility-monitoring.json'
 import hmis105 from '../../../packages/reference-packages/hmis/configuration/reports/hmis-105-anc.json'
 import { type GridTexts, type ReportRun, closedPeriods, periodOf, reportCsv, reportsQuery, runGrids, runQuery } from '../src/features/reports/api'
 import { parseCsv } from '../src/features/reports/csv'
@@ -16,6 +17,7 @@ const report: Report = read.report
 
 const texts: GridTexts = {
   indicator: 'Indicator',
+  patient: 'Patient',
   total: 'Total',
   value: 'Value',
   change: '% change',
@@ -84,6 +86,116 @@ describe('a Report run', () => {
   test('quotes CSV fields that need it', () => {
     const quoted = { ...run, place: { ...run.place, name: 'Kampala, "Central"' } }
     expect(parseCsv(reportCsv(report, quoted, texts))[1]).toEqual(['Kampala, "Central"', '2026-03'])
+  })
+})
+
+describe('a Report run on the facility’s edge (#557, part 2)', () => {
+  const readMonitoring = readReport(JSON.stringify(monitoring))
+  if (!('report' in readMonitoring)) throw new Error(readMonitoring.refusal)
+  const watched = readMonitoring.report
+  const edgeRun: ReportRun = {
+    ...run,
+    where: 'facility',
+    place: { code: 'KAM013', name: 'Kampala HC IV', level: 'facility' },
+    sections: [
+      { kind: 'table', disaggregations: [], rows: [{ row: 'median-ga', indicator: { title: 'Median GA', calculation: 'median' }, current: { value: '14', count: 3, denominator: null, disaggregations: [] }, previous: null, error: null }] },
+      {
+        kind: 'lineList',
+        list: {
+          program: { title: 'Antenatal care', episodeType: 'ANC' },
+          rows: [
+            { patient: 'Nakato, Sarah', record: 'EpisodeOfCare/1', cells: [[{ value: 'Nakato, Sarah' }], [{ value: '25' }], [], [{ value: '2026-03-02' }], [{ value: '2026-03-30' }], [{ value: '14', date: '2026-03-30' }]] },
+          ],
+          error: null,
+        },
+      },
+      { kind: 'lineList', list: { program: null, rows: [], error: 'no indicator is x here' } },
+    ],
+  }
+
+  test('lays a line list out as the screen shows it, the patient first and an empty cell a dash', () => {
+    const grids = runGrids(watched, edgeRun, texts)
+    const clients = grids.find((g) => g.section.id === 'clients')
+    expect(clients?.grid.header).toEqual(['Patient', 'Name', 'Age (years)', 'Phone', 'Enrolled on', 'Last visit', 'Gestational age (weeks)'])
+    expect(clients?.grid.rows).toEqual([{ head: 'Nakato, Sarah', cells: ['Nakato, Sarah', '25', '—', '2026-03-02', '2026-03-30', '14'] }])
+    // One that could not run has no cells.
+    expect(grids.some((g) => g.section.id === 'first-visits')).toBe(false)
+  })
+
+  test('exports its line lists in the CSV as on the screen', () => {
+    const rows = parseCsv(reportCsv(watched, edgeRun, texts))
+    const screen = runGrids(watched, edgeRun, texts).flatMap(({ section, grid }) => [[''], [section.title], grid.header, ...grid.rows.map((r) => [r.head, ...r.cells])])
+    expect(rows.slice(2)).toEqual(screen)
+    expect(rows).toContainEqual(['Nakato, Sarah', 'Nakato, Sarah', '25', '—', '2026-03-02', '2026-03-30', '14'])
+  })
+})
+
+const bandsOf = (name: string, codes: string[]) => ({ name, title: name, bands: codes.map((code) => ({ code, label: code })) })
+
+describe('a crossed cell in a Report run', () => {
+  const crossedReport = readReport(
+    JSON.stringify({
+      ...hmis105,
+      sections: [
+        {
+          kind: 'table',
+          id: 'tested',
+          title: 'Tested',
+          disaggregations: [
+            { code: 'hiv', expression: '%record.code', axis: 'columns' },
+            { code: 'visit', expression: '%record.type', axis: 'columns' },
+          ],
+          rows: [{ id: 'tested', indicator: 'https://x/Measure/tested|1.0.0', label: 'Tested' }],
+          columnTotals: false,
+          rowTotals: false,
+          change: false,
+          sendToDhis2: false,
+        },
+      ],
+    }),
+  )
+  if (!('report' in crossedReport)) throw new Error(crossedReport.refusal)
+  const crossedRun: ReportRun = {
+    ...run,
+    sections: [
+      {
+        kind: 'table',
+        disaggregations: [bandsOf('hiv', ['positive', 'negative']), bandsOf('visit', ['first', 'later'])],
+        rows: [
+          {
+            row: 'tested',
+            indicator: { title: 'Tested', calculation: 'percentage' },
+            current: {
+              value: '50',
+              count: 5,
+              denominator: 10,
+              disaggregations: [
+                { name: 'hiv', bands: [] },
+                { name: 'visit', bands: [] },
+              ],
+              crossed: [
+                { at: [{ name: 'hiv', code: 'positive' }, { name: 'visit', code: 'first' }], value: '66.67', count: 4, denominator: 6 },
+                { at: [{ name: 'hiv', code: 'positive' }, { name: 'visit', code: 'later' }], value: null, count: 0, denominator: 0 },
+                { at: [{ name: 'hiv', code: 'negative' }, { name: 'visit', code: 'first' }], value: null, count: 0, denominator: 0 },
+                { at: [{ name: 'hiv', code: 'negative' }, { name: 'visit', code: 'later' }], value: '25', count: 1, denominator: 4 },
+              ],
+            },
+            previous: null,
+            error: null,
+          },
+        ],
+      },
+    ],
+  }
+
+  test('shows the summed crossed parts the server sends, and says why when it sends none', () => {
+    const [grid] = runGrids(crossedReport.report, crossedRun, texts)
+    expect(grid?.grid.header).toEqual(['Indicator', 'positive · first', 'positive · later', 'negative · first', 'negative · later'])
+    expect(grid?.grid.rows[0]?.cells).toEqual(['66.67%', '—', '—', '25%'])
+    const section = crossedRun.sections[0]
+    if (section?.kind !== 'table' || section.rows[0]?.current === null || section.rows[0]?.current === undefined) throw new Error('a table')
+    const without: ReportRun = { ...crossedRun, sections: [{ ...section, rows: [{ ...section.rows[0], current: { ...section.rows[0].current, crossed: [] } }] }] }
+    expect(runGrids(crossedReport.report, without, texts)[0]?.grid.rows[0]?.cells[0]).toBe('n/a (crossed)')
   })
 })
 
