@@ -2,7 +2,7 @@
   "name": "ug.moh.sample-dashboards",
   "version": "1.0.0",
   "title": "Sample standard Dashboards",
-  "description": "A Reporting package for a local backend (#603): the ANC overview Dashboard over the sample indicators, published so every user's Dashboards tab lists it.",
+  "description": "A Reporting package for a local backend (#603, #557): the ANC overview Dashboard and the sample ANC report over the sample indicators, published so every user's Dashboards tab lists the one and the Reports page runs the other.",
   "fhirVersions": [
     "5.0.0"
   ],

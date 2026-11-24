@@ -22,6 +22,7 @@ import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LaboratoryRouteImport } from './routes/laboratory'
 import { Route as PharmacyRouteImport } from './routes/pharmacy'
 import { Route as RegistrationRouteImport } from './routes/registration'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as TriageRouteImport } from './routes/triage'
@@ -133,6 +134,11 @@ const PharmacyRoute = PharmacyRouteImport.update({
 const RegistrationRoute = RegistrationRouteImport.update({
   id: '/registration',
   path: '/registration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResultsRoute = ResultsRouteImport.update({
@@ -386,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/triage': typeof TriageRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/triage': typeof TriageRoute
@@ -511,6 +519,7 @@ export interface FileRoutesById {
   '/laboratory': typeof LaboratoryRoute
   '/pharmacy': typeof PharmacyRoute
   '/registration': typeof RegistrationRoute
+  '/reports': typeof ReportsRoute
   '/results': typeof ResultsRoute
   '/sign-in': typeof SignInRoute
   '/triage': typeof TriageRoute
@@ -575,6 +584,7 @@ export interface FileRouteTypes {
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/reports'
     | '/results'
     | '/sign-in'
     | '/triage'
@@ -637,6 +647,7 @@ export interface FileRouteTypes {
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/reports'
     | '/results'
     | '/sign-in'
     | '/triage'
@@ -699,6 +710,7 @@ export interface FileRouteTypes {
     | '/laboratory'
     | '/pharmacy'
     | '/registration'
+    | '/reports'
     | '/results'
     | '/sign-in'
     | '/triage'
@@ -762,6 +774,7 @@ export interface RootRouteChildren {
   LaboratoryRoute: typeof LaboratoryRoute
   PharmacyRoute: typeof PharmacyRoute
   RegistrationRoute: typeof RegistrationRoute
+  ReportsRoute: typeof ReportsRoute
   ResultsRoute: typeof ResultsRoute
   SignInRoute: typeof SignInRoute
   TriageRoute: typeof TriageRoute
@@ -902,6 +915,13 @@ declare module '@tanstack/react-router' {
       path: '/registration'
       fullPath: '/registration'
       preLoaderRoute: typeof RegistrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/results': {
@@ -1250,6 +1270,7 @@ const rootRouteChildren: RootRouteChildren = {
   LaboratoryRoute: LaboratoryRoute,
   PharmacyRoute: PharmacyRoute,
   RegistrationRoute: RegistrationRoute,
+  ReportsRoute: ReportsRoute,
   ResultsRoute: ResultsRoute,
   SignInRoute: SignInRoute,
   TriageRoute: TriageRoute,

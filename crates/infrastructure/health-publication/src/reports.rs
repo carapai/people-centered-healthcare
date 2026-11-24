@@ -23,8 +23,13 @@ use crate::{Error, Publications, failed, lifecycle_id};
 
 /// The package's Reports, each with its file, as written or why it cannot be read.
 pub fn reports_in(packed: &Packed) -> Vec<(String, Result<ReportDefinition, String>)> {
-    packed
-        .files
+    reports_in_files(&packed.files)
+}
+
+/// The Reports in a package's `files`, as [`reports_in`] reads them: what a Facility Edge Node
+/// runs from its active packages (#557).
+pub fn reports_in_files(files: &Files) -> Vec<(String, Result<ReportDefinition, String>)> {
+    files
         .iter()
         .filter(|(path, _)| path.starts_with("configuration/") && path.ends_with(".json"))
         .filter_map(|(path, bytes)| {
@@ -36,6 +41,38 @@ pub fn reports_in(packed: &Packed) -> Vec<(String, Result<ReportDefinition, Stri
             })
         })
         .collect()
+}
+
+/// A Report as published.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublishedReport {
+    /// Its package's name.
+    pub package: String,
+    /// The package version it is in.
+    pub version: String,
+    /// The Report.
+    pub report: ReportDefinition,
+}
+
+impl Publications {
+    /// The Reports of the newest published version of every package, by package and then file
+    /// (#557): what district and national users run at central. A Report that does not read is
+    /// left out (Validation refused it).
+    pub async fn published_reports(&self) -> Result<Vec<PublishedReport>, Error> {
+        let mut found = Vec::new();
+        for (package, version, packed) in self.newest_published().await? {
+            for (_, read) in reports_in(&packed) {
+                if let Ok(report) = read {
+                    found.push(PublishedReport {
+                        package: package.clone(),
+                        version: version.to_string(),
+                        report,
+                    });
+                }
+            }
+        }
+        Ok(found)
+    }
 }
 
 /// Adds the indicators (with their disaggregations) and Age Band Sets `packed` holds to

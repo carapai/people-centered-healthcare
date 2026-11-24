@@ -104,6 +104,10 @@ function Home() {
               <li>
                 <Link to="/dashboards">{intl.formatMessage(explorerMessages.dbTitle)}</Link>
               </li>
+              {/* Reports (ADR 0070): run at central for the area's places, on an edge for its facility, offline (#557). */}
+              <li>
+                <Link to="/reports">{intl.formatMessage(explorerMessages.rpTitle)}</Link>
+              </li>
               {/* Places and areas are central's (ADR 0094): the session's place and its facilities. */}
               {platform.capabilities.studio ? (
                 <li>

@@ -129,7 +129,9 @@ pub use dashboards::{
 };
 pub use extraction::FIXTURE_TYPE as EXTRACTION_FIXTURE_TYPE;
 pub use population::estimates_in;
-pub use reports::{IndicatorMapping, ReportSources, SourcePackage, reports_in};
+pub use reports::{
+    IndicatorMapping, PublishedReport, ReportSources, SourcePackage, reports_in, reports_in_files,
+};
 pub use workflows::{WorkflowSandbox, workflow_definitions};
 
 pub use health_workflow_actions::ActionDescriptor;

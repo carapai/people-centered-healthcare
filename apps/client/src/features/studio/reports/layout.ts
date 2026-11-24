@@ -1,4 +1,4 @@
-import type { StudioReportBands, StudioReportFigures, StudioReportRow, StudioReportSection } from '@health/api-client'
+import type { StudioReportRow } from '@health/api-client'
 
 import { disaggregationName, type IndicatorRow, type Level, type TableSection } from './report'
 
@@ -18,6 +18,47 @@ import { disaggregationName, type IndicatorRow, type Level, type TableSection } 
 // section's Disaggregations (a note, not an error), a crossing the preview has not counted, and a
 // median or distinct count above facility level (they cannot be rebuilt from facility summaries,
 // ADR 0070).
+
+// What a table section is laid out from: the designer's preview over test patients
+// (`StudioReportSection`), or a Report run over stored summaries (#557; features/reports). Only
+// what the layout reads is named, so both fit.
+
+/** A figure as it arrives: exact decimal text, or a number. */
+type Value = { toString: () => string } | null | undefined
+
+/** One of a section's Disaggregations, with its bands in order. */
+export interface SectionBands {
+  name: string
+  title: string
+  bands: readonly { code: string; label: string }[]
+}
+
+/** A figure's parts. */
+export interface FigureParts {
+  value?: Value
+  count: number
+  denominator?: number | null | undefined
+}
+
+/** An indicator's figures over one period: the whole, its bands, and its crossed cells. */
+export interface SectionFigures extends FigureParts {
+  disaggregations: readonly { name: string; bands: readonly (FigureParts & { code: string })[] }[]
+  crossed?: readonly (FigureParts & { at: readonly { name: string; code: string }[] })[] | undefined
+}
+
+/** One indicator row's figures. */
+export interface SectionRow {
+  row: string
+  indicator?: { calculation: string } | null | undefined
+  current?: SectionFigures | null | undefined
+  previous?: SectionFigures | null | undefined
+}
+
+/** A table section's figures. */
+export interface SectionPreview {
+  disaggregations: readonly SectionBands[]
+  rows: readonly SectionRow[]
+}
 
 /** One band of one of the section's Disaggregations. */
 export interface At {
@@ -85,12 +126,12 @@ const FACILITY_ONLY = ['median', 'distinct-count']
 export const shownAt = (calculation: string | undefined, level: Level) => level === 'facility' || calculation === undefined || !FACILITY_ONLY.includes(calculation)
 
 /** Every combination of one band from each of `by`, in order: the cartesian product. */
-function crossed(by: readonly StudioReportBands[]): At[][] {
+function crossed(by: readonly SectionBands[]): At[][] {
   return by.reduce<At[][]>((combos, d) => combos.flatMap((combo) => d.bands.map((b) => [...combo, { name: d.name, code: b.code, label: b.label }])), [[]])
 }
 
 /** The section's Disaggregations on one side, with their bands from the preview (or none yet). */
-function side(section: TableSection, preview: StudioReportSection | undefined, axis: 'rows' | 'columns'): StudioReportBands[] {
+function side(section: TableSection, preview: SectionPreview | undefined, axis: 'rows' | 'columns'): SectionBands[] {
   return section.disaggregations
     .filter((d) => d.axis === axis)
     .map((d) => {
@@ -99,14 +140,14 @@ function side(section: TableSection, preview: StudioReportSection | undefined, a
     })
 }
 
-const asFigure = (f: { value?: { toString: () => string } | null | undefined; count: number; denominator?: number | null | undefined }): Figure => ({
+const asFigure = (f: FigureParts): Figure => ({
   value: f.value === null || f.value === undefined ? null : f.value.toString(),
-  count: f.count,
-  denominator: f.denominator ?? null,
+  count: Number(f.count),
+  denominator: f.denominator === null || f.denominator === undefined ? null : Number(f.denominator),
 })
 
 /** The indicator's figure at `at`, or why it has none. */
-export function figureAt(figures: StudioReportFigures | null | undefined, at: readonly At[]): { figure: Figure } | { notShown: NotShown; missing?: string } {
+export function figureAt(figures: SectionFigures | null | undefined, at: readonly At[]): { figure: Figure } | { notShown: NotShown; missing?: string } {
   if (figures === null || figures === undefined) return { notShown: 'no-preview' }
   if (at.length === 0) return { figure: asFigure(figures) }
   const missing = at.find((a) => !figures.disaggregations.some((d) => d.name === a.name))
@@ -125,7 +166,7 @@ export function figureAt(figures: StudioReportFigures | null | undefined, at: re
   return { figure: band === undefined ? { value: null, count: 0, denominator: null } : asFigure(band) }
 }
 
-function cellOf(preview: StudioReportRow | undefined, at: At[], total: boolean, level: Level): Cell {
+function cellOf(preview: SectionRow | undefined, at: At[], total: boolean, level: Level): Cell {
   if (preview === undefined) return { at, total, figure: null, previous: null, notShown: 'no-preview' }
   if (preview.indicator === null || preview.indicator === undefined) return { at, total, figure: null, previous: null, notShown: 'no-indicator' }
   if (!shownAt(preview.indicator.calculation, level)) return { at, total, figure: null, previous: null, notShown: 'facility-only' }
@@ -144,7 +185,7 @@ export function percentChange(now: Figure | null, previous: Figure | null): stri
 }
 
 /** The table section `section` laid out at `level`, from its preview if there is one. */
-export function layoutTable(section: TableSection, preview: StudioReportSection | undefined, level: Level): Layout {
+export function layoutTable(section: TableSection, preview: SectionPreview | undefined, level: Level): Layout {
   const rowSide = side(section, preview, 'rows')
   const columnSide = side(section, preview, 'columns')
   const columnBands = columnSide.length === 0 ? [[]] : crossed(columnSide)
@@ -195,7 +236,7 @@ export interface SentCell {
 }
 
 /** Every cell of the sent sections, in order: what the DHIS2 mapping sheet lists. */
-export function sentCells(sections: readonly { section: TableSection; index: number; preview: StudioReportSection | undefined }[]): SentCell[] {
+export function sentCells(sections: readonly { section: TableSection; index: number; preview: SectionPreview | undefined }[]): SentCell[] {
   return sections
     .filter((s) => s.section.sendToDhis2)
     .flatMap(({ section, index, preview }) =>

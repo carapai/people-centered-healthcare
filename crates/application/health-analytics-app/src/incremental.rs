@@ -121,6 +121,11 @@ impl Indicators {
         &self.indicators
     }
 
+    /// The Age Band Sets they may pin: what a Report run here labels its bands with (#557).
+    pub fn age_band_sets(&self) -> &[health_analytics::AgeBandSet] {
+        self.library.age_band_sets()
+    }
+
     /// The facility they are computed for.
     pub fn facility(&self) -> &str {
         &self.facility

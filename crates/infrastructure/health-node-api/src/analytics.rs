@@ -19,6 +19,11 @@
 //!   is the facility, and each item is answered by `/explore` over the node's own summaries.
 //!   Saved Dashboards are central's (user content, #602), so none are listed and none are made.
 //!
+//! - `GET /api/analytics/reports` and `POST /api/analytics/reports/run` (#557): the active
+//!   Reporting packages' Reports that run at facility level ([`reports_here`]), run for the
+//!   facility over the node's own summaries, offline ([`run_here`]), as central runs them for a
+//!   district. Any other place is refused (403). Line lists wait for #557's second part.
+//!
 //! A percentage or rate over a Population Estimate type (#553; ADR 0071) is the facility's count
 //! over its own estimate for the period: the node keeps only its own place's figures of the
 //! active Population packages ([`estimates_here`]), so a facility without a catchment figure
@@ -32,11 +37,14 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
-use health_analytics::{Indicator, PopulationEstimates, STANDARD_PERIODS};
+use health_analytics::{
+    AgeBandSet, Indicator, Level, Period, PopulationEstimates, STANDARD_PERIODS,
+};
 use health_analytics_app::dashboards::standard_json;
 use health_analytics_app::explore::{
     ExplorePlace, OwnSummaries, cells_json, explore, indicator_json, periods_json, read_question,
 };
+use health_analytics_app::reports::{RunPlace, RunWith, listed_json, run_report};
 use health_files::FsBlobStore;
 use health_persistence::Store as _;
 use health_registries_app::places::places;
@@ -210,6 +218,138 @@ pub fn dashboards_here<'a>(
     json!({ "canAuthor": false, "dashboards": dashboards, "visualizations": [] })
 }
 
+/// The Reports of the active Reporting packages (`packages`, each by its id, `name@version`,
+/// with its files), each with its package's name and version: those that run at facility level.
+fn facility_reports<'a>(
+    packages: impl IntoIterator<Item = (&'a str, &'a health_packages::Files)>,
+) -> Vec<(String, String, health_analytics::ReportDefinition)> {
+    let mut found = Vec::new();
+    for (id, files) in packages {
+        let reporting = files
+            .get("package.json")
+            .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
+            .is_some_and(|package| package["kind"] == "reporting");
+        let Some((package, version)) = id.rsplit_once('@').filter(|_| reporting) else {
+            continue;
+        };
+        for (_, read) in health_publication::reports_in_files(files) {
+            // Validation refused one that does not read before it was published.
+            if let Ok(report) = read
+                && report.levels.contains(&Level::Facility)
+            {
+                found.push((package.to_owned(), version.to_owned(), report));
+            }
+        }
+    }
+    found
+}
+
+/// What the Reports page lists here (#557): the active Reporting packages' Reports that run at
+/// facility level, by package and then file, each run for `facility` only.
+pub async fn reports_here<'a>(
+    store: &SurrealStore,
+    packages: impl IntoIterator<Item = (&'a str, &'a health_packages::Files)>,
+    facility: &str,
+) -> Value {
+    let place = json!({
+        "code": facility,
+        "name": name_of(store, facility).await,
+        "level": "facility",
+        "parent": null,
+    });
+    let reports: Vec<Value> = facility_reports(packages)
+        .iter()
+        .map(|(package, version, report)| {
+            listed_json(package, version, report, std::slice::from_ref(&place))
+        })
+        .collect();
+    json!({ "where": "facility", "reports": reports })
+}
+
+/// What a Report run here reads: the active packages (each by its id with its files), their
+/// indicators and the Age Band Sets they pin, and the facility's own Population Estimates.
+pub struct Active<'a> {
+    /// The active packages.
+    pub packages: &'a [(String, health_packages::Files)],
+    /// Their indicators.
+    pub indicators: &'a [Indicator],
+    /// The Age Band Sets their indicators pin.
+    pub sets: &'a [AgeBandSet],
+    /// The facility's own Population Estimates.
+    pub estimates: &'a PopulationEstimates,
+}
+
+/// Report `body` (`{"report": "<package>:<id>", "place": <facility>, "period": "2026-03"}`) run
+/// for `facility` over its own summaries in `store`, as of `now`.
+pub async fn run_here(
+    store: &SurrealStore,
+    active: &Active<'_>,
+    facility: &str,
+    body: &Value,
+    now: jiff::Timestamp,
+) -> Result<Value, Refusal> {
+    let (Some(wanted), Some(place), Some(period)) = (
+        body["report"].as_str(),
+        body["place"].as_str(),
+        body["period"].as_str(),
+    ) else {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "name the `report`, the `place` and the `period`".into(),
+        ));
+    };
+    if place != facility {
+        return Err((
+            StatusCode::FORBIDDEN,
+            format!("{place} is run at central: this node holds {facility}'s figures only"),
+        ));
+    }
+    let reports = facility_reports(
+        active
+            .packages
+            .iter()
+            .map(|(id, files)| (id.as_str(), files)),
+    );
+    let Some((package, version, report)) = reports
+        .iter()
+        .find(|(package, _, report)| format!("{package}:{}", report.id) == wanted)
+    else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            format!("{wanted} is not a Report run here"),
+        ));
+    };
+    let period = Period::parse(report.period_type, period)
+        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()))?;
+    let name = name_of(store, facility).await;
+    let names = [(facility.to_owned(), name.clone())].into();
+    let mut tx = store.begin().await.map_err(unavailable)?;
+    let mut own = OwnSummaries::new(&mut tx, facility, now);
+    let run = RunPlace {
+        place: ExplorePlace {
+            code: facility.to_owned(),
+            facilities: vec![facility.to_owned()],
+        },
+        name,
+        level: Level::Facility,
+    };
+    let with = RunWith {
+        indicators: active.indicators,
+        sets: active.sets,
+        estimates: active.estimates,
+        names: &names,
+    };
+    let mut answer = run_report(&mut own, report, &run, &period, &with, "facility")
+        .await
+        .map_err(unavailable)?;
+    answer["report"] = json!({
+        "id": wanted,
+        "title": report.title,
+        "package": format!("{package}@{version}"),
+    });
+    Ok(answer)
+}
+
 #[derive(Clone)]
 struct Explorer {
     store: SurrealStore,
@@ -225,6 +365,8 @@ pub(crate) fn router(store: SurrealStore, blobs: FsBlobStore, facility: String) 
         .route("/explore", post(explore_route))
         .route("/map", get(map_route))
         .route("/dashboards", get(dashboards_route))
+        .route("/reports", get(reports_route))
+        .route("/reports/run", post(run_route))
         .with_state(Explorer {
             store,
             blobs,
@@ -322,6 +464,69 @@ async fn explore_route(
         &explorer.store,
         &indicators,
         &estimates,
+        &explorer.facility,
+        &body,
+        jiff::Timestamp::now(),
+    )
+    .await
+    {
+        Ok(answer) => Json(answer).into_response(),
+        Err(refusal) => refused(refusal),
+    }
+}
+
+async fn reports_route(
+    State(explorer): State<Explorer>,
+    subject: Option<Extension<Subject>>,
+) -> Response {
+    if let Err(refusal) = allowed(subject) {
+        return refused(refusal);
+    }
+    match crate::indicators::active_files(&explorer.store, &explorer.blobs).await {
+        Ok(packages) => Json(
+            reports_here(
+                &explorer.store,
+                packages.iter().map(|(id, files)| (id.as_str(), files)),
+                &explorer.facility,
+            )
+            .await,
+        )
+        .into_response(),
+        Err(error) => refused(unavailable(error)),
+    }
+}
+
+async fn run_route(
+    State(explorer): State<Explorer>,
+    subject: Option<Extension<Subject>>,
+    Json(body): Json<Value>,
+) -> Response {
+    if let Err(refusal) = allowed(subject) {
+        return refused(refusal);
+    }
+    let indicators =
+        match crate::indicators::active(&explorer.store, &explorer.blobs, &explorer.facility).await
+        {
+            Ok(indicators) => indicators,
+            Err(error) => return refused(unavailable(error)),
+        };
+    let packages = match crate::indicators::active_files(&explorer.store, &explorer.blobs).await {
+        Ok(packages) => packages,
+        Err(error) => return refused(unavailable(error)),
+    };
+    let estimates = estimates_here(
+        packages.iter().map(|(id, files)| (id.as_str(), files)),
+        &explorer.facility,
+    );
+    let active = Active {
+        packages: &packages,
+        indicators: indicators.indicators(),
+        sets: indicators.age_band_sets(),
+        estimates: &estimates,
+    };
+    match run_here(
+        &explorer.store,
+        &active,
         &explorer.facility,
         &body,
         jiff::Timestamp::now(),

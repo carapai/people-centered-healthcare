@@ -110,6 +110,24 @@ impl Publications {
     /// The standard Dashboards of the newest published version of every package, by package
     /// and then file. A Dashboard that does not read is left out (Validation refused it).
     pub async fn published_dashboards(&self) -> Result<Vec<PublishedDashboard>, Error> {
+        let mut found = Vec::new();
+        for (package, version, packed) in self.newest_published().await? {
+            for (_, read) in dashboards_in(&packed) {
+                if let Ok(dashboard) = read {
+                    found.push(PublishedDashboard {
+                        package: package.clone(),
+                        version: version.to_string(),
+                        dashboard,
+                    });
+                }
+            }
+        }
+        Ok(found)
+    }
+
+    /// The newest published version of every package, by package: its name, version and
+    /// contents.
+    pub(crate) async fn newest_published(&self) -> Result<Vec<(String, Version, Packed)>, Error> {
         let mut tx = self.begin().await?;
         let lifecycles = tx.package_lifecycles().await.map_err(failed)?;
         drop(tx);
@@ -129,19 +147,10 @@ impl Publications {
                 );
             }
         }
-        let mut found = Vec::new();
+        let mut out = Vec::with_capacity(newest.len());
         for (package, (version, content)) in newest {
-            let packed = self.packed(&content).await?;
-            for (_, read) in dashboards_in(&packed) {
-                if let Ok(dashboard) = read {
-                    found.push(PublishedDashboard {
-                        package: package.clone(),
-                        version: version.to_string(),
-                        dashboard,
-                    });
-                }
-            }
+            out.push((package, version, self.packed(&content).await?));
         }
-        Ok(found)
+        Ok(out)
     }
 }
