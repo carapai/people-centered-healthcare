@@ -379,6 +379,19 @@ impl NodeRegistry {
         })
     }
 
+    /// The facility intermediate public key on record for the active node `node_id`: what
+    /// central encrypts that node's staff hashes to (#889). `None` for a node not active or with
+    /// no key on record.
+    pub async fn intermediate_key(&self, node_id: &str) -> Result<Option<p256::PublicKey>, Error> {
+        let mut tx = self.begin().await?;
+        Ok(self
+            .node(&mut tx, node_id)
+            .await?
+            .filter(|node| node.status == NodeStatus::Active)
+            .and_then(|node| URL_SAFE_NO_PAD.decode(&node.intermediate_key).ok())
+            .and_then(|sec1| p256::PublicKey::from_sec1_bytes(&sec1).ok()))
+    }
+
     /// Every node at `facility`, decommissioned ones too.
     pub async fn nodes_at(&self, facility: &str) -> Result<Vec<Node>, Error> {
         let mut tx = self.begin().await?;

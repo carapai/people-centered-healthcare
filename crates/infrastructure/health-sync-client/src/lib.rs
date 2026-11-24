@@ -7,28 +7,33 @@
 //! 1. **Handshake.** The node says hello and learns central's node id and verdict. Central is
 //!    added as the node's upstream: the first time, everything already on the log is queued for
 //!    it.
-//! 2. **Push.** The outbox goes up in batches of whole transactions (at most 500 items or 4 MiB).
+//! 2. **Staff.** With [`Accounts`], while the node is compatible, it takes its facility's staff
+//!    and their permission snapshots from `/sync/v1/accounts` as central signed them, before it
+//!    uploads anything (ADR 0011: revocations and snapshots first). A role central withdrew is
+//!    refused here from this round on (#889). A central that sends no accounts, or a bundle the
+//!    node refuses, does not fail the round.
+//! 3. **Push.** The outbox goes up in batches of whole transactions (at most 500 items or 4 MiB).
 //!    Each answered group is acknowledged, and a conflict or rejection is kept as an unaccepted
 //!    candidate. A quarantined node still pushes; central holds its items for review.
-//! 3. **Attachments.** Each blob an accepted record references is uploaded in 1 MiB chunks from
+//! 4. **Attachments.** Each blob an accepted record references is uploaded in 1 MiB chunks from
 //!    where central says it stopped, so an interrupted upload resumes.
-//! 4. **Break-glass grants** made or acknowledged here go up, so their review starts when they
+//! 5. **Break-glass grants** made or acknowledged here go up, so their review starts when they
 //!    reach central.
-//! 5. **Inter-facility transfers** go up, and those addressed here come down to be received.
-//! 6. **Indicator summaries.** While the node is compatible and computes indicators, the summary
+//! 6. **Inter-facility transfers** go up, and those addressed here come down to be received.
+//! 7. **Indicator summaries.** While the node is compatible and computes indicators, the summary
 //!    `MeasureReport`s whose figures central does not hold go up, with those forgotten since,
 //!    to `/sync/v1/indicator-summaries` (#555). Only summaries leave the facility; the post is
 //!    made each round, even with none, so central knows when the facility last synced.
-//! 7. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
+//! 8. **Pull.** While the node is compatible, it pulls until caught up. Each group is applied
 //!    with its checkpoint.
-//! 8. **Pre-fetch.** The attachments of pulled records whose type is pre-fetched
+//! 9. **Pre-fetch.** The attachments of pulled records whose type is pre-fetched
 //!    (`health_sync_protocol::PREFETCH`, e.g. signed consent scans) are fetched now rather than
 //!    when first opened. One central cannot serve yet stays queued for the next round.
-//! 9. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
-//!    packages its activation records want, fetching each tarball from central by its sha-256,
-//!    and switches to the set, or keeps the previous one and reports why (#89). Reports central
-//!    does not have yet go up to `/sync/v1/activation-reports`.
-//! 10. **Releases.** With [`Releases`](releases::Releases), the node works out the release its
+//! 10. **Activation.** With an [`Activator`](health_activation::Activator), the node stages the
+//!     packages its activation records want, fetching each tarball from central by its sha-256,
+//!     and switches to the set, or keeps the previous one and reports why (#89). Reports central
+//!     does not have yet go up to `/sync/v1/activation-reports`.
+//! 11. **Releases.** With [`Releases`](releases::Releases), the node works out the release its
 //!     roll-out records allow, keeps its desktops' artifacts if it is an edge, and fetches and
 //!     stages its own when that release is newer than the one it runs, resuming downloads over
 //!     rounds ([`releases`]; #136).
@@ -78,6 +83,19 @@ const MAX_BACKOFF: Duration = Duration::from_secs(30 * 60);
 const BATCH: usize = 500;
 /// The wait after a `429` that named none.
 const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
+
+/// What a node does with the provisioning bundle of its facility's staff that central sends each
+/// round (#889): on an edge, verify it and take it as the whole of its staff
+/// (`health_auth::Provisioning::replace`).
+pub trait Accounts: std::marker::Sync + Send + 'static {
+    /// Takes the bundle `jws`: the snapshots stored, and those removed as withdrawn.
+    fn replace<'a>(&'a self, jws: &'a str) -> Replaced<'a>;
+}
+
+/// What [`Accounts::replace`] answers: the snapshots stored, and those removed as withdrawn.
+pub type Replaced<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<(usize, usize), String>> + Send + 'a>,
+>;
 
 /// Where the node syncs to, from its provisioning record (`node.json`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,6 +150,9 @@ pub struct Round {
     pub activation: Option<health_activation::Outcome>,
     /// What the roll-out meant for this node this round (#136).
     pub release: Option<releases::ReleaseStep>,
+    /// The staff snapshots central sent and the node stored, and those it removed because
+    /// central withdrew them (#889); `None` when none were taken this round.
+    pub accounts: Option<(usize, usize)>,
 }
 
 pub(crate) type Https = hyper_rustls::HttpsConnector<HttpConnector>;
@@ -158,6 +179,7 @@ pub struct Sync {
     blobs: Option<health_files::FsBlobStore>,
     activator: Option<health_activation::Activator>,
     releases: Option<releases::Releases>,
+    accounts: Option<Arc<dyn Accounts>>,
     /// The `Retry-After` of central's last `429`: it is re-syncing as many nodes as it can
     /// (ADR 0046), so the next round waits that long, and no alert is raised.
     busy: Arc<std::sync::Mutex<Option<Duration>>>,
@@ -227,6 +249,7 @@ impl Sync {
             blobs: None,
             activator: None,
             releases: None,
+            accounts: None,
             busy: Arc::default(),
         })
     }
@@ -243,6 +266,35 @@ impl Sync {
     pub fn with_releases(mut self, releases: releases::Releases) -> Self {
         self.releases = Some(releases);
         self
+    }
+
+    /// Takes the facility's staff and their snapshots from central each round (#889).
+    #[must_use]
+    pub fn with_accounts(mut self, accounts: Arc<dyn Accounts>) -> Self {
+        self.accounts = Some(accounts);
+        self
+    }
+
+    /// The staff step of a round: central's bundle of the facility's staff, handed to the
+    /// node's [`Accounts`]. `None` when the node takes none or central sends none.
+    pub async fn take_accounts(&self) -> Result<Option<(usize, usize)>, String> {
+        const PATH: &str = "/sync/v1/accounts";
+        let Some(accounts) = &self.accounts else {
+            return Ok(None);
+        };
+        let (status, bytes) = self.send("POST", PATH, b"{}".to_vec()).await?;
+        if status == 404 {
+            return Ok(None);
+        }
+        if status != 200 {
+            return Err(format!("{PATH}: central answered {status}"));
+        }
+        let answer: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|e| format!("{PATH}: {e}"))?;
+        let bundle = answer["bundle"]
+            .as_str()
+            .ok_or_else(|| format!("{PATH}: no bundle"))?;
+        accounts.replace(bundle).await.map(Some)
     }
 
     /// A package tarball from central's blob store, by its sha-256.
@@ -617,6 +669,19 @@ impl Sync {
             .add_upstream(&peer)
             .await
             .map_err(|e| e.to_string())?;
+        // Revocations and snapshots before anything goes up (ADR 0011). A bundle not taken
+        // does not fail the round: the node keeps the staff it had, until their snapshots
+        // expire.
+        if welcome.verdict == Verdict::Compatible {
+            match self.take_accounts().await {
+                Ok(taken) => round.accounts = taken,
+                Err(error) => tracing::warn!(
+                    alert = "accounts-unsynced",
+                    %error,
+                    "this node's staff and their roles are not as central holds them"
+                ),
+            }
+        }
         // Central was restored: queue again what it no longer holds (ADR 0065).
         if let Some(requeued) = self
             .store

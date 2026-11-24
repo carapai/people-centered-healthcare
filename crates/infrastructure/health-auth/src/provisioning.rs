@@ -6,6 +6,11 @@
 //! central's, for an account in the bundle and this facility. Each hash is decrypted with the
 //! node's facility intermediate key and stored re-encrypted under its own pepper key. An account
 //! already here keeps its failed-login state.
+//!
+//! The same bundle comes with every sync round (#889): [`Provisioning::replace`] imports it and
+//! removes the snapshots at the facility that central no longer holds, so a role withdrawn at
+//! central is refused here from that round on. [`facility_bundle`] is central's side, for the
+//! sync endpoint and the `provision bundle` command alike.
 
 use std::sync::Arc;
 
@@ -52,6 +57,64 @@ pub struct Imported {
     pub accounts: usize,
     /// Snapshots stored.
     pub snapshots: usize,
+    /// Snapshots removed because central no longer holds them ([`Provisioning::replace`]).
+    pub withdrawn: usize,
+}
+
+/// Central's provisioning bundle of `facility` for the node `node_id` (ADR 0059): every account
+/// holding a snapshot at the facility in `store`, its hash opened from central's pepper
+/// (`credentials`) and encrypted to the node's facility intermediate key `recipient`, with the
+/// snapshots as central signed them and the country's `local` configuration, signed by `signer`,
+/// central's snapshot key. An account whose hash does not open under the pepper fails the whole
+/// bundle, naming it.
+#[allow(clippy::too_many_arguments)]
+pub async fn facility_bundle(
+    store: &SurrealAuthStore,
+    credentials: &Credentials,
+    facility: &str,
+    node_id: &str,
+    local: crate::store::LocalConfig,
+    signer: &SnapshotSigner,
+    recipient: &p256::PublicKey,
+    now: health_time::Timestamp,
+) -> Result<String, String> {
+    let mut accounts = Vec::new();
+    let mut snapshots = Vec::new();
+    for (id, jws) in store
+        .snapshots_at(facility)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        let Some(account) = store.account(id).await.map_err(|e| e.to_string())? else {
+            continue;
+        };
+        // Central's own sealing comes off; the bundle encrypts the hash to the node instead.
+        let phc = credentials
+            .open(account.id, &account.credential)
+            .ok_or_else(|| {
+                format!(
+                    "{}'s credential does not open under this pepper key",
+                    account.username
+                )
+            })?;
+        accounts.push(BundleAccount {
+            id: account.id,
+            username: account.username,
+            status: account.status,
+            phc,
+        });
+        snapshots.push(jws);
+    }
+    Bundle {
+        facility: facility.to_owned(),
+        node_id: node_id.to_owned(),
+        issued_at: now,
+        accounts,
+        snapshots,
+        local,
+    }
+    .seal(signer, recipient)
+    .map_err(|e| e.to_string())
 }
 
 /// The import, over the edge's store.
@@ -159,8 +222,40 @@ impl Provisioning {
         .seal(signer, recipient)?)
     }
 
+    /// Imports the bundle in `jws` as the whole of central's staff at the facility (#889): as
+    /// [`import`](Self::import), then removes each snapshot stored at the facility whose account
+    /// has none in the bundle, since central has withdrawn every role it held there. A bundle
+    /// refused is refused whole, and nothing is removed.
+    pub async fn replace(&self, jws: &str) -> Result<Imported, ImportError> {
+        let (mut imported, kept) = self.import_bundle(jws).await?;
+        let unavailable = |e: crate::store::StoreError| ImportError::Unavailable(e.to_string());
+        for (account, _) in self
+            .store
+            .snapshots_at(&self.facility)
+            .await
+            .map_err(unavailable)?
+        {
+            if !kept.contains(&account) {
+                self.store
+                    .remove_snapshot(account, &self.facility)
+                    .await
+                    .map_err(unavailable)?;
+                imported.withdrawn += 1;
+            }
+        }
+        Ok(imported)
+    }
+
     /// Imports the bundle in `jws`.
     pub async fn import(&self, jws: &str) -> Result<Imported, ImportError> {
+        self.import_bundle(jws).await.map(|(imported, _)| imported)
+    }
+
+    /// Imports the bundle in `jws`: what it stored, and the accounts it holds snapshots for.
+    async fn import_bundle(
+        &self,
+        jws: &str,
+    ) -> Result<(Imported, Vec<health_identity::AccountId>), ImportError> {
         let recipient = Arc::clone(&self.recipient);
         let key = tokio::task::spawn_blocking(move || recipient())
             .await
@@ -217,10 +312,14 @@ impl Provisioning {
                 .await
                 .map_err(unavailable)?;
         }
-        Ok(Imported {
-            accounts: bundle.accounts.len(),
-            snapshots: snapshots.len(),
-        })
+        Ok((
+            Imported {
+                accounts: bundle.accounts.len(),
+                snapshots: snapshots.len(),
+                withdrawn: 0,
+            },
+            snapshots.iter().map(|(account, _)| *account).collect(),
+        ))
     }
 
     /// `POST /api/admin/provision/accounts`.

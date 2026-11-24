@@ -403,6 +403,19 @@ pub async fn run(
                             sync
                         }
                     };
+                    // The facility's staff and their roles, as central holds them (#889).
+                    let sync = match secrets
+                        .as_ref()
+                        .ok_or_else(|| "no keystore".to_owned())
+                        .and_then(|secrets| {
+                            crate::auth::central_accounts(config, connection, secrets)
+                        }) {
+                        Ok(accounts) => sync.with_accounts(Arc::new(accounts)),
+                        Err(error) => {
+                            tracing::info!(%error, "staff come only in provisioning bundles");
+                            sync
+                        }
+                    };
                     let every = config.sync_interval;
                     supervisor.spawn("sync", move || sync.clone().run(every));
                 }

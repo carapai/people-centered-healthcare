@@ -288,6 +288,7 @@ const INVENTORY: &[Mounted] = &[
             "/sync/v1/transfers/inbound",
             "/sync/v1/activation-reports",
             "/sync/v1/indicator-summaries",
+            "/sync/v1/accounts",
             "/sync/v1/events",
         ],
     },
