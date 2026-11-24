@@ -4,6 +4,10 @@
 //! - **Accounts** come from central's provisioning bundle, imported once with
 //!   `health-desktop accounts import <bundle.jws> --snapshot-keys <keys.json>`. Its hashes are
 //!   re-encrypted under this node's pepper, and central's snapshot keys are kept beside the chain.
+//!   From then on every sync round takes the same bundle from central as the whole of the
+//!   facility's staff ([`CentralAccounts`], #895): a role withdrawn at central is refused here
+//!   from the next round. Under an edge, each round that reaches it takes the edge's staff for
+//!   this desktop's location the same way ([`import_from_edge`]).
 //! - **Sign-in runs in process.** The `sign_in` command takes the username and password over IPC
 //!   and runs the authorization-code flow with PKCE against `health_auth::AuthServer` through the
 //!   router, the code that serves edges and central, with its lockout, snapshot and clock checks.
@@ -127,15 +131,14 @@ fn auth_store(connection: &Connection) -> SurrealAuthStore {
     )
 }
 
-/// `health-desktop accounts import <bundle> --snapshot-keys <keys>`: central's provisioning
-/// bundle for this node, opened with its key from the keystore. Returns the accounts imported.
-pub(crate) async fn import(
+/// The import of central's provisioning bundles for this provisioned node, checked against
+/// central's snapshot keys in `snapshot_keys`, opened with the node key from the keystore.
+fn node_provisioning(
     connection: &Connection,
     data_dir: &Path,
-    keys: &(dyn Keystore + 'static),
-    bundle: &str,
+    keys: &dyn Keystore,
     snapshot_keys: &Path,
-) -> Result<usize, String> {
+) -> Result<Provisioning, String> {
     let (node, facility) = identity(data_dir)?;
     let verifier = verifier(snapshot_keys)?;
     let pem = keys
@@ -146,15 +149,26 @@ pub(crate) async fn import(
     let recipient: RecipientKey = Arc::new(move || {
         p256::SecretKey::from_pkcs8_pem(&pem).map_err(|_| format!("{KEY} is not a P-256 key"))
     });
-    let provisioning = Provisioning::new(
+    Ok(Provisioning::new(
         auth_store(connection),
         credentials(keys)?,
         verifier,
         node,
         facility,
         recipient,
-    );
-    let imported = provisioning
+    ))
+}
+
+/// `health-desktop accounts import <bundle> --snapshot-keys <keys>`: central's provisioning
+/// bundle for this node, opened with its key from the keystore. Returns the accounts imported.
+pub(crate) async fn import(
+    connection: &Connection,
+    data_dir: &Path,
+    keys: &(dyn Keystore + 'static),
+    bundle: &str,
+    snapshot_keys: &Path,
+) -> Result<usize, String> {
+    let imported = node_provisioning(connection, data_dir, keys, snapshot_keys)?
         .import(bundle)
         .await
         .map_err(|e| e.to_string())?;
@@ -164,17 +178,68 @@ pub(crate) async fn import(
     Ok(imported.accounts)
 }
 
+/// Central's bundle of this facility's staff, taken with every sync round of a standalone
+/// desktop (#895) as the whole of it, as an edge takes it (#889): the accounts and snapshots it
+/// holds are stored as central signed them, and a snapshot it no longer holds is removed, so the
+/// role is refused here from that round on. A round that takes no bundle keeps the staff as they
+/// were and raises the `accounts-unsynced` alert.
+pub(crate) struct CentralAccounts(Provisioning);
+
+impl health_sync_client::Accounts for CentralAccounts {
+    fn replace<'a>(&'a self, jws: &'a str) -> health_sync_client::Replaced<'a> {
+        Box::pin(async move {
+            let imported = self.0.replace(jws).await.map_err(|e| e.to_string())?;
+            if imported.withdrawn > 0 {
+                eprintln!(
+                    "health-desktop: central withdrew {} staff's roles here",
+                    imported.withdrawn
+                );
+            }
+            Ok((imported.snapshots, imported.withdrawn))
+        })
+    }
+
+    fn unsynced(&self, error: &str) {
+        eprintln!(
+            "health-desktop: alert accounts-unsynced: the staff here are not as central holds them: {error}"
+        );
+    }
+}
+
+/// The staff a provisioned desktop takes from central with each sync round (#895); or why it
+/// takes none: it is not provisioned, or central's accounts have not yet been imported, which
+/// is when central's snapshot keys are kept here.
+pub(crate) fn central_accounts(
+    connection: &Connection,
+    data_dir: &Path,
+    keys: &dyn Keystore,
+) -> Result<CentralAccounts, String> {
+    if !pki_dir(data_dir).join("node.json").is_file() {
+        return Err("this desktop is not provisioned".into());
+    }
+    let keys_file = snapshot_keys_path(data_dir);
+    if !keys_file.is_file() {
+        return Err("no accounts imported yet, so central's snapshot keys are not here".into());
+    }
+    node_provisioning(connection, data_dir, keys, &keys_file).map(CentralAccounts)
+}
+
 /// The edge's staff for this enrolled desktop (#133), its answer to `POST /api/desktop/accounts`:
 /// the bundle, signed with the edge's facility intermediate key (`signer`), its hashes encrypted
 /// to the device key; and central's snapshot keys, which every snapshot inside must verify
 /// against, kept for sign-in. The facility is the edge's, and stays: an answer for another is
-/// refused. Returns the accounts imported.
+/// refused.
+///
+/// The bundle is taken as the whole of the staff here (#895): a snapshot it does not carry is
+/// removed, since the edge no longer holds it (central withdrew the role, and the edge took that
+/// with its own sync), or it is no longer for this location, or it has expired. A refused answer
+/// removes nothing. Returns what was imported.
 pub(crate) async fn import_from_edge(
     connection: &Connection,
     data_dir: &Path,
     keys: &(dyn Keystore + 'static),
     answer: &serde_json::Value,
-) -> Result<usize, String> {
+) -> Result<health_auth::Imported, String> {
     let edge_file = pki_dir(data_dir).join("edge.json");
     let mut edge: serde_json::Value = std::fs::read_to_string(&edge_file)
         .ok()
@@ -222,7 +287,7 @@ pub(crate) async fn import_from_edge(
         recipient,
     )
     .with_bundle_verifier(bundle_verifier)
-    .import(bundle)
+    .replace(bundle)
     .await
     .map_err(|e| e.to_string())?;
     // Kept for sign-in, which checks every snapshot against them; the facility last, since its
@@ -234,7 +299,7 @@ pub(crate) async fn import_from_edge(
     .map_err(|e| format!("cannot keep the snapshot keys: {e}"))?;
     edge["facility"] = serde_json::Value::String(facility);
     std::fs::write(&edge_file, edge.to_string()).map_err(|e| format!("edge.json: {e}"))?;
-    Ok(imported.accounts)
+    Ok(imported)
 }
 
 /// The authorization server and, behind its sessions, the clinical API; `None` until the desktop
@@ -643,7 +708,7 @@ mod tests {
         let imported = import_from_edge(&connection, dir.path(), &keys, &answer("KLA001"))
             .await
             .expect("import");
-        assert_eq!(imported, 1);
+        assert_eq!(imported.accounts, 1);
         let router = routes(&connection, dir.path(), &keys, None)
             .expect("routes")
             .expect("set up");
@@ -659,5 +724,287 @@ mod tests {
 
         let moved = import_from_edge(&connection, dir.path(), &keys, &answer("GUL002")).await;
         assert!(moved.is_err_and(|e| e.contains("GUL002")));
+    }
+
+    const PASSWORD: &str = "correct horse battery";
+
+    /// Central, holding Login Accounts and the snapshots it signed at KLA001 (#895).
+    struct Central {
+        store: SurrealAuthStore,
+        credentials: Credentials,
+        signer: SnapshotSigner,
+    }
+
+    impl Central {
+        async fn new() -> Self {
+            let connection = Connection::open(&Settings {
+                target: Target::Memory,
+                namespace: "central".into(),
+                database: "main".into(),
+            })
+            .await
+            .expect("open");
+            migrate(&connection, MIGRATIONS).await.expect("migrate");
+            Self {
+                store: auth_store(&connection),
+                credentials: Credentials::new([5; 32].to_vec()).expect("credentials"),
+                signer: SnapshotSigner::generate(),
+            }
+        }
+
+        /// `username`, a clinician at KLA001.
+        async fn clinician(&self, username: &str) -> AccountId {
+            let account = AccountId(uuid::Uuid::now_v7());
+            self.store
+                .put_account(&LoginAccount {
+                    id: account,
+                    username: username.into(),
+                    credential: self
+                        .credentials
+                        .credential(account, PASSWORD)
+                        .expect("hash"),
+                    status: AccountStatus::Active,
+                    lockout: Lockout::default(),
+                })
+                .await
+                .expect("account");
+            let issued = health_time::Timestamp::now();
+            let snapshot = PermissionSnapshot {
+                account,
+                facility: "KLA001".into(),
+                roles: vec![RoleAssignment {
+                    role: "clinician".into(),
+                    locations: vec![],
+                }],
+                programs: vec![],
+                issued_at: issued,
+                not_after: SnapshotPolicy::default().not_after(issued),
+                snapshot_version: 1,
+            };
+            let roles = serde_json::from_value(serde_json::json!({ "clinician": ["Patient.crs"] }))
+                .expect("roles");
+            let jws = self.signer.sign(&snapshot, &roles).expect("sign");
+            self.store
+                .put_snapshot(account, "KLA001", &jws)
+                .await
+                .expect("snapshot");
+            account
+        }
+
+        /// Withdraws every role `account` held at KLA001.
+        async fn withdraw(&self, account: AccountId) {
+            self.store
+                .remove_snapshot(account, "KLA001")
+                .await
+                .expect("withdraw");
+        }
+
+        /// The facility's bundle for the node `node_id`, encrypted to `recipient`, as
+        /// `/sync/v1/accounts` answers it.
+        async fn bundle(&self, node_id: &str, recipient: &p256::PublicKey) -> String {
+            health_auth::facility_bundle(
+                &self.store,
+                &self.credentials,
+                "KLA001",
+                node_id,
+                health_auth::LocalConfig::default(),
+                &self.signer,
+                recipient,
+                health_time::Timestamp::now(),
+            )
+            .await
+            .expect("bundle")
+        }
+    }
+
+    async fn signs_in(
+        connection: &Connection,
+        dir: &Path,
+        keys: &MemoryKeystore,
+        who: &str,
+    ) -> bool {
+        let router = routes(connection, dir, keys, None)
+            .expect("routes")
+            .expect("set up");
+        sign_in(&router, who, PASSWORD).await.is_ok()
+    }
+
+    /// A standalone desktop (#895): central's bundle comes with every sync round, as the whole
+    /// of the facility's staff. A role withdrawn at central is refused here after the next round;
+    /// a refused bundle leaves the staff as they were.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_standalone_desktop_refuses_a_role_withdrawn_at_central_after_its_next_sync() {
+        use health_sync_client::Accounts as _;
+
+        let central = Central::new().await;
+        let nakato = central.clinician("nakato").await;
+        let okello = central.clinician("okello").await;
+
+        // A provisioned desktop of KLA001 whose accounts were imported once.
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "standalone".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let dir = tempfile::tempdir().expect("dir");
+        let node = "018f0000-0000-7000-8000-000000000000";
+        std::fs::create_dir_all(pki_dir(dir.path())).expect("pki");
+        std::fs::write(
+            pki_dir(dir.path()).join("node.json"),
+            serde_json::json!({ "node_id": node, "facility": "KLA001" }).to_string(),
+        )
+        .expect("node");
+        let keys = MemoryKeystore::default();
+        let node_pem = health_pki::new_key().expect("key").serialize_pem();
+        keys.set(KEY, node_pem.as_bytes()).expect("node key");
+        let node_key = p256::SecretKey::from_pkcs8_pem(&node_pem)
+            .expect("node key")
+            .public_key();
+        assert!(
+            central_accounts(&connection, dir.path(), &keys).is_err(),
+            "nothing is taken before central's snapshot keys are here"
+        );
+        std::fs::write(
+            snapshot_keys_path(dir.path()),
+            serde_json::to_string(&[central.signer.public()]).expect("keys"),
+        )
+        .expect("keys");
+        let accounts = central_accounts(&connection, dir.path(), &keys).expect("accounts");
+
+        let taken = accounts
+            .replace(&central.bundle(node, &node_key).await)
+            .await
+            .expect("taken");
+        assert_eq!(taken, (2, 0));
+        assert!(signs_in(&connection, dir.path(), &keys, "nakato").await);
+
+        // Withdrawn at central: held until the next round, refused after it.
+        central.withdraw(nakato).await;
+        assert!(signs_in(&connection, dir.path(), &keys, "nakato").await);
+        let taken = accounts
+            .replace(&central.bundle(node, &node_key).await)
+            .await
+            .expect("taken");
+        assert_eq!(taken, (1, 1));
+        assert!(!signs_in(&connection, dir.path(), &keys, "nakato").await);
+        assert!(signs_in(&connection, dir.path(), &keys, "okello").await);
+
+        // A bundle refused (signed by a key that is not central's) removes nothing.
+        central.withdraw(okello).await;
+        let forged = Central::new().await;
+        forged.clinician("mugisha").await;
+        assert!(
+            accounts
+                .replace(&forged.bundle(node, &node_key).await)
+                .await
+                .is_err()
+        );
+        assert!(signs_in(&connection, dir.path(), &keys, "okello").await);
+        assert!(!signs_in(&connection, dir.path(), &keys, "mugisha").await);
+    }
+
+    /// A desktop under an edge (#895): a role withdrawn at central is refused here after the
+    /// edge's next sync with central, then the desktop's next with the edge. A refused answer
+    /// leaves the staff as they were.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_desktop_under_an_edge_refuses_a_role_withdrawn_at_central_after_both_syncs() {
+        let central = Central::new().await;
+        let nakato = central.clinician("nakato").await;
+        central.clinician("okello").await;
+
+        // The edge of KLA001, which takes central's bundle with each of its rounds (#889).
+        let edge_connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "edge".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&edge_connection, MIGRATIONS)
+            .await
+            .expect("migrate");
+        let edge_key = p256::SecretKey::random(&mut rand_core::OsRng);
+        let edge_public = edge_key.public_key();
+        let recipient: RecipientKey = Arc::new(move || Ok(edge_key.clone()));
+        let edge = Provisioning::new(
+            auth_store(&edge_connection),
+            Credentials::new([9; 32].to_vec()).expect("credentials"),
+            SnapshotVerifier::new(&[central.signer.public()]).expect("verifier"),
+            "edge",
+            "KLA001",
+            recipient,
+        );
+        let edge_syncs = async || {
+            edge.replace(&central.bundle("edge", &edge_public).await)
+                .await
+                .expect("the edge's round");
+        };
+        edge_syncs().await;
+
+        // The desktop, enrolled with that edge at OPD.
+        let intermediate = SnapshotSigner::generate();
+        let device_pem = health_pki::new_key().expect("key").serialize_pem();
+        let device_key = p256::SecretKey::from_pkcs8_pem(&device_pem)
+            .expect("device key")
+            .public_key();
+        let device = "0193a000-0000-7000-8000-000000000002";
+        let answer = async || {
+            serde_json::json!({
+                "facility": "KLA001",
+                "snapshot_keys": [central.signer.public()],
+                "signer": intermediate.public(),
+                "bundle": edge
+                    .export(device, "OPD", &device_key, &intermediate, health_time::Timestamp::now())
+                    .await
+                    .expect("export"),
+            })
+        };
+        let connection = Connection::open(&Settings {
+            target: Target::Memory,
+            namespace: "under-edge".into(),
+            database: "main".into(),
+        })
+        .await
+        .expect("open");
+        migrate(&connection, MIGRATIONS).await.expect("migrate");
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::create_dir_all(pki_dir(dir.path())).expect("pki");
+        std::fs::write(
+            pki_dir(dir.path()).join("edge.json"),
+            serde_json::json!({ "edge": "https://edge.local", "device_id": device }).to_string(),
+        )
+        .expect("edge");
+        let keys = MemoryKeystore::default();
+        keys.set(crate::enroll::DEVICE_KEY, device_pem.as_bytes())
+            .expect("device key");
+        let desktop_syncs =
+            async || import_from_edge(&connection, dir.path(), &keys, &answer().await).await;
+        let taken = desktop_syncs().await.expect("taken");
+        assert_eq!((taken.snapshots, taken.withdrawn), (2, 0));
+        assert!(signs_in(&connection, dir.path(), &keys, "nakato").await);
+
+        // Withdrawn at central: the desktop holds it while the edge does.
+        central.withdraw(nakato).await;
+        desktop_syncs().await.expect("taken");
+        assert!(signs_in(&connection, dir.path(), &keys, "nakato").await);
+        // The edge syncs with central, then the desktop with the edge: refused.
+        edge_syncs().await;
+        let taken = desktop_syncs().await.expect("taken");
+        assert_eq!((taken.snapshots, taken.withdrawn), (1, 1));
+        assert!(!signs_in(&connection, dir.path(), &keys, "nakato").await);
+        assert!(signs_in(&connection, dir.path(), &keys, "okello").await);
+
+        // An answer refused (signed by a key that is not the one it names) removes nothing.
+        let mut forged = answer().await;
+        forged["signer"] = serde_json::to_value(SnapshotSigner::generate().public()).expect("key");
+        assert!(
+            import_from_edge(&connection, dir.path(), &keys, &forged)
+                .await
+                .is_err()
+        );
+        assert!(signs_in(&connection, dir.path(), &keys, "okello").await);
     }
 }

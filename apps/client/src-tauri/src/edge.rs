@@ -29,12 +29,11 @@ const EDGE_REDIRECT_PATH: &str = "/callback";
 const TIMEOUT: Duration = Duration::from_secs(15);
 /// How often the edge is tried while it is missed.
 const PROBE: Duration = Duration::from_secs(5);
-/// How often the edge's staff are taken for sign-in while it cannot be reached.
-const ACCOUNTS_EVERY: Duration = Duration::from_secs(3600);
 
-/// What to do with the edge's answer to `POST /api/desktop/accounts`: import it.
+/// What to do with the edge's answer to `POST /api/desktop/accounts`: import it, as the whole of
+/// the staff here (#895); or why it was refused.
 pub(crate) type Accounts = std::sync::Arc<
-    dyn Fn(serde_json::Value) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send>>
+    dyn Fn(serde_json::Value) -> std::pin::Pin<Box<dyn Future<Output = Result<(), String>> + Send>>
         + Send
         + std::marker::Sync,
 >;
@@ -171,9 +170,11 @@ impl EdgeLink {
 
     /// Syncs with the edge until the process ends: each round that reaches it tells the link the
     /// edge is there and the outbox has gone up; each that fails, that it was missed. While the
-    /// edge is missed it is tried every 5 seconds, otherwise every `interval`. Hourly, after a
-    /// round that reached it, the edge's staff are taken and handed to `accounts`. After every
-    /// round that reached it, the desktop's Authority Leases are brought up to date in `store`.
+    /// edge is missed it is tried every 5 seconds, otherwise every `interval`. After every round
+    /// that reached it, the desktop's Authority Leases are brought up to date in `store`, and the
+    /// edge's staff are taken and handed to `accounts` (#895), so a role the edge no longer holds
+    /// is refused here from then on. Staff not taken stay as they were, and raise the
+    /// `accounts-unsynced` alert.
     pub(crate) async fn sync(
         &self,
         sync: Sync,
@@ -181,7 +182,6 @@ impl EdgeLink {
         interval: Duration,
         accounts: Accounts,
     ) {
-        let mut taken: Option<Instant> = None;
         loop {
             let reached = match sync.round().await {
                 Ok(_) => {
@@ -202,14 +202,10 @@ impl EdgeLink {
             if reached && let Err(e) = self.keep_leases(&store).await {
                 eprintln!("health-desktop: the leases were not brought up to date: {e}");
             }
-            if reached && taken.is_none_or(|at| at.elapsed() >= ACCOUNTS_EVERY) {
-                match self.accounts().await {
-                    Ok(answer) => {
-                        accounts(answer).await;
-                        taken = Some(Instant::now());
-                    }
-                    Err(e) => eprintln!("health-desktop: the edge's staff were not taken: {e}"),
-                }
+            if reached && let Err(error) = self.take_staff(&accounts).await {
+                eprintln!(
+                    "health-desktop: alert accounts-unsynced: the staff here are not as the edge holds them: {error}"
+                );
             }
             let wait = if self.mode() == Mode::PassThrough {
                 interval
@@ -222,6 +218,12 @@ impl EdgeLink {
 }
 
 impl EdgeLink {
+    /// Takes the edge's staff for this desktop and hands them to `accounts`; why not, when the
+    /// edge sent none or they were refused.
+    async fn take_staff(&self, accounts: &Accounts) -> Result<(), String> {
+        accounts(self.accounts().await?).await
+    }
+
     /// Sends `method` to the edge's `path` with `body`, as the device; the JSON answer, or why
     /// there is none.
     async fn device_call(

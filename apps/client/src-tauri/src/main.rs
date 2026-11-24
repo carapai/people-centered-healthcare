@@ -324,34 +324,37 @@ async fn open() -> Result<Api, String> {
                     Arc::clone(&report),
                     Arc::clone(&local),
                 );
+                // Local sign-in starts with the first staff taken; later rounds only replace
+                // what the store holds, which every request reads.
+                let composed = Arc::new(std::sync::atomic::AtomicBool::new(false));
                 let accounts: edge::Accounts = Arc::new(move |answer| {
-                    let (connection, dir, report, local, link, flows) = (
+                    let (connection, dir, report, local, link, flows, composed) = (
                         connection.clone(),
                         dir.clone(),
                         Arc::clone(&report),
                         Arc::clone(&local),
                         Arc::clone(&link),
                         flows.clone(),
+                        Arc::clone(&composed),
                     );
                     Box::pin(async move {
-                        match auth::import_from_edge(&connection, &dir, &OsKeystore, &answer).await
-                        {
-                            Ok(imported) => {
-                                *local.write().await = compose(
-                                    &connection,
-                                    &dir,
-                                    &report,
-                                    Some(&link),
-                                    flows.as_ref(),
-                                );
-                                eprintln!(
-                                    "health-desktop: {imported} staff can sign in here while the edge cannot be reached"
-                                );
-                            }
-                            Err(e) => {
-                                eprintln!("health-desktop: the edge's staff were not taken: {e}")
-                            }
+                        let imported =
+                            auth::import_from_edge(&connection, &dir, &OsKeystore, &answer).await?;
+                        if !composed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            *local.write().await =
+                                compose(&connection, &dir, &report, Some(&link), flows.as_ref());
+                            eprintln!(
+                                "health-desktop: {} staff can sign in here while the edge cannot be reached",
+                                imported.accounts
+                            );
                         }
+                        if imported.withdrawn > 0 {
+                            eprintln!(
+                                "health-desktop: {} staff's roles are no longer held here",
+                                imported.withdrawn
+                            );
+                        }
+                        Ok(())
                     })
                 });
                 tokio::spawn(
