@@ -55,6 +55,8 @@
 //!   Dashboard's shares may hold, and how a Dashboard reads to a viewer.
 //! - **Line lists** ([`line_list`], #867): a line list section's rows, one per enrollment in a
 //!   program or per visit, with their attribute and concept columns.
+//! - **Running a Report** ([`reports`], #557): a Report's table sections over stored summaries,
+//!   at central for a place in the session's area and on an edge for its facility.
 //! - [`test_patient`] reads a package's test patient: a `tests/` file of `type`
 //!   [`TEST_PATIENT_TYPE`] holding a Patient and their records.
 
@@ -79,6 +81,7 @@ pub mod explore;
 pub mod incremental;
 pub mod line_list;
 pub mod report;
+pub mod reports;
 pub mod rollup;
 
 pub use incremental::{Indicators, Refreshed};

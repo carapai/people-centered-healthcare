@@ -1,0 +1,37 @@
+{
+  "$schema": "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1",
+  "id": "sample-anc",
+  "title": "Sample ANC report",
+  "periodType": "monthly",
+  "levels": ["facility", "district", "region", "national"],
+  "sections": [
+    {
+      "kind": "table",
+      "id": "attendance",
+      "title": "ANC attendance",
+      "disaggregations": [
+        { "ageBandSet": "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0", "axis": "columns" }
+      ],
+      "rows": [
+        { "id": "first-visits", "indicator": "https://health.go.ug/fhir/Measure/sample-anc-first-visits|1.0.0", "label": "ANC 1st visits" }
+      ],
+      "columnTotals": false,
+      "rowTotals": true,
+      "change": true,
+      "sendToDhis2": false
+    },
+    {
+      "kind": "table",
+      "id": "timing",
+      "title": "Timing of the 1st visit",
+      "disaggregations": [],
+      "rows": [
+        { "id": "before-12-weeks", "indicator": "https://health.go.ug/fhir/Measure/sample-anc-first-visit-before-12-weeks|1.0.0", "label": "ANC 1st visit before 12 weeks (%)" }
+      ],
+      "columnTotals": false,
+      "rowTotals": false,
+      "change": true,
+      "sendToDhis2": false
+    }
+  ]
+}

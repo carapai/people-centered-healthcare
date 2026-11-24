@@ -33,6 +33,17 @@
 //! Each needs [`VIEW_PERMISSION`], and every change [`AUTHOR_PERMISSION`] too. Sharing never
 //! widens what a viewer reads: the explorer still answers only for their own area.
 //!
+//! Reports (#557; ADR 0070, ADR 0072) are run here for any place in the session's area at a level
+//! the Report runs for, over the facilities' synced summaries, so running one is instant:
+//!
+//! - `GET /reports` lists the Reports of the newest published version of each Reporting package,
+//!   each with the places in the session's area it may be run for.
+//! - `POST /reports/run` runs one (`{"report": "<package>:<id>", "place": "...", "period":
+//!   "2026-03"}`): each table row's figure for the period and, with % change, the one before,
+//!   the whole and each band, rolled up from summed parts with the completeness of the period's
+//!   figures (`health_analytics_app::reports`). A place outside the area is refused (403), and
+//!   a line list has no rows here: it is patient-level, so it runs on the facility's edge.
+//!
 //! Standard Dashboards (#603; ADR 0075) ship in Reporting packages: `GET /dashboards` lists, to
 //! every session, those of the newest published version of each package, first, their periods
 //! as of today and their places following the viewer. They are never changed here (a new
@@ -49,8 +60,8 @@ use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use health_access_policy::Subject;
 use health_analytics::{
-    EstimatesDefinition, Indicator, PopulationEstimates, STANDARD_PERIODS, SavedDashboard,
-    SavedDashboards as _, SavedVisualization, Share, Viewer,
+    AgeBandSet, EstimatesDefinition, Indicator, Period, PopulationEstimates, STANDARD_PERIODS,
+    SavedDashboard, SavedDashboards as _, SavedVisualization, Share, Viewer,
 };
 use health_analytics_app::dashboards::{
     AUTHOR_PERMISSION, EACH_AREA_UNDER, MOST_ITEMS, copied_setup, dashboard_json, read_setup,
@@ -59,10 +70,11 @@ use health_analytics_app::dashboards::{
 use health_analytics_app::explore::{
     ExplorePlace, cells_json, explore, indicator_json, periods_json, read_question,
 };
+use health_analytics_app::reports::{RunPlace, RunWith, level_of, listed_json, run_report};
 use health_auth::SessionRoles;
 use health_facility_registry::{AdministrativeBoundaries, Place, PlaceLevel, Places};
 use health_persistence::{Store as _, Transaction as _};
-use health_publication::{Publications, PublishedDashboard};
+use health_publication::{Publications, PublishedDashboard, PublishedReport};
 use health_registries_app::places::places;
 use health_surrealdb::SurrealStore;
 use health_time::Clock;
@@ -99,6 +111,8 @@ pub(crate) fn router(
         .route("/dashboards", get(dashboards).post(new_dashboard))
         .route("/dashboards/{id}", put(change_dashboard))
         .route("/visualizations", post(save_visualization))
+        .route("/reports", get(reports))
+        .route("/reports/run", post(run_report_route))
         .with_state(AnalyticsApi {
             store,
             catalogue,
@@ -740,6 +754,145 @@ async fn save_visualization(
         .into_response()
 }
 
+/// The places of `area` a Report running for `levels` may be run for.
+fn runnable<'a>(area: &'a [Place], levels: &[health_analytics::Level]) -> Vec<&'a Place> {
+    area.iter()
+        .filter(|p| level_of(p.level.code()).is_some_and(|l| levels.contains(&l)))
+        .collect()
+}
+
+/// `GET /reports`.
+async fn reports(State(api): State<AnalyticsApi>, subject: Option<Extension<Subject>>) -> Response {
+    let subject = match viewer(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    let published = match api.catalogue.reports().await {
+        Ok(published) => published,
+        Err(error) => return unavailable(error),
+    };
+    let area = area(&registry, &subject);
+    let reports: Vec<Value> = published
+        .iter()
+        .filter_map(|p| {
+            let places: Vec<Value> = runnable(&area, &p.report.levels)
+                .into_iter()
+                .map(place_json)
+                .collect();
+            (!places.is_empty()).then(|| listed_json(&p.package, &p.version, &p.report, &places))
+        })
+        .collect();
+    Json(json!({ "where": "central", "reports": reports })).into_response()
+}
+
+/// `POST /reports/run`.
+async fn run_report_route(
+    State(api): State<AnalyticsApi>,
+    subject: Option<Extension<Subject>>,
+    Json(body): Json<Value>,
+) -> Response {
+    let subject = match viewer(subject) {
+        Ok(subject) => subject,
+        Err(response) => return *response,
+    };
+    let (Some(wanted), Some(code), Some(period)) = (
+        body["report"].as_str(),
+        body["place"].as_str(),
+        body["period"].as_str(),
+    ) else {
+        return problem(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "name the `report`, the `place` and the `period`",
+        );
+    };
+    let published = match api.catalogue.reports().await {
+        Ok(published) => published,
+        Err(error) => return unavailable(error),
+    };
+    let Some(found) = published
+        .iter()
+        .find(|p| format!("{}:{}", p.package, p.report.id) == wanted)
+    else {
+        return problem(
+            StatusCode::NOT_FOUND,
+            format!("{wanted} is not a published Report"),
+        );
+    };
+    let report = &found.report;
+    let period = match Period::parse(report.period_type, period) {
+        Ok(period) => period,
+        Err(error) => return problem(StatusCode::UNPROCESSABLE_ENTITY, error.to_string()),
+    };
+    let registry = match registry(&api.store).await {
+        Ok(registry) => registry,
+        Err(response) => return *response,
+    };
+    let area = area(&registry, &subject);
+    let Some(place) = area.iter().find(|p| p.code == code) else {
+        return problem(StatusCode::FORBIDDEN, format!("{code} is not in your area"));
+    };
+    let Some(level) = level_of(place.level.code()).filter(|l| report.levels.contains(l)) else {
+        return problem(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("{} does not run for a {}", report.title, place.level.code()),
+        );
+    };
+    let facilities = if place.level == PlaceLevel::Facility {
+        vec![place.code.clone()]
+    } else {
+        registry.facilities_in(&place.code)
+    };
+    let indicators = match api.catalogue.indicators().await {
+        Ok(indicators) => indicators,
+        Err(error) => return unavailable(error),
+    };
+    let sets = match api.catalogue.age_band_sets().await {
+        Ok(sets) => sets,
+        Err(error) => return unavailable(error),
+    };
+    let estimates = match api.catalogue.estimates().await {
+        Ok(years) => estimates_over(years, &registry),
+        Err(error) => return unavailable(error),
+    };
+    let names: BTreeMap<String, String> = registry
+        .iter()
+        .map(|p| (p.code.clone(), p.name.clone()))
+        .collect();
+    let mut tx = match api.store.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return unavailable(error),
+    };
+    let run = RunPlace {
+        place: ExplorePlace {
+            code: place.code.clone(),
+            facilities,
+        },
+        name: place.name.clone(),
+        level,
+    };
+    let with = RunWith {
+        indicators: &indicators,
+        sets: &sets,
+        estimates: &estimates,
+        names: &names,
+    };
+    match run_report(&mut tx, report, &run, &period, &with, "central").await {
+        Ok(mut answer) => {
+            answer["report"] = json!({
+                "id": wanted,
+                "title": report.title,
+                "package": format!("{}@{}", found.package, found.version),
+            });
+            Json(answer).into_response()
+        }
+        Err(error) => unavailable(error),
+    }
+}
+
 // After the routes: the route inventory reads this file up to its first test-only item.
 /// Where the indicators offered, and the standard Dashboards, come from.
 #[derive(Clone)]
@@ -754,6 +907,7 @@ pub(crate) enum Catalogue {
         Vec<PublishedDashboard>,
         Option<AdministrativeBoundaries>,
         Vec<EstimatesDefinition>,
+        Vec<PublishedReport>,
     ),
 }
 
@@ -766,7 +920,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(indicators, _, _, _) => Ok(indicators.clone()),
+            Self::Fixed(indicators, _, _, _, _) => Ok(indicators.clone()),
         }
     }
 
@@ -778,7 +932,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, dashboards, _, _) => Ok(dashboards.clone()),
+            Self::Fixed(_, dashboards, _, _, _) => Ok(dashboards.clone()),
         }
     }
 
@@ -792,7 +946,34 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, _, _, estimates) => Ok(estimates.clone()),
+            Self::Fixed(_, _, _, estimates, _) => Ok(estimates.clone()),
+        }
+    }
+
+    /// The Reports of the newest published version of each package (#557).
+    async fn reports(&self) -> Result<Vec<PublishedReport>, String> {
+        match self {
+            Self::Published(None) => Ok(Vec::new()),
+            Self::Published(Some(publications)) => publications
+                .published_reports()
+                .await
+                .map_err(|e| e.to_string()),
+            #[cfg(test)]
+            Self::Fixed(_, _, _, _, reports) => Ok(reports.clone()),
+        }
+    }
+
+    /// Every published Age Band Set, to label a Report's bands (#557).
+    async fn age_band_sets(&self) -> Result<Vec<AgeBandSet>, String> {
+        match self {
+            Self::Published(None) => Ok(Vec::new()),
+            Self::Published(Some(publications)) => publications
+                .age_band_sets()
+                .await
+                .map(|sets| sets.into_iter().map(|p| p.set).collect())
+                .map_err(|e| e.to_string()),
+            #[cfg(test)]
+            Self::Fixed(..) => Ok(Vec::new()),
         }
     }
 
@@ -805,7 +986,7 @@ impl Catalogue {
                 .await
                 .map_err(|e| e.to_string()),
             #[cfg(test)]
-            Self::Fixed(_, _, boundaries, _) => Ok(boundaries.clone()),
+            Self::Fixed(_, _, boundaries, _, _) => Ok(boundaries.clone()),
         }
     }
 }
@@ -1007,7 +1188,13 @@ mod tests {
         path: &str,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
-        let catalogue = Catalogue::Fixed(vec![visits(), weeks()], Vec::new(), None, Vec::new());
+        let catalogue = Catalogue::Fixed(
+            vec![visits(), weeks()],
+            Vec::new(),
+            None,
+            Vec::new(),
+            Vec::new(),
+        );
         ask_in(store, catalogue, subject, roles, method, path, body).await
     }
 
@@ -1089,7 +1276,13 @@ mod tests {
                 value: 24_000,
             }],
         };
-        let catalogue = Catalogue::Fixed(vec![coverage()], Vec::new(), None, vec![estimates]);
+        let catalogue = Catalogue::Fixed(
+            vec![coverage()],
+            Vec::new(),
+            None,
+            vec![estimates],
+            Vec::new(),
+        );
         let national = subject("central", true, [VIEW_PERMISSION]);
         let question = json!({
             "indicators": [coverage().canonical()],
@@ -1221,8 +1414,13 @@ mod tests {
     }
 
     async fn map_for(store: &SurrealStore, subject: Subject) -> (StatusCode, Value) {
-        let catalogue =
-            Catalogue::Fixed(vec![visits()], Vec::new(), Some(boundaries()), Vec::new());
+        let catalogue = Catalogue::Fixed(
+            vec![visits()],
+            Vec::new(),
+            Some(boundaries()),
+            Vec::new(),
+            Vec::new(),
+        );
         ask_in(store, catalogue, subject, &[], "GET", "/map", None).await
     }
 
@@ -1570,6 +1768,7 @@ mod tests {
             }],
             None,
             Vec::new(),
+            Vec::new(),
         )
     }
 
@@ -1713,5 +1912,182 @@ mod tests {
             StatusCode::FORBIDDEN,
             "Save as needs analytics.author"
         );
+    }
+
+    /// A published Reporting package's ANC report: first visits and the median gestational age,
+    /// run for facilities and districts; and a facility-only monitoring Report.
+    fn with_reports() -> Catalogue {
+        let anc: health_analytics::ReportDefinition = serde_json::from_value(json!({
+            "id": "anc",
+            "title": "ANC",
+            "periodType": "monthly",
+            "levels": ["facility", "district"],
+            "sections": [{
+                "kind": "table",
+                "id": "attendance",
+                "title": "Attendance",
+                "rows": [
+                    { "id": "first", "indicator": visits().canonical(), "label": "ANC 1st visits" },
+                    { "id": "weeks", "indicator": weeks().canonical(), "label": "Weeks" },
+                ],
+                "change": true,
+            }],
+        }))
+        .expect("report");
+        let monitoring = health_analytics::ReportDefinition {
+            id: "monitoring".into(),
+            title: "Monitoring".into(),
+            levels: vec![health_analytics::Level::Facility],
+            ..anc.clone()
+        };
+        let published = |report| PublishedReport {
+            package: "ug.moh.hmis".into(),
+            version: "1.0.0".into(),
+            report,
+        };
+        Catalogue::Fixed(
+            vec![visits(), weeks()],
+            Vec::new(),
+            None,
+            Vec::new(),
+            vec![published(anc), published(monitoring)],
+        )
+    }
+
+    /// #557: a district user runs a Report at central for the places in their area only, from
+    /// the facilities' synced summaries; without `reporting.view` they cannot run it at all.
+    #[tokio::test]
+    async fn a_district_user_runs_a_report_for_places_in_their_area_only() {
+        let store = central().await;
+        let run = |place: &str| json!({ "report": "ug.moh.hmis:anc", "place": place, "period": "2026-03" });
+
+        // Without reporting.view: neither listed nor run.
+        let unauthorised = subject("district-kampala", true, ["Organization.rs"]);
+        for (method, path, body) in [
+            ("GET", "/reports", None),
+            ("POST", "/reports/run", Some(run("district-kampala"))),
+        ] {
+            let (status, _) = ask_in(
+                &store,
+                with_reports(),
+                unauthorised.clone(),
+                &[],
+                method,
+                path,
+                body,
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{path}");
+        }
+
+        // With it: the Reports offered, each for the places in Kampala at its levels.
+        let district = subject("district-kampala", true, [VIEW_PERMISSION]);
+        let (status, listed) = ask_in(
+            &store,
+            with_reports(),
+            district.clone(),
+            &[],
+            "GET",
+            "/reports",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        let reports = listed["reports"].as_array().expect("reports");
+        assert_eq!(reports[0]["id"], "ug.moh.hmis:anc");
+        assert_eq!(reports[0]["package"], "ug.moh.hmis@1.0.0");
+        assert_eq!(reports[0]["definition"]["sections"][0]["id"], "attendance");
+        let places: Vec<&Value> = reports[0]["places"]
+            .as_array()
+            .expect("places")
+            .iter()
+            .map(|p| &p["code"])
+            .collect();
+        assert_eq!(
+            places,
+            ["district-kampala", "KAM013", "KAM020", "KAM031"],
+            "Kampala and its facilities, never Wakiso's"
+        );
+        // The facility-only Report is offered for the facilities, not the district.
+        let places: Vec<&Value> = reports[1]["places"]
+            .as_array()
+            .expect("places")
+            .iter()
+            .map(|p| &p["code"])
+            .collect();
+        assert_eq!(places, ["KAM013", "KAM020", "KAM031"]);
+
+        // Run for the district: 4 + 6 first visits, KAM031 missing rather than zero, and the
+        // median refused above facility level.
+        let (status, answer) = ask_in(
+            &store,
+            with_reports(),
+            district.clone(),
+            &[],
+            "POST",
+            "/reports/run",
+            Some(run("district-kampala")),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert_eq!(answer["where"], "central");
+        assert_eq!(answer["report"]["title"], "ANC");
+        assert_eq!(answer["place"]["name"], "kampala");
+        let rows = &answer["sections"][0]["rows"];
+        assert_eq!(rows[0]["current"]["value"], "10");
+        assert_eq!(rows[1]["facilityOnly"], "median");
+        assert_eq!(answer["completeness"]["reported"], 2);
+        assert_eq!(answer["completeness"]["expected"], 3);
+        assert_eq!(
+            answer["completeness"]["missing"][0]["name"],
+            "Kitebi HC III"
+        );
+        assert_eq!(answer["previous"]["id"], "2026-02");
+
+        // A facility of the area: its own figure, and its median.
+        let (status, answer) = ask_in(
+            &store,
+            with_reports(),
+            district.clone(),
+            &[],
+            "POST",
+            "/reports/run",
+            Some(run("KAM013")),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert_eq!(answer["sections"][0]["rows"][0]["current"]["value"], "4");
+        assert_eq!(answer["sections"][0]["rows"][1]["current"]["value"], "4");
+
+        // Another district's place is refused; a level the Report does not run for, and a
+        // period not of its type, cannot be run.
+        for (body, wanted) in [
+            (run("WAK001"), StatusCode::FORBIDDEN),
+            (run("district-wakiso"), StatusCode::FORBIDDEN),
+            (
+                json!({ "report": "ug.moh.hmis:monitoring", "place": "district-kampala", "period": "2026-03" }),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                json!({ "report": "ug.moh.hmis:anc", "place": "district-kampala", "period": "2026Q1" }),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                json!({ "report": "ug.moh.hmis:nothing", "place": "district-kampala", "period": "2026-03" }),
+                StatusCode::NOT_FOUND,
+            ),
+        ] {
+            let (status, refused) = ask_in(
+                &store,
+                with_reports(),
+                district.clone(),
+                &[],
+                "POST",
+                "/reports/run",
+                Some(body.clone()),
+            )
+            .await;
+            assert_eq!(status, wanted, "{body} {refused}");
+        }
     }
 }

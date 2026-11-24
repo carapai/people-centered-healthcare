@@ -686,3 +686,176 @@ fn an_edge_keeps_only_its_own_places_population_estimates() {
             .is_empty()
     );
 }
+
+/// #557: the HMIS 105 ANC Report run at a facility, on its edge and offline, matches the
+/// indicators' summaries this node computed from its records: every row's figure for March and
+/// February (for % change), the whole and each age band, with the bands labelled from MoH's
+/// set. The facility's ANC monitoring is listed too (facility only), and another place is
+/// refused.
+#[tokio::test]
+async fn the_hmis_105_anc_report_at_a_facility_matches_the_indicators_summaries() {
+    use health_node_api::analytics::{Active, reports_here, run_here};
+    let store = store().await;
+    let dir = std::env::temp_dir().join(format!("edge-reports-{}", uuid::Uuid::new_v4()));
+    let blobs = health_files::FsBlobStore::open(&dir).expect("blob store");
+    let mut active = health_configuration::activation::ActiveSet::new();
+    for name in ["anc", "core", "hmis"] {
+        let packed = health_packages::pack(&package_tree(name)).expect("pack");
+        blobs.put(packed.tgz.as_slice()).expect("blob");
+        let mut tx = store.begin().await.expect("begin");
+        tx.put_staged_package(&packed.id, &packed.digest.to_string(), "{}")
+            .await
+            .expect("staged");
+        tx.commit().await.expect("commit");
+        let (package, version) = packed.id.rsplit_once('@').expect("id");
+        active.insert(package.into(), version.parse().expect("version"));
+    }
+    let mut tx = store.begin().await.expect("begin");
+    tx.set_active_packages(&serde_json::to_string(&active).expect("json"))
+        .await
+        .expect("active");
+    tx.commit().await.expect("commit");
+
+    let indicators = indicators();
+    let now = at("2026-07-01");
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("first run");
+    for patient in test_patients() {
+        for resource in &patient {
+            write(&store, resource).await;
+        }
+    }
+    catch_up(&indicators, &store, &now, false)
+        .await
+        .expect("run");
+
+    let packages = health_node_api::indicators::active_files(&store, &blobs)
+        .await
+        .expect("active files");
+    let _ = std::fs::remove_dir_all(&dir);
+    let listed = reports_here(
+        &store,
+        packages.iter().map(|(id, files)| (id.as_str(), files)),
+        FACILITY,
+    )
+    .await;
+    let ids: Vec<&Value> = listed["reports"]
+        .as_array()
+        .expect("reports")
+        .iter()
+        .map(|r| &r["id"])
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "ug.moh.hmis:anc-facility-monitoring",
+            "ug.moh.hmis:hmis-105-anc"
+        ]
+    );
+    assert_eq!(listed["reports"][1]["places"][0]["code"], FACILITY);
+
+    let estimates = Default::default();
+    let active = Active {
+        packages: &packages,
+        indicators: indicators.indicators(),
+        sets: indicators.age_band_sets(),
+        estimates: &estimates,
+    };
+    let asked =
+        json!({ "report": "ug.moh.hmis:hmis-105-anc", "place": FACILITY, "period": "2026-03" });
+    let at: jiff::Timestamp = "2026-07-01T07:00:00Z".parse().expect("now");
+    let run = run_here(&store, &active, FACILITY, &asked, at)
+        .await
+        .expect("run");
+    assert_eq!(run["where"], "facility");
+    assert_eq!(run["report"]["title"], "HMIS 105 · 2 Antenatal care");
+    assert_eq!(run["completeness"]["expected"], 1);
+    assert_eq!(run["completeness"]["reported"], 1);
+
+    // Every row against the summary this node keeps, for March and February.
+    let definition: health_analytics::ReportDefinition =
+        serde_json::from_slice(&package_tree("hmis")["configuration/reports/hmis-105-anc.json"])
+            .expect("report");
+    let mut compared = 0;
+    for (s, section) in definition.sections.iter().enumerate() {
+        let health_analytics::Section::Table(table) = section else {
+            continue;
+        };
+        for (r, row) in table.rows.iter().enumerate() {
+            let shown = &run["sections"][s]["rows"][r];
+            assert_eq!(shown["row"], row.id.as_str());
+            let indicator = indicators
+                .indicators()
+                .iter()
+                .find(|i| i.canonical() == row.indicator)
+                .expect("indicator");
+            for (side, period) in [("current", "2026-03"), ("previous", "2026-02")] {
+                let mut tx = store.begin().await.expect("begin");
+                let kept = tx
+                    .summaries(PeriodType::Monthly, period)
+                    .await
+                    .expect("summaries")
+                    .into_iter()
+                    .find(|k| k.measure == row.indicator);
+                let figures = &shown[side];
+                let Some(kept) = kept else {
+                    // Nothing counted that month: no summary, and no figure but its zero.
+                    assert!(
+                        figures.is_null() || figures["count"] == 0,
+                        "{}: {figures}",
+                        row.id
+                    );
+                    continue;
+                };
+                let report: Value = serde_json::from_str(&kept.report).expect("report");
+                let summary = report_summary(&report, indicator.calculation).expect("summary");
+                let exact = |s: &health_analytics::Summary| {
+                    json!(s.value.map(|v| v.round_dp(2).normalize().to_string()))
+                };
+                assert_eq!(figures["value"], exact(&summary), "{}", row.id);
+                assert_eq!(figures["count"], summary.count, "{}", row.id);
+                assert_eq!(
+                    figures["denominator"],
+                    json!(summary.denominator),
+                    "{}",
+                    row.id
+                );
+                for (d, by) in summary.disaggregations.iter().enumerate() {
+                    for (b, band) in by.bands.iter().enumerate() {
+                        let shown = &figures["disaggregations"][d]["bands"][b];
+                        assert_eq!(shown["code"], band.code.as_str());
+                        assert_eq!(
+                            shown["count"], band.summary.count,
+                            "{} {}",
+                            row.id, band.code
+                        );
+                        assert_eq!(shown["value"], exact(&band.summary));
+                    }
+                }
+                compared += 1;
+            }
+        }
+    }
+    assert!(compared >= 4, "{run}");
+    // MoH's ANC age bands, in the set's order, labelled, then *not recorded*.
+    let bands = &run["sections"][0]["disaggregations"][0];
+    assert_eq!(
+        bands["name"],
+        "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0"
+    );
+    let last = bands["bands"].as_array().expect("bands").last().cloned();
+    assert_eq!(last.expect("a band")["code"], "not-recorded");
+    assert_ne!(
+        bands["bands"][0]["label"], bands["bands"][0]["code"],
+        "{bands}"
+    );
+
+    // A district is run at central.
+    let mut elsewhere = asked.clone();
+    elsewhere["place"] = json!("district-kampala");
+    let (status, _) = run_here(&store, &active, FACILITY, &elsewhere, at)
+        .await
+        .expect_err("refused");
+    assert_eq!(status.as_u16(), 403);
+}

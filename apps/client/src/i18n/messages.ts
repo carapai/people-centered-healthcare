@@ -925,6 +925,28 @@ type ExplorerValues = {
   dbSaveAsTitle: {}
   dbSaveAsCopy: { title: string }
   dbSaveAsButton: {}
+  rpTitle: {}
+  rpLoading: {}
+  rpFailed: {}
+  rpForbidden: {}
+  rpNone: {}
+  rpFrom: { package: string }
+  rpPlace: {}
+  rpPeriod: {}
+  rpRunning: {}
+  rpRunFailed: { reason: string }
+  rpWhere: { where: string; place: string; period: string; start: string; end: string }
+  rpComputedAt: { at: string }
+  rpReported: { reported: number; expected: number }
+  rpMissing: { name: string; lastSync: string }
+  rpNeverSynced: { name: string }
+  rpPrint: {}
+  rpCsv: {}
+  rpNotShown: { reason: string; name: string }
+  rpRowError: { label: string; reason: string }
+  rpEstimate: { label: string; title: string; value: string }
+  rpLineListCentral: {}
+  rpLineListLater: {}
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -1071,6 +1093,28 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   dbSaveAsTitle: { id: 'app.dashboards.saveAsTitle', defaultMessage: 'Your copy’s title', description: 'Dashboards: the title of the copy Save as makes' },
   dbSaveAsCopy: { id: 'app.dashboards.saveAsCopy', defaultMessage: '{title} (copy)', description: 'Dashboards: the title Save as suggests' },
   dbSaveAsButton: { id: 'app.dashboards.saveAsButton', defaultMessage: 'Save as my Dashboard', description: 'Dashboards: make the copy' },
+  rpTitle: { id: 'app.reports.title', defaultMessage: 'Reports', description: 'Reports heading and home link' },
+  rpLoading: { id: 'app.reports.loading', defaultMessage: 'Loading…', description: 'Reports: loading' },
+  rpFailed: { id: 'app.reports.failed', defaultMessage: 'The Reports could not be loaded. Please try again.', description: 'Reports: loading failed' },
+  rpForbidden: { id: 'app.reports.forbidden', defaultMessage: 'Running Reports needs the reporting.view permission.', description: 'Reports: the user may not run Reports' },
+  rpNone: { id: 'app.reports.none', defaultMessage: 'No Report runs for your place yet.', description: 'Reports: none offered' },
+  rpFrom: { id: 'app.reports.from', defaultMessage: 'From {package}', description: 'Reports: the package version a Report is in' },
+  rpPlace: { id: 'app.reports.place', defaultMessage: 'Place', description: 'Reports: the place picker' },
+  rpPeriod: { id: 'app.reports.period', defaultMessage: 'Period', description: 'Reports: the period picker' },
+  rpRunning: { id: 'app.reports.running', defaultMessage: 'Running the Report…', description: 'Reports: running' },
+  rpRunFailed: { id: 'app.reports.runFailed', defaultMessage: 'The Report could not be run: {reason}', description: 'Reports: running failed' },
+  rpWhere: { id: 'app.reports.where', defaultMessage: '{place}, {period} ({start} to {end}). {where, select, central {Rolled up at central from the facilities’ synced figures.} other {Computed on this facility.}}', description: 'Reports: where and when the figures are of' },
+  rpComputedAt: { id: 'app.reports.computedAt', defaultMessage: 'Newest figures computed {at}.', description: 'Reports: freshness' },
+  rpReported: { id: 'app.reports.reported', defaultMessage: '{reported} of {expected, plural, one {# facility} other {# facilities}} reported.', description: 'Reports: completeness' },
+  rpMissing: { id: 'app.reports.missing', defaultMessage: '{name}: missing, last synced {lastSync}. Not counted as zero.', description: 'Reports: a facility that has not reported' },
+  rpNeverSynced: { id: 'app.reports.neverSynced', defaultMessage: '{name}: missing, never synced. Not counted as zero.', description: 'Reports: a facility that has never synced' },
+  rpPrint: { id: 'app.reports.print', defaultMessage: 'Print or save as PDF', description: 'Reports: print button' },
+  rpCsv: { id: 'app.reports.csv', defaultMessage: 'Download CSV', description: 'Reports: CSV export' },
+  rpNotShown: { id: 'app.reports.notShown', defaultMessage: '{reason, select, notBrokenDown {not broken down by {name}} crossed {crossed bands are not run from summaries yet} facilityOnly {facility level only} noIndicator {no indicator} other {n/a}}', description: 'Reports: why a cell has no figure, also in the CSV' },
+  rpRowError: { id: 'app.reports.rowError', defaultMessage: '{label}: {reason}', description: 'Reports: a row that could not be run' },
+  rpEstimate: { id: 'app.reports.estimate', defaultMessage: '{label} is over {title}: {value}.', description: 'Reports: an indicator over a Population Estimate' },
+  rpLineListCentral: { id: 'app.reports.lineListCentral', defaultMessage: 'This line list shows patients, so it runs on the facility’s own node, never at central.', description: 'Reports: a line list at central' },
+  rpLineListLater: { id: 'app.reports.lineListLater', defaultMessage: 'Line lists are not run here yet.', description: 'Reports: a line list on an edge' },
 })
 
 type AccessValues = {
