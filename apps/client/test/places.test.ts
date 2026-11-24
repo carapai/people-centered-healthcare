@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { type ImportPlan, type Place, PlacesError, applyImport, assign, changedFields, optionsQuery, placeLabel, planIsEmpty, previewImport, userQuery, withdraw } from '../src/features/places/api'
+import { type ImportPlan, type Place, PlacesError, applyImport, assign, changedFields, optionsQuery, placeLabel, planIsEmpty, previewImport, reportingQuery, setReporting, userQuery, withdraw } from '../src/features/places/api'
 import { fakeTransport } from './fake'
 
 const place = (code: string, level: Place['level'], parent: string | null, extra: Partial<Place> = {}): Place => ({ code, name: code, level, parent, active: true, ...extra })
@@ -37,6 +37,29 @@ describe('the NHFR import', () => {
     const after = { ...before, name: 'Kisenyi HC IV', care_level: 'HC IV', active: false }
     expect(changedFields({ before, after })).toEqual(['name', 'active', 'care_level'])
     expect(changedFields({ before, after: { ...before, coordinates: { latitude: '0.32', longitude: '32.56' } } })).toEqual(['coordinates'])
+    expect(changedFields({ before, after: { ...before, org_unit: 'KisenyiH4a1' } })).toEqual(['org_unit'])
+  })
+})
+
+describe('HMIS reporting settings', () => {
+  test('the settings are read, and a blank org unit ID is sent as none', async () => {
+    const settings = { manage: true, metadataRecorded: true, forms: [{ id: 'Hmis105Smpl', name: 'HMIS 105', periodType: 'Monthly' }], facilities: [] }
+    const row = { code: 'KAM013', name: 'Kisenyi HC IV', district: 'district-kampala', active: true, nhfrOrgUnit: 'KisenyiH4a1', orgUnit: null, forms: [], flags: [] }
+    const transport = fakeTransport((request) => ({ body: request.method === 'GET' ? settings : row }))
+    expect(await reportingQuery(transport).queryFn({})).toEqual(settings)
+    expect(await setReporting(transport, 'KAM013', '  ', [])).toEqual(row)
+    await setReporting(transport, 'KAM013', ' Unknown0001 ', ['Hmis105Smpl'])
+    expect(transport.sent.map((r) => [r.method, r.path, r.body])).toEqual([
+      ['GET', '/places/reporting', undefined],
+      ['PUT', '/places/reporting/KAM013', { orgUnit: null, forms: [] }],
+      ['PUT', '/places/reporting/KAM013', { orgUnit: 'Unknown0001', forms: ['Hmis105Smpl'] }],
+    ])
+  })
+
+  test("refused settings carry the server's problems", async () => {
+    const problems = ['a form is reported through the platform only once the facility has an org unit ID']
+    const transport = fakeTransport(() => ({ status: 422, body: { detail: 'the HMIS reporting settings cannot be kept', problems } }))
+    await expect(setReporting(transport, 'KAM013', '', ['Hmis105Smpl'])).rejects.toEqual(new PlacesError(422, 'the HMIS reporting settings cannot be kept', problems))
   })
 })
 

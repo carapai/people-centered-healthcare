@@ -746,6 +746,27 @@ type PlacesValues = {
   plAssigned: { username: string; roles: string; place: string }
   plCannotGrant: { role: string; permission: string }
   plWithdrawn: { place: string }
+  plField_org_unit: {}
+  plReportingTitle: {}
+  plReportingIntro: {}
+  plReportingForbidden: {}
+  plReadOnly: {}
+  plNoMetadata: {}
+  plNoFacilities: {}
+  plOrgUnit: {}
+  plNhfrOrgUnit: { orgUnit: string }
+  plNhfrNone: {}
+  plOrgUnitSet: { orgUnit: string }
+  plOrgUnitNotSet: {}
+  plFormsLegend: {}
+  plFormsOn: { forms: string }
+  plFormsNone: {}
+  plSaveReporting: {}
+  plSavedReporting: { name: string }
+  plFlag_unknownToNhfr: { orgUnit: string }
+  plFlag_nhfrListsElsewhere: { orgUnit: string; facility: string }
+  plFlag_nhfrListsAnother: { orgUnit: string; nhfr: string }
+  plFlag_sharedWith: { orgUnit: string; facility: string }
 }
 
 // The facility registry's administration pages (features/places; ADR 0094; #873).
@@ -796,6 +817,27 @@ export const placesMessages = defineMessages<PlacesValues>({
   plCannotGrant: { id: 'app.places.roles.cannotGrant', defaultMessage: 'You cannot grant {role}: it carries {permission}, which your own roles do not give you.', description: 'Role assignment page: the administrator tried to grant a permission they do not hold' },
   plAssigned: { id: 'app.places.roles.assigned', defaultMessage: '{username} now holds {roles} at {place}. They sign in for it from their next sign-in.', description: 'Role assignment page: the roles were assigned' },
   plWithdrawn: { id: 'app.places.roles.withdrawn', defaultMessage: 'Every role at {place} was withdrawn.', description: 'Role assignment page: the roles at a place were withdrawn' },
+  plField_org_unit: { id: 'app.places.import.field.orgUnit', defaultMessage: 'DHIS2 org unit', description: 'NHFR import page: changed field' },
+  plReportingTitle: { id: 'app.places.reporting.title', defaultMessage: 'HMIS reporting', description: 'HMIS reporting settings page heading and home link (#560)' },
+  plReportingIntro: { id: 'app.places.reporting.intro', defaultMessage: "Each facility's HMIS org unit ID is the DHIS2 organisation unit central sends its forms to, checked against the NHFR. A form reported through the platform is sent by central once the facility's in-charge signs it off, so the district stops keying it.", description: 'HMIS reporting settings page: what it does' },
+  plReportingForbidden: { id: 'app.places.reporting.forbidden', defaultMessage: 'Your role does not include HMIS reporting.', description: 'HMIS reporting settings page: the user lacks reporting.view and places.manage' },
+  plReadOnly: { id: 'app.places.reporting.readOnly', defaultMessage: 'These settings are set at central by those who manage the facility registry.', description: 'HMIS reporting settings page: the user may read but not change them' },
+  plNoMetadata: { id: 'app.places.reporting.noMetadata', defaultMessage: "Central holds no copy of the DHIS2 instance's metadata yet, so no form can be reported through the platform.", description: 'HMIS reporting settings page: no DHIS2 metadata recorded' },
+  plNoFacilities: { id: 'app.places.reporting.noFacilities', defaultMessage: 'There are no facilities in your area.', description: 'HMIS reporting settings page: empty area' },
+  plOrgUnit: { id: 'app.places.reporting.orgUnit', defaultMessage: 'HMIS org unit ID', description: "HMIS reporting settings page: the facility's DHIS2 org unit ID field" },
+  plNhfrOrgUnit: { id: 'app.places.reporting.nhfr', defaultMessage: 'The NHFR lists org unit {orgUnit}.', description: "HMIS reporting settings page: the NHFR's org unit ID for the facility" },
+  plNhfrNone: { id: 'app.places.reporting.nhfrNone', defaultMessage: 'The NHFR lists no org unit ID for it.', description: 'HMIS reporting settings page: the NHFR gives the facility no org unit ID' },
+  plOrgUnitSet: { id: 'app.places.reporting.set', defaultMessage: 'HMIS org unit ID: {orgUnit}', description: 'HMIS reporting settings page, read only: the org unit ID set' },
+  plOrgUnitNotSet: { id: 'app.places.reporting.notSet', defaultMessage: 'No HMIS org unit ID is set.', description: 'HMIS reporting settings page, read only: no org unit ID set' },
+  plFormsLegend: { id: 'app.places.reporting.forms', defaultMessage: 'Forms reported through the platform', description: 'HMIS reporting settings page: the per-form switches' },
+  plFormsOn: { id: 'app.places.reporting.formsOn', defaultMessage: 'Reported through the platform: {forms}', description: 'HMIS reporting settings page, read only: the forms switched on' },
+  plFormsNone: { id: 'app.places.reporting.formsNone', defaultMessage: 'No form is reported through the platform; the district keys them.', description: 'HMIS reporting settings page, read only: no form switched on' },
+  plSaveReporting: { id: 'app.places.reporting.save', defaultMessage: 'Save', description: 'HMIS reporting settings page: save a facility' },
+  plSavedReporting: { id: 'app.places.reporting.saved', defaultMessage: '{name} saved.', description: "HMIS reporting settings page: a facility's settings were saved" },
+  plFlag_unknownToNhfr: { id: 'app.places.reporting.flag.unknown', defaultMessage: 'The NHFR does not list org unit {orgUnit}.', description: 'HMIS reporting settings page: the org unit ID set is unknown to the NHFR' },
+  plFlag_nhfrListsElsewhere: { id: 'app.places.reporting.flag.elsewhere', defaultMessage: 'The NHFR lists org unit {orgUnit} for {facility}.', description: 'HMIS reporting settings page: the NHFR gives the org unit ID to another facility' },
+  plFlag_nhfrListsAnother: { id: 'app.places.reporting.flag.another', defaultMessage: 'The NHFR lists org unit {nhfr} for this facility, not {orgUnit}.', description: 'HMIS reporting settings page: the NHFR gives the facility another org unit ID' },
+  plFlag_sharedWith: { id: 'app.places.reporting.flag.shared', defaultMessage: '{facility} is also set to org unit {orgUnit}.', description: 'HMIS reporting settings page: two facilities are set to one org unit ID' },
 })
 
 type ExplorerValues = {

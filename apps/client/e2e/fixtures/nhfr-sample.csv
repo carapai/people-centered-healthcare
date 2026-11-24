@@ -1,8 +1,8 @@
-nhfr_id,name,district,level,ownership,status,latitude,longitude
-KAM013,Kisenyi HC IV,district-kampala,HC IV,Government,open,0.3136,32.5664
-KAM020,Kawempe HC III,district-kampala,HC III,Government,open,0.3790,32.5580
-KAM031,Kitebi HC III,district-kampala,HC III,Government,open,0.2870,32.5590
-WAK001,Wakiso HC IV,district-wakiso,HC IV,Government,open,0.4044,32.4594
-WAK014,Namulonge HC III,district-wakiso,HC III,PNFP,closed,0.5310,32.6150
-JIN001,Jinja Regional Referral Hospital,district-jinja,RRH,Government,open,0.4290,33.2040
-GUL001,Gulu Regional Referral Hospital,district-gulu,RRH,Government,open,2.7760,32.2990
+nhfr_id,name,district,level,ownership,status,latitude,longitude,dhis2_uid
+KAM013,Kisenyi HC IV,district-kampala,HC IV,Government,open,0.3136,32.5664,KisenyiH4a1
+KAM020,Kawempe HC III,district-kampala,HC III,Government,open,0.3790,32.5580,KawempeH3b2
+KAM031,Kitebi HC III,district-kampala,HC III,Government,open,0.2870,32.5590,KitebiH3c03
+WAK001,Wakiso HC IV,district-wakiso,HC IV,Government,open,0.4044,32.4594,WakisoH4d04
+WAK014,Namulonge HC III,district-wakiso,HC III,PNFP,closed,0.5310,32.6150,
+JIN001,Jinja Regional Referral Hospital,district-jinja,RRH,Government,open,0.4290,33.2040,JinjaRRH005
+GUL001,Gulu Regional Referral Hospital,district-gulu,RRH,Government,open,2.7760,32.2990,GuluRRH0006

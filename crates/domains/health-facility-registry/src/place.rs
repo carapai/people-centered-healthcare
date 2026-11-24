@@ -145,6 +145,10 @@ pub struct Place {
     /// Where it is, for a facility that has a position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coordinates: Option<Coordinates>,
+    /// The facility's DHIS2 org unit ID as the NHFR lists it, if it does (#560): what the HMIS
+    /// org unit ID central sets for it is checked against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org_unit: Option<String>,
 }
 
 impl Place {
@@ -159,6 +163,7 @@ impl Place {
             care_level: None,
             ownership: None,
             coordinates: None,
+            org_unit: None,
         }
     }
 }
@@ -287,6 +292,7 @@ mod tests {
             care_level: None,
             ownership: None,
             coordinates: None,
+            org_unit: None,
         }
     }
 

@@ -125,6 +125,12 @@ function Home() {
                   <Link to="/places/import">{intl.formatMessage(placesMessages.plImportTitle)}</Link>
                 </li>
               ) : null}
+              {/* Each facility's HMIS org unit ID and forms reported through the platform (#560; ADR 0069), set at central. */}
+              {platform.capabilities.studio ? (
+                <li>
+                  <Link to="/places/reporting">{intl.formatMessage(placesMessages.plReportingTitle)}</Link>
+                </li>
+              ) : null}
               {/* The Studio is central's only (studio.md § Scope). */}
               {platform.capabilities.studio ? (
                 <li>

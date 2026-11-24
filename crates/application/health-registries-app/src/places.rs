@@ -3,7 +3,8 @@
 //!
 //! - An Organization's id is derived from its place code ([`place_id`]), so a place is read by
 //!   its code without a search. It carries the code as an identifier ([`PLACE_SYSTEM`]; a
-//!   facility's is its NHFR identifier, also under [`NHFR_SYSTEM`]), its level as a type coding
+//!   facility's is its NHFR identifier, also under [`NHFR_SYSTEM`], and its DHIS2 org unit ID
+//!   as the NHFR lists it under [`DHIS2_ORG_UNIT_SYSTEM`]), its level as a type coding
 //!   ([`PLACE_LEVEL_SYSTEM`]), and the NHFR's level of care and ownership as further codings.
 //! - [`places`] reads the hierarchy; [`apply_import`] writes an NHFR import's plan in one
 //!   transaction, each place's write audited, a place written over only at the version read.
@@ -27,6 +28,8 @@ use crate::{AuditTrail, RegistryError};
 pub const PLACE_SYSTEM: &str = "urn:health:place";
 /// The identifier system of a facility's NHFR identifier.
 pub const NHFR_SYSTEM: &str = "urn:health:nhfr";
+/// The identifier system of a facility's DHIS2 org unit ID as the NHFR lists it (#560).
+pub const DHIS2_ORG_UNIT_SYSTEM: &str = "urn:health:dhis2-org-unit";
 /// The code system of a place's level (`facility`, `district`, `region`, `national`).
 pub const PLACE_LEVEL_SYSTEM: &str =
     "https://carapai.github.io/people-centered-healthcare/fhir/CodeSystem/place-level";
@@ -180,6 +183,9 @@ pub fn organization_json(place: &Place) -> Value {
     if place.level == PlaceLevel::Facility {
         identifier.push(json!({ "system": NHFR_SYSTEM, "value": place.code }));
     }
+    if let Some(org_unit) = &place.org_unit {
+        identifier.push(json!({ "system": DHIS2_ORG_UNIT_SYSTEM, "value": org_unit }));
+    }
     if let Some(level) = &place.care_level {
         types.push(coding(CARE_LEVEL_SYSTEM, level));
     }
@@ -244,12 +250,15 @@ pub fn level_of(organization: &Value) -> Option<PlaceLevel> {
 /// are not read back here.
 pub fn place_of(organization: &Value) -> Option<Place> {
     let level = level_of(organization)?;
-    let code = organization["identifier"]
-        .as_array()?
-        .iter()
-        .find(|i| i["system"] == PLACE_SYSTEM)?["value"]
-        .as_str()?
-        .to_owned();
+    let identifier = |system: &str| {
+        organization["identifier"]
+            .as_array()?
+            .iter()
+            .find(|i| i["system"] == system)?["value"]
+            .as_str()
+            .map(str::to_owned)
+    };
+    let code = identifier(PLACE_SYSTEM)?;
     Some(Place {
         code,
         name: organization["name"].as_str().unwrap_or_default().to_owned(),
@@ -261,6 +270,7 @@ pub fn place_of(organization: &Value) -> Option<Place> {
         care_level: code_in(&organization["type"], CARE_LEVEL_SYSTEM),
         ownership: code_in(&organization["type"], OWNERSHIP_SYSTEM),
         coordinates: None,
+        org_unit: identifier(DHIS2_ORG_UNIT_SYSTEM),
     })
 }
 

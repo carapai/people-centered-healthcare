@@ -14,6 +14,8 @@ export interface Place {
   care_level?: string
   ownership?: string
   coordinates?: { latitude: string; longitude: string }
+  /** The facility's DHIS2 org unit ID as the NHFR lists it (#560). */
+  org_unit?: string
 }
 
 /** The session's place and its area (`GET /api/places/area`). */

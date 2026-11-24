@@ -32,6 +32,7 @@ import { Route as BreakGlassReviewsRouteImport } from './routes/break-glass.revi
 import { Route as EdgeStatusRouteImport } from './routes/edge.status'
 import { Route as PatientsIdRouteImport } from './routes/patients.$id'
 import { Route as PlacesImportRouteImport } from './routes/places.import'
+import { Route as PlacesReportingRouteImport } from './routes/places.reporting'
 import { Route as PlacesRolesRouteImport } from './routes/places.roles'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalCallbackRouteImport } from './routes/portal.callback'
@@ -184,6 +185,11 @@ const PatientsIdRoute = PatientsIdRouteImport.update({
 const PlacesImportRoute = PlacesImportRouteImport.update({
   id: '/places/import',
   path: '/places/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlacesReportingRoute = PlacesReportingRouteImport.update({
+  id: '/places/reporting',
+  path: '/places/reporting',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlacesRolesRoute = PlacesRolesRouteImport.update({
@@ -402,6 +408,7 @@ export interface FileRoutesByFullPath {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/places/import': typeof PlacesImportRoute
+  '/places/reporting': typeof PlacesReportingRoute
   '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
@@ -465,6 +472,7 @@ export interface FileRoutesByTo {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/places/import': typeof PlacesImportRoute
+  '/places/reporting': typeof PlacesReportingRoute
   '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
@@ -529,6 +537,7 @@ export interface FileRoutesById {
   '/edge/status': typeof EdgeStatusRoute
   '/patients/$id': typeof PatientsIdRoute
   '/places/import': typeof PlacesImportRoute
+  '/places/reporting': typeof PlacesReportingRoute
   '/places/roles': typeof PlacesRolesRoute
   '/portal/callback': typeof PortalCallbackRoute
   '/reception/queues': typeof ReceptionQueuesRoute
@@ -594,6 +603,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/places/import'
+    | '/places/reporting'
     | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
@@ -657,6 +667,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/places/import'
+    | '/places/reporting'
     | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
@@ -720,6 +731,7 @@ export interface FileRouteTypes {
     | '/edge/status'
     | '/patients/$id'
     | '/places/import'
+    | '/places/reporting'
     | '/places/roles'
     | '/portal/callback'
     | '/reception/queues'
@@ -784,6 +796,7 @@ export interface RootRouteChildren {
   EdgeStatusRoute: typeof EdgeStatusRoute
   PatientsIdRoute: typeof PatientsIdRoute
   PlacesImportRoute: typeof PlacesImportRoute
+  PlacesReportingRoute: typeof PlacesReportingRoute
   PlacesRolesRoute: typeof PlacesRolesRoute
   PortalCallbackRoute: typeof PortalCallbackRoute
   ReceptionQueuesRoute: typeof ReceptionQueuesRoute
@@ -985,6 +998,13 @@ declare module '@tanstack/react-router' {
       path: '/places/import'
       fullPath: '/places/import'
       preLoaderRoute: typeof PlacesImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/places/reporting': {
+      id: '/places/reporting'
+      path: '/places/reporting'
+      fullPath: '/places/reporting'
+      preLoaderRoute: typeof PlacesReportingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/places/roles': {
@@ -1280,6 +1300,7 @@ const rootRouteChildren: RootRouteChildren = {
   EdgeStatusRoute: EdgeStatusRoute,
   PatientsIdRoute: PatientsIdRoute,
   PlacesImportRoute: PlacesImportRoute,
+  PlacesReportingRoute: PlacesReportingRoute,
   PlacesRolesRoute: PlacesRolesRoute,
   PortalCallbackRoute: PortalCallbackRoute,
   ReceptionQueuesRoute: ReceptionQueuesRoute,
