@@ -1,0 +1,14 @@
+{
+  "name": "ug.population.2026",
+  "version": "1.0.0",
+  "title": "Uganda population estimates 2026",
+  "description": "A sample of a year's Population Estimates (ADR 0071): total population for the sample districts, and expected pregnancies derived as 5% of it. The figures are illustrative, not UBOS's.",
+  "fhirVersions": [
+    "5.0.0"
+  ],
+  "kind": "population",
+  "platform": {
+    "minSoftware": "0.1.0",
+    "formatVersion": 1
+  }
+}

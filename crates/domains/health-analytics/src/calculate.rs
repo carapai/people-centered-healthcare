@@ -246,9 +246,10 @@ impl Summary {
             return Err(RollUpError::Mixed);
         }
         let count = parts.iter().map(|p| p.count).sum();
-        let denominator = calculation
-            .has_denominator()
-            .then(|| parts.iter().filter_map(|p| p.denominator).sum());
+        // A denominator that is a Population Estimate is not in the parts: it is the place's.
+        let denominator = (calculation.has_denominator()
+            && (parts.is_empty() || parts.iter().any(|p| p.denominator.is_some())))
+        .then(|| parts.iter().filter_map(|p| p.denominator).sum());
         let values = matches!(calculation, Calculation::Value(_)).then(|| {
             let all: Vec<&Values> = parts.iter().filter_map(|p| p.values.as_ref()).collect();
             let numbers =
@@ -383,7 +384,7 @@ fn in_period(indicator: &Indicator, record: &RecordOutcome) -> Reason {
         return Reason::NoEnrollment;
     }
     let mut sides = vec![PopulationKind::InitialPopulation];
-    if indicator.calculation.has_denominator() {
+    if indicator.counts_its_denominator() {
         sides.push(PopulationKind::Denominator);
     }
     if matches!(indicator.calculation, Calculation::Value(_)) {
@@ -473,10 +474,7 @@ fn summarize<'a>(indicator: &Indicator, counted: impl Iterator<Item = &'a Counte
         }
         taken.extend(thing.value.iter());
     }
-    let denominator = indicator
-        .calculation
-        .has_denominator()
-        .then_some(in_denominator);
+    let denominator = indicator.counts_its_denominator().then_some(in_denominator);
     let numbers: Vec<Decimal> = taken
         .iter()
         .filter_map(|o| match o {
@@ -591,8 +589,7 @@ pub fn calculate(
             patient: patient.patient.clone(),
             count,
             denominator: indicator
-                .calculation
-                .has_denominator()
+                .counts_its_denominator()
                 .then_some(by_unit.len() as u64),
             records,
         });
@@ -689,6 +686,7 @@ mod tests {
             references: BTreeSet::new(),
             disaggregations: Vec::new(),
             thresholds: Vec::new(),
+            estimate: None,
             value: matches!(calculation, Calculation::Value(_)).then(|| IndicatorValue {
                 source: ValueSource::Expression("v".into()),
                 pick: Pick::First,
@@ -1409,5 +1407,48 @@ mod tests {
         let mut whole = evaluated.summary.clone();
         whole.disaggregations = Vec::new();
         assert_eq!(evaluated.crossed(&percentage, &[]), whole);
+    }
+
+    #[test]
+    fn a_denominator_that_is_an_estimate_is_not_counted_from_records() {
+        use PopulationKind::{InitialPopulation, Numerator};
+        // ANC 1st visit coverage over expected pregnancies (#553): the facility counts the
+        // numerator; the denominator is the place's estimate, which roll-up takes.
+        let patients =
+            [("a", true), ("b", false), ("c", true)].map(|(name, first)| PatientOutcome {
+                patient: format!("Patient/{name}"),
+                records: vec![record(
+                    &format!("Encounter/{name}1"),
+                    Some("2026-03-04"),
+                    &[(InitialPopulation, Ok(true)), (Numerator, Ok(first))],
+                )],
+            });
+        let coverage = Indicator {
+            estimate: Some("expected-pregnancies".into()),
+            ..indicator(Calculation::Percentage, Counts::People)
+        };
+        let evaluation = calculate(&coverage, &march(), &patients, &[]);
+        assert_eq!(
+            (
+                evaluation.summary.count,
+                evaluation.summary.denominator,
+                evaluation.summary.value
+            ),
+            (2, None, None)
+        );
+        assert_eq!(evaluation.members[0].denominator, None);
+        assert_eq!(
+            evaluation.members[1].records[0].reason,
+            Reason::DenominatorOnly
+        );
+        let rolled = Summary::roll_up(
+            Calculation::Percentage,
+            &[evaluation.summary.clone(), evaluation.summary],
+        )
+        .expect("rolled up");
+        assert_eq!(
+            (rolled.count, rolled.denominator, rolled.value),
+            (4, None, None)
+        );
     }
 }

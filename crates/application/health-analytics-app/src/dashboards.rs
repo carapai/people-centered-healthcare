@@ -310,6 +310,7 @@ mod tests {
             references: BTreeSet::new(),
             disaggregations: Vec::new(),
             thresholds: Vec::new(),
+            estimate: None,
             value: None,
         }
     }

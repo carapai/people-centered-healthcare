@@ -47,6 +47,7 @@ fn indicator(name: &str, calculation: Calculation) -> Indicator {
         references: BTreeSet::new(),
         disaggregations: Vec::new(),
         thresholds: Vec::new(),
+        estimate: None,
         value: None,
     }
 }

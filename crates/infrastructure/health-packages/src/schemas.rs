@@ -42,6 +42,13 @@ pub const DASHBOARD: &str =
 
 const DASHBOARD_SCHEMA: &str = include_str!("../schemas/dashboard-1.json");
 
+/// The `$schema` of a Population package's estimates, `configuration/population.json` (ADR 0071;
+/// #553; `health_analytics::estimates`).
+pub const POPULATION: &str =
+    "https://carapai.github.io/people-centered-healthcare/fhir/schema/population/1";
+
+const POPULATION_SCHEMA: &str = include_str!("../schemas/population-1.json");
+
 const OVERRIDE_POINTS_SCHEMA: &str = include_str!("../schemas/override-points-1.json");
 
 const OVERRIDES_SCHEMA: &str = include_str!("../schemas/overrides-1.json");
@@ -67,7 +74,8 @@ impl Schemas {
     /// configuration: Form Layouts (#92, [`FORM_LAYOUT`]), Language Pack entries (#502,
     /// [`LANGUAGE_PACK`]), and override point declarations and settings (#507,
     /// [`crate::overrides::OVERRIDE_POINTS_SCHEMA`], [`crate::overrides::OVERRIDES_SCHEMA`]),
-    /// Reports (#556, [`REPORT`]) and standard Dashboards (#603, [`DASHBOARD`]).
+    /// Reports (#556, [`REPORT`]), standard Dashboards (#603, [`DASHBOARD`]) and Population
+    /// Estimates (#553, [`POPULATION`]).
     /// Configuration naming any other schema (deployment settings) is refused until its
     /// feature arrives.
     pub fn platform() -> Self {
@@ -82,6 +90,7 @@ impl Schemas {
             (crate::overrides::OVERRIDES_SCHEMA, OVERRIDES_SCHEMA),
             (REPORT, REPORT_SCHEMA),
             (DASHBOARD, DASHBOARD_SCHEMA),
+            (POPULATION, POPULATION_SCHEMA),
         ] {
             // Built into the release and checked by its tests, so it always compiles.
             if let Ok(schema) = serde_json::from_str::<Value>(text)

@@ -62,6 +62,8 @@ export function useOpenDesign() {
         return navigate({ to: target.to, params: target.params })
       case '/studio/$id/dashboards/$':
         return navigate({ to: target.to, params: target.params })
+      case '/studio/$id/population/$':
+        return navigate({ to: target.to, params: target.params })
     }
   }
 }
@@ -191,7 +193,7 @@ function Listing({ section, designs }: { section: SectionId; designs: StudioDesi
   )
 }
 
-const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language', 'reporting']
+const kinds: StudioPackageKind[] = ['program', 'national-core', 'terminology', 'country-configuration', 'override', 'language', 'reporting', 'population']
 
 /** *New* in a section: which package (a draft the person holds, a published package whose next
  * version they start, or a new package), then a title; a decision table also asks which workflow
@@ -205,12 +207,19 @@ function NewDesign({ section, designs, onCancel }: { section: SectionId; designs
   const tables = section === 'decision-tables'
   const workflows = designs.designs.filter((d) => d.kind === 'workflow')
   const reports = section === 'reports' || section === 'dashboards'
-  // A Report or a standard Dashboard belongs in a Reporting package (ADR 0070, ADR 0075).
-  const choices = packageChoices(designs).filter((c) => (!tables || workflows.some((w) => w.package === c.name)) && (!reports || packageOf(designs, c.name)?.kind === 'reporting'))
+  const population = section === 'population'
+  // A Report or a standard Dashboard belongs in a Reporting package (ADR 0070, ADR 0075); a
+  // year's estimates in a Population package that has none yet (ADR 0071).
+  const choices = packageChoices(designs).filter(
+    (c) =>
+      (!tables || workflows.some((w) => w.package === c.name)) &&
+      (!reports || packageOf(designs, c.name)?.kind === 'reporting') &&
+      (!population || (packageOf(designs, c.name)?.kind === 'population' && !designs.designs.some((d) => d.kind === 'population' && d.package === c.name))),
+  )
   const [chosen, setChosen] = useState<string>(choices[0]?.name ?? (tables ? '' : '*new'))
   const [title, setTitle] = useState('')
-  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : section === 'indicators' ? 'indicator' : section === 'dashboards' ? 'dashboard' : reports ? 'report' : 'form')
-  const [blank, setBlank] = useState({ name: '', title: '', kind: (reports ? 'reporting' : 'program') as StudioPackageKind, canonical: '' })
+  const [what, setWhat] = useState<NewKind>(section === 'concepts' ? 'code-system' : section === 'workflows' ? 'workflow' : section === 'age-bands' ? 'age-band-set' : section === 'indicators' ? 'indicator' : section === 'dashboards' ? 'dashboard' : reports ? 'report' : population ? 'population' : 'form')
+  const [blank, setBlank] = useState({ name: '', title: '', kind: (reports ? 'reporting' : population ? 'population' : 'program') as StudioPackageKind, canonical: '' })
   const inPackage = useMemo(() => workflows.filter((w) => w.package === chosen), [workflows, chosen])
   const [workflow, setWorkflow] = useState('')
   const workflowPath = inPackage.some((w) => w.path === workflow) ? workflow : (inPackage[0]?.path ?? '')

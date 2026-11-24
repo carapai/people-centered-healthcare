@@ -29,6 +29,7 @@ pub(crate) enum StudioDesignKind {
     Indicator,
     Report,
     Dashboard,
+    Population,
 }
 
 impl From<DesignKind> for StudioDesignKind {
@@ -44,6 +45,7 @@ impl From<DesignKind> for StudioDesignKind {
             DesignKind::Indicator => Self::Indicator,
             DesignKind::Report => Self::Report,
             DesignKind::Dashboard => Self::Dashboard,
+            DesignKind::Population => Self::Population,
         }
     }
 }

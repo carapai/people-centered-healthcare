@@ -51,6 +51,7 @@ import { Route as StudioDecisionTablesRouteImport } from './routes/studio.decisi
 import { Route as StudioFormsRouteImport } from './routes/studio.forms'
 import { Route as StudioIndicatorsRouteImport } from './routes/studio.indicators'
 import { Route as StudioPackagesRouteImport } from './routes/studio.packages'
+import { Route as StudioPopulationRouteImport } from './routes/studio.population'
 import { Route as StudioProgramsRouteImport } from './routes/studio.programs'
 import { Route as StudioReportsRouteImport } from './routes/studio.reports'
 import { Route as StudioWorkflowsRouteImport } from './routes/studio.workflows'
@@ -63,6 +64,7 @@ import { Route as StudioIdDashboardsSplatRouteImport } from './routes/studio.$id
 import { Route as StudioIdFilesSplatRouteImport } from './routes/studio.$id_.files.$'
 import { Route as StudioIdFormsSplatRouteImport } from './routes/studio.$id_.forms.$'
 import { Route as StudioIdIndicatorsSplatRouteImport } from './routes/studio.$id_.indicators.$'
+import { Route as StudioIdPopulationSplatRouteImport } from './routes/studio.$id_.population.$'
 import { Route as StudioIdProgramsSplatRouteImport } from './routes/studio.$id_.programs.$'
 import { Route as StudioIdReportsSplatRouteImport } from './routes/studio.$id_.reports.$'
 import { Route as StudioIdTerminologySplatRouteImport } from './routes/studio.$id_.terminology.$'
@@ -278,6 +280,11 @@ const StudioPackagesRoute = StudioPackagesRouteImport.update({
   path: '/studio/packages',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioPopulationRoute = StudioPopulationRouteImport.update({
+  id: '/studio/population',
+  path: '/studio/population',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioProgramsRoute = StudioProgramsRouteImport.update({
   id: '/studio/programs',
   path: '/studio/programs',
@@ -336,6 +343,11 @@ const StudioIdFormsSplatRoute = StudioIdFormsSplatRouteImport.update({
 const StudioIdIndicatorsSplatRoute = StudioIdIndicatorsSplatRouteImport.update({
   id: '/studio/$id_/indicators/$',
   path: '/studio/$id/indicators/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioIdPopulationSplatRoute = StudioIdPopulationSplatRouteImport.update({
+  id: '/studio/$id_/population/$',
+  path: '/studio/$id/population/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioIdProgramsSplatRoute = StudioIdProgramsSplatRouteImport.update({
@@ -399,6 +411,7 @@ export interface FileRoutesByFullPath {
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
+  '/studio/population': typeof StudioPopulationRoute
   '/studio/programs': typeof StudioProgramsRoute
   '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
@@ -415,6 +428,7 @@ export interface FileRoutesByFullPath {
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/indicators/$': typeof StudioIdIndicatorsSplatRoute
+  '/studio/$id/population/$': typeof StudioIdPopulationSplatRoute
   '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id/reports/$': typeof StudioIdReportsSplatRoute
   '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
@@ -459,6 +473,7 @@ export interface FileRoutesByTo {
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
+  '/studio/population': typeof StudioPopulationRoute
   '/studio/programs': typeof StudioProgramsRoute
   '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
@@ -475,6 +490,7 @@ export interface FileRoutesByTo {
   '/studio/$id/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id/indicators/$': typeof StudioIdIndicatorsSplatRoute
+  '/studio/$id/population/$': typeof StudioIdPopulationSplatRoute
   '/studio/$id/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id/reports/$': typeof StudioIdReportsSplatRoute
   '/studio/$id/terminology/$': typeof StudioIdTerminologySplatRoute
@@ -520,6 +536,7 @@ export interface FileRoutesById {
   '/studio/forms': typeof StudioFormsRoute
   '/studio/indicators': typeof StudioIndicatorsRoute
   '/studio/packages': typeof StudioPackagesRoute
+  '/studio/population': typeof StudioPopulationRoute
   '/studio/programs': typeof StudioProgramsRoute
   '/studio/reports': typeof StudioReportsRoute
   '/studio/workflows': typeof StudioWorkflowsRoute
@@ -536,6 +553,7 @@ export interface FileRoutesById {
   '/studio/$id_/files/$': typeof StudioIdFilesSplatRoute
   '/studio/$id_/forms/$': typeof StudioIdFormsSplatRoute
   '/studio/$id_/indicators/$': typeof StudioIdIndicatorsSplatRoute
+  '/studio/$id_/population/$': typeof StudioIdPopulationSplatRoute
   '/studio/$id_/programs/$': typeof StudioIdProgramsSplatRoute
   '/studio/$id_/reports/$': typeof StudioIdReportsSplatRoute
   '/studio/$id_/terminology/$': typeof StudioIdTerminologySplatRoute
@@ -582,6 +600,7 @@ export interface FileRouteTypes {
     | '/studio/forms'
     | '/studio/indicators'
     | '/studio/packages'
+    | '/studio/population'
     | '/studio/programs'
     | '/studio/reports'
     | '/studio/workflows'
@@ -598,6 +617,7 @@ export interface FileRouteTypes {
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/indicators/$'
+    | '/studio/$id/population/$'
     | '/studio/$id/programs/$'
     | '/studio/$id/reports/$'
     | '/studio/$id/terminology/$'
@@ -642,6 +662,7 @@ export interface FileRouteTypes {
     | '/studio/forms'
     | '/studio/indicators'
     | '/studio/packages'
+    | '/studio/population'
     | '/studio/programs'
     | '/studio/reports'
     | '/studio/workflows'
@@ -658,6 +679,7 @@ export interface FileRouteTypes {
     | '/studio/$id/files/$'
     | '/studio/$id/forms/$'
     | '/studio/$id/indicators/$'
+    | '/studio/$id/population/$'
     | '/studio/$id/programs/$'
     | '/studio/$id/reports/$'
     | '/studio/$id/terminology/$'
@@ -702,6 +724,7 @@ export interface FileRouteTypes {
     | '/studio/forms'
     | '/studio/indicators'
     | '/studio/packages'
+    | '/studio/population'
     | '/studio/programs'
     | '/studio/reports'
     | '/studio/workflows'
@@ -718,6 +741,7 @@ export interface FileRouteTypes {
     | '/studio/$id_/files/$'
     | '/studio/$id_/forms/$'
     | '/studio/$id_/indicators/$'
+    | '/studio/$id_/population/$'
     | '/studio/$id_/programs/$'
     | '/studio/$id_/reports/$'
     | '/studio/$id_/terminology/$'
@@ -763,6 +787,7 @@ export interface RootRouteChildren {
   StudioFormsRoute: typeof StudioFormsRoute
   StudioIndicatorsRoute: typeof StudioIndicatorsRoute
   StudioPackagesRoute: typeof StudioPackagesRoute
+  StudioPopulationRoute: typeof StudioPopulationRoute
   StudioProgramsRoute: typeof StudioProgramsRoute
   StudioReportsRoute: typeof StudioReportsRoute
   StudioWorkflowsRoute: typeof StudioWorkflowsRoute
@@ -779,6 +804,7 @@ export interface RootRouteChildren {
   StudioIdFilesSplatRoute: typeof StudioIdFilesSplatRoute
   StudioIdFormsSplatRoute: typeof StudioIdFormsSplatRoute
   StudioIdIndicatorsSplatRoute: typeof StudioIdIndicatorsSplatRoute
+  StudioIdPopulationSplatRoute: typeof StudioIdPopulationSplatRoute
   StudioIdProgramsSplatRoute: typeof StudioIdProgramsSplatRoute
   StudioIdReportsSplatRoute: typeof StudioIdReportsSplatRoute
   StudioIdTerminologySplatRoute: typeof StudioIdTerminologySplatRoute
@@ -1081,6 +1107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPackagesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/population': {
+      id: '/studio/population'
+      path: '/studio/population'
+      fullPath: '/studio/population'
+      preLoaderRoute: typeof StudioPopulationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/programs': {
       id: '/studio/programs'
       path: '/studio/programs'
@@ -1165,6 +1198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioIdIndicatorsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/$id_/population/$': {
+      id: '/studio/$id_/population/$'
+      path: '/studio/$id/population/$'
+      fullPath: '/studio/$id/population/$'
+      preLoaderRoute: typeof StudioIdPopulationSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/$id_/programs/$': {
       id: '/studio/$id_/programs/$'
       path: '/studio/$id/programs/$'
@@ -1235,6 +1275,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioFormsRoute: StudioFormsRoute,
   StudioIndicatorsRoute: StudioIndicatorsRoute,
   StudioPackagesRoute: StudioPackagesRoute,
+  StudioPopulationRoute: StudioPopulationRoute,
   StudioProgramsRoute: StudioProgramsRoute,
   StudioReportsRoute: StudioReportsRoute,
   StudioWorkflowsRoute: StudioWorkflowsRoute,
@@ -1251,6 +1292,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioIdFilesSplatRoute: StudioIdFilesSplatRoute,
   StudioIdFormsSplatRoute: StudioIdFormsSplatRoute,
   StudioIdIndicatorsSplatRoute: StudioIdIndicatorsSplatRoute,
+  StudioIdPopulationSplatRoute: StudioIdPopulationSplatRoute,
   StudioIdProgramsSplatRoute: StudioIdProgramsSplatRoute,
   StudioIdReportsSplatRoute: StudioIdReportsSplatRoute,
   StudioIdTerminologySplatRoute: StudioIdTerminologySplatRoute,

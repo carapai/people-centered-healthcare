@@ -1858,6 +1858,125 @@ mod tests {
         assert_eq!(area["facilities"], serde_json::json!(["KAM013"]));
     }
 
+    /// Population Estimates (#553; ADR 0071): the HMIS lead's CSV is checked against the
+    /// registry, a row with an unknown place code refusing the file with the row named; a good
+    /// file answers the draft's estimates with its figures and each district's totals, derived
+    /// types included. It needs `metadata.author`.
+    #[tokio::test]
+    async fn the_hmis_lead_previews_population_estimates_against_the_registry() {
+        let connection = sample_places().await;
+        let key = [6u8; 32];
+        let policy: AccessPolicy = serde_json::from_value(serde_json::json!({
+            "roles": { "hmis": ["metadata.author"], "clinician": ["Patient.crs"] },
+            "labels": [],
+        }))
+        .expect("policy");
+        provision_at(&connection, &key, &policy, "lead", &["hmis"], "central").await;
+        provision(&connection, &key, &policy, "nakato", &["clinician"]).await;
+        let mut settings = settings();
+        settings.login_page = None;
+        settings.snapshot_keys = vec![key];
+        settings.policy = Some(policy);
+        let ready = Arc::new(OnceCell::new());
+        let app = gate(Arc::clone(&ready));
+        let _ = ready.set(routes(connection, &settings).expect("routes"));
+
+        let estimates = serde_json::json!({
+            "$schema": "https://carapai.github.io/people-centered-healthcare/fhir/schema/population/1",
+            "year": 2026,
+            "types": [
+                { "code": "total-population", "title": "Total population" },
+                { "code": "expected-pregnancies", "title": "Expected pregnancies",
+                  "derivedFrom": "total-population", "percent": "5" }
+            ],
+            "figures": []
+        });
+        let preview =
+            |csv: &str| Some(serde_json::json!({ "csv": csv, "estimates": estimates.clone() }));
+        let lead = sign_in(&app, "lead").await;
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/places/population/preview",
+                &lead,
+                preview(
+                    "place,total-population
+KAM013,40000
+KAM999,1000
+",
+                ),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let refused: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(
+            refused["problems"],
+            serde_json::json!([
+                "row 3: the place KAM999 is not in the facility registry or the NHFR"
+            ])
+        );
+
+        let (status, body, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/places/population/preview",
+                &lead,
+                preview(
+                    "place,total-population
+KAM013,40000
+KAM020,60000
+district-wakiso,300000
+",
+                ),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let previewed: serde_json::Value = serde_json::from_str(&body).expect("json");
+        assert_eq!(previewed["figures"], 3);
+        assert_eq!(previewed["problems"], serde_json::json!([]));
+        assert_eq!(previewed["estimates"]["$schema"], estimates["$schema"]);
+        assert_eq!(
+            previewed["estimates"]["figures"][2],
+            serde_json::json!({ "place": "district-wakiso", "type": "total-population", "value": 300000 })
+        );
+        assert_eq!(
+            previewed["districts"],
+            serde_json::json!([
+                { "code": "district-kampala", "name": "Kampala", "region": "region-central",
+                  "totals": [
+                      { "type": "total-population", "title": "Total population", "annual": "100000" },
+                      { "type": "expected-pregnancies", "title": "Expected pregnancies", "annual": "5000" }
+                  ] },
+                { "code": "district-wakiso", "name": "Wakiso", "region": "region-central",
+                  "totals": [
+                      { "type": "total-population", "title": "Total population", "annual": "300000" },
+                      { "type": "expected-pregnancies", "title": "Expected pregnancies", "annual": "15000" }
+                  ] }
+            ])
+        );
+
+        // Someone outside the Studio may not import.
+        let clinician = sign_in(&app, "nakato").await;
+        let (status, _, _) = send(
+            &app,
+            authorized(
+                "POST",
+                "/api/places/population/preview",
+                &clinician,
+                preview(
+                    "place,total-population
+",
+                ),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+
     /// Role assignment at a place (#873; ADR 0094): a national administrator assigns a role at a
     /// district to a user who holds none, and that user signs in for the district; the
     /// assignment is listed, refused outside the administrator's area, for an undefined role or

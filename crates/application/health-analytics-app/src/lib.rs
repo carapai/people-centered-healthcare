@@ -94,6 +94,9 @@ pub const PERIOD_DATE: &str = "https://carapai.github.io/people-centered-healthc
 pub const COUNTS: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-counts";
 /// A rate's factor (`valueInteger`): 100, 1000, 10000 or 100000.
 pub const RATE_PER: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-rate-per";
+/// The Population Estimate type a percentage's, rate's or ratio's denominator is (`valueCode`,
+/// `expected-pregnancies`, …), instead of a `denominator` population (#553; ADR 0071).
+pub const DENOMINATOR_ESTIMATE: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-denominator-estimate";
 /// Whether the indicator counts from the first record up to the period's end (`valueBoolean`).
 pub const CUMULATIVE: &str = "https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-cumulative";
 /// On the `measure-observation`: which value of a counted thing is taken (`valueCode`, `first`
@@ -179,6 +182,8 @@ pub fn measure(resource: &Value) -> MeasureDefinition {
         counts: extension(resource, COUNTS).and_then(|e| text(&e["valueCode"])),
         rate_per: extension(resource, RATE_PER).and_then(|e| e["valueInteger"].as_i64()),
         cumulative: extension(resource, CUMULATIVE).and_then(|e| e["valueBoolean"].as_bool()),
+        denominator_estimate: extension(resource, DENOMINATOR_ESTIMATE)
+            .map(|e| text(&e["valueCode"]).unwrap_or_default()),
         period_date: extension(resource, PERIOD_DATE)
             .map(|e| expression(&e["valueExpression"]).unwrap_or_default()),
         populations,
@@ -504,7 +509,7 @@ fn memberships<'a>(
                     circle.join(" → ")
                 ));
             }
-            if reference.side == Side::Denominator && !other.calculation.has_denominator() {
+            if reference.side == Side::Denominator && !other.counts_its_denominator() {
                 return Err(format!(
                     "{} refers to the denominator of {measure}, which has none",
                     indicator.canonical()

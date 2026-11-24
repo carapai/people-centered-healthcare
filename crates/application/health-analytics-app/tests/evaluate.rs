@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use health_analytics::{Calculation, Evaluation, Period, PeriodType, Reason, Values};
 use health_analytics_app::{
-    Library, PatientRecords, evaluate, is_test_patient, measure, test_patient,
+    DENOMINATOR_ESTIMATE, Library, PatientRecords, evaluate, is_test_patient, measure, test_patient,
 };
 use health_fhir_validation::OctofhirEngine;
 use rust_decimal::Decimal;
@@ -262,6 +262,36 @@ fn the_measure_reads_as_written() {
             "the indicator has no period date: the declared date that places care in a Report's period"
         ]
     );
+}
+
+#[test]
+fn a_denominator_estimate_reads_as_written() {
+    // ANC 1st visit coverage over expected pregnancies (#553): a proportion with a numerator
+    // and the estimate type its denominator is, instead of a denominator population.
+    let mut resource = anc_first_visits();
+    resource["scoring"] = json!({ "coding": [{ "code": "proportion" }] });
+    resource["extension"]
+        .as_array_mut()
+        .expect("extensions")
+        .push(json!({
+            "url": DENOMINATOR_ESTIMATE,
+            "valueCode": "expected-pregnancies",
+        }));
+    resource["group"][0]["population"]
+        .as_array_mut()
+        .expect("populations")
+        .push(json!({
+            "code": { "coding": [{ "code": "numerator" }] },
+            "criteria": { "language": "text/fhirpath", "expression": "true" },
+        }));
+    let definition = measure(&resource);
+    assert_eq!(
+        definition.denominator_estimate.as_deref(),
+        Some("expected-pregnancies")
+    );
+    let indicator = definition.indicator().expect("an indicator");
+    assert_eq!(indicator.calculation, Calculation::Percentage);
+    assert_eq!(indicator.estimate.as_deref(), Some("expected-pregnancies"));
 }
 
 #[test]

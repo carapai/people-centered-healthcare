@@ -39,6 +39,12 @@
 //!   that runs above facility level, and indicators or Age Band Sets not pinned to
 //!   `url|version`.
 //!
+//! - **Population Estimates** ([`estimates`], #553; ADR 0071): a yearly Population package's
+//!   estimate types, given per place or derived as a percentage of another, its figures summed
+//!   upward through the place hierarchy and never split down ([`Estimates`]), taken pro rata to
+//!   a Report's period ([`pro_rata`]), and the HMIS lead's CSV import ([`parse_estimates_csv`]).
+//!   A percentage or rate may name an estimate type as its denominator ([`over_estimate`]).
+//!
 //! - **On each node** ([`store`], #554): each patient's membership per indicator and period, kept
 //!   for the periods they have care in ([`periods_with_care`]), and a summary per indicator,
 //!   period and facility, calculated again from the kept membership whenever a patient changes.
@@ -63,6 +69,7 @@ pub mod age_bands;
 pub mod calculate;
 pub mod dashboard;
 pub mod disaggregation;
+pub mod estimates;
 pub mod indicator;
 pub mod membership;
 pub mod period;
@@ -83,6 +90,10 @@ pub use calculate::{
 pub use dashboard::{SavedDashboard, SavedDashboards, SavedVisualization, Share, Viewer};
 pub use disaggregation::{
     Disaggregation, DisaggregationDefinition, DisaggregationSource, NOT_RECORDED,
+};
+pub use estimates::{
+    ESTIMATES_FILE, EstimateTypeDefinition, Estimates, EstimatesDefinition, Figure, PLACE_COLUMN,
+    over_estimate, parse_estimates_csv, pro_rata,
 };
 pub use indicator::{
     Aggregate, BetweenDefinition, Calculation, Counts, Expression, FHIRPATH, Indicator,

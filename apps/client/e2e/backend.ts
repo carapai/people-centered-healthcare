@@ -254,6 +254,11 @@ if (anc.status !== 0) throw new Error('drafting the ANC reference package failed
 // HMIS 105 antenatal care Report and the facility's ANC monitoring, over the ANC indicators.
 const hmis = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/hmis'), '--by', author], { env, stdio: 'inherit' })
 if (hmis.status !== 0) throw new Error('drafting the HMIS reference package failed')
+// The 2026 Population package (#553; packages/reference-packages/population), drafted by the
+// author: total population and expected pregnancies (5% of it), whose figures the HMIS lead
+// imports from a CSV checked against the NHFR sample's places imported above.
+const populationDraft = spawnSync(centralBin, ['package', 'draft', resolve(import.meta.dirname, '../../../packages/reference-packages/population'), '--by', author], { env, stdio: 'inherit' })
+if (populationDraft.status !== 0) throw new Error('drafting the Population reference package failed')
 if (seedPatients > 0) {
   const token = await signIn(CENTRAL, ORIGIN, USERS.admin, 'KAM013')
   const generated = seed(syntheticBin, dir, CENTRAL, token, seedPatients)

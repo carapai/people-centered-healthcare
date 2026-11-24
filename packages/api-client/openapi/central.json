@@ -4389,7 +4389,8 @@
           "age-band-set",
           "indicator",
           "report",
-          "dashboard"
+          "dashboard",
+          "population"
         ]
       },
       "StudioDesignPackage": {
@@ -5392,7 +5393,8 @@
           "country-configuration",
           "override",
           "language",
-          "reporting"
+          "reporting",
+          "population"
         ]
       },
       "StudioPackageList": {

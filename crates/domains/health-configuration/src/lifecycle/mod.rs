@@ -90,7 +90,8 @@ pub fn approvals_required(kind: PackageKind) -> usize {
         PackageKind::CountryConfiguration
         | PackageKind::Override
         | PackageKind::Language
-        | PackageKind::Reporting => 1,
+        | PackageKind::Reporting
+        | PackageKind::Population => 1,
     }
 }
 

@@ -327,3 +327,37 @@ async fn a_reporting_package_lists_its_reports_and_dashboards() {
         ]
     );
 }
+
+/// A Population package's estimates (#553), from `configuration/population.json`, under their
+/// year.
+#[tokio::test]
+async fn a_population_package_lists_its_estimates() {
+    let central = central().await;
+    let publications = &central.publications;
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../packages/reference-packages/population");
+    let mut files = Files::new();
+    for path in [
+        "package.json",
+        "Library-manifest.json",
+        "configuration/population.json",
+    ] {
+        files.insert(path.into(), std::fs::read(dir.join(path)).expect("read"));
+    }
+    publications.draft(&files, "ann").await.expect("draft");
+    let designs = publications.studio_designs("ann").await.expect("designs");
+    assert_eq!(designs.packages[0].kind, PackageKind::Population);
+    let found: Vec<_> = designs
+        .designs
+        .iter()
+        .map(|d| (d.kind, d.title.as_str(), d.path.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [(
+            DesignKind::Population,
+            "Population estimates 2026",
+            "configuration/population.json"
+        )]
+    );
+}

@@ -20,6 +20,7 @@ use serde_json::Value;
 use health_analytics_app::is_age_band_set;
 
 use crate::dashboards::dashboards_in;
+use crate::population::estimates_in;
 use crate::reports::reports_in;
 use crate::workflows::workflow_definitions;
 use crate::{Error, Publications, failed, lifecycle_id};
@@ -49,6 +50,9 @@ pub enum DesignKind {
     /// A standard Dashboard in a Reporting package, `configuration/dashboards/<id>.json`
     /// (#603, #879).
     Dashboard,
+    /// A year's Population Estimates in a Population package, `configuration/population.json`
+    /// (#553).
+    Population,
 }
 
 /// One designed artefact, in the package version it opens in.
@@ -199,6 +203,20 @@ pub fn designs_in(packed: &Packed, package: &str, id: &str) -> Vec<Design> {
             .filter(|t| !t.trim().is_empty())
             .unwrap_or_else(|| path.clone());
         found.push(design(DesignKind::Report, title, &path, None, None, None));
+    }
+    for (path, estimates) in estimates_in(&packed.files) {
+        let title = estimates
+            .ok()
+            .map(|e| format!("Population estimates {}", e.year))
+            .unwrap_or_else(|| path.clone());
+        found.push(design(
+            DesignKind::Population,
+            title,
+            &path,
+            None,
+            None,
+            None,
+        ));
     }
     for (path, dashboard) in dashboards_in(packed) {
         let title = dashboard
