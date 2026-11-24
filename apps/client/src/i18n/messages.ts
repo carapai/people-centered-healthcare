@@ -3863,6 +3863,8 @@ type IndicatorValues = {
   inMappingNone: {}
   inMappingRow: { title: string; section: string; label: string }
   inMappingWhere: { package: string; published: string; pinned: string; sent: string }
+  inMappingCell: { bands: string; element: string; combo: string; dataSet: string; from: string; to: string }
+  inMappingWhole: {}
 }
 
 export const indicatorMessages = defineMessages<IndicatorValues>({
@@ -4013,6 +4015,8 @@ export const indicatorMessages = defineMessages<IndicatorValues>({
   inMapping: { id: 'app.studio.indicator.mapping', defaultMessage: 'HMIS mapping', description: 'Indicator editor: where Reports lay the indicator out' },
   inMappingHint: { id: 'app.studio.indicator.mappingHint', defaultMessage: "Read-only: the rows of Reports that lay this indicator out. Mappings are edited in the Reporting package's Report designer.", description: 'Indicator editor' },
   inMappingNone: { id: 'app.studio.indicator.mappingNone', defaultMessage: 'No Report lays this indicator out yet.', description: 'Indicator editor' },
+  inMappingCell: { id: 'app.studio.indicator.mappingCell', defaultMessage: '{bands}: DHIS2 {element} · {combo} in {dataSet}, from {from}{to, select, none {} other { to {to}}}', description: "Indicator editor: one DHIS2 mapping of one cell of a Report row (its bands, data element, category option combo, data set and the dates it is in effect)" },
+  inMappingWhole: { id: 'app.studio.indicator.mappingWhole', defaultMessage: 'Total', description: 'Indicator editor: a DHIS2 mapping of a Report row as a whole, with no band' },
   inMappingRow: { id: 'app.studio.indicator.mappingRow', defaultMessage: '{title}, {section}: {label}', description: 'Indicator editor: a Report row laying the indicator out' },
   inMappingWhere: {
     id: 'app.studio.indicator.mappingWhere',
@@ -4156,6 +4160,15 @@ type ReportValues = {
   rdDhis2Combo: {}
   rdSentIfMapped: {}
   rdNotMapped: {}
+  rdDhis2DataSet: {}
+  rdDhis2Effect: {}
+  rdDhis2From: {}
+  rdDhis2To: {}
+  rdDhis2Zero: {}
+  rdDhis2Add: {}
+  rdDhis2Remove: {}
+  rdDhis2Field: { field: string; cell: string; n: number }
+  rdCellMapped: { element: string; combo: string; from: string; to: string }
 }
 
 export const reportMessages = defineMessages<ReportValues>({
@@ -4282,9 +4295,10 @@ export const reportMessages = defineMessages<ReportValues>({
   rdCellPrevious: { id: 'app.studio.report.cellPrevious', defaultMessage: 'Previous period ({period}): {value}', description: 'Report designer' },
   rdCellNobody: { id: 'app.studio.report.cellNobody', defaultMessage: 'Nobody counted.', description: 'Report designer' },
   rdCellCounted: { id: 'app.studio.report.cellCounted', defaultMessage: 'Who it counted: {names}', description: 'Report designer' },
-  rdCellMapping: { id: 'app.studio.report.cellMapping', defaultMessage: 'DHIS2 mapping: none yet. Mappings are added with #560.', description: 'Report designer' },
+  rdCellMapping: { id: 'app.studio.report.cellMapping', defaultMessage: 'DHIS2: not mapped. Map it in the DHIS2 mapping sheet below.', description: 'Report designer: a cell of a sent section with no DHIS2 mapping' },
+  rdCellMapped: { id: 'app.studio.report.cellMapped', defaultMessage: 'DHIS2: {element} · {combo}, from {from}{to, select, none {} other { to {to}}}', description: 'Report designer: one DHIS2 mapping of the selected cell' },
   rdDhis2: { id: 'app.studio.report.dhis2', defaultMessage: 'DHIS2 mapping', description: 'Report designer' },
-  rdDhis2Hint: { id: 'app.studio.report.dhis2Hint', defaultMessage: 'Every cell of the sections sent to DHIS2, each to be mapped to a data element and category option combo with effective dates (#560). Totals and not recorded bands are sent only if mapped.', description: 'Report designer' },
+  rdDhis2Hint: { id: 'app.studio.report.dhis2Hint', defaultMessage: 'Every cell of the sections sent to DHIS2, each mapped to a data set, data element and category option combo, in effect from a date and, when the form is revised, up to one. Validation checks the IDs against the DHIS2 instance’s metadata recorded at central. Totals and not recorded bands are sent only if mapped.', description: 'Report designer' },
   rdDhis2None: { id: 'app.studio.report.dhis2None', defaultMessage: 'No section is sent to DHIS2.', description: 'Report designer' },
   rdDhis2Section: { id: 'app.studio.report.dhis2Section', defaultMessage: 'Section', description: 'Report designer' },
   rdDhis2Row: { id: 'app.studio.report.dhis2Row', defaultMessage: 'Indicator', description: 'Report designer' },
@@ -4293,6 +4307,14 @@ export const reportMessages = defineMessages<ReportValues>({
   rdDhis2Combo: { id: 'app.studio.report.dhis2Combo', defaultMessage: 'Category option combo', description: 'Report designer' },
   rdSentIfMapped: { id: 'app.studio.report.sentIfMapped', defaultMessage: '(sent only if mapped)', description: 'Report designer' },
   rdNotMapped: { id: 'app.studio.report.notMapped', defaultMessage: 'Not mapped yet', description: 'Report designer' },
+  rdDhis2DataSet: { id: 'app.studio.report.dhis2DataSet', defaultMessage: 'Data set', description: 'Report designer: DHIS2 mapping sheet column' },
+  rdDhis2Effect: { id: 'app.studio.report.dhis2Effect', defaultMessage: 'In effect', description: 'Report designer: DHIS2 mapping sheet column, the dates a mapping is in effect' },
+  rdDhis2From: { id: 'app.studio.report.dhis2From', defaultMessage: 'From', description: 'Report designer: the first day a DHIS2 mapping is in effect' },
+  rdDhis2To: { id: 'app.studio.report.dhis2To', defaultMessage: 'To (blank: until further notice)', description: 'Report designer: the last day a DHIS2 mapping is in effect' },
+  rdDhis2Zero: { id: 'app.studio.report.dhis2Zero', defaultMessage: 'Zeros are significant', description: 'Report designer: a DHIS2 mapping sends a zero as a zero, not as a deletion' },
+  rdDhis2Add: { id: 'app.studio.report.dhis2Add', defaultMessage: '+ mapping', description: 'Report designer: adds a DHIS2 mapping to a cell (the first, or one for a revised form)' },
+  rdDhis2Remove: { id: 'app.studio.report.dhis2Remove', defaultMessage: 'Remove mapping', description: 'Report designer' },
+  rdDhis2Field: { id: 'app.studio.report.dhis2Field', defaultMessage: '{field}, {cell}, mapping {n}', description: 'Report designer: the accessible name of one field of one DHIS2 mapping of a cell' },
 })
 
 // The Dashboard designer (#879; studio.md § Dashboards): a standard Dashboard in a Reporting

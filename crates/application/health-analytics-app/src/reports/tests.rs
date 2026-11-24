@@ -133,6 +133,7 @@ fn report() -> ReportDefinition {
             row_totals: true,
             change: true,
             send_to_dhis2: false,
+            mappings: Vec::new(),
         })],
     }
 }

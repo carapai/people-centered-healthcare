@@ -10,14 +10,19 @@ import {
   addAttribute,
   addConcept,
   addLineList,
+  addMapping,
   addRow,
   addTable,
   addVisitType,
   newReport,
+  isOfCell,
   readReport,
+  removeMapping,
+  removeRow,
   toggleLevel,
   updateSection,
   withList,
+  withMapping,
   withOptions,
   withRowPer,
   withSettings,
@@ -34,6 +39,12 @@ const BANDS = 'https://health.go.ug/fhir/Library/age-bands-anc|1.0.0'
 const M = 'https://health.go.ug/fhir/Measure/'
 const ANC = 'https://health.go.ug/fhir/PlanDefinition/anc'
 const GA = { system: 'http://loinc.org', code: '18185-9' }
+const AGE_COMBOS = [
+  ['10-14', 'Age1014Smpl'],
+  ['15-19', 'Age1519Smpl'],
+  ['20-24', 'Age2024Smpl'],
+  ['25+', 'Age25upSmpl'],
+] as const
 
 /** The designer's steps on the last section added. */
 function last<K extends 'table' | 'lineList'>(report: Report, kind: K, change: Parameters<typeof updateSection<K>>[3]): Report {
@@ -49,7 +60,17 @@ describe('building the sample Reports in the designer', () => {
       let t: TableSection = { ...addAgeBands(s, BANDS), id: 'attendance' }
       t = addRow(t, `${M}anc-first-visits|1.0.0`, 'ANC 1st visit for women', 'first-visits')
       t = addRow(t, `${M}anc-visits|1.0.0`, 'ANC visits (all)', 'visits')
-      return withOptions(t, { rowTotals: true, change: true, sendToDhis2: true })
+      t = withOptions(t, { rowTotals: true, change: true, sendToDhis2: true })
+      // #560: each cell mapped to the (illustrative) HMIS 105 data elements, by age band.
+      for (const [row, element] of [
+        ['first-visits', 'An01aSample'],
+        ['visits', 'An02xSample'],
+      ] as const)
+        for (const [band, combo] of AGE_COMBOS) {
+          t = addMapping(t, row, { [BANDS]: band }, '2024-07-01')
+          t = withMapping(t, t.mappings.length - 1, { dataSet: 'Hmis105Smpl', dataElement: element, categoryOptionCombo: combo })
+        }
+      return t
     })
     report = addTable(report, '2.2 Timing of the 1st visit')
     report = last(report, 'table', (s) => {
@@ -95,6 +116,33 @@ describe('building the sample Reports in the designer', () => {
       expect(JSON.stringify(writeReport(read.report))).toBe(JSON.stringify(fixture))
     }
     expect(readReport('{"id":"x"}')).toEqual({ refusal: 'not written to the report/1 schema' })
+  })
+
+  // #560: a cell's DHIS2 mappings, one after another as the form is revised.
+  test('a cell is mapped, revised from the day after its mapping ends, and its row takes its mappings with it', () => {
+    const read = readReport(JSON.stringify(hmis105))
+    if ('refusal' in read) throw new Error(read.refusal)
+    const attendance = read.report.sections[0] as TableSection
+    const teens = { [BANDS]: '15-19' }
+    expect(attendance.mappings.filter((mapping) => isOfCell(mapping, 'first-visits', teens))).toEqual([
+      { row: 'first-visits', bands: teens, dataSet: 'Hmis105Smpl', dataElement: 'An01aSample', categoryOptionCombo: 'Age1519Smpl', from: '2024-07-01' },
+    ])
+    // The cell's mapping ends with the 2024 form; the revision copies its IDs from the day after.
+    let t = withMapping(attendance, 1, { to: '2026-06-30' })
+    t = addMapping(t, 'first-visits', teens, '2026-11-24')
+    expect(t.mappings.at(-1)).toEqual({ row: 'first-visits', bands: teens, dataSet: 'Hmis105Smpl', dataElement: 'An01aSample', categoryOptionCombo: 'Age1519Smpl', from: '2026-07-01' })
+    // A cell never mapped starts empty, from the day given; a Total names no band.
+    const total = addMapping(t, 'visits', {}, '2026-11-24').mappings.at(-1)
+    expect(total).toEqual({ row: 'visits', bands: {}, dataSet: '', dataElement: '', categoryOptionCombo: '', from: '2026-11-24' })
+    expect(isOfCell(total!, 'visits', {})).toBe(true)
+    expect(isOfCell(total!, 'visits', teens)).toBe(false)
+    // Written in the schema's key order, an empty end and band list left out, zeros kept.
+    const zero = withMapping(addMapping(t, 'visits', {}, '2026-11-24'), t.mappings.length, { to: '', zeroIsSignificant: true })
+    const written = writeReport({ ...read.report, sections: [zero] }).sections as { mappings: unknown[] }[]
+    expect(JSON.stringify(written[0]?.mappings.at(-1))).toBe('{"row":"visits","dataSet":"","dataElement":"","categoryOptionCombo":"","from":"2026-11-24","zeroIsSignificant":true}')
+    expect(removeMapping(t, t.mappings.length - 1).mappings).toHaveLength(attendance.mappings.length)
+    // Removing a row removes its cells' mappings.
+    expect(removeRow(attendance, 0).mappings.map((mapping) => mapping.row)).toEqual(['visits', 'visits', 'visits', 'visits'])
   })
 
   test('switching a line list to visits drops the enrollment choice and visit-only columns go with enrollments', () => {
@@ -234,6 +282,9 @@ describe('laying a table section out from the preview', () => {
     const sheet = sentCells([{ section: attendance, index: 0, preview }])
     expect(sheet).toHaveLength(8)
     expect(sheet.filter((c) => c.total || c.notRecorded)).toHaveLength(4)
+    // #560: each mapped band cell of the sheet finds its mapping by its bands.
+    const mapped = sheet.filter((c) => attendance.mappings.some((mapping) => isOfCell(mapping, c.row.id, Object.fromEntries(c.at.map((a) => [a.name, a.code])))))
+    expect(mapped.map((c) => `${c.row.id} ${c.at.map((a) => a.code).join()}`)).toEqual(['first-visits 15-19', 'first-visits 20-24', 'visits 15-19', 'visits 20-24'])
   })
 
   // #867, part 2: a line list's cells, as central reads them over the test patients.

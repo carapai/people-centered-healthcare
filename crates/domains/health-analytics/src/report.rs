@@ -17,13 +17,16 @@
 //!   level may not hold a median or a distinct count (they cannot be rebuilt from facility
 //!   summaries), nor a line list (patient-level records never leave the facility).
 //!
-//! What a Report sends to DHIS2 cell by cell is #560; running one is #557.
+//! - **DHIS2 mappings** ([`crate::dhis2`], #560): each cell of a section sent to DHIS2 maps to
+//!   a data set, data element and category option combo with effective dates, checked against
+//!   central's recorded copy of the instance's metadata.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::age_bands::is_pinned;
+use crate::dhis2::{CellMapping, Dhis2Metadata};
 use crate::indicator::{Aggregate, Calculation};
 use crate::period::PeriodType;
 
@@ -129,6 +132,9 @@ pub struct TableSection {
     /// Whether its cells are sent to DHIS2.
     #[serde(default, rename = "sendToDhis2")]
     pub send_to_dhis2: bool,
+    /// Its cells' DHIS2 mappings, when it is sent (#560).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mappings: Vec<CellMapping>,
 }
 
 /// What a line list has one row per.
@@ -323,6 +329,11 @@ pub struct Catalogue {
     /// The names of each indicator's disaggregations, by `url|version`: what a standard
     /// Dashboard's Visualization may split it by (#603).
     pub disaggregations: BTreeMap<String, BTreeSet<String>>,
+    /// Each Age Band Set's band codes in order (`15-19`, `25+`), by `url|version`: the cells a
+    /// section sent to DHIS2 maps (#560).
+    pub age_band_codes: BTreeMap<String, Vec<String>>,
+    /// Central's recorded copy of the DHIS2 instance's metadata, if one is recorded (#560).
+    pub dhis2: Option<Dhis2Metadata>,
 }
 
 /// Why a calculation cannot run above facility level, if it cannot.
@@ -410,6 +421,12 @@ impl ReportDefinition {
             match section {
                 Section::Table(table) => {
                     problems.extend(table_problems(table, &name, above.as_deref(), catalogue));
+                    problems.extend(crate::dhis2::section_problems(
+                        table,
+                        &name,
+                        self.period_type,
+                        catalogue,
+                    ));
                 }
                 Section::LineList(list) => {
                     if let Some(above) = &above {

@@ -577,6 +577,10 @@ DEFINE TABLE device_request_history TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD version_id ON device_request_history TYPE string PERMISSIONS FULL
   DEFINE FIELD version_seq ON device_request_history TYPE int PERMISSIONS FULL
   DEFINE INDEX device_request_history_last_updated ON device_request_history FIELDS last_updated, version_seq
+DEFINE TABLE dhis2_metadata TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
+  DEFINE FIELD export ON dhis2_metadata TYPE string PERMISSIONS FULL
+  DEFINE FIELD recorded_at ON dhis2_metadata TYPE datetime PERMISSIONS FULL
+  DEFINE FIELD recorded_by ON dhis2_metadata TYPE string PERMISSIONS FULL
 DEFINE TABLE diagnostic_report TYPE NORMAL SCHEMAFULL PERMISSIONS NONE
   DEFINE FIELD deleted ON diagnostic_report TYPE bool PERMISSIONS FULL
   DEFINE FIELD index_keys ON diagnostic_report TYPE array<record> DEFAULT [] PERMISSIONS FULL

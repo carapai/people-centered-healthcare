@@ -348,6 +348,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0064_saved_dashboards",
         sql: include_str!("../migrations/0064_saved_dashboards.surql"),
     },
+    Migration {
+        version: 65,
+        name: "0065_dhis2_metadata",
+        sql: include_str!("../migrations/0065_dhis2_metadata.surql"),
+    },
 ];
 
 /// The ledger of applied migrations, defined before anything else runs.

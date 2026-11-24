@@ -55,6 +55,8 @@
 //! - **Threshold bands** ([`threshold`], #600): an indicator may carry a legend set, ranges of
 //!   its figure read as good, warning or bad, which every Visualization colours figures by.
 //!   Bands never overlap ([`threshold_bands`]).
+//! - **DHIS2 mappings** ([`dhis2`], #560): each cell of a Report section sent to DHIS2 maps to a
+//!   data set, data element and category option combo with effective dates.
 //! - **Saved Dashboards** ([`dashboard`], #602): Visualizations and Dashboards users holding
 //!   `analytics.author` save at central, shared with a person, a role or a place level
 //!   ([`SavedDashboard::visible_to`]).
@@ -68,6 +70,7 @@
 pub mod age_bands;
 pub mod calculate;
 pub mod dashboard;
+pub mod dhis2;
 pub mod disaggregation;
 pub mod estimates;
 pub mod indicator;
@@ -88,6 +91,7 @@ pub use calculate::{
     Reason, RecordOutcome, RecordPart, RollUpError, Summary, Values, calculate,
 };
 pub use dashboard::{SavedDashboard, SavedDashboards, SavedVisualization, Share, Viewer};
+pub use dhis2::{CellMapping, DataSetsExport, Dhis2Metadata, dhis2_period_type};
 pub use disaggregation::{
     Disaggregation, DisaggregationDefinition, DisaggregationSource, NOT_RECORDED,
 };

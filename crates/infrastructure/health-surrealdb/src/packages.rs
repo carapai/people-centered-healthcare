@@ -2,6 +2,9 @@
 //! `health-publication`: each lifecycle, its records and each published package as JSON, with
 //! the columns lookups need. Tarballs are blobs, outside the database.
 //!
+//! Central's recorded copy of the DHIS2 instance's metadata (migration `0065_dhis2_metadata`;
+//! #560) is kept here too: what Validation checks a Report's DHIS2 mappings against.
+//!
 //! Package activation records (migration `0049_package_activation`; #89) are kept here too: on
 //! central, where publication issues them, and on every node they reach by sync.
 
@@ -461,5 +464,28 @@ impl SurrealTx {
             )
             .await?;
         Ok(all(rows))
+    }
+
+    /// Records `export`, the DHIS2 instance's metadata as it exported it, by `by`, replacing
+    /// any copy recorded before (migration `0065_dhis2_metadata`; #560).
+    pub async fn put_dhis2_metadata(&mut self, export: &str, by: &str) -> Result<(), WriteError> {
+        self.run(
+            "UPSERT dhis2_metadata:instance CONTENT { export: $export, recorded_by: $by, \
+             recorded_at: time::now() } RETURN NONE",
+            vec![("export", export.to_owned()), ("by", by.to_owned())],
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// The recorded copy of the DHIS2 instance's metadata, as exported, if one is recorded.
+    pub async fn dhis2_metadata(&mut self) -> Result<Option<String>, StoreError> {
+        let rows = self
+            .rows(
+                "SELECT VALUE [export] FROM dhis2_metadata:instance",
+                Vec::new(),
+            )
+            .await?;
+        Ok(first(rows))
     }
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://carapai.github.io/people-centered-healthcare/fhir/schema/report/1",
   "title": "Report",
-  "description": "A Report in a Reporting package (ADR 0070, ADR 0072): a title, one period type, the levels it runs for, and sections, each a table of indicator rows with its own Disaggregations or a line list. What the schema cannot say (pinned versions, facility-only calculations and line lists) Validation checks.",
+  "description": "A Report in a Reporting package (ADR 0070, ADR 0072): a title, one period type, the levels it runs for, and sections, each a table of indicator rows with its own Disaggregations or a line list. What the schema cannot say (pinned versions, facility-only calculations and line lists, and DHIS2 mappings against the instance's metadata) Validation checks.",
   "type": "object",
   "required": ["$schema", "id", "title", "periodType"],
   "additionalProperties": false,
@@ -61,7 +61,24 @@
         "columnTotals": { "type": "boolean" },
         "rowTotals": { "type": "boolean" },
         "change": { "type": "boolean" },
-        "sendToDhis2": { "type": "boolean" }
+        "sendToDhis2": { "type": "boolean" },
+        "mappings": { "type": "array", "items": { "$ref": "#/$defs/mapping" } }
+      }
+    },
+    "mapping": {
+      "description": "One cell of a section sent to DHIS2 (an indicator row at a band of each Disaggregation, by its name; a side left out is that side's Total) mapped to a DHIS2 data set, data element and category option combo, in effect from a date and optionally up to one (#560).",
+      "type": "object",
+      "required": ["row", "dataSet", "dataElement", "categoryOptionCombo", "from"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "type": "string" },
+        "bands": { "type": "object", "additionalProperties": { "type": "string" } },
+        "dataSet": { "type": "string" },
+        "dataElement": { "type": "string" },
+        "categoryOptionCombo": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "zeroIsSignificant": { "type": "boolean" }
       }
     },
     "lineList": {

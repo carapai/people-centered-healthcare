@@ -12,7 +12,11 @@
 //!   Visualization references an unknown indicator fails, and once the package is published
 //!   its newest version's Dashboards are listed.
 //! - an indicator's HMIS mapping (#864): the rows of Reports laying it out, in the newest
-//!   published version and the open draft.
+//!   published version and the open draft, each with its cells' DHIS2 mappings (#560);
+//! - DHIS2 mappings (#560), checked against central's recorded copy of the instance's metadata
+//!   (`packages/reference-packages/dhis2`): an unmapped count cell, a data element missing from
+//!   the metadata and two mappings in effect on the same dates each fail Validation, and without
+//!   a recorded copy the mappings cannot be checked.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -157,11 +161,23 @@ async fn publish(central: &Central, files: &Files) {
         .expect("publish");
 }
 
-/// Central with the national core and the ANC indicators published.
+/// The recorded copy of the DHIS2 instance's metadata the reference mappings use
+/// (`packages/reference-packages/dhis2/ehmis-metadata.json`, illustrative IDs).
+fn ehmis_metadata() -> String {
+    std::fs::read_to_string(root().join("dhis2/ehmis-metadata.json")).expect("metadata")
+}
+
+/// Central with the national core and the ANC indicators published, and the DHIS2 instance's
+/// metadata recorded.
 async fn with_indicators() -> Central {
     let central = central().await;
     publish(&central, &package("core")).await;
     publish(&central, &package("anc")).await;
+    central
+        .publications
+        .record_dhis2_metadata(&ehmis_metadata(), "hmis-lead")
+        .await
+        .expect("metadata recorded");
     central
 }
 
@@ -242,6 +258,7 @@ async fn a_report_pins_indicator_and_age_band_set_versions() {
             json!("https://health.go.ug/fhir/Measure/anc-first-visits");
         section["rows"][1]["indicator"] =
             json!("https://health.go.ug/fhir/Measure/anc-visits|3.0.0");
+        section["mappings"] = json!([]);
     });
     let (_, stage, problems) = submit(&central, &versioned(unpinned, "1.0.1")).await;
     assert_eq!(stage, Stage::Draft);
@@ -435,6 +452,20 @@ async fn an_indicators_mapping_lists_the_report_rows_laying_it_out() {
         rows(&found),
         [row("ug.moh.hmis@1.0.0", true, "ANC 1st visit for women")]
     );
+    // Each row carries its cells' DHIS2 mappings (#560).
+    assert_eq!(
+        found[0]
+            .mappings
+            .iter()
+            .map(|m| (m.data_element.as_str(), m.category_option_combo.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("An01aSample", "Age1014Smpl"),
+            ("An01aSample", "Age1519Smpl"),
+            ("An01aSample", "Age2024Smpl"),
+            ("An01aSample", "Age25upSmpl"),
+        ]
+    );
     // An open draft that relabels the row is listed beside the published version.
     let mut relabelled = versioned(package("hmis"), "1.1.0");
     let mut report = json_of(&relabelled, HMIS_105);
@@ -466,4 +497,112 @@ async fn an_indicators_mapping_lists_the_report_rows_laying_it_out() {
             .expect("none"),
         []
     );
+}
+
+const ATTENDANCE: &str = "section 1 (2.1 ANC attendance)";
+
+/// Every problem of the HMIS package with the HMIS 105 Report edited by `edit`, at version
+/// `version`.
+async fn hmis_problems(
+    central: &Central,
+    version: &str,
+    edit: impl FnOnce(&mut Value),
+) -> Vec<String> {
+    let (_, stage, problems) = submit(central, &versioned(hmis_105(edit), version)).await;
+    assert_eq!(stage, Stage::Draft);
+    problems
+}
+
+#[tokio::test]
+async fn an_unmapped_count_cell_in_a_sent_section_fails_validation() {
+    let central = with_indicators().await;
+    let problems = hmis_problems(&central, "1.0.1", |report| {
+        report["sections"][0]["mappings"]
+            .as_array_mut()
+            .expect("mappings")
+            .remove(5);
+    })
+    .await;
+    assert_eq!(
+        problems,
+        [format!(
+            "{HMIS_105}: {ATTENDANCE}: row 2 (ANC visits (all)) at 15-19 is not mapped to DHIS2"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_mapping_to_a_data_element_missing_from_the_instance_fails_validation() {
+    let central = with_indicators().await;
+    let problems = hmis_problems(&central, "1.0.1", |report| {
+        report["sections"][0]["mappings"][0]["dataElement"] = json!("An01bSample");
+    })
+    .await;
+    assert_eq!(
+        problems,
+        [format!(
+            "{HMIS_105}: {ATTENDANCE}'s DHIS2 mapping 1 (row 1 (ANC 1st visit for women) at 10-14): the data element An01bSample is not in the DHIS2 instance's metadata"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn two_mappings_in_effect_on_the_same_dates_fail_validation() {
+    let central = with_indicators().await;
+    let problems = hmis_problems(&central, "1.0.1", |report| {
+        let mappings = report["sections"][0]["mappings"]
+            .as_array_mut()
+            .expect("mappings");
+        let mut revised = mappings[0].clone();
+        revised["from"] = json!("2019-07-01");
+        revised["to"] = json!("2024-07-31");
+        mappings.push(revised);
+    })
+    .await;
+    assert_eq!(
+        problems,
+        [format!(
+            "{HMIS_105}: {ATTENDANCE}: two DHIS2 mappings of row 1 (ANC 1st visit for women) at 10-14 are in effect on the same dates (2024-07-01 to further notice and 2019-07-01 to 2024-07-31)"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn without_the_instances_metadata_recorded_mappings_cannot_be_checked() {
+    let central = central().await;
+    publish(&central, &package("core")).await;
+    publish(&central, &package("anc")).await;
+    let (_, stage, problems) = submit(&central, &package("hmis")).await;
+    assert_eq!(stage, Stage::Draft);
+    assert_eq!(
+        problems,
+        [format!(
+            "{HMIS_105}: {ATTENDANCE}'s DHIS2 mappings cannot be checked: no copy of the DHIS2 instance's metadata is recorded at central"
+        )]
+    );
+    // A file that is not a dataSets export is not recorded.
+    for refused in ["[]", "{}"] {
+        assert!(
+            central
+                .publications
+                .record_dhis2_metadata(refused, "hmis-lead")
+                .await
+                .is_err()
+        );
+    }
+    let recorded = central
+        .publications
+        .record_dhis2_metadata(&ehmis_metadata(), "hmis-lead")
+        .await
+        .expect("recorded");
+    assert_eq!(
+        recorded.data_sets,
+        [(
+            "Hmis105Smpl".to_owned(),
+            "HMIS 105: Health unit outpatient monthly report (illustrative IDs)".to_owned(),
+            2
+        )]
+    );
+    let (_, stage, problems) = submit(&central, &versioned(package("hmis"), "1.0.1")).await;
+    assert_eq!((stage, problems), (Stage::Review, Vec::new()));
 }

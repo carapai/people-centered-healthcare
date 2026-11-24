@@ -2996,7 +2996,31 @@ async fn an_indicators_mapping_lists_the_report_rows_laying_it_out() {
             "label": "ANC 1st visit before 12 weeks (%)",
             "indicator": format!("{url}|1.0.0"),
             "sentToDhis2": false,
+            "mappings": [],
         }])
+    );
+    // A row of a sent section carries its cells' DHIS2 mappings (#560).
+    let first = "https://health.go.ug/fhir/Measure/anc-first-visits";
+    let (status, body) = call(
+        &publications,
+        author(),
+        "GET",
+        &format!("/indicator-mappings?url={}", urlencoding(first)),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body[0]["sentToDhis2"], true);
+    assert_eq!(
+        body[0]["mappings"][1],
+        json!({
+            "bands": { "https://health.go.ug/fhir/Library/age-bands-anc|1.0.0": "15-19" },
+            "dataSet": "Hmis105Smpl",
+            "dataElement": "An01aSample",
+            "categoryOptionCombo": "Age1519Smpl",
+            "from": "2024-07-01",
+            "to": null,
+        })
     );
     let (status, body) = call(
         &publications,
