@@ -22,16 +22,23 @@
 //!   all of them with their dates, or how many; a visit row shows its latest.
 //!
 //! Rows come in the order the patients are given, then by start or visit date.
+//!
+//! **On a Facility Edge Node** ([`facility_rows`], #557): over the facility's own patients'
+//! records, never anywhere else (ADR 0072). *Only those counted by* reads the indicator's kept
+//! membership for the period (what the node computed it from), so the rows are exactly those its
+//! summary counted, and only the patients counted are read. Enrollments and visits another
+//! facility recorded are that facility's, as they are for its indicators.
 
 use std::collections::BTreeSet;
 
 use health_analytics::{
-    Code, Enrollments, Evaluation, LineListSection, ListColumn, ListPick, Period, Reason, RowPer,
-    local_date,
+    AgeBandSet, Code, Enrollments, Evaluation, Indicator, IndicatorStore, LineListSection,
+    ListColumn, ListPick, Period, Reason, RowPer, local_date,
 };
 use jiff::civil::Date;
 use serde_json::Value;
 
+use crate::incremental::{Indicators, facility_of};
 use crate::{PatientRecords, enrollment, extension, text};
 
 /// On an EpisodeOfCare: the program it is an enrollment in (`valueCanonical`).
@@ -431,3 +438,56 @@ fn read(row: &Row<'_>, list: &LineListSection, record: &str) -> ListRow {
 
 #[cfg(test)]
 mod tests;
+
+/// A line list's rows at `facility` for `period`, over the patients `store` keeps (#557): with
+/// *only those counted by*, the indicator's kept membership (`indicators` are those the node
+/// computes, `sets` the Age Band Sets they pin) says which; a record tagged with another
+/// facility is left out. Each row comes with the patient's name, if they have one.
+pub async fn facility_rows<T: IndicatorStore>(
+    store: &mut T,
+    list: &LineListSection,
+    program: &ProgramType,
+    with: (&[Indicator], &[AgeBandSet]),
+    period: &Period,
+    facility: &str,
+) -> Result<Vec<(Option<String>, ListRow)>, String> {
+    let (indicators, sets) = with;
+    let (patients, counted) = match &list.counted_by {
+        None => (store.patient_ids().await.map_err(|e| e.to_string())?, None),
+        Some(reference) => {
+            let indicator = indicators
+                .iter()
+                .find(|i| i.canonical() == *reference)
+                .ok_or_else(|| format!("no indicator is {reference} here"))?;
+            let members = store
+                .members(reference, period)
+                .await
+                .map_err(|e| e.to_string())?;
+            let evaluation = health_analytics::calculate(indicator, period, &members, sets);
+            let ids: Vec<String> = evaluation
+                .counted()
+                .filter_map(|m| m.patient.strip_prefix("Patient/").map(str::to_owned))
+                .collect();
+            (ids, Some(counted(&evaluation)))
+        }
+    };
+    let mut read = Vec::with_capacity(patients.len());
+    for id in &patients {
+        if let Some(mut patient) = Indicators::records(store, id).await? {
+            patient
+                .records
+                .retain(|r| facility_of(r).is_none_or(|f| f == facility));
+            read.push(patient);
+        }
+    }
+    Ok(rows(list, program, &read, period, counted.as_ref())
+        .into_iter()
+        .map(|row| {
+            let name = read
+                .iter()
+                .find(|p| p.reference() == row.patient)
+                .and_then(PatientRecords::name);
+            (name, row)
+        })
+        .collect())
+}

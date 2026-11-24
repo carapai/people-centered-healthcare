@@ -22,7 +22,10 @@
 //! - `GET /api/analytics/reports` and `POST /api/analytics/reports/run` (#557): the active
 //!   Reporting packages' Reports that run at facility level ([`reports_here`]), run for the
 //!   facility over the node's own summaries, offline ([`run_here`]), as central runs them for a
-//!   district. Any other place is refused (403). Line lists wait for #557's second part.
+//!   district. Any other place is refused (403). A line list section runs here only, over the
+//!   facility's own patients (ADR 0072): its program is the active packages' PlanDefinition, and
+//!   *only those counted by* reads the indicator's kept membership
+//!   (`health_analytics_app::line_list::facility_rows`).
 //!
 //! A percentage or rate over a Population Estimate type (#553; ADR 0071) is the facility's count
 //! over its own estimate for the period: the node keeps only its own place's figures of the
@@ -44,6 +47,7 @@ use health_analytics_app::dashboards::standard_json;
 use health_analytics_app::explore::{
     ExplorePlace, OwnSummaries, cells_json, explore, indicator_json, periods_json, read_question,
 };
+use health_analytics_app::line_list::{ProgramType, facility_rows};
 use health_analytics_app::reports::{RunPlace, RunWith, listed_json, run_report};
 use health_files::FsBlobStore;
 use health_persistence::Store as _;
@@ -342,12 +346,99 @@ pub async fn run_here(
     let mut answer = run_report(&mut own, report, &run, &period, &with, "facility")
         .await
         .map_err(unavailable)?;
+    for (at, section) in report.sections.iter().enumerate() {
+        if let health_analytics::Section::LineList(list) = section {
+            answer["sections"][at]["list"] =
+                line_list_here(&mut tx, active, list, &period, facility).await;
+        }
+    }
     answer["report"] = json!({
         "id": wanted,
         "title": report.title,
         "package": format!("{package}@{version}"),
     });
     Ok(answer)
+}
+
+/// The PlanDefinition `canonical` (`url`, or `url|version`) names among the active packages'
+/// top-level files.
+fn plan_named(packages: &[(String, health_packages::Files)], canonical: &str) -> Option<Value> {
+    let (url, version) = match canonical.split_once('|') {
+        Some((url, version)) => (url, Some(version)),
+        None => (canonical, None),
+    };
+    packages
+        .iter()
+        .flat_map(|(_, files)| files.iter())
+        .filter(|(path, _)| !path.contains('/') && path.ends_with(".json"))
+        .filter_map(|(_, bytes)| serde_json::from_slice::<Value>(bytes).ok())
+        .find(|plan| {
+            plan["resourceType"] == "PlanDefinition"
+                && plan["url"] == url
+                && version.is_none_or(|v| plan["version"] == v)
+        })
+}
+
+/// Line list `list` run for `facility` over `period` (#557): its program, and its rows over
+/// the facility's own patients, or why it could not run.
+async fn line_list_here<T: health_analytics::IndicatorStore>(
+    tx: &mut T,
+    active: &Active<'_>,
+    list: &health_analytics::LineListSection,
+    period: &Period,
+    facility: &str,
+) -> Value {
+    let failed =
+        |program: Value, why: String| json!({ "program": program, "rows": [], "error": why });
+    let Some(plan) = plan_named(active.packages, &list.program) else {
+        return failed(
+            Value::Null,
+            format!("no active program is {}", list.program),
+        );
+    };
+    let program = match health_programs_app::program(&plan) {
+        Ok(program) => program,
+        Err(why) => {
+            return failed(
+                Value::Null,
+                format!("{} is not a usable program: {why}", list.program),
+            );
+        }
+    };
+    let shown = json!({
+        "title": plan["title"].as_str().or_else(|| plan["name"].as_str()).unwrap_or(program.url.as_str()),
+        "episodeType": program.episode_type.text,
+    });
+    let kind = ProgramType {
+        url: program.url,
+        system: program.episode_type.system,
+        code: program.episode_type.code,
+        text: program.episode_type.text,
+    };
+    match facility_rows(
+        tx,
+        list,
+        &kind,
+        (active.indicators, active.sets),
+        period,
+        facility,
+    )
+    .await
+    {
+        Err(why) => failed(shown, why),
+        Ok(rows) => json!({
+            "program": shown,
+            "rows": rows.into_iter().map(|(name, row)| json!({
+                "patient": name.unwrap_or_else(|| row.patient.clone()),
+                "record": row.record,
+                "cells": row.cells.iter().map(|cell| cell.iter().map(|v| json!({
+                    "value": v.value,
+                    "date": v.date.map(|d| d.to_string()),
+                })).collect::<Vec<_>>()).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "error": Value::Null,
+        }),
+    }
 }
 
 #[derive(Clone)]

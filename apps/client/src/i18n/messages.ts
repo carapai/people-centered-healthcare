@@ -946,7 +946,10 @@ type ExplorerValues = {
   rpRowError: { label: string; reason: string }
   rpEstimate: { label: string; title: string; value: string }
   rpLineListCentral: {}
-  rpLineListLater: {}
+  rpListPatient: {}
+  rpListFailed: { reason: string }
+  rpListEmpty: {}
+  rpListCount: { rows: number; rowPer: string; program: string }
 }
 
 // The data explorer's strings (features/explorer; ADR 0075).
@@ -1110,11 +1113,14 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   rpNeverSynced: { id: 'app.reports.neverSynced', defaultMessage: '{name}: missing, never synced. Not counted as zero.', description: 'Reports: a facility that has never synced' },
   rpPrint: { id: 'app.reports.print', defaultMessage: 'Print or save as PDF', description: 'Reports: print button' },
   rpCsv: { id: 'app.reports.csv', defaultMessage: 'Download CSV', description: 'Reports: CSV export' },
-  rpNotShown: { id: 'app.reports.notShown', defaultMessage: '{reason, select, notBrokenDown {not broken down by {name}} crossed {crossed bands are not run from summaries yet} facilityOnly {facility level only} noIndicator {no indicator} other {n/a}}', description: 'Reports: why a cell has no figure, also in the CSV' },
+  rpNotShown: { id: 'app.reports.notShown', defaultMessage: '{reason, select, notBrokenDown {not broken down by {name}} crossed {not every facility’s figures carry crossed bands yet} facilityOnly {facility level only} noIndicator {no indicator} other {n/a}}', description: 'Reports: why a cell has no figure, also in the CSV' },
   rpRowError: { id: 'app.reports.rowError', defaultMessage: '{label}: {reason}', description: 'Reports: a row that could not be run' },
   rpEstimate: { id: 'app.reports.estimate', defaultMessage: '{label} is over {title}: {value}.', description: 'Reports: an indicator over a Population Estimate' },
   rpLineListCentral: { id: 'app.reports.lineListCentral', defaultMessage: 'This line list shows patients, so it runs on the facility’s own node, never at central.', description: 'Reports: a line list at central' },
-  rpLineListLater: { id: 'app.reports.lineListLater', defaultMessage: 'Line lists are not run here yet.', description: 'Reports: a line list on an edge' },
+  rpListPatient: { id: 'app.reports.listPatient', defaultMessage: 'Patient', description: 'Reports: a line list’s first column' },
+  rpListFailed: { id: 'app.reports.listFailed', defaultMessage: 'This line list could not be run: {reason}', description: 'Reports: a line list that could not run on the edge' },
+  rpListEmpty: { id: 'app.reports.listEmpty', defaultMessage: 'Nobody has a row in this period.', description: 'Reports: an empty line list' },
+  rpListCount: { id: 'app.reports.listCount', defaultMessage: '{rows, plural, one {# row} other {# rows}}, one per {rowPer, select, visit {visit} other {enrollment}} in {program}, from this facility’s own records.', description: 'Reports: a line list’s rows on the edge' },
 })
 
 type AccessValues = {

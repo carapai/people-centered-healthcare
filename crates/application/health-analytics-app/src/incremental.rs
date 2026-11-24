@@ -89,7 +89,7 @@ fn patients_referenced(value: &Value, found: &mut BTreeSet<String>) {
     }
 }
 
-fn facility_of(resource: &Value) -> Option<&str> {
+pub(crate) fn facility_of(resource: &Value) -> Option<&str> {
     resource["meta"]["tag"]
         .as_array()?
         .iter()
@@ -162,7 +162,7 @@ impl Indicators {
     }
 
     /// The patient `id` and their records, if they are here.
-    async fn records<T: IndicatorStore>(
+    pub(crate) async fn records<T: IndicatorStore>(
         tx: &mut T,
         id: &str,
     ) -> Result<Option<PatientRecords>, String> {

@@ -1,12 +1,13 @@
 import type { Transport } from '../../platform/types'
-import { layoutTable, type At, type Cell, type SectionPreview } from '../studio/reports/layout'
-import { REPORT_SCHEMA, readReport, type Level, type PeriodType, type Report, type TableSection } from '../studio/reports/report'
+import { layoutTable, listCellText, type At, type Cell, type ListValue, type SectionPreview } from '../studio/reports/layout'
+import { REPORT_SCHEMA, readReport, type Level, type LineListSection, type PeriodType, type Report, type TableSection } from '../studio/reports/report'
 
 // Running a Report (analytics.md § Reports; ADR 0070, ADR 0072; #557): the Reports the session
 // may run, each with the places it may be run for, and a Report run for a place and a period,
 // read from stored Indicator Reports. At central for the places in the session's area, on an edge
-// for its facility, offline. The screen and the CSV export are both drawn from `sectionGrid`, so
-// they hold the same cells.
+// for its facility, offline. The screen and the CSV export are both drawn from `sectionGrid` and
+// `listGrid`, so they hold the same cells. A line list (patient-level, ADR 0072) has rows on the
+// facility's edge only.
 
 /** A place a Report may be run for. */
 export interface ReportPlace {
@@ -56,7 +57,15 @@ export interface RunRow {
   error: string | null
 }
 
-export type RunSection = { kind: 'table'; disaggregations: SectionPreview['disaggregations']; rows: RunRow[] } | { kind: 'lineList'; rows: null }
+/** A line list run on the facility's edge (#557): its program, and a row per enrollment or visit. */
+export interface RunList {
+  program: { title: string; episodeType: string } | null
+  rows: { patient: string; record: string; cells: ListValue[][] }[]
+  error: string | null
+}
+
+/** A run's section: a table, or a line list (none at central). */
+export type RunSection = { kind: 'table'; disaggregations: SectionPreview['disaggregations']; rows: RunRow[] } | { kind: 'lineList'; list: RunList | null }
 
 /** A Report run (`POST /api/analytics/reports/run`). */
 export interface ReportRun {
@@ -173,6 +182,8 @@ export function closedPeriods(kind: PeriodType, today: Date, count: number): str
 /** The words a grid is written in, so the screen and the CSV read alike. */
 export interface GridTexts {
   indicator: string
+  /** A line list's first column. */
+  patient: string
   total: string
   value: string
   change: string
@@ -213,12 +224,21 @@ export function sectionGrid(section: TableSection, run: SectionPreview | undefin
   return { header, rows }
 }
 
-/** The run's table sections, each with its section and grid; line lists have none. */
-export function runGrids(definition: Report, run: ReportRun, texts: GridTexts): { section: TableSection; grid: Grid }[] {
-  return definition.sections.flatMap((section, n) => {
+/** Line list `section`'s rows as text: the patient, then each column's values. */
+export function listGrid(section: LineListSection, list: RunList, texts: GridTexts): Grid {
+  return {
+    header: [texts.patient, ...section.columns.map((c) => c.label)],
+    rows: list.rows.map((r) => ({ head: r.patient, cells: section.columns.map((c, n) => listCellText(r.cells[n] ?? [], c.pick === 'all')) })),
+  }
+}
+
+/** The run's sections that have cells, each with its section and grid: tables, and line lists run here. */
+export function runGrids(definition: Report, run: ReportRun, texts: GridTexts): { section: TableSection | LineListSection; grid: Grid }[] {
+  return definition.sections.flatMap((section, n): { section: TableSection | LineListSection; grid: Grid }[] => {
     const shown = run.sections[n]
-    if (section.kind !== 'table' || shown?.kind !== 'table') return []
-    return [{ section, grid: sectionGrid(section, shown, run.place.level, texts) }]
+    if (section.kind === 'table' && shown?.kind === 'table') return [{ section, grid: sectionGrid(section, shown, run.place.level, texts) }]
+    if (section.kind === 'lineList' && shown?.kind === 'lineList' && shown.list !== null && shown.list.error === null) return [{ section, grid: listGrid(section, shown.list, texts) }]
+    return []
   })
 }
 
@@ -226,8 +246,9 @@ export function runGrids(definition: Report, run: ReportRun, texts: GridTexts): 
 const field = (text: string) => (/[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text)
 
 /**
- * The run as CSV: the Report's title, place and period, then each table section's title, its
- * header and its rows, exactly the cells the screen shows; a blank line between sections.
+ * The run as CSV: the Report's title, place and period, then each section's title, its header
+ * and its rows (a table's, or a line list's run here), exactly the cells the screen shows; a
+ * blank line between sections.
  */
 export function reportCsv(definition: Report, run: ReportRun, texts: GridTexts): string {
   const lines: string[][] = [[run.report.title], [run.place.name, run.period.id]]

@@ -10,9 +10,11 @@
 //!   of a side) is computed from summed parts like any other cell.
 //! - **Bands.** Each row carries the whole and its band of each of the section's
 //!   Disaggregations, under the section's name for it (the Age Band Set's `url|version`, or the
-//!   code), with what a person reads for each band. A cell crossing several Disaggregations
-//!   needs the counted things themselves, which never leave the facility's membership, so it is
-//!   not run from summaries (yet).
+//!   code), with what a person reads for each band. A cell crossing several Disaggregations is
+//!   read from the summaries' crossings (each combination of bands' own parts, rolled up from
+//!   summed parts like a band), for the crossings the section lays out: its row Disaggregations,
+//!   its column ones, and all of them. When a facility's summary predates crossings, its crossed
+//!   cells are left out rather than summed in part.
 //! - **Estimates** (#553). An indicator whose denominator is a Population Estimate type takes
 //!   its place's estimate for the period, as the explorer does; a place with no estimate has no
 //!   figure.
@@ -24,9 +26,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use health_analytics::{
-    AgeBandSet, DisaggregationSource, FacilitySummaries, Indicator, Level, NOT_RECORDED, Period,
-    PopulationEstimates, ReportDefinition, Section, SectionDisaggregation, Summary, TableSection,
-    pinned,
+    AgeBandSet, Axis, DisaggregationSource, FacilitySummaries, Indicator, Level, NOT_RECORDED,
+    Period, PopulationEstimates, ReportDefinition, Section, SectionDisaggregation, Summary,
+    TableSection, pinned,
 };
 use jiff::Timestamp;
 use rust_decimal::RoundingStrategy;
@@ -148,6 +150,102 @@ fn figures_json(
     })
 }
 
+/// Which of a table section's Disaggregations its cells cross: those on rows, those on columns,
+/// and all of them, each when it is two or more (as the designer lays cells out).
+fn crossings(table: &TableSection) -> Vec<Vec<&SectionDisaggregation>> {
+    let side = |axis: Option<Axis>| -> Vec<&SectionDisaggregation> {
+        table
+            .disaggregations
+            .iter()
+            .filter(|d| axis.is_none_or(|a| d.axis == a) && section_name(d).is_some())
+            .collect()
+    };
+    let mut out: Vec<Vec<&SectionDisaggregation>> = Vec::new();
+    for ds in [
+        side(Some(Axis::Rows)),
+        side(Some(Axis::Columns)),
+        side(None),
+    ] {
+        if ds.len() > 1 && !out.contains(&ds) {
+            out.push(ds);
+        }
+    }
+    out
+}
+
+/// `summary`'s figure at every cell crossing each of the section's `crossings`, over the bands
+/// the section lays out (`bands`, as [`section_bands`] gives them), under the section's names. A
+/// crossing with a Disaggregation the indicator is not broken down by, or that the summary cannot
+/// tell, is left out (the page says why).
+fn crossed_json(
+    indicator: &Indicator,
+    summary: &Summary,
+    crossings: &[Vec<&SectionDisaggregation>],
+    bands: &[Value],
+) -> Vec<Value> {
+    let mut cells = Vec::new();
+    'crossing: for ds in crossings {
+        let Some(sides) = ds
+            .iter()
+            .map(|d| {
+                let at = matching(indicator, d)?;
+                let name = section_name(d)?;
+                let codes: Vec<&str> = bands.iter().find(|b| b["name"] == name)?["bands"]
+                    .as_array()?
+                    .iter()
+                    .filter_map(|b| b["code"].as_str())
+                    .collect();
+                Some((name, at, codes))
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        // The indicator keeps its crossings in its own order of disaggregations.
+        let mut order: Vec<usize> = (0..sides.len()).collect();
+        order.sort_by_key(|i| sides[*i].1);
+        let names: Vec<&str> = order
+            .iter()
+            .map(|i| indicator.disaggregations[sides[*i].1].name.as_str())
+            .collect();
+        let combos = sides
+            .iter()
+            .fold(vec![Vec::new()], |combos, (_, _, codes)| {
+                combos
+                    .iter()
+                    .flat_map(|combo: &Vec<&str>| {
+                        codes.iter().map(move |code| {
+                            let mut next = combo.clone();
+                            next.push(*code);
+                            next
+                        })
+                    })
+                    .collect()
+            });
+        let mut found = Vec::with_capacity(combos.len());
+        for combo in combos {
+            let codes: Vec<&str> = order.iter().map(|i| combo[*i]).collect();
+            let Some(cell) = summary.crossed_at(&names, &codes) else {
+                continue 'crossing;
+            };
+            found.push(json!({
+                "at": sides.iter().zip(&combo).map(|((name, _, _), code)| json!({
+                    "name": name,
+                    "code": code,
+                })).collect::<Vec<_>>(),
+                "value": cell.value.map(exact),
+                "count": cell.count,
+                "denominator": cell.denominator,
+            }));
+        }
+        cells.extend(found);
+    }
+    cells
+}
+
+/// A row's indicator, with its summary for the period run and, for % change, the one before.
+type RowSummaries<'a> = (&'a Indicator, Option<Summary>, Option<Summary>);
+
 /// The facilities expected, those missing (with their last sync) and the newest summary taken,
 /// over every figure of the period run.
 #[derive(Default)]
@@ -186,20 +284,22 @@ impl Completeness {
     }
 }
 
+/// One period's summary of a row, if it has one.
+fn summary_of(cell: Option<&Cell>) -> Option<&Summary> {
+    match cell.map(|c| &c.figure) {
+        Some(Figure::Rolled(rolled)) => rolled.summary.as_ref(),
+        _ => None,
+    }
+}
+
 /// One period's figure of a row, as a Report reads it, or none when there is none.
 fn period_json(
-    cell: Option<&Cell>,
+    summary: Option<&Summary>,
     indicator: &Indicator,
     table: &TableSection,
     sets: &[AgeBandSet],
 ) -> Value {
-    match cell.map(|c| &c.figure) {
-        Some(Figure::Rolled(rolled)) => rolled
-            .summary
-            .as_ref()
-            .map_or(Value::Null, |s| figures_json(indicator, table, s, sets)),
-        _ => Value::Null,
-    }
+    summary.map_or(Value::Null, |s| figures_json(indicator, table, s, sets))
 }
 
 /// The bands of the section's `d`, in order: an Age Band Set's from the set, a coded value's from
@@ -260,11 +360,14 @@ pub async fn run_report<S: FacilitySummaries>(
         let table = match section {
             Section::Table(table) => table,
             Section::LineList(_) => {
-                sections.push(json!({ "kind": "lineList", "rows": Value::Null }));
+                // Patient-level: filled in on the facility's edge ([`crate::line_list`]).
+                sections.push(json!({ "kind": "lineList", "list": Value::Null }));
                 continue;
             }
         };
         let mut rows = Vec::with_capacity(table.rows.len());
+        // Each row's indicator and summaries for the period and the one before, to cross.
+        let mut summaries: Vec<Option<RowSummaries<'_>>> = Vec::with_capacity(table.rows.len());
         for row in &table.rows {
             let Some(indicator) = with
                 .indicators
@@ -278,6 +381,7 @@ pub async fn run_report<S: FacilitySummaries>(
                     "previous": Value::Null,
                     "error": format!("no indicator is {}", row.indicator),
                 }));
+                summaries.push(None);
                 continue;
             };
             let mut periods = vec![period.clone()];
@@ -316,9 +420,9 @@ pub async fn run_report<S: FacilitySummaries>(
                     "title": indicator.title,
                     "calculation": calculation_code(indicator.calculation),
                 },
-                "current": period_json(now, indicator, table, with.sets),
+                "current": period_json(summary_of(now), indicator, table, with.sets),
                 "previous": if table.change {
-                    period_json(before, indicator, table, with.sets)
+                    period_json(summary_of(before), indicator, table, with.sets)
                 } else {
                     Value::Null
                 },
@@ -326,6 +430,11 @@ pub async fn run_report<S: FacilitySummaries>(
                 "estimate": estimate,
                 "error": Value::Null,
             }));
+            summaries.push(Some((
+                indicator,
+                summary_of(now).cloned(),
+                summary_of(before).filter(|_| table.change).cloned(),
+            )));
         }
         let disaggregations: Vec<Value> = table
             .disaggregations
@@ -333,6 +442,26 @@ pub async fn run_report<S: FacilitySummaries>(
             .filter(|d| section_name(d).is_some())
             .map(|d| section_bands(d, with.sets, &rows))
             .collect();
+        let crossings = crossings(table);
+        if !crossings.is_empty() {
+            for (row, kept) in rows.iter_mut().zip(&summaries) {
+                let Some((indicator, now, before)) = kept else {
+                    continue;
+                };
+                for (side, summary) in [("current", now), ("previous", before)] {
+                    if let Some(summary) = summary
+                        && row[side].is_object()
+                    {
+                        row[side]["crossed"] = json!(crossed_json(
+                            indicator,
+                            summary,
+                            &crossings,
+                            &disaggregations
+                        ));
+                    }
+                }
+            }
+        }
         sections.push(json!({
             "kind": "table",
             "disaggregations": disaggregations,

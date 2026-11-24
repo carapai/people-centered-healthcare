@@ -164,6 +164,30 @@ pub struct Summary {
     /// The parts per band of each disaggregation, in the indicator's order; each band's
     /// summary has none of its own (#552).
     pub disaggregations: Vec<Disaggregated>,
+    /// The parts in each combination of bands of two or more disaggregations (#557): what a
+    /// Report's cell crossing them is run from. None for a band's or a cell's own summary.
+    pub crossed: Vec<Crossing>,
+}
+
+/// An indicator's parts in each combination of bands of several of its disaggregations (#557):
+/// a summary is kept per combination of bands (ADR 0070), so a Report's crossed cells roll up
+/// from summed parts like any other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Crossing {
+    /// The disaggregations crossed, by name, in the indicator's order.
+    pub names: Vec<String>,
+    /// Each combination of bands something was counted in; any other counted nothing.
+    pub cells: Vec<CrossedCell>,
+}
+
+/// One combination of bands' part.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrossedCell {
+    /// Its band in each disaggregation crossed, in [`Crossing::names`]' order.
+    pub codes: Vec<String>,
+    /// The figure within the cell, with what roll-up needs: a percentage's numerator and
+    /// denominator are both the cell's.
+    pub summary: Summary,
 }
 
 /// An indicator's parts by one disaggregation (#552).
@@ -310,7 +334,85 @@ impl Summary {
             denominator,
             values,
             disaggregations,
+            crossed: Self::roll_up_crossed(calculation, parts)?,
         })
+    }
+
+    /// Whether nothing was counted: no part of it adds anything.
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+            && self.denominator.unwrap_or(0) == 0
+            && self.values.as_ref().is_none_or(|v| v.count == 0)
+    }
+
+    /// The crossings of `parts` rolled up cell by cell. A crossing is kept when every part that
+    /// counted something carries it (one computed before crossings were kept does not), so a
+    /// cell is never a partial sum.
+    fn roll_up_crossed(
+        calculation: Calculation,
+        parts: &[Self],
+    ) -> Result<Vec<Crossing>, RollUpError> {
+        let mut crossed: Vec<Crossing> = Vec::new();
+        for crossing in parts.iter().flat_map(|p| &p.crossed) {
+            if crossed.iter().any(|c| c.names == crossing.names)
+                || parts
+                    .iter()
+                    .any(|p| !p.is_empty() && !p.crossed.iter().any(|c| c.names == crossing.names))
+            {
+                continue;
+            }
+            let mut codes: Vec<&Vec<String>> = parts
+                .iter()
+                .flat_map(|p| &p.crossed)
+                .filter(|c| c.names == crossing.names)
+                .flat_map(|c| c.cells.iter().map(|cell| &cell.codes))
+                .collect();
+            codes.sort();
+            codes.dedup();
+            let mut cells = Vec::with_capacity(codes.len());
+            for codes in codes {
+                let same: Vec<Self> = parts
+                    .iter()
+                    .flat_map(|p| &p.crossed)
+                    .filter(|c| c.names == crossing.names)
+                    .flat_map(|c| &c.cells)
+                    .filter(|cell| &cell.codes == codes)
+                    .map(|cell| cell.summary.clone())
+                    .collect();
+                cells.push(CrossedCell {
+                    codes: codes.clone(),
+                    summary: Self::roll_up(calculation, &same)?,
+                });
+            }
+            crossed.push(Crossing {
+                names: crossing.names.clone(),
+                cells,
+            });
+        }
+        Ok(crossed)
+    }
+
+    /// The part at one combination of bands of the crossing of `names` (in the indicator's
+    /// order): its cell, or an empty part when nothing was counted there. None when the crossing
+    /// is not kept and something was counted, so the cell cannot be told.
+    pub fn crossed_at(&self, names: &[&str], codes: &[&str]) -> Option<Self> {
+        let crossing = self
+            .crossed
+            .iter()
+            .find(|c| c.names.iter().map(String::as_str).eq(names.iter().copied()));
+        match crossing {
+            None if !self.is_empty() => None,
+            None => Some(Self::roll_up(self.calculation, &[]).ok()?),
+            Some(crossing) => match crossing.cells.iter().find(|cell| {
+                cell.codes
+                    .iter()
+                    .map(String::as_str)
+                    .eq(codes.iter().copied())
+            }) {
+                Some(cell) => Some(cell.summary.clone()),
+                None => Some(Self::roll_up(self.calculation, &[]).ok()?),
+            },
+        }
     }
 }
 
@@ -505,7 +607,23 @@ fn summarize<'a>(indicator: &Indicator, counted: impl Iterator<Item = &'a Counte
         denominator,
         values,
         disaggregations: Vec::new(),
+        crossed: Vec::new(),
     }
+}
+
+/// The most disaggregations an indicator's crossings are kept for: 57 crossings.
+const MOST_CROSSED: usize = 6;
+
+/// Every set of two or more of `n` disaggregations, as indices in order; none past
+/// [`MOST_CROSSED`].
+fn crossings_of(n: usize) -> Vec<Vec<usize>> {
+    if n > MOST_CROSSED {
+        return Vec::new();
+    }
+    (0u32..1 << n)
+        .filter(|mask| mask.count_ones() >= 2)
+        .map(|mask| (0..n).filter(|d| mask & (1 << d) != 0).collect::<Vec<_>>())
+        .collect()
 }
 
 /// The band a record's stratum puts it in.
@@ -623,6 +741,30 @@ pub fn calculate(
                         let summary =
                             summarize(indicator, counted.iter().filter(|c| c.bands[d] == code));
                         Band { code, summary }
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+    summary.crossed = crossings_of(indicator.disaggregations.len())
+        .into_iter()
+        .map(|ds| {
+            let mut by: BTreeMap<Vec<String>, Vec<&Counted>> = BTreeMap::new();
+            for thing in &counted {
+                by.entry(ds.iter().map(|d| thing.bands[*d].clone()).collect())
+                    .or_default()
+                    .push(thing);
+            }
+            Crossing {
+                names: ds
+                    .iter()
+                    .map(|d| indicator.disaggregations[*d].name.clone())
+                    .collect(),
+                cells: by
+                    .into_iter()
+                    .map(|(codes, things)| CrossedCell {
+                        codes,
+                        summary: summarize(indicator, things.into_iter()),
                     })
                     .collect(),
             }
@@ -1037,6 +1179,7 @@ mod tests {
             denominator,
             values,
             disaggregations: Vec::new(),
+            crossed: Vec::new(),
         };
         // Two facilities' percentages, 1 of 4 and 3 of 6, give 4 of 10 (40%), not the average
         // of 25% and 50%.
@@ -1406,7 +1549,75 @@ mod tests {
         assert_eq!(alone, evaluated.summary.disaggregations[1].bands[0].summary);
         let mut whole = evaluated.summary.clone();
         whole.disaggregations = Vec::new();
+        whole.crossed = Vec::new();
         assert_eq!(evaluated.crossed(&percentage, &[]), whole);
+
+        // #557: the summary keeps every combination something was counted in, as the cell.
+        let kept = &evaluated.summary.crossed;
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].names, ["age", "hiv-status"]);
+        assert_eq!(kept[0].cells.len(), 4, "{kept:?}");
+        for cell in &kept[0].cells {
+            let at: Vec<(usize, &str)> = cell
+                .codes
+                .iter()
+                .enumerate()
+                .map(|(d, c)| (d, c.as_str()))
+                .collect();
+            assert_eq!(cell.summary, evaluated.crossed(&percentage, &at));
+        }
+        let at = |s: &Summary, age: &str, status: &str| {
+            s.crossed_at(&["age", "hiv-status"], &[age, status])
+                .map(|c| (c.count, c.denominator, c.value))
+        };
+        assert_eq!(
+            at(&evaluated.summary, "15-19", "positive"),
+            Some((1, Some(2), n(50)))
+        );
+        // Nothing counted there: an empty cell, not an unknown one.
+        assert_eq!(
+            at(&evaluated.summary, "15-19", NOT_RECORDED),
+            Some((0, Some(0), None))
+        );
+
+        // Two facilities' cells roll up from summed parts.
+        let two = Summary::roll_up(
+            Calculation::Percentage,
+            &[evaluated.summary.clone(), evaluated.summary.clone()],
+        )
+        .expect("rolled up");
+        assert_eq!(at(&two, "15-19", "positive"), Some((2, Some(4), n(50))));
+        // A summary kept before crossings were (none, though it counted) leaves the cell unknown;
+        // one that counted nothing adds nothing.
+        let mut older = evaluated.summary.clone();
+        older.crossed = Vec::new();
+        let mixed = Summary::roll_up(
+            Calculation::Percentage,
+            &[evaluated.summary.clone(), older.clone()],
+        )
+        .expect("rolled up");
+        assert_eq!(at(&mixed, "15-19", "positive"), None);
+        let empty = Summary::roll_up(Calculation::Percentage, &[]).expect("empty");
+        let with_empty = Summary::roll_up(
+            Calculation::Percentage,
+            &[evaluated.summary.clone(), empty.clone()],
+        )
+        .expect("rolled up");
+        assert_eq!(
+            at(&with_empty, "15-19", "positive"),
+            Some((1, Some(2), n(50)))
+        );
+        assert_eq!(at(&empty, "25+", "negative"), Some((0, Some(0), None)));
+    }
+
+    #[test]
+    fn every_set_of_two_or_more_disaggregations_is_crossed() {
+        assert_eq!(crossings_of(1), Vec::<Vec<usize>>::new());
+        assert_eq!(crossings_of(2), [vec![0, 1]]);
+        let three = crossings_of(3);
+        assert_eq!(three.len(), 4);
+        assert!(three.contains(&vec![0, 1, 2]) && three.contains(&vec![1, 2]));
+        assert!(crossings_of(MOST_CROSSED + 1).is_empty());
     }
 
     #[test]

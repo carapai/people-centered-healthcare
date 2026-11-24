@@ -39,6 +39,7 @@ const noPrint = css({ _print: { display: 'none' } })
 export function gridTexts(intl: IntlShape): GridTexts {
   return {
     indicator: intl.formatMessage(reportMessages.rdIndicatorColumn),
+    patient: intl.formatMessage(m.rpListPatient),
     total: intl.formatMessage(reportMessages.rdTotal),
     value: intl.formatMessage(reportMessages.rdValue),
     change: intl.formatMessage(reportMessages.rdChangeColumn),
@@ -184,15 +185,31 @@ function Shown({ report, run }: { report: ListedReport; run: ReportRun }) {
       </div>
       {report.definition.sections.map((section, n) => {
         const shown = run.sections[n]
+        const grid = grids.find((g) => g.section === section)?.grid
         if (section.kind === 'lineList' || shown?.kind !== 'table') {
+          const list = shown?.kind === 'lineList' ? shown.list : null
           return (
-            <section key={section.id} aria-label={section.title}>
+            <section key={section.id} aria-label={section.title} className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
               <h3 className={css({ fontWeight: 'semibold' })}>{section.title}</h3>
-              <p className={muted}>{intl.formatMessage(run.where === 'central' ? m.rpLineListCentral : m.rpLineListLater)}</p>
+              {list === null ? (
+                <p className={muted}>{intl.formatMessage(m.rpLineListCentral)}</p>
+              ) : list.error !== null ? (
+                <p role="alert" className={css({ color: 'danger.text' })}>
+                  {intl.formatMessage(m.rpListFailed, { reason: list.error })}
+                </p>
+              ) : (
+                <>
+                  {grid === undefined ? null : <Grid caption={section.title} grid={grid} />}
+                  <p className={muted}>
+                    {list.rows.length === 0
+                      ? intl.formatMessage(m.rpListEmpty)
+                      : intl.formatMessage(m.rpListCount, { rows: list.rows.length, rowPer: section.kind === 'lineList' ? section.rowPer : 'enrollment', program: list.program?.title ?? '' })}
+                  </p>
+                </>
+              )}
             </section>
           )
         }
-        const grid = grids.find((g) => g.section === section)?.grid
         return (
           <section key={section.id} aria-label={section.title} className={css({ display: 'flex', flexDirection: 'column', gap: '2' })}>
             <h3 className={css({ fontWeight: 'semibold' })}>{section.title}</h3>
@@ -232,5 +249,33 @@ function Shown({ report, run }: { report: ListedReport; run: ReportRun }) {
         )
       })}
     </article>
+  )
+}
+
+/** A line list's rows as a table: the patient heads each row. */
+function Grid({ caption, grid }: { caption: string; grid: { header: string[]; rows: { head: string; cells: string[] }[] } }) {
+  return (
+    <table className={`${table} ${css({ '& td': { textAlign: 'start' } })}`}>
+      <caption className={css({ srOnly: true })}>{caption}</caption>
+      <thead>
+        <tr>
+          {grid.header.map((h, i) => (
+            <th key={i} scope="col">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {grid.rows.map((row, i) => (
+          <tr key={i}>
+            <th scope="row">{row.head}</th>
+            {row.cells.map((cell, j) => (
+              <td key={j}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }

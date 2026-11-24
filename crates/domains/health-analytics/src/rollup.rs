@@ -182,6 +182,7 @@ mod tests {
             denominator: Some(denominator),
             values: None,
             disaggregations: Vec::new(),
+            crossed: Vec::new(),
         }
     }
 
@@ -330,6 +331,7 @@ mod tests {
             denominator: None,
             values: None,
             disaggregations: Vec::new(),
+            crossed: Vec::new(),
         };
         let summaries = BTreeMap::from([
             ("A".to_owned(), (median(14), at("2026-04-01T06:00:00Z"))),

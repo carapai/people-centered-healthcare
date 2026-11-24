@@ -1122,6 +1122,7 @@ mod tests {
                     denominator: None,
                     values: None,
                     disaggregations: Vec::new(),
+                    crossed: Vec::new(),
                 };
                 let report = measure_report(
                     &indicator.canonical(),
