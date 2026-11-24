@@ -19,7 +19,7 @@ The e2e backend also runs by hand, for exploring the app with data:
 
 ```sh
 cargo build -p central-server -p synthetic-data   # from the repository root
-HEALTH_SEED=1 bun e2e/backend.ts                  # central on 18080, SurrealDB in memory on 18000
+HEALTH_SEED=1 bun e2e/backend.ts                  # central on 18080, SurrealDB in memory on 18000; 18081 answers once seeded
 export HEALTH_DEV_BACKEND=http://127.0.0.1:18080        # in another shell: the app on 4173, as Playwright serves it
 bun run build && bunx --bun vite preview --port 4173 --strictPort
 ```

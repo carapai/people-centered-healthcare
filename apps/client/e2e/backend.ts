@@ -1,7 +1,9 @@
 // The e2e backend (#228): SurrealDB in memory, central-server with sign-in, the access policy,
 // the client registry and the patient portal, and the provisioned users (e2e/users.ts), among
 // them `admin` with every right. Playwright starts it (playwright.config.ts) and stops it with
-// the run. Binaries come from SURREAL_BIN (default `surreal`) and CENTRAL_SERVER_BIN (default
+// the run. It answers on its own readiness port (HEALTH_E2E_READY_PORT, default 18081) only once
+// every package is published and every sample is seeded (#893): central's /ready comes much
+// earlier, so Playwright waits on this one instead. Binaries come from SURREAL_BIN (default `surreal`) and CENTRAL_SERVER_BIN (default
 // the workspace's debug build).
 //
 // Run by hand with HEALTH_SEED=1 (or a patient count, e.g. HEALTH_SEED=1000), it also loads a
@@ -24,6 +26,7 @@ import { ADMIN_PERMISSIONS, OTP_OUTBOX, USERS } from './users'
 const ORIGIN = process.env['HEALTH_E2E_ORIGIN'] ?? 'http://localhost:4173'
 const CENTRAL_PORT = process.env['HEALTH_E2E_CENTRAL_PORT'] ?? '18080'
 const DB_PORT = process.env['HEALTH_E2E_DB_PORT'] ?? '18000'
+const READY_PORT = Number(process.env['HEALTH_E2E_READY_PORT'] ?? '18081')
 const CENTRAL = `http://127.0.0.1:${CENTRAL_PORT}`
 
 const surrealBin = process.env['SURREAL_BIN'] ?? 'surreal'
@@ -36,8 +39,7 @@ const file = (name: string, content: string) => {
   writeFileSync(path, content, { mode: 0o600 })
   return path
 }
-const otpOutbox = process.env['HEALTH_DEV_OTP_OUTBOX'] ?? OTP_OUTBOX
-writeFileSync(otpOutbox, '', { mode: 0o600 })
+writeFileSync(OTP_OUTBOX, '', { mode: 0o600 })
 const dbPassword = randomBytes(16).toString('hex')
 // A throwaway publication-signing key and self-signed certificate, so the Studio can publish
 // locally (#835). With no national root configured, nothing verifies the chain against one.
@@ -66,7 +68,7 @@ const env = {
   HEALTH_REGISTRY_NIN_SYSTEM: 'urn:health:nin',
   // The patient portal (#111), sending one-time codes to the development outbox.
   HEALTH_PORTAL_REDIRECT_URIS: `${ORIGIN}/portal/callback`,
-  HEALTH_DEV_OTP_OUTBOX: otpOutbox,
+  HEALTH_DEV_OTP_OUTBOX: OTP_OUTBOX,
   // Central's blob store, which holds the Studio's package tarballs (#492).
   HEALTH_FILES_DIR: (() => {
     const files = join(dir, 'files')
@@ -155,6 +157,8 @@ const children: ChildProcess[] = []
 const stop = () => {
   for (const child of children) child.kill('SIGTERM')
 }
+// Also when seeding fails, so SurrealDB and central do not outlive it and Playwright sees the exit.
+process.on('exit', stop)
 process.on('SIGINT', stop)
 process.on('SIGTERM', () => {
   stop()
@@ -306,4 +310,6 @@ if (seedPatients > 0) {
   process.stdout.write(`${await activity(CENTRAL, token, generated)}\n`)
   process.stdout.write(`seeded ${seedPatients} patients; sign in as ${USERS.admin.username} / ${USERS.admin.password} at KAM013\n`)
 }
-process.stdout.write('e2e backend ready\n')
+// Seeding is done: only now does the readiness port open (#893).
+Bun.serve({ hostname: '127.0.0.1', port: READY_PORT, fetch: () => new Response('ready\n') })
+process.stdout.write(`e2e backend ready: http://127.0.0.1:${READY_PORT}/\n`)

@@ -67,7 +67,7 @@ jobs:
             HEALTH_ORIGINS=http://127.0.0.1:18443 HEALTH_MDNS=off HEALTH_LOG=warn \
             target/debug/facility-edge > "$RUNNER_TEMP/edge.log" 2>&1 &
           for _ in $(seq 90); do
-            curl --silent --fail http://127.0.0.1:18080/ready > /dev/null \
+            curl --silent --fail http://127.0.0.1:18081/ > /dev/null \
               && curl --silent --fail http://127.0.0.1:18443/ > /dev/null && exit 0
             sleep 2
           done
