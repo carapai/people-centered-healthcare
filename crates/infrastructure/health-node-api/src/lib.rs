@@ -19,6 +19,10 @@
 //!   from the node's change log, with the active packages' Measures, and keeps a summary
 //!   `MeasureReport` per indicator, period and facility. With [`Clinical::with_explorer`],
 //!   **`/api/analytics`** answers the data explorer from them, offline ([`analytics`], #599).
+//! - **Terminology** (#843): with [`Clinical::with_terminology`], `/api/fhir/ValueSet/$expand`
+//!   and the other terminology operations answer from the active packages' terminology, which
+//!   [`terminology::spawn_terminology`] keeps current, so a form's bound questions offer their
+//!   codes offline.
 //! - **Search** uses the parameters central does (`health_fhir_server::search_registry`), and a
 //!   submitted form is re-validated against its Questionnaire and extracted (#103), with the
 //!   definitions central sends down.
@@ -50,9 +54,10 @@ use tower::ServiceExt as _;
 
 pub mod analytics;
 pub mod indicators;
+pub mod terminology;
 pub mod workflows;
 
-pub use health_fhir_server::WorkflowConfig;
+pub use health_fhir_server::{ActiveTerminology, WorkflowConfig};
 
 /// The clinical routes, built from the provisioning bundle's rules.
 #[derive(Clone)]
@@ -75,6 +80,8 @@ pub struct Clinical {
     /// The data explorer at `/api/analytics` (#599): the package tarballs its indicators are
     /// read from, and the facility.
     explorer: Option<(health_files::FsBlobStore, String)>,
+    /// The terminology the FHIR routes serve, if any (#843).
+    terminology: Option<ActiveTerminology>,
     built: Arc<RwLock<Option<(LocalConfig, Router)>>>,
 }
 
@@ -119,6 +126,7 @@ impl Clinical {
             payments: None,
             attachments: None,
             explorer: None,
+            terminology: None,
             built: Arc::new(RwLock::new(None)),
         }
     }
@@ -135,6 +143,13 @@ impl Clinical {
     #[must_use]
     pub fn with_explorer(mut self, blobs: health_files::FsBlobStore, facility: &str) -> Self {
         self.explorer = Some((blobs, facility.to_owned()));
+        self
+    }
+
+    /// Serves the terminology operations at `/api/fhir` from `terminology` (#843).
+    #[must_use]
+    pub fn with_terminology(mut self, terminology: ActiveTerminology) -> Self {
+        self.terminology = Some(terminology);
         self
     }
 
@@ -197,6 +212,10 @@ impl Clinical {
                         system: "urn:health:mrn".into(),
                     })
             }
+            None => fhir,
+        };
+        let fhir = match &self.terminology {
+            Some(terminology) => fhir.with_terminology(terminology.clone()),
             None => fhir,
         };
         let fhir = match &self.workflows {

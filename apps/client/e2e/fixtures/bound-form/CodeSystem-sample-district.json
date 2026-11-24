@@ -1,0 +1,68 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "sample-district",
+  "url": "https://health.go.ug/fhir/CodeSystem/sample-district",
+  "version": "1.0.0",
+  "name": "SampleDistrict",
+  "title": "Sample districts",
+  "status": "active",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "arua",
+      "display": "Arua"
+    },
+    {
+      "code": "gulu",
+      "display": "Gulu"
+    },
+    {
+      "code": "hoima",
+      "display": "Hoima"
+    },
+    {
+      "code": "jinja",
+      "display": "Jinja"
+    },
+    {
+      "code": "kabale",
+      "display": "Kabale"
+    },
+    {
+      "code": "kampala",
+      "display": "Kampala"
+    },
+    {
+      "code": "lira",
+      "display": "Lira"
+    },
+    {
+      "code": "masaka",
+      "display": "Masaka"
+    },
+    {
+      "code": "mbale",
+      "display": "Mbale"
+    },
+    {
+      "code": "mbarara",
+      "display": "Mbarara"
+    },
+    {
+      "code": "moroto",
+      "display": "Moroto"
+    },
+    {
+      "code": "soroti",
+      "display": "Soroti"
+    },
+    {
+      "code": "tororo",
+      "display": "Tororo"
+    },
+    {
+      "code": "wakiso",
+      "display": "Wakiso"
+    }
+  ]
+}

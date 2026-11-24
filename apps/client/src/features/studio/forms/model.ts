@@ -218,16 +218,8 @@ export function withValueSet(item: QuestionnaireItem, binding: string | null): Q
   return binding === null ? rest : { ...rest, answerValueSet: binding }
 }
 
-/** A binding's canonical URL and version (none when it names no version). */
-export function splitBinding(binding: string): { url: string; version: string | null } {
-  const bar = binding.indexOf('|')
-  return bar === -1 ? { url: binding, version: null } : { url: binding.slice(0, bar), version: binding.slice(bar + 1) }
-}
-
-/** The ValueSets the form binds, each once, in the order they are first asked. */
-export function boundValueSets(questionnaire: Questionnaire): string[] {
-  return [...new Set(rows(questionnaire).flatMap((row) => (row.item.answerValueSet === undefined ? [] : [row.item.answerValueSet])))]
-}
+// What a form binds is read as forms in use read it (#843).
+export { boundValueSets, splitBinding } from '../../forms/model'
 
 /**
  * The suggested widget for a ValueSet of `codes` codes, as a Form Layout can name it. A Form

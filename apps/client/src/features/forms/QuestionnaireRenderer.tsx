@@ -194,7 +194,7 @@ function Question({ definition, instance, ...shown }: Shown & { definition: Ques
   const help = `${id}-help`
   const described = hint !== undefined || errors.length > 0 || unanswered || computed !== undefined ? help : undefined
   const readOnly = definition.readOnly === true || computed !== undefined
-  const chosen = widget(definition, shown.layout)
+  const chosen = widget(definition, shown.layout, definition.type === 'coding' ? choices(definition, shown.answers).length : 0)
   const common = { id, 'aria-describedby': described, 'aria-required': required, 'aria-invalid': errors.some((e) => e.severity === 'error') || unanswered }
 
   let input

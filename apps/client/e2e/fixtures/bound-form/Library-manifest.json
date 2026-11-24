@@ -1,0 +1,11 @@
+{
+  "resourceType": "Library",
+  "id": "manifest",
+  "status": "active",
+  "url": "https://health.go.ug/fhir/Library/ug.moh.sample-complaints-manifest",
+  "version": "1.0.0",
+  "title": "Sample presenting complaints",
+  "type": {
+    "text": "asset-collection"
+  }
+}

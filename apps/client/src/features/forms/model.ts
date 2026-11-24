@@ -52,6 +52,25 @@ export function initialResponse(questionnaire: Questionnaire): QuestionnaireResp
   } as QuestionnaireResponse
 }
 
+/** A binding's canonical URL and version (none when it names no version). */
+export function splitBinding(binding: string): { url: string; version: string | null } {
+  const bar = binding.indexOf('|')
+  return bar === -1 ? { url: binding, version: null } : { url: binding.slice(0, bar), version: binding.slice(bar + 1) }
+}
+
+/** The ValueSets the form binds (`answerValueSet`), each once, in the order they are first asked. */
+export function boundValueSets(questionnaire: Questionnaire): string[] {
+  const found: string[] = []
+  const walk = (items: QuestionnaireItem[] | undefined) => {
+    for (const item of items ?? []) {
+      if (item.answerValueSet !== undefined) found.push(item.answerValueSet)
+      walk(item.item)
+    }
+  }
+  walk(questionnaire.item)
+  return [...new Set(found)]
+}
+
 /**
  * The codes a choice question offers: its own options, or, when it is bound to a ValueSet, the
  * codes `answers` holds for that binding (none until they are known).

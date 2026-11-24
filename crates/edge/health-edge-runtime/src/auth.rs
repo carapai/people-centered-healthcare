@@ -458,6 +458,20 @@ pub(crate) fn routes(
             facility.clone(),
         );
     }
+    // Terminology (#843): the active packages', so a form's bound questions offer their codes
+    // offline.
+    let clinical = match &blobs {
+        Some(blobs) => {
+            let terminology = health_node_api::ActiveTerminology::default();
+            health_node_api::terminology::spawn_terminology(
+                terminology.clone(),
+                clinical.store().clone(),
+                blobs.clone(),
+            );
+            clinical.with_terminology(terminology)
+        }
+        None => clinical,
+    };
     health_node_api::workflows::spawn_upkeep(workflows, clinical.store().clone(), blobs);
     // Its desktops' staff, for sign-in while the edge cannot be reached (#133).
     let desktops = DesktopAccounts {

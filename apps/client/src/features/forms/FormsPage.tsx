@@ -6,6 +6,7 @@ import { useIntl } from 'react-intl'
 
 import { formMessages } from '../../i18n/messages'
 import { FhirError, fhirKeys, newResourceId, searchQuery, usePlatform } from '../../platform'
+import { useBoundAnswers } from './answers'
 import { canonical, resources } from './api'
 import { initialResponse } from './model'
 import { QuestionnaireRenderer } from './QuestionnaireRenderer'
@@ -51,6 +52,10 @@ export function FormsPage() {
   // canonical references until activation brings their SearchParameters (#89).
   const draftParams = { status: 'in-progress' }
   const drafts = useQuery({ ...searchQuery(platform.fhir, 'QuestionnaireResponse', draftParams), enabled: picked !== undefined })
+
+  // The codes of the open form's questions bound to a ValueSet, from this node's terminology:
+  // central's, or the edge's offline (#843).
+  const bound = useBoundAnswers(open?.questionnaire)
 
   const mine = drafts.data === undefined ? [] : resources<QuestionnaireResponse>(drafts.data).filter((draft) => draft.questionnaire === chosen)
 
@@ -145,9 +150,15 @@ export function FormsPage() {
       {open === undefined ? null : (
         <section aria-label={open.questionnaire.title ?? canonical(open.questionnaire)}>
           <h2 className={css({ fontSize: 'xl', fontWeight: 'semibold', mb: '3' })}>{open.questionnaire.title ?? canonical(open.questionnaire)}</h2>
+          {bound.failed ? (
+            <p role="alert" className={css({ color: 'danger.text', mb: '3' })}>
+              {intl.formatMessage(formMessages.fmCodesFailed)}
+            </p>
+          ) : null}
           <QuestionnaireRenderer
             key={open.key}
             questionnaire={open.questionnaire}
+            answers={bound.answers}
             initial={open.response}
             busy={save.isPending}
             onSave={(response) => save.mutate({ response: { ...response, status: 'in-progress' }, submitted: false })}

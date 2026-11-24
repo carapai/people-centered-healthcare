@@ -334,6 +334,60 @@ mod tests {
         assert!(lookup(&served), "the previous terminology stays");
     }
 
+    /// #843: a published form's question bound to a ValueSet offers its codes at central: the
+    /// active packages' ValueSet expands by the binding's `url|version`, retired codes left out
+    /// as forms in use ask.
+    #[test]
+    fn a_bound_value_set_expands_from_the_active_packages() {
+        let served = Definitions::default();
+        let codes = json!({
+            "resourceType": "CodeSystem", "id": "presenting-complaint",
+            "url": "https://health.go.ug/fhir/CodeSystem/presenting-complaint",
+            "version": "1.0.0", "status": "active", "content": "complete",
+            "concept": [
+                { "code": "fever", "display": "Fever" },
+                { "code": "cough", "display": "Cough" },
+                { "code": "malaise", "display": "Malaise",
+                  "property": [{ "code": "status", "valueCode": "retired" }] }
+            ]
+        });
+        let bound = json!({
+            "resourceType": "ValueSet", "id": "presenting-complaint",
+            "url": "https://health.go.ug/fhir/ValueSet/presenting-complaint",
+            "version": "1.0.0", "status": "active",
+            "compose": { "include": [{
+                "system": "https://health.go.ug/fhir/CodeSystem/presenting-complaint"
+            }] }
+        });
+        let form = json!({
+            "resourceType": "Questionnaire", "id": "complaint",
+            "url": "https://health.go.ug/fhir/Questionnaire/complaint", "version": "1.0.0",
+            "status": "active",
+            "item": [{ "linkId": "complaint", "type": "coding",
+                       "answerValueSet": "https://health.go.ug/fhir/ValueSet/presenting-complaint|1.0.0" }]
+        });
+        served
+            .load(&[(
+                "ug.moh.opd@1.0.0".into(),
+                files(&[codes, bound, form.clone()]),
+            )])
+            .expect("loads");
+        let binding = form["item"][0]["answerValueSet"].as_str().expect("binding");
+        let expansion = served
+            .terminology
+            .current()
+            .expand(
+                binding,
+                &health_terminology::ExpandRequest {
+                    active_only: true,
+                    ..health_terminology::ExpandRequest::default()
+                },
+            )
+            .expect("expands");
+        let offered: Vec<&str> = expansion.contains.iter().map(|c| c.code.as_str()).collect();
+        assert_eq!(offered, ["cough", "fever"]);
+    }
+
     #[test]
     fn a_package_whose_workflow_cannot_be_read_keeps_the_running_ones() {
         let served = Definitions::default();

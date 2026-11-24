@@ -62,10 +62,18 @@ export function fitting(item: QuestionnaireItem): Widget[] {
   return fits[item.type] ?? ['input']
 }
 
-/** The widget for `item`: the layout's choice where it fits the item's type, else the default. */
-export function widget(item: QuestionnaireItem, layout: FormLayout | undefined): Widget {
+/** The most choices shown as radio buttons when the layout names no widget (studio.md § Terminology). */
+export const RADIO_MOST = 7
+
+/**
+ * The widget for `item`: the layout's choice where it fits the item's type, else the default. A
+ * choice question with more than `RADIO_MOST` of its `choices` is a drop-down, as a large bound
+ * ValueSet is until a Form Layout has a search widget (#843).
+ */
+export function widget(item: QuestionnaireItem, layout: FormLayout | undefined, choices = 0): Widget {
   const chosen = layout?.items?.[item.linkId]?.widget
   const allowed = fitting(item)
   if (chosen !== undefined && allowed.includes(chosen)) return chosen
+  if (item.type === 'coding' && choices > RADIO_MOST) return 'select'
   return allowed[0] ?? 'input'
 }

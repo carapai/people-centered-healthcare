@@ -5,6 +5,7 @@ import type {
   Patient,
   QuestionnaireResponse,
   ResourceTypeMap,
+  ValueSet,
 } from '@health/fhir-types'
 import { LosslessNumber } from 'lossless-json'
 
@@ -23,6 +24,16 @@ export interface SearchOptions extends RequestOptions {
 
 /** Instance, type or system history. */
 export type HistoryTarget = { type: ResourceType; id?: string } | { type?: undefined }
+
+/** What `ValueSet/$expand` is asked for: a ValueSet held by the node, by canonical. */
+export interface ExpandOptions extends RequestOptions {
+  /** The ValueSet's version, when the binding names one. */
+  valueSetVersion?: string
+  /** Leave retired codes out, as forms in use do. */
+  activeOnly?: boolean
+  /** At most this many codes. */
+  count?: number
+}
 
 export interface MatchOptions extends RequestOptions {
   onlyCertainMatches?: boolean
@@ -44,6 +55,8 @@ export interface FhirClient {
   extract(response: QuestionnaireResponse, options?: RequestOptions): Promise<Bundle>
   /** `Questionnaire/$populate` with SDC's input parameters: the prefilled response. */
   populate(input: Parameters, options?: RequestOptions): Promise<QuestionnaireResponse>
+  /** `ValueSet/$expand` from the node's own terminology (#90): the ValueSet with its `expansion`. */
+  expand(url: string, options?: ExpandOptions): Promise<ValueSet>
   /** `Patient/{id}/$summary`: the shared record's patient summary (#104). */
   summary(patientId: string, options?: RequestOptions): Promise<PatientSummary>
 }
@@ -137,6 +150,13 @@ export function fhirClient(transport: Transport, base = '/fhir'): FhirClient {
         signal: options?.signal,
       })
       return outParameter<QuestionnaireResponse>(result, 'response', 'QuestionnaireResponse')
+    },
+    expand(url, options) {
+      const query: Record<string, string> = { url }
+      if (options?.valueSetVersion !== undefined) query['valueSetVersion'] = options.valueSetVersion
+      if (options?.activeOnly !== undefined) query['activeOnly'] = String(options.activeOnly)
+      if (options?.count !== undefined) query['count'] = String(options.count)
+      return call<ValueSet>('ValueSet', 'GET', '/ValueSet/$expand', { query, signal: options?.signal })
     },
     async summary(patientId, options) {
       // Plain JSON, not a resource: a read model.

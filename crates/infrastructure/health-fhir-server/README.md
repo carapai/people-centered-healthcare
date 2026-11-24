@@ -176,7 +176,7 @@ Layer: **infrastructure**. FHIR R5 REST handlers, the CapabilityStatement and Bu
     - `CodeSystem/$subsumes`: `outcome`.
     - `ConceptMap/$translate`: `sourceCode` and `sourceSystem`, or `sourceCoding`, with `url` and `targetSystem`. It returns `result` and each `match` (`relationship`, `originMap`, `concept`).
   - **Errors:** what the node does not hold is 404. What cannot be answered offline (a filter on a code system held in part, a `regex` filter, a cycle) is 422 `not-supported`. A malformed request is 400.
-  - **`ActiveTerminology::replace`** swaps the terminology served, and a request keeps the version it started with. Activation (#89) calls it when a package with terminology becomes active. Until then, no node passes one in, so the routes answer 404.
+  - **`ActiveTerminology::replace`** swaps the terminology served, and a request keeps the version it started with. Central's activation (#89) and each edge (`health-node-api`, #843) call it when the active set changes; a node without one answers 404.
   - **Access:** the routes sit behind the same sign-in as every FHIR route, with no further permission, because terminology holds no patient data.
 - **Tiers 3–4 on writes (#91):** `with_profiles(ActiveProfiles)` validates every write after tiers 1–2: creates, updates, transaction and batch entries, and `$register`.
   - **Which profiles:** each profile the resource claims in `meta.profile`, which must be active on the node (a profile it does not have is a `processing` error), and each profile `Profiles::required` names for its type.
