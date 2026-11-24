@@ -6,14 +6,22 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use health_auth::{
+    AuthStore as _, Credentials, Provisioning, SnapshotSigner, SnapshotVerifier, SurrealAuthStore,
+};
+use health_edge_runtime::CentralAccounts;
 use health_edge_runtime::sync::{Sync, Upstream};
 use health_identifiers::{NodeId, OpId, ResourceId};
+use health_identity::snapshot::{
+    PermissionSnapshot, RoleAssignment, RolePermissions, SnapshotPolicy,
+};
+use health_identity::{AccountId, AccountStatus, Lockout, LoginAccount, SessionPolicy};
 use health_persistence::{Precondition, RawJson, Store as _, Transaction as _, WriteRequest};
 use health_pki::{Authority, IssuingCa, KeyPair, new_key, request};
 use health_provisioning::NodeRegistry;
 use health_surrealdb::{Connection, MIGRATIONS, Settings, SurrealStore, Target, migrate};
 use health_sync_protocol::{Compatibility, PROTOCOL, Verdict};
-use health_sync_server::SyncServer;
+use health_sync_server::{AccountExport, SyncServer};
 use health_time::{SystemClock, Timestamp};
 use p256::ecdsa::SigningKey;
 use p256::pkcs8::DecodePrivateKey as _;
@@ -97,6 +105,10 @@ struct Central {
     cert_pem: String,
     node: NodeId,
     key: SigningKey,
+    /// Central's Login Accounts and snapshots, sent to the edge each round (#889).
+    accounts: SurrealAuthStore,
+    credentials: Credentials,
+    signer: SnapshotSigner,
 }
 
 /// Central with one provisioned edge, serving `/sync/v1` over HTTPS on localhost.
@@ -140,8 +152,22 @@ async fn central() -> Central {
     };
     let dir = tempfile::tempdir().expect("files");
     let files = health_files::FsBlobStore::open(dir.path()).expect("blob store");
+    let accounts = SurrealAuthStore::new(store.clone(), SessionPolicy::default().hard_cap);
+    let credentials = Credentials::new([5; 32].to_vec()).expect("credentials");
+    let signer = SnapshotSigner::generate();
+    let export = AccountExport::new(
+        accounts.clone(),
+        credentials.clone(),
+        signer.clone(),
+        health_auth::LocalConfig {
+            roles: roles(),
+            ..health_auth::LocalConfig::default()
+        },
+        registry.clone(),
+    );
     let app = SyncServer::new(store.clone(), registry, compatibility)
         .with_blobs(files.clone())
+        .with_accounts(export)
         .router();
     let (listener, origin, cert_pem) = tls().await;
     tokio::spawn(async move {
@@ -155,7 +181,17 @@ async fn central() -> Central {
         cert_pem,
         node: node.id.to_string().parse().expect("node id"),
         key: SigningKey::from_pkcs8_pem(&edge_key.serialize_pem()).expect("p256 key"),
+        accounts,
+        credentials,
+        signer,
     }
+}
+
+fn roles() -> RolePermissions {
+    RolePermissions(std::collections::BTreeMap::from([
+        ("clinician".into(), BTreeSet::from(["record.read".into()])),
+        ("nurse".into(), BTreeSet::from(["record.read".into()])),
+    ]))
 }
 
 impl Central {
@@ -171,6 +207,92 @@ impl Central {
         )
         .expect("sync")
     }
+}
+
+impl Central {
+    /// A Login Account at central for `username`, with `password`.
+    async fn account(&self, username: &str, password: &str) -> AccountId {
+        let id = AccountId(uuid::Uuid::now_v7());
+        let phc = Credentials::hash(password).expect("hash");
+        self.accounts
+            .put_account(&LoginAccount {
+                id,
+                username: username.into(),
+                credential: self.credentials.seal(id, &phc).expect("seal"),
+                status: AccountStatus::Active,
+                lockout: Lockout::default(),
+            })
+            .await
+            .expect("account");
+        id
+    }
+
+    /// Assigns `roles` to `account` here at the facility, as Roles at places does: a newly
+    /// signed snapshot. Its JWS.
+    async fn assign(&self, account: AccountId, assigned: &[&str]) -> String {
+        let issued = Timestamp::now();
+        let snapshot = PermissionSnapshot {
+            account,
+            facility: FACILITY.into(),
+            roles: assigned
+                .iter()
+                .map(|role| RoleAssignment {
+                    role: (*role).into(),
+                    locations: Vec::new(),
+                })
+                .collect(),
+            programs: Vec::new(),
+            issued_at: issued,
+            not_after: SnapshotPolicy::default().not_after(issued),
+            snapshot_version: u64::try_from(issued.as_second()).expect("version"),
+        };
+        let jws = self.signer.sign(&snapshot, &roles()).expect("sign");
+        self.accounts
+            .put_snapshot(account, FACILITY, &jws)
+            .await
+            .expect("snapshot");
+        jws
+    }
+
+    /// The edge's import of what central sends it, into `edge` under its own pepper key.
+    fn edge_accounts(&self, edge: &SurrealAuthStore, credentials: &Credentials) -> CentralAccounts {
+        // The facility intermediate's key, which the edge's requests are signed with too.
+        let key = p256::SecretKey::from_bytes(&self.key.to_bytes()).expect("key");
+        CentralAccounts(Provisioning::new(
+            edge.clone(),
+            credentials.clone(),
+            SnapshotVerifier::new(&[self.signer.public()]).expect("verifier"),
+            self.node.to_string(),
+            FACILITY,
+            Arc::new(move || Ok(key.clone())),
+        ))
+    }
+}
+
+/// Whether `account` may sign in at the edge at `now` with `password`, by what the edge holds:
+/// its password under the edge's pepper key, and a snapshot central signed for this facility,
+/// unexpired. What the edge's authorization server checks (`SnapshotGate`), with no central.
+async fn signs_in_at_edge(
+    edge: &SurrealAuthStore,
+    credentials: &Credentials,
+    verifier: &SnapshotVerifier,
+    account: AccountId,
+    password: &str,
+) -> bool {
+    let Some(stored) = edge.account(account).await.expect("account") else {
+        return false;
+    };
+    let Some(jws) = edge.snapshot(account, FACILITY).await.expect("snapshot") else {
+        return false;
+    };
+    credentials.verify(account, password, &stored.credential)
+        && verifier.verify(&jws).is_ok_and(|snapshot| {
+            snapshot.account == account
+                && snapshot.facility == FACILITY
+                && SnapshotPolicy::default()
+                    .check(&snapshot, Timestamp::now())
+                    .is_ok()
+        })
 }
 
 async fn write(store: &SurrealStore, body: &Value) -> ResourceId {
@@ -487,6 +609,133 @@ async fn a_grant_made_offline_reaches_central_s_review_queue_due_from_arrival() 
         "due 72 h after it arrived, not after it was made"
     );
     assert_eq!(sync.round().await.expect("round").grants, 0, "sent once");
+}
+
+/// Roles at places (#889): a role assigned at central works on the edge after its next sync, and
+/// offline after that; one withdrawn at central is refused after the next; and the snapshot the
+/// edge holds is exactly the one central signed.
+#[tokio::test]
+async fn roles_assigned_and_withdrawn_at_central_reach_the_edge_with_its_next_sync() {
+    const PASSWORD: &str = "correct horse battery";
+    let central = central().await;
+    let edge = store("edge").await;
+    let edge_auth = SurrealAuthStore::new(edge.clone(), SessionPolicy::default().hard_cap);
+    let edge_credentials = Credentials::new([9; 32].to_vec()).expect("credentials");
+    let verifier = SnapshotVerifier::new(&[central.signer.public()]).expect("verifier");
+    let sync = central.sync(&edge, &central.origin).with_accounts(Arc::new(
+        central.edge_accounts(&edge_auth, &edge_credentials),
+    ));
+    let nakato = central.account("nakato", PASSWORD).await;
+    let okello = central.account("okello", PASSWORD).await;
+    central.assign(okello, &["nurse"]).await;
+    assert_eq!(sync.round().await.expect("round").accounts, Some((1, 0)));
+    assert!(
+        !signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, nakato, PASSWORD).await,
+        "no role at the facility yet"
+    );
+
+    // Assigned at central: it works on the edge after its next sync.
+    let signed = central.assign(nakato, &["clinician"]).await;
+    assert_eq!(sync.round().await.expect("round").accounts, Some((2, 0)));
+    assert!(signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, nakato, PASSWORD).await);
+    // The snapshot the edge holds is the one central signed, byte for byte.
+    assert_eq!(
+        edge_auth.snapshot(nakato, FACILITY).await.expect("read"),
+        Some(signed)
+    );
+    let stored = edge_auth
+        .account(nakato)
+        .await
+        .expect("read")
+        .expect("account");
+    assert!(
+        !stored.credential.contains("argon2"),
+        "the hash is kept under the edge's pepper key"
+    );
+
+    // Offline thereafter: central cannot be reached, and the edge still signs the user in.
+    let offline = central
+        .sync(&edge, "https://localhost:1")
+        .with_accounts(Arc::new(
+            central.edge_accounts(&edge_auth, &edge_credentials),
+        ));
+    assert!(offline.round().await.is_err());
+    assert!(signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, nakato, PASSWORD).await);
+
+    // Changed at central: the edge holds the new snapshot after its next sync.
+    let changed = central.assign(nakato, &["clinician", "nurse"]).await;
+    sync.round().await.expect("round");
+    assert_eq!(
+        edge_auth.snapshot(nakato, FACILITY).await.expect("read"),
+        Some(changed)
+    );
+
+    // Withdrawn at central: refused on the edge after its next sync; the others keep theirs.
+    central
+        .accounts
+        .remove_snapshot(nakato, FACILITY)
+        .await
+        .expect("withdraw");
+    assert!(
+        signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, nakato, PASSWORD).await,
+        "until the edge syncs"
+    );
+    assert_eq!(sync.round().await.expect("round").accounts, Some((1, 1)));
+    assert!(!signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, nakato, PASSWORD).await);
+    assert_eq!(
+        edge_auth.snapshot(nakato, FACILITY).await.expect("read"),
+        None
+    );
+    assert!(signs_in_at_edge(&edge_auth, &edge_credentials, &verifier, okello, PASSWORD).await);
+}
+
+/// An edge whose central sends no accounts (no snapshot key or access policy there) syncs as
+/// before, keeping the staff its provisioning bundle gave it.
+#[tokio::test]
+async fn an_edge_whose_central_sends_no_accounts_keeps_its_staff() {
+    let central = central().await;
+    let edge = store("edge").await;
+    let edge_auth = SurrealAuthStore::new(edge.clone(), SessionPolicy::default().hard_cap);
+    let edge_credentials = Credentials::new([9; 32].to_vec()).expect("credentials");
+    // A central without the export, on the same store and registry.
+    let registry = NodeRegistry::new(central.store.clone(), Arc::new(SystemClock), "central");
+    let plain = SyncServer::new(
+        central.store.clone(),
+        registry,
+        Compatibility {
+            protocol: PROTOCOL,
+            software: env!("CARGO_PKG_VERSION").parse().expect("version"),
+            approved: BTreeSet::new(),
+        },
+    )
+    .router();
+    let (listener, origin, cert_pem) = tls().await;
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, plain).await;
+    });
+    let account = AccountId(uuid::Uuid::now_v7());
+    edge_auth
+        .put_snapshot(account, FACILITY, "kept")
+        .await
+        .expect("snapshot");
+    let sync = Sync::new(
+        edge.clone(),
+        Upstream {
+            origin,
+            ca_pem: Some(cert_pem),
+            node: central.node,
+        },
+        central.key.clone(),
+    )
+    .expect("sync")
+    .with_accounts(Arc::new(
+        central.edge_accounts(&edge_auth, &edge_credentials),
+    ));
+    assert_eq!(sync.round().await.expect("round").accounts, None);
+    assert_eq!(
+        edge_auth.snapshot(account, FACILITY).await.expect("read"),
+        Some("kept".into())
+    );
 }
 
 /// A summary `MeasureReport` of ANC 1st visits at this facility, as the edge computes it.

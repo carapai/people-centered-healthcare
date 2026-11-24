@@ -34,6 +34,12 @@
 //!   the facility's summaries synced. Every summary must be the peer's facility's, and nothing
 //!   in one may name a patient ([`summary_problem`](health_sync_protocol::summary_problem));
 //!   otherwise none is kept (#555).
+//! - `POST /sync/v1/accounts` answers `{"bundle": <jws>}`, the facility's provisioning bundle
+//!   (ADR 0059) for the calling node: its staff, their hashes encrypted to the node's facility
+//!   intermediate key on record, and their permission snapshots as central signed them. The
+//!   node takes it as the whole of its staff, so a role withdrawn at central is refused there
+//!   from that round on (#889). Served to a compatible facility node by a server built
+//!   [`with_accounts`](SyncServer::with_accounts); otherwise `404`.
 //! - `GET /sync/v1/events` is a server-sent event stream of "cursor advanced" hints. The pull is
 //!   the truth; the hint only saves the peer a poll.
 //!
@@ -92,6 +98,60 @@ pub trait GroupCheck: Send + Sync {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Outcome>> + Send + 'a>>;
 }
 
+/// What central exports of each facility's staff to its nodes (#889): the accounts and signed
+/// snapshots in `accounts`, hashes opened under `credentials`, the bundle signed by `signer`
+/// (central's snapshot key) and encrypted to the node's facility intermediate key as `registry`
+/// records it.
+#[derive(Clone)]
+pub struct AccountExport {
+    accounts: health_auth::SurrealAuthStore,
+    credentials: health_auth::Credentials,
+    signer: Arc<health_auth::SnapshotSigner>,
+    local: health_auth::LocalConfig,
+    registry: NodeRegistry,
+}
+
+impl AccountExport {
+    /// The export; see the type.
+    pub fn new(
+        accounts: health_auth::SurrealAuthStore,
+        credentials: health_auth::Credentials,
+        signer: health_auth::SnapshotSigner,
+        local: health_auth::LocalConfig,
+        registry: NodeRegistry,
+    ) -> Self {
+        Self {
+            accounts,
+            credentials,
+            signer: Arc::new(signer),
+            local,
+            registry,
+        }
+    }
+
+    /// The bundle of `facility` for its node `node`, encrypted to the key on record for it.
+    async fn bundle(&self, facility: &str, node: NodeId) -> Result<String, String> {
+        let id = node.to_string();
+        let recipient = self
+            .registry
+            .intermediate_key(&id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("node {id} has no facility intermediate key on record"))?;
+        health_auth::facility_bundle(
+            &self.accounts,
+            &self.credentials,
+            facility,
+            &id,
+            self.local.clone(),
+            &self.signer,
+            &recipient,
+            health_time::Timestamp::now(),
+        )
+        .await
+    }
+}
+
 /// The largest request body on the wire: a push batch is at most 4 MiB (synchronization.md
 /// § Push), with room for the envelope. A compressed one may expand to
 /// [`MAX_DECODED`](health_sync_protocol::MAX_DECODED).
@@ -108,6 +168,7 @@ pub struct SyncServer {
     blobs: Option<health_files::FsBlobStore>,
     events: Option<health_http::Events>,
     check: Option<Arc<dyn GroupCheck>>,
+    accounts: Option<AccountExport>,
     limit: Arc<limit::Limit>,
 }
 
@@ -143,6 +204,7 @@ impl SyncServer {
             blobs: None,
             events: None,
             check: None,
+            accounts: None,
             limit: Arc::new(limit::Limit::default()),
         }
     }
@@ -160,6 +222,13 @@ impl SyncServer {
     #[must_use]
     pub fn with_check(mut self, check: Arc<dyn GroupCheck>) -> Self {
         self.check = Some(check);
+        self
+    }
+
+    /// Sends each facility node its staff and their snapshots with every round (#889).
+    #[must_use]
+    pub fn with_accounts(mut self, accounts: AccountExport) -> Self {
+        self.accounts = Some(accounts);
         self
     }
 
@@ -196,6 +265,7 @@ impl SyncServer {
             .route("/sync/v1/transfers/inbound", post(inbound_transfers))
             .route("/sync/v1/activation-reports", post(activation_reports))
             .route("/sync/v1/indicator-summaries", post(indicator_summaries))
+            .route("/sync/v1/accounts", post(accounts))
             .route("/sync/v1/events", get(events))
             .layer(DefaultBodyLimit::max(health_sync_protocol::MAX_DECODED))
             .layer(axum::middleware::from_fn(zstd_bodies))
@@ -801,6 +871,54 @@ async fn break_glass(
     }
     axum::Json(json!({ "received": grants.iter().map(|g| &g.id).collect::<Vec<_>>() }))
         .into_response()
+}
+
+/// The facility's staff and their snapshots for the calling node (#889); see the module docs.
+async fn accounts(
+    State(server): State<SyncServer>,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    extensions: Extensions,
+    body: Bytes,
+) -> Response {
+    let peer = match server
+        .authenticate(&method, &uri, &headers, &extensions, &body)
+        .await
+    {
+        Ok(peer) => peer,
+        Err(response) => return *response,
+    };
+    let Some(export) = &server.accounts else {
+        return problem(StatusCode::NOT_FOUND, "this node sends no accounts");
+    };
+    match server.verdict(&peer).await {
+        Ok(Verdict::Compatible) => {}
+        Ok(_) => {
+            return problem(
+                StatusCode::FORBIDDEN,
+                "an out-of-range node is sent no data until it upgrades",
+            );
+        }
+        Err(response) => return *response,
+    }
+    let SyncScope::Facility(facility) = &peer.scope else {
+        return problem(StatusCode::FORBIDDEN, "accounts go to a facility's node");
+    };
+    match export.bundle(facility, peer.id).await {
+        Ok(bundle) => (
+            [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
+            axum::Json(json!({ "bundle": bundle })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!(alert = "accounts-unexported", %error, facility = %facility, "a node's staff could not be exported");
+            problem(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the facility's staff cannot be exported",
+            )
+        }
+    }
 }
 
 /// A node's package activation reports (#89): kept per node, once each; a failed activation is

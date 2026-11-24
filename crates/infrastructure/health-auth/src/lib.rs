@@ -42,7 +42,7 @@ pub use jose::{InvalidKey, TokenSigner};
 pub use local_admin::{GrantSigner, LocalAdmin};
 pub use otp::{DevOutbox, OtpSendError, OtpSender, PhoneOtp, PhoneSignIn, SendFuture};
 pub use patient::patient_layer;
-pub use provisioning::{ImportError, Imported, Provisioning, RecipientKey};
+pub use provisioning::{ImportError, Imported, Provisioning, RecipientKey, facility_bundle};
 pub use server::{
     AccessError, AccessVerifier, AuthConfig, AuthServer, Client, DeviceAnswer, DeviceCheck,
     Principal,

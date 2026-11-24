@@ -183,7 +183,7 @@ The upstream computes each node's Sync Scope from a server-side definition, and 
   - **Audit:** AuditEvent and Provenance.
   - **Clinical:** everything else.
 
-  A node pulls `Lane::PULLED` in that order. Each lane has its own cursor, a checkpoint keyed by peer and lane, so one lane's cursor never skips another lane's items. A re-seed moves every lane's cursor to the snapshot's. Permission snapshots and revocation lists join the revocations lane when they become records. Blobs come on demand rather than through a lane.
+  A node pulls `Lane::PULLED` in that order. Each lane has its own cursor, a checkpoint keyed by peer and lane, so one lane's cursor never skips another lane's items. A re-seed moves every lane's cursor to the snapshot's. Permission snapshots and revocation lists join the revocations lane when they become records. Until then an edge takes its facility's staff and their snapshots from `POST /sync/v1/accounts` each round, before its push (#889; offline-auth.md § Credentials). Blobs come on demand rather than through a lane.
 
 ### Seeding
 

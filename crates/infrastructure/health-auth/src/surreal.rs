@@ -181,6 +181,20 @@ impl SurrealAuthStore {
         }
     }
 
+    /// Removes `account`'s snapshot at `facility`, if one is stored: central withdrew every role
+    /// there, and the edge learns it at its next sync (#889).
+    pub async fn remove_snapshot(
+        &self,
+        account: AccountId,
+        facility: &str,
+    ) -> Result<(), StoreError> {
+        let mut tx = self.begin().await?;
+        tx.delete_auth_snapshot(account, facility)
+            .await
+            .map_err(failed)?;
+        tx.commit().await.map_err(failed)
+    }
+
     /// Assigns `account`'s roles at `place` (ADR 0094): stores the signed snapshot `jws`, or with
     /// `None` removes the one there, and appends its AuditEvent `audit` in the same transaction.
     pub async fn assign(

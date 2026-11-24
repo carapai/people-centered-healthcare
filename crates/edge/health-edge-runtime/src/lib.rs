@@ -42,7 +42,9 @@ pub mod update;
 mod ups;
 pub mod web;
 
-pub use auth::{CLIENT_ID, INTERMEDIATE_KEY, PEPPER_KEY, REDIRECT_PATH, Secrets, TOKEN_KEY};
+pub use auth::{
+    CLIENT_ID, CentralAccounts, INTERMEDIATE_KEY, PEPPER_KEY, REDIRECT_PATH, Secrets, TOKEN_KEY,
+};
 pub use config::{ConfigError, EdgeConfig};
 pub use node::{EdgeError, Stop, run, shutdown_signal};
 #[cfg(windows)]

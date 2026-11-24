@@ -12,6 +12,10 @@
 //!   admin (`access.administer-local`): local grants, signed with the node's key, and local
 //!   revocations.
 //!
+//! - **With every sync round** (#889), central's bundle of the facility's staff is taken as the
+//!   whole of it ([`CentralAccounts`]): a role assigned at central works here from that round,
+//!   offline thereafter, and one withdrawn there is refused here.
+//!
 //! It needs `HEALTH_FACILITY`, `HEALTH_SNAPSHOT_KEYS_FILE`, and the pepper and token-signing keys
 //! that `facility-edge provision request` seals in the keystore. Without any of them the node
 //! serves no sign-in, and says why in a `sign-in-off` alert.
@@ -266,6 +270,84 @@ async fn desktop_accounts(
     }
 }
 
+/// The import of central's bundles into `store` for this node at `facility`, each hash
+/// re-encrypted under `credentials` and each snapshot checked by `verifier`, opened with the
+/// facility intermediate's key from `secrets`.
+fn provisioning(
+    config: &EdgeConfig,
+    facility: &str,
+    store: SurrealAuthStore,
+    credentials: Credentials,
+    verifier: SnapshotVerifier,
+    secrets: &Secrets,
+) -> Provisioning {
+    let recipient: RecipientKey = {
+        let secrets = Arc::clone(secrets);
+        Arc::new(move || {
+            let pem = String::from_utf8(secret(&secrets, INTERMEDIATE_KEY)?)
+                .map_err(|_| format!("{INTERMEDIATE_KEY} is not PEM"))?;
+            SecretKey::from_pkcs8_pem(&pem)
+                .map_err(|_| format!("{INTERMEDIATE_KEY} is not a P-256 key"))
+        })
+    };
+    Provisioning::new(
+        store,
+        credentials,
+        verifier,
+        config.node_id.clone(),
+        facility.to_owned(),
+        recipient,
+    )
+}
+
+/// Central's bundle of this facility's staff, taken with every sync round (#889) as the whole of
+/// it: the accounts and snapshots it holds are stored, and a snapshot it no longer holds is
+/// removed, so the role is refused from then on.
+#[derive(Clone)]
+pub struct CentralAccounts(pub Provisioning);
+
+impl health_sync_client::Accounts for CentralAccounts {
+    fn replace<'a>(&'a self, jws: &'a str) -> health_sync_client::Replaced<'a> {
+        Box::pin(async move {
+            let imported = self.0.replace(jws).await.map_err(|e| e.to_string())?;
+            if imported.withdrawn > 0 {
+                tracing::info!(
+                    outcome = "roles-withdrawn",
+                    withdrawn = imported.withdrawn,
+                    "central withdrew staff's roles here"
+                );
+            }
+            Ok((imported.snapshots, imported.withdrawn))
+        })
+    }
+}
+
+/// The staff this edge takes from central with each sync round (#889), over `connection`; or
+/// why it takes none, when sign-in is not set up here.
+pub(crate) fn central_accounts(
+    config: &EdgeConfig,
+    connection: &health_surrealdb::Connection,
+    secrets: &Secrets,
+) -> Result<CentralAccounts, String> {
+    let (Some(facility), Some(keys_file)) = (&config.facility, &config.snapshot_keys_file) else {
+        return Err("no HEALTH_FACILITY or HEALTH_SNAPSHOT_KEYS_FILE".into());
+    };
+    let credentials = Credentials::new(secret(secrets, PEPPER_KEY)?)
+        .map_err(|_| format!("{PEPPER_KEY} is not a 32-byte key"))?;
+    let store = SurrealAuthStore::new(
+        health_surrealdb::SurrealStore::new(connection.clone(), Arc::new(health_time::SystemClock)),
+        health_identity::SessionPolicy::default().hard_cap,
+    );
+    Ok(CentralAccounts(provisioning(
+        config,
+        facility,
+        store,
+        credentials,
+        snapshot_keys(keys_file)?,
+        secrets,
+    )))
+}
+
 fn secret(secrets: &Secrets, name: &str) -> Result<Vec<u8>, String> {
     secrets(name)?
         .ok_or_else(|| format!("{name} is not sealed: run `facility-edge provision request`"))
@@ -318,24 +400,8 @@ pub(crate) fn routes(
     let clock_for_desktops = Arc::clone(&clock);
     let server = AuthServer::new(auth, signer, credentials.clone(), store.clone(), clock);
 
-    let recipient: RecipientKey = {
-        let secrets = Arc::clone(secrets);
-        Arc::new(move || {
-            let pem = String::from_utf8(secret(&secrets, INTERMEDIATE_KEY)?)
-                .map_err(|_| format!("{INTERMEDIATE_KEY} is not PEM"))?;
-            SecretKey::from_pkcs8_pem(&pem)
-                .map_err(|_| format!("{INTERMEDIATE_KEY} is not a P-256 key"))
-        })
-    };
     let provisioning_store = store.clone();
-    let provisioning = Provisioning::new(
-        store,
-        credentials,
-        verifier,
-        config.node_id.clone(),
-        facility.clone(),
-        recipient,
-    );
+    let provisioning = provisioning(config, facility, store, credentials, verifier, secrets);
     // Offline administration (ADR 0011): grants are signed with the node's key, the facility
     // intermediate's, which central trusts through the certificate it issued.
     let grant_signer: GrantSigner = {

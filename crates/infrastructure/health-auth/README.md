@@ -104,6 +104,7 @@ Layer: **infrastructure**. The OIDC / SMART App Launch v2 authorization server (
   - **What it refuses:** with 422, a bundle that is not central's, or is for another node or facility; a bundle encrypted to another key; and any snapshot inside that is not central's or not for one of the bundle's accounts at this facility.
   - **What it stores:** each hash re-encrypted under the edge's pepper key. An account already here keeps its failed-login state.
   - The node's intermediate key comes from a `RecipientKey`, unsealed from the keystore on a blocking thread.
+  - **With every sync round** (#889), `Provisioning::replace` takes central's bundle as the whole of the facility's staff: it imports it, then removes each snapshot at the facility that the bundle does not carry. A refused bundle removes nothing. Central builds the bundle with `facility_bundle`, for the sync endpoint and `central-server provision bundle` alike.
 
 ## Offline administration (#75; ADR 0011)
 

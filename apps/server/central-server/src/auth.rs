@@ -138,6 +138,17 @@ impl LabelFile {
     }
 }
 
+/// What an edge's provisioning bundle carries of `policy` for offline administration: the role
+/// mappings, the locally grantable roles, and the label rules central applies, so the edge
+/// serving records enforces them (#106).
+pub(crate) fn local_config(policy: &AccessPolicy) -> health_auth::LocalConfig {
+    health_auth::LocalConfig {
+        roles: policy.roles.clone(),
+        grantable: policy.locally_grantable.clone(),
+        labels: policy.labels.iter().map(LabelFile::sensitive).collect(),
+    }
+}
+
 /// Reads the access policy file.
 pub(crate) fn read_policy(path: &Path) -> Result<AccessPolicy, &'static str> {
     let text =
@@ -295,6 +306,7 @@ pub(crate) fn routes(
         sync = Some(sync_routes(
             fhir_store.clone(),
             registry.clone(),
+            account_export(settings, &store, &credentials, &registry)?,
             settings.files.clone(),
             events.clone(),
             settings.definitions.as_ref(),
@@ -622,11 +634,35 @@ impl health_sync_server::GroupCheck for Rederive {
     }
 }
 
+/// Each edge's staff and their snapshots, sent with every sync round (#889), when central signs
+/// snapshots under an access policy; otherwise `None`, and edges get them only in a
+/// provisioning bundle.
+fn account_export(
+    settings: &AuthSettings,
+    store: &SurrealAuthStore,
+    credentials: &Credentials,
+    registry: &NodeRegistry,
+) -> Result<Option<health_sync_server::AccountExport>, &'static str> {
+    let (Some(key), Some(policy)) = (settings.snapshot_keys.first(), &settings.policy) else {
+        return Ok(None);
+    };
+    let signer = SnapshotSigner::from_secret(key)
+        .map_err(|_| "HEALTH_AUTH_SNAPSHOT_KEYS_FILE holds an invalid key")?;
+    Ok(Some(health_sync_server::AccountExport::new(
+        store.clone(),
+        credentials.clone(),
+        signer,
+        local_config(policy),
+        registry.clone(),
+    )))
+}
+
 /// The `/sync/v1` endpoints (#81; ADR 0062). Peers on this release or the one before are served;
 /// no package is approved yet, so a peer reporting one is quarantined.
 fn sync_routes(
     store: SurrealStore,
     registry: NodeRegistry,
+    accounts: Option<health_sync_server::AccountExport>,
     files: Option<health_files::FsBlobStore>,
     events: health_http::Events,
     definitions: Option<&crate::activation::Definitions>,
@@ -655,6 +691,10 @@ fn sync_routes(
         .with_events(events)
         .with_check(rederive)
         .with_concurrent_resyncs(concurrent);
+    let server = match accounts {
+        Some(accounts) => server.with_accounts(accounts),
+        None => server,
+    };
     Ok(match files {
         Some(files) => server.with_blobs(files),
         None => server,

@@ -14,10 +14,7 @@
 
 use std::sync::Arc;
 
-use health_auth::{
-    AuthStore, BreachedPasswords, Bundle, BundleAccount, Credentials, SnapshotSigner,
-    SurrealAuthStore,
-};
+use health_auth::{AuthStore, BreachedPasswords, Credentials, SnapshotSigner, SurrealAuthStore};
 use health_identity::snapshot::{PermissionSnapshot, RoleAssignment, SnapshotPolicy};
 use health_identity::{
     AccountId, AccountStatus, Lockout, LoginAccount, PasswordPolicy, SessionPolicy,
@@ -222,53 +219,23 @@ async fn bundle(config: &Config, args: &[String]) -> Result<(), Box<dyn std::err
         .map_err(|_| format!("{intermediate} does not hold a P-256 key"))?;
 
     let store = open_store(config).await?;
-    let mut accounts = Vec::new();
-    let mut snapshots = Vec::new();
-    for (id, jws) in store.snapshots_at(facility).await? {
-        let Some(account) = store.account(id).await? else {
-            continue;
-        };
-        // Central's own sealing comes off; the bundle encrypts the hash to the edge instead.
-        let phc = credentials
-            .open(account.id, &account.credential)
-            .ok_or_else(|| {
-                format!(
-                    "{}'s credential does not open under this pepper key",
-                    account.username
-                )
-            })?;
-        accounts.push(BundleAccount {
-            id: account.id,
-            username: account.username,
-            status: account.status,
-            phc,
-        });
-        snapshots.push(jws);
-    }
     // The country's role mappings and locally grantable roles, for offline administration.
     let local = settings
         .policy
         .as_ref()
-        .map(|policy| health_auth::LocalConfig {
-            roles: policy.roles.clone(),
-            grantable: policy.locally_grantable.clone(),
-            // The same label rules central applies, so the edge serving records enforces them.
-            labels: policy
-                .labels
-                .iter()
-                .map(crate::auth::LabelFile::sensitive)
-                .collect(),
-        })
+        .map(crate::auth::local_config)
         .unwrap_or_default();
-    let sealed = Bundle {
-        facility: facility.clone(),
-        node_id: node_id.clone(),
-        issued_at: Timestamp::now(),
-        accounts,
-        snapshots,
+    let sealed = health_auth::facility_bundle(
+        &store,
+        &credentials,
+        facility,
+        node_id,
         local,
-    }
-    .seal(&signer, &recipient)?;
+        &signer,
+        &recipient,
+        Timestamp::now(),
+    )
+    .await?;
     std::fs::write(out, sealed).map_err(|_| format!("cannot write {out}"))?;
     std::io::Write::write_all(
         &mut std::io::stdout(),

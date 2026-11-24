@@ -265,3 +265,97 @@ async fn an_edge_gives_a_desktop_the_staff_at_its_location() {
     }
     assert_eq!(desktop_store.account(ward.0).await.expect("read"), None);
 }
+
+/// With every sync round (#889) the bundle is the whole of central's staff at the facility: a
+/// snapshot it no longer carries is removed, so the role is refused; a refused bundle removes
+/// nothing.
+#[tokio::test]
+async fn a_replacing_import_removes_the_snapshots_central_no_longer_holds() {
+    let central = Central {
+        signer: SnapshotSigner::generate(),
+        account: AccountId(Uuid::now_v7()),
+    };
+    let edge_key = SecretKey::random(&mut rand_core::OsRng);
+    let store = store().await;
+    let recipient = {
+        let key = edge_key.clone();
+        Arc::new(move || Ok(key.clone()))
+    };
+    let provisioning = Provisioning::new(
+        store.clone(),
+        Credentials::new([3; 32].to_vec()).expect("credentials"),
+        SnapshotVerifier::new(&[central.signer.public()]).expect("verifier"),
+        NODE,
+        FACILITY,
+        recipient,
+    );
+    let withdrawn = AccountId(Uuid::now_v7());
+    store
+        .put_snapshot(withdrawn, FACILITY, "an older snapshot")
+        .await
+        .expect("snapshot");
+    store
+        .put_snapshot(withdrawn, "ug-gul-lacor", "another facility's")
+        .await
+        .expect("snapshot");
+
+    // Refused whole: nothing is removed.
+    let stray = central.bundle(FACILITY, AccountId(Uuid::now_v7()), &edge_key);
+    assert_eq!(
+        provisioning.replace(&stray).await,
+        Err(ImportError::Snapshot)
+    );
+    assert!(
+        store
+            .snapshot(withdrawn, FACILITY)
+            .await
+            .expect("read")
+            .is_some()
+    );
+
+    let bundle = central.bundle(FACILITY, central.account, &edge_key);
+    let imported = provisioning.replace(&bundle).await.expect("replace");
+    assert_eq!(
+        (imported.accounts, imported.snapshots, imported.withdrawn),
+        (1, 1, 1)
+    );
+    assert_eq!(
+        store.snapshot(withdrawn, FACILITY).await.expect("read"),
+        None
+    );
+    assert!(
+        store
+            .snapshot(central.account, FACILITY)
+            .await
+            .expect("read")
+            .is_some()
+    );
+    assert!(
+        store
+            .snapshot(withdrawn, "ug-gul-lacor")
+            .await
+            .expect("read")
+            .is_some(),
+        "only this facility's snapshots are central's to withdraw here"
+    );
+    // A plain import (the provisioning screen) adds and updates, and removes nothing.
+    store
+        .put_snapshot(withdrawn, FACILITY, "an older snapshot")
+        .await
+        .expect("snapshot");
+    assert_eq!(
+        provisioning
+            .import(&bundle)
+            .await
+            .expect("import")
+            .withdrawn,
+        0
+    );
+    assert!(
+        store
+            .snapshot(withdrawn, FACILITY)
+            .await
+            .expect("read")
+            .is_some()
+    );
+}
