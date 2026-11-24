@@ -102,7 +102,7 @@ None.
 
 ## Failing tests
 
-None.
+None. The edge suite's assertions wait up to 30 s (#907): the edge it starts is a debug build, where a write indexed for search takes seconds, so Playwright's 5 s default failed `opd-lan.spec.ts` at registration on a loaded machine.
 
 ## Next recommended step
 
