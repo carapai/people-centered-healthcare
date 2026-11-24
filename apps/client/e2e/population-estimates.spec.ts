@@ -7,14 +7,15 @@ import { USERS } from './users'
 // from the HMIS lead's CSV. Central checks each place code against the facility registry (the
 // NHFR sample's places): a row with an unknown code refuses the file, naming the row. A good file
 // shows each district's totals, expected pregnancies derived as 5% of the total population, and
-// is saved to the draft.
+// is saved to the draft. The backend also publishes a sample Population package for this year
+// (e2e/backend.ts), which the explorer divides by (#553, explorer.spec.ts).
 
 test('a Population CSV is checked against the registry and its district totals saved', async ({ page }) => {
   await signIn(page, USERS.author)
   await press(page, 'Studio', 'link')
-  await expect(page.getByRole('article', { name: 'Population estimates' }).getByText('1 year of population estimates')).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Population estimates' }).getByText('2 years of population estimates')).toBeVisible()
   await press(page, 'Open population estimates', 'link')
-  await page.getByRole('grid', { name: 'Population estimates' }).getByText('Population estimates 2026', { exact: true }).click()
+  await page.getByRole('grid', { name: 'Population estimates' }).getByRole('row').filter({ hasText: 'ug.population.2026@' }).getByText('Population estimates 2026', { exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'Population estimates 2026', level: 1 })).toBeVisible()
   const types = page.getByRole('table', { name: 'Estimate types' })
@@ -41,6 +42,6 @@ test('a Population CSV is checked against the registry and its district totals s
   await expect(page.getByText('Saved.')).toBeVisible()
   // Opened again, the draft holds the imported figures.
   await page.goBack()
-  await page.getByRole('grid', { name: 'Population estimates' }).getByText('Population estimates 2026', { exact: true }).click()
+  await page.getByRole('grid', { name: 'Population estimates' }).getByRole('row').filter({ hasText: 'ug.population.2026@' }).getByText('Population estimates 2026', { exact: true }).click()
   await expect(page.getByText('3 figures for 3 places')).toBeVisible()
 })

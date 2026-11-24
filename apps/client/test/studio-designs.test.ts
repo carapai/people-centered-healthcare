@@ -35,6 +35,7 @@ const design = (kind: StudioDesign['kind'], title: string, pkg: string, packageI
   version: null,
   package: pkg,
   packageId,
+  estimateTypes: [],
 })
 
 const designs: StudioDesigns = {

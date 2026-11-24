@@ -308,3 +308,107 @@ fn the_file_reads_and_writes_as_json() {
     );
     assert_eq!(serde_json::to_string(&read).expect("writes"), written);
 }
+
+#[test]
+fn an_edge_keeps_only_its_own_places_figures() {
+    let definition = uganda_2026(vec![
+        figure("KAM013", "total-population", 40_000),
+        figure("KAM020", "total-population", 60_000),
+        figure("district-kampala", "under-1", 50_000),
+    ]);
+    let own = definition.for_places(|place| place == "KAM013");
+    assert_eq!(own.year, 2026);
+    assert_eq!(own.types, definition.types, "every type stays declared");
+    assert_eq!(
+        own.figures,
+        vec![figure("KAM013", "total-population", 40_000)]
+    );
+    let estimates = Estimates::new(own, |_| None);
+    // 5% of the facility's own catchment.
+    assert_eq!(
+        estimates.annual("KAM013", "expected-pregnancies"),
+        Some(Decimal::from(2_000))
+    );
+    assert_eq!(estimates.annual("KAM020", "total-population"), None);
+}
+
+fn coverage() -> Indicator {
+    Indicator {
+        url: "https://x/Measure/anc1-coverage".into(),
+        version: "1.0.0".into(),
+        title: "ANC 1st visit coverage".into(),
+        scoring: crate::indicator::Scoring::Proportion,
+        calculation: Calculation::Percentage,
+        basis: "Encounter".into(),
+        counts: crate::indicator::Counts::People,
+        cumulative: false,
+        value: None,
+        period_date: "Encounter.actualPeriod.start".into(),
+        populations: BTreeMap::new(),
+        references: std::collections::BTreeSet::new(),
+        disaggregations: Vec::new(),
+        thresholds: Vec::new(),
+        estimate: Some("expected-pregnancies".into()),
+    }
+}
+
+#[test]
+fn each_period_takes_the_estimates_of_the_year_it_starts_in() {
+    let tree = hierarchy();
+    let mut y2025 = uganda_2026(vec![figure(
+        "district-kampala",
+        "total-population",
+        1_200_000,
+    )]);
+    y2025.year = 2025;
+    let y2026 = uganda_2026(vec![figure(
+        "district-kampala",
+        "total-population",
+        2_400_000,
+    )]);
+    let yearly = PopulationEstimates::new([y2025, y2026], move |code| {
+        tree.get(code).map(|p| (*p).to_owned())
+    });
+    // March 2026: 5% of 2,400,000 / 12 = 10,000 expected pregnancies; 750 is 7.5%.
+    assert_eq!(
+        yearly.estimate(&coverage(), "district-kampala", &month()),
+        Some(Decimal::from(10_000))
+    );
+    assert_eq!(
+        yearly.figure(&coverage(), 750, "district-kampala", &month()),
+        Some(Decimal::new(75, 1))
+    );
+    // December 2025 takes 2025's: 5,000 a month.
+    let december = Period::parse(PeriodType::Monthly, "2025-12").expect("december");
+    assert_eq!(
+        yearly.estimate(&coverage(), "district-kampala", &december),
+        Some(Decimal::from(5_000))
+    );
+    // The financial year from July 2025 takes 2025's whole annual figure.
+    let financial = Period::parse(PeriodType::FinancialJuly, "2025July").expect("financial");
+    assert_eq!(
+        yearly.estimate(&coverage(), "district-kampala", &financial),
+        Some(Decimal::from(60_000))
+    );
+    // No Population package for 2024; a facility below the figures has none; a count names no
+    // estimate.
+    let earlier = Period::parse(PeriodType::Monthly, "2024-03").expect("2024");
+    assert_eq!(
+        yearly.estimate(&coverage(), "district-kampala", &earlier),
+        None
+    );
+    assert_eq!(yearly.estimate(&coverage(), "KAM013", &month()), None);
+    assert_eq!(yearly.figure(&coverage(), 750, "KAM013", &month()), None);
+    let count = Indicator {
+        estimate: None,
+        calculation: Calculation::Count,
+        ..coverage()
+    };
+    assert_eq!(yearly.estimate(&count, "district-kampala", &month()), None);
+    assert_eq!(
+        yearly.title("expected-pregnancies", &month()),
+        "expected-pregnancies"
+    );
+    assert!(PopulationEstimates::default().is_empty());
+    assert!(!yearly.is_empty());
+}

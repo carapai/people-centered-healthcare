@@ -1,7 +1,9 @@
 // Sample indicator summaries for a local backend (#599): central-server receives them at startup
 // (HEALTH_DEV_INDICATOR_SUMMARIES) as if the facilities' edges had synced them, since a local
 // backend has no edges computing indicators. They are summary MeasureReports of the sample
-// indicators (e2e/fixtures/indicators; malaria test positivity's for #600; ANC 1st visits by age band for #601), written as health-analytics-app's `report` writes them,
+// indicators (e2e/fixtures/indicators; malaria test positivity's for #600; ANC 1st visits by age band for #601;
+// ANC 1st visit coverage's first visits with no denominator, which central divides by the sample
+// Population package's expected pregnancies, for #553), written as health-analytics-app's `report` writes them,
 // for KAM013, KAM020 and WAK001, and Jinja's and Gulu's referral hospitals (JIN001, GUL001) so a
 // national map shades the Eastern and Northern regions too (#604); KAM031 never syncs, so it
 // shows as missing in Kampala.
@@ -11,6 +13,7 @@ export const FIRST_VISITS = `${MEASURES}sample-anc-first-visits|1.0.0`
 export const BEFORE_12_WEEKS = `${MEASURES}sample-anc-first-visit-before-12-weeks|1.0.0`
 export const GESTATIONAL_AGE = `${MEASURES}sample-anc-gestational-age-at-first-visit|1.0.0`
 export const MALARIA_POSITIVITY = `${MEASURES}sample-malaria-test-positivity|1.0.0`
+export const COVERAGE = `${MEASURES}sample-anc-first-visit-coverage|1.0.0`
 const PERIOD_TYPE = 'https://carapai.github.io/people-centered-healthcare/fhir/StructureDefinition/indicator-period-type'
 const POPULATION = 'http://terminology.hl7.org/CodeSystem/measure-population'
 
@@ -146,6 +149,8 @@ export function sampleSummaries(today: Date): object[] {
       out.push(
         report(BEFORE_12_WEEKS, period, facility, { population: [population('numerator', early), population('denominator', visits)], measureScoreQuantity: { value: Math.round((early * 10_000) / visits) / 100 } }, computed),
       )
+      // Coverage's facilities send their count only: central divides it by the place's estimate (#553).
+      out.push(report(COVERAGE, period, facility, { population: [population('numerator', visits)] }, computed))
       out.push(report(GESTATIONAL_AGE, period, facility, { population: [population('measure-population', visits)], measureScoreQuantity: { value: weeks } }, computed))
       const tested = 20 * visits
       const positive = positiveOutOf20(facility, period, today) * visits

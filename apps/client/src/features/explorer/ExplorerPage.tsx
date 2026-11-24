@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl'
 import { explorerMessages as m } from '../../i18n/messages'
 import { usePlatform } from '../../platform'
 import { DASHBOARDS_KEY, DashboardsError, createDashboard, dashboardsQuery, saveVisualization } from '../dashboards/api'
-import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, explorerQuery, fitted, forViewer, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
+import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type PeriodType, type Question, type Series, type SeriesBy, type TableLayout, type ThresholdBand, type Tone, type Visualization as Shown, type VisualizationType, answerQuery, chartSeries, childAreas, estimateNotes, explorerQuery, fitted, forViewer, newestComputed, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from './api'
 import { type DrawnMap, drawnMap, mapQuery } from './map'
 
 const layout = css({ display: 'grid', gap: '4', gridTemplateColumns: { base: '1fr', md: '18rem 1fr' }, alignItems: 'start' })
@@ -452,6 +452,12 @@ export function Visualization({ explorer, shown, answer, before, footer = true }
           <p key={measure} role="note">
             {intl.formatMessage(m.exFacilityOnly, { indicator: title(measure) })}
           </p>
+        ))}
+        {estimateNotes(answer).map((note) => (
+          <div key={note.indicator} role="note">
+            <p>{intl.formatMessage(m.exOverEstimate, { indicator: title(note.indicator), estimate: note.estimate })}</p>
+            {note.without.length > 0 ? <p>{intl.formatMessage(m.exNoEstimate, { estimate: note.estimate, places: note.without.map(placeName).join(', ') })}</p> : null}
+          </div>
         ))}
       </div> : null}
     </>

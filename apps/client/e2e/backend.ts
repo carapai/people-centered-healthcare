@@ -230,6 +230,47 @@ if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
     }
   }
 }
+// A sample Population package for this year (#553; ADR 0071), published with the HMIS lead's one
+// approval, so the sample ANC 1st visit coverage has expected pregnancies to divide by: Kampala's
+// and Wakiso's total population, and Kisenyi HC IV's own catchment; Kawempe HC III has no figure
+// of its own, so it shows *no estimate*. Written for the current year, as the sample summaries are.
+if ('HEALTH_PUBLICATION_KEY_FILE' in publication) {
+  const year = new Date().getUTCFullYear()
+  const id = `ug.sample-population.${year}@1.0.0`
+  const source = join(dir, 'sample-population')
+  mkdirSync(join(source, 'configuration'), { recursive: true })
+  writeFileSync(
+    join(source, 'package.json'),
+    JSON.stringify({ name: `ug.sample-population.${year}`, version: '1.0.0', title: `Sample population estimates ${year}`, fhirVersions: ['5.0.0'], kind: 'population', platform: { minSoftware: '0.1.0', formatVersion: 1 } }),
+  )
+  writeFileSync(join(source, 'Library-manifest.json'), JSON.stringify({ resourceType: 'Library', id: 'manifest', status: 'active', url: 'https://health.go.ug/fhir/Library/ug.sample-population-manifest', version: '1.0.0', type: { text: 'asset-collection' } }))
+  writeFileSync(
+    join(source, 'configuration/population.json'),
+    JSON.stringify({
+      $schema: 'https://carapai.github.io/people-centered-healthcare/fhir/schema/population/1',
+      year,
+      types: [
+        { code: 'total-population', title: 'Total population' },
+        { code: 'expected-pregnancies', title: 'Expected pregnancies', derivedFrom: 'total-population', percent: '5' },
+      ],
+      figures: [
+        { place: 'district-kampala', type: 'total-population', value: 12000 },
+        { place: 'district-wakiso', type: 'total-population', value: 10000 },
+        { place: 'KAM013', type: 'total-population', value: 6000 },
+      ],
+    }),
+  )
+  for (const step of [
+    ['draft', source, '--by', author],
+    ['submit', id, '--by', author],
+    ['review', id, '--by', 'e2e-reviewer-cli'],
+    ['approve', id, '--by', 'e2e-approver-cli'],
+    ['publish', id, '--by', 'e2e-publisher-cli'],
+  ]) {
+    const done = spawnSync(centralBin, ['package', ...step], { env, stdio: 'inherit' })
+    if (done.status !== 0) throw new Error(`${step[0]} of ${id} failed`)
+  }
+}
 // The facility registry's places (#869; ADR 0094): the admin previews and imports the NHFR sample
 // (e2e/fixtures/nhfr-sample.csv), whose facilities lie in the national core's districts published
 // above, so e2e-district's area (Kampala) lists KAM013 and two more.

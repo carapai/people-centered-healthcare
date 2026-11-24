@@ -137,6 +137,15 @@ async fn submit(central: &Central, files: &Files) -> (String, Stage, Vec<String>
 #[tokio::test]
 async fn the_reference_population_package_publishes_with_the_hmis_lead_s_approval() {
     let central = central().await;
+    // Nothing published yet: no estimates.
+    assert!(
+        central
+            .publications
+            .published_estimates()
+            .await
+            .expect("none")
+            .is_empty()
+    );
     let (id, stage, problems) = submit(&central, &package("population")).await;
     assert_eq!((stage, problems), (Stage::Review, Vec::<String>::new()));
     let publications = &central.publications;
@@ -150,6 +159,15 @@ async fn the_reference_population_package_publishes_with_the_hmis_lead_s_approva
         .publish(&id, "ops", &central.signer)
         .await
         .expect("publish");
+
+    // Once published, central reads its estimates (#553): the explorer's denominators.
+    let published = publications
+        .published_estimates()
+        .await
+        .expect("published estimates");
+    assert_eq!(published.len(), 1);
+    assert_eq!(published[0].year, 2026);
+    assert_eq!(published[0].figures.len(), 4);
 
     // Kampala's 1,800,000 people expect 90,000 pregnancies a year, 7,500 a month.
     let found = estimates_in(&package("population"));

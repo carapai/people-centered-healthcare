@@ -9,11 +9,19 @@
 //!
 //! Place codes are checked against the facility registry when the HMIS lead imports the CSV at
 //! central, before the figures are written to the draft.
+//!
+//! Once published, central's explorer, Reports and Dashboards divide by the estimates of the
+//! newest published version of each Population package ([`Publications::published_estimates`]).
+
+use std::collections::BTreeMap;
 
 use health_analytics::{ESTIMATES_FILE, EstimatesDefinition};
-use health_configuration::package::PackageKind;
+use health_configuration::lifecycle::{Lifecycle, Stage};
+use health_configuration::package::{PackageKind, Version};
 use health_packages::{Files, POPULATION, Packed};
 use serde_json::Value;
+
+use crate::{Error, Publications, failed};
 
 /// The year's estimates in a package's `files`, each with its file, as written or why they
 /// cannot be read.
@@ -81,4 +89,43 @@ pub(crate) fn problems(packed: &Packed) -> Vec<String> {
         );
     }
     problems
+}
+
+impl Publications {
+    /// The Population Estimates of the newest published version of every Population package,
+    /// by package. Estimates that do not read are left out (Validation refused them).
+    pub async fn published_estimates(&self) -> Result<Vec<EstimatesDefinition>, Error> {
+        let mut tx = self.begin().await?;
+        let lifecycles = tx.package_lifecycles().await.map_err(failed)?;
+        drop(tx);
+        let mut newest: BTreeMap<String, (Version, String)> = BTreeMap::new();
+        for json in lifecycles {
+            let lifecycle: Lifecycle = serde_json::from_str(&json).map_err(failed)?;
+            if lifecycle.stage != Stage::Published {
+                continue;
+            }
+            if newest
+                .get(&lifecycle.package)
+                .is_none_or(|(version, _)| *version < lifecycle.version)
+            {
+                newest.insert(
+                    lifecycle.package.clone(),
+                    (lifecycle.version.clone(), lifecycle.content.clone()),
+                );
+            }
+        }
+        let mut found = Vec::new();
+        for (_, content) in newest.into_values() {
+            let packed = self.packed(&content).await?;
+            if packed.contents.package.kind != PackageKind::Population {
+                continue;
+            }
+            found.extend(
+                estimates_in(&packed.files)
+                    .into_iter()
+                    .filter_map(|(_, read)| read.ok()),
+            );
+        }
+        Ok(found)
+    }
 }

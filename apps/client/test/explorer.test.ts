@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type Question, type ThresholdBand, answerQuery, bandsOf, chartSeries, childAreas, explorerQuery, fitted, newestComputed, periodOf, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from '../src/features/explorer/api'
+import { type Answer, type Explorer, ExplorerError, type ExplorerIndicator, NOT_RECORDED, type Question, type ThresholdBand, answerQuery, bandsOf, chartSeries, childAreas, estimateNotes, explorerQuery, fitted, newestComputed, periodOf, previousPeriod, recentPeriods, sharedDisaggregations, singleNumbers, tableOf, toneOf } from '../src/features/explorer/api'
 import { fakeTransport } from './fake'
 
 const explorer: Explorer = {
@@ -70,6 +70,34 @@ describe('explorer', () => {
       ['ANC 1st visits, Kisenyi HC IV', [3, 4]],
     ])
     expect(newestComputed(answer)).toBe('2026-04-02T06:00:00Z')
+  })
+})
+
+// #553: a coverage indicator over a Population Estimate type.
+const estimate = (value: string | null) => ({ type: 'expected-pregnancies', title: 'Expected pregnancies', value })
+
+describe('estimates', () => {
+  const coverage = 'https://x/Measure/anc1-coverage|1.0.0'
+  const answered: Answer = {
+    where: 'central',
+    periods: [{ id: '2026-03', start: '2026-03-01', end: '2026-03-31' }],
+    cells: [
+      { indicator: coverage, period: '2026-03', place: 'district-kampala', value: '10.01', count: 750, estimate: estimate('7490.51') },
+      { indicator: coverage, period: '2026-03', place: 'KAM013', value: null, count: 420, estimate: estimate(null) },
+      { indicator: coverage, period: '2026-04', place: 'KAM013', value: null, count: 400, estimate: estimate(null) },
+      { indicator: 'https://x/Measure/anc1|1.0.0', period: '2026-03', place: 'KAM013', value: '4' },
+    ],
+  }
+
+  test('each indicator over an estimate says so, and names the places with none', () => {
+    expect(estimateNotes(answered)).toEqual([{ indicator: coverage, estimate: 'Expected pregnancies', without: ['KAM013'] }])
+  })
+
+  test('counts arrive as plain numbers', async () => {
+    const transport = fakeTransport(() => ({ body: { ...answered, cells: [{ ...answered.cells[0], count: 750 }] } }))
+    const read = await answerQuery(transport, question).queryFn({})
+    expect(read.cells[0]?.count).toBe(750)
+    expect(read.cells[0]?.estimate?.value).toBe('7490.51')
   })
 })
 

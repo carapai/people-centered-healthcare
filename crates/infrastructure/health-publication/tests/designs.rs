@@ -360,4 +360,17 @@ async fn a_population_package_lists_its_estimates() {
             "configuration/population.json"
         )]
     );
+    // The types an indicator's denominator may name (#864), given and derived.
+    let types: Vec<(&str, &str)> = designs.designs[0]
+        .estimate_types
+        .iter()
+        .map(|t| (t.code.as_str(), t.title.as_str()))
+        .collect();
+    assert_eq!(
+        types,
+        [
+            ("total-population", "Total population"),
+            ("expected-pregnancies", "Expected pregnancies")
+        ]
+    );
 }

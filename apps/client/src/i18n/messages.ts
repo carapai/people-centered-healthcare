@@ -831,6 +831,8 @@ type ExplorerValues = {
   exNeverSynced: { name: string }
   exLastSynced: { name: string; at: string }
   exFacilityOnly: { indicator: string }
+  exOverEstimate: { indicator: string; estimate: string }
+  exNoEstimate: { estimate: string; places: string }
   exChartType: {}
   exType_column: {}
   exType_line: {}
@@ -962,6 +964,16 @@ export const explorerMessages = defineMessages<ExplorerValues>({
   exMissingLine: { id: 'app.explorer.missingLine', defaultMessage: '{period}, {place}: {facilities}', description: 'Data explorer: the facilities missing for a period and place' },
   exNeverSynced: { id: 'app.explorer.neverSynced', defaultMessage: '{name} (never synced)', description: 'Data explorer: a missing facility that has never synced' },
   exLastSynced: { id: 'app.explorer.lastSynced', defaultMessage: '{name} (last synced {at})', description: 'Data explorer: a missing facility and its last sync' },
+  exOverEstimate: {
+    id: 'app.explorer.overEstimate',
+    defaultMessage: '{indicator} is over each place’s {estimate} for the period, from the year’s Population estimates.',
+    description: 'Data explorer: an indicator whose denominator is a Population Estimate type (#553)',
+  },
+  exNoEstimate: {
+    id: 'app.explorer.noEstimate',
+    defaultMessage: 'No estimate of {estimate} for {places}: no figure is shown rather than a guessed share.',
+    description: 'Data explorer: places without a Population Estimate, so no coverage figure (#553)',
+  },
   exFacilityOnly: {
     id: 'app.explorer.facilityOnly',
     defaultMessage: '{indicator} shows at facility level only: a median or a distinct count cannot be rebuilt from the facilities’ summaries.',
@@ -3708,6 +3720,11 @@ type IndicatorValues = {
   inDenominatorHint: {}
   inAddDenominator: {}
   inRemoveDenominator: {}
+  inDenominatorFrom: {}
+  inFromRecords: {}
+  inFromEstimate: { title: string }
+  inEstimateHint: {}
+  inNoEstimateTypes: {}
   inCompiled: {}
   inCompiledOf: { side: string }
   inGroup: { at: string; join: string }
@@ -3851,6 +3868,15 @@ export const indicatorMessages = defineMessages<IndicatorValues>({
   inDenominatorHint: { id: 'app.studio.indicator.denominatorHint', defaultMessage: 'The records with care in the period the numerator is a share of.', description: 'Indicator editor' },
   inAddDenominator: { id: 'app.studio.indicator.addDenominator', defaultMessage: '+ Add denominator', description: 'Indicator editor' },
   inRemoveDenominator: { id: 'app.studio.indicator.removeDenominator', defaultMessage: 'Remove denominator', description: 'Indicator editor' },
+  inDenominatorFrom: { id: 'app.studio.indicator.denominatorFrom', defaultMessage: 'Denominator from', description: 'Indicator editor: where the denominator comes from (#864)' },
+  inFromRecords: { id: 'app.studio.indicator.fromRecords', defaultMessage: 'Records: the conditions below', description: 'Indicator editor: a denominator counted from records' },
+  inFromEstimate: { id: 'app.studio.indicator.fromEstimate', defaultMessage: '{title} (Population estimate)', description: 'Indicator editor: a denominator from a Population Estimate type (#553)' },
+  inEstimateHint: {
+    id: 'app.studio.indicator.estimateHint',
+    defaultMessage: 'Each place’s estimate for the period, taken pro rata from the year’s Population package. A place without an estimate shows no figure. Try counts the numerator only.',
+    description: 'Indicator editor: what an estimate denominator does (#864)',
+  },
+  inNoEstimateTypes: { id: 'app.studio.indicator.noEstimateTypes', defaultMessage: 'No Population package declares an estimate type yet.', description: 'Indicator editor: nothing to pick as an estimate denominator' },
   inCompiled: { id: 'app.studio.indicator.compiled', defaultMessage: 'Saved as FHIRPath:', description: 'Indicator editor' },
   inCompiledOf: { id: 'app.studio.indicator.compiledOf', defaultMessage: '{side} as FHIRPath', description: 'Indicator editor' },
   inGroup: { id: 'app.studio.indicator.group', defaultMessage: 'Group {at}: {join}', description: 'Indicator editor' },

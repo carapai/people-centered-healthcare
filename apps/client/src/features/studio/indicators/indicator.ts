@@ -15,6 +15,9 @@
 // - **The numerator** is the count's `initial-population`, a percentage's, rate's or ratio's
 //   `numerator` (within its `denominator`), or a value's `measure-population`; each is a condition
 //   tree (`conditions.ts`) saved as one FHIRPath expression.
+// - **A denominator from a Population Estimate** (#553, #864): a percentage, rate or ratio may name
+//   an estimate type (`indicator-denominator-estimate`, `valueCode`) instead of a `denominator`
+//   population; each place's estimate for the period then divides its count.
 // - **Disaggregations** are the first group's stratifiers: an Age Band Set pinned to
 //   `url|version` (`indicator-age-band-set`), or a coded value (`criteria`) named by its `code`.
 //
@@ -32,7 +35,8 @@ export const CUMULATIVE = `${EXTENSION}/indicator-cumulative`
 export const VALUE_PICK = `${EXTENSION}/indicator-value-pick`
 export const VALUE_BETWEEN = `${EXTENSION}/indicator-value-between`
 export const AGE_BAND_SET = `${EXTENSION}/indicator-age-band-set`
-const OWN_EXTENSIONS = [PERIOD_DATE, COUNTS, RATE_PER, CUMULATIVE]
+export const DENOMINATOR_ESTIMATE = `${EXTENSION}/indicator-denominator-estimate`
+const OWN_EXTENSIONS = [PERIOD_DATE, COUNTS, RATE_PER, CUMULATIVE, DENOMINATOR_ESTIMATE]
 
 const SCORING = 'http://terminology.hl7.org/CodeSystem/measure-scoring'
 const POPULATION = 'http://terminology.hl7.org/CodeSystem/measure-population'
@@ -70,8 +74,10 @@ export interface Indicator {
   ratePer: number
   cumulative: boolean
   numerator: Criteria
-  /** A percentage's, rate's or ratio's; null otherwise. */
+  /** A percentage's, rate's or ratio's; null otherwise. Kept, unused, while the denominator is an estimate. */
   denominator: Criteria | null
+  /** The Population Estimate type a percentage's, rate's or ratio's denominator is (#864), instead of `denominator`; null when it is counted from records. */
+  denominatorEstimate: string | null
   /** A value calculation's value. */
   value: IndicatorValue
   pick: 'first' | 'last'
@@ -166,6 +172,7 @@ export function readIndicator(text: string): { measure: Json; indicator: Indicat
       cumulative: extensionOf(value, CUMULATIVE)?.['valueBoolean'] === true,
       numerator,
       denominator: hasDenominator(calculation) ? criteria('denominator') : null,
+      denominatorEstimate: hasDenominator(calculation) ? string(extensionOf(value, DENOMINATOR_ESTIMATE)?.['valueCode']) || null : null,
       value: taken,
       pick: observation !== undefined && extensionOf(observation, VALUE_PICK)?.['valueCode'] === 'last' ? 'last' : 'first',
       disaggregations,
@@ -180,8 +187,11 @@ export function readIndicator(text: string): { measure: Json; indicator: Indicat
  * percentage, rate or ratio, and goes for the others. */
 export function withCalculation(indicator: Indicator, calculation: Calculation): Indicator {
   const denominator = hasDenominator(calculation) ? (indicator.denominator ?? EVERYONE) : null
-  return { ...indicator, calculation, denominator }
+  return { ...indicator, calculation, denominator, denominatorEstimate: denominator === null ? null : indicator.denominatorEstimate }
 }
+
+/** The denominator from Population Estimate type `code` (#864), or counted from records again for null. */
+export const withDenominatorEstimate = (indicator: Indicator, code: string | null): Indicator => ({ ...indicator, denominatorEstimate: hasDenominator(indicator.calculation) && code !== '' ? code : null })
 
 /** *+ Add denominator*: a percentage of everyone with care, narrowed by the author. */
 export const addDenominator = (indicator: Indicator) => withCalculation(indicator, hasDenominator(indicator.calculation) ? indicator.calculation : 'percentage')
@@ -213,6 +223,7 @@ function writePopulations(indicator: Indicator, held: Map<string, Json>): Json[]
   const numerator = compileCriteria(indicator.numerator)
   if (indicator.calculation === 'count') return [population('initial-population', numerator)]
   const everyone = population('initial-population', 'true')
+  if (hasDenominator(indicator.calculation) && indicator.denominatorEstimate !== null) return [everyone, population('numerator', numerator)]
   if (hasDenominator(indicator.calculation)) return [everyone, population('denominator', compileCriteria(indicator.denominator ?? EVERYONE)), population('numerator', numerator)]
   const value = indicator.value
   const observation = population('measure-observation', value.kind === 'expression' ? value.expression : '', {
@@ -262,6 +273,7 @@ export function writeIndicator(measure: Json, indicator: Indicator): Json {
     { url: COUNTS, valueCode: indicator.counts },
     ...(indicator.calculation === 'rate' ? [{ url: RATE_PER, valueInteger: indicator.ratePer }] : []),
     ...(indicator.cumulative ? [{ url: CUMULATIVE, valueBoolean: true }] : []),
+    ...(hasDenominator(indicator.calculation) && indicator.denominatorEstimate !== null ? [{ url: DENOMINATOR_ESTIMATE, valueCode: indicator.denominatorEstimate }] : []),
   ]
   const groups = list(measure['group'])
   const first: Json = isObject(groups[0]) ? groups[0] : {}
@@ -294,6 +306,7 @@ export function newIndicator(common: Json): Json {
       cumulative: false,
       numerator: EVERYONE,
       denominator: null,
+      denominatorEstimate: null,
       value: { kind: 'expression', expression: '' },
       pick: 'first',
       disaggregations: [],
@@ -341,6 +354,19 @@ export const CONDITION_INPUTS = ['%patient.gender', '%resource.status', '%patien
 // ---------------------------------------------------------------------------------------------
 // Problems
 
+/** An estimate type a Population package declares (#864): what a denominator may name. */
+export interface EstimateType {
+  code: string
+  title: string
+}
+
+/** The estimate types the Population packages declare, each code once, in the order found: what the denominator picker offers. */
+export function estimateTypesOf(designs: readonly { kind: string; estimateTypes?: readonly EstimateType[] | undefined }[]): EstimateType[] {
+  const found = new Map<string, EstimateType>()
+  for (const design of designs) if (design.kind === 'population') for (const t of design.estimateTypes ?? []) if (!found.has(t.code)) found.set(t.code, { code: t.code, title: t.title.trim() === '' ? t.code : t.title })
+  return [...found.values()]
+}
+
 /** Another indicator of the package: `url|version`, and the ones it refers to. */
 export interface Other {
   canonical: string
@@ -362,7 +388,7 @@ export type IndicatorProblem =
 
 /** The other indicators `indicator` refers to, `url|version`, from both sides. */
 export function referred(indicator: Indicator): string[] {
-  const trees = [indicator.numerator, ...(indicator.denominator === null ? [] : [indicator.denominator])]
+  const trees = [indicator.numerator, ...(indicator.denominator === null || indicator.denominatorEstimate !== null ? [] : [indicator.denominator])]
   return [...new Set(trees.flatMap(referencesOf).map((m) => m.measure))]
 }
 
@@ -498,6 +524,6 @@ export function explainedConditions(indicator: Indicator): Explained[] {
     if ((node as { kind: string }).kind === 'group') for (const child of (node as Criteria).children) walk(side, child, depth + 1)
   }
   for (const child of indicator.numerator.children) walk('numerator', child, 1)
-  for (const child of indicator.denominator?.children ?? []) walk('denominator', child, 1)
+  if (indicator.denominatorEstimate === null) for (const child of indicator.denominator?.children ?? []) walk('denominator', child, 1)
   return out
 }

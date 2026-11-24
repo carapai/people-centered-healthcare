@@ -10,6 +10,10 @@
 //!   places a session may pick is the caller's: the session's place and those below it.
 //! - **Periods.** Whole standard periods only (`Period::range`): each one is stored as it is,
 //!   since every edge computes every standard period type.
+//! - **Estimates** (#553; ADR 0071). An indicator whose denominator is a Population Estimate
+//!   type is its place's summed count over the place's estimate for the period, pro rata, from
+//!   the year's Population package ([`PopulationEstimates`]); a place below the figures given has
+//!   *no estimate* and no figure, never a guessed share.
 //! - **Completeness.** Each figure carries the facilities that reported and those missing with
 //!   their last sync, never counted as zero; a median or a distinct count over more than one
 //!   facility has no figure, and says why ([`Figure::FacilityOnly`]).
@@ -18,10 +22,11 @@ use std::collections::BTreeMap;
 
 use health_analytics::{
     Aggregate, Calculation, DisaggregationSource, FacilitySummaries, FacilitySummary, Indicator,
-    IndicatorStore, Period, RolledUp, Summary,
+    IndicatorStore, Period, PopulationEstimates, RolledUp, Summary, over_estimate,
 };
 use health_persistence::StoreError;
 use jiff::Timestamp;
+use rust_decimal::{Decimal, RoundingStrategy};
 use serde_json::{Value, json};
 
 use crate::roll_up;
@@ -56,15 +61,30 @@ pub struct Cell {
     pub place: String,
     /// Its figure.
     pub figure: Figure,
+    /// The estimate its denominator is, for an indicator over a Population Estimate type.
+    pub estimate: Option<Estimated>,
+}
+
+/// The Population Estimate a cell's denominator is (#553).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Estimated {
+    /// The estimate type's code (`expected-pregnancies`).
+    pub kind: String,
+    /// What a person reads for it.
+    pub title: String,
+    /// The place's estimate for the period, pro rata; none when it has *no estimate*.
+    pub value: Option<Decimal>,
 }
 
 /// Every `indicators` × `periods` × `places` figure from the summaries `store` keeps, indicator
-/// by indicator, then period, then place.
+/// by indicator, then period, then place. An indicator over a Population Estimate type takes
+/// each place's from `estimates`.
 pub async fn explore<S: FacilitySummaries>(
     store: &mut S,
     indicators: &[Indicator],
     periods: &[Period],
     places: &[ExplorePlace],
+    estimates: &PopulationEstimates,
 ) -> Result<Vec<Cell>, String> {
     let mut cells = Vec::new();
     for indicator in indicators {
@@ -82,16 +102,45 @@ pub async fn explore<S: FacilitySummaries>(
                         roll_up(store, indicator, period, &place.facilities).await?,
                     )),
                 };
+                let (figure, estimate) =
+                    over_estimates(indicator, period, place, figure, estimates);
                 cells.push(Cell {
                     indicator: indicator.canonical(),
                     period: period.id.clone(),
                     place: place.code.clone(),
                     figure,
+                    estimate,
                 });
             }
         }
     }
     Ok(cells)
+}
+
+/// `figure` of `indicator` at `place` over `period`, its summed count over the place's estimate
+/// when its denominator is a Population Estimate type, with that estimate.
+fn over_estimates(
+    indicator: &Indicator,
+    period: &Period,
+    place: &ExplorePlace,
+    mut figure: Figure,
+    estimates: &PopulationEstimates,
+) -> (Figure, Option<Estimated>) {
+    let Some(kind) = indicator.estimate.as_deref() else {
+        return (figure, None);
+    };
+    let value = estimates.estimate(indicator, &place.code, period);
+    if let Figure::Rolled(rolled) = &mut figure
+        && let Some(summary) = rolled.summary.as_mut()
+    {
+        summary.value = over_estimate(indicator.calculation, summary.count, value);
+    }
+    let estimate = Estimated {
+        kind: kind.to_owned(),
+        title: estimates.title(kind, period),
+        value,
+    };
+    (figure, Some(estimate))
 }
 
 /// A Facility Edge Node's own summaries, read as central reads synced ones: the facility has
@@ -180,6 +229,7 @@ pub fn indicator_json(indicator: &Indicator) -> Value {
                 },
             }))
             .collect::<Vec<_>>(),
+        "denominatorEstimate": indicator.estimate,
         "rollsUp": !matches!(
             indicator.calculation,
             Calculation::Value(aggregate) if !aggregate.rolls_up()
@@ -232,6 +282,9 @@ pub fn cells_json(cells: &[Cell], names: &BTreeMap<String, String>, by: Option<&
                             .map(|b| json!({ "code": b.code, "value": figure_text(&b.summary) }))
                             .collect();
                     }
+                    if cell.estimate.is_some() {
+                        out["count"] = json!(rolled.summary.as_ref().map(|s| s.count));
+                    }
                     out["reported"] = json!(reported);
                     out["expected"] = json!(expected);
                     out["computedAt"] = json!(rolled.computed_at.map(|t| t.to_string()));
@@ -247,6 +300,16 @@ pub fn cells_json(cells: &[Cell], names: &BTreeMap<String, String>, by: Option<&
                         })
                         .collect();
                 }
+            }
+            if let Some(estimate) = &cell.estimate {
+                out["estimate"] = json!({
+                    "type": estimate.kind,
+                    "title": estimate.title,
+                    "value": estimate.value.map(|v| v
+                        .round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
+                        .normalize()
+                        .to_string()),
+                });
             }
             out
         })

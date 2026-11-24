@@ -440,9 +440,16 @@ async fn a_facility_user_explores_their_facility_s_months_offline() {
         "places": [FACILITY],
     });
     let now: jiff::Timestamp = "2026-04-03T07:00:00Z".parse().expect("now");
-    let answer = explore_here(&store, offered, FACILITY, &question, now)
-        .await
-        .expect("explored");
+    let answer = explore_here(
+        &store,
+        offered,
+        &Default::default(),
+        FACILITY,
+        &question,
+        now,
+    )
+    .await
+    .expect("explored");
     let values: Vec<&Value> = answer["cells"]
         .as_array()
         .expect("cells")
@@ -464,9 +471,16 @@ async fn a_facility_user_explores_their_facility_s_months_offline() {
     // Districts are explored at central.
     let mut elsewhere = question.clone();
     elsewhere["places"] = json!(["district-kampala"]);
-    let (status, _) = explore_here(&store, offered, FACILITY, &elsewhere, now)
-        .await
-        .expect_err("refused");
+    let (status, _) = explore_here(
+        &store,
+        offered,
+        &Default::default(),
+        FACILITY,
+        &elsewhere,
+        now,
+    )
+    .await
+    .expect_err("refused");
     assert_eq!(status.as_u16(), 403);
 
     // A map here draws no boundaries (#604): only the facility's own point, which this node's
@@ -578,9 +592,16 @@ async fn a_facility_user_opens_a_standard_dashboard_offline() {
     let mut question = item["question"].clone();
     question["places"] = json!([FACILITY]);
     let at: jiff::Timestamp = "2026-04-03T07:00:00Z".parse().expect("now");
-    let answer = explore_here(&store, indicators.indicators(), FACILITY, &question, at)
-        .await
-        .expect("explored");
+    let answer = explore_here(
+        &store,
+        indicators.indicators(),
+        &Default::default(),
+        FACILITY,
+        &question,
+        at,
+    )
+    .await
+    .expect("explored");
     assert_eq!(answer["where"], "facility");
     let values: Vec<&Value> = answer["cells"]
         .as_array()
@@ -599,5 +620,69 @@ async fn a_facility_user_opens_a_standard_dashboard_offline() {
             &json!("0")
         ],
         "{answer}"
+    );
+}
+
+/// #553 (ADR 0071): an edge keeps only its own place's figures of an active Population package.
+/// A facility given its own catchment figure shows its first visits over its own expected
+/// pregnancies; the districts' figures are not kept here, and a facility without a figure of its
+/// own shows *no estimate*.
+#[test]
+fn an_edge_keeps_only_its_own_places_population_estimates() {
+    use health_analytics::{Calculation, Indicator};
+    use health_node_api::analytics::estimates_here;
+    let mut population = package_tree("population");
+    let mut estimates: Value =
+        serde_json::from_slice(&population["configuration/population.json"]).expect("estimates");
+    estimates["figures"]
+        .as_array_mut()
+        .expect("figures")
+        .push(json!({ "place": FACILITY, "type": "total-population", "value": 24_000 }));
+    population.insert(
+        "configuration/population.json".into(),
+        serde_json::to_vec(&estimates).expect("json"),
+    );
+    let hmis = package_tree("hmis");
+    let packages = [
+        ("ug.population.2026@1.0.0", &population),
+        ("ug.moh.hmis@1.0.0", &hmis),
+    ];
+
+    let here = estimates_here(packages, FACILITY);
+    let march = Period::parse(PeriodType::Monthly, "2026-03").expect("march");
+    let held = here.of(&march).expect("2026's estimates");
+    assert_eq!(
+        held.definition().figures.len(),
+        1,
+        "only the facility's own figure: {:?}",
+        held.definition().figures
+    );
+    let coverage = indicators()
+        .indicators()
+        .iter()
+        .find(|i| i.calculation == Calculation::Count)
+        .map(|i| Indicator {
+            calculation: Calculation::Percentage,
+            estimate: Some("expected-pregnancies".into()),
+            ..i.clone()
+        })
+        .expect("an indicator");
+    // 5% of 24,000 is 1,200 expected pregnancies a year, 100 in March: 30 first visits is 30%.
+    assert_eq!(
+        here.figure(&coverage, 30, FACILITY, &march)
+            .map(|d| d.to_string()),
+        Some("30".into())
+    );
+    assert_eq!(here.estimate(&coverage, "district-kampala", &march), None);
+
+    let elsewhere = estimates_here(packages, "KAM020");
+    assert_eq!(elsewhere.estimate(&coverage, "KAM020", &march), None);
+    assert!(
+        elsewhere
+            .of(&march)
+            .expect("the year's types")
+            .definition()
+            .figures
+            .is_empty()
     );
 }
