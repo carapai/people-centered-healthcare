@@ -20,7 +20,7 @@ This extends ADR 0059, which covers credentials from central to an edge, to a de
   - It re-encrypts each hash under its own pepper, kept in the OS keystore.
   - It keeps central's keys for sign-in.
   - It takes the facility the first time. After that, an answer naming another facility is refused.
-- **When it imports:** after enrollment, and then hourly, after a sync round that reached the edge.
+- **When it imports:** after enrollment, and then after every sync round that reached the edge (amended 2026-11-25, #895; it was hourly).
 - **Trust rests on the pinned edge.** The answer comes over TLS to the edge, verified against the CA named at enrollment (`health-desktop enroll --ca`, now required). The edge's certificates chain to the national root, not the OS trust store. The signer key and central's snapshot keys are taken from the same answer, so a desktop trusts them because it trusts its edge, which is its authorization server already.
 
 ## Considered Options
@@ -39,5 +39,5 @@ This extends ADR 0059, which covers credentials from central to an edge, to a de
   - expiring snapshots.
 
   Revoking the device stops the next export, and snapshots bound how long an old one lasts.
-- **The import adds and updates; it does not remove.** A member of staff who leaves the location keeps a stored hash until their snapshot expires, after which sign-in refuses them. A purge of accounts no longer exported is later work.
+- **The import replaces the desktop's staff with the edge's answer** (amended 2026-11-25, #895). A member of staff whose role central withdrew, or who leaves the location, is removed at the desktop's next import, so sign-in refuses them from then on. A refused or missing answer leaves the staff as they were, bounded by snapshot expiry, and raises an `accounts-unsynced` alert. As first decided, the import only added and updated, and a purge was later work.
 - **`health-auth`:** `Provisioning::export` builds the bundle, and `Provisioning::with_bundle_verifier` lets an import check the bundle with one key and the snapshots with another.
