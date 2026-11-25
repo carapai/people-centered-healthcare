@@ -1,7 +1,7 @@
 // A facility-edge process for the edge suite (#76): the workspace's build (or FACILITY_EDGE_BIN),
 // with the web app embedded, over a fresh data directory. Tests start and stop it themselves, so
 // a test can take the edge away from a loaded page.
-import { spawn, spawnSync } from 'node:child_process'
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -23,6 +23,14 @@ export interface Edge {
   readonly bundle?: string
   stop(): Promise<void>
 }
+
+// Every edge this worker started and has not seen exit. A test that times out while its edge is
+// starting never gets an `Edge` to stop, and Playwright then tears the worker down: the edges
+// still here are killed when the worker exits, so none outlives the run (#907).
+const running = new Set<ChildProcess>()
+process.once('exit', () => {
+  for (const child of running) child.kill('SIGKILL')
+})
 
 function freePort(): Promise<number> {
   return new Promise((done, fail) => {
@@ -95,26 +103,30 @@ export async function startEdge(options: { signIn?: boolean; opd?: boolean; dash
     },
     stdio: ['ignore', 'ignore', 'inherit'],
   })
+  running.add(child)
   const exited = new Promise<void>((done) => child.once('exit', () => done()))
+  void exited.then(() => running.delete(child))
   const stop = async () => {
-    if (child.exitCode === null) child.kill('SIGTERM')
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
     await exited
   }
-  // A fresh store's first start runs every migration, over a minute on macOS (ADR 0060).
-  const deadline = Date.now() + 300_000
-  for (;;) {
-    if (child.exitCode !== null) throw new Error(`facility-edge exited with ${child.exitCode}`)
-    const ready = await fetch(`${origin}/ready`).then((r) => r.ok, () => false)
-    if (ready) break
-    if (Date.now() > deadline) {
-      await stop()
-      throw new Error('facility-edge was not ready in time')
+  try {
+    // A fresh store's first start runs every migration, over a minute on macOS (ADR 0060).
+    const deadline = Date.now() + 300_000
+    for (;;) {
+      if (child.exitCode !== null) throw new Error(`facility-edge exited with ${child.exitCode}`)
+      const ready = await fetch(`${origin}/ready`).then((r) => r.ok, () => false)
+      if (ready) break
+      if (Date.now() > deadline) throw new Error('facility-edge was not ready in time')
+      await new Promise((done) => setTimeout(done, 250))
     }
-    await new Promise((done) => setTimeout(done, 250))
-  }
-  if (!(await fetch(`${origin}/sw.js`)).ok) {
+    if (!(await fetch(`${origin}/sw.js`)).ok) {
+      throw new Error('facility-edge was built without the web app: run `bun run build`, then `cargo build -p facility-edge`')
+    }
+  } catch (error) {
+    // Whatever went wrong, the caller has no edge to stop: stop the one started here.
     await stop()
-    throw new Error('facility-edge was built without the web app: run `bun run build`, then `cargo build -p facility-edge`')
+    throw error
   }
   return { origin, ...(bundle === undefined ? {} : { bundle }), stop }
 }
